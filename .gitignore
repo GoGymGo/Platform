@@ -1,0 +1,24 @@
+# Dependencies
+**/node_modules/
+
+# Expo and React Native generated output
+**/.expo/
+**/.expo-shared/
+**/dist/
+**/web-build/
+**/.expo-audit-export/
+**/.expo-export-check/
+
+# Logs and local runtime noise
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS/editor metadata
+.DS_Store
+Thumbs.db
+
+# Local Codex workspace metadata
+.agents/
+.codex/

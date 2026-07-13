@@ -1,0 +1,50 @@
+services:
+  database:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: gogymgo
+      POSTGRES_PASSWORD: gogymgo
+      POSTGRES_USER: gogymgo
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gogymgo -d gogymgo']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - '5432:5432'
+    volumes:
+      - gogymgo_postgres:/var/lib/postgresql/data
+
+  migrate:
+    build: .
+    command: ['npm', 'run', 'migrate:deploy']
+    environment: &runtime_environment
+      AUTH_MODE: test
+      DATABASE_URL: postgresql://gogymgo:gogymgo@database:5432/gogymgo
+      HYPERWALLET_ENABLED: 'false'
+      NODE_ENV: development
+      OPENAPI_ENABLED: 'true'
+      PUSH_NOTIFICATIONS_ENABLED: 'false'
+    depends_on:
+      database:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment: *runtime_environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - '3000:3000'
+
+  worker:
+    build: .
+    command: ['node', 'dist/worker.js']
+    environment: *runtime_environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  gogymgo_postgres:

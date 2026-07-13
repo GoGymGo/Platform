@@ -17,6 +17,14 @@ export function createOpenApiDocument(app: INestApplication) {
       },
       'firebase',
     )
+    .addBasicAuth(
+      {
+        description: 'Dedicated credentials configured only for Hyperwallet.',
+        type: 'http',
+        scheme: 'basic',
+      },
+      'hyperwallet-webhook',
+    )
     .build();
 
   return SwaggerModule.createDocument(app, config, {

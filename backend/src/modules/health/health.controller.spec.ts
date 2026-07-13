@@ -1,8 +1,9 @@
 import { HealthController } from './health.controller';
+import type { DatabaseService } from '../../database/database.service';
 
 describe('HealthController', () => {
   it('reports API liveness without external dependencies', () => {
-    const response = new HealthController().getHealth();
+    const response = new HealthController({} as DatabaseService).getHealth();
 
     expect(response.service).toBe('gogymgo-api');
     expect(response.status).toBe('ok');

@@ -13,6 +13,11 @@ type NullableTimestamp = ColumnType<
 >;
 type DateKey = ColumnType<string, Date | string, Date | string>;
 type BigInteger = ColumnType<string, bigint | number | string, never>;
+type MutableBigInteger = ColumnType<
+  string,
+  bigint | number | string,
+  bigint | number | string
+>;
 
 export type AccountStatus = 'active' | 'deleted' | 'suspended';
 export type PublicIdentityMode = 'alias' | 'private' | 'real_name';
@@ -38,6 +43,24 @@ export type LedgerReason =
   | 'verified_session'
   | 'weekly_match';
 export type DrawStatus = 'cancelled' | 'locked' | 'settled';
+export type PayoutClaimStatus =
+  | 'action_required'
+  | 'cancelled'
+  | 'failed'
+  | 'paid'
+  | 'pending_review'
+  | 'processing'
+  | 'ready'
+  | 'verification_pending';
+export type ProviderWebhookState = 'failed' | 'processed' | 'received';
+export type PartnerApplicationType = 'creator' | 'gym' | 'sponsor';
+export type PartnerApplicationStatus =
+  'approved' | 'in_review' | 'rejected' | 'submitted';
+export type NotificationDeliveryStatus =
+  'cancelled' | 'failed' | 'pending' | 'sent';
+export type PrivacyRequestType = 'delete' | 'export';
+export type PrivacyRequestStatus =
+  'completed' | 'processing' | 'rejected' | 'requested';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -286,6 +309,138 @@ export interface DrawWinnersTable {
   created_at: Timestamp;
 }
 
+export interface PayoutClaimsTable {
+  id: Generated<string>;
+  draw_winner_id: string;
+  user_id: string;
+  status: PayoutClaimStatus;
+  provider: 'hyperwallet';
+  amount_minor: MutableBigInteger;
+  currency: string;
+  approved_by_user_id: string | null;
+  approved_at: NullableTimestamp;
+  paid_at: NullableTimestamp;
+  failure_code: string | null;
+  version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface HyperwalletUsersTable {
+  id: Generated<string>;
+  user_id: string;
+  program_token: string;
+  provider_user_token: string;
+  provider_status: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface PayoutPaymentsTable {
+  id: Generated<string>;
+  payout_claim_id: string;
+  client_payment_id: string;
+  provider_payment_token: string | null;
+  provider_status: string;
+  amount_minor: MutableBigInteger;
+  currency: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ProviderWebhooksTable {
+  provider_webhook_token: string;
+  provider: 'hyperwallet';
+  event_type: string;
+  provider_created_on: NullableTimestamp;
+  object_token: string | null;
+  object_status: string | null;
+  payload_hash: string | null;
+  normalized_payload: ColumnType<JsonValue, JsonValue, JsonValue>;
+  state: ProviderWebhookState;
+  attempt_count: number;
+  processing_error: string | null;
+  received_at: Timestamp;
+  processed_at: NullableTimestamp;
+}
+
+export interface PayoutStateEventsTable {
+  id: Generated<string>;
+  payout_claim_id: string;
+  previous_status: PayoutClaimStatus | null;
+  next_status: PayoutClaimStatus;
+  source: string;
+  source_event_id: string;
+  metadata: ColumnType<JsonValue, JsonValue, never>;
+  created_at: Timestamp;
+}
+
+export interface PartnerApplicationsTable {
+  id: Generated<string>;
+  application_type: PartnerApplicationType;
+  user_id: string | null;
+  contact_email: string | null;
+  region: string;
+  payload: ColumnType<JsonValue, JsonValue, JsonValue>;
+  dedupe_hash: string;
+  status: PartnerApplicationStatus;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface PushDevicesTable {
+  id: Generated<string>;
+  user_id: string;
+  provider: 'expo';
+  platform: 'android' | 'ios';
+  push_token: string;
+  enabled: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface NotificationDeliveriesTable {
+  id: Generated<string>;
+  user_id: string;
+  template: string;
+  payload: ColumnType<JsonValue, JsonValue, JsonValue>;
+  status: NotificationDeliveryStatus;
+  attempt_count: number;
+  last_error: string | null;
+  scheduled_at: Timestamp;
+  sent_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface PrivacyRequestsTable {
+  id: Generated<string>;
+  user_id: string;
+  request_type: PrivacyRequestType;
+  status: PrivacyRequestStatus;
+  reason: string | null;
+  result_object_key: string | null;
+  requested_at: Timestamp;
+  completed_at: NullableTimestamp;
+}
+
+export interface CreatorWorkoutsTable {
+  id: Generated<string>;
+  creator_user_id: string | null;
+  title: string;
+  creator_name: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  duration_minutes: number;
+  workout_style: string;
+  sponsor_name: string | null;
+  region_codes: string[];
+  published: boolean;
+  published_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface Database {
   competition_draws: CompetitionDrawsTable;
   competition_enrollments: CompetitionEnrollmentsTable;
@@ -297,9 +452,19 @@ export interface Database {
   draw_entries: DrawEntriesTable;
   draw_winners: DrawWinnersTable;
   entry_ledger: EntryLedgerTable;
+  creator_workouts: CreatorWorkoutsTable;
+  hyperwallet_users: HyperwalletUsersTable;
   idempotency_keys: IdempotencyKeysTable;
   operator_audit_events: OperatorAuditEventsTable;
+  notification_deliveries: NotificationDeliveriesTable;
+  partner_applications: PartnerApplicationsTable;
+  payout_claims: PayoutClaimsTable;
+  payout_payments: PayoutPaymentsTable;
+  payout_state_events: PayoutStateEventsTable;
+  privacy_requests: PrivacyRequestsTable;
   profiles: ProfilesTable;
+  provider_webhooks: ProviderWebhooksTable;
+  push_devices: PushDevicesTable;
   region_policies: RegionPoliciesTable;
   region_verifications: RegionVerificationsTable;
   session_events: SessionEventsTable;

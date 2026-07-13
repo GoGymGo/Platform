@@ -60,6 +60,31 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication before payout claim access', () => {
+    return request(app.getHttpServer())
+      .get('/v1/payout-claims/me')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('keeps the provider webhook closed when Hyperwallet is disabled', () => {
+    return request(app.getHttpServer())
+      .post('/v1/webhooks/hyperwallet')
+      .send({ token: 'wbn-test', type: 'PAYMENTS.UPDATED' })
+      .expect(503)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({
+            code: 'PAYOUT_PROVIDER_UNAVAILABLE',
+          }),
+        });
+      });
+  });
+
   afterEach(async () => {
     await app.close();
   });

@@ -5,11 +5,16 @@ describe('environment validation', () => {
     const environment = validateEnvironment({
       NODE_ENV: 'test',
       AUTH_MODE: 'test',
+      HYPERWALLET_PORTAL_URL: '',
     });
 
     expect(environment.PORT).toBe(3000);
     expect(environment.OPENAPI_ENABLED).toBe(true);
     expect(environment.DATABASE_URL).toContain('localhost:5432');
+    expect(environment.HYPERWALLET_ENABLED).toBe(false);
+    expect(environment.HYPERWALLET_API_URL).toBe(
+      'https://uat-api.paylution.com/rest/v4',
+    );
   });
 
   it('rejects test authentication in production', () => {
@@ -26,5 +31,15 @@ describe('environment validation', () => {
     expect(() =>
       validateEnvironment({ NODE_ENV: 'production', AUTH_MODE: 'firebase' }),
     ).toThrow(/FIREBASE_PROJECT_ID is required/i);
+  });
+
+  it('requires every server-side Hyperwallet setting when payouts are enabled', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'test',
+        AUTH_MODE: 'test',
+        HYPERWALLET_ENABLED: 'true',
+      }),
+    ).toThrow(/HYPERWALLET_PORTAL_URL is required/i);
   });
 });

@@ -12,7 +12,7 @@ const execFileAsync = promisify(execFile);
 const describeWithDatabase =
   process.env.RUN_DATABASE_INTEGRATION === 'true' ? describe : describe.skip;
 
-describeWithDatabase('foundation database migration', () => {
+describeWithDatabase('database migrations', () => {
   jest.setTimeout(120_000);
 
   let container: StartedPostgreSqlContainer;
@@ -67,7 +67,14 @@ describeWithDatabase('foundation database migration', () => {
         'entry_ledger',
         'idempotency_keys',
         'operator_audit_events',
+        'partner_applications',
+        'payout_claims',
+        'payout_payments',
+        'payout_state_events',
         'profiles',
+        'privacy_requests',
+        'provider_webhooks',
+        'push_devices',
         'region_policies',
         'region_verifications',
         'session_events',
@@ -92,6 +99,7 @@ describeWithDatabase('foundation database migration', () => {
         'draw_winners_append_only',
         'entry_ledger_append_only',
         'operator_audit_events_append_only',
+        'payout_state_events_append_only',
         'session_events_append_only',
       ]),
     );

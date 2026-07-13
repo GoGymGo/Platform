@@ -9,6 +9,7 @@ import type { Database, JsonArray } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { stableJson } from '../../common/idempotency/stable-json';
 import { parseCompetitionRules } from '../competitions/competition-rules';
+import { PayoutsService } from '../payouts/payouts.service';
 import {
   buildPayoutLadder,
   buildSeedCommitment,
@@ -46,7 +47,10 @@ export interface SettledDrawResult {
 
 @Injectable()
 export class DrawsService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly payouts: PayoutsService,
+  ) {}
 
   async lock(input: LockDrawInput): Promise<LockedDrawResult> {
     if (!/^[a-f0-9]{64}$/i.test(input.seedCommitment)) {
@@ -273,7 +277,7 @@ export class DrawsService {
           rules.payoutExponent,
         );
         const now = new Date();
-        await transaction
+        const insertedWinners = await transaction
           .insertInto('draw_winners')
           .values(
             winners.map((winner, index) => ({
@@ -285,7 +289,17 @@ export class DrawsService {
               user_id: winner.userId,
             })),
           )
+          .returning(['amount_minor', 'currency', 'id', 'user_id'])
           .execute();
+        await this.payouts.createClaimsForWinners(
+          transaction,
+          insertedWinners.map((winner) => ({
+            amountMinor: winner.amount_minor,
+            currency: winner.currency,
+            id: winner.id,
+            userId: winner.user_id,
+          })),
+        );
         await transaction
           .updateTable('competition_draws')
           .set({

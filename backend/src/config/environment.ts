@@ -10,6 +10,12 @@ const optionalTrimmedString = z.preprocess(
   z.string().trim().min(1).optional(),
 );
 
+const optionalUrl = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().url().optional(),
+);
+
 export const environmentSchema = z
   .object({
     NODE_ENV: z
@@ -33,6 +39,12 @@ export const environmentSchema = z
       .max(3_600_000)
       .default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(120),
+    WORKER_POLL_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(60_000)
+      .default(5_000),
     AUTH_MODE: z.enum(['firebase', 'test']).default('firebase'),
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
@@ -41,16 +53,24 @@ export const environmentSchema = z
       .url()
       .default('postgresql://gogymgo:gogymgo@localhost:5432/gogymgo'),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
-    REDIS_URL: z.string().url().default('redis://localhost:6379'),
     GCP_STORAGE_BUCKET: optionalTrimmedString,
+    PUSH_NOTIFICATIONS_ENABLED: booleanString.default(false),
+    EXPO_PUSH_API_URL: z
+      .string()
+      .url()
+      .default('https://exp.host/--/api/v2/push/send'),
+    EXPO_PUSH_ACCESS_TOKEN: optionalTrimmedString,
+    HYPERWALLET_ENABLED: booleanString.default(false),
     HYPERWALLET_API_URL: z
       .string()
       .url()
-      .default('https://api.sandbox.hyperwallet.com'),
+      .default('https://uat-api.paylution.com/rest/v4'),
+    HYPERWALLET_PORTAL_URL: optionalUrl,
     HYPERWALLET_PROGRAM_TOKEN: optionalTrimmedString,
     HYPERWALLET_USERNAME: optionalTrimmedString,
     HYPERWALLET_PASSWORD: optionalTrimmedString,
-    HYPERWALLET_WEBHOOK_SECRET: optionalTrimmedString,
+    HYPERWALLET_WEBHOOK_USERNAME: optionalTrimmedString,
+    HYPERWALLET_WEBHOOK_PASSWORD: optionalTrimmedString,
   })
   .superRefine((environment, context) => {
     if (
@@ -73,6 +93,27 @@ export const environmentSchema = z
         message: 'FIREBASE_PROJECT_ID is required in production.',
         path: ['FIREBASE_PROJECT_ID'],
       });
+    }
+
+    if (environment.HYPERWALLET_ENABLED) {
+      const requiredKeys = [
+        'HYPERWALLET_PORTAL_URL',
+        'HYPERWALLET_PROGRAM_TOKEN',
+        'HYPERWALLET_USERNAME',
+        'HYPERWALLET_PASSWORD',
+        'HYPERWALLET_WEBHOOK_USERNAME',
+        'HYPERWALLET_WEBHOOK_PASSWORD',
+      ] as const;
+
+      for (const key of requiredKeys) {
+        if (!environment[key]) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} is required when HYPERWALLET_ENABLED is true.`,
+            path: [key],
+          });
+        }
+      }
     }
   });
 

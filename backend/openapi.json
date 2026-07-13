@@ -1,25 +1,78 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/v1/health": {
-      "get": {
-        "operationId": "getHealth",
-        "parameters": [],
+    "/v1/me/push-devices": {
+      "post": {
+        "operationId": "register",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPushDeviceDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
+          "201": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponseDto"
+                  "$ref": "#/components/schemas/PushDeviceResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "Report API liveness",
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Register an Expo push token for this account",
         "tags": [
-          "health"
+          "push devices"
+        ]
+      }
+    },
+    "/v1/me/push-devices/{deviceId}": {
+      "delete": {
+        "operationId": "disable",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Disable a push token owned by this account",
+        "tags": [
+          "push devices"
         ]
       }
     },
@@ -82,6 +135,876 @@
         "summary": "Update the authenticated account public identity and privacy settings",
         "tags": [
           "profiles"
+        ]
+      }
+    },
+    "/v1/operator/work-queue": {
+      "get": {
+        "operationId": "listWorkQueue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OperatorWorkQueueItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "List review work without sensitive evidence data",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/operator/sessions/{sessionId}/verify": {
+      "post": {
+        "operationId": "verifySession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifySessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Manually verify a reviewed workout session",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/operator/draws/lock": {
+      "post": {
+        "operationId": "lockDraw",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LockDrawDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Lock a competition draw snapshot and commitment",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/operator/draws/{drawId}/settle": {
+      "post": {
+        "operationId": "settleDraw",
+        "parameters": [
+          {
+            "name": "drawId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleDrawDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Reveal the draw seed and settle winners",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/operator/region-verifications/{verificationId}/decision": {
+      "post": {
+        "operationId": "decideRegion",
+        "parameters": [
+          {
+            "name": "verificationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideRegionVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Approve or reject a region-verification review",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/operator/partner-applications/{applicationId}/decision": {
+      "post": {
+        "operationId": "decidePartner",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecidePartnerApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Review a partner application",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/operator/privacy-requests/{privacyRequestId}/decision": {
+      "post": {
+        "operationId": "decidePrivacy",
+        "parameters": [
+          {
+            "name": "privacyRequestId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecidePrivacyRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Start or reject a privacy request",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/v1/webhooks/hyperwallet": {
+      "post": {
+        "operationId": "receive",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HyperwalletWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HyperwalletWebhookAcceptedDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hyperwallet-webhook": []
+          }
+        ],
+        "summary": "Durably accept a Hyperwallet notification for reconciliation",
+        "tags": [
+          "provider webhooks"
+        ]
+      }
+    },
+    "/v1/operator/payout-claims/{claimId}/approve": {
+      "post": {
+        "operationId": "approve",
+        "parameters": [
+          {
+            "name": "claimId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorPayoutActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorPayoutClaimResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Approve a reviewed winner claim for payee setup",
+        "tags": [
+          "operator payouts"
+        ]
+      }
+    },
+    "/v1/operator/payout-claims/{claimId}/release": {
+      "post": {
+        "operationId": "release",
+        "parameters": [
+          {
+            "name": "claimId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorPayoutActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorPayoutClaimResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Release a ready claim to Hyperwallet exactly once",
+        "tags": [
+          "operator payouts"
+        ]
+      }
+    },
+    "/v1/payout-claims/me": {
+      "get": {
+        "operationId": "getMyClaim",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutClaimResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Return the current approved winner payout claim",
+        "tags": [
+          "payouts"
+        ]
+      }
+    },
+    "/v1/payout-claims/{claimId}/portal-action": {
+      "post": {
+        "operationId": "openPortal",
+        "parameters": [
+          {
+            "name": "claimId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Provision hosted payee setup and return the approved portal URL",
+        "tags": [
+          "payouts"
+        ]
+      }
+    },
+    "/v1/sessions": {
+      "post": {
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Start an authoritative competition workout session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}/events": {
+      "post": {
+        "operationId": "appendEvent",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppendSessionEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionEventResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Append immutable, untrusted evidence to an active session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}/complete": {
+      "post": {
+        "operationId": "complete",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCompletionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Close a session and submit it for server-side evidence review",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report API liveness",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/health/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report whether the API database dependency is ready",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/partner-applications/creators": {
+      "post": {
+        "operationId": "submitCreator",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatorApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerApplicationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Submit an authenticated creator application",
+        "tags": [
+          "partner applications"
+        ]
+      }
+    },
+    "/v1/partner-applications/sponsors": {
+      "post": {
+        "operationId": "submitSponsor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SponsorApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerApplicationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Submit a public sponsor inquiry",
+        "tags": [
+          "partner applications"
+        ]
+      }
+    },
+    "/v1/partner-applications/gyms": {
+      "post": {
+        "operationId": "submitGym",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GymApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerApplicationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Submit a public partner-gym inquiry",
+        "tags": [
+          "partner applications"
         ]
       }
     },
@@ -153,6 +1076,53 @@
         "summary": "Submit minimized regional eligibility evidence for server review",
         "tags": [
           "regions"
+        ]
+      }
+    },
+    "/v1/results/payout-winners": {
+      "get": {
+        "operationId": "getPayoutWinners",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayoutWinnerResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the public top payout results",
+        "tags": [
+          "competition results"
+        ]
+      }
+    },
+    "/v1/results/settled-competition": {
+      "get": {
+        "operationId": "getSettledCompetition",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettledCompetitionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the latest settled payout rules summary",
+        "tags": [
+          "competition results"
         ]
       }
     },
@@ -333,157 +1303,28 @@
         ]
       }
     },
-    "/v1/sessions": {
-      "post": {
-        "operationId": "create",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSessionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
-        "summary": "Start an authoritative competition workout session",
-        "tags": [
-          "sessions"
-        ]
-      }
-    },
-    "/v1/sessions/{sessionId}/events": {
-      "post": {
-        "operationId": "appendEvent",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AppendSessionEventDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionEventResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
-        "summary": "Append immutable, untrusted evidence to an active session",
-        "tags": [
-          "sessions"
-        ]
-      }
-    },
-    "/v1/sessions/{sessionId}/complete": {
-      "post": {
-        "operationId": "complete",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteSessionDto"
-              }
-            }
-          }
-        },
+    "/v1/creator-workouts": {
+      "get": {
+        "operationId": "listPublished",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionCompletionResponseDto"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreatorWorkoutResponseDto"
+                  }
                 }
               }
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
-        "summary": "Close a session and submit it for server-side evidence review",
+        "summary": "List the currently published creator workouts",
         "tags": [
-          "sessions"
+          "creator workouts"
         ]
       }
     },
@@ -551,6 +1392,80 @@
           "leaderboards"
         ]
       }
+    },
+    "/v1/me/privacy-requests": {
+      "post": {
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrivacyRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Request an account data export or deletion",
+        "tags": [
+          "privacy requests"
+        ]
+      },
+      "get": {
+        "operationId": "list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivacyRequestResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "List this account privacy requests",
+        "tags": [
+          "privacy requests"
+        ]
+      }
     }
   },
   "info": {
@@ -568,37 +1483,64 @@
         "bearerFormat": "Firebase ID token",
         "type": "http",
         "description": "Firebase ID token verified by the GoGymGo API."
+      },
+      "hyperwallet-webhook": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Dedicated credentials configured only for Hyperwallet."
       }
     },
     "schemas": {
-      "HealthResponseDto": {
+      "RegisterPushDeviceDto": {
         "type": "object",
         "properties": {
-          "service": {
-            "type": "string",
-            "example": "gogymgo-api"
-          },
-          "status": {
+          "platform": {
             "type": "string",
             "enum": [
-              "ok"
-            ],
-            "example": "ok"
+              "android",
+              "ios"
+            ]
           },
-          "timestamp": {
+          "pushToken": {
             "type": "string",
-            "example": "2026-07-12T12:00:00.000Z"
-          },
-          "uptimeSeconds": {
-            "type": "number",
-            "example": 123.45
+            "maxLength": 512,
+            "minLength": 16
           }
         },
         "required": [
-          "service",
-          "status",
-          "timestamp",
-          "uptimeSeconds"
+          "platform",
+          "pushToken"
+        ]
+      },
+      "PushDeviceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "expo"
+            ]
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "platform",
+          "enabled"
         ]
       },
       "PrivacySettingsDto": {
@@ -711,6 +1653,676 @@
             "$ref": "#/components/schemas/UpdatePrivacySettingsDto"
           }
         }
+      },
+      "OperatorWorkQueueItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "partner_application",
+              "payout_claim",
+              "privacy_request",
+              "region_verification",
+              "workout_session"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "createdAt"
+        ]
+      },
+      "VerifySessionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          },
+          "trustedEvidenceSummary": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "reason",
+          "trustedEvidenceSummary"
+        ]
+      },
+      "OperatorActionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
+      "LockDrawDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seedCommitment": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          }
+        },
+        "required": [
+          "reason",
+          "competitionId",
+          "seedCommitment"
+        ]
+      },
+      "SettleDrawDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          },
+          "seedReveal": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          }
+        },
+        "required": [
+          "reason",
+          "seedReveal"
+        ]
+      },
+      "DecideRegionVerificationDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "reason",
+          "decision"
+        ]
+      },
+      "DecidePartnerApplicationDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "in_review",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "reason",
+          "decision"
+        ]
+      },
+      "DecidePrivacyRequestDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "reason",
+          "decision"
+        ]
+      },
+      "HyperwalletWebhookDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "token",
+          "type"
+        ]
+      },
+      "HyperwalletWebhookAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted"
+        ]
+      },
+      "OperatorPayoutActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "OperatorPayoutClaimResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_review",
+              "action_required",
+              "verification_pending",
+              "ready",
+              "processing",
+              "paid",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ]
+      },
+      "PayoutClaimResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountMinor": {
+            "type": "number"
+          },
+          "competitionLabel": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "CAD",
+              "MXN",
+              "USD"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "hyperwallet"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "action-required",
+              "verification-pending",
+              "ready",
+              "paid"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "amountMinor",
+          "competitionLabel",
+          "currency",
+          "provider",
+          "status"
+        ]
+      },
+      "PortalActionResponseDto": {
+        "type": "object",
+        "properties": {
+          "portalUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "portalUrl"
+        ]
+      },
+      "CreateSessionDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientStartedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "competitionId"
+        ]
+      },
+      "SessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eligibleDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_review",
+              "verified",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "eligibleDate",
+          "status",
+          "policyVersion",
+          "startedAt",
+          "completedAt"
+        ]
+      },
+      "AppendSessionEventDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "device_attestation",
+              "face_check",
+              "gym_qr_scan",
+              "heart_rate_sample"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "heartRateBpm": {
+            "type": "number",
+            "maximum": 240,
+            "minimum": 30
+          },
+          "faceMatchConfidence": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0
+          },
+          "qrPayload": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "deviceEvidenceToken": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt"
+        ]
+      },
+      "SessionEventResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "device_attestation",
+              "face_check",
+              "gym_qr_scan",
+              "heart_rate_sample"
+            ]
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "eventType",
+          "receivedAt"
+        ]
+      },
+      "CompleteSessionDto": {
+        "type": "object",
+        "properties": {
+          "clientCompletedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SessionCompletionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eligibleDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_review",
+              "verified",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "eligibleForReview": {
+            "type": "boolean"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "eligibleDate",
+          "status",
+          "policyVersion",
+          "startedAt",
+          "completedAt",
+          "eligibleForReview",
+          "violations"
+        ]
+      },
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "example": "gogymgo-api"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ],
+            "example": "ok"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-07-12T12:00:00.000Z"
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "example": 123.45
+          }
+        },
+        "required": [
+          "service",
+          "status",
+          "timestamp",
+          "uptimeSeconds"
+        ]
+      },
+      "CreatorApplicationDto": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "channelUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048
+          },
+          "sampleWorkoutUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048
+          },
+          "workoutStyle": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "region",
+          "channelUrl",
+          "sampleWorkoutUrl",
+          "workoutStyle"
+        ]
+      },
+      "PartnerApplicationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationType": {
+            "type": "string",
+            "enum": [
+              "creator",
+              "gym",
+              "sponsor"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "in_review",
+              "rejected",
+              "submitted"
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "applicationType",
+          "status",
+          "submittedAt"
+        ]
+      },
+      "SponsorApplicationDto": {
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "contactEmail": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          },
+          "targetRegion": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "companyName",
+          "contactEmail",
+          "targetRegion"
+        ]
+      },
+      "GymApplicationDto": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "gymAddress": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "gymName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "managerName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "workEmail": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          }
+        },
+        "required": [
+          "region",
+          "gymAddress",
+          "gymName",
+          "managerName",
+          "workEmail"
+        ]
       },
       "RegionPolicyResponseDto": {
         "type": "object",
@@ -869,6 +2481,44 @@
           "status",
           "policyVersion",
           "createdAt"
+        ]
+      },
+      "PayoutWinnerResponseDto": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "number"
+          },
+          "payoutRank": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "alias",
+          "amountMinor",
+          "payoutRank"
+        ]
+      },
+      "SettledCompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "payoutExponent": {
+            "type": "number"
+          },
+          "payoutPoolAmountMinor": {
+            "type": "number"
+          },
+          "payoutWinnerCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "payoutExponent",
+          "payoutPoolAmountMinor",
+          "payoutWinnerCount"
         ]
       },
       "CompetitionRulesResponseDto": {
@@ -1112,211 +2762,32 @@
           "region"
         ]
       },
-      "CreateSessionDto": {
-        "type": "object",
-        "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "clientStartedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "competitionId"
-        ]
-      },
-      "SessionResponseDto": {
+      "CreatorWorkoutResponseDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
           },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eligibleDate": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "pending_review",
-              "verified",
-              "rejected",
-              "cancelled"
-            ]
-          },
-          "policyVersion": {
-            "type": "string"
-          },
-          "startedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "completedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "competitionId",
-          "eligibleDate",
-          "status",
-          "policyVersion",
-          "startedAt",
-          "completedAt"
-        ]
-      },
-      "AppendSessionEventDto": {
-        "type": "object",
-        "properties": {
-          "eventId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eventType": {
-            "type": "string",
-            "enum": [
-              "device_attestation",
-              "face_check",
-              "gym_qr_scan",
-              "heart_rate_sample"
-            ]
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "heartRateBpm": {
-            "type": "number",
-            "maximum": 240,
-            "minimum": 30
-          },
-          "faceMatchConfidence": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0
-          },
-          "qrPayload": {
-            "type": "string",
-            "maxLength": 2048
-          },
-          "deviceEvidenceToken": {
-            "type": "string",
-            "maxLength": 4096
-          }
-        },
-        "required": [
-          "eventId",
-          "eventType",
-          "occurredAt"
-        ]
-      },
-      "SessionEventResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eventId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eventType": {
-            "type": "string",
-            "enum": [
-              "device_attestation",
-              "face_check",
-              "gym_qr_scan",
-              "heart_rate_sample"
-            ]
-          },
-          "receivedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "eventId",
-          "eventType",
-          "receivedAt"
-        ]
-      },
-      "CompleteSessionDto": {
-        "type": "object",
-        "properties": {
-          "clientCompletedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "SessionCompletionResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eligibleDate": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "pending_review",
-              "verified",
-              "rejected",
-              "cancelled"
-            ]
-          },
-          "policyVersion": {
-            "type": "string"
-          },
-          "startedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "completedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "eligibleForReview": {
+          "joined": {
             "type": "boolean"
           },
-          "violations": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "name": {
+            "type": "string"
+          },
+          "reward": {
+            "type": "string"
+          },
+          "timing": {
+            "type": "string"
           }
         },
         "required": [
           "id",
-          "competitionId",
-          "eligibleDate",
-          "status",
-          "policyVersion",
-          "startedAt",
-          "completedAt",
-          "eligibleForReview",
-          "violations"
+          "joined",
+          "name",
+          "reward",
+          "timing"
         ]
       },
       "CategoryLeaderboardRowDto": {
@@ -1393,6 +2864,66 @@
           "categoryScore",
           "prizeDrawEntries",
           "updatedAt"
+        ]
+      },
+      "CreatePrivacyRequestDto": {
+        "type": "object",
+        "properties": {
+          "requestType": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "export"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "requestType"
+        ]
+      },
+      "PrivacyRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestType": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "export"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "processing",
+              "rejected",
+              "requested"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "requestType",
+          "status",
+          "requestedAt",
+          "completedAt"
         ]
       }
     }

@@ -10,11 +10,19 @@ import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompetitionsModule } from './modules/competitions/competitions.module';
 import { DrawsModule } from './modules/draws/draws.module';
+import { CreatorWorkoutsModule } from './modules/creator-workouts/creator-workouts.module';
 import { HealthModule } from './modules/health/health.module';
 import { LeaderboardsModule } from './modules/leaderboards/leaderboards.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OperatorModule } from './modules/operator/operator.module';
+import { OperationsModule } from './modules/operations/operations.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
+import { PartnersModule } from './modules/partners/partners.module';
+import { PayoutsModule } from './modules/payouts/payouts.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 import { RegionsModule } from './modules/regions/regions.module';
+import { ResultsModule } from './modules/results/results.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 
 @Module({
@@ -77,12 +85,20 @@ import { SessionsModule } from './modules/sessions/sessions.module';
     IdempotencyModule,
     AuthModule,
     LedgerModule,
+    NotificationsModule,
+    OperatorModule,
+    OperationsModule,
     HealthModule,
     ProfilesModule,
+    PartnersModule,
     RegionsModule,
+    ResultsModule,
     CompetitionsModule,
+    CreatorWorkoutsModule,
     SessionsModule,
     LeaderboardsModule,
+    PayoutsModule,
+    PrivacyModule,
     DrawsModule,
   ],
   providers: [

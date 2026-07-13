@@ -348,6 +348,7 @@ export class PrivacyOperationsRepository {
           metadata: {
             directIdentifiersRemoved: true,
             retainedRecordClasses: [
+              'account_legal_receipts',
               'competition_integrity',
               'fraud_and_eligibility',
               'payout_and_financial',

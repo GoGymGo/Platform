@@ -10,6 +10,7 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 - Retryable and money-affecting mutations require an idempotency key.
 - Hyperwallet credentials, webhooks, user/payment tokens, and hosted portal actions remain server-side.
 - GoGymGo never accepts bank-account, tax-form, or identity-document fields.
+- Account legal documents and receipts are versioned, content-hashed, append-only, and server-timestamped; local device state is never authoritative competition consent.
 
 ## Local foundation
 
@@ -45,10 +46,15 @@ duplicate webhook intake, payment release, and terminal reconciliation.
 Profile-media coverage proves exact constrained upload actions, retry conflicts,
 private completion, moderation-only activation, audited decisions, replacement
 isolation, and object cleanup without persisting signed URLs.
+Account-legal coverage proves jurisdiction fallback without locale fallback,
+immutable publication and withdrawal, exact receipt actions and content hashes,
+stale-bundle invalidation, privacy-export inclusion, and enrollment linkage.
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
 
 The private avatar upload, moderation, cleanup, and privacy lifecycle is documented in [profile-media operations](docs/profile-media.md).
+
+Server-authoritative Terms and Privacy publication, receipt, withdrawal, and enrollment controls are documented in [account legal documents](docs/legal-documents.md).
 
 The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
 

@@ -11,6 +11,7 @@ import { normalizeDateKey } from '../../database/date-key';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { LedgerService } from '../ledger/ledger.service';
+import { LegalDocumentsService } from '../legal/legal-documents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import {
   assertMonthKey,
@@ -38,6 +39,7 @@ export class CompetitionsService {
     private readonly database: DatabaseService,
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
+    private readonly legalDocuments: LegalDocumentsService,
     private readonly profiles: ProfilesService,
   ) {}
 
@@ -133,6 +135,7 @@ export class CompetitionsService {
           ageEligibilityAttested: request.ageEligibilityAttested,
           competitionId,
           goalDays: request.goalDays,
+          legalReceiptBundleId: request.legalReceiptBundleId,
           regionVerificationId: request.regionVerificationId,
           rulesAccepted: request.rulesAccepted,
         },
@@ -166,10 +169,18 @@ export class CompetitionsService {
         }
 
         const existingEnrollment = await transaction
-          .selectFrom('competition_enrollments')
-          .selectAll()
-          .where('competition_id', '=', competition.id)
-          .where('user_id', '=', user.id)
+          .selectFrom('competition_enrollments as enrollment')
+          .innerJoin(
+            'competition_rule_acceptances as acceptance',
+            'acceptance.id',
+            'enrollment.rules_acceptance_id',
+          )
+          .selectAll('enrollment')
+          .select(
+            'acceptance.account_legal_receipt_bundle_id as legal_receipt_bundle_id',
+          )
+          .where('enrollment.competition_id', '=', competition.id)
+          .where('enrollment.user_id', '=', user.id)
           .executeTakeFirst();
         if (existingEnrollment) {
           if (existingEnrollment.status !== 'active') {
@@ -182,7 +193,9 @@ export class CompetitionsService {
           if (
             existingEnrollment.goal_days !== request.goalDays ||
             existingEnrollment.region_verification_id !==
-              request.regionVerificationId
+              request.regionVerificationId ||
+            existingEnrollment.legal_receipt_bundle_id !==
+              request.legalReceiptBundleId
           ) {
             throw new ConflictException({
               code: 'COMPETITION_ENROLLMENT_ALREADY_EXISTS',
@@ -207,16 +220,29 @@ export class CompetitionsService {
             .where('goal_days', '=', request.goalDays)
             .executeTakeFirst(),
           transaction
-            .selectFrom('region_verifications')
-            .selectAll()
-            .where('id', '=', request.regionVerificationId)
-            .where('user_id', '=', user.id)
-            .where('region_policy_id', '=', competition.region_policy_id)
-            .where('status', '=', 'approved')
+            .selectFrom('region_verifications as verification')
+            .innerJoin(
+              'region_policies as policy',
+              'policy.id',
+              'verification.region_policy_id',
+            )
+            .select([
+              'verification.id',
+              'policy.country_code',
+              'policy.subdivision_code',
+            ])
+            .where('verification.id', '=', request.regionVerificationId)
+            .where('verification.user_id', '=', user.id)
+            .where(
+              'verification.region_policy_id',
+              '=',
+              competition.region_policy_id,
+            )
+            .where('verification.status', '=', 'approved')
             .where((expression) =>
               expression.or([
-                expression('expires_at', 'is', null),
-                expression('expires_at', '>', now),
+                expression('verification.expires_at', 'is', null),
+                expression('verification.expires_at', '>', now),
               ]),
             )
             .executeTakeFirst(),
@@ -251,11 +277,18 @@ export class CompetitionsService {
             message: 'The competition has reached its entrant cap.',
           });
         }
+        await this.legalDocuments.assertCurrentReceiptBundle(
+          transaction,
+          user.id,
+          `${verification.country_code}-${verification.subdivision_code}`,
+          request.legalReceiptBundleId,
+        );
 
         const acceptance = await transaction
           .insertInto('competition_rule_acceptances')
           .values({
             accepted_at: now,
+            account_legal_receipt_bundle_id: request.legalReceiptBundleId,
             age_eligibility_attested: request.ageEligibilityAttested,
             competition_id: competition.id,
             metadata: { source: 'mobile' },

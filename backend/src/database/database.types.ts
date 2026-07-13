@@ -70,6 +70,9 @@ export type ProfileMediaStatus =
   | 'rejected'
   | 'removed'
   | 'superseded';
+export type LegalReceiptRequirement = 'accept' | 'acknowledge' | 'none';
+export type LegalDocumentState = 'published' | 'withdrawn';
+export type LegalReceiptAction = 'accept' | 'acknowledge';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -218,6 +221,51 @@ export interface CompetitionRuleAcceptancesTable {
   rules_version: string;
   age_eligibility_attested: boolean;
   metadata: ColumnType<JsonValue, JsonValue, JsonValue>;
+  accepted_at: Timestamp;
+  account_legal_receipt_bundle_id: string | null;
+}
+
+export interface LegalDocumentsTable {
+  id: Generated<string>;
+  document_key: string;
+  jurisdiction_code: string;
+  locale: string;
+  version: string;
+  title: string;
+  content: ColumnType<JsonValue, JsonValue, never>;
+  content_sha256: string;
+  receipt_requirement: LegalReceiptRequirement;
+  effective_at: Timestamp;
+  created_at: Timestamp;
+}
+
+export interface LegalDocumentEventsTable {
+  id: Generated<string>;
+  legal_document_id: string;
+  previous_state: LegalDocumentState | null;
+  next_state: LegalDocumentState;
+  actor_user_id: string;
+  reason: string;
+  request_id: string;
+  created_at: Timestamp;
+}
+
+export interface AccountLegalReceiptBundlesTable {
+  id: Generated<string>;
+  user_id: string;
+  jurisdiction_code: string;
+  locale: string;
+  bundle_sha256: string;
+  request_id: string;
+  accepted_at: Timestamp;
+}
+
+export interface AccountLegalReceiptsTable {
+  id: Generated<string>;
+  receipt_bundle_id: string;
+  legal_document_id: string;
+  receipt_action: LegalReceiptAction;
+  presented_content_sha256: string;
   accepted_at: Timestamp;
 }
 
@@ -510,6 +558,8 @@ export interface WorkerHeartbeatsTable {
 }
 
 export interface Database {
+  account_legal_receipt_bundles: AccountLegalReceiptBundlesTable;
+  account_legal_receipts: AccountLegalReceiptsTable;
   competition_draws: CompetitionDrawsTable;
   competition_enrollments: CompetitionEnrollmentsTable;
   competition_goal_brackets: CompetitionGoalBracketsTable;
@@ -523,6 +573,8 @@ export interface Database {
   creator_workouts: CreatorWorkoutsTable;
   hyperwallet_users: HyperwalletUsersTable;
   idempotency_keys: IdempotencyKeysTable;
+  legal_document_events: LegalDocumentEventsTable;
+  legal_documents: LegalDocumentsTable;
   operator_audit_events: OperatorAuditEventsTable;
   notification_deliveries: NotificationDeliveriesTable;
   partner_applications: PartnerApplicationsTable;

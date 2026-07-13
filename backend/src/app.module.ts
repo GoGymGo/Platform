@@ -13,6 +13,7 @@ import { DrawsModule } from './modules/draws/draws.module';
 import { CreatorWorkoutsModule } from './modules/creator-workouts/creator-workouts.module';
 import { HealthModule } from './modules/health/health.module';
 import { LeaderboardsModule } from './modules/leaderboards/leaderboards.module';
+import { LegalModule } from './modules/legal/legal.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OperatorModule } from './modules/operator/operator.module';
@@ -114,6 +115,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
     CreatorWorkoutsModule,
     SessionsModule,
     LeaderboardsModule,
+    LegalModule,
     PayoutsModule,
     PrivacyModule,
     DrawsModule,

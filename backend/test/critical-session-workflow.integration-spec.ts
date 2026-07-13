@@ -3,6 +3,8 @@ import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
+import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
+import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
@@ -65,6 +67,7 @@ const competitionRules = {
 
 interface CompetitionFixture {
   competitionId: string;
+  legalReceiptBundleId: string;
   regionVerificationId: string;
 }
 
@@ -74,6 +77,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let competitions: CompetitionsService;
   let database: DatabaseService;
   let migrated: MigratedPostgisTestDatabase;
+  let legalDocuments: LegalDocumentsService;
   let operatorUserId: string;
   let profiles: ProfilesService;
   let sessions: SessionsService;
@@ -84,10 +88,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const idempotency = new IdempotencyService(database);
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
+    legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
     competitions = new CompetitionsService(
       database,
       idempotency,
       ledger,
+      legalDocuments,
       profiles,
     );
     sessions = new SessionsService(database, idempotency, ledger, profiles);
@@ -96,6 +102,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       database.connection,
     );
     operatorUserId = operator.id;
+    await seedAccountLegalDocuments();
   });
 
   afterAll(async () => {
@@ -112,6 +119,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       {
         ageEligibilityAttested: true,
         goalDays: 3,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
         regionVerificationId: fixture.regionVerificationId,
         rulesAccepted: true,
       },
@@ -124,6 +132,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         {
           ageEligibilityAttested: true,
           goalDays: 3,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
           regionVerificationId: fixture.regionVerificationId,
           rulesAccepted: true,
         },
@@ -325,6 +334,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
           {
             ageEligibilityAttested: true,
             goalDays: 3,
+            legalReceiptBundleId: user.legalReceiptBundleId,
             regionVerificationId: user.regionVerificationId,
             rulesAccepted: true,
           },
@@ -359,6 +369,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const originalRequest = {
       ageEligibilityAttested: true as const,
       goalDays: 3,
+      legalReceiptBundleId: winner.legalReceiptBundleId,
       regionVerificationId: winner.regionVerificationId,
       rulesAccepted: true as const,
     };
@@ -448,6 +459,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
   async function seedRegistrationCompetition(): Promise<CompetitionFixture> {
     const now = Date.now();
     const user = await profiles.ensureUser(userPrincipal, database.connection);
+    const legalReceiptBundleId = await acceptCurrentLegalBundle(
+      userPrincipal,
+      'critical-session-legal-receipt',
+    );
     const region = await migrated.pool.query<{ id: string }>(
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
@@ -499,6 +514,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     return {
       competitionId: competition.rows[0].id,
+      legalReceiptBundleId,
       regionVerificationId: verification.rows[0].id,
     };
   }
@@ -506,8 +522,16 @@ describeWithDatabase('critical session and ledger workflow', () => {
   async function seedCappedCompetition(): Promise<{
     competitionId: string;
     users: readonly [
-      { principal: AuthenticatedPrincipal; regionVerificationId: string },
-      { principal: AuthenticatedPrincipal; regionVerificationId: string },
+      {
+        legalReceiptBundleId: string;
+        principal: AuthenticatedPrincipal;
+        regionVerificationId: string;
+      },
+      {
+        legalReceiptBundleId: string;
+        principal: AuthenticatedPrincipal;
+        regionVerificationId: string;
+      },
     ];
   }> {
     const now = Date.now();
@@ -524,11 +548,16 @@ describeWithDatabase('critical session and ledger workflow', () => {
       [new Date(now - 24 * 60 * 60_000)],
     );
     const users = [] as Array<{
+      legalReceiptBundleId: string;
       principal: AuthenticatedPrincipal;
       regionVerificationId: string;
     }>;
     for (const principal of cappedUserPrincipals) {
       const user = await profiles.ensureUser(principal, database.connection);
+      const legalReceiptBundleId = await acceptCurrentLegalBundle(
+        principal,
+        `critical-capped-legal-${principal.firebaseUid}`,
+      );
       const verification = await migrated.pool.query<{ id: string }>(
         `INSERT INTO region_verifications
            (user_id, region_policy_id, method, status, evidence_metadata,
@@ -544,6 +573,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         ],
       );
       users.push({
+        legalReceiptBundleId,
         principal,
         regionVerificationId: verification.rows[0].id,
       });
@@ -613,10 +643,94 @@ describeWithDatabase('critical session and ledger workflow', () => {
     return {
       competitionId: competition.rows[0].id,
       users: users as [
-        { principal: AuthenticatedPrincipal; regionVerificationId: string },
-        { principal: AuthenticatedPrincipal; regionVerificationId: string },
+        {
+          legalReceiptBundleId: string;
+          principal: AuthenticatedPrincipal;
+          regionVerificationId: string;
+        },
+        {
+          legalReceiptBundleId: string;
+          principal: AuthenticatedPrincipal;
+          regionVerificationId: string;
+        },
       ],
     };
+  }
+
+  async function seedAccountLegalDocuments(): Promise<void> {
+    const effectiveAt = new Date(Date.now() - 60_000);
+    for (const document of [
+      {
+        documentKey: 'privacy_policy',
+        receiptRequirement: 'acknowledge' as const,
+        title: 'Privacy Policy',
+      },
+      {
+        documentKey: 'terms_of_service',
+        receiptRequirement: 'accept' as const,
+        title: 'Terms of Service',
+      },
+    ]) {
+      const content = {
+        intro: `${document.title} integration fixture`,
+        sections: [{ body: 'Fixture body', heading: 'Fixture section' }],
+      };
+      const inserted = await database.connection
+        .insertInto('legal_documents')
+        .values({
+          content,
+          content_sha256: hashLegalDocumentContent(document.title, content),
+          created_at: effectiveAt,
+          document_key: document.documentKey,
+          effective_at: effectiveAt,
+          jurisdiction_code: 'GLOBAL',
+          locale: 'en-CA',
+          receipt_requirement: document.receiptRequirement,
+          title: document.title,
+          version: 'integration-v1',
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      await database.connection
+        .insertInto('legal_document_events')
+        .values({
+          actor_user_id: operatorUserId,
+          created_at: effectiveAt,
+          legal_document_id: inserted.id,
+          next_state: 'published',
+          previous_state: null,
+          reason: 'Integration fixture publication',
+          request_id: `fixture-${document.documentKey}`,
+        })
+        .executeTakeFirstOrThrow();
+    }
+  }
+
+  async function acceptCurrentLegalBundle(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+  ): Promise<string> {
+    const current = await legalDocuments.getCurrent({
+      jurisdictionCode: 'CA-BC',
+      locale: 'en-CA',
+    });
+    const status = await legalDocuments.recordReceiptBundle(
+      principal,
+      idempotencyKey,
+      {
+        bundleSha256: current.bundleSha256,
+        documents: current.documents
+          .filter((document) => document.receiptRequirement !== 'none')
+          .map((document) => ({
+            action: document.receiptRequirement as 'accept' | 'acknowledge',
+            contentSha256: document.contentSha256,
+            documentId: document.id,
+          })),
+        jurisdictionCode: 'CA-BC',
+        locale: 'en-CA',
+      },
+    );
+    return status.receiptBundleId!;
   }
 
   async function activateCompetition(competitionId: string): Promise<void> {

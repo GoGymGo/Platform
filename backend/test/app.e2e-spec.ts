@@ -92,9 +92,50 @@ describe('platform foundation (e2e)', () => {
       .send({
         ageEligibilityAttested: true,
         goalDays: 3,
+        legalReceiptBundleId: '30000000-0000-4000-8000-000000000003',
         regionVerificationId: '20000000-0000-4000-8000-000000000002',
         rulesAccepted: true,
       })
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('validates public legal document scope before database access', () => {
+    return request(app.getHttpServer())
+      .get('/v1/legal-documents/current?jurisdictionCode=INVALID_SCOPE')
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+        });
+      });
+  });
+
+  it('requires authentication before legal receipt status or submission', async () => {
+    await request(app.getHttpServer())
+      .get('/v1/me/legal-receipts/status?jurisdictionCode=CA-BC&locale=en-CA')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+    await request(app.getHttpServer())
+      .post('/v1/me/legal-receipts')
+      .set('Idempotency-Key', 'legal-receipt-e2e')
+      .send({})
+      .expect(401);
+  });
+
+  it('requires authentication before legal document publication', () => {
+    return request(app.getHttpServer())
+      .post('/v1/operator/configuration/legal-documents')
+      .set('Idempotency-Key', 'legal-publication-e2e')
+      .send({})
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({

@@ -30,7 +30,7 @@ The worker:
 - clears privacy-request reasons and marks the account `deleted`;
 - records an immutable completion event without personal information.
 
-The database retains pseudonymized competition enrollments, rules acceptance facts, workout evidence, entry ledgers, draws, winnings, payout claims/payments, provider mappings, fraud evidence, and operator audit events. These records protect competition integrity and meet financial, tax, fraud, dispute, and legal-hold obligations. Retention schedules and Hyperwallet subprocessor handling require legal approval; the deletion endpoint must not claim that legally retained records were erased.
+The database retains pseudonymized account legal receipt bundles, competition enrollments, rules acceptance facts, workout evidence, entry ledgers, draws, winnings, payout claims/payments, provider mappings, fraud evidence, and operator audit events. Legal receipts identify the exact document version, content digest, jurisdiction, locale, required action, and server acceptance time; they do not retain IP addresses or device fingerprints. These records protect competition integrity and meet financial, tax, fraud, dispute, and legal-hold obligations. Retention schedules and Hyperwallet subprocessor handling require legal approval; the deletion endpoint must not claim that legally retained records were erased.
 
 ## Failure and incident behavior
 

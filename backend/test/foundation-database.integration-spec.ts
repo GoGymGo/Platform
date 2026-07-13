@@ -33,6 +33,8 @@ describeWithDatabase('database migrations', () => {
 
     expect(names).toEqual(
       expect.arrayContaining([
+        'account_legal_receipt_bundles',
+        'account_legal_receipts',
         'competition_draws',
         'competition_enrollments',
         'competition_progress',
@@ -41,6 +43,8 @@ describeWithDatabase('database migrations', () => {
         'draw_winners',
         'entry_ledger',
         'idempotency_keys',
+        'legal_document_events',
+        'legal_documents',
         'operator_audit_events',
         'partner_applications',
         'payout_claims',
@@ -190,9 +194,14 @@ describeWithDatabase('database migrations', () => {
 
     expect(triggers.rows.map((row) => row.trigger_name)).toEqual(
       expect.arrayContaining([
+        'account_legal_receipt_bundles_append_only',
+        'account_legal_receipts_append_only',
+        'account_legal_receipts_validate',
         'draw_entries_append_only',
         'draw_winners_append_only',
         'entry_ledger_append_only',
+        'legal_document_events_append_only',
+        'legal_documents_append_only',
         'operator_audit_events_append_only',
         'payout_state_events_append_only',
         'privacy_request_events_append_only',

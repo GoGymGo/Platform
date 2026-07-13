@@ -7,7 +7,9 @@ const requiredOperations = [
   ['post', '/v1/competitions/{competitionId}/enrollments'],
   ['get', '/v1/creator-workouts'],
   ['get', '/v1/leaderboards/current'],
+  ['get', '/v1/legal-documents/current'],
   ['get', '/v1/me/avatar'],
+  ['get', '/v1/me/legal-receipts/status'],
   ['get', '/v1/payout-claims/me'],
   ['get', '/v1/results/payout-winners'],
   ['get', '/v1/results/settled-competition'],
@@ -16,6 +18,7 @@ const requiredOperations = [
   ['post', '/v1/partner-applications/sponsors'],
   ['post', '/v1/payout-claims/{claimId}/portal-action'],
   ['post', '/v1/me/avatar-upload'],
+  ['post', '/v1/me/legal-receipts'],
   ['post', '/v1/me/avatar-upload/{mediaId}/complete'],
   ['delete', '/v1/me/avatar'],
 ];

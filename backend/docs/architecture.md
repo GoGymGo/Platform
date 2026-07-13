@@ -2,7 +2,7 @@
 
 ## Decision
 
-GoGymGo uses a server-authoritative modular monolith. The mobile app is an untrusted presentation client; the backend owns competition eligibility, draws, payout state, ledger entries, provider reconciliation, privacy operations, and operator authorization.
+GoGymGo uses a server-authoritative modular monolith. The mobile app is an untrusted presentation client; the backend owns account legal document versions and receipts, competition eligibility, draws, payout state, ledger entries, provider reconciliation, privacy operations, and operator authorization.
 
 ```mermaid
 flowchart LR
@@ -40,6 +40,8 @@ PostgreSQL is the sole system of record. PostGIS handles regional competition bo
 
 Competition enrollment takes a row lock on the authoritative competition before checking registration state, entrant capacity, and inserting the enrollment. This serializes concurrent entrants at the cap without a distributed lock. An existing enrollment is immutable through the create route: an exact active retry returns the original record, changed enrollment details fail closed, and an inactive or disqualified enrollment cannot be recreated by the user.
 
+Legal documents are immutable content-hashed records with append-only publication and withdrawal events. The current bundle resolves each document key from exact subdivision to country to global scope but never crosses locales. A user submits all required document receipts atomically; competition enrollment stores and validates the exact server-timestamped receipt bundle for that competition jurisdiction. Missing, foreign, incomplete, jurisdiction-mismatched, or superseded bundles fail closed.
+
 The first production stage uses database-backed work queues. This keeps a payout or privacy state transition and its queued work in one transaction. Add Pub/Sub or Cloud Tasks only when queue latency, connection pressure, or independently scaling consumers demonstrate a need; introducing either earlier would add duplicate-delivery and cross-system consistency work without reducing current financial risk.
 
 Each environment has one regional primary database with regional high availability, private networking, automated backups, and point-in-time recovery. North America-wide client access does not require an active-active financial ledger. A single writer avoids conflicting payout and draw decisions; add a read strategy or disaster-recovery replica only after recovery targets and jurisdictional requirements are approved.
@@ -58,6 +60,7 @@ This lowers operational and data-security exposure, but it does not transfer eve
 - User content and privacy exports use separate private buckets with public-access prevention and uniform bucket-level access. Privacy exports expire after seven days and do not use soft delete or object versioning.
 - Avatar uploads use five-minute V4 create-only actions bound to exact content type and length. New media remains owner-private and pending moderation; only an audited operator approval can activate it. The API can create/read only the `avatars/` prefix, while worker-only deletion handles rejection, replacement, removal, expiry, and erasure.
 - Account erasure is an approved, leased worker operation that removes direct identity/content while preserving legally necessary pseudonymized payout, competition, fraud, ledger, and audit evidence.
+- Privacy exports include account legal receipt metadata. Erasure preserves pseudonymous document-version, digest, jurisdiction, locale, action, and acceptance-time evidence without storing IP addresses or device fingerprints in the receipt path.
 
 ## Health and observability
 
@@ -75,7 +78,7 @@ The architecture is code-complete only after these external gates are satisfied 
 2. a least-privilege PostgreSQL login and Secret Manager versions;
 3. Hyperwallet account/program approval, hosted-portal URLs, webhook registration, and end-to-end UAT payouts/refunds/reconciliation;
 4. Expo credentials and real-device notification testing;
-5. privacy export/erasure rehearsal, restore rehearsal, operator bootstrap, incident runbooks, and legal/compliance approval;
+5. counsel-approved legal document publication for every enabled jurisdiction/locale, mobile stale-document UAT, emergency withdrawal rehearsal, privacy export/erasure rehearsal, restore rehearsal, operator bootstrap, incident runbooks, and legal/compliance approval;
 6. load tests that confirm API instance limits, worker count, and database connection budgets before raising them.
 
 The infrastructure implementation is in [Terraform](../infra/terraform/README.md), and release/incident procedures are in the [deployment runbook](deployment-runbook.md).

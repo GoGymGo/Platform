@@ -110,6 +110,10 @@ export class CreateEnrollmentDto {
   @IsUUID()
   regionVerificationId!: string;
 
+  @ApiProperty({ format: 'uuid', type: String })
+  @IsUUID()
+  legalReceiptBundleId!: string;
+
   @ApiProperty({ enum: [true], type: Boolean })
   @Equals(true)
   @IsBoolean()

@@ -115,6 +115,7 @@ Do not add Plaid, Stripe Financial Connections, or another bank-linking SDK for 
 | --- | --- |
 | Auth | Firebase token guard, user bootstrap, roles, account status. |
 | Profiles | Public identity, avatar metadata, privacy settings. |
+| Legal | Immutable jurisdiction- and locale-aware document publication, content hashes, account receipt bundles, and withdrawal events. |
 | Regions | Versioned service areas, residency evidence, country/currency/time-zone policy. |
 | Competitions | Competition definitions, goal brackets, enrollment, rules version. |
 | Sessions | Check-in/out evidence, signed QR events, device evidence, review status. |
@@ -133,6 +134,7 @@ All routes are versioned under `/v1`. Mutations accept `Idempotency-Key` where a
 Payout responses use integer `amountMinor` or `payoutPoolAmountMinor` fields plus ISO currency; the frontend repository converts those values to display units at its boundary.
 
 - `GET /me`, `PATCH /me`, `POST /me/avatar-upload`, `POST /me/avatar-upload/{mediaId}/complete`, `GET /me/avatar`, `DELETE /me/avatar`
+- `GET /legal-documents/current`, `GET /me/legal-receipts/status`, `POST /me/legal-receipts`
 - `GET /regions`, `POST /me/region-verifications`
 - `GET /competitions/current`, `POST /competitions/:id/enrollments`
 - `GET /competitions/:monthKey/matches?goal=&region=`
@@ -155,7 +157,8 @@ The frontend now has a bearer-token API client boundary configured by `EXPO_PUBL
 
 - Monetary amounts are integer minor units plus ISO currency; never floating point.
 - Entry ledger rows are append-only. Corrections are compensating rows, not updates/deletes.
-- One enrollment per user/competition; competition-row locking serializes entrant caps, inactive enrollments cannot be recreated by the user, and one award exists per unique source event/policy.
+- One enrollment per user/competition; competition-row locking serializes entrant caps, inactive enrollments cannot be recreated by the user, and one award exists per unique source event/policy. Every new enrollment references a complete current server-side account legal receipt bundle for the competition jurisdiction.
+- Legal documents, publication/withdrawal events, receipt bundles, and receipts are append-only. Receipt actions and content hashes must match the immutable document, and current resolution falls from subdivision to country to global scope without changing locale.
 - Draw settlement locks an immutable entrant snapshot and rule version.
 - One internal user maps to at most one Hyperwallet user per program.
 - Provider webhook token and payment token are unique.
@@ -176,8 +179,9 @@ Do not hard-code "North America" as one ruleset. Store country, subdivision, cur
 4. Replace preview reads with React Query hooks and render explicit loading, empty, offline, and error states.
 5. Add signed QR verification and real device evidence only after server replay/fraud rules exist.
 6. Complete Hyperwallet UAT onboarding, webhook reconciliation, operations runbooks, and sandbox payout E2E tests.
-7. Complete the remaining admin configuration tooling, observability, infrastructure automation, device-level E2E coverage, and alerting. Privacy export/deletion, rules acceptance, rate limits, and the backend HTTP/migration test foundations are implemented.
-8. Run legal review for each launch jurisdiction before enabling cash competition enrollment.
+7. Replace `src/services/legalAcceptance.ts` as the authority: fetch and render the server bundle, submit the exact receipt actions, refresh status after sign-in/account switching, and pass `receiptBundleId` during competition enrollment. AsyncStorage may cache UI state only.
+8. Complete the remaining admin configuration tooling, observability, infrastructure automation, device-level E2E coverage, and alerting. Privacy export/deletion, account legal receipts, competition-rules acceptance, rate limits, and the backend HTTP/migration test foundations are implemented.
+9. Run legal review and publish approved document versions for each launch jurisdiction and locale before enabling cash competition enrollment.
 
 ## Definition of backend-ready frontend
 

@@ -129,6 +129,37 @@ export class PrivacyExportBuilder {
           .orderBy('accepted_at')
           .execute();
 
+        const accountLegalReceipts = await transaction
+          .selectFrom('account_legal_receipt_bundles as bundle')
+          .innerJoin(
+            'account_legal_receipts as receipt',
+            'receipt.receipt_bundle_id',
+            'bundle.id',
+          )
+          .innerJoin(
+            'legal_documents as document',
+            'document.id',
+            'receipt.legal_document_id',
+          )
+          .select([
+            'bundle.id as receipt_bundle_id',
+            'bundle.jurisdiction_code',
+            'bundle.locale',
+            'bundle.bundle_sha256',
+            'bundle.accepted_at as bundle_accepted_at',
+            'document.document_key',
+            'document.version',
+            'document.title',
+            'document.content_sha256',
+            'document.effective_at',
+            'receipt.receipt_action',
+            'receipt.accepted_at',
+          ])
+          .where('bundle.user_id', '=', job.userId)
+          .orderBy('bundle.accepted_at')
+          .orderBy('document.document_key')
+          .execute();
+
         const sessions = await transaction
           .selectFrom('workout_sessions')
           .select([
@@ -379,6 +410,7 @@ export class PrivacyExportBuilder {
 
         return {
           account,
+          accountLegalReceipts,
           competitionData: {
             drawEntries,
             enrollments,
@@ -410,7 +442,7 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 1,
+          schemaVersion: 2,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',

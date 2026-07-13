@@ -1286,6 +1286,193 @@
         "tags": ["competitions"]
       }
     },
+    "/v1/legal-documents/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [
+          {
+            "name": "jurisdictionCode",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "GLOBAL", "type": "string" }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "en", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentLegalDocumentsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the current server-authoritative legal document bundle for a jurisdiction and locale",
+        "tags": ["legal-documents"]
+      }
+    },
+    "/v1/me/legal-receipts/status": {
+      "get": {
+        "operationId": "getStatus",
+        "parameters": [
+          {
+            "name": "jurisdictionCode",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "GLOBAL", "type": "string" }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "en", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return this account current legal receipt status",
+        "tags": ["legal-receipts"]
+      }
+    },
+    "/v1/me/legal-receipts": {
+      "post": {
+        "operationId": "record",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLegalReceiptBundleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Atomically record receipts for the exact current legal bundle",
+        "tags": ["legal-receipts"]
+      }
+    },
+    "/v1/operator/configuration/legal-documents": {
+      "post": {
+        "operationId": "publish",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Publish an immutable legal document version",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
+      "post": {
+        "operationId": "withdraw",
+        "parameters": [
+          {
+            "name": "legalDocumentId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Withdraw an immutable legal document version",
+        "tags": ["operator-configuration"]
+      }
+    },
     "/v1/me/privacy-requests": {
       "post": {
         "operationId": "create",
@@ -2552,12 +2739,14 @@
         "properties": {
           "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
           "regionVerificationId": { "type": "string", "format": "uuid" },
+          "legalReceiptBundleId": { "type": "string", "format": "uuid" },
           "rulesAccepted": { "type": "boolean", "enum": [true] },
           "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
         },
         "required": [
           "goalDays",
           "regionVerificationId",
+          "legalReceiptBundleId",
           "rulesAccepted",
           "ageEligibilityAttested"
         ]
@@ -2603,6 +2792,215 @@
           "periodIndex",
           "region"
         ]
+      },
+      "LegalDocumentSectionDto": {
+        "type": "object",
+        "properties": {
+          "heading": { "type": "string", "maxLength": 160 },
+          "body": { "type": "string", "maxLength": 4000 },
+          "bullets": {
+            "maxItems": 30,
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["heading"]
+      },
+      "LegalDocumentContentDto": {
+        "type": "object",
+        "properties": {
+          "intro": { "type": "string", "maxLength": 4000 },
+          "sections": {
+            "maxItems": 40,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LegalDocumentSectionDto" }
+          }
+        },
+        "required": ["intro", "sections"]
+      },
+      "LegalDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "documentKey": { "type": "string" },
+          "jurisdictionCode": { "type": "string" },
+          "locale": { "type": "string" },
+          "version": { "type": "string" },
+          "title": { "type": "string" },
+          "content": { "$ref": "#/components/schemas/LegalDocumentContentDto" },
+          "contentSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "receiptRequirement": {
+            "type": "string",
+            "enum": ["accept", "acknowledge", "none"]
+          },
+          "effectiveAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "documentKey",
+          "jurisdictionCode",
+          "locale",
+          "version",
+          "title",
+          "content",
+          "contentSha256",
+          "receiptRequirement",
+          "effectiveAt"
+        ]
+      },
+      "CurrentLegalDocumentsResponseDto": {
+        "type": "object",
+        "properties": {
+          "bundleSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "configured": { "type": "boolean" },
+          "documents": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LegalDocumentResponseDto" }
+          },
+          "jurisdictionCode": { "type": "string" },
+          "locale": { "type": "string" }
+        },
+        "required": [
+          "bundleSha256",
+          "configured",
+          "documents",
+          "jurisdictionCode",
+          "locale"
+        ]
+      },
+      "LegalReceiptStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "bundleSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "configured": { "type": "boolean" },
+          "documents": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LegalDocumentResponseDto" }
+          },
+          "jurisdictionCode": { "type": "string" },
+          "locale": { "type": "string" },
+          "complete": { "type": "boolean" },
+          "receiptBundleId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "bundleSha256",
+          "configured",
+          "documents",
+          "jurisdictionCode",
+          "locale",
+          "complete"
+        ]
+      },
+      "LegalReceiptItemDto": {
+        "type": "object",
+        "properties": {
+          "documentId": { "type": "string", "format": "uuid" },
+          "contentSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "action": { "type": "string", "enum": ["accept", "acknowledge"] }
+        },
+        "required": ["documentId", "contentSha256", "action"]
+      },
+      "RecordLegalReceiptBundleDto": {
+        "type": "object",
+        "properties": {
+          "jurisdictionCode": { "type": "string", "default": "GLOBAL" },
+          "locale": { "type": "string", "default": "en" },
+          "bundleSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "documents": {
+            "maxItems": 20,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LegalReceiptItemDto" }
+          }
+        },
+        "required": ["bundleSha256", "documents"]
+      },
+      "PublishLegalDocumentDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "documentKey": {
+            "type": "string",
+            "example": "terms_of_service",
+            "maxLength": 64
+          },
+          "jurisdictionCode": {
+            "type": "string",
+            "example": "CA-BC",
+            "maxLength": 16
+          },
+          "locale": { "type": "string", "example": "en-CA", "maxLength": 16 },
+          "version": { "type": "string", "maxLength": 64 },
+          "title": { "type": "string", "maxLength": 160 },
+          "content": { "$ref": "#/components/schemas/LegalDocumentContentDto" },
+          "receiptRequirement": {
+            "type": "string",
+            "enum": ["accept", "acknowledge", "none"]
+          },
+          "effectiveAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "reason",
+          "documentKey",
+          "jurisdictionCode",
+          "locale",
+          "version",
+          "title",
+          "content",
+          "receiptRequirement",
+          "effectiveAt"
+        ]
+      },
+      "AdminLegalDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["effective", "scheduled", "withdrawn"]
+          },
+          "contentSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          }
+        },
+        "required": ["id", "status", "contentSha256"]
+      },
+      "WithdrawLegalDocumentDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 }
+        },
+        "required": ["reason"]
       },
       "CreatePrivacyRequestDto": {
         "type": "object",

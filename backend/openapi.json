@@ -664,6 +664,94 @@
         "tags": ["sessions"]
       }
     },
+    "/v1/me/privacy-requests": {
+      "post": {
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrivacyRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Request an account data export or deletion",
+        "tags": ["privacy requests"]
+      },
+      "get": {
+        "operationId": "list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivacyRequestResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List this account privacy requests",
+        "tags": ["privacy requests"]
+      }
+    },
+    "/v1/me/privacy-requests/{privacyRequestId}/download-action": {
+      "post": {
+        "operationId": "downloadAction",
+        "parameters": [
+          {
+            "name": "privacyRequestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyDownloadActionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a short-lived private export download URL",
+        "tags": ["privacy requests"]
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "getHealth",
@@ -1106,66 +1194,6 @@
         "summary": "Return authoritative current competition progress from the ledger",
         "tags": ["leaderboards"]
       }
-    },
-    "/v1/me/privacy-requests": {
-      "post": {
-        "operationId": "create",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePrivacyRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PrivacyRequestResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Request an account data export or deletion",
-        "tags": ["privacy requests"]
-      },
-      "get": {
-        "operationId": "list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PrivacyRequestResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "List this account privacy requests",
-        "tags": ["privacy requests"]
-      }
     }
   },
   "info": {
@@ -1560,6 +1588,56 @@
           "violations"
         ]
       },
+      "CreatePrivacyRequestDto": {
+        "type": "object",
+        "properties": {
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "reason": { "type": "string", "maxLength": 1000 }
+        },
+        "required": ["requestType"]
+      },
+      "PrivacyRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "status": {
+            "type": "string",
+            "enum": ["completed", "processing", "rejected", "requested"]
+          },
+          "requestedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "downloadAvailable": { "type": "boolean" },
+          "exportExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureCode": { "type": "string", "nullable": true }
+        },
+        "required": [
+          "id",
+          "requestType",
+          "status",
+          "requestedAt",
+          "completedAt",
+          "downloadAvailable",
+          "exportExpiresAt",
+          "failureCode"
+        ]
+      },
+      "PrivacyDownloadActionDto": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["url", "expiresAt"]
+      },
       "HealthResponseDto": {
         "type": "object",
         "properties": {
@@ -1921,38 +1999,6 @@
           "categoryScore",
           "prizeDrawEntries",
           "updatedAt"
-        ]
-      },
-      "CreatePrivacyRequestDto": {
-        "type": "object",
-        "properties": {
-          "requestType": { "type": "string", "enum": ["delete", "export"] },
-          "reason": { "type": "string", "maxLength": 1000 }
-        },
-        "required": ["requestType"]
-      },
-      "PrivacyRequestResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "requestType": { "type": "string", "enum": ["delete", "export"] },
-          "status": {
-            "type": "string",
-            "enum": ["completed", "processing", "rejected", "requested"]
-          },
-          "requestedAt": { "type": "string", "format": "date-time" },
-          "completedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "requestType",
-          "status",
-          "requestedAt",
-          "completedAt"
         ]
       }
     }

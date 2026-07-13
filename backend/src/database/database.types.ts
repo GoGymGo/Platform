@@ -420,8 +420,29 @@ export interface PrivacyRequestsTable {
   status: PrivacyRequestStatus;
   reason: string | null;
   result_object_key: string | null;
+  result_deleted_at: NullableTimestamp;
+  result_sha256: string | null;
+  export_expires_at: NullableTimestamp;
+  processing_started_at: NullableTimestamp;
+  attempt_count: Generated<number>;
+  next_attempt_at: Timestamp;
+  lease_token: string | null;
+  lease_expires_at: NullableTimestamp;
+  failure_code: string | null;
   requested_at: Timestamp;
   completed_at: NullableTimestamp;
+  updated_at: Timestamp;
+}
+
+export interface PrivacyRequestEventsTable {
+  id: Generated<string>;
+  privacy_request_id: string;
+  previous_status: PrivacyRequestStatus | null;
+  next_status: PrivacyRequestStatus;
+  source: string;
+  source_event_id: string;
+  metadata: ColumnType<JsonValue, JsonValue, never>;
+  created_at: Timestamp;
 }
 
 export interface CreatorWorkoutsTable {
@@ -461,6 +482,7 @@ export interface Database {
   payout_claims: PayoutClaimsTable;
   payout_payments: PayoutPaymentsTable;
   payout_state_events: PayoutStateEventsTable;
+  privacy_request_events: PrivacyRequestEventsTable;
   privacy_requests: PrivacyRequestsTable;
   profiles: ProfilesTable;
   provider_webhooks: ProviderWebhooksTable;

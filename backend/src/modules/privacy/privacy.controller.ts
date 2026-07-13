@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -12,6 +20,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
   CreatePrivacyRequestDto,
+  PrivacyDownloadActionDto,
   PrivacyRequestResponseDto,
 } from './dto/privacy-request.dto';
 import { PrivacyService } from './privacy.service';
@@ -45,5 +54,15 @@ export class PrivacyController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<PrivacyRequestResponseDto[]> {
     return this.privacy.listRequests(principal);
+  }
+
+  @Post(':privacyRequestId/download-action')
+  @ApiOperation({ summary: 'Create a short-lived private export download URL' })
+  @ApiOkResponse({ type: PrivacyDownloadActionDto })
+  downloadAction(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('privacyRequestId', ParseUUIDPipe) privacyRequestId: string,
+  ): Promise<PrivacyDownloadActionDto> {
+    return this.privacy.createDownloadAction(principal, privacyRequestId);
   }
 }

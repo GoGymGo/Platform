@@ -28,7 +28,9 @@ export function buildSessionEventPayload(
         throw invalidEvent('A gym QR event requires qrPayload.');
       }
       return {
-        qrPayload: event.qrPayload,
+        qrPayloadHash: createHash('sha256')
+          .update(event.qrPayload)
+          .digest('hex'),
         trust: 'pending_server_signature_verification',
       };
     case 'device_attestation':

@@ -16,6 +16,12 @@ const optionalUrl = z.preprocess(
   z.string().url().optional(),
 );
 
+const optionalSecret = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().min(32).optional(),
+);
+
 export const environmentSchema = z
   .object({
     NODE_ENV: z
@@ -54,6 +60,27 @@ export const environmentSchema = z
       .default('postgresql://gogymgo:gogymgo@localhost:5432/gogymgo'),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
     GCP_STORAGE_BUCKET: optionalTrimmedString,
+    PRIVACY_OPERATIONS_ENABLED: booleanString.default(false),
+    PRIVACY_EXPORT_BUCKET: optionalTrimmedString,
+    PRIVACY_EXPORT_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .default(7),
+    PRIVACY_DOWNLOAD_URL_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(900)
+      .default(300),
+    PRIVACY_JOB_LEASE_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(3_600)
+      .default(600),
+    PRIVACY_PSEUDONYMIZATION_KEY: optionalSecret,
     PUSH_NOTIFICATIONS_ENABLED: booleanString.default(false),
     EXPO_PUSH_API_URL: z
       .string()
@@ -110,6 +137,29 @@ export const environmentSchema = z
           context.addIssue({
             code: 'custom',
             message: `${key} is required when HYPERWALLET_ENABLED is true.`,
+            path: [key],
+          });
+        }
+      }
+    }
+
+    if (environment.PRIVACY_OPERATIONS_ENABLED) {
+      if (environment.AUTH_MODE !== 'firebase') {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'AUTH_MODE must be firebase when PRIVACY_OPERATIONS_ENABLED is true.',
+          path: ['AUTH_MODE'],
+        });
+      }
+      for (const key of [
+        'PRIVACY_EXPORT_BUCKET',
+        'PRIVACY_PSEUDONYMIZATION_KEY',
+      ] as const) {
+        if (!environment[key]) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} is required when PRIVACY_OPERATIONS_ENABLED is true.`,
             path: [key],
           });
         }

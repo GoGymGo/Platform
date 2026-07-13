@@ -332,16 +332,37 @@ export class OperatorService {
           if (!current) {
             throw this.notFound(input.entityType);
           }
-          if (!['requested', 'processing'].includes(current.status)) {
+          if (current.status !== 'requested') {
             throw new ConflictException({
               code: 'PRIVACY_REQUEST_ALREADY_DECIDED',
-              message: 'The privacy request is already final.',
+              message: 'The privacy request is no longer awaiting a decision.',
             });
           }
           await transaction
             .updateTable('privacy_requests')
-            .set({ status: input.nextStatus })
+            .set({
+              completed_at: input.nextStatus === 'rejected' ? new Date() : null,
+              failure_code: null,
+              lease_expires_at: null,
+              lease_token: null,
+              next_attempt_at: new Date(),
+              processing_started_at:
+                input.nextStatus === 'processing' ? new Date() : null,
+              status: input.nextStatus,
+              updated_at: new Date(),
+            })
             .where('id', '=', current.id)
+            .executeTakeFirstOrThrow();
+          await transaction
+            .insertInto('privacy_request_events')
+            .values({
+              metadata: { reasonRecordedInOperatorAudit: true },
+              next_status: input.nextStatus,
+              previous_status: current.status,
+              privacy_request_id: current.id,
+              source: 'operator_decision',
+              source_event_id: input.requestId,
+            })
             .executeTakeFirstOrThrow();
           await this.auditDecision(
             transaction,

@@ -5,7 +5,7 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 ## Trust boundaries
 
 - Firebase Admin verifies the bearer token and supplies the account identity. Client-supplied user IDs are never authoritative.
-- PostgreSQL/PostGIS is the source of truth. Redis and BullMQ may cache or retry work but cannot award value.
+- PostgreSQL/PostGIS is the source of truth and durable job queue. Workers claim jobs with bounded database leases; Redis is not required for the initial production system.
 - Money is stored as integer minor units with an ISO currency.
 - Retryable and money-affecting mutations require an idempotency key.
 - Hyperwallet credentials, webhooks, user/payment tokens, and hosted portal actions remain server-side.
@@ -41,6 +41,7 @@ Database integration tests use Testcontainers and require a running Docker engin
 2. PostgreSQL migrations, Firebase authentication, accounts, profiles, and regions.
 3. Competitions, enrollments, sessions, append-only entry ledger, and leaderboards.
 4. Draw settlement, payout claims, Hyperwallet adapter/webhooks, and reconciliation.
-5. Notifications, partnerships, moderation/admin, privacy operations, observability, and deployment hardening.
+5. Notifications, partnerships, moderation/admin, and executable privacy operations.
+6. Observability, infrastructure provisioning, and deployment hardening.
 
 See [the frontend architecture decision](../mobile-app/docs/backend-handoff-architecture.md) and [the clean-push prompt](../BACKEND_CLEAN_PUSH_PROMPT.md) for the full contract and publish policy.

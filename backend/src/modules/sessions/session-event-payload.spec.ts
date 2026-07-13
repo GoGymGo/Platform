@@ -23,4 +23,16 @@ describe('session event payloads', () => {
     expect(payload.tokenHash).toHaveLength(64);
     expect(JSON.stringify(payload)).not.toContain('opaque-device-token');
   });
+
+  it('hashes gym QR payloads instead of persisting reusable credentials', () => {
+    const payload = buildSessionEventPayload({
+      eventId: crypto.randomUUID(),
+      eventType: 'gym_qr_scan',
+      occurredAt: new Date().toISOString(),
+      qrPayload: 'gym-signed-credential',
+    });
+
+    expect(payload.qrPayloadHash).toHaveLength(64);
+    expect(JSON.stringify(payload)).not.toContain('gym-signed-credential');
+  });
 });

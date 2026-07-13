@@ -40,4 +40,21 @@ export class PrivacyRequestResponseDto {
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   completedAt!: string | null;
+
+  @ApiProperty({ type: Boolean })
+  downloadAvailable!: boolean;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  exportExpiresAt!: string | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  failureCode!: string | null;
+}
+
+export class PrivacyDownloadActionDto {
+  @ApiProperty({ format: 'uri', type: String })
+  url!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
 }

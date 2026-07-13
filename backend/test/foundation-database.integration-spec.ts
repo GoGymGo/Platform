@@ -72,6 +72,7 @@ describeWithDatabase('database migrations', () => {
         'payout_payments',
         'payout_state_events',
         'profiles',
+        'privacy_request_events',
         'privacy_requests',
         'provider_webhooks',
         'push_devices',
@@ -100,6 +101,7 @@ describeWithDatabase('database migrations', () => {
         'entry_ledger_append_only',
         'operator_audit_events_append_only',
         'payout_state_events_append_only',
+        'privacy_request_events_append_only',
         'session_events_append_only',
       ]),
     );
@@ -123,6 +125,42 @@ describeWithDatabase('database migrations', () => {
       pool.query(
         `UPDATE operator_audit_events SET reason = 'changed' WHERE id = $1`,
         [audit.rows[0].id],
+      ),
+    ).rejects.toThrow(/append-only/i);
+  });
+
+  it('enforces one active privacy request and immutable state events', async () => {
+    const user = await pool.query<{ id: string }>(
+      `INSERT INTO users (firebase_uid)
+       VALUES ('privacy-integration-user')
+       RETURNING id`,
+    );
+    const privacyRequest = await pool.query<{ id: string }>(
+      `INSERT INTO privacy_requests (user_id, request_type)
+       VALUES ($1, 'export')
+       RETURNING id`,
+      [user.rows[0].id],
+    );
+
+    await expect(
+      pool.query(
+        `INSERT INTO privacy_requests (user_id, request_type)
+         VALUES ($1, 'delete')`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/privacy_requests_one_active_per_user/i);
+
+    const event = await pool.query<{ id: string }>(
+      `INSERT INTO privacy_request_events
+         (privacy_request_id, previous_status, next_status, source, source_event_id)
+       VALUES ($1, NULL, 'requested', 'integration', 'event-1')
+       RETURNING id`,
+      [privacyRequest.rows[0].id],
+    );
+    await expect(
+      pool.query(
+        `UPDATE privacy_request_events SET source = 'changed' WHERE id = $1`,
+        [event.rows[0].id],
       ),
     ).rejects.toThrow(/append-only/i);
   });

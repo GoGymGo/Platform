@@ -31,6 +31,9 @@ async function bootstrap(): Promise<void> {
       if (
         result.notificationsSent > 0 ||
         result.paymentsReconciled > 0 ||
+        result.privacyExportsDeleted > 0 ||
+        result.privacyOperationsCompleted > 0 ||
+        result.privacyOperationsFailed > 0 ||
         result.webhooksProcessed > 0
       ) {
         logger.log({ event: 'worker.batch.completed', ...result });

@@ -37,6 +37,7 @@
     "check": "npm run format:check && npm run typecheck && npm run lint && npm run test && npm run test:e2e && npm run test:integration && npm run openapi:generate && npm run format:check && npm run audit:contract && npm run audit:source && npm run build"
   },
   "dependencies": {
+    "@google-cloud/storage": "7.21.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",

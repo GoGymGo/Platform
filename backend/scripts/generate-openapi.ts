@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
+import { format } from 'prettier';
 import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/bootstrap';
 import { createOpenApiDocument } from '../src/common/openapi/openapi';
@@ -15,10 +16,11 @@ async function generateOpenApi(): Promise<void> {
   await app.init();
 
   const document = createOpenApiDocument(app);
-  await writeFile(
-    resolve(process.cwd(), 'openapi.json'),
-    `${JSON.stringify(document, null, 2)}\n`,
-  );
+  const formattedDocument = await format(JSON.stringify(document), {
+    endOfLine: 'lf',
+    parser: 'json',
+  });
+  await writeFile(resolve(process.cwd(), 'openapi.json'), formattedDocument);
   await app.close();
 }
 

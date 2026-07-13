@@ -34,7 +34,7 @@
     "audit:source": "node scripts/audit-source.mjs",
     "audit:contract": "node scripts/audit-frontend-contract.mjs",
     "audit:deps": "npm audit --omit=dev --audit-level=high",
-    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test && npm run test:e2e && npm run test:integration && npm run openapi:generate && npm run audit:contract && npm run audit:source && npm run build"
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test && npm run test:e2e && npm run test:integration && npm run openapi:generate && npm run format:check && npm run audit:contract && npm run audit:source && npm run build"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

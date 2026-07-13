@@ -9,18 +9,14 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterPushDeviceDto"
-              }
+              "schema": { "$ref": "#/components/schemas/RegisterPushDeviceDto" }
             }
           }
         },
@@ -36,15 +32,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Register an Expo push token for this account",
-        "tags": [
-          "push devices"
-        ]
+        "tags": ["push devices"]
       }
     },
     "/v1/me/push-devices/{deviceId}": {
@@ -55,25 +45,13 @@
             "name": "deviceId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "responses": { "204": { "description": "" } },
+        "security": [{ "firebase": [] }],
         "summary": "Disable a push token owned by this account",
-        "tags": [
-          "push devices"
-        ]
+        "tags": ["push devices"]
       }
     },
     "/v1/me": {
@@ -85,22 +63,14 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeResponseDto"
-                }
+                "schema": { "$ref": "#/components/schemas/MeResponseDto" }
               }
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Bootstrap and return the authenticated account profile",
-        "tags": [
-          "profiles"
-        ]
+        "tags": ["profiles"]
       },
       "patch": {
         "operationId": "updateMe",
@@ -109,9 +79,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateMeDto"
-              }
+              "schema": { "$ref": "#/components/schemas/UpdateMeDto" }
             }
           }
         },
@@ -120,22 +88,14 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeResponseDto"
-                }
+                "schema": { "$ref": "#/components/schemas/MeResponseDto" }
               }
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Update the authenticated account public identity and privacy settings",
-        "tags": [
-          "profiles"
-        ]
+        "tags": ["profiles"]
       }
     },
     "/v1/operator/work-queue": {
@@ -157,15 +117,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "List review work without sensitive evidence data",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/operator/sessions/{sessionId}/verify": {
@@ -176,26 +130,20 @@
             "name": "sessionId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifySessionDto"
-              }
+              "schema": { "$ref": "#/components/schemas/VerifySessionDto" }
             }
           }
         },
@@ -211,15 +159,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Manually verify a reviewed workout session",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/operator/draws/lock": {
@@ -230,18 +172,14 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LockDrawDto"
-              }
+              "schema": { "$ref": "#/components/schemas/LockDrawDto" }
             }
           }
         },
@@ -257,15 +195,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Lock a competition draw snapshot and commitment",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/operator/draws/{drawId}/settle": {
@@ -276,26 +208,20 @@
             "name": "drawId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SettleDrawDto"
-              }
+              "schema": { "$ref": "#/components/schemas/SettleDrawDto" }
             }
           }
         },
@@ -311,15 +237,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Reveal the draw seed and settle winners",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/operator/region-verifications/{verificationId}/decision": {
@@ -330,17 +250,13 @@
             "name": "verificationId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -365,15 +281,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Approve or reject a region-verification review",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/operator/partner-applications/{applicationId}/decision": {
@@ -384,17 +294,13 @@
             "name": "applicationId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -419,15 +325,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Review a partner application",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/operator/privacy-requests/{privacyRequestId}/decision": {
@@ -438,17 +338,13 @@
             "name": "privacyRequestId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -473,15 +369,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Start or reject a privacy request",
-        "tags": [
-          "operator"
-        ]
+        "tags": ["operator"]
       }
     },
     "/v1/webhooks/hyperwallet": {
@@ -492,9 +382,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HyperwalletWebhookDto"
-              }
+              "schema": { "$ref": "#/components/schemas/HyperwalletWebhookDto" }
             }
           }
         },
@@ -510,15 +398,9 @@
             }
           }
         },
-        "security": [
-          {
-            "hyperwallet-webhook": []
-          }
-        ],
+        "security": [{ "hyperwallet-webhook": [] }],
         "summary": "Durably accept a Hyperwallet notification for reconciliation",
-        "tags": [
-          "provider webhooks"
-        ]
+        "tags": ["provider webhooks"]
       }
     },
     "/v1/operator/payout-claims/{claimId}/approve": {
@@ -529,17 +411,13 @@
             "name": "claimId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -564,15 +442,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Approve a reviewed winner claim for payee setup",
-        "tags": [
-          "operator payouts"
-        ]
+        "tags": ["operator payouts"]
       }
     },
     "/v1/operator/payout-claims/{claimId}/release": {
@@ -583,17 +455,13 @@
             "name": "claimId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -618,15 +486,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Release a ready claim to Hyperwallet exactly once",
-        "tags": [
-          "operator payouts"
-        ]
+        "tags": ["operator payouts"]
       }
     },
     "/v1/payout-claims/me": {
@@ -645,15 +507,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Return the current approved winner payout claim",
-        "tags": [
-          "payouts"
-        ]
+        "tags": ["payouts"]
       }
     },
     "/v1/payout-claims/{claimId}/portal-action": {
@@ -664,17 +520,13 @@
             "name": "claimId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
@@ -689,15 +541,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Provision hosted payee setup and return the approved portal URL",
-        "tags": [
-          "payouts"
-        ]
+        "tags": ["payouts"]
       }
     },
     "/v1/sessions": {
@@ -708,18 +554,14 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSessionDto"
-              }
+              "schema": { "$ref": "#/components/schemas/CreateSessionDto" }
             }
           }
         },
@@ -728,22 +570,14 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionResponseDto"
-                }
+                "schema": { "$ref": "#/components/schemas/SessionResponseDto" }
               }
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Start an authoritative competition workout session",
-        "tags": [
-          "sessions"
-        ]
+        "tags": ["sessions"]
       }
     },
     "/v1/sessions/{sessionId}/events": {
@@ -754,26 +588,20 @@
             "name": "sessionId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AppendSessionEventDto"
-              }
+              "schema": { "$ref": "#/components/schemas/AppendSessionEventDto" }
             }
           }
         },
@@ -789,15 +617,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Append immutable, untrusted evidence to an active session",
-        "tags": [
-          "sessions"
-        ]
+        "tags": ["sessions"]
       }
     },
     "/v1/sessions/{sessionId}/complete": {
@@ -808,26 +630,20 @@
             "name": "sessionId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteSessionDto"
-              }
+              "schema": { "$ref": "#/components/schemas/CompleteSessionDto" }
             }
           }
         },
@@ -843,15 +659,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Close a session and submit it for server-side evidence review",
-        "tags": [
-          "sessions"
-        ]
+        "tags": ["sessions"]
       }
     },
     "/v1/health": {
@@ -863,17 +673,13 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponseDto"
-                }
+                "schema": { "$ref": "#/components/schemas/HealthResponseDto" }
               }
             }
           }
         },
         "summary": "Report API liveness",
-        "tags": [
-          "health"
-        ]
+        "tags": ["health"]
       }
     },
     "/v1/health/ready": {
@@ -885,17 +691,13 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponseDto"
-                }
+                "schema": { "$ref": "#/components/schemas/HealthResponseDto" }
               }
             }
           }
         },
         "summary": "Report whether the API database dependency is ready",
-        "tags": [
-          "health"
-        ]
+        "tags": ["health"]
       }
     },
     "/v1/partner-applications/creators": {
@@ -906,18 +708,14 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatorApplicationDto"
-              }
+              "schema": { "$ref": "#/components/schemas/CreatorApplicationDto" }
             }
           }
         },
@@ -933,15 +731,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Submit an authenticated creator application",
-        "tags": [
-          "partner applications"
-        ]
+        "tags": ["partner applications"]
       }
     },
     "/v1/partner-applications/sponsors": {
@@ -952,9 +744,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SponsorApplicationDto"
-              }
+              "schema": { "$ref": "#/components/schemas/SponsorApplicationDto" }
             }
           }
         },
@@ -971,9 +761,7 @@
           }
         },
         "summary": "Submit a public sponsor inquiry",
-        "tags": [
-          "partner applications"
-        ]
+        "tags": ["partner applications"]
       }
     },
     "/v1/partner-applications/gyms": {
@@ -984,9 +772,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GymApplicationDto"
-              }
+              "schema": { "$ref": "#/components/schemas/GymApplicationDto" }
             }
           }
         },
@@ -1003,9 +789,7 @@
           }
         },
         "summary": "Submit a public partner-gym inquiry",
-        "tags": [
-          "partner applications"
-        ]
+        "tags": ["partner applications"]
       }
     },
     "/v1/regions": {
@@ -1028,9 +812,7 @@
           }
         },
         "summary": "List active versioned service-region policies",
-        "tags": [
-          "regions"
-        ]
+        "tags": ["regions"]
       }
     },
     "/v1/me/region-verifications": {
@@ -1041,9 +823,7 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -1068,15 +848,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Submit minimized regional eligibility evidence for server review",
-        "tags": [
-          "regions"
-        ]
+        "tags": ["regions"]
       }
     },
     "/v1/results/payout-winners": {
@@ -1099,9 +873,7 @@
           }
         },
         "summary": "Return the public top payout results",
-        "tags": [
-          "competition results"
-        ]
+        "tags": ["competition results"]
       }
     },
     "/v1/results/settled-competition": {
@@ -1121,9 +893,7 @@
           }
         },
         "summary": "Return the latest settled payout rules summary",
-        "tags": [
-          "competition results"
-        ]
+        "tags": ["competition results"]
       }
     },
     "/v1/competitions/current": {
@@ -1142,15 +912,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Return the authenticated user current regional competition",
-        "tags": [
-          "competitions"
-        ]
+        "tags": ["competitions"]
       }
     },
     "/v1/competitions/{competitionId}/enrollments": {
@@ -1161,26 +925,20 @@
             "name": "competitionId",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateEnrollmentDto"
-              }
+              "schema": { "$ref": "#/components/schemas/CreateEnrollmentDto" }
             }
           }
         },
@@ -1196,15 +954,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Enroll the authenticated eligible user in a goal bracket",
-        "tags": [
-          "competitions"
-        ]
+        "tags": ["competitions"]
       }
     },
     "/v1/competitions/{monthKey}/enrollment-count": {
@@ -1215,17 +967,13 @@
             "name": "monthKey",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "region",
             "required": true,
             "in": "query",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
@@ -1241,9 +989,7 @@
           }
         },
         "summary": "Return the active enrollment count for a regional competition",
-        "tags": [
-          "competitions"
-        ]
+        "tags": ["competitions"]
       }
     },
     "/v1/competitions/{monthKey}/matches": {
@@ -1254,27 +1000,19 @@
             "name": "monthKey",
             "required": true,
             "in": "path",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "region",
             "required": true,
             "in": "query",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "goal",
             "required": true,
             "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 7,
-              "type": "number"
-            }
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
           }
         ],
         "responses": {
@@ -1292,15 +1030,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Return the authenticated entrant weekly competition matches",
-        "tags": [
-          "competitions"
-        ]
+        "tags": ["competitions"]
       }
     },
     "/v1/creator-workouts": {
@@ -1323,9 +1055,7 @@
           }
         },
         "summary": "List the currently published creator workouts",
-        "tags": [
-          "creator workouts"
-        ]
+        "tags": ["creator workouts"]
       }
     },
     "/v1/leaderboards/current": {
@@ -1336,11 +1066,7 @@
             "name": "goal",
             "required": true,
             "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 7,
-              "type": "number"
-            }
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
           }
         ],
         "responses": {
@@ -1355,15 +1081,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Return the current authenticated regional category leaderboard",
-        "tags": [
-          "leaderboards"
-        ]
+        "tags": ["leaderboards"]
       }
     },
     "/v1/me/progress": {
@@ -1382,15 +1102,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Return authoritative current competition progress from the ledger",
-        "tags": [
-          "leaderboards"
-        ]
+        "tags": ["leaderboards"]
       }
     },
     "/v1/me/privacy-requests": {
@@ -1401,9 +1115,7 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -1428,15 +1140,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "Request an account data export or deletion",
-        "tags": [
-          "privacy requests"
-        ]
+        "tags": ["privacy requests"]
       },
       "get": {
         "operationId": "list",
@@ -1456,15 +1162,9 @@
             }
           }
         },
-        "security": [
-          {
-            "firebase": []
-          }
-        ],
+        "security": [{ "firebase": [] }],
         "summary": "List this account privacy requests",
-        "tags": [
-          "privacy requests"
-        ]
+        "tags": ["privacy requests"]
       }
     }
   },
@@ -1494,119 +1194,50 @@
       "RegisterPushDeviceDto": {
         "type": "object",
         "properties": {
-          "platform": {
-            "type": "string",
-            "enum": [
-              "android",
-              "ios"
-            ]
-          },
-          "pushToken": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 16
-          }
+          "platform": { "type": "string", "enum": ["android", "ios"] },
+          "pushToken": { "type": "string", "maxLength": 512, "minLength": 16 }
         },
-        "required": [
-          "platform",
-          "pushToken"
-        ]
+        "required": ["platform", "pushToken"]
       },
       "PushDeviceResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "expo"
-            ]
-          },
-          "platform": {
-            "type": "string",
-            "enum": [
-              "android",
-              "ios"
-            ]
-          },
-          "enabled": {
-            "type": "boolean"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "provider": { "type": "string", "enum": ["expo"] },
+          "platform": { "type": "string", "enum": ["android", "ios"] },
+          "enabled": { "type": "boolean" }
         },
-        "required": [
-          "id",
-          "provider",
-          "platform",
-          "enabled"
-        ]
+        "required": ["id", "provider", "platform", "enabled"]
       },
       "PrivacySettingsDto": {
         "type": "object",
         "properties": {
-          "showRegion": {
-            "type": "boolean"
-          },
-          "showStats": {
-            "type": "boolean"
-          }
+          "showRegion": { "type": "boolean" },
+          "showStats": { "type": "boolean" }
         },
-        "required": [
-          "showRegion",
-          "showStats"
-        ]
+        "required": ["showRegion", "showStats"]
       },
       "MeResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "callsign": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "emailVerified": {
-            "type": "boolean"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "callsign": { "type": "string" },
+          "email": { "type": "string", "nullable": true },
+          "emailVerified": { "type": "boolean" },
           "publicIdentityMode": {
             "type": "string",
-            "enum": [
-              "private",
-              "alias",
-              "real_name"
-            ]
+            "enum": ["private", "alias", "real_name"]
           },
-          "publicName": {
-            "type": "string",
-            "nullable": true
-          },
+          "publicName": { "type": "string", "nullable": true },
           "privacySettings": {
             "$ref": "#/components/schemas/PrivacySettingsDto"
           },
-          "roles": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
+          "roles": { "type": "array", "items": { "type": "string" } },
           "status": {
             "type": "string",
-            "enum": [
-              "active",
-              "suspended",
-              "deleted"
-            ]
+            "enum": ["active", "suspended", "deleted"]
           },
-          "version": {
-            "type": "number"
-          }
+          "version": { "type": "number" }
         },
         "required": [
           "id",
@@ -1624,12 +1255,8 @@
       "UpdatePrivacySettingsDto": {
         "type": "object",
         "properties": {
-          "showRegion": {
-            "type": "boolean"
-          },
-          "showStats": {
-            "type": "boolean"
-          }
+          "showRegion": { "type": "boolean" },
+          "showStats": { "type": "boolean" }
         }
       },
       "UpdateMeDto": {
@@ -1637,11 +1264,7 @@
         "properties": {
           "publicIdentityMode": {
             "type": "string",
-            "enum": [
-              "private",
-              "alias",
-              "real_name"
-            ]
+            "enum": ["private", "alias", "real_name"]
           },
           "publicName": {
             "type": "string",
@@ -1657,10 +1280,7 @@
       "OperatorWorkQueueItemDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
           "kind": {
             "type": "string",
             "enum": [
@@ -1671,220 +1291,102 @@
               "workout_session"
             ]
           },
-          "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "status": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "id",
-          "kind",
-          "status",
-          "createdAt"
-        ]
+        "required": ["id", "kind", "status", "createdAt"]
       },
       "VerifySessionDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          },
-          "trustedEvidenceSummary": {
-            "type": "object"
-          }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "trustedEvidenceSummary": { "type": "object" }
         },
-        "required": [
-          "reason",
-          "trustedEvidenceSummary"
-        ]
+        "required": ["reason", "trustedEvidenceSummary"]
       },
       "OperatorActionResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "type": "string"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string" }
         },
-        "required": [
-          "id",
-          "status"
-        ]
+        "required": ["id", "status"]
       },
       "LockDrawDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "competitionId": { "type": "string", "format": "uuid" },
           "seedCommitment": {
             "type": "string",
             "maxLength": 64,
             "minLength": 64
           }
         },
-        "required": [
-          "reason",
-          "competitionId",
-          "seedCommitment"
-        ]
+        "required": ["reason", "competitionId", "seedCommitment"]
       },
       "SettleDrawDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          },
-          "seedReveal": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 64
-          }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "seedReveal": { "type": "string", "maxLength": 64, "minLength": 64 }
         },
-        "required": [
-          "reason",
-          "seedReveal"
-        ]
+        "required": ["reason", "seedReveal"]
       },
       "DecideRegionVerificationDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          },
-          "decision": {
-            "type": "string",
-            "enum": [
-              "approved",
-              "rejected"
-            ]
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "decision": { "type": "string", "enum": ["approved", "rejected"] },
+          "expiresAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "reason",
-          "decision"
-        ]
+        "required": ["reason", "decision"]
       },
       "DecidePartnerApplicationDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          },
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
           "decision": {
             "type": "string",
-            "enum": [
-              "approved",
-              "in_review",
-              "rejected"
-            ]
+            "enum": ["approved", "in_review", "rejected"]
           }
         },
-        "required": [
-          "reason",
-          "decision"
-        ]
+        "required": ["reason", "decision"]
       },
       "DecidePrivacyRequestDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          },
-          "decision": {
-            "type": "string",
-            "enum": [
-              "processing",
-              "rejected"
-            ]
-          }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "decision": { "type": "string", "enum": ["processing", "rejected"] }
         },
-        "required": [
-          "reason",
-          "decision"
-        ]
+        "required": ["reason", "decision"]
       },
       "HyperwalletWebhookDto": {
         "type": "object",
         "properties": {
-          "token": {
-            "type": "string",
-            "maxLength": 64
-          },
-          "type": {
-            "type": "string",
-            "maxLength": 160
-          },
-          "createdOn": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "data": {
-            "type": "object"
-          }
+          "token": { "type": "string", "maxLength": 64 },
+          "type": { "type": "string", "maxLength": 160 },
+          "createdOn": { "type": "string", "format": "date-time" },
+          "data": { "type": "object" }
         },
-        "required": [
-          "token",
-          "type"
-        ]
+        "required": ["token", "type"]
       },
       "HyperwalletWebhookAcceptedDto": {
         "type": "object",
-        "properties": {
-          "accepted": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "accepted"
-        ]
+        "properties": { "accepted": { "type": "boolean" } },
+        "required": ["accepted"]
       },
       "OperatorPayoutActionDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 8
-          }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 }
         },
-        "required": [
-          "reason"
-        ]
+        "required": ["reason"]
       },
       "OperatorPayoutClaimResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
           "status": {
             "type": "string",
             "enum": [
@@ -1898,51 +1400,21 @@
               "cancelled"
             ]
           },
-          "version": {
-            "type": "number"
-          }
+          "version": { "type": "number" }
         },
-        "required": [
-          "id",
-          "status",
-          "version"
-        ]
+        "required": ["id", "status", "version"]
       },
       "PayoutClaimResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "amountMinor": {
-            "type": "number"
-          },
-          "competitionLabel": {
-            "type": "string"
-          },
-          "currency": {
-            "type": "string",
-            "enum": [
-              "CAD",
-              "MXN",
-              "USD"
-            ]
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "hyperwallet"
-            ]
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "amountMinor": { "type": "number" },
+          "competitionLabel": { "type": "string" },
+          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
+          "provider": { "type": "string", "enum": ["hyperwallet"] },
           "status": {
             "type": "string",
-            "enum": [
-              "action-required",
-              "verification-pending",
-              "ready",
-              "paid"
-            ]
+            "enum": ["action-required", "verification-pending", "ready", "paid"]
           }
         },
         "required": [
@@ -1956,46 +1428,23 @@
       },
       "PortalActionResponseDto": {
         "type": "object",
-        "properties": {
-          "portalUrl": {
-            "type": "string",
-            "format": "uri"
-          }
-        },
-        "required": [
-          "portalUrl"
-        ]
+        "properties": { "portalUrl": { "type": "string", "format": "uri" } },
+        "required": ["portalUrl"]
       },
       "CreateSessionDto": {
         "type": "object",
         "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "clientStartedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "competitionId": { "type": "string", "format": "uuid" },
+          "clientStartedAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "competitionId"
-        ]
+        "required": ["competitionId"]
       },
       "SessionResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eligibleDate": {
-            "type": "string"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string" },
           "status": {
             "type": "string",
             "enum": [
@@ -2006,13 +1455,8 @@
               "cancelled"
             ]
           },
-          "policyVersion": {
-            "type": "string"
-          },
-          "startedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "policyVersion": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
           "completedAt": {
             "type": "string",
             "format": "date-time",
@@ -2032,10 +1476,7 @@
       "AppendSessionEventDto": {
         "type": "object",
         "properties": {
-          "eventId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "eventId": { "type": "string", "format": "uuid" },
           "eventType": {
             "type": "string",
             "enum": [
@@ -2045,46 +1486,23 @@
               "heart_rate_sample"
             ]
           },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "heartRateBpm": {
-            "type": "number",
-            "maximum": 240,
-            "minimum": 30
-          },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "heartRateBpm": { "type": "number", "maximum": 240, "minimum": 30 },
           "faceMatchConfidence": {
             "type": "number",
             "maximum": 1,
             "minimum": 0
           },
-          "qrPayload": {
-            "type": "string",
-            "maxLength": 2048
-          },
-          "deviceEvidenceToken": {
-            "type": "string",
-            "maxLength": 4096
-          }
+          "qrPayload": { "type": "string", "maxLength": 2048 },
+          "deviceEvidenceToken": { "type": "string", "maxLength": 4096 }
         },
-        "required": [
-          "eventId",
-          "eventType",
-          "occurredAt"
-        ]
+        "required": ["eventId", "eventType", "occurredAt"]
       },
       "SessionEventResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eventId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "eventId": { "type": "string", "format": "uuid" },
           "eventType": {
             "type": "string",
             "enum": [
@@ -2094,41 +1512,22 @@
               "heart_rate_sample"
             ]
           },
-          "receivedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "receivedAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "id",
-          "eventId",
-          "eventType",
-          "receivedAt"
-        ]
+        "required": ["id", "eventId", "eventType", "receivedAt"]
       },
       "CompleteSessionDto": {
         "type": "object",
         "properties": {
-          "clientCompletedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "clientCompletedAt": { "type": "string", "format": "date-time" }
         }
       },
       "SessionCompletionResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "eligibleDate": {
-            "type": "string"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string" },
           "status": {
             "type": "string",
             "enum": [
@@ -2139,27 +1538,15 @@
               "cancelled"
             ]
           },
-          "policyVersion": {
-            "type": "string"
-          },
-          "startedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "policyVersion": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
           "completedAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           },
-          "eligibleForReview": {
-            "type": "boolean"
-          },
-          "violations": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
+          "eligibleForReview": { "type": "boolean" },
+          "violations": { "type": "array", "items": { "type": "string" } }
         },
         "required": [
           "id",
@@ -2176,40 +1563,20 @@
       "HealthResponseDto": {
         "type": "object",
         "properties": {
-          "service": {
-            "type": "string",
-            "example": "gogymgo-api"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok"
-            ],
-            "example": "ok"
-          },
+          "service": { "type": "string", "example": "gogymgo-api" },
+          "status": { "type": "string", "enum": ["ok"], "example": "ok" },
           "timestamp": {
             "type": "string",
             "example": "2026-07-12T12:00:00.000Z"
           },
-          "uptimeSeconds": {
-            "type": "number",
-            "example": 123.45
-          }
+          "uptimeSeconds": { "type": "number", "example": 123.45 }
         },
-        "required": [
-          "service",
-          "status",
-          "timestamp",
-          "uptimeSeconds"
-        ]
+        "required": ["service", "status", "timestamp", "uptimeSeconds"]
       },
       "CreatorApplicationDto": {
         "type": "object",
         "properties": {
-          "region": {
-            "type": "string",
-            "maxLength": 120
-          },
+          "region": { "type": "string", "maxLength": 120 },
           "channelUrl": {
             "type": "string",
             "format": "uri",
@@ -2220,101 +1587,47 @@
             "format": "uri",
             "maxLength": 2048
           },
-          "workoutStyle": {
-            "type": "string",
-            "maxLength": 120
-          }
+          "workoutStyle": { "type": "string", "maxLength": 120 }
         },
-        "required": [
-          "region",
-          "channelUrl",
-          "sampleWorkoutUrl",
-          "workoutStyle"
-        ]
+        "required": ["region", "channelUrl", "sampleWorkoutUrl", "workoutStyle"]
       },
       "PartnerApplicationResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
           "applicationType": {
             "type": "string",
-            "enum": [
-              "creator",
-              "gym",
-              "sponsor"
-            ]
+            "enum": ["creator", "gym", "sponsor"]
           },
           "status": {
             "type": "string",
-            "enum": [
-              "approved",
-              "in_review",
-              "rejected",
-              "submitted"
-            ]
+            "enum": ["approved", "in_review", "rejected", "submitted"]
           },
-          "submittedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "submittedAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "id",
-          "applicationType",
-          "status",
-          "submittedAt"
-        ]
+        "required": ["id", "applicationType", "status", "submittedAt"]
       },
       "SponsorApplicationDto": {
         "type": "object",
         "properties": {
-          "companyName": {
-            "type": "string",
-            "maxLength": 160
-          },
+          "companyName": { "type": "string", "maxLength": 160 },
           "contactEmail": {
             "type": "string",
             "format": "email",
             "maxLength": 320
           },
-          "targetRegion": {
-            "type": "string",
-            "maxLength": 120
-          }
+          "targetRegion": { "type": "string", "maxLength": 120 }
         },
-        "required": [
-          "companyName",
-          "contactEmail",
-          "targetRegion"
-        ]
+        "required": ["companyName", "contactEmail", "targetRegion"]
       },
       "GymApplicationDto": {
         "type": "object",
         "properties": {
-          "region": {
-            "type": "string",
-            "maxLength": 120
-          },
-          "gymAddress": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "gymName": {
-            "type": "string",
-            "maxLength": 160
-          },
-          "managerName": {
-            "type": "string",
-            "maxLength": 160
-          },
-          "workEmail": {
-            "type": "string",
-            "format": "email",
-            "maxLength": 320
-          }
+          "region": { "type": "string", "maxLength": 120 },
+          "gymAddress": { "type": "string", "maxLength": 500 },
+          "gymName": { "type": "string", "maxLength": 160 },
+          "managerName": { "type": "string", "maxLength": 160 },
+          "workEmail": { "type": "string", "format": "email", "maxLength": 320 }
         },
         "required": [
           "region",
@@ -2327,60 +1640,20 @@
       "RegionPolicyResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string",
-            "example": "CA-BC-VICTORIA"
-          },
-          "countryCode": {
-            "type": "string",
-            "example": "CA"
-          },
-          "subdivisionCode": {
-            "type": "string",
-            "example": "BC"
-          },
-          "metroName": {
-            "type": "string",
-            "example": "Victoria"
-          },
-          "currency": {
-            "type": "string",
-            "example": "CAD"
-          },
-          "timezone": {
-            "type": "string",
-            "example": "America/Vancouver"
-          },
-          "languageCodes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "minimumAge": {
-            "type": "number",
-            "example": 19
-          },
-          "competitionEnabled": {
-            "type": "boolean"
-          },
-          "payoutEnabled": {
-            "type": "boolean"
-          },
-          "policyVersion": {
-            "type": "string"
-          },
-          "boundaryVersion": {
-            "type": "string"
-          },
-          "validFrom": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string", "example": "CA-BC-VICTORIA" },
+          "countryCode": { "type": "string", "example": "CA" },
+          "subdivisionCode": { "type": "string", "example": "BC" },
+          "metroName": { "type": "string", "example": "Victoria" },
+          "currency": { "type": "string", "example": "CAD" },
+          "timezone": { "type": "string", "example": "America/Vancouver" },
+          "languageCodes": { "type": "array", "items": { "type": "string" } },
+          "minimumAge": { "type": "number", "example": 19 },
+          "competitionEnabled": { "type": "boolean" },
+          "payoutEnabled": { "type": "boolean" },
+          "policyVersion": { "type": "string" },
+          "boundaryVersion": { "type": "string" },
+          "validFrom": { "type": "string", "format": "date-time" },
           "validTo": {
             "type": "string",
             "format": "date-time",
@@ -2408,71 +1681,32 @@
       "CreateRegionVerificationDto": {
         "type": "object",
         "properties": {
-          "regionPolicyId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
           "method": {
             "type": "string",
-            "enum": [
-              "device_location",
-              "postal_code"
-            ]
+            "enum": ["device_location", "postal_code"]
           },
-          "latitude": {
-            "type": "number",
-            "maximum": 90,
-            "minimum": -90
-          },
-          "longitude": {
-            "type": "number",
-            "maximum": 180,
-            "minimum": -180
-          },
-          "postalCode": {
-            "type": "string"
-          }
+          "latitude": { "type": "number", "maximum": 90, "minimum": -90 },
+          "longitude": { "type": "number", "maximum": 180, "minimum": -180 },
+          "postalCode": { "type": "string" }
         },
-        "required": [
-          "regionPolicyId",
-          "method"
-        ]
+        "required": ["regionPolicyId", "method"]
       },
       "RegionVerificationResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "regionPolicyId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
           "method": {
             "type": "string",
-            "enum": [
-              "device_location",
-              "postal_code",
-              "manual_review"
-            ]
+            "enum": ["device_location", "postal_code", "manual_review"]
           },
           "status": {
             "type": "string",
-            "enum": [
-              "pending",
-              "approved",
-              "rejected",
-              "expired"
-            ]
+            "enum": ["pending", "approved", "rejected", "expired"]
           },
-          "policyVersion": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "policyVersion": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
@@ -2486,34 +1720,18 @@
       "PayoutWinnerResponseDto": {
         "type": "object",
         "properties": {
-          "alias": {
-            "type": "string"
-          },
-          "amountMinor": {
-            "type": "number"
-          },
-          "payoutRank": {
-            "type": "number"
-          }
+          "alias": { "type": "string" },
+          "amountMinor": { "type": "number" },
+          "payoutRank": { "type": "number" }
         },
-        "required": [
-          "alias",
-          "amountMinor",
-          "payoutRank"
-        ]
+        "required": ["alias", "amountMinor", "payoutRank"]
       },
       "SettledCompetitionResponseDto": {
         "type": "object",
         "properties": {
-          "payoutExponent": {
-            "type": "number"
-          },
-          "payoutPoolAmountMinor": {
-            "type": "number"
-          },
-          "payoutWinnerCount": {
-            "type": "number"
-          }
+          "payoutExponent": { "type": "number" },
+          "payoutPoolAmountMinor": { "type": "number" },
+          "payoutWinnerCount": { "type": "number" }
         },
         "required": [
           "payoutExponent",
@@ -2524,36 +1742,16 @@
       "CompetitionRulesResponseDto": {
         "type": "object",
         "properties": {
-          "minSessionMinutes": {
-            "type": "number"
-          },
-          "minHeartRateSamples": {
-            "type": "number"
-          },
-          "requireFaceCheck": {
-            "type": "boolean"
-          },
-          "requireGymQr": {
-            "type": "boolean"
-          },
-          "signupPrizeDrawEntries": {
-            "type": "number"
-          },
-          "verifiedSessionCategoryScore": {
-            "type": "number"
-          },
-          "verifiedSessionPrizeDrawEntries": {
-            "type": "number"
-          },
-          "payoutPoolAmountMinor": {
-            "type": "number"
-          },
-          "payoutWinnerCount": {
-            "type": "number"
-          },
-          "payoutExponent": {
-            "type": "number"
-          }
+          "minSessionMinutes": { "type": "number" },
+          "minHeartRateSamples": { "type": "number" },
+          "requireFaceCheck": { "type": "boolean" },
+          "requireGymQr": { "type": "boolean" },
+          "signupPrizeDrawEntries": { "type": "number" },
+          "verifiedSessionCategoryScore": { "type": "number" },
+          "verifiedSessionPrizeDrawEntries": { "type": "number" },
+          "payoutPoolAmountMinor": { "type": "number" },
+          "payoutWinnerCount": { "type": "number" },
+          "payoutExponent": { "type": "number" }
         },
         "required": [
           "minSessionMinutes",
@@ -2571,16 +1769,9 @@
       "CompetitionResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "monthKey": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "monthKey": { "type": "string" },
+          "name": { "type": "string" },
           "status": {
             "type": "string",
             "enum": [
@@ -2592,43 +1783,18 @@
               "cancelled"
             ]
           },
-          "currency": {
-            "type": "string"
-          },
-          "regionCode": {
-            "type": "string"
-          },
-          "regionName": {
-            "type": "string"
-          },
-          "rulesVersion": {
-            "type": "string"
-          },
+          "currency": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "rulesVersion": { "type": "string" },
           "rules": {
             "$ref": "#/components/schemas/CompetitionRulesResponseDto"
           },
-          "goalDays": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "registrationOpensAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "registrationClosesAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "startsAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "endsAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "goalDays": { "type": "array", "items": { "type": "number" } },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
@@ -2650,27 +1816,10 @@
       "CreateEnrollmentDto": {
         "type": "object",
         "properties": {
-          "goalDays": {
-            "type": "number",
-            "maximum": 7,
-            "minimum": 1
-          },
-          "regionVerificationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "rulesAccepted": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          },
-          "ageEligibilityAttested": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          }
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "regionVerificationId": { "type": "string", "format": "uuid" },
+          "rulesAccepted": { "type": "boolean", "enum": [true] },
+          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
         },
         "required": [
           "goalDays",
@@ -2682,77 +1831,36 @@
       "EnrollmentResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "goalDays": {
-            "type": "number"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "goalDays": { "type": "number" },
           "status": {
             "type": "string",
-            "enum": [
-              "active",
-              "withdrawn",
-              "disqualified"
-            ]
+            "enum": ["active", "withdrawn", "disqualified"]
           },
-          "enrolledAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "enrolledAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "id",
-          "competitionId",
-          "goalDays",
-          "status",
-          "enrolledAt"
-        ]
+        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
       },
       "EnrollmentCountResponseDto": {
         "type": "object",
-        "properties": {
-          "count": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "count"
-        ]
+        "properties": { "count": { "type": "number" } },
+        "required": ["count"]
       },
       "CompetitionMatchResponseDto": {
         "type": "object",
         "properties": {
           "availability": {
             "type": "string",
-            "enum": [
-              "matched",
-              "searching",
-              "solo"
-            ]
+            "enum": ["matched", "searching", "solo"]
           },
-          "opponentAlias": {
-            "type": "string"
-          },
+          "opponentAlias": { "type": "string" },
           "opponentVerifiedDateKeys": {
             "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "items": { "type": "string" }
           },
-          "periodIndex": {
-            "type": "number",
-            "maximum": 4,
-            "minimum": 1
-          },
-          "region": {
-            "type": "string"
-          }
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "region": { "type": "string" }
         },
         "required": [
           "availability",
@@ -2765,62 +1873,28 @@
       "CreatorWorkoutResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "joined": {
-            "type": "boolean"
-          },
-          "name": {
-            "type": "string"
-          },
-          "reward": {
-            "type": "string"
-          },
-          "timing": {
-            "type": "string"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "joined": { "type": "boolean" },
+          "name": { "type": "string" },
+          "reward": { "type": "string" },
+          "timing": { "type": "string" }
         },
-        "required": [
-          "id",
-          "joined",
-          "name",
-          "reward",
-          "timing"
-        ]
+        "required": ["id", "joined", "name", "reward", "timing"]
       },
       "CategoryLeaderboardRowDto": {
         "type": "object",
         "properties": {
-          "alias": {
-            "type": "string"
-          },
-          "categoryEntries": {
-            "type": "number"
-          },
-          "rank": {
-            "type": "number"
-          },
-          "verifiedDays": {
-            "type": "number"
-          }
+          "alias": { "type": "string" },
+          "categoryEntries": { "type": "number" },
+          "rank": { "type": "number" },
+          "verifiedDays": { "type": "number" }
         },
-        "required": [
-          "alias",
-          "categoryEntries",
-          "rank",
-          "verifiedDays"
-        ]
+        "required": ["alias", "categoryEntries", "rank", "verifiedDays"]
       },
       "CategoryLeaderboardDto": {
         "type": "object",
         "properties": {
-          "goal": {
-            "type": "number",
-            "maximum": 7,
-            "minimum": 1
-          },
+          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
           "rows": {
             "type": "array",
             "items": {
@@ -2828,34 +1902,17 @@
             }
           }
         },
-        "required": [
-          "goal",
-          "rows"
-        ]
+        "required": ["goal", "rows"]
       },
       "CompetitionProgressResponseDto": {
         "type": "object",
         "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "goalDays": {
-            "type": "number"
-          },
-          "verifiedDays": {
-            "type": "number"
-          },
-          "categoryScore": {
-            "type": "number"
-          },
-          "prizeDrawEntries": {
-            "type": "number"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "competitionId": { "type": "string", "format": "uuid" },
+          "goalDays": { "type": "number" },
+          "verifiedDays": { "type": "number" },
+          "categoryScore": { "type": "number" },
+          "prizeDrawEntries": { "type": "number" },
+          "updatedAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "competitionId",
@@ -2869,49 +1926,21 @@
       "CreatePrivacyRequestDto": {
         "type": "object",
         "properties": {
-          "requestType": {
-            "type": "string",
-            "enum": [
-              "delete",
-              "export"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 1000
-          }
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "reason": { "type": "string", "maxLength": 1000 }
         },
-        "required": [
-          "requestType"
-        ]
+        "required": ["requestType"]
       },
       "PrivacyRequestResponseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "requestType": {
-            "type": "string",
-            "enum": [
-              "delete",
-              "export"
-            ]
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
           "status": {
             "type": "string",
-            "enum": [
-              "completed",
-              "processing",
-              "rejected",
-              "requested"
-            ]
+            "enum": ["completed", "processing", "rejected", "requested"]
           },
-          "requestedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "requestedAt": { "type": "string", "format": "date-time" },
           "completedAt": {
             "type": "string",
             "format": "date-time",

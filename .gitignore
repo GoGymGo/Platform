@@ -5,12 +5,14 @@
 **/.expo/
 **/.expo-shared/
 **/dist/
+**/coverage/
 **/web-build/
 **/.expo-audit-export/
 **/.expo-export-check/
 
 # Logs and local runtime noise
 *.log
+*.tsbuildinfo
 npm-debug.*
 yarn-debug.*
 yarn-error.*

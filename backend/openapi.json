@@ -1,0 +1,480 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Report API liveness",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Bootstrap and return the authenticated account profile",
+        "tags": [
+          "profiles"
+        ]
+      },
+      "patch": {
+        "operationId": "updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Update the authenticated account public identity and privacy settings",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/v1/regions": {
+      "get": {
+        "operationId": "listRegions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegionPolicyResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List active versioned service-region policies",
+        "tags": [
+          "regions"
+        ]
+      }
+    },
+    "/v1/me/region-verifications": {
+      "post": {
+        "operationId": "createVerification",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRegionVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegionVerificationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Submit minimized regional eligibility evidence for server review",
+        "tags": [
+          "regions"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "GoGymGo API",
+    "description": "Authoritative API for GoGymGo accounts, verified competition activity, ledgers, results, and payouts.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "firebase": {
+        "scheme": "bearer",
+        "bearerFormat": "Firebase ID token",
+        "type": "http",
+        "description": "Firebase ID token verified by the GoGymGo API."
+      }
+    },
+    "schemas": {
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "example": "gogymgo-api"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ],
+            "example": "ok"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-07-12T12:00:00.000Z"
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "example": 123.45
+          }
+        },
+        "required": [
+          "service",
+          "status",
+          "timestamp",
+          "uptimeSeconds"
+        ]
+      },
+      "PrivacySettingsDto": {
+        "type": "object",
+        "properties": {
+          "showRegion": {
+            "type": "boolean"
+          },
+          "showStats": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "showRegion",
+          "showStats"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "callsign": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "publicIdentityMode": {
+            "type": "string",
+            "enum": [
+              "private",
+              "alias",
+              "real_name"
+            ]
+          },
+          "publicName": {
+            "type": "string",
+            "nullable": true
+          },
+          "privacySettings": {
+            "$ref": "#/components/schemas/PrivacySettingsDto"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "deleted"
+            ]
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "callsign",
+          "email",
+          "emailVerified",
+          "publicIdentityMode",
+          "publicName",
+          "privacySettings",
+          "roles",
+          "status",
+          "version"
+        ]
+      },
+      "UpdatePrivacySettingsDto": {
+        "type": "object",
+        "properties": {
+          "showRegion": {
+            "type": "boolean"
+          },
+          "showStats": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateMeDto": {
+        "type": "object",
+        "properties": {
+          "publicIdentityMode": {
+            "type": "string",
+            "enum": [
+              "private",
+              "alias",
+              "real_name"
+            ]
+          },
+          "publicName": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "nullable": true
+          },
+          "privacySettings": {
+            "$ref": "#/components/schemas/UpdatePrivacySettingsDto"
+          }
+        }
+      },
+      "RegionPolicyResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "CA-BC-VICTORIA"
+          },
+          "countryCode": {
+            "type": "string",
+            "example": "CA"
+          },
+          "subdivisionCode": {
+            "type": "string",
+            "example": "BC"
+          },
+          "metroName": {
+            "type": "string",
+            "example": "Victoria"
+          },
+          "currency": {
+            "type": "string",
+            "example": "CAD"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "America/Vancouver"
+          },
+          "languageCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "minimumAge": {
+            "type": "number",
+            "example": 19
+          },
+          "competitionEnabled": {
+            "type": "boolean"
+          },
+          "payoutEnabled": {
+            "type": "boolean"
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "boundaryVersion": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "countryCode",
+          "subdivisionCode",
+          "metroName",
+          "currency",
+          "timezone",
+          "languageCodes",
+          "minimumAge",
+          "competitionEnabled",
+          "payoutEnabled",
+          "policyVersion",
+          "boundaryVersion",
+          "validFrom",
+          "validTo"
+        ]
+      },
+      "CreateRegionVerificationDto": {
+        "type": "object",
+        "properties": {
+          "regionPolicyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "device_location",
+              "postal_code"
+            ]
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90,
+            "minimum": -90
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180,
+            "minimum": -180
+          },
+          "postalCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "regionPolicyId",
+          "method"
+        ]
+      },
+      "RegionVerificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "regionPolicyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "device_location",
+              "postal_code",
+              "manual_review"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "expired"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "method",
+          "status",
+          "policyVersion",
+          "createdAt"
+        ]
+      }
+    }
+  }
+}

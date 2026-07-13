@@ -4,6 +4,7 @@ const contract = JSON.parse(await readFile('openapi.json', 'utf8'));
 const requiredOperations = [
   ['get', '/v1/competitions/{monthKey}/enrollment-count'],
   ['get', '/v1/competitions/{monthKey}/matches'],
+  ['post', '/v1/competitions/{competitionId}/enrollments'],
   ['get', '/v1/creator-workouts'],
   ['get', '/v1/leaderboards/current'],
   ['get', '/v1/me/avatar'],

@@ -36,8 +36,9 @@ The liveness route is `GET http://localhost:3000/v1/health`. In non-production e
 Database integration tests use Testcontainers and require a running Docker engine. A missing Docker engine is an environment limitation, never a passing database test.
 With `RUN_DATABASE_INTEGRATION=true`, the suite also exercises the critical
 PostgreSQL-backed trust paths. Evidence-to-ledger coverage proves enrollment
-and session idempotency, evidence replay rejection, disqualification checks,
-one award per eligible day, and exact progress totals. Draw-to-payout coverage
+and session idempotency, serialized entrant caps, inactive re-enrollment
+rejection, evidence replay rejection, disqualification checks, one award per
+eligible day, and exact progress totals. Draw-to-payout coverage
 proves minimum entrants, resolved session reviews, disqualification filtering,
 retry-safe settlement, exact payout allocation, hosted-payee activation,
 duplicate webhook intake, payment release, and terminal reconciliation.

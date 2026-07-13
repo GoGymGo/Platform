@@ -155,7 +155,7 @@ The frontend now has a bearer-token API client boundary configured by `EXPO_PUBL
 
 - Monetary amounts are integer minor units plus ISO currency; never floating point.
 - Entry ledger rows are append-only. Corrections are compensating rows, not updates/deletes.
-- One enrollment per user/competition; one award per unique source event/policy.
+- One enrollment per user/competition; competition-row locking serializes entrant caps, inactive enrollments cannot be recreated by the user, and one award exists per unique source event/policy.
 - Draw settlement locks an immutable entrant snapshot and rule version.
 - One internal user maps to at most one Hyperwallet user per program.
 - Provider webhook token and payment token are unique.

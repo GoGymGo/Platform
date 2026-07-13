@@ -30,6 +30,26 @@ const operatorPrincipal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 
+const cappedUserPrincipals: readonly [
+  AuthenticatedPrincipal,
+  AuthenticatedPrincipal,
+] = [
+  {
+    email: 'capped-enrollment-a@integration.test',
+    emailVerified: true,
+    firebaseUid: 'capped-enrollment-user-a',
+    roles: ['user'],
+    tokenIssuedAt: 1,
+  },
+  {
+    email: 'capped-enrollment-b@integration.test',
+    emailVerified: true,
+    firebaseUid: 'capped-enrollment-user-b',
+    roles: ['user'],
+    tokenIssuedAt: 1,
+  },
+];
+
 const competitionRules = {
   minHeartRateSamples: 2,
   minSessionMinutes: 10,
@@ -294,6 +314,114 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
   });
 
+  it('serializes entrant caps and never resurrects inactive enrollments', async () => {
+    const fixture = await seedCappedCompetition();
+    const outcomes = await Promise.allSettled(
+      fixture.users.map((user, index) =>
+        competitions.enroll(
+          user.principal,
+          fixture.competitionId,
+          `capped-enrollment-${index + 1}`,
+          {
+            ageEligibilityAttested: true,
+            goalDays: 3,
+            regionVerificationId: user.regionVerificationId,
+            rulesAccepted: true,
+          },
+        ),
+      ),
+    );
+    const successful = outcomes.filter(
+      (outcome) => outcome.status === 'fulfilled',
+    );
+    const rejected = outcomes.filter(
+      (outcome) => outcome.status === 'rejected',
+    );
+    expect(successful).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({
+      response: { code: 'COMPETITION_FULL' },
+    });
+
+    const winnerIndex = outcomes.findIndex(
+      (outcome) => outcome.status === 'fulfilled',
+    );
+    const winner = fixture.users[winnerIndex];
+    const enrollment = (
+      outcomes[winnerIndex] as PromiseFulfilledResult<{
+        competitionId: string;
+        enrolledAt: string;
+        goalDays: number;
+        id: string;
+        status: 'active';
+      }>
+    ).value;
+    const originalRequest = {
+      ageEligibilityAttested: true as const,
+      goalDays: 3,
+      regionVerificationId: winner.regionVerificationId,
+      rulesAccepted: true as const,
+    };
+    await expect(
+      competitions.enroll(
+        winner.principal,
+        fixture.competitionId,
+        'capped-enrollment-resource-retry',
+        originalRequest,
+      ),
+    ).resolves.toEqual(enrollment);
+    await expect(
+      competitions.enroll(
+        winner.principal,
+        fixture.competitionId,
+        'capped-enrollment-details-conflict',
+        { ...originalRequest, goalDays: 4 },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_ENROLLMENT_ALREADY_EXISTS' },
+    });
+
+    await migrated.pool.query(
+      `UPDATE competition_enrollments
+       SET status = 'disqualified'
+       WHERE id = $1`,
+      [enrollment.id],
+    );
+    await expect(
+      competitions.enroll(
+        winner.principal,
+        fixture.competitionId,
+        'capped-enrollment-inactive-conflict',
+        originalRequest,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_ENROLLMENT_INACTIVE' },
+    });
+
+    const counts = await migrated.pool.query<{
+      acceptances: number;
+      enrollments: number;
+      ledger_entries: number;
+    }>(
+      `SELECT
+         (SELECT count(*)::integer
+          FROM competition_enrollments
+          WHERE competition_id = $1) AS enrollments,
+         (SELECT count(*)::integer
+          FROM competition_rule_acceptances
+          WHERE competition_id = $1) AS acceptances,
+         (SELECT count(*)::integer
+          FROM entry_ledger
+          WHERE competition_id = $1 AND reason = 'enrollment') AS ledger_entries`,
+      [fixture.competitionId],
+    );
+    expect(counts.rows[0]).toEqual({
+      acceptances: 1,
+      enrollments: 1,
+      ledger_entries: 1,
+    });
+  });
+
   function verifySession(sessionId: string, requestId: string) {
     return sessions.verifySession({
       operatorUserId,
@@ -372,6 +500,84 @@ describeWithDatabase('critical session and ledger workflow', () => {
     return {
       competitionId: competition.rows[0].id,
       regionVerificationId: verification.rows[0].id,
+    };
+  }
+
+  async function seedCappedCompetition(): Promise<{
+    competitionId: string;
+    users: readonly [
+      { principal: AuthenticatedPrincipal; regionVerificationId: string },
+      { principal: AuthenticatedPrincipal; regionVerificationId: string },
+    ];
+  }> {
+    const now = Date.now();
+    const region = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO region_policies
+         (code, country_code, subdivision_code, metro_name, currency,
+          timezone, language_codes, minimum_age, competition_enabled,
+          payout_enabled, boundary_version, policy_version, valid_from)
+       VALUES
+         ('critical-capped-enrollment-region', 'CA', 'BC',
+          'Critical Capped Enrollment Region', 'CAD', 'America/Vancouver',
+          ARRAY['en-CA'], 19, TRUE, TRUE, 'boundary-v1', 'policy-v1', $1)
+       RETURNING id`,
+      [new Date(now - 24 * 60 * 60_000)],
+    );
+    const users = [] as Array<{
+      principal: AuthenticatedPrincipal;
+      regionVerificationId: string;
+    }>;
+    for (const principal of cappedUserPrincipals) {
+      const user = await profiles.ensureUser(principal, database.connection);
+      const verification = await migrated.pool.query<{ id: string }>(
+        `INSERT INTO region_verifications
+           (user_id, region_policy_id, method, status, evidence_metadata,
+            policy_version, verified_at, expires_at)
+         VALUES ($1, $2, 'manual_review', 'approved', '{}'::jsonb,
+                 'policy-v1', $3, $4)
+         RETURNING id`,
+        [
+          user.id,
+          region.rows[0].id,
+          new Date(now - 60_000),
+          new Date(now + 24 * 60 * 60_000),
+        ],
+      );
+      users.push({
+        principal,
+        regionVerificationId: verification.rows[0].id,
+      });
+    }
+    const competition = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competitions
+         (region_policy_id, month_key, name, status, currency, rules_version,
+          rules, minimum_entrants, entrant_cap, registration_opens_at,
+          registration_closes_at, starts_at, ends_at)
+       VALUES ($1, '2030-02', 'Critical Capped Enrollment Competition',
+               'registration', 'CAD', 'rules-v1', $2::jsonb, 1, 1,
+               $3, $4, $5, $6)
+       RETURNING id`,
+      [
+        region.rows[0].id,
+        JSON.stringify(competitionRules),
+        new Date(now - 60 * 60_000),
+        new Date(now + 60 * 60_000),
+        new Date(now + 2 * 60 * 60_000),
+        new Date(now + 24 * 60 * 60_000),
+      ],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_goal_brackets
+         (competition_id, goal_days, label)
+       VALUES ($1, 3, 'Three days'), ($1, 4, 'Four days')`,
+      [competition.rows[0].id],
+    );
+    return {
+      competitionId: competition.rows[0].id,
+      users: users as [
+        { principal: AuthenticatedPrincipal; regionVerificationId: string },
+        { principal: AuthenticatedPrincipal; regionVerificationId: string },
+      ],
     };
   }
 

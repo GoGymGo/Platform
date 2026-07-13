@@ -85,6 +85,24 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication before competition enrollment', () => {
+    return request(app.getHttpServer())
+      .post('/v1/competitions/10000000-0000-4000-8000-000000000001/enrollments')
+      .set('Idempotency-Key', 'competition-enrollment-e2e')
+      .send({
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        regionVerificationId: '20000000-0000-4000-8000-000000000002',
+        rulesAccepted: true,
+      })
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
   it('requires authentication before creating a private export download action', () => {
     return request(app.getHttpServer())
       .post(

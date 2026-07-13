@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
 } from '@nestjs/common';
@@ -56,7 +57,7 @@ export class CompetitionsController {
   @ApiCreatedResponse({ type: EnrollmentResponseDto })
   enroll(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Param('competitionId') competitionId: string,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() request: CreateEnrollmentDto,
   ): Promise<EnrollmentResponseDto> {

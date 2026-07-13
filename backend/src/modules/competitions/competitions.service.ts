@@ -146,6 +146,7 @@ export class CompetitionsService {
           .selectFrom('competitions')
           .selectAll()
           .where('id', '=', competitionId)
+          .forUpdate()
           .executeTakeFirst();
         if (!competition) {
           throw new NotFoundException({
@@ -162,6 +163,40 @@ export class CompetitionsService {
             code: 'COMPETITION_REGISTRATION_CLOSED',
             message: 'Registration is not open for this competition.',
           });
+        }
+
+        const existingEnrollment = await transaction
+          .selectFrom('competition_enrollments')
+          .selectAll()
+          .where('competition_id', '=', competition.id)
+          .where('user_id', '=', user.id)
+          .executeTakeFirst();
+        if (existingEnrollment) {
+          if (existingEnrollment.status !== 'active') {
+            throw new ConflictException({
+              code: 'COMPETITION_ENROLLMENT_INACTIVE',
+              message:
+                'This competition enrollment is no longer active and cannot be recreated.',
+            });
+          }
+          if (
+            existingEnrollment.goal_days !== request.goalDays ||
+            existingEnrollment.region_verification_id !==
+              request.regionVerificationId
+          ) {
+            throw new ConflictException({
+              code: 'COMPETITION_ENROLLMENT_ALREADY_EXISTS',
+              message:
+                'This account is already enrolled with different enrollment details.',
+            });
+          }
+          return {
+            competitionId: competition.id,
+            enrolledAt: existingEnrollment.enrolled_at.toISOString(),
+            goalDays: existingEnrollment.goal_days,
+            id: existingEnrollment.id,
+            status: 'active',
+          };
         }
 
         const [bracket, verification, enrollmentCount] = await Promise.all([
@@ -236,7 +271,7 @@ export class CompetitionsService {
           )
           .returning('id')
           .executeTakeFirstOrThrow();
-        let enrollment = await transaction
+        const enrollment = await transaction
           .insertInto('competition_enrollments')
           .values({
             competition_id: competition.id,
@@ -247,16 +282,7 @@ export class CompetitionsService {
             status: 'active',
             user_id: user.id,
           })
-          .onConflict((conflict) =>
-            conflict.columns(['competition_id', 'user_id']).doNothing(),
-          )
           .returningAll()
-          .executeTakeFirst();
-        enrollment ??= await transaction
-          .selectFrom('competition_enrollments')
-          .selectAll()
-          .where('competition_id', '=', competition.id)
-          .where('user_id', '=', user.id)
           .executeTakeFirstOrThrow();
 
         const rules = parseCompetitionRules(competition.rules);

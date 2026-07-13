@@ -38,6 +38,8 @@ All workloads use one digest-pinned image. The release pipeline updates and exec
 
 PostgreSQL is the sole system of record. PostGIS handles regional competition boundaries. Constraints, append-only events, immutable identifiers, optimistic versions, advisory locks, leases, and idempotency keys enforce correctness at the database boundary instead of relying on client behavior or in-memory locks.
 
+Competition enrollment takes a row lock on the authoritative competition before checking registration state, entrant capacity, and inserting the enrollment. This serializes concurrent entrants at the cap without a distributed lock. An existing enrollment is immutable through the create route: an exact active retry returns the original record, changed enrollment details fail closed, and an inactive or disqualified enrollment cannot be recreated by the user.
+
 The first production stage uses database-backed work queues. This keeps a payout or privacy state transition and its queued work in one transaction. Add Pub/Sub or Cloud Tasks only when queue latency, connection pressure, or independently scaling consumers demonstrate a need; introducing either earlier would add duplicate-delivery and cross-system consistency work without reducing current financial risk.
 
 Each environment has one regional primary database with regional high availability, private networking, automated backups, and point-in-time recovery. North America-wide client access does not require an active-active financial ledger. A single writer avoids conflicting payout and draw decisions; add a read strategy or disaster-recovery replica only after recovery targets and jurisdictional requirements are approved.

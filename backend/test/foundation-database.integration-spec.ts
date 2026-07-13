@@ -80,6 +80,7 @@ describeWithDatabase('database migrations', () => {
         'region_verifications',
         'session_events',
         'users',
+        'worker_heartbeats',
         'workout_sessions',
       ]),
     );
@@ -89,6 +90,23 @@ describeWithDatabase('database migrations', () => {
         "SELECT extname FROM pg_extension WHERE extname = 'btree_gist'",
       ),
     ).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  it('constrains the durable worker heartbeat status', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO worker_heartbeats
+           (worker_name, instance_id, status)
+         VALUES ('operations', 'integration-instance', 'running')`,
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      pool.query(
+        `UPDATE worker_heartbeats
+         SET status = 'unknown'
+         WHERE worker_name = 'operations'`,
+      ),
+    ).rejects.toThrow(/worker_heartbeats_status_valid/i);
   });
 
   it('allows adjacent region versions while rejecting overlapping validity windows', async () => {

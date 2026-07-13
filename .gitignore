@@ -29,3 +29,13 @@ Thumbs.db
 # Local Codex workspace metadata
 .agents/
 .codex/
+
+# Terraform local state and plans
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/.terraform.tfstate.lock.info
+**/crash.log
+**/crash.*.log
+!**/.terraform.lock.hcl

@@ -4,15 +4,16 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { PrivacyModule } from '../privacy/privacy.module';
 import { OperationsWorkerService } from './operations-worker.service';
+import { WorkerObservabilityService } from './worker-observability.service';
 
 @Module({
-  exports: [OperationsWorkerService],
+  exports: [OperationsWorkerService, WorkerObservabilityService],
   imports: [
     CompetitionsModule,
     NotificationsModule,
     PayoutsModule,
     PrivacyModule,
   ],
-  providers: [OperationsWorkerService],
+  providers: [OperationsWorkerService, WorkerObservabilityService],
 })
 export class OperationsModule {}

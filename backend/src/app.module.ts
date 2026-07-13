@@ -24,6 +24,8 @@ import { PrivacyModule } from './modules/privacy/privacy.module';
 import { RegionsModule } from './modules/regions/regions.module';
 import { ResultsModule } from './modules/results/results.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
+import { activeTraceLogFields } from './observability/log-correlation';
+import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.service';
 
 @Module({
   imports: [
@@ -38,10 +40,18 @@ import { SessionsModule } from './modules/sessions/sessions.module';
       useFactory: (config: ConfigService<Environment, true>) => {
         const isProduction =
           config.get('NODE_ENV', { infer: true }) === 'production';
+        const revision =
+          process.env.K_REVISION ?? process.env.CLOUD_RUN_REVISION;
 
         return {
           pinoHttp: {
+            base: {
+              environment: config.get<Environment['NODE_ENV']>('NODE_ENV'),
+              ...(revision ? { revision } : {}),
+              service: config.get<string>('OTEL_SERVICE_NAME') ?? 'gogymgo-api',
+            },
             level: config.get('LOG_LEVEL', { infer: true }),
+            mixin: activeTraceLogFields,
             redact: {
               paths: [
                 'req.headers.authorization',
@@ -109,6 +119,7 @@ import { SessionsModule } from './modules/sessions/sessions.module';
     DrawsModule,
   ],
   providers: [
+    TelemetryLifecycleService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

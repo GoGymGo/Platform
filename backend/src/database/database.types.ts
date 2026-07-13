@@ -61,6 +61,7 @@ export type NotificationDeliveryStatus =
 export type PrivacyRequestType = 'delete' | 'export';
 export type PrivacyRequestStatus =
   'completed' | 'processing' | 'rejected' | 'requested';
+export type WorkerHeartbeatStatus = 'failed' | 'running' | 'stopping';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -464,6 +465,22 @@ export interface CreatorWorkoutsTable {
   version: Generated<number>;
 }
 
+export interface WorkerHeartbeatsTable {
+  worker_name: string;
+  instance_id: string;
+  status: WorkerHeartbeatStatus;
+  last_started_at: Timestamp;
+  last_completed_at: NullableTimestamp;
+  last_failed_at: NullableTimestamp;
+  last_failure_code: string | null;
+  last_result: ColumnType<
+    JsonValue | null,
+    JsonValue | null | undefined,
+    JsonValue | null
+  >;
+  updated_at: Timestamp;
+}
+
 export interface Database {
   competition_draws: CompetitionDrawsTable;
   competition_enrollments: CompetitionEnrollmentsTable;
@@ -493,5 +510,6 @@ export interface Database {
   region_verifications: RegionVerificationsTable;
   session_events: SessionEventsTable;
   users: UsersTable;
+  worker_heartbeats: WorkerHeartbeatsTable;
   workout_sessions: WorkoutSessionsTable;
 }

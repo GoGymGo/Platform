@@ -37,6 +37,8 @@ Database integration tests use Testcontainers and require a running Docker engin
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
 
+The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
+
 ## Module build order
 
 1. Platform configuration, health, errors, logging, security, and OpenAPI.

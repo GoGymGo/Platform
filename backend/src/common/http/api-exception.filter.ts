@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-type RequestWithId = Request & { id?: string };
+interface SafeRequestLogger {
+  error(payload: Record<string, unknown>, message: string): void;
+}
+
+type RequestWithId = Request & { id?: string; log?: SafeRequestLogger };
 
 interface ExceptionBody {
   code?: unknown;
@@ -43,6 +47,28 @@ export class ApiExceptionFilter implements ExceptionFilter {
         : status === 400
           ? 'VALIDATION_ERROR'
           : `HTTP_${status}`;
+
+    if (status >= 500) {
+      request.log?.error(
+        {
+          errorType:
+            exception instanceof Error
+              ? exception.name.slice(0, 120)
+              : 'UnknownError',
+          event: 'api.request.failed',
+          requestId: request.id ?? 'unknown',
+          statusCode: status,
+          stackFrames:
+            exception instanceof Error
+              ? exception.stack
+                  ?.split('\n')
+                  .slice(1, 11)
+                  .map((line) => line.trim())
+              : undefined,
+        },
+        'Unhandled API exception',
+      );
+    }
 
     response.status(status).json({
       error: {

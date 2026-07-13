@@ -13,3 +13,20 @@ export class HealthResponseDto {
   @ApiProperty({ example: 123.45, type: Number })
   uptimeSeconds!: number;
 }
+
+export class ReadinessDependenciesDto {
+  @ApiProperty({ enum: ['ok'], example: 'ok', type: String })
+  database!: 'ok';
+
+  @ApiProperty({
+    enum: ['healthy', 'starting'],
+    example: 'healthy',
+    type: String,
+  })
+  worker!: 'healthy' | 'starting';
+}
+
+export class ReadinessResponseDto extends HealthResponseDto {
+  @ApiProperty({ type: ReadinessDependenciesDto })
+  dependencies!: ReadinessDependenciesDto;
+}

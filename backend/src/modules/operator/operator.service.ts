@@ -4,19 +4,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Transaction } from 'kysely';
+import type { Environment } from '../../config/environment';
 import { DatabaseService } from '../../database/database.service';
 import type { Database, JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { DrawsService } from '../draws/draws.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { SessionsService } from '../sessions/sessions.service';
+import { resolveWorkerHealth } from '../operations/operational-health';
 import type {
   DecidePartnerApplicationDto,
   DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
   LockDrawDto,
   OperatorActionResponseDto,
+  OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
   VerifySessionDto,
@@ -26,10 +30,116 @@ import type {
 export class OperatorService {
   constructor(
     private readonly database: DatabaseService,
+    private readonly config: ConfigService<Environment, true>,
     private readonly draws: DrawsService,
     private readonly profiles: ProfilesService,
     private readonly sessions: SessionsService,
   ) {}
+
+  async getSystemHealth(
+    principal: AuthenticatedPrincipal,
+  ): Promise<OperatorSystemHealthResponseDto> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.requireOperator(principal, transaction);
+        const now = new Date();
+        const [
+          heartbeat,
+          competitionStartsDue,
+          notificationsPending,
+          paymentsUncertain,
+          privacyOperationsPending,
+          webhooksPending,
+        ] = await Promise.all([
+          transaction
+            .selectFrom('worker_heartbeats')
+            .selectAll()
+            .where('worker_name', '=', 'operations')
+            .executeTakeFirst(),
+          transaction
+            .selectFrom('competitions')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('status', '=', 'registration')
+            .where('starts_at', '<=', now)
+            .executeTakeFirstOrThrow(),
+          transaction
+            .selectFrom('notification_deliveries')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('status', 'in', ['failed', 'pending'])
+            .where('attempt_count', '<', 5)
+            .executeTakeFirstOrThrow(),
+          transaction
+            .selectFrom('payout_payments')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('provider_status', 'in', [
+              'SUBMITTING',
+              'SUBMISSION_UNCERTAIN',
+            ])
+            .executeTakeFirstOrThrow(),
+          transaction
+            .selectFrom('privacy_requests')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('status', '=', 'processing')
+            .executeTakeFirstOrThrow(),
+          transaction
+            .selectFrom('provider_webhooks')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('state', 'in', ['failed', 'received'])
+            .where('attempt_count', '<', 10)
+            .executeTakeFirstOrThrow(),
+        ]);
+
+        const staleAfterMs = this.config.get('WORKER_STALE_AFTER_MS', {
+          infer: true,
+        });
+        const workerHealth = resolveWorkerHealth(
+          heartbeat
+            ? {
+                lastCompletedAt: heartbeat.last_completed_at,
+                lastFailedAt: heartbeat.last_failed_at,
+                lastStartedAt: heartbeat.last_started_at,
+                status: heartbeat.status,
+              }
+            : null,
+          now,
+          staleAfterMs,
+        );
+
+        return {
+          checkedAt: now.toISOString(),
+          database: 'ok',
+          queues: {
+            competitionStartsDue: Number(competitionStartsDue.count),
+            notificationsPending: Number(notificationsPending.count),
+            paymentsUncertain: Number(paymentsUncertain.count),
+            privacyOperationsPending: Number(privacyOperationsPending.count),
+            webhooksPending: Number(webhooksPending.count),
+          },
+          worker: {
+            heartbeatAgeSeconds:
+              workerHealth.heartbeatAgeMs === null
+                ? null
+                : Math.floor(workerHealth.heartbeatAgeMs / 1_000),
+            lastCompletedAt:
+              heartbeat?.last_completed_at?.toISOString() ?? null,
+            lastFailedAt: heartbeat?.last_failed_at?.toISOString() ?? null,
+            lastFailureCode: heartbeat?.last_failure_code ?? null,
+            status: workerHealth.status,
+          },
+        };
+      });
+  }
 
   async listWorkQueue(
     principal: AuthenticatedPrincipal,

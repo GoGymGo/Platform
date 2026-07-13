@@ -1,0 +1,21 @@
+project_id      = "replace-with-isolated-gcp-project-id"
+environment     = "staging"
+container_image = "northamerica-northeast1-docker.pkg.dev/replace-with-isolated-gcp-project-id/gogymgo-backend/api@sha256:replace-with-64-lowercase-hex-characters"
+
+cors_origins = [
+  "https://staging.example.com",
+]
+
+# Keep regulated and external-provider features off until their secrets and UAT
+# gates are complete. Secret values never belong in this file or Terraform state.
+hyperwallet_enabled          = false
+privacy_operations_enabled   = false
+push_notifications_enabled   = false
+otel_exporter_otlp_endpoint  = null
+monitoring_notification_channels = []
+
+# Production defaults are deliberately conservative. A staging project may
+# override these after reviewing the cost/reliability tradeoff.
+database_ha_enabled = false
+api_min_instances   = 0
+deletion_protection = true

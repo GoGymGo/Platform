@@ -31,7 +31,9 @@ services:
 
   api:
     build: .
-    environment: *runtime_environment
+    environment:
+      <<: *runtime_environment
+      RUNTIME_ROLE: api
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -40,8 +42,16 @@ services:
 
   worker:
     build: .
-    command: ['node', 'dist/worker.js']
-    environment: *runtime_environment
+    command:
+      [
+        'node',
+        '--require',
+        './dist/observability/instrumentation.js',
+        'dist/worker.js',
+      ]
+    environment:
+      <<: *runtime_environment
+      RUNTIME_ROLE: worker
     depends_on:
       migrate:
         condition: service_completed_successfully

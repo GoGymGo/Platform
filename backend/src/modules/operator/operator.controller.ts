@@ -23,6 +23,7 @@ import {
   DecideRegionVerificationDto,
   LockDrawDto,
   OperatorActionResponseDto,
+  OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
   VerifySessionDto,
@@ -42,6 +43,15 @@ export class OperatorController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<OperatorWorkQueueItemDto[]> {
     return this.operator.listWorkQueue(principal);
+  }
+
+  @Get('system-health')
+  @ApiOperation({ summary: 'Inspect worker heartbeat and durable queue depth' })
+  @ApiOkResponse({ type: OperatorSystemHealthResponseDto })
+  getSystemHealth(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<OperatorSystemHealthResponseDto> {
+    return this.operator.getSystemHealth(principal);
   }
 
   @Post('sessions/:sessionId/verify')

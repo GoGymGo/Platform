@@ -1,15 +1,23 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { sql } from 'kysely';
+import type { Environment } from '../../config/environment';
 import { DatabaseService } from '../../database/database.service';
-import { HealthResponseDto } from './dto/health-response.dto';
 import { Public } from '../auth/public.decorator';
+import { resolveWorkerHealth } from '../operations/operational-health';
+import {
+  HealthResponseDto,
+  ReadinessResponseDto,
+} from './dto/health-response.dto';
 
 @ApiTags('health')
 @Public()
 @Controller('health')
 export class HealthController {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly config: ConfigService<Environment, true>,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Report API liveness' })
@@ -25,18 +33,51 @@ export class HealthController {
 
   @Get('ready')
   @ApiOperation({
-    summary: 'Report whether the API database dependency is ready',
+    summary: 'Report database and background-worker readiness',
   })
-  @ApiOkResponse({ type: HealthResponseDto })
-  async getReadiness(): Promise<HealthResponseDto> {
+  @ApiOkResponse({ type: ReadinessResponseDto })
+  async getReadiness(): Promise<ReadinessResponseDto> {
     try {
-      await sql`select 1`.execute(this.database.connection);
-    } catch {
+      const heartbeat = await this.database.connection
+        .selectFrom('worker_heartbeats')
+        .select([
+          'last_completed_at',
+          'last_failed_at',
+          'last_started_at',
+          'status',
+        ])
+        .where('worker_name', '=', 'operations')
+        .executeTakeFirst();
+      const worker = resolveWorkerHealth(
+        heartbeat
+          ? {
+              lastCompletedAt: heartbeat.last_completed_at,
+              lastFailedAt: heartbeat.last_failed_at,
+              lastStartedAt: heartbeat.last_started_at,
+              status: heartbeat.status,
+            }
+          : null,
+        new Date(),
+        this.config.get('WORKER_STALE_AFTER_MS', { infer: true }),
+      ).status;
+
+      if (worker === 'degraded' || worker === 'stale') {
+        throw new ServiceUnavailableException({
+          code: 'SERVICE_NOT_READY',
+          message: 'The background worker is not ready.',
+        });
+      }
+
+      return {
+        ...this.getHealth(),
+        dependencies: { database: 'ok', worker },
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
       throw new ServiceUnavailableException({
         code: 'SERVICE_NOT_READY',
-        message: 'The API database dependency is not ready.',
+        message: 'A required service dependency is not ready.',
       });
     }
-    return this.getHealth();
   }
 }

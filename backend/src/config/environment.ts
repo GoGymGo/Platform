@@ -27,6 +27,7 @@ export const environmentSchema = z
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
       .default('development'),
+    RUNTIME_ROLE: z.enum(['api', 'worker']).default('api'),
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
@@ -51,6 +52,21 @@ export const environmentSchema = z
       .min(1_000)
       .max(60_000)
       .default(5_000),
+    WORKER_HEARTBEAT_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(10_000)
+      .max(300_000)
+      .default(30_000),
+    WORKER_STALE_AFTER_MS: z.coerce
+      .number()
+      .int()
+      .min(30_000)
+      .max(900_000)
+      .default(120_000),
+    OTEL_ENABLED: booleanString.default(false),
+    OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
+    OTEL_SERVICE_NAME: optionalTrimmedString,
     AUTH_MODE: z.enum(['firebase', 'test']).default('firebase'),
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
@@ -128,8 +144,6 @@ export const environmentSchema = z
         'HYPERWALLET_PROGRAM_TOKEN',
         'HYPERWALLET_USERNAME',
         'HYPERWALLET_PASSWORD',
-        'HYPERWALLET_WEBHOOK_USERNAME',
-        'HYPERWALLET_WEBHOOK_PASSWORD',
       ] as const;
 
       for (const key of requiredKeys) {
@@ -137,6 +151,36 @@ export const environmentSchema = z
           context.addIssue({
             code: 'custom',
             message: `${key} is required when HYPERWALLET_ENABLED is true.`,
+            path: [key],
+          });
+        }
+      }
+
+      if (environment.RUNTIME_ROLE === 'api') {
+        for (const key of [
+          'HYPERWALLET_WEBHOOK_USERNAME',
+          'HYPERWALLET_WEBHOOK_PASSWORD',
+        ] as const) {
+          if (!environment[key]) {
+            context.addIssue({
+              code: 'custom',
+              message: `${key} is required by the API when HYPERWALLET_ENABLED is true.`,
+              path: [key],
+            });
+          }
+        }
+      }
+    }
+
+    if (environment.OTEL_ENABLED) {
+      for (const key of [
+        'OTEL_EXPORTER_OTLP_ENDPOINT',
+        'OTEL_SERVICE_NAME',
+      ] as const) {
+        if (!environment[key]) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} is required when OTEL_ENABLED is true.`,
             path: [key],
           });
         }
@@ -152,10 +196,7 @@ export const environmentSchema = z
           path: ['AUTH_MODE'],
         });
       }
-      for (const key of [
-        'PRIVACY_EXPORT_BUCKET',
-        'PRIVACY_PSEUDONYMIZATION_KEY',
-      ] as const) {
+      for (const key of ['PRIVACY_EXPORT_BUCKET'] as const) {
         if (!environment[key]) {
           context.addIssue({
             code: 'custom',
@@ -164,6 +205,30 @@ export const environmentSchema = z
           });
         }
       }
+      if (
+        environment.RUNTIME_ROLE === 'worker' &&
+        !environment.PRIVACY_PSEUDONYMIZATION_KEY
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'PRIVACY_PSEUDONYMIZATION_KEY is required by the worker when PRIVACY_OPERATIONS_ENABLED is true.',
+          path: ['PRIVACY_PSEUDONYMIZATION_KEY'],
+        });
+      }
+    }
+
+    if (
+      environment.PUSH_NOTIFICATIONS_ENABLED &&
+      environment.RUNTIME_ROLE === 'worker' &&
+      !environment.EXPO_PUSH_ACCESS_TOKEN
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'EXPO_PUSH_ACCESS_TOKEN is required by the worker when PUSH_NOTIFICATIONS_ENABLED is true.',
+        path: ['EXPO_PUSH_ACCESS_TOKEN'],
+      });
     }
   });
 

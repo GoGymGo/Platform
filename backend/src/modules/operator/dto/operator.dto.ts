@@ -113,3 +113,54 @@ export class OperatorWorkQueueItemDto {
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 }
+
+export class OperatorQueueDepthsDto {
+  @ApiProperty({ minimum: 0, type: Number })
+  competitionStartsDue!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  notificationsPending!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  paymentsUncertain!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  privacyOperationsPending!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  webhooksPending!: number;
+}
+
+export class OperatorWorkerHealthDto {
+  @ApiProperty({ nullable: true, type: Number })
+  heartbeatAgeSeconds!: number | null;
+
+  @ApiPropertyOptional({ format: 'date-time', nullable: true, type: String })
+  lastCompletedAt!: string | null;
+
+  @ApiPropertyOptional({ format: 'date-time', nullable: true, type: String })
+  lastFailedAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  lastFailureCode!: string | null;
+
+  @ApiProperty({
+    enum: ['degraded', 'healthy', 'stale', 'starting'],
+    type: String,
+  })
+  status!: 'degraded' | 'healthy' | 'stale' | 'starting';
+}
+
+export class OperatorSystemHealthResponseDto {
+  @ApiProperty({ format: 'date-time', type: String })
+  checkedAt!: string;
+
+  @ApiProperty({ enum: ['ok'], type: String })
+  database!: 'ok';
+
+  @ApiProperty({ type: OperatorQueueDepthsDto })
+  queues!: OperatorQueueDepthsDto;
+
+  @ApiProperty({ type: OperatorWorkerHealthDto })
+  worker!: OperatorWorkerHealthDto;
+}

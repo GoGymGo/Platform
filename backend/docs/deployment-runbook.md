@@ -4,14 +4,14 @@ This service deploys as three independently controlled workloads built from the 
 
 1. a one-shot migration job running `npm run migrate:deploy`;
 2. the HTTP API running `node dist/main.js`;
-3. a worker running `node dist/worker.js`.
+3. a continuous Cloud Run worker pool running `node --require ./dist/observability/instrumentation.js dist/worker.js`.
 
-Run migrations before shifting traffic to a new API revision. Never run destructive down migrations in production. The API and worker must use the same image digest and environment configuration.
+Run migrations before updating the worker and before shifting traffic to a new API revision. Never run destructive down migrations in production. The API, worker, and migration job must use the same immutable image digest. Runtime configuration is workload-specific and owned by Terraform.
 
 ## Required managed resources
 
 - Cloud SQL for PostgreSQL 17 with PostGIS enabled, private connectivity, automated backups, point-in-time recovery, and separate development/staging/production instances.
-- Cloud Run services for the API and worker, plus a Cloud Run job for migrations.
+- A Cloud Run service for the API, a Cloud Run worker pool for continuous polling, and a Cloud Run job for migrations. A worker pool has no public endpoint and does not need to listen on `PORT`.
 - Secret Manager entries for Hyperwallet API credentials, Hyperwallet webhook credentials, and the optional Expo access token.
 - Secret Manager entries for `PRIVACY_PSEUDONYMIZATION_KEY` and every other enabled provider secret.
 - Firebase production applications and Application Default Credentials on the API/worker service accounts.
@@ -22,16 +22,29 @@ Run migrations before shifting traffic to a new API revision. Never run destruct
 ## Release order
 
 1. Build once from `backend/Dockerfile`, scan the image, and record its immutable digest.
-2. Execute Backend CI, including the real PostGIS migration suite.
+2. Execute Backend CI, including Terraform validation and the real PostGIS migration suite.
 3. Deploy the migration job with the new digest and wait for a successful exit.
-4. Deploy the worker with no public ingress.
-5. Deploy the API with `GET /v1/health` as liveness and `GET /v1/health/ready` as readiness.
-6. Run staging contract tests and a Hyperwallet UAT payout before production promotion.
-7. Shift traffic gradually and monitor 5xx rate, database saturation, webhook failures, uncertain payments, and notification failures.
+4. Deploy the private operations worker pool with the same digest.
+5. Deploy the API with `GET /v1/health` as its Cloud Run startup/liveness probe.
+6. Verify `GET /v1/health/ready`; it returns success only when PostgreSQL responds and the durable worker heartbeat is healthy or still within its startup grace period.
+7. Run staging contract tests and a Hyperwallet UAT payout before production promotion.
+8. Shift traffic gradually and monitor 5xx rate, worker heartbeat/failures, database saturation, webhook failures, uncertain payments, and notification failures.
+
+The protected manual workflow at `.github/workflows/backend-deploy.yml` enforces steps 3-6 for an image pinned to `@sha256:`. The API first deploys as a tagged zero-traffic candidate and receives user traffic only after readiness succeeds. Terraform ignores image-only drift so an infrastructure apply cannot bypass this ordering. See [the Terraform foundation](../infra/terraform/README.md) for provisioning, remote-state, and secret-bootstrap instructions.
 
 ## Secret and environment policy
 
 Use `backend/.env.example` only as a key inventory. Do not upload an `.env` file, Firebase service-account JSON, or Hyperwallet credential into the repository, Expo variables, container image, or CI logs. Production must set `AUTH_MODE=firebase`, `FIREBASE_PROJECT_ID`, `DATABASE_URL`, and the explicitly enabled provider settings.
+
+Terraform creates secret containers but never secret versions, preventing secret payloads from being retained in Terraform state. Populate versions through a protected operator or CI identity before enabling the corresponding feature flag. Production GitHub deployment uses Workload Identity Federation and must not store a service-account JSON key.
+
+## Health and incident signals
+
+- Cloud Run restarts the API only when the dependency-free `/v1/health` liveness probe fails.
+- The external `/v1/health/ready` check covers PostgreSQL and a database-backed worker heartbeat without coupling worker failure to API process restarts.
+- `GET /v1/operator/system-health` requires an audited database-backed operator and adds queue depths, uncertain payments, pending webhooks, privacy work, and the last safe worker failure code.
+- Application logs contain request/trace correlation fields and safe error types, never exception messages. Log-based metrics alert on API 5xx responses and worker batch failures.
+- When OTLP is enabled, HTTP, Express, PostgreSQL, worker spans, batch duration, result counts, and failure counters export to the configured collector. Keep OTLP disabled unless an HTTPS collector endpoint is configured.
 
 ## Privacy operation controls
 

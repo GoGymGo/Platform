@@ -33,6 +33,20 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('keeps readiness public but fails closed without dependencies', () => {
+    return request(app.getHttpServer())
+      .get('/v1/health/ready')
+      .expect(503)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({
+            code: 'SERVICE_NOT_READY',
+            path: '/v1/health/ready',
+          }),
+        });
+      });
+  });
+
   it('returns the stable error envelope for missing routes', () => {
     return request(app.getHttpServer())
       .get('/v1/not-a-route')
@@ -87,6 +101,17 @@ describe('platform foundation (e2e)', () => {
   it('requires authentication before administrative configuration changes', () => {
     return request(app.getHttpServer())
       .post('/v1/operator/configuration/competitions')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('requires authentication before operational health access', () => {
+    return request(app.getHttpServer())
+      .get('/v1/operator/system-health')
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({

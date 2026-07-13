@@ -38,11 +38,14 @@ describe('ApiExceptionFilter', () => {
 
   it('does not leak internal exception messages', () => {
     const json = jest.fn();
+    const error = jest.fn();
     const status = jest.fn().mockReturnValue({ json });
     const host = {
       switchToHttp: () => ({
         getRequest: () => ({
           header: () => undefined,
+          id: 'request-500',
+          log: { error },
           originalUrl: '/v1/example',
         }),
         getResponse: () => ({ status }),
@@ -56,5 +59,17 @@ describe('ApiExceptionFilter', () => {
         message: 'An unexpected error occurred.',
       }),
     });
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorType: 'Error',
+        event: 'api.request.failed',
+        requestId: 'request-500',
+        statusCode: 500,
+      }),
+      'Unhandled API exception',
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(
+      'database password leaked',
+    );
   });
 });

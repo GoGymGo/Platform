@@ -410,6 +410,27 @@
         "tags": ["operator"]
       }
     },
+    "/v1/operator/system-health": {
+      "get": {
+        "operationId": "getSystemHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSystemHealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Inspect worker heartbeat and durable queue depth",
+        "tags": ["operator"]
+      }
+    },
     "/v1/operator/sessions/{sessionId}/verify": {
       "post": {
         "operationId": "verifySession",
@@ -1206,12 +1227,14 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponseDto" }
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponseDto"
+                }
               }
             }
           }
         },
-        "summary": "Report whether the API database dependency is ready",
+        "summary": "Report database and background-worker readiness",
         "tags": ["health"]
       }
     },
@@ -1835,6 +1858,55 @@
         },
         "required": ["id", "kind", "status", "createdAt"]
       },
+      "OperatorQueueDepthsDto": {
+        "type": "object",
+        "properties": {
+          "competitionStartsDue": { "type": "number", "minimum": 0 },
+          "notificationsPending": { "type": "number", "minimum": 0 },
+          "paymentsUncertain": { "type": "number", "minimum": 0 },
+          "privacyOperationsPending": { "type": "number", "minimum": 0 },
+          "webhooksPending": { "type": "number", "minimum": 0 }
+        },
+        "required": [
+          "competitionStartsDue",
+          "notificationsPending",
+          "paymentsUncertain",
+          "privacyOperationsPending",
+          "webhooksPending"
+        ]
+      },
+      "OperatorWorkerHealthDto": {
+        "type": "object",
+        "properties": {
+          "heartbeatAgeSeconds": { "type": "number", "nullable": true },
+          "lastCompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastFailedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastFailureCode": { "type": "string", "nullable": true },
+          "status": {
+            "type": "string",
+            "enum": ["degraded", "healthy", "stale", "starting"]
+          }
+        },
+        "required": ["heartbeatAgeSeconds", "status"]
+      },
+      "OperatorSystemHealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "checkedAt": { "type": "string", "format": "date-time" },
+          "database": { "type": "string", "enum": ["ok"] },
+          "queues": { "$ref": "#/components/schemas/OperatorQueueDepthsDto" },
+          "worker": { "$ref": "#/components/schemas/OperatorWorkerHealthDto" }
+        },
+        "required": ["checkedAt", "database", "queues", "worker"]
+      },
       "VerifySessionDto": {
         "type": "object",
         "properties": {
@@ -2292,6 +2364,40 @@
           "uptimeSeconds": { "type": "number", "example": 123.45 }
         },
         "required": ["service", "status", "timestamp", "uptimeSeconds"]
+      },
+      "ReadinessDependenciesDto": {
+        "type": "object",
+        "properties": {
+          "database": { "type": "string", "enum": ["ok"], "example": "ok" },
+          "worker": {
+            "type": "string",
+            "enum": ["healthy", "starting"],
+            "example": "healthy"
+          }
+        },
+        "required": ["database", "worker"]
+      },
+      "ReadinessResponseDto": {
+        "type": "object",
+        "properties": {
+          "service": { "type": "string", "example": "gogymgo-api" },
+          "status": { "type": "string", "enum": ["ok"], "example": "ok" },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-07-12T12:00:00.000Z"
+          },
+          "uptimeSeconds": { "type": "number", "example": 123.45 },
+          "dependencies": {
+            "$ref": "#/components/schemas/ReadinessDependenciesDto"
+          }
+        },
+        "required": [
+          "service",
+          "status",
+          "timestamp",
+          "uptimeSeconds",
+          "dependencies"
+        ]
       },
       "CreatorApplicationDto": {
         "type": "object",

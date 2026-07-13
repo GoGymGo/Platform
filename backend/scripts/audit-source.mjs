@@ -4,6 +4,7 @@ import { extname, join, relative } from 'node:path';
 const root = process.cwd();
 const ignoredDirectories = new Set([
   '.git',
+  '.terraform',
   'coverage',
   'dist',
   'node_modules',
@@ -52,7 +53,7 @@ for (const file of files) {
     continue;
   }
 
-  if (!/\.(?:c?js|json|md|mjs|ts|txt|ya?ml)$/.test(file)) {
+  if (!/\.(?:c?js|json|md|mjs|tf|tfvars|ts|txt|ya?ml)$/.test(file)) {
     continue;
   }
 

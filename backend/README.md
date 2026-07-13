@@ -34,6 +34,11 @@ The liveness route is `GET http://localhost:3000/v1/health`. In non-production e
 `npm run check` runs formatting verification, strict TypeScript compilation, ESLint, unit tests, HTTP end-to-end tests, OpenAPI generation, the mobile-to-API contract audit, the source-policy/secret audit, and a production build. Run `npm run audit:deps` separately when dependency metadata is available.
 
 Database integration tests use Testcontainers and require a running Docker engine. A missing Docker engine is an environment limitation, never a passing database test.
+With `RUN_DATABASE_INTEGRATION=true`, the suite also exercises the complete
+PostgreSQL-backed draw-to-payout path: minimum-entrant enforcement,
+disqualification filtering, retry-safe draw locking and settlement, exact
+payout allocation, hosted-payee activation, duplicate webhook intake, payment
+release, and terminal payment reconciliation.
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
 

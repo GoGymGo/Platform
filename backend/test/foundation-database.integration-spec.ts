@@ -1,13 +1,8 @@
-import { resolve } from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
 import { Pool } from 'pg';
-
-const execFileAsync = promisify(execFile);
+import {
+  MigratedPostgisTestDatabase,
+  startMigratedPostgisTestDatabase,
+} from './support/postgis-test-database';
 
 const describeWithDatabase =
   process.env.RUN_DATABASE_INTEGRATION === 'true' ? describe : describe.skip;
@@ -15,36 +10,16 @@ const describeWithDatabase =
 describeWithDatabase('database migrations', () => {
   jest.setTimeout(120_000);
 
-  let container: StartedPostgreSqlContainer;
+  let database: MigratedPostgisTestDatabase;
   let pool: Pool;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgis/postgis:17-3.5').start();
-    const databaseUrl = container.getConnectionUri();
-    await execFileAsync(
-      process.execPath,
-      [
-        resolve(
-          process.cwd(),
-          'node_modules/node-pg-migrate/bin/node-pg-migrate.js',
-        ),
-        'up',
-        '--tsx',
-        '--migrations-dir',
-        resolve(process.cwd(), 'migrations'),
-        '--database-url-var',
-        'DATABASE_URL',
-      ],
-      {
-        env: { ...process.env, DATABASE_URL: databaseUrl },
-      },
-    );
-    pool = new Pool({ connectionString: databaseUrl });
+    database = await startMigratedPostgisTestDatabase();
+    pool = database.pool;
   });
 
   afterAll(async () => {
-    await pool?.end();
-    await container?.stop();
+    await database?.stop();
   });
 
   it('creates the identity, region, idempotency, and audit tables with PostGIS', async () => {

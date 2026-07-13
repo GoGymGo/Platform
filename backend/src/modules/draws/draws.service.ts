@@ -76,6 +76,27 @@ export class DrawsService {
             message: 'The competition was not found.',
           });
         }
+
+        const existing = await transaction
+          .selectFrom('competition_draws')
+          .selectAll()
+          .where('competition_id', '=', competition.id)
+          .executeTakeFirst();
+        if (existing) {
+          if (existing.seed_commitment !== input.seedCommitment.toLowerCase()) {
+            throw new ConflictException({
+              code: 'DRAW_ALREADY_LOCKED',
+              message:
+                'This competition already has a draw locked with a different seed commitment.',
+            });
+          }
+          return {
+            drawId: existing.id,
+            entrantCount: existing.entrant_count,
+            entrantSnapshotHash: existing.entrant_snapshot_hash,
+            totalEntries: existing.total_entries,
+          };
+        }
         if (
           competition.status !== 'active' ||
           new Date() < competition.ends_at
@@ -87,12 +108,37 @@ export class DrawsService {
           });
         }
 
-        const progress = await transaction
-          .selectFrom('competition_progress')
-          .select(['enrollment_id', 'prize_draw_entries', 'user_id'])
+        const activeEnrollments = await transaction
+          .selectFrom('competition_enrollments')
+          .select((expression) => expression.fn.countAll<number>().as('count'))
           .where('competition_id', '=', competition.id)
-          .where('prize_draw_entries', '>', 0)
-          .orderBy('user_id')
+          .where('status', '=', 'active')
+          .executeTakeFirstOrThrow();
+        if (Number(activeEnrollments.count) < competition.minimum_entrants) {
+          throw new ConflictException({
+            code: 'COMPETITION_MINIMUM_ENTRANTS_NOT_MET',
+            message:
+              'The competition cannot lock a draw before its minimum active entrant count is met.',
+          });
+        }
+
+        const progress = await transaction
+          .selectFrom('competition_progress as progress')
+          .innerJoin(
+            'competition_enrollments as enrollment',
+            'enrollment.id',
+            'progress.enrollment_id',
+          )
+          .select([
+            'progress.enrollment_id',
+            'progress.prize_draw_entries',
+            'progress.user_id',
+          ])
+          .where('progress.competition_id', '=', competition.id)
+          .where('enrollment.competition_id', '=', competition.id)
+          .where('enrollment.status', '=', 'active')
+          .where('progress.prize_draw_entries', '>', 0)
+          .orderBy('progress.user_id')
           .execute();
         if (progress.length === 0) {
           throw new ConflictException({
@@ -113,30 +159,6 @@ export class DrawsService {
           (total, entry) => total + BigInt(entry.prize_draw_entries),
           0n,
         );
-        const existing = await transaction
-          .selectFrom('competition_draws')
-          .selectAll()
-          .where('competition_id', '=', competition.id)
-          .executeTakeFirst();
-        if (existing) {
-          if (
-            existing.seed_commitment !== input.seedCommitment ||
-            existing.entrant_snapshot_hash !== entrantSnapshotHash
-          ) {
-            throw new ConflictException({
-              code: 'DRAW_ALREADY_LOCKED',
-              message:
-                'This competition already has a different locked draw snapshot.',
-            });
-          }
-          return {
-            drawId: existing.id,
-            entrantCount: existing.entrant_count,
-            entrantSnapshotHash: existing.entrant_snapshot_hash,
-            totalEntries: existing.total_entries,
-          };
-        }
-
         const draw = await transaction
           .insertInto('competition_draws')
           .values({
@@ -211,6 +233,7 @@ export class DrawsService {
             'draw.competition_id',
             'draw.id',
             'draw.seed_commitment',
+            'draw.seed_reveal',
             'draw.status',
           ])
           .where('draw.id', '=', input.drawId)
@@ -223,6 +246,13 @@ export class DrawsService {
           });
         }
         if (draw.status === 'settled') {
+          if (draw.seed_reveal !== input.seedReveal.toLowerCase()) {
+            throw new ConflictException({
+              code: 'DRAW_ALREADY_SETTLED',
+              message:
+                'This draw was already settled with a different seed reveal.',
+            });
+          }
           const count = await transaction
             .selectFrom('draw_winners')
             .select((expression) =>

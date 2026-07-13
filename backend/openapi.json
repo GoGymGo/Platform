@@ -155,6 +155,402 @@
           "regions"
         ]
       }
+    },
+    "/v1/competitions/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Return the authenticated user current regional competition",
+        "tags": [
+          "competitions"
+        ]
+      }
+    },
+    "/v1/competitions/{competitionId}/enrollments": {
+      "post": {
+        "operationId": "enroll",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnrollmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Enroll the authenticated eligible user in a goal bracket",
+        "tags": [
+          "competitions"
+        ]
+      }
+    },
+    "/v1/competitions/{monthKey}/enrollment-count": {
+      "get": {
+        "operationId": "getEnrollmentCount",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentCountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the active enrollment count for a regional competition",
+        "tags": [
+          "competitions"
+        ]
+      }
+    },
+    "/v1/competitions/{monthKey}/matches": {
+      "get": {
+        "operationId": "getMatches",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 7,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitionMatchResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Return the authenticated entrant weekly competition matches",
+        "tags": [
+          "competitions"
+        ]
+      }
+    },
+    "/v1/sessions": {
+      "post": {
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Start an authoritative competition workout session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}/events": {
+      "post": {
+        "operationId": "appendEvent",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppendSessionEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionEventResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Append immutable, untrusted evidence to an active session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}/complete": {
+      "post": {
+        "operationId": "complete",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCompletionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Close a session and submit it for server-side evidence review",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/leaderboards/current": {
+      "get": {
+        "operationId": "getCurrentLeaderboard",
+        "parameters": [
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 7,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryLeaderboardDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Return the current authenticated regional category leaderboard",
+        "tags": [
+          "leaderboards"
+        ]
+      }
+    },
+    "/v1/me/progress": {
+      "get": {
+        "operationId": "getMyProgress",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionProgressResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "summary": "Return authoritative current competition progress from the ledger",
+        "tags": [
+          "leaderboards"
+        ]
+      }
     }
   },
   "info": {
@@ -473,6 +869,530 @@
           "status",
           "policyVersion",
           "createdAt"
+        ]
+      },
+      "CompetitionRulesResponseDto": {
+        "type": "object",
+        "properties": {
+          "minSessionMinutes": {
+            "type": "number"
+          },
+          "minHeartRateSamples": {
+            "type": "number"
+          },
+          "requireFaceCheck": {
+            "type": "boolean"
+          },
+          "requireGymQr": {
+            "type": "boolean"
+          },
+          "signupPrizeDrawEntries": {
+            "type": "number"
+          },
+          "verifiedSessionCategoryScore": {
+            "type": "number"
+          },
+          "verifiedSessionPrizeDrawEntries": {
+            "type": "number"
+          },
+          "payoutPoolAmountMinor": {
+            "type": "number"
+          },
+          "payoutWinnerCount": {
+            "type": "number"
+          },
+          "payoutExponent": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "minSessionMinutes",
+          "minHeartRateSamples",
+          "requireFaceCheck",
+          "requireGymQr",
+          "signupPrizeDrawEntries",
+          "verifiedSessionCategoryScore",
+          "verifiedSessionPrizeDrawEntries",
+          "payoutPoolAmountMinor",
+          "payoutWinnerCount",
+          "payoutExponent"
+        ]
+      },
+      "CompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "monthKey": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "registration",
+              "active",
+              "settling",
+              "settled",
+              "cancelled"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "regionCode": {
+            "type": "string"
+          },
+          "regionName": {
+            "type": "string"
+          },
+          "rulesVersion": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
+          },
+          "goalDays": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "registrationOpensAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "registrationClosesAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "monthKey",
+          "name",
+          "status",
+          "currency",
+          "regionCode",
+          "regionName",
+          "rulesVersion",
+          "rules",
+          "goalDays",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "CreateEnrollmentDto": {
+        "type": "object",
+        "properties": {
+          "goalDays": {
+            "type": "number",
+            "maximum": 7,
+            "minimum": 1
+          },
+          "regionVerificationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rulesAccepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "ageEligibilityAttested": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "goalDays",
+          "regionVerificationId",
+          "rulesAccepted",
+          "ageEligibilityAttested"
+        ]
+      },
+      "EnrollmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "goalDays": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "withdrawn",
+              "disqualified"
+            ]
+          },
+          "enrolledAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "goalDays",
+          "status",
+          "enrolledAt"
+        ]
+      },
+      "EnrollmentCountResponseDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "CompetitionMatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "searching",
+              "solo"
+            ]
+          },
+          "opponentAlias": {
+            "type": "string"
+          },
+          "opponentVerifiedDateKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "periodIndex": {
+            "type": "number",
+            "maximum": 4,
+            "minimum": 1
+          },
+          "region": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "availability",
+          "opponentAlias",
+          "opponentVerifiedDateKeys",
+          "periodIndex",
+          "region"
+        ]
+      },
+      "CreateSessionDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientStartedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "competitionId"
+        ]
+      },
+      "SessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eligibleDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_review",
+              "verified",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "eligibleDate",
+          "status",
+          "policyVersion",
+          "startedAt",
+          "completedAt"
+        ]
+      },
+      "AppendSessionEventDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "device_attestation",
+              "face_check",
+              "gym_qr_scan",
+              "heart_rate_sample"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "heartRateBpm": {
+            "type": "number",
+            "maximum": 240,
+            "minimum": 30
+          },
+          "faceMatchConfidence": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0
+          },
+          "qrPayload": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "deviceEvidenceToken": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "eventId",
+          "eventType",
+          "occurredAt"
+        ]
+      },
+      "SessionEventResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "device_attestation",
+              "face_check",
+              "gym_qr_scan",
+              "heart_rate_sample"
+            ]
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "eventType",
+          "receivedAt"
+        ]
+      },
+      "CompleteSessionDto": {
+        "type": "object",
+        "properties": {
+          "clientCompletedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SessionCompletionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eligibleDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_review",
+              "verified",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "eligibleForReview": {
+            "type": "boolean"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "eligibleDate",
+          "status",
+          "policyVersion",
+          "startedAt",
+          "completedAt",
+          "eligibleForReview",
+          "violations"
+        ]
+      },
+      "CategoryLeaderboardRowDto": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "categoryEntries": {
+            "type": "number"
+          },
+          "rank": {
+            "type": "number"
+          },
+          "verifiedDays": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "alias",
+          "categoryEntries",
+          "rank",
+          "verifiedDays"
+        ]
+      },
+      "CategoryLeaderboardDto": {
+        "type": "object",
+        "properties": {
+          "goal": {
+            "type": "number",
+            "maximum": 7,
+            "minimum": 1
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryLeaderboardRowDto"
+            }
+          }
+        },
+        "required": [
+          "goal",
+          "rows"
+        ]
+      },
+      "CompetitionProgressResponseDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "goalDays": {
+            "type": "number"
+          },
+          "verifiedDays": {
+            "type": "number"
+          },
+          "categoryScore": {
+            "type": "number"
+          },
+          "prizeDrawEntries": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "competitionId",
+          "goalDays",
+          "verifiedDays",
+          "categoryScore",
+          "prizeDrawEntries",
+          "updatedAt"
         ]
       }
     }

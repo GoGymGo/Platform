@@ -58,15 +58,43 @@ describeWithDatabase('foundation database migration', () => {
 
     expect(names).toEqual(
       expect.arrayContaining([
+        'competition_draws',
+        'competition_enrollments',
+        'competition_progress',
+        'competitions',
+        'draw_entries',
+        'draw_winners',
+        'entry_ledger',
         'idempotency_keys',
         'operator_audit_events',
         'profiles',
         'region_policies',
         'region_verifications',
+        'session_events',
         'users',
+        'workout_sessions',
       ]),
     );
     await expect(pool.query('SELECT PostGIS_Version()')).resolves.toBeDefined();
+  });
+
+  it('installs append-only triggers for evidence, ledgers, snapshots, and winners', async () => {
+    const triggers = await pool.query<{ trigger_name: string }>(
+      `SELECT trigger_name
+       FROM information_schema.triggers
+       WHERE trigger_schema = 'public'
+       ORDER BY trigger_name`,
+    );
+
+    expect(triggers.rows.map((row) => row.trigger_name)).toEqual(
+      expect.arrayContaining([
+        'draw_entries_append_only',
+        'draw_winners_append_only',
+        'entry_ledger_append_only',
+        'operator_audit_events_append_only',
+        'session_events_append_only',
+      ]),
+    );
   });
 
   it('rejects mutation of append-only operator audit events', async () => {

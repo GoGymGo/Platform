@@ -11,6 +11,8 @@ type NullableTimestamp = ColumnType<
   Date | string | null | undefined,
   Date | string | null
 >;
+type DateKey = ColumnType<string, Date | string, Date | string>;
+type BigInteger = ColumnType<string, bigint | number | string, never>;
 
 export type AccountStatus = 'active' | 'deleted' | 'suspended';
 export type PublicIdentityMode = 'alias' | 'private' | 'real_name';
@@ -19,6 +21,23 @@ export type RegionVerificationMethod =
 export type RegionVerificationStatus =
   'approved' | 'expired' | 'pending' | 'rejected';
 export type IdempotencyState = 'completed' | 'processing';
+export type CompetitionStatus =
+  'active' | 'cancelled' | 'draft' | 'registration' | 'settled' | 'settling';
+export type EnrollmentStatus = 'active' | 'disqualified' | 'withdrawn';
+export type CompetitionMatchStatus =
+  'cancelled' | 'matched' | 'searching' | 'settled';
+export type WorkoutSessionStatus =
+  'active' | 'cancelled' | 'pending_review' | 'rejected' | 'verified';
+export type SessionEventType =
+  'device_attestation' | 'face_check' | 'gym_qr_scan' | 'heart_rate_sample';
+export type LedgerReason =
+  | 'enrollment'
+  | 'operator_adjustment'
+  | 'perfect_month'
+  | 'reversal'
+  | 'verified_session'
+  | 'weekly_match';
+export type DrawStatus = 'cancelled' | 'locked' | 'settled';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -113,11 +132,177 @@ export interface OperatorAuditEventsTable {
   created_at: Timestamp;
 }
 
+export interface CompetitionsTable {
+  id: Generated<string>;
+  region_policy_id: string;
+  month_key: string;
+  name: string;
+  status: CompetitionStatus;
+  currency: string;
+  rules_version: string;
+  rules: ColumnType<JsonValue, JsonValue, JsonValue>;
+  minimum_entrants: number;
+  entrant_cap: number | null;
+  registration_opens_at: Timestamp;
+  registration_closes_at: Timestamp;
+  starts_at: Timestamp;
+  ends_at: Timestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface CompetitionGoalBracketsTable {
+  competition_id: string;
+  goal_days: number;
+  label: string;
+  created_at: Timestamp;
+}
+
+export interface CompetitionRuleAcceptancesTable {
+  id: Generated<string>;
+  competition_id: string;
+  user_id: string;
+  rules_version: string;
+  age_eligibility_attested: boolean;
+  metadata: ColumnType<JsonValue, JsonValue, JsonValue>;
+  accepted_at: Timestamp;
+}
+
+export interface CompetitionEnrollmentsTable {
+  id: Generated<string>;
+  competition_id: string;
+  user_id: string;
+  goal_days: number;
+  region_verification_id: string;
+  rules_acceptance_id: string;
+  status: EnrollmentStatus;
+  enrolled_at: Timestamp;
+}
+
+export interface CompetitionMatchesTable {
+  id: Generated<string>;
+  competition_id: string;
+  period_index: number;
+  period_start_date: DateKey;
+  period_end_date: DateKey;
+  user_a_id: string;
+  user_b_id: string | null;
+  status: CompetitionMatchStatus;
+  outcome: ColumnType<
+    JsonValue | null,
+    JsonValue | null | undefined,
+    JsonValue | null
+  >;
+  created_at: Timestamp;
+  settled_at: NullableTimestamp;
+}
+
+export interface WorkoutSessionsTable {
+  id: Generated<string>;
+  competition_id: string;
+  enrollment_id: string;
+  user_id: string;
+  eligible_date: DateKey;
+  status: WorkoutSessionStatus;
+  policy_version: string;
+  client_started_at: NullableTimestamp;
+  started_at: Timestamp;
+  completed_at: NullableTimestamp;
+  verification_summary: ColumnType<
+    JsonValue | null,
+    JsonValue | null | undefined,
+    JsonValue | null
+  >;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface SessionEventsTable {
+  id: Generated<string>;
+  session_id: string;
+  client_event_id: string;
+  event_type: SessionEventType;
+  occurred_at: Timestamp;
+  received_at: Timestamp;
+  payload: ColumnType<JsonValue, JsonValue, never>;
+}
+
+export interface EntryLedgerTable {
+  id: Generated<string>;
+  competition_id: string;
+  enrollment_id: string;
+  user_id: string;
+  reason: LedgerReason;
+  source_event_id: string;
+  verified_days_delta: number;
+  category_score_delta: number;
+  prize_draw_entries_delta: number;
+  policy_version: string;
+  metadata: ColumnType<JsonValue, JsonValue, never>;
+  created_at: Timestamp;
+}
+
+export interface CompetitionProgressTable {
+  competition_id: string;
+  enrollment_id: string;
+  user_id: string;
+  goal_days: number;
+  verified_days: number;
+  category_score: number;
+  prize_draw_entries: number;
+  updated_at: Timestamp;
+}
+
+export interface CompetitionDrawsTable {
+  id: Generated<string>;
+  competition_id: string;
+  status: DrawStatus;
+  rules_version: string;
+  seed_commitment: string;
+  seed_reveal: string | null;
+  entrant_snapshot_hash: string;
+  entrant_count: number;
+  total_entries: BigInteger;
+  locked_at: Timestamp;
+  settled_at: NullableTimestamp;
+}
+
+export interface DrawEntriesTable {
+  draw_id: string;
+  user_id: string;
+  enrollment_id: string;
+  entry_count: number;
+  snapshot_position: number;
+  created_at: Timestamp;
+}
+
+export interface DrawWinnersTable {
+  id: Generated<string>;
+  draw_id: string;
+  user_id: string;
+  payout_rank: number;
+  amount_minor: BigInteger;
+  currency: string;
+  created_at: Timestamp;
+}
+
 export interface Database {
+  competition_draws: CompetitionDrawsTable;
+  competition_enrollments: CompetitionEnrollmentsTable;
+  competition_goal_brackets: CompetitionGoalBracketsTable;
+  competition_matches: CompetitionMatchesTable;
+  competition_progress: CompetitionProgressTable;
+  competition_rule_acceptances: CompetitionRuleAcceptancesTable;
+  competitions: CompetitionsTable;
+  draw_entries: DrawEntriesTable;
+  draw_winners: DrawWinnersTable;
+  entry_ledger: EntryLedgerTable;
   idempotency_keys: IdempotencyKeysTable;
   operator_audit_events: OperatorAuditEventsTable;
   profiles: ProfilesTable;
   region_policies: RegionPoliciesTable;
   region_verifications: RegionVerificationsTable;
+  session_events: SessionEventsTable;
   users: UsersTable;
+  workout_sessions: WorkoutSessionsTable;
 }

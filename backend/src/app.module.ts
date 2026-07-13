@@ -8,9 +8,14 @@ import { Environment, validateEnvironment } from './config/environment';
 import { DatabaseModule } from './database/database.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CompetitionsModule } from './modules/competitions/competitions.module';
+import { DrawsModule } from './modules/draws/draws.module';
 import { HealthModule } from './modules/health/health.module';
+import { LeaderboardsModule } from './modules/leaderboards/leaderboards.module';
+import { LedgerModule } from './modules/ledger/ledger.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { RegionsModule } from './modules/regions/regions.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
 
 @Module({
   imports: [
@@ -71,9 +76,14 @@ import { RegionsModule } from './modules/regions/regions.module';
     DatabaseModule,
     IdempotencyModule,
     AuthModule,
+    LedgerModule,
     HealthModule,
     ProfilesModule,
     RegionsModule,
+    CompetitionsModule,
+    SessionsModule,
+    LeaderboardsModule,
+    DrawsModule,
   ],
   providers: [
     {

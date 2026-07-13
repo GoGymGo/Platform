@@ -59,7 +59,7 @@ interface CompletionJson extends SessionJson {
   violations: string[];
 }
 
-export interface VerifySessionInput {
+export interface SessionReviewDecisionInput {
   evidenceSnapshotSha256: string;
   findings: SessionEvidenceFindings;
   operatorUserId: string;
@@ -379,7 +379,7 @@ export class SessionsService {
     );
   }
 
-  async verifySession(input: VerifySessionInput): Promise<boolean> {
+  async verifySession(input: SessionReviewDecisionInput): Promise<boolean> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
@@ -467,16 +467,7 @@ export class SessionsService {
           transaction,
           session,
         );
-        if (
-          evidenceReview.evidenceSnapshotSha256 !==
-          input.evidenceSnapshotSha256.toLowerCase()
-        ) {
-          throw new ConflictException({
-            code: 'SESSION_REVIEW_SNAPSHOT_STALE',
-            message:
-              'The session evidence changed or this approval references a different review snapshot.',
-          });
-        }
+        this.assertCurrentEvidenceSnapshot(evidenceReview, input);
         const unapproved = unapprovedRequiredEvidence(
           evidenceReview,
           input.findings,
@@ -494,19 +485,17 @@ export class SessionsService {
         }
 
         const now = new Date();
-        const verificationSummary: JsonObject = {
-          evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
-          evidenceTrust: 'operator_manual_review',
-          findings: input.findings,
-          limitations: evidenceReview.limitations,
-          reviewedAt: now.toISOString(),
-        };
         await transaction
           .updateTable('workout_sessions')
           .set({
             status: 'verified',
             updated_at: now,
-            verification_summary: verificationSummary,
+            verification_summary: this.buildDecisionSummary(
+              evidenceReview,
+              input,
+              'verified',
+              now,
+            ),
           })
           .where('id', '=', session.id)
           .where('status', '=', 'pending_review')
@@ -530,7 +519,92 @@ export class SessionsService {
           userId: session.user_id,
           verifiedDaysDelta: 1,
         });
-        await this.appendOperatorAudit(transaction, input, session.user_id);
+        await this.appendSessionDecisionAudit(
+          transaction,
+          input,
+          session.user_id,
+          'verified',
+        );
+        return true;
+      });
+  }
+
+  async rejectSession(input: SessionReviewDecisionInput): Promise<boolean> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const session = await transaction
+          .selectFrom('workout_sessions as session')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'session.competition_id',
+          )
+          .select([
+            'competition.rules',
+            'session.competition_id',
+            'session.completed_at',
+            'session.eligible_date',
+            'session.id',
+            'session.policy_version',
+            'session.started_at',
+            'session.status',
+            'session.user_id',
+          ])
+          .where('session.id', '=', input.sessionId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!session) {
+          throw new NotFoundException({
+            code: 'SESSION_NOT_FOUND',
+            message: 'The session was not found.',
+          });
+        }
+        if (session.status === 'rejected') {
+          return false;
+        }
+        if (session.status !== 'pending_review') {
+          throw new ConflictException({
+            code: 'SESSION_NOT_REVIEWABLE',
+            message: 'Only a pending-review session can be rejected.',
+          });
+        }
+
+        const evidenceReview = await this.buildEvidenceReview(
+          transaction,
+          session,
+        );
+        this.assertCurrentEvidenceSnapshot(evidenceReview, input);
+        if (!Object.values(input.findings).includes('rejected')) {
+          throw new UnprocessableEntityException({
+            code: 'SESSION_REJECTION_FINDING_REQUIRED',
+            message:
+              'A rejected session decision must identify at least one rejected evidence category.',
+          });
+        }
+
+        const now = new Date();
+        await transaction
+          .updateTable('workout_sessions')
+          .set({
+            status: 'rejected',
+            updated_at: now,
+            verification_summary: this.buildDecisionSummary(
+              evidenceReview,
+              input,
+              'rejected',
+              now,
+            ),
+          })
+          .where('id', '=', session.id)
+          .where('status', '=', 'pending_review')
+          .executeTakeFirstOrThrow();
+        await this.appendSessionDecisionAudit(
+          transaction,
+          input,
+          session.user_id,
+          'rejected',
+        );
         return true;
       });
   }
@@ -620,15 +694,48 @@ export class SessionsService {
     });
   }
 
-  private appendOperatorAudit(
+  private assertCurrentEvidenceSnapshot(
+    evidenceReview: SessionEvidenceReview,
+    input: SessionReviewDecisionInput,
+  ): void {
+    if (
+      evidenceReview.evidenceSnapshotSha256 !==
+      input.evidenceSnapshotSha256.toLowerCase()
+    ) {
+      throw new ConflictException({
+        code: 'SESSION_REVIEW_SNAPSHOT_STALE',
+        message:
+          'The session evidence changed or this decision references a different review snapshot.',
+      });
+    }
+  }
+
+  private buildDecisionSummary(
+    evidenceReview: SessionEvidenceReview,
+    input: SessionReviewDecisionInput,
+    outcome: 'rejected' | 'verified',
+    reviewedAt: Date,
+  ): JsonObject {
+    return {
+      evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
+      evidenceTrust: 'operator_manual_review',
+      findings: input.findings,
+      limitations: evidenceReview.limitations,
+      outcome,
+      reviewedAt: reviewedAt.toISOString(),
+    };
+  }
+
+  private appendSessionDecisionAudit(
     transaction: Transaction<Database>,
-    input: VerifySessionInput,
+    input: SessionReviewDecisionInput,
     subjectUserId: string,
+    outcome: 'rejected' | 'verified',
   ): Promise<unknown> {
     return transaction
       .insertInto('operator_audit_events')
       .values({
-        action: 'session.verified',
+        action: `session.${outcome}`,
         actor_user_id: input.operatorUserId,
         created_at: new Date(),
         entity_id: input.sessionId,
@@ -636,7 +743,7 @@ export class SessionsService {
         next_state: {
           evidenceSnapshotSha256: input.evidenceSnapshotSha256.toLowerCase(),
           findings: input.findings,
-          status: 'verified',
+          status: outcome,
           subjectUserId,
         },
         previous_state: { status: 'pending_review' },

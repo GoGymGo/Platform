@@ -563,6 +563,48 @@
         "tags": ["operator"]
       }
     },
+    "/v1/operator/sessions/{sessionId}/reject": {
+      "post": {
+        "operationId": "rejectSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RejectSessionDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Reject a reviewed workout session",
+        "tags": ["operator"]
+      }
+    },
     "/v1/operator/sessions/{sessionId}/verify": {
       "post": {
         "operationId": "verifySession",
@@ -2545,7 +2587,7 @@
         },
         "required": ["deviceAttestation", "faceCheck", "gymQr", "heartRate"]
       },
-      "VerifySessionDto": {
+      "RejectSessionDto": {
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
@@ -2567,6 +2609,21 @@
           "status": { "type": "string" }
         },
         "required": ["id", "status"]
+      },
+      "VerifySessionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "evidenceSnapshotSha256": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "findings": {
+            "$ref": "#/components/schemas/SessionEvidenceFindingsDto"
+          }
+        },
+        "required": ["reason", "evidenceSnapshotSha256", "findings"]
       },
       "LockDrawDto": {
         "type": "object",

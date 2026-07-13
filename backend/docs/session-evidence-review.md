@@ -10,9 +10,9 @@ Manual review is a controlled fallback, not cryptographic verification. Producti
 
 1. An authorized operator reads `GET /v1/operator/sessions/{sessionId}/review`.
 2. The API derives a privacy-minimized summary from the immutable session and append-only events. It returns counts, bounded aggregates, declared trust states, rule-required flags, and an `evidenceSnapshotSha256`. Raw QR/device values and their stored hashes are not returned.
-3. The operator submits `POST /v1/operator/sessions/{sessionId}/verify` with the exact snapshot digest, a reason, and one typed finding for each evidence category.
-4. In a row-locked transaction, the API recomputes the digest. A stale or foreign digest fails closed. Every competition-required category must be `approved`, and no category may be `rejected`.
-5. The API—not the operator—builds the stored verification summary, appends the entry-ledger award exactly once, and writes the operator, reason, snapshot, findings, and state transition to the audit log.
+3. The operator submits either `POST /v1/operator/sessions/{sessionId}/verify` or `POST /v1/operator/sessions/{sessionId}/reject` with the exact snapshot digest, a reason, and one typed finding for each evidence category.
+4. In a row-locked transaction, the API recomputes the digest. A stale or foreign digest fails closed. Approval requires every competition-required category to be `approved` and no category to be `rejected`; rejection requires at least one explicit `rejected` finding.
+5. The API, not the operator, builds the stored decision summary and writes the operator, reason, snapshot, findings, and terminal state to the audit log. Approval appends the entry-ledger award exactly once. Rejection appends no value and is retry-safe, allowing settlement to proceed once every session is terminal.
 
 The digest commits to the session identity, competition, eligible date, policy version, exact rules, server start/completion times, state, and every stored event ID, type, timestamp, and payload. Event order is canonicalized so the same evidence always produces the same digest.
 

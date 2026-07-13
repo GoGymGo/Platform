@@ -414,6 +414,67 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toMatchObject({
       response: { code: 'VERIFIED_DAY_ALREADY_AWARDED' },
     });
+    const duplicateReview = await sessions.getEvidenceReview(
+      duplicateDay.rows[0].id,
+    );
+    await expect(
+      sessions.rejectSession({
+        evidenceSnapshotSha256: duplicateReview.evidenceSnapshotSha256,
+        findings: {
+          deviceAttestation: 'not_required',
+          faceCheck: 'not_required',
+          gymQr: 'not_required',
+          heartRate: 'not_required',
+        },
+        operatorUserId,
+        reason: 'rejection requires a failed evidence finding',
+        requestId: 'reject-duplicate-without-finding',
+        sessionId: duplicateDay.rows[0].id,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'SESSION_REJECTION_FINDING_REQUIRED' },
+    });
+    await expect(
+      rejectSession(
+        duplicateDay.rows[0].id,
+        duplicateReview.evidenceSnapshotSha256,
+        'reject-duplicate-day',
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      rejectSession(
+        duplicateDay.rows[0].id,
+        duplicateReview.evidenceSnapshotSha256,
+        'reject-duplicate-day-retry',
+      ),
+    ).resolves.toBe(false);
+    const rejection = await migrated.pool.query<{
+      audit_count: number;
+      outcome: string;
+      pending_count: number;
+      status: string;
+    }>(
+      `SELECT session.status,
+              session.verification_summary->>'outcome' AS outcome,
+              (SELECT count(*)::integer
+               FROM operator_audit_events
+               WHERE action = 'session.rejected'
+                 AND entity_id = session.id) AS audit_count,
+              (SELECT count(*)::integer
+               FROM workout_sessions
+               WHERE competition_id = session.competition_id
+                 AND status IN ('active', 'pending_review')) AS pending_count
+       FROM workout_sessions AS session
+       WHERE session.id = $1`,
+      [duplicateDay.rows[0].id],
+    );
+    expect(rejection.rows[0]).toEqual({
+      audit_count: 1,
+      outcome: 'rejected',
+      pending_count: 0,
+      status: 'rejected',
+    });
+    await expect(verifiedLedgerCount(duplicateDay.rows[0].id)).resolves.toBe(0);
     await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
   });
 
@@ -545,6 +606,26 @@ describeWithDatabase('critical session and ledger workflow', () => {
       },
       operatorUserId,
       reason: 'trusted evidence reviewed in integration test',
+      requestId,
+      sessionId,
+    });
+  }
+
+  function rejectSession(
+    sessionId: string,
+    evidenceSnapshotSha256: string,
+    requestId: string,
+  ) {
+    return sessions.rejectSession({
+      evidenceSnapshotSha256,
+      findings: {
+        deviceAttestation: 'not_required',
+        faceCheck: 'rejected',
+        gymQr: 'not_required',
+        heartRate: 'not_required',
+      },
+      operatorUserId,
+      reason: 'evidence failed operator review in integration test',
       requestId,
       sessionId,
     });

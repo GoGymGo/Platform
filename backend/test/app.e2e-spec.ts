@@ -188,8 +188,8 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
-  it('requires an operator token before session evidence review access', () => {
-    return request(app.getHttpServer())
+  it('requires an operator token before session evidence review access', async () => {
+    await request(app.getHttpServer())
       .get('/v1/operator/sessions/10000000-0000-4000-8000-000000000001/review')
       .expect(401)
       .expect(({ body }) => {
@@ -197,6 +197,11 @@ describe('platform foundation (e2e)', () => {
           error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
         });
       });
+    await request(app.getHttpServer())
+      .post('/v1/operator/sessions/10000000-0000-4000-8000-000000000001/reject')
+      .set('Idempotency-Key', 'reject-session-e2e')
+      .send({})
+      .expect(401);
   });
 
   it('requires authentication before administrative configuration changes', () => {

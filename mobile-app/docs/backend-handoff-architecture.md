@@ -141,7 +141,7 @@ Payout responses use integer `amountMinor` or `payoutPoolAmountMinor` fields plu
 - `GET /competitions/:monthKey/matches?goal=&region=`
 - `GET /competitions/:monthKey/enrollment-count?region=`
 - `POST /sessions`, `POST /sessions/:id/events`, `POST /sessions/:id/complete`
-- `GET /operator/sessions/:id/review`, `POST /operator/sessions/:id/verify` (operator-only; approval is bound to the returned evidence snapshot)
+- `GET /operator/sessions/:id/review`, `POST /operator/sessions/:id/verify`, `POST /operator/sessions/:id/reject` (operator-only; every decision is bound to the returned evidence snapshot)
 - `GET /me/progress`, `GET /leaderboards/current?goal=`
 - `GET /creator-workouts`
 - `GET /results/settled-competition`, `GET /results/payout-winners`

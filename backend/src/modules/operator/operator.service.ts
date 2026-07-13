@@ -27,6 +27,7 @@ import type {
   OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
+  RejectSessionDto,
   VerifySessionDto,
 } from './dto/operator.dto';
 
@@ -269,6 +270,27 @@ export class OperatorService {
   ): Promise<SessionEvidenceReviewResponseDto> {
     await this.getOperatorId(principal);
     return this.sessions.getEvidenceReview(sessionId);
+  }
+
+  async rejectSession(
+    principal: AuthenticatedPrincipal,
+    sessionId: string,
+    requestId: string,
+    input: RejectSessionDto,
+  ): Promise<OperatorActionResponseDto> {
+    const operatorId = await this.getOperatorId(principal);
+    const rejected = await this.sessions.rejectSession({
+      evidenceSnapshotSha256: input.evidenceSnapshotSha256,
+      findings: input.findings,
+      operatorUserId: operatorId,
+      reason: input.reason,
+      requestId,
+      sessionId,
+    });
+    return {
+      id: sessionId,
+      status: rejected ? 'rejected' : 'already_rejected',
+    };
   }
 
   async lockDraw(

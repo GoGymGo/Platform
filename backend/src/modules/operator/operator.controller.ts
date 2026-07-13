@@ -28,6 +28,7 @@ import {
   SessionEvidenceReviewResponseDto,
   OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
+  RejectSessionDto,
   SettleDrawDto,
   VerifySessionDto,
 } from './dto/operator.dto';
@@ -67,6 +68,24 @@ export class OperatorController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
   ): Promise<SessionEvidenceReviewResponseDto> {
     return this.operator.getSessionEvidenceReview(principal, sessionId);
+  }
+
+  @Post('sessions/:sessionId/reject')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Reject a reviewed workout session' })
+  @ApiOkResponse({ type: OperatorActionResponseDto })
+  rejectSession(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: RejectSessionDto,
+  ): Promise<OperatorActionResponseDto> {
+    return this.operator.rejectSession(
+      principal,
+      sessionId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
   }
 
   @Post('sessions/:sessionId/verify')

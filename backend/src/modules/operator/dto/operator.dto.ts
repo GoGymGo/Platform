@@ -42,7 +42,7 @@ export class SessionEvidenceFindingsDto {
   heartRate!: 'approved' | 'not_required' | 'rejected';
 }
 
-export class VerifySessionDto extends OperatorReasonDto {
+export class SessionReviewDecisionDto extends OperatorReasonDto {
   @ApiProperty({ maxLength: 64, minLength: 64, type: String })
   @Matches(/^[a-f0-9]{64}$/i)
   evidenceSnapshotSha256!: string;
@@ -52,6 +52,10 @@ export class VerifySessionDto extends OperatorReasonDto {
   @ValidateNested()
   findings!: SessionEvidenceFindingsDto;
 }
+
+export class VerifySessionDto extends SessionReviewDecisionDto {}
+
+export class RejectSessionDto extends SessionReviewDecisionDto {}
 
 export class SessionEvidenceCategoryReviewDto {
   @ApiProperty({ minimum: 0, type: Number })

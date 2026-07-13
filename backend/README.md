@@ -52,7 +52,8 @@ immutable publication and withdrawal, exact receipt actions and content hashes,
 stale-bundle invalidation, privacy-export inclusion, and enrollment linkage.
 Session-review coverage proves deterministic server evidence snapshots, safe
 operator aggregates, stale-review rejection, typed fail-closed findings, and
-ledger awards bound to the exact reviewed snapshot.
+ledger awards bound to the exact reviewed snapshot. Terminal rejection is
+snapshot-bound, retry-safe, audited once, and awards no ledger value.
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
 

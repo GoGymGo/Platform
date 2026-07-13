@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
@@ -242,7 +243,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
     );
     await database.connection
       .updateTable('profile_media')
-      .set({ expires_at: new Date(Date.now() - 1_000) })
+      .set({ expires_at: sql<Date>`created_at + interval '1 millisecond'` })
       .where('id', 'in', [expired.id, second.id])
       .execute();
 
@@ -283,7 +284,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
     });
     await database.connection
       .updateTable('profile_media')
-      .set({ expires_at: new Date(Date.now() - 1_000) })
+      .set({ expires_at: sql<Date>`created_at + interval '1 millisecond'` })
       .where('id', '=', first.id)
       .executeTakeFirstOrThrow();
     await expect(cleanup.process()).resolves.toEqual({

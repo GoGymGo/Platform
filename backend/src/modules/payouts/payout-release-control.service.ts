@@ -16,6 +16,9 @@ interface PayoutReleaseControlJson extends JsonObject {
   version: number;
 }
 
+const PAYOUT_RELEASE_CONTROL_AUDIT_ENTITY_ID =
+  '00000000-0000-4000-8000-000000000001';
+
 @Injectable()
 export class PayoutReleaseControlService {
   constructor(
@@ -116,7 +119,7 @@ export class PayoutReleaseControlService {
             ? 'payout_release_control.paused'
             : 'payout_release_control.resumed',
           actorUserId: administrator.id,
-          entityId: 'global',
+          entityId: PAYOUT_RELEASE_CONTROL_AUDIT_ENTITY_ID,
           entityType: 'payout_release_control',
           nextState: { paused: updated.paused, version: updated.version },
           previousState: {

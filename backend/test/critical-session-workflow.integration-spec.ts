@@ -1,0 +1,416 @@
+import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
+import { DatabaseService } from '../src/database/database.service';
+import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
+import { CompetitionsService } from '../src/modules/competitions/competitions.service';
+import { LedgerService } from '../src/modules/ledger/ledger.service';
+import { ProfilesService } from '../src/modules/profiles/profiles.service';
+import { SessionsService } from '../src/modules/sessions/sessions.service';
+import {
+  createTestConfig,
+  MigratedPostgisTestDatabase,
+  startMigratedPostgisTestDatabase,
+} from './support/postgis-test-database';
+
+const describeWithDatabase =
+  process.env.RUN_DATABASE_INTEGRATION === 'true' ? describe : describe.skip;
+
+const userPrincipal: AuthenticatedPrincipal = {
+  email: 'session-user@integration.test',
+  emailVerified: true,
+  firebaseUid: 'critical-session-user',
+  roles: ['user'],
+  tokenIssuedAt: 1,
+};
+
+const operatorPrincipal: AuthenticatedPrincipal = {
+  email: 'session-operator@integration.test',
+  emailVerified: true,
+  firebaseUid: 'critical-session-operator',
+  roles: ['operator'],
+  tokenIssuedAt: 1,
+};
+
+const competitionRules = {
+  minHeartRateSamples: 2,
+  minSessionMinutes: 10,
+  payoutExponent: 0.8,
+  payoutPoolAmountMinor: 10_000,
+  payoutWinnerCount: 3,
+  requireFaceCheck: true,
+  requireGymQr: true,
+  signupPrizeDrawEntries: 5,
+  verifiedSessionCategoryScore: 7,
+  verifiedSessionPrizeDrawEntries: 3,
+};
+
+interface CompetitionFixture {
+  competitionId: string;
+  regionVerificationId: string;
+}
+
+describeWithDatabase('critical session and ledger workflow', () => {
+  jest.setTimeout(120_000);
+
+  let competitions: CompetitionsService;
+  let database: DatabaseService;
+  let migrated: MigratedPostgisTestDatabase;
+  let operatorUserId: string;
+  let profiles: ProfilesService;
+  let sessions: SessionsService;
+
+  beforeAll(async () => {
+    migrated = await startMigratedPostgisTestDatabase();
+    database = new DatabaseService(createTestConfig(migrated.databaseUrl));
+    const idempotency = new IdempotencyService(database);
+    const ledger = new LedgerService();
+    profiles = new ProfilesService(database);
+    competitions = new CompetitionsService(
+      database,
+      idempotency,
+      ledger,
+      profiles,
+    );
+    sessions = new SessionsService(database, idempotency, ledger, profiles);
+    const operator = await profiles.ensureUser(
+      operatorPrincipal,
+      database.connection,
+    );
+    operatorUserId = operator.id;
+  });
+
+  afterAll(async () => {
+    await database?.onApplicationShutdown();
+    await migrated?.stop();
+  });
+
+  it('accepts evidence once and awards the verified day exactly once', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const enrollment = await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'session-workflow-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'session-workflow-enrollment',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).resolves.toEqual(enrollment);
+    await activateCompetition(fixture.competitionId);
+
+    const created = await sessions.create(
+      userPrincipal,
+      'session-workflow-create',
+      { competitionId: fixture.competitionId },
+    );
+    await expect(
+      sessions.create(userPrincipal, 'session-workflow-create', {
+        competitionId: fixture.competitionId,
+      }),
+    ).resolves.toEqual(created);
+    await backdateSession(created.id);
+
+    const evidenceTimes = buildEvidenceTimes();
+    await sessions.appendEvent(
+      userPrincipal,
+      created.id,
+      'session-heart-rate-one',
+      {
+        eventId: '10000000-0000-4000-8000-000000000001',
+        eventType: 'heart_rate_sample',
+        heartRateBpm: 132,
+        occurredAt: evidenceTimes[0],
+      },
+    );
+    await sessions.appendEvent(
+      userPrincipal,
+      created.id,
+      'session-heart-rate-two',
+      {
+        eventId: '10000000-0000-4000-8000-000000000002',
+        eventType: 'heart_rate_sample',
+        heartRateBpm: 141,
+        occurredAt: evidenceTimes[1],
+      },
+    );
+    await sessions.appendEvent(
+      userPrincipal,
+      created.id,
+      'session-face-check',
+      {
+        eventId: '10000000-0000-4000-8000-000000000003',
+        eventType: 'face_check',
+        faceMatchConfidence: 0.94,
+        occurredAt: evidenceTimes[2],
+      },
+    );
+    const qrEvent = {
+      eventId: '10000000-0000-4000-8000-000000000004',
+      eventType: 'gym_qr_scan' as const,
+      occurredAt: evidenceTimes[3],
+      qrPayload: 'signed-gym-credential',
+    };
+    const storedQr = await sessions.appendEvent(
+      userPrincipal,
+      created.id,
+      'session-gym-qr',
+      qrEvent,
+    );
+    await expect(
+      sessions.appendEvent(
+        userPrincipal,
+        created.id,
+        'session-gym-qr',
+        qrEvent,
+      ),
+    ).resolves.toEqual(storedQr);
+    await expect(
+      sessions.appendEvent(userPrincipal, created.id, 'session-gym-qr', {
+        ...qrEvent,
+        qrPayload: 'changed-gym-credential',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'IDEMPOTENCY_KEY_REUSED' } });
+    await expect(
+      sessions.appendEvent(
+        userPrincipal,
+        created.id,
+        'session-gym-qr-replayed',
+        { ...qrEvent, qrPayload: 'changed-gym-credential' },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'SESSION_EVENT_REPLAY_MISMATCH' },
+    });
+
+    const completed = await sessions.complete(
+      userPrincipal,
+      created.id,
+      'session-workflow-complete',
+      {},
+    );
+    expect(completed).toMatchObject({
+      eligibleForReview: true,
+      status: 'pending_review',
+      violations: [],
+    });
+    await expect(
+      sessions.complete(
+        userPrincipal,
+        created.id,
+        'session-workflow-complete',
+        {},
+      ),
+    ).resolves.toEqual(completed);
+
+    await migrated.pool.query(
+      `UPDATE competition_enrollments
+       SET status = 'disqualified'
+       WHERE id = $1`,
+      [enrollment.id],
+    );
+    await expect(
+      verifySession(created.id, 'verify-disqualified-session'),
+    ).rejects.toMatchObject({
+      response: { code: 'ACTIVE_ENROLLMENT_REQUIRED' },
+    });
+    await expect(verifiedLedgerCount(created.id)).resolves.toBe(0);
+
+    await migrated.pool.query(
+      `UPDATE competition_enrollments
+       SET status = 'active'
+       WHERE id = $1`,
+      [enrollment.id],
+    );
+    await expect(verifySession(created.id, 'verify-session')).resolves.toBe(
+      true,
+    );
+    await expect(
+      verifySession(created.id, 'verify-session-retry'),
+    ).resolves.toBe(false);
+
+    const progress = await migrated.pool.query<{
+      category_score: number;
+      prize_draw_entries: number;
+      verified_days: number;
+    }>(
+      `SELECT category_score, prize_draw_entries, verified_days
+       FROM competition_progress
+       WHERE competition_id = $1 AND enrollment_id = $2`,
+      [fixture.competitionId, enrollment.id],
+    );
+    expect(progress.rows[0]).toEqual({
+      category_score: 7,
+      prize_draw_entries: 8,
+      verified_days: 1,
+    });
+    await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
+
+    const storedEvidence = await migrated.pool.query<{
+      event_count: string;
+      payloads: string;
+    }>(
+      `SELECT count(*)::text AS event_count,
+              string_agg(payload::text, ' ') AS payloads
+       FROM session_events
+       WHERE session_id = $1`,
+      [created.id],
+    );
+    expect(storedEvidence.rows[0].event_count).toBe('4');
+    expect(storedEvidence.rows[0].payloads).not.toContain(
+      'signed-gym-credential',
+    );
+    expect(storedEvidence.rows[0].payloads).not.toContain(
+      'changed-gym-credential',
+    );
+
+    const duplicateDay = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at, completed_at)
+       SELECT competition_id, enrollment_id, user_id, eligible_date,
+              'pending_review', policy_version, started_at, completed_at
+       FROM workout_sessions
+       WHERE id = $1
+       RETURNING id`,
+      [created.id],
+    );
+    await expect(
+      verifySession(duplicateDay.rows[0].id, 'verify-duplicate-day'),
+    ).rejects.toMatchObject({
+      response: { code: 'VERIFIED_DAY_ALREADY_AWARDED' },
+    });
+    await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
+  });
+
+  function verifySession(sessionId: string, requestId: string) {
+    return sessions.verifySession({
+      operatorUserId,
+      reason: 'trusted evidence reviewed in integration test',
+      requestId,
+      sessionId,
+      trustedEvidenceSummary: {
+        deviceAttestation: 'reviewed',
+        evidenceTrust: 'operator_verified',
+      },
+    });
+  }
+
+  async function verifiedLedgerCount(sourceEventId: string): Promise<number> {
+    const result = await migrated.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM entry_ledger
+       WHERE source_event_id = $1 AND reason = 'verified_session'`,
+      [sourceEventId],
+    );
+    return Number(result.rows[0].count);
+  }
+
+  async function seedRegistrationCompetition(): Promise<CompetitionFixture> {
+    const now = Date.now();
+    const user = await profiles.ensureUser(userPrincipal, database.connection);
+    const region = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO region_policies
+         (code, country_code, subdivision_code, metro_name, currency,
+          timezone, language_codes, minimum_age, competition_enabled,
+          payout_enabled, boundary_version, policy_version, valid_from)
+       VALUES
+         ('critical-session-region', 'CA', 'BC', 'Critical Session Region',
+          'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE, TRUE,
+          'boundary-v1', 'policy-v1', $1)
+       RETURNING id`,
+      [new Date(now - 24 * 60 * 60_000)],
+    );
+    const verification = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO region_verifications
+         (user_id, region_policy_id, method, status, evidence_metadata,
+          policy_version, verified_at, expires_at)
+       VALUES ($1, $2, 'manual_review', 'approved', '{}'::jsonb,
+               'policy-v1', $3, $4)
+       RETURNING id`,
+      [
+        user.id,
+        region.rows[0].id,
+        new Date(now - 60_000),
+        new Date(now + 24 * 60 * 60_000),
+      ],
+    );
+    const competition = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competitions
+         (region_policy_id, month_key, name, status, currency, rules_version,
+          rules, minimum_entrants, registration_opens_at,
+          registration_closes_at, starts_at, ends_at)
+       VALUES ($1, '2030-01', 'Critical Session Competition', 'registration',
+               'CAD', 'rules-v1', $2::jsonb, 100, $3, $4, $5, $6)
+       RETURNING id`,
+      [
+        region.rows[0].id,
+        JSON.stringify(competitionRules),
+        new Date(now - 60 * 60_000),
+        new Date(now + 60 * 60_000),
+        new Date(now + 2 * 60 * 60_000),
+        new Date(now + 24 * 60 * 60_000),
+      ],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_goal_brackets
+         (competition_id, goal_days, label)
+       VALUES ($1, 3, 'Three days')`,
+      [competition.rows[0].id],
+    );
+    return {
+      competitionId: competition.rows[0].id,
+      regionVerificationId: verification.rows[0].id,
+    };
+  }
+
+  async function activateCompetition(competitionId: string): Promise<void> {
+    const now = Date.now();
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET status = 'active',
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4,
+           updated_at = $1
+       WHERE id = $5`,
+      [
+        new Date(now),
+        new Date(now - 30 * 60_000),
+        new Date(now - 20 * 60_000),
+        new Date(now + 24 * 60 * 60_000),
+        competitionId,
+      ],
+    );
+  }
+
+  async function backdateSession(sessionId: string): Promise<void> {
+    await migrated.pool.query(
+      `UPDATE workout_sessions
+       SET started_at = $1, updated_at = $1
+       WHERE id = $2`,
+      [new Date(Date.now() - 11 * 60_000), sessionId],
+    );
+  }
+
+  function buildEvidenceTimes(): [string, string, string, string] {
+    const now = Date.now();
+    return [
+      new Date(now - 9 * 60_000).toISOString(),
+      new Date(now - 7 * 60_000).toISOString(),
+      new Date(now - 5 * 60_000).toISOString(),
+      new Date(now - 3 * 60_000).toISOString(),
+    ];
+  }
+});

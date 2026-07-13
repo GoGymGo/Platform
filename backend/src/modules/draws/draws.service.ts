@@ -108,6 +108,20 @@ export class DrawsService {
           });
         }
 
+        const unresolvedSessions = await transaction
+          .selectFrom('workout_sessions')
+          .select((expression) => expression.fn.countAll<number>().as('count'))
+          .where('competition_id', '=', competition.id)
+          .where('status', 'in', ['active', 'pending_review'])
+          .executeTakeFirstOrThrow();
+        if (Number(unresolvedSessions.count) > 0) {
+          throw new ConflictException({
+            code: 'COMPETITION_SESSION_REVIEWS_PENDING',
+            message:
+              'The competition cannot lock a draw while workout sessions remain active or pending review.',
+          });
+        }
+
         const activeEnrollments = await transaction
           .selectFrom('competition_enrollments')
           .select((expression) => expression.fn.countAll<number>().as('count'))

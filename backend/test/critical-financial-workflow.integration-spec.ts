@@ -214,6 +214,39 @@ describeWithDatabase('critical financial workflow', () => {
     const seedCommitment = buildSeedCommitment(seedReveal);
     const operatorUser = await operatorUserId();
 
+    const unresolvedSession = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at, completed_at)
+       SELECT enrollment.competition_id, enrollment.id, enrollment.user_id,
+              '2020-01-15', 'pending_review', 'rules-v1',
+              '2020-01-15T10:00:00.000Z', '2020-01-15T11:00:00.000Z'
+       FROM competition_enrollments AS enrollment
+       WHERE enrollment.competition_id = $1
+         AND enrollment.status = 'active'
+       ORDER BY enrollment.user_id
+       LIMIT 1
+       RETURNING id`,
+      [seeded.competitionId],
+    );
+    await expect(
+      draws.lock({
+        competitionId: seeded.competitionId,
+        operatorUserId: operatorUser,
+        reason: 'integration unresolved session guard',
+        requestId: 'draw-lock-unresolved-session',
+        seedCommitment,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_SESSION_REVIEWS_PENDING' },
+    });
+    await migrated.pool.query(
+      `UPDATE workout_sessions
+       SET status = 'rejected'
+       WHERE id = $1`,
+      [unresolvedSession.rows[0].id],
+    );
+
     const locked = await draws.lock({
       competitionId: seeded.competitionId,
       operatorUserId: operatorUser,

@@ -8,6 +8,7 @@ import type { Transaction } from 'kysely';
 import type { Database, JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import { stableJson } from '../../common/idempotency/stable-json';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { parseCompetitionRules } from '../competitions/competition-rules';
@@ -170,6 +171,7 @@ export class SessionsService {
     idempotencyKey: string,
     event: AppendSessionEventDto,
   ): Promise<SessionEventResponseDto> {
+    const eventPayload = buildSessionEventPayload(event);
     return this.idempotency.execute<SessionEventJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -178,6 +180,7 @@ export class SessionsService {
           eventId: event.eventId,
           eventType: event.eventType,
           occurredAt: event.occurredAt,
+          payload: eventPayload,
           sessionId,
         },
         responseCode: 201,
@@ -223,7 +226,7 @@ export class SessionsService {
             client_event_id: event.eventId,
             event_type: event.eventType,
             occurred_at: occurredAt,
-            payload: buildSessionEventPayload(event),
+            payload: eventPayload,
             received_at: receivedAt,
             session_id: session.id,
           })
@@ -232,12 +235,25 @@ export class SessionsService {
           )
           .returningAll()
           .executeTakeFirst();
-        stored ??= await transaction
-          .selectFrom('session_events')
-          .selectAll()
-          .where('session_id', '=', session.id)
-          .where('client_event_id', '=', event.eventId)
-          .executeTakeFirstOrThrow();
+        if (!stored) {
+          stored = await transaction
+            .selectFrom('session_events')
+            .selectAll()
+            .where('session_id', '=', session.id)
+            .where('client_event_id', '=', event.eventId)
+            .executeTakeFirstOrThrow();
+          if (
+            stored.event_type !== event.eventType ||
+            stored.occurred_at.getTime() !== occurredAt.getTime() ||
+            stableJson(stored.payload) !== stableJson(eventPayload)
+          ) {
+            throw new ConflictException({
+              code: 'SESSION_EVENT_REPLAY_MISMATCH',
+              message:
+                'This session event identifier was already used for different evidence.',
+            });
+          }
+        }
 
         return {
           eventId: stored.client_event_id,
@@ -368,6 +384,7 @@ export class SessionsService {
             'competition.rules',
             'competition.rules_version',
             'enrollment.goal_days',
+            'enrollment.status as enrollment_status',
             'session.competition_id',
             'session.eligible_date',
             'session.enrollment_id',
@@ -391,6 +408,13 @@ export class SessionsService {
           throw new ConflictException({
             code: 'SESSION_NOT_REVIEWABLE',
             message: 'Only a pending-review session can be verified.',
+          });
+        }
+        if (session.enrollment_status !== 'active') {
+          throw new ConflictException({
+            code: 'ACTIVE_ENROLLMENT_REQUIRED',
+            message:
+              'A session cannot be verified after its competition enrollment is no longer active.',
           });
         }
 

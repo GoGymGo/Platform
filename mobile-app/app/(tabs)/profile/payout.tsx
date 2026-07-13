@@ -12,10 +12,11 @@ import {
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
 import { SponsorRail } from '@/components/sponsor';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, componentSizes, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCurrentUserPayout } from '@/data/appDataHooks';
 import { canOpenPayoutPortal, formatPayoutAmount } from '@/domain/payout';
 import { openHyperwalletPortal } from '@/services/payouts';
+import { isApiUnavailableError } from '@/services/api/availability';
 import { useAuth } from '@/state/auth';
 import { useApi } from '@/state/api';
 
@@ -40,8 +41,10 @@ export default function PayoutAccountScreen() {
       if (!opened) {
         setMessage('YOUR SECURE HYPERWALLET LINK IS NOT READY. TRY AGAIN LATER.');
       }
-    } catch {
-      setMessage('HYPERWALLET COULD NOT BE OPENED. CHECK YOUR CONNECTION AND TRY AGAIN.');
+    } catch (error) {
+      setMessage(isApiUnavailableError(error)
+        ? 'PAYOUT ACTIONS REQUIRE A CONFIGURED API.'
+        : 'HYPERWALLET COULD NOT BE OPENED. CHECK YOUR CONNECTION AND TRY AGAIN.');
     } finally {
       setOpening(false);
     }
@@ -162,7 +165,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   title: {

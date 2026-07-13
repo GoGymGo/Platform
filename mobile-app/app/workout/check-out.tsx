@@ -10,7 +10,6 @@ import {
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SessionUnavailable } from '@/components/session';
-import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
@@ -30,11 +29,10 @@ export default function CheckOutScreen() {
   const { activeSession } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
-    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
   const elapsedSeconds = activeSession
-    ? getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale)
+    ? getSessionElapsedSeconds(activeSession.startedAt, new Date())
     : 0;
   const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
     activeSession &&
@@ -138,10 +136,13 @@ export default function CheckOutScreen() {
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentReady || !cameraConsentAccepted}
-        label="VERIFY BIOMETRIC - FINISH ->"
-        onPress={() => router.push('/workout/complete')}
+        disabled
+        label="FINAL IDENTITY CHECK REQUIRED"
+        onPress={() => undefined}
       />
+      <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
+        COMPLETION WILL UNLOCK ONLY AFTER THE BACKEND ACCEPTS FINAL VERIFICATION EVIDENCE.
+      </TerminalText>
 
       <CyberButtonOutline
         label="BACK"
@@ -249,5 +250,10 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
+  },
+  integrationNote: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.body,
+    textAlign: 'center'
   },
 });

@@ -17,7 +17,6 @@ import type {
   CompetitionRegion,
   CompetitionRegionVerificationMethod
 } from '@/config/regions';
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import {
   isCompleteCanadianPostalCode,
@@ -85,14 +84,6 @@ export default function RegionScreen() {
     const region = resolveCompetitionRegionFromPostalCode(normalizedPostalCode);
 
     if (!region) {
-      if (isLocalPreviewEnabled) {
-        setPostalError('');
-        setCandidateRegion(competitionRegion);
-        setVerificationMethod('postal-code');
-        setVerificationState('verified');
-        return;
-      }
-
       setCandidateRegion(null);
       setVerificationMethod(null);
       setVerificationState('unsupported-region');
@@ -112,11 +103,6 @@ export default function RegionScreen() {
     }
 
     await verifyCompetitionRegion(candidateRegion, verificationMethod);
-    router.replace(isProfileSource ? '/profile' : '/consents');
-  }
-
-  async function continueWithPreviewRegion() {
-    await verifyCompetitionRegion(competitionRegion, 'postal-code');
     router.replace(isProfileSource ? '/profile' : '/consents');
   }
 
@@ -157,23 +143,6 @@ export default function RegionScreen() {
             BACKGROUND.
           </TerminalText>
         </HUDBorderBox>
-
-        {isLocalPreviewEnabled ? (
-          <HUDBorderBox style={styles.previewCard} tone="muted">
-            <TerminalText tone="cyan" variant="label">
-              FRONTEND PREVIEW
-            </TerminalText>
-            <TerminalText tone="muted" variant="body">
-              LOCATION ELIGIBILITY IS BYPASSED WHILE YOU REVIEW THE UI. CONTINUE
-              WITH {competitionRegion.label} DEMO DATA OR TEST THE LOCATION FLOW
-              BELOW.
-            </TerminalText>
-            <CyberButtonOutline
-              label={`CONTINUE WITH ${competitionRegion.label} DEMO ->`}
-              onPress={() => void continueWithPreviewRegion()}
-            />
-          </HUDBorderBox>
-        ) : null}
 
         {isProfileSource && regionVerification ? (
           <HUDBorderBox style={styles.currentCard} tone="muted">
@@ -242,7 +211,7 @@ export default function RegionScreen() {
             <AuthTextField
               autoCapitalize="characters"
               autoComplete="postal-code"
-              error={isLocalPreviewEnabled && verificationState === 'unsupported-region' ? '' : postalError}
+              error={postalError}
               label="CANADIAN POSTAL CODE"
               maxLength={7}
               onChangeText={(value) => {
@@ -312,10 +281,6 @@ const styles = StyleSheet.create({
   },
   privacyCard: {
     gap: spacing.sm,
-    padding: spacing.lg
-  },
-  previewCard: {
-    gap: spacing.md,
     padding: spacing.lg
   },
   currentCard: {

@@ -9,7 +9,6 @@ export type PayoutClaim = {
   competitionLabel: string;
   currency: 'CAD' | 'USD' | 'MXN';
   id: string;
-  portalUrl?: string;
   provider: 'hyperwallet';
   status: PayoutClaimStatus;
 };

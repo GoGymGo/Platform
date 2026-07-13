@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  TextInput,
   View
 } from 'react-native';
 
@@ -15,10 +14,11 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { FormTextInput } from '@/components/formTextInput';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -113,16 +113,13 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             <TerminalText tone="dim" variant="micro">
               ALIAS
             </TerminalText>
-            <TextInput
+            <FormTextInput
               accessibilityLabel="Alias"
               autoCapitalize="words"
               autoCorrect={false}
               maxLength={24}
               onChangeText={setAlias}
               placeholder="Enter your alias"
-              placeholderTextColor={colors.dim}
-              selectionColor={colors.cyan}
-              style={styles.input}
               value={alias}
             />
           </View>
@@ -208,17 +205,6 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: spacing.xs,
     marginTop: spacing.sm
-  },
-  input: {
-    minHeight: 50,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyanMedium,
-    borderRadius: radii.sm,
-    color: colors.text,
-    backgroundColor: colors.panelAlpha70,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.control
   },
   pictureSection: {
     alignItems: 'center',

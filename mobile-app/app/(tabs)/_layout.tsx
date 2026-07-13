@@ -2,19 +2,35 @@ import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, type ColorValue, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
-import { colors, fontFamilies, fontSizes } from '@/constants/theme';
+import {
+  borders,
+  colors,
+  componentSizes,
+  fontFamilies,
+  fontSizes,
+  interactionStates,
+  spacing
+} from '@/constants/theme';
 
 const tabScreenOptions = {
   headerShown: false,
   tabBarActiveTintColor: colors.cyan,
   tabBarInactiveTintColor: colors.dim,
   tabBarStyle: {
-    height: 78,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceCyanActive,
-    backgroundColor: colors.background
+    height: componentSizes.tabBarHeight,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.borderDefault,
+    backgroundColor: colors.surfaceRaised,
+    ...(Platform.select<ViewStyle>({
+      web: {
+        width: '100%',
+        maxWidth: componentSizes.screenMaxWidth,
+        alignSelf: 'center'
+      },
+      default: {}
+    }) ?? {})
   },
   tabBarLabelStyle: {
     fontFamily: fontFamilies.terminal,
@@ -23,9 +39,10 @@ const tabScreenOptions = {
     textTransform: 'uppercase'
   },
   tabBarItemStyle: Platform.select({
-    web: { outlineColor: colors.cyan } as unknown as ViewStyle,
-    default: {}
-  })
+    web: interactionStates.webFocus as unknown as ViewStyle,
+    default: { minHeight: componentSizes.minimumTouchTarget }
+  }),
+  tabBarActiveBackgroundColor: colors.surfaceCyanGhost
 } as const;
 
 export default function TabsLayout() {
@@ -120,14 +137,14 @@ function SessionGlyph({ color, focused }: { color: ColorValue; focused: boolean 
 
 const styles = StyleSheet.create({
   glyph: {
-    width: 18,
+    width: componentSizes.iconSmall,
     height: 5,
     borderWidth: 1,
     borderRadius: 5
   },
   sessionGlyph: {
-    width: 28,
-    height: 28,
+    width: componentSizes.iconMedium,
+    height: componentSizes.iconMedium,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

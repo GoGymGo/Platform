@@ -288,22 +288,20 @@ export function calculateBestStreak(dateKeys: readonly string[]) {
 
 export function getSessionElapsedSeconds(
   startedAt: string,
-  referenceDate = new Date(),
-  timeScale = 1
+  referenceDate = new Date()
 ) {
   const elapsedMilliseconds = Math.max(
     0,
     referenceDate.getTime() - new Date(startedAt).getTime()
   );
 
-  return Math.floor((elapsedMilliseconds / 1000) * Math.max(1, timeScale));
+  return Math.floor(elapsedMilliseconds / 1000);
 }
 
 export function evaluateSessionCompletion(
   session: SessionCompletionCandidate | null,
   logs: readonly WorkoutLog[],
-  referenceDate = new Date(),
-  timeScale = 1
+  referenceDate = new Date()
 ): SessionCompletionStatus {
   if (!session) {
     return 'no-active-session';
@@ -314,7 +312,7 @@ export function evaluateSessionCompletion(
   }
 
   if (
-    getSessionElapsedSeconds(session.startedAt, referenceDate, timeScale) <
+    getSessionElapsedSeconds(session.startedAt, referenceDate) <
     workoutRules.minimumSessionSeconds
   ) {
     return 'minimum-not-met';

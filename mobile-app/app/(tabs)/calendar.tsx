@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -10,8 +10,9 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { FormTextInput } from '@/components/formTextInput';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, componentSizes, cyberGlow, fontFamilies, radii, spacing, fontSizes, interactionStates } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
 import {
   formatDateKey,
@@ -253,7 +254,7 @@ export default function CalendarScreen() {
           style={styles.manualToggle}
         />
 
-        {showManualLogForm ? <HUDBorderBox style={styles.manualCard} tone="cyan">
+        {showManualLogForm ? <HUDBorderBox style={styles.manualCard} tone="muted">
           <View style={styles.manualHeader}>
             <View style={styles.manualHeaderCopy}>
               <TerminalText glow tone="cyan" variant="label">
@@ -285,13 +286,12 @@ export default function CalendarScreen() {
           <TerminalText style={styles.inputLabel} tone="dim" variant="micro">
             WORKOUT NAME // OPTIONAL
           </TerminalText>
-          <TextInput
+          <FormTextInput
             accessibilityLabel="Workout name"
             autoCapitalize="sentences"
             maxLength={60}
             onChangeText={setManualTitle}
             placeholder="Example: Upper body strength"
-            placeholderTextColor={colors.dim}
             style={styles.input}
             value={manualTitle}
           />
@@ -299,13 +299,12 @@ export default function CalendarScreen() {
           <TerminalText style={styles.inputLabel} tone="dim" variant="micro">
             DURATION // MINUTES
           </TerminalText>
-          <TextInput
+          <FormTextInput
             accessibilityLabel="Workout duration in minutes"
             keyboardType="number-pad"
             maxLength={4}
             onChangeText={setManualDuration}
             placeholder="45"
-            placeholderTextColor={colors.dim}
             style={styles.input}
             value={manualDuration}
           />
@@ -313,13 +312,12 @@ export default function CalendarScreen() {
           <TerminalText style={styles.inputLabel} tone="dim" variant="micro">
             EXERCISES, SETS + NOTES // OPTIONAL
           </TerminalText>
-          <TextInput
+          <FormTextInput
             accessibilityLabel="Exercises, sets and workout notes"
             maxLength={500}
             multiline
             onChangeText={setManualExercises}
             placeholder={'Example:\nBench press - 3 x 8\nCable row - 3 x 10\nFelt strong today'}
-            placeholderTextColor={colors.dim}
             style={[styles.input, styles.notesInput]}
             value={manualExercises}
           />
@@ -471,7 +469,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -549,7 +547,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderCyanButton,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceCyanGhost
+    backgroundColor: colors.surfaceInteractive,
+    ...interactionStates.webFocus
   },
   monthLabel: {
     flex: 1,
@@ -582,7 +581,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: radii.sm,
-    backgroundColor: colors.panelAlpha45
+    backgroundColor: colors.surfaceBase,
+    ...interactionStates.webFocus
   },
   dayCellMuted: {
     opacity: 0.42
@@ -705,11 +705,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderCyanSoft,
-    borderRadius: radii.sm,
-    color: colors.text,
-    backgroundColor: colors.panelAlpha70,
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.body
   },
@@ -725,7 +720,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

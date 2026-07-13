@@ -10,7 +10,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, componentSizes, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { calculateRankedPrizeDrawPayouts } from '@/domain/campaignEconomics';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   },
   entrySummary: {
     borderTopWidth: 1,
-    borderTopColor: colors.borderCyanSubtle
+    borderTopColor: colors.divider
   },
   entrySummaryRow: {
     minHeight: 48,
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderCyanSubtle
+    borderBottomColor: colors.divider
   },
   entryStatusCopy: {
     fontFamily: fontFamilies.body

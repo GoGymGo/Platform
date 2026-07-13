@@ -13,7 +13,7 @@ import {
   SponsorRail as SponsorBanner
 } from '@/components/sponsor';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, componentSizes, cyberGlow, fontFamilies, interactionStates, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
   useCreatorWorkouts,
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -383,7 +383,8 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressableCard: {
-    width: '100%'
+    width: '100%',
+    ...interactionStates.webFocus
   },
   videoAd: {
     marginBottom: spacing.lg,
@@ -553,7 +554,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   videoBadgeRow: {
     width: '100%',
@@ -596,7 +597,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

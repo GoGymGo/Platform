@@ -11,9 +11,8 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { colors, fontFamilies, interactionStates, spacing } from '@/constants/theme';
 import {
-  useAppData,
   useCategoryLeaderboards,
   usePayoutWinners,
   useSettledCompetition
@@ -39,7 +38,6 @@ export default function WinnersCircleScreen() {
   const router = useRouter();
   const { auto } = useLocalSearchParams<{ auto?: string }>();
   const { user } = useAuth();
-  const { mode: appDataMode } = useAppData();
   const { competitionRegion } = useCompetitionRegion();
   const { campaign } = useSponsorCampaign();
   const [closing, setClosing] = useState(false);
@@ -76,11 +74,16 @@ export default function WinnersCircleScreen() {
     usePayoutWinners(payoutSchedule);
 
   async function closeWinnersCircle() {
+    if (!user) {
+      router.replace('/sign-in');
+      return;
+    }
+
     setClosing(true);
 
     try {
       await markWinnersCircleSeen(
-        user?.uid ?? 'local-preview',
+        user.uid,
         competitionRegion.timeZone
       );
     } finally {
@@ -133,7 +136,7 @@ export default function WinnersCircleScreen() {
         >
           <View style={styles.header}>
             <TerminalText glow tone="pink" variant="label">
-              {`${appDataMode === 'demo' ? 'SAMPLE RESULTS' : 'MONTHLY RESULTS'} // ${campaign.region}`}
+              {`MONTHLY RESULTS // ${campaign.region}`}
             </TerminalText>
             <TerminalText glow style={styles.title} tone="pink" variant="title">
               WINNERS CIRCLE
@@ -376,7 +379,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   resultTab: {
     minWidth: 0,
@@ -385,7 +388,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
-    borderRadius: 5
+    borderRadius: 5,
+    ...interactionStates.webFocus
   },
   resultTabSelected: {
     backgroundColor: colors.surfaceCyanActive
@@ -405,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   lastRow: {
     borderBottomWidth: 0
@@ -436,6 +440,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs
   },
   pressed: {
-    opacity: 0.74
+    ...interactionStates.pressed
   }
 });

@@ -3,14 +3,12 @@ import { StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail } from '@/components/sponsor';
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import {
   formatCampaignCurrency,
@@ -107,7 +105,7 @@ export default function WelcomeScreen() {
                 <TerminalText
                   glow
                   style={[styles.prizeValue, !sponsorConfirmed && styles.prizePending]}
-                  tone={sponsorConfirmed ? 'pink' : 'cyan'}
+                  tone={sponsorConfirmed ? 'pink' : 'amber'}
                   variant="title"
                 >
                   {sponsorConfirmed
@@ -128,7 +126,7 @@ export default function WelcomeScreen() {
             </View>
             <TerminalText
               style={styles.drawLabel}
-              tone={sponsorConfirmed ? 'pink' : 'cyan'}
+              tone={sponsorConfirmed ? 'pink' : 'amber'}
               variant="label"
             >
               15% OF PLAYERS GET PAID
@@ -140,12 +138,6 @@ export default function WelcomeScreen() {
               label="CREATE ACCOUNT ->"
               onPress={() => router.push('/join')}
             />
-            {isLocalPreviewEnabled ? (
-              <CyberButtonOutline
-                label="PREVIEW APP FLOW"
-                onPress={() => router.push('/identity')}
-              />
-            ) : null}
           </View>
         </View>
       </ScreenScrollView>
@@ -287,8 +279,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfacePinkSoft
   },
   pendingPrizeBlock: {
-    borderColor: colors.borderCyanSubtle,
-    backgroundColor: colors.surfaceCyanFaint
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
   },
   prizeValue: {
     marginTop: 2,
@@ -312,7 +304,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCyanWhisper
   },
   pendingSponsorAd: {
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
   },
   sponsorAdCopy: {
     flex: 1

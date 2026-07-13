@@ -9,7 +9,6 @@ import {
 } from 'react';
 
 import { competitionConfig } from '@/config/competition';
-import { sessionTimeScale } from '@/config/runtime';
 import {
   evaluateMonthlyCompetition,
   getCompetitionMonthKey,
@@ -345,8 +344,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     const completionStatus = evaluateSessionCompletion(
       activeSession,
       logs,
-      now,
-      sessionTimeScale
+      now
     );
 
     if (

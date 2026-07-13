@@ -13,7 +13,7 @@ import {
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { colors, componentSizes, fontFamilies, interactionStates, spacing } from '@/constants/theme';
 import { useCurrentUserPayout } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
@@ -289,7 +289,7 @@ export default function ProfileScreen() {
           <View style={styles.accountRow}>
             <View style={styles.profileImageCopy}>
               <TerminalText tone="text" uppercase={false} variant="body">
-                {user?.email ?? 'PREVIEW ACCOUNT'}
+                {user?.email ?? 'ACCOUNT EMAIL UNAVAILABLE'}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
                 {user
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   profileHeader: {
@@ -598,7 +598,8 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.whiteAlpha05
+    borderBottomColor: colors.whiteAlpha05,
+    ...interactionStates.webFocus
   },
   settingsCopy: {
     flex: 1
@@ -616,7 +617,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

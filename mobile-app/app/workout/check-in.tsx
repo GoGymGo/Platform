@@ -13,14 +13,11 @@ import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SponsorRail } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
-import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
   const router = useRouter();
-  const { startWorkoutSession } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
-    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
 
@@ -70,13 +67,13 @@ export default function CheckInScreen() {
         />
 
         <CyberButtonPrimary
-          disabled={!cameraConsentReady || !cameraConsentAccepted}
-          label="VERIFY BIOMETRIC ->"
-          onPress={() => {
-            startWorkoutSession('heartRate');
-            router.push('/workout/active');
-          }}
+          disabled
+          label="IDENTITY PROVIDER REQUIRED"
+          onPress={() => undefined}
         />
+        <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
+          CHECK-IN WILL UNLOCK WHEN THE BACKEND IDENTITY AND HEART-RATE PROVIDERS ARE CONNECTED.
+        </TerminalText>
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -143,5 +140,10 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
+  },
+  integrationNote: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.body,
+    textAlign: 'center'
   }
 });

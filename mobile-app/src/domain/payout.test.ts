@@ -12,8 +12,7 @@ const claim: PayoutClaim = {
   amount: 125,
   competitionLabel: 'JUNE 2026 PRIZE DRAW',
   currency: 'CAD',
-  id: 'payout-preview-001',
-  portalUrl: 'https://example.com/payout',
+  id: 'payout-test-001',
   provider: 'hyperwallet',
   status: 'action-required'
 };
@@ -27,7 +26,6 @@ describe('payout claims', () => {
 
   it('only allows a backend portal action for an unpaid claim', () => {
     assert.equal(canOpenPayoutPortal(claim), true);
-    assert.equal(canOpenPayoutPortal({ ...claim, portalUrl: undefined }), true);
     assert.equal(canOpenPayoutPortal({ ...claim, status: 'paid' }), false);
   });
 

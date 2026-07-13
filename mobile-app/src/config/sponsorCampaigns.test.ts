@@ -4,12 +4,12 @@ import { describe, it } from 'node:test';
 import { resolveSponsorCampaign } from './sponsorCampaigns';
 
 describe('regional sponsor campaign resolution', () => {
-  it('returns the approved sponsor for the matching region and month', () => {
+  it('uses neutral creative until an approved campaign is returned by the API', () => {
     const campaign = resolveSponsorCampaign('TORONTO', '2026-07');
 
-    assert.equal(campaign.id, 'toronto-2026-07-volt');
-    assert.equal(campaign.sponsor.shortName, 'VOLT');
-    assert.equal(campaign.status, 'approved');
+    assert.equal(campaign.id, 'toronto-2026-07-neutral');
+    assert.equal(campaign.sponsor.shortName, 'GOGYMGO');
+    assert.equal(campaign.status, 'draft');
     assert.equal(campaign.economics.sponsorPerVerifiedUser, 3);
     assert.equal(campaign.economics.prizeDrawPerVerifiedUser, 2);
     assert.equal(campaign.economics.prizeDrawWinnerRate, 0.15);
@@ -24,7 +24,7 @@ describe('regional sponsor campaign resolution', () => {
     assert.equal(campaign.placements.leaderboard.placementLabel, 'LEADERBOARD');
   });
 
-  it('uses neutral GoGymGo creative for a different region in the same month', () => {
+  it('keeps neutral creative scoped to the requested region', () => {
     const campaign = resolveSponsorCampaign('VANCOUVER', '2026-07');
 
     assert.equal(campaign.id, 'vancouver-2026-07-neutral');

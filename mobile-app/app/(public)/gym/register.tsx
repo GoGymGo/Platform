@@ -22,6 +22,7 @@ import {
   type GymRegistrationErrors
 } from '@/domain/gymRegistration';
 import { recordGymRegistrationRequest } from '@/services/gymRegistration';
+import { isApiUnavailableError } from '@/services/api/availability';
 import { useApi } from '@/state/api';
 
 export default function GymRegistrationScreen() {
@@ -57,8 +58,10 @@ export default function GymRegistrationScreen() {
     try {
       await recordGymRegistrationRequest(api, input);
       setSubmitted(true);
-    } catch {
-      setSubmissionError('GYM REGISTRATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+    } catch (error) {
+      setSubmissionError(isApiUnavailableError(error)
+        ? 'GYM REGISTRATION REQUIRES A CONFIGURED API.'
+        : 'GYM REGISTRATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +99,7 @@ export default function GymRegistrationScreen() {
           <ProcessRow index="03" text="APPROVED GYMS RECEIVE ENTRY + EXIT QR CODES" />
         </View>
 
-        <HUDBorderBox style={styles.form} tone="cyan">
+        <HUDBorderBox style={styles.form} tone="muted">
           <AuthTextField
             error={errors.gymName}
             label="GYM NAME"
@@ -195,7 +198,7 @@ const styles = StyleSheet.create({
   },
   processList: {
     borderTopWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   processRow: {
     minHeight: 48,
@@ -203,7 +206,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   processText: {
     flex: 1,

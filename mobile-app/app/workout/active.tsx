@@ -10,10 +10,9 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
-import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
-import { useAppData } from '@/data/appDataHooks';
 import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { readWorkoutTelemetry } from '@/services/workoutTelemetry';
 import { formatDateKey, useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatClock(totalSeconds: number) {
@@ -24,7 +23,6 @@ function formatClock(totalSeconds: number) {
 
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
-  const { mode: appDataMode, source: appDataSource } = useAppData();
   const {
     activeSession,
     cancelActiveWorkout,
@@ -43,11 +41,7 @@ export default function ActiveWorkoutScreen() {
     const updateElapsedTime = () => {
       setElapsedSeconds(
         Math.min(
-          getSessionElapsedSeconds(
-            activeSessionStartedAt,
-            new Date(),
-            sessionTimeScale
-          ),
+          getSessionElapsedSeconds(activeSessionStartedAt, new Date()),
           workoutRules.minimumSessionSeconds
         )
       );
@@ -62,7 +56,7 @@ export default function ActiveWorkoutScreen() {
   }, [activeSessionStartedAt]);
 
   const session = useMemo(() => {
-    const telemetry = appDataSource.getSessionTelemetry(elapsedSeconds);
+    const telemetry = readWorkoutTelemetry();
     const progressPercent = Math.min(
       100,
       Math.round((elapsedSeconds / workoutRules.minimumSessionSeconds) * 100)
@@ -96,7 +90,7 @@ export default function ActiveWorkoutScreen() {
       progressPercent,
       ready: minimumReached && midSessionVerified && heartRateReady
     };
-  }, [activeSession, appDataSource, elapsedSeconds]);
+  }, [activeSession, elapsedSeconds]);
 
   useEffect(() => {
     if (
@@ -238,10 +232,6 @@ export default function ActiveWorkoutScreen() {
             Connected device telemetry is required before this session can be verified.
           </TerminalText>
         </HUDBorderBox>
-      ) : appDataMode === 'demo' ? (
-        <TerminalText style={styles.demoNotice} tone="amber" variant="micro">
-          DEMO TELEMETRY // NOT A LIVE DEVICE READING
-        </TerminalText>
       ) : null}
 
       <View style={styles.statusList}>
@@ -445,10 +435,6 @@ const styles = StyleSheet.create({
   },
   telemetryNoticeCopy: {
     fontFamily: fontFamilies.body
-  },
-  demoNotice: {
-    marginBottom: spacing.sm,
-    textAlign: 'center'
   },
   statusList: {
     gap: spacing.xs,

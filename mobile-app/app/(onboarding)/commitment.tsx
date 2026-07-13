@@ -11,7 +11,7 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { SponsorRail } from '@/components/sponsor';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, fontFamilies, fontSizes, interactionStates, spacing } from '@/constants/theme';
 import {
   calculateWeeklyMatchEntries,
   type WeeklyMatchMultiplier
@@ -784,7 +784,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderRadius: 8
+    borderRadius: 8,
+    ...interactionStates.webFocus
   },
   dayButtonActive: {
     borderColor: colors.borderCyanBright,
@@ -792,7 +793,7 @@ const styles = StyleSheet.create({
   },
   dayButtonIdle: {
     borderColor: colors.whiteAlpha08,
-    backgroundColor: colors.panelAlpha45
+    backgroundColor: colors.surfaceBase
   },
   dayButtonUnavailable: {
     opacity: 0.35,
@@ -839,7 +840,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   weeklyMatchLabel: {
     width: 92,
@@ -857,7 +858,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 5
+    borderRadius: 5,
+    ...interactionStates.webFocus
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -866,7 +868,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   segment: {
     minWidth: 0,
@@ -875,7 +877,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
-    borderRadius: 5
+    borderRadius: 5,
+    ...interactionStates.webFocus
   },
   segmentLabel: {
     width: '100%',
@@ -905,7 +908,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   toggleCopy: {
     flex: 1,
@@ -933,7 +936,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: colors.borderCyanSubtle
+    backgroundColor: colors.divider
   },
   resultPanel: {
     alignItems: 'center',

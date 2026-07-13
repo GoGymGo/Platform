@@ -1,25 +1,27 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
-import { accountLegalConsentLabels } from '@/constants/legal';
-import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { SponsorRail } from '@/components/sponsor';
+import { isLocalPreviewEnabled } from '@/config/firebase';
+import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import {
+  formatCampaignCurrency,
+  useSponsorCampaign
+} from '@/state/sponsorCampaign';
 
 type Accent = 'cyan';
 
 type WelcomeStep = {
   accent: Accent;
   index: string;
-  marker: string;
-  subtitle: string;
   title: string;
 };
 
@@ -27,46 +29,39 @@ const welcomeSteps: readonly WelcomeStep[] = [
   {
     accent: 'cyan',
     index: '01',
-    marker: 'IN',
-    subtitle: 'CHECK IN AT THE GYM',
     title: 'SHOW UP'
   },
   {
     accent: 'cyan',
     index: '02',
-    marker: 'ID',
-    subtitle: 'VERIFY YOUR WORKOUT',
     title: 'PROVE IT'
   },
   {
     accent: 'cyan',
     index: '03',
-    marker: 'WIN',
-    subtitle: 'EARN PRIZE DRAW ENTRIES',
     title: 'WIN'
   }
 ];
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const accountLegalAccepted = privacyAccepted && termsAccepted;
+  const { campaign, economics } = useSponsorCampaign();
+  const sponsorConfirmed = campaign.status === 'approved';
 
   return (
     <ScreenContainer>
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <SponsorBanner />
+        <SponsorRail style={styles.sponsorBanner} />
 
         <View style={styles.introStack}>
           <View style={styles.statusRail}>
             <View style={styles.onlineDot} />
             <TerminalText glow tone="cyan" variant="label">
-              SYSTEM ONLINE // ENTRY OPEN
+              SYSTEM ONLINE // REGISTRATION OPEN
             </TerminalText>
           </View>
 
@@ -84,11 +79,11 @@ export default function WelcomeScreen() {
             </View>
           </View>
 
-          <View style={styles.stepList}>
+          <HUDBorderBox style={styles.stepStrip} tone="cyan">
             {welcomeSteps.map((step) => (
-              <WelcomeStepRow key={step.index} step={step} />
+              <WelcomeStepCell key={step.index} step={step} />
             ))}
-          </View>
+          </HUDBorderBox>
 
           <TerminalText style={styles.sponsorLine} tone="dim" variant="label">
             FREE TO PLAY // FUNDED BY SPONSORS
@@ -96,125 +91,80 @@ export default function WelcomeScreen() {
 
           <HUDBorderBox glow style={styles.entryPanel} tone="cyan">
             <TerminalText style={styles.entryIntro} tone="muted" variant="label">
-              ON SIGNUP YOU RECEIVE
+              ON SIGNUP YOU RECEIVE A
             </TerminalText>
-            <TerminalText glow style={styles.entryTitle} tone="cyan" variant="value">
-              1 FREE ENTRY
+            <TerminalText glow style={styles.entryTitle} tone="pink" variant="value">
+              FREE ENTRY
+            </TerminalText>
+            <TerminalText style={styles.entryActivation} tone="muted" variant="micro">
+              INTO THE MONTHLY PRIZE DRAW
             </TerminalText>
             <View style={styles.entryDetailRow}>
-              <View style={styles.prizeBlock}>
+              <View style={[styles.prizeBlock, !sponsorConfirmed && styles.pendingPrizeBlock]}>
                 <TerminalText tone="muted" variant="micro">
-                  CURRENT PRIZE POOL
+                  PROJECTED DRAW POOL
                 </TerminalText>
-                <TerminalText glow style={styles.prizeValue} tone="pink" variant="title">
-                  $5,000
+                <TerminalText
+                  glow
+                  style={[styles.prizeValue, !sponsorConfirmed && styles.prizePending]}
+                  tone={sponsorConfirmed ? 'pink' : 'cyan'}
+                  variant="title"
+                >
+                  {sponsorConfirmed
+                    ? formatCampaignCurrency(economics.prizeDrawAmount)
+                    : 'PUBLISHED\nSOON'}
                 </TerminalText>
               </View>
-              <View style={styles.sponsorAd}>
-                <View style={styles.entrySponsorMark}>
-                  <TerminalText glow tone="pink" variant="label">
-                    V
-                  </TerminalText>
-                </View>
+              <View style={[styles.sponsorAd, !sponsorConfirmed && styles.pendingSponsorAd]}>
                 <View style={styles.sponsorAdCopy}>
                   <TerminalText tone="dim" variant="micro">
                     MONTH SPONSOR
                   </TerminalText>
                   <TerminalText style={styles.sponsorAdTitle} tone="text" variant="body">
-                    VOLT RECOVERY FUEL
+                    {campaign.sponsor.offerTitle}
                   </TerminalText>
                 </View>
               </View>
             </View>
-            <TerminalText style={styles.drawLabel} tone="pink" variant="label">
-              CURRENT REGIONAL PRIZE DRAW
+            <TerminalText
+              style={styles.drawLabel}
+              tone={sponsorConfirmed ? 'pink' : 'cyan'}
+              variant="label"
+            >
+              15% OF PLAYERS GET PAID
             </TerminalText>
           </HUDBorderBox>
 
-          <View style={styles.legalStack}>
-            <View style={styles.legalHeader}>
-              <TerminalText glow tone="cyan" variant="label">
-                LEGAL CHECKPOINT
-              </TerminalText>
-              <TerminalText style={styles.legalIntro} tone="muted" variant="micro">
-                CHECK BOTH BOXES TO ENABLE ACCOUNT CREATION
-              </TerminalText>
-            </View>
-            <LegalDocumentLinks />
-            <LegalConsentCheckbox
-              checked={privacyAccepted}
-              label={accountLegalConsentLabels.privacy}
-              onToggle={() => setPrivacyAccepted((current) => !current)}
-            />
-            <LegalConsentCheckbox
-              checked={termsAccepted}
-              label={accountLegalConsentLabels.terms}
-              onToggle={() => setTermsAccepted((current) => !current)}
-            />
-          </View>
-
           <View style={styles.primaryActions}>
             <CyberButtonPrimary
-              disabled={!accountLegalAccepted}
               label="CREATE ACCOUNT ->"
-              onPress={() => router.push('/identity')}
+              onPress={() => router.push('/join')}
             />
-            <CyberButtonOutline
-              label="I ALREADY HAVE AN ACCOUNT"
-              onPress={() => router.replace('/home')}
-            />
+            {isLocalPreviewEnabled ? (
+              <CyberButtonOutline
+                label="PREVIEW APP FLOW"
+                onPress={() => router.push('/identity')}
+              />
+            ) : null}
           </View>
         </View>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
-function SponsorBanner() {
-  return (
-    <HUDBorderBox style={styles.sponsorBanner} tone="muted">
-      <View style={styles.sponsorMark}>
-        <TerminalText glow tone="pink" variant="title">
-          V
-        </TerminalText>
-      </View>
-      <View style={styles.sponsorCopy}>
-        <TerminalText tone="dim" variant="micro">
-          SPONSOR SIGNAL
-        </TerminalText>
-        <TerminalText style={styles.sponsorTitle} tone="text" variant="body">
-          SPONSORED BY VOLT
-        </TerminalText>
-        <TerminalText tone="muted" variant="body">
-          PRIZE POOL PARTNER
-        </TerminalText>
-      </View>
-    </HUDBorderBox>
-  );
-}
-
-function WelcomeStepRow({ step }: { step: WelcomeStep }) {
+function WelcomeStepCell({ step }: { step: WelcomeStep }) {
   const tone = step.accent;
 
   return (
-    <HUDBorderBox glow style={styles.stepRow} tone={tone}>
-      <View style={[styles.stepMarker, styles.markerCyan]}>
-        <TerminalText glow tone={tone} variant="label">
-          {step.marker}
-        </TerminalText>
-      </View>
-      <View style={styles.stepTextBlock}>
-        <TerminalText glow style={styles.stepTitle} tone={tone} variant="title">
-          {step.title}
-        </TerminalText>
-        <TerminalText tone="muted" variant="micro">
-          {step.subtitle}
-        </TerminalText>
-      </View>
-      <TerminalText tone={tone} variant="label">
+    <View style={styles.stepCell}>
+      <TerminalText glow style={styles.stepNumber} tone={tone} variant="label">
         {step.index}
       </TerminalText>
-    </HUDBorderBox>
+      <TerminalText style={styles.stepTitle} tone="text" variant="micro">
+        {step.title}
+      </TerminalText>
+    </View>
   );
 }
 
@@ -228,29 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   sponsorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: 42,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
-  },
-  sponsorMark: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePink
-  },
-  sponsorCopy: {
-    flex: 1
-  },
-  sponsorTitle: {
-    marginTop: 1,
-    fontFamily: fontFamilies.terminal
+    marginBottom: spacing.lg
   },
   statusRail: {
     flexDirection: 'row',
@@ -268,11 +196,7 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: colors.cyan,
-    shadowColor: colors.cyan,
-    shadowOpacity: 0.72,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4
+    ...cyberGlow.cyan
   },
   introStack: {
     width: '100%',
@@ -302,47 +226,24 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.sm
   },
-  legalStack: {
+  stepStrip: {
     width: '100%',
-    gap: spacing.sm,
-    marginTop: spacing.xs
-  },
-  legalHeader: {
-    gap: 2
-  },
-  legalIntro: {
-    fontFamily: fontFamilies.terminal
-  },
-  stepList: {
-    width: '100%',
-    gap: spacing.md
-  },
-  stepRow: {
     flexDirection: 'row',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm
+  },
+  stepCell: {
+    flex: 1,
     alignItems: 'center',
-    gap: spacing.lg,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg
+    gap: 2,
+    paddingHorizontal: 3
   },
-  stepMarker: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 10
-  },
-  markerCyan: {
-    borderColor: colors.borderCyanMedium,
-    backgroundColor: colors.surfaceCyanSoft
-  },
-  stepTextBlock: {
-    flex: 1
+  stepNumber: {
+    fontFamily: fontFamilies.display
   },
   stepTitle: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.stat,
-    lineHeight: 24
+    fontFamily: fontFamilies.terminal,
+    textAlign: 'center'
   },
   sponsorLine: {
     fontFamily: fontFamilies.terminal,
@@ -363,6 +264,12 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display,
     textAlign: 'center'
   },
+  entryActivation: {
+    marginTop: -4,
+    marginBottom: spacing.sm,
+    fontFamily: fontFamilies.terminal,
+    textAlign: 'center'
+  },
   entryDetailRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -379,17 +286,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.surfacePinkSoft
   },
+  pendingPrizeBlock: {
+    borderColor: colors.borderCyanSubtle,
+    backgroundColor: colors.surfaceCyanFaint
+  },
   prizeValue: {
     marginTop: 2,
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.titleLarge,
-    lineHeight: 28
+    lineHeight: 28,
+    textAlign: 'center'
+  },
+  prizePending: {
+    fontSize: fontSizes.body,
+    lineHeight: 20
   },
   sponsorAd: {
     flex: 1.18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
@@ -397,22 +311,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.surfaceCyanWhisper
   },
-  entrySponsorMark: {
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePink
+  pendingSponsorAd: {
+    borderColor: colors.borderCyanSubtle
   },
   sponsorAdCopy: {
     flex: 1
   },
   sponsorAdTitle: {
     marginTop: 1,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.display
   },
   drawLabel: {
     marginTop: spacing.xs,

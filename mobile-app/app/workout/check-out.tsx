@@ -1,6 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { type Href, useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
 import {
   CyberButtonOutline,
@@ -10,22 +9,77 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { SessionUnavailable } from '@/components/session';
+import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type CheckoutMetric = {
   label: string;
   value: string;
 };
 
-const metrics: readonly CheckoutMetric[] = [
-  { label: 'MIN ELEVATED', value: '22' },
-  { label: 'AVG BPM', value: '138' },
-  { label: 'CHECKPOINTS', value: '3/3' }
-];
-
 export default function CheckOutScreen() {
   const router = useRouter();
-  const [cameraConsentAccepted, setCameraConsentAccepted] = useState(false);
+  const { campaign } = useSponsorCampaign();
+  const sponsorConfirmed = campaign.status === 'approved';
+  const { activeSession } = useWorkoutProgress();
+  const {
+    accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
+    toggle: toggleCameraConsent
+  } = useBiometricCameraConsent();
+  const elapsedSeconds = activeSession
+    ? getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale)
+    : 0;
+  const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
+    activeSession &&
+      activeSession.heartRateObservedSeconds >= workoutRules.minimumSessionSeconds &&
+      activeSession.averageHeartRateBpm >= workoutRules.minimumAverageHeartRateBpm
+  );
+  const checkoutReady = Boolean(
+    activeSession?.midSessionVerified &&
+      elapsedSeconds >= workoutRules.minimumSessionSeconds &&
+      heartRateReady
+  );
+  const metrics: readonly CheckoutMetric[] = activeSession?.verificationMethod === 'heartRate'
+    ? [
+        { label: 'DURATION', value: '30:00' },
+        { label: 'AVG BPM', value: String(activeSession.averageHeartRateBpm) },
+        { label: 'TARGET', value: `${workoutRules.minimumAverageHeartRateBpm}+` }
+      ]
+    : [
+        { label: 'DURATION', value: '30:00' },
+        { label: 'FACE CHECK', value: 'PASS' },
+        { label: 'GYM QR', value: 'READY' }
+      ];
+
+  if (!activeSession || !checkoutReady) {
+    return (
+      <SessionUnavailable
+        actionLabel={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START A SESSION ->'}
+        body={
+          !activeSession
+            ? 'START A VERIFIED SESSION BEFORE OPENING CHECK-OUT.'
+            : activeSession.verificationMethod === 'heartRate' && !heartRateReady
+              ? `MAINTAIN AN AVERAGE OF AT LEAST ${workoutRules.minimumAverageHeartRateBpm} BPM ACROSS THE FULL 30-MINUTE SESSION.`
+              : 'THE 30-MINUTE MINIMUM AND AUTOMATIC FACE CHECK MUST BOTH PASS BEFORE CHECK-OUT.'
+        }
+        onAction={() => {
+          if (activeSession) {
+            router.replace('/workout/active');
+          } else {
+            router.replace('/session' as Href);
+          }
+        }}
+        title="CHECK-OUT LOCKED"
+      />
+    );
+  }
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
@@ -33,35 +87,29 @@ export default function CheckOutScreen() {
         CHECK-OUT // 3 OF 3
       </TerminalText>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push('/sponsor-offer')}
-        style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-      >
-        <HUDBorderBox style={styles.sponsorCard} tone="muted">
-          <View style={styles.sponsorMark}>
-            <TerminalText glow tone="pink" variant="title">
-              V
-            </TerminalText>
-          </View>
-          <View style={styles.sponsorCopy}>
-            <TerminalText tone="dim" variant="micro">
-              SESSION SPONSOR
-            </TerminalText>
-            <TerminalText style={styles.sponsorText} tone="text" variant="body">
-              VOLT FUNDS VERIFIED SESSION ENTRIES.
-            </TerminalText>
-          </View>
-        </HUDBorderBox>
-      </Pressable>
+      <HUDBorderBox style={styles.sponsorCard} tone="muted">
+        <View style={[styles.sponsorMark, !sponsorConfirmed ? styles.sponsorMarkPending : null]}>
+          <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
+            {campaign.sponsor.mark}
+          </TerminalText>
+        </View>
+        <View style={styles.sponsorCopy}>
+          <TerminalText tone="dim" variant="micro">
+            SESSION SPONSOR
+          </TerminalText>
+          <TerminalText style={styles.sponsorText} tone="text" variant="body">
+            {campaign.sponsor.shortName} FUNDS THIS REGIONAL CAMPAIGN.
+          </TerminalText>
+        </View>
+      </HUDBorderBox>
 
       <View style={styles.centerContent}>
-        <HUDBorderBox glow style={styles.successMark} tone="cyan">
-          <TerminalText glow style={styles.successMarkText} tone="cyan" variant="value">
+        <HUDBorderBox glow style={styles.successMark} tone="green">
+          <TerminalText glow style={styles.successMarkText} tone="green" variant="value">
             OK
           </TerminalText>
         </HUDBorderBox>
-        <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
+        <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
           30:00 COMPLETE
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
@@ -85,19 +133,19 @@ export default function CheckOutScreen() {
       <BiometricCameraConsentBanner
         checked={cameraConsentAccepted}
         compact
-        onToggle={() => setCameraConsentAccepted((current) => !current)}
+        onToggle={toggleCameraConsent}
         style={styles.cameraConsent}
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentAccepted}
+        disabled={!cameraConsentReady || !cameraConsentAccepted}
         label="VERIFY BIOMETRIC - FINISH ->"
         onPress={() => router.push('/workout/complete')}
       />
 
       <CyberButtonOutline
         label="BACK"
-        onPress={() => router.push('/workout/active')}
+        onPress={() => goBackOrReplace(router, '/workout/active')}
         style={styles.backButton}
       />
     </ScreenContainer>
@@ -117,9 +165,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.terminal,
     textAlign: 'center'
   },
-  pressableCard: {
-    width: '100%'
-  },
   sponsorCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -138,6 +183,10 @@ const styles = StyleSheet.create({
     borderColor: colors.sponsorBorder,
     borderRadius: 9,
     backgroundColor: colors.surfacePinkSoft
+  },
+  sponsorMarkPending: {
+    borderColor: colors.borderCyanSoft,
+    backgroundColor: colors.surfaceCyanGhost
   },
   sponsorCopy: {
     flex: 1
@@ -159,7 +208,7 @@ const styles = StyleSheet.create({
     padding: 0,
     borderRadius: 38,
     marginBottom: 18,
-    ...cyberGlow.cyan
+    ...cyberGlow.green
   },
   successMarkText: {
     fontFamily: fontFamilies.display
@@ -201,8 +250,4 @@ const styles = StyleSheet.create({
   cameraConsent: {
     marginBottom: spacing.md
   },
-  pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
-  }
 });

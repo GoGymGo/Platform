@@ -1,61 +1,84 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenScrollView,
   CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
-
-const sponsorFacts = [
-  "FUNDS THIS MONTH'S $5,000 REGIONAL PRIZE POOL",
-  'SUPPORTS THE TORONTO CREATOR PAYOUT POOL',
-  'OFFER LIVES OUTSIDE YOUTUBE PLAYER SURFACES'
-] as const;
+import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function SponsorOfferModal() {
   const router = useRouter();
-  const [offerSaved, setOfferSaved] = useState(false);
+  const { campaign, economics, enrollment } = useSponsorCampaign();
+  const sponsorConfirmed = campaign.status === 'approved';
+  const screenTone = sponsorConfirmed ? 'pink' : 'cyan';
+  const sponsorFacts = sponsorConfirmed
+    ? [
+        `FUNDS A PROJECTED ${formatCampaignCurrency(economics.prizeDrawAmount)} REGIONAL PRIZE DRAW`,
+        `${Math.round(campaign.economics.prizeDrawWinnerRate * 100)}% OF PLAYERS GET PAID`,
+        `REQUIRES ${enrollment.minimumEntrants} REGISTERED PLAYERS ACROSS THE REGION TO LAUNCH`,
+        enrollment.maximumEntrants === null
+          ? 'THIS REGIONAL CAMPAIGN HAS NO PLAYER CAP'
+          : `THIS REGIONAL CAMPAIGN HAS A ${enrollment.maximumEntrants.toLocaleString()}-PLAYER SPONSOR CAP`,
+        `SUPPORTS A PROJECTED ${formatCampaignCurrency(economics.creatorPayoutAmount)} CREATOR PAYOUT`
+      ]
+    : [
+        'REGIONAL SPONSOR AND PRIZE DETAILS WILL BE PUBLISHED BEFORE THE COMPETITION',
+        `${Math.round(campaign.economics.prizeDrawWinnerRate * 100)}% OF PLAYERS IS THE TARGET PAYOUT RATE`,
+        `REQUIRES ${enrollment.minimumEntrants} REGISTERED PLAYERS ACROSS THE REGION TO LAUNCH`,
+        enrollment.maximumEntrants === null
+          ? 'NO PLAYER CAP IS CURRENTLY CONFIGURED'
+          : `CURRENT PLAYER CAP: ${enrollment.maximumEntrants.toLocaleString()}`,
+        'CREATOR PAYOUT DETAILS WILL APPEAR WITH THE SPONSOR ANNOUNCEMENT'
+      ];
+  const closeOffer = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace('/home');
+  };
 
   return (
     <ScreenContainer contentStyle={styles.sheet}>
       <View style={styles.header}>
-        <TerminalText glow tone="pink" variant="label">
-          SPONSOR OFFER
+        <TerminalText glow tone={screenTone} variant="label">
+          {sponsorConfirmed ? 'SPONSOR OFFER' : 'SPONSOR ANNOUNCEMENT'}
         </TerminalText>
         <CyberButtonOutline
           label="CLOSE"
-          onPress={() => router.back()}
+          onPress={closeOffer}
           style={styles.closeButton}
         />
       </View>
 
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <HUDBorderBox glow style={styles.heroCard} tone="pink">
+        <HUDBorderBox glow style={styles.heroCard} tone={screenTone}>
           <View style={styles.logoMark}>
-            <TerminalText glow style={styles.logoText} tone="pink" variant="display">
-              V
+            <TerminalText glow style={styles.logoText} tone={screenTone} variant="display">
+              {campaign.sponsor.mark}
             </TerminalText>
           </View>
           <TerminalText style={styles.sponsorName} tone="text" variant="title">
-            VOLT ENERGY
+            {campaign.sponsor.displayName}
           </TerminalText>
           <TerminalText tone="muted" variant="body">
-            MONTHLY SPONSOR // TORONTO
+            MONTHLY SPONSOR // {campaign.region}
           </TerminalText>
-          <TerminalText glow style={styles.offerTitle} tone="pink" variant="body">
-            15% OFF RECOVERY FUEL
+          <TerminalText glow style={styles.offerTitle} tone={screenTone} variant="body">
+            {campaign.sponsor.offerHeadline}
           </TerminalText>
           <TerminalText glow style={styles.offerCode} tone="cyan" variant="label">
-            CODE: GOGYMGO15
+            {sponsorConfirmed ? `CODE: ${campaign.sponsor.offerCode}` : 'CAMPAIGN DETAILS COMING SOON'}
           </TerminalText>
         </HUDBorderBox>
 
@@ -63,49 +86,21 @@ export default function SponsorOfferModal() {
           {sponsorFacts.map((fact) => (
             <HUDBorderBox key={fact} style={styles.factRow} tone="cyan">
               <TerminalText glow tone="cyan" variant="micro">
-                OK
+                {sponsorConfirmed ? 'OK' : 'INFO'}
               </TerminalText>
-              <TerminalText style={styles.factText} tone="cyan" variant="body">
+              <TerminalText style={styles.factText} tone={sponsorConfirmed ? 'cyan' : 'muted'} variant="body">
                 {fact}
               </TerminalText>
             </HUDBorderBox>
           ))}
         </View>
 
-        <HUDBorderBox style={styles.disclosureCard} tone="muted">
-          <TerminalText tone="dim" variant="label">
-            SPONSOR DISCLOSURE
-          </TerminalText>
-          <TerminalText style={styles.disclosureCopy} tone="muted" variant="body">
-            SPONSOR PLACEMENTS CAN APPEAR IN GOGYMGO-OWNED APP SURFACES.
-            YOUTUBE PLAYER CONTROLS AND ADS STAY UNTOUCHED.
-          </TerminalText>
-        </HUDBorderBox>
-
-        <CyberButtonPrimary
-          label="CLAIM OFFER ->"
-          onPress={() => setOfferSaved(true)}
-          style={styles.primaryButton}
-          tone="pink"
-        />
-
-        {offerSaved ? (
-          <HUDBorderBox glow style={styles.savedCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
-              OFFER SAVED
-            </TerminalText>
-            <TerminalText style={styles.savedCopy} tone="muted" variant="body">
-              VOLT OFFER SAVED FOR YOUR GOGYMGO ACCOUNT.
-            </TerminalText>
-          </HUDBorderBox>
-        ) : null}
-
         <CyberButtonOutline
           label="BACK TO APP"
-          onPress={() => router.back()}
+          onPress={closeOffer}
           style={styles.secondaryButton}
         />
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
@@ -128,7 +123,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: 104,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   content: {
@@ -180,25 +175,7 @@ const styles = StyleSheet.create({
   },
   factText: {
     flex: 1,
-    fontFamily: fontFamilies.terminal
-  },
-  disclosureCard: {
-    marginBottom: spacing.xl,
-    borderStyle: 'dashed'
-  },
-  disclosureCopy: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.terminal
-  },
-  primaryButton: {
-    marginBottom: spacing.sm
-  },
-  savedCard: {
-    marginBottom: spacing.sm
-  },
-  savedCopy: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   secondaryButton: {
     marginTop: 0

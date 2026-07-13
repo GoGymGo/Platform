@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -9,9 +9,12 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { SessionUnavailable } from '@/components/session';
+import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
-
-const minimumSeconds = 1800;
+import { useAppData } from '@/data/appDataHooks';
+import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { formatDateKey, useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatClock(totalSeconds: number) {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -21,49 +24,120 @@ function formatClock(totalSeconds: number) {
 
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
+  const { mode: appDataMode, source: appDataSource } = useAppData();
+  const {
+    activeSession,
+    cancelActiveWorkout,
+    recordHeartRateSample,
+    triggerMidSessionCheck
+  } = useWorkoutProgress();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const activeSessionStartedAt = activeSession?.startedAt;
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedSeconds((currentSeconds) =>
-        Math.min(currentSeconds + 23, minimumSeconds)
+    if (!activeSessionStartedAt) {
+      return undefined;
+    }
+
+    const updateElapsedTime = () => {
+      setElapsedSeconds(
+        Math.min(
+          getSessionElapsedSeconds(
+            activeSessionStartedAt,
+            new Date(),
+            sessionTimeScale
+          ),
+          workoutRules.minimumSessionSeconds
+        )
       );
+    };
+
+    updateElapsedTime();
+    const timer = setInterval(() => {
+      updateElapsedTime();
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [activeSessionStartedAt]);
 
   const session = useMemo(() => {
+    const telemetry = appDataSource.getSessionTelemetry(elapsedSeconds);
     const progressPercent = Math.min(
       100,
-      Math.round((elapsedSeconds / minimumSeconds) * 100)
+      Math.round((elapsedSeconds / workoutRules.minimumSessionSeconds) * 100)
     );
-    const heartRate = 132 + Math.round(7 * Math.sin(elapsedSeconds / 4));
-    const elevatedMinutes = Math.min(20, Math.floor(elapsedSeconds / 60));
+    const minimumReached = elapsedSeconds >= workoutRules.minimumSessionSeconds;
+    const midSessionVerified = activeSession?.midSessionVerified ?? false;
+    const currentHeartRateElevated = Boolean(
+      telemetry && telemetry.heartRate >= workoutRules.minimumAverageHeartRateBpm
+    );
+    const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
+      activeSession &&
+        activeSession.heartRateObservedSeconds >= workoutRules.minimumSessionSeconds &&
+        activeSession.averageHeartRateBpm >= workoutRules.minimumAverageHeartRateBpm
+    );
 
     return {
+      averageHeartRate: activeSession?.averageHeartRateBpm ?? 0,
       clock: formatClock(elapsedSeconds),
-      elevatedMinutes,
       finishCta:
-        elapsedSeconds >= minimumSeconds
+        minimumReached && midSessionVerified && heartRateReady
           ? 'FINISH & CHECK OUT ->'
-          : 'FINISH UNLOCKS AT 30:00',
-      heartRate,
+          : minimumReached
+            ? !midSessionVerified
+              ? 'MID-SESSION FACE CHECK REQUIRED'
+              : `AVERAGE MUST REACH ${workoutRules.minimumAverageHeartRateBpm} BPM`
+            : 'FINISH UNLOCKS AT 30:00',
+      heartRate: telemetry?.heartRate ?? 0,
+      currentHeartRateElevated,
+      telemetryAvailable: telemetry !== null,
+      heartRateReady,
       progressPercent,
-      ready: elapsedSeconds >= minimumSeconds
+      ready: minimumReached && midSessionVerified && heartRateReady
     };
-  }, [elapsedSeconds]);
+  }, [activeSession, appDataSource, elapsedSeconds]);
+
+  useEffect(() => {
+    if (
+      activeSession?.verificationMethod === 'heartRate' &&
+      session.telemetryAvailable &&
+      elapsedSeconds > 0
+    ) {
+      recordHeartRateSample(session.heartRate, elapsedSeconds);
+    }
+  }, [activeSession?.verificationMethod, elapsedSeconds, recordHeartRateSample, session.heartRate, session.telemetryAvailable]);
+
+  useEffect(() => {
+    if (
+      activeSession &&
+      !activeSession.midSessionCheckPrompted &&
+      !activeSession.midSessionVerified &&
+      elapsedSeconds >= activeSession.midSessionCheckAtSeconds
+    ) {
+      triggerMidSessionCheck();
+      router.replace('/workout/ping');
+    }
+  }, [activeSession, elapsedSeconds, router, triggerMidSessionCheck]);
 
   const progressWidth = `${session.progressPercent}%` as `${number}%`;
+
+  if (!activeSession) {
+    return (
+      <SessionUnavailable
+        body="START FROM THE SESSION TAB SO CHECK-IN, TIMER AND CHECKPOINTS CAN BE TRACKED TOGETHER."
+        onAction={() => router.replace('/session' as Href)}
+      />
+    );
+  }
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
-        <HUDBorderBox style={styles.recordingPill} tone="pink">
+        <HUDBorderBox style={styles.recordingPill} tone="cyan">
           <View style={styles.recordingDot} />
-          <TerminalText glow tone="pink" variant="micro">
-            RECORDING
+          <TerminalText glow tone="cyan" variant="micro">
+            SESSION TRACKING
           </TerminalText>
         </HUDBorderBox>
         <TerminalText style={styles.headerLabel} tone="muted" variant="label">
@@ -100,60 +174,130 @@ export default function ActiveWorkoutScreen() {
         </View>
 
         <View style={styles.metricRow}>
-          <HUDBorderBox style={styles.metricCard} tone="pink">
-            <TerminalText glow tone="pink" variant="label">
-              HEART
-            </TerminalText>
-            <TerminalText style={styles.metricValue} tone="text" variant="value">
-              {session.heartRate}
-            </TerminalText>
-            <TerminalText tone="pink" variant="micro">
-              BPM ELEVATED
-            </TerminalText>
-          </HUDBorderBox>
+          {activeSession.verificationMethod === 'heartRate' ? (
+            <>
+              <HUDBorderBox style={styles.metricCard} tone={session.currentHeartRateElevated ? 'green' : 'amber'}>
+                <TerminalText glow tone={session.currentHeartRateElevated ? 'green' : 'amber'} variant="label">
+                  CURRENT BPM
+                </TerminalText>
+                <TerminalText style={styles.metricValue} tone="text" variant="value">
+                  {session.telemetryAvailable ? session.heartRate : '--'}
+                </TerminalText>
+                <TerminalText tone={session.currentHeartRateElevated ? 'green' : 'amber'} variant="micro">
+                  {session.currentHeartRateElevated ? 'ABOVE TARGET' : 'BELOW TARGET'}
+                </TerminalText>
+              </HUDBorderBox>
 
-          <HUDBorderBox style={styles.metricCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
-              MIN
-            </TerminalText>
-            <TerminalText style={styles.metricValue} tone="text" variant="value">
-              {session.elevatedMinutes}
-            </TerminalText>
-            <TerminalText tone="cyan" variant="micro">
-              MIN ELEVATED / 20
-            </TerminalText>
-          </HUDBorderBox>
+              <HUDBorderBox style={styles.metricCard} tone={session.heartRateReady ? 'green' : 'cyan'}>
+                <TerminalText glow tone={session.heartRateReady ? 'green' : 'cyan'} variant="label">
+                  30-MIN AVG
+                </TerminalText>
+                <TerminalText style={styles.metricValue} tone="text" variant="value">
+                  {session.averageHeartRate}
+                </TerminalText>
+                <TerminalText tone={session.heartRateReady ? 'green' : 'cyan'} variant="micro">
+                  {workoutRules.minimumAverageHeartRateBpm}+ REQUIRED
+                </TerminalText>
+              </HUDBorderBox>
+            </>
+          ) : (
+            <>
+              <HUDBorderBox style={styles.metricCard} tone="green">
+                <TerminalText glow tone="green" variant="label">
+                  ENTRY QR
+                </TerminalText>
+                <TerminalText style={styles.metricValue} tone="text" variant="value">
+                  OK
+                </TerminalText>
+                <TerminalText tone="green" variant="micro">
+                  CHECKED IN
+                </TerminalText>
+              </HUDBorderBox>
+              <HUDBorderBox style={styles.metricCard} tone="cyan">
+                <TerminalText glow tone="cyan" variant="label">
+                  EXIT QR
+                </TerminalText>
+                <TerminalText style={styles.metricValue} tone="text" variant="value">
+                  END
+                </TerminalText>
+                <TerminalText tone="cyan" variant="micro">
+                  SCAN AT CHECKOUT
+                </TerminalText>
+              </HUDBorderBox>
+            </>
+          )}
         </View>
       </View>
 
-      <TerminalText style={styles.notice} tone="dim" variant="micro">
-        A RANDOM PRESENCE CHECK MAY APPEAR BETWEEN MIN 8-24
-      </TerminalText>
+      {activeSession.verificationMethod === 'heartRate' && !session.telemetryAvailable ? (
+        <HUDBorderBox style={styles.telemetryNotice} tone="amber">
+          <TerminalText glow tone="amber" variant="label">
+            LIVE HEART-RATE SOURCE NOT CONNECTED
+          </TerminalText>
+          <TerminalText style={styles.telemetryNoticeCopy} tone="muted" uppercase={false} variant="body">
+            Connected device telemetry is required before this session can be verified.
+          </TerminalText>
+        </HUDBorderBox>
+      ) : appDataMode === 'demo' ? (
+        <TerminalText style={styles.demoNotice} tone="amber" variant="micro">
+          DEMO TELEMETRY // NOT A LIVE DEVICE READING
+        </TerminalText>
+      ) : null}
+
+      <View style={styles.statusList}>
+        <SessionStatusRow
+          label="EFFORT"
+          tone={activeSession.verificationMethod === 'heartRate'
+            ? session.currentHeartRateElevated ? 'green' : 'amber'
+            : 'green'}
+          value={activeSession.verificationMethod === 'heartRate'
+            ? session.currentHeartRateElevated ? 'HEART RATE ON TRACK' : 'RAISE YOUR HEART RATE'
+            : 'PARTNER GYM CHECK-IN ACTIVE'}
+        />
+        <SessionStatusRow
+          label="FACE CHECK"
+          tone={activeSession.midSessionVerified
+            ? 'green'
+            : activeSession.midSessionCheckPrompted ? 'amber' : 'cyan'}
+          value={activeSession.midSessionVerified
+            ? 'VERIFIED'
+            : activeSession.midSessionCheckPrompted ? 'ACTION REQUIRED' : 'WILL APPEAR AUTOMATICALLY'}
+        />
+        <SessionStatusRow
+          label="SESSION SAVE"
+          tone="cyan"
+          value={`AUTO-SAVED // ${formatDateKey(activeSession.dateKey).toUpperCase()}`}
+        />
+      </View>
 
       <CyberButtonPrimary
         disabled={!session.ready}
         label={session.finishCta}
         onPress={() => router.push('/workout/check-out')}
+        tone={session.ready ? 'green' : 'cyan'}
       />
 
       <View style={styles.actionRow}>
-        <CyberButtonOutline
-          label="MID-SESSION CHECK"
-          onPress={() => router.push('/workout/ping')}
-          style={styles.actionButton}
-        />
+        {activeSession.midSessionCheckPrompted && !activeSession.midSessionVerified ? (
+          <CyberButtonOutline
+            label="COMPLETE FACE CHECK"
+            onPress={() => router.push('/workout/ping')}
+            style={styles.actionButton}
+            tone="amber"
+          />
+        ) : null}
 
         <CyberButtonOutline
           label="END SESSION"
           onPress={() => setShowCancelConfirm(true)}
           style={styles.actionButton}
-          tone="cyan"
+          tone="red"
         />
       </View>
 
       {showCancelConfirm ? (
-        <HUDBorderBox glow style={styles.confirmCard} tone="pink">
-          <TerminalText style={styles.confirmCopy} tone="pink" variant="body">
+        <HUDBorderBox glow style={styles.confirmCard} tone="red">
+          <TerminalText style={styles.confirmCopy} tone="red" variant="body">
             END THIS SESSION? PROGRESS FROM THIS WORKOUT WILL NOT COUNT.
           </TerminalText>
           <View style={styles.confirmRow}>
@@ -165,20 +309,46 @@ export default function ActiveWorkoutScreen() {
 
             <CyberButtonOutline
               label="END NOW"
-              onPress={() => router.push('/home')}
+              onPress={() => {
+                cancelActiveWorkout();
+                router.replace('/home');
+              }}
               style={styles.confirmButton}
-              tone="pink"
+              tone="red"
             />
           </View>
         </HUDBorderBox>
       ) : null}
 
       <CyberButtonOutline
-        label="BACK"
-        onPress={() => router.push('/workout/check-in')}
+        label="LEAVE SCREEN // SESSION CONTINUES"
+        onPress={() => {
+          router.replace('/home');
+        }}
         style={styles.backButton}
       />
     </ScreenContainer>
+  );
+}
+
+function SessionStatusRow({
+  label,
+  tone,
+  value
+}: {
+  label: string;
+  tone: 'cyan' | 'green' | 'amber';
+  value: string;
+}) {
+  return (
+    <HUDBorderBox style={styles.statusRow} tone={tone}>
+      <TerminalText tone="dim" variant="micro">
+        {label}
+      </TerminalText>
+      <TerminalText glow tone={tone} variant="label">
+        {value}
+      </TerminalText>
+    </HUDBorderBox>
   );
 }
 
@@ -210,8 +380,8 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.pink,
-    ...cyberGlow.pink
+    backgroundColor: colors.cyan,
+    ...cyberGlow.cyan
   },
   headerLabel: {
     flex: 1,
@@ -268,10 +438,30 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontFamily: fontFamilies.display
   },
-  notice: {
-    marginBottom: 14,
-    fontFamily: fontFamilies.terminal,
+  telemetryNotice: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    padding: spacing.md
+  },
+  telemetryNoticeCopy: {
+    fontFamily: fontFamilies.body
+  },
+  demoNotice: {
+    marginBottom: spacing.sm,
     textAlign: 'center'
+  },
+  statusList: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm
+  },
+  statusRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md
   },
   actionRow: {
     flexDirection: 'row',
@@ -290,7 +480,7 @@ const styles = StyleSheet.create({
   },
   confirmCopy: {
     marginBottom: 10,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   confirmRow: {

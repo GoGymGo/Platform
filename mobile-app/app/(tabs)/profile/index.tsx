@@ -1,19 +1,34 @@
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
+import { AuthStatusNotice } from '@/components/auth';
 import {
+  ScreenScrollView,
   CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
-
-type IdentityMode = 'private' | 'alias' | 'real';
+import { CompactTextButton } from '@/components/onboarding';
+import { ProfileAvatar } from '@/components/profileAvatar';
+import { SponsorRail as SponsorBanner } from '@/components/sponsor';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { useCurrentUserPayout } from '@/data/appDataHooks';
+import { getPublicInitials } from '@/domain/profile';
+import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
+import { useAuth } from '@/state/auth';
+import {
+  getVerificationPreference,
+  hasSubmittedCreatorApplication,
+  type VerificationPreference
+} from '@/state/onboardingPreferences';
+import { useProfile } from '@/state/profile';
+import { useCompetitionRegion } from '@/state/competitionRegion';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type ProfileStat = {
-  accent: 'cyan' | 'pink';
+  accent: 'cyan' | 'green' | 'pink';
   label: string;
   value: string;
 };
@@ -23,94 +38,275 @@ type SettingsRow = {
   status?: string;
   subtitle: string;
   title: string;
-  tone: 'cyan' | 'pink' | 'muted';
+  tone: 'cyan' | 'green' | 'muted';
 };
 
-const profileStats: readonly ProfileStat[] = [
-  { value: '0', label: 'DAY STREAK', accent: 'cyan' },
-  { value: '0', label: 'VERIFIED', accent: 'cyan' },
-  { value: '1', label: 'PRIZE DRAW ENTRY', accent: 'pink' }
-];
+type SettingsGroups = {
+  competition: readonly SettingsRow[];
+  legal: readonly SettingsRow[];
+  partnerships: readonly SettingsRow[];
+};
 
-const settingsRows: readonly SettingsRow[] = [
-  {
-    title: 'PAYOUT VERIFICATION',
-    subtitle: 'ONLY NEEDED IF YOU WIN OR RECEIVE CREATOR PAYOUTS',
-    status: 'LATER',
-    tone: 'muted'
-  },
-  {
-    title: 'WORKOUT VERIFICATION',
-    subtitle: 'NO DEVICE CONNECTED YET',
-    status: 'SET UP',
-    tone: 'muted',
-    route: '/verification'
-  },
-  {
-    title: 'CREATOR WORKOUTS',
-    subtitle: 'TRAIN SOLO OR FOLLOW LOCAL CREATOR WORKOUTS',
-    tone: 'cyan',
-    route: '/workouts'
-  },
-  {
-    title: 'CREATOR STATUS',
-    subtitle: 'APPLY TO SUBMIT LOCAL WORKOUTS',
-    status: 'NOT APPLIED',
-    tone: 'pink',
-    route: '/creator/apply'
-  },
-  {
-    title: 'NOTIFICATIONS',
-    subtitle: 'PINGS, PACTS, PRIZE DRAW RESULTS // NOT SET',
-    tone: 'muted'
-  },
-  {
-    title: 'PRIVACY POLICY',
-    subtitle: 'DATA RIGHTS // US + CANADA',
-    tone: 'muted',
-    route: '/privacy-policy' as Href
-  },
-  {
-    title: 'TERMS OF SERVICE',
-    subtitle: 'PRIZE DRAW RULES // VERIFICATION TERMS',
-    tone: 'muted',
-    route: '/terms-of-service' as Href
-  },
-  {
-    title: 'BIOMETRIC / CAMERA CONSENT',
-    subtitle: 'LOCAL CHECKS // NO IMAGERY STORED',
-    tone: 'cyan',
-    route: '/biometric-camera-consent' as Href
-  }
-];
+function getSettingsRows(
+  creatorApplicationSubmitted: boolean,
+  verificationSourceLabel: string,
+  hasPayoutClaim: boolean
+): SettingsGroups {
+  return {
+    competition: [
+      {
+        title: 'WORKOUT VERIFICATION',
+        subtitle: verificationSourceLabel,
+        status: 'DEFAULT',
+        tone: 'muted',
+        route: '/verification?source=profile' as Href
+      },
+      {
+        title: 'WORKOUT CALENDAR',
+        subtitle: 'VERIFIED DAYS, PERSONAL STREAKS AND WORKOUT LOGS',
+        tone: 'cyan',
+        route: '/calendar' as Href
+      },
+      {
+        title: 'HOW GOGYMGO WORKS',
+        subtitle: 'GOALS, PERIOD MATCHES AND PRIZE DRAW ENTRIES',
+        tone: 'cyan',
+        route: '/how-it-works?from=profile' as Href
+      },
+      {
+        title: 'HYPERWALLET PAYOUT ACCOUNT',
+        subtitle: hasPayoutClaim
+          ? 'CONNECT A BANK ACCOUNT TO RECEIVE YOUR PRIZE'
+          : 'ONLY NEEDED IF YOU ARE SELECTED FOR A PAYOUT',
+        status: hasPayoutClaim ? 'ACTION REQUIRED' : 'NOT NEEDED',
+        tone: hasPayoutClaim ? 'green' : 'muted',
+        route: '/profile/payout' as Href
+      },
+    ],
+    partnerships: [
+      {
+        title: 'CREATOR WORKOUTS',
+        subtitle: 'FOLLOW A CREATOR OR START YOUR OWN WORKOUT',
+        tone: 'cyan',
+        route: '/workouts?source=profile'
+      },
+      {
+        title: 'APPLY AS A CREATOR',
+        subtitle: creatorApplicationSubmitted
+          ? 'CREATOR INTEREST RECORDED'
+          : 'SUBMIT LOCAL FOLLOW-ALONG WORKOUTS',
+        status: creatorApplicationSubmitted ? 'SUBMITTED' : undefined,
+        tone: creatorApplicationSubmitted ? 'green' : 'cyan',
+        route: '/creator/apply?source=profile' as Href
+      },
+      {
+        title: 'APPLY AS A SPONSOR',
+        subtitle: 'FUND A TARGETED REGIONAL CAMPAIGN',
+        tone: 'cyan',
+        route: '/sponsor/apply'
+      },
+      {
+        title: 'REGISTER A GYM',
+        subtitle: 'REQUEST A GOGYMGO QR CODE FOR YOUR LOCATION',
+        tone: 'cyan',
+        route: '/gym/register'
+      }
+    ],
+    legal: [
+      {
+        title: 'PRIVACY POLICY',
+        subtitle: 'DATA RIGHTS // US + CANADA',
+        tone: 'muted',
+        route: '/privacy-policy' as Href
+      },
+      {
+        title: 'TERMS OF SERVICE',
+        subtitle: 'PRIZE DRAW RULES // VERIFICATION TERMS',
+        tone: 'muted',
+        route: '/terms-of-service' as Href
+      },
+      {
+        title: 'BIOMETRIC / CAMERA CONSENT',
+        subtitle: 'LOCAL CHECKS // NO IMAGERY STORED',
+        tone: 'muted',
+        route: '/biometric-camera-consent' as Href
+      }
+    ]
+  };
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [identityMode, setIdentityMode] = useState<IdentityMode>('private');
+  const { signOutUser, user } = useAuth();
+  const { publicName } = useProfile();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
+  const publicInitials = getPublicInitials(publicName);
+  const {
+    currentStreak,
+    remindersEnabled,
+    setCompetitionRemindersEnabled,
+    totalEntries,
+    verifiedSessionCount
+  } = useWorkoutProgress();
+  const [creatorApplicationSubmitted, setCreatorApplicationSubmitted] = useState(false);
+  const [verificationPreference, setVerificationPreference] =
+    useState<VerificationPreference>({
+      method: 'heartRate',
+      sourceKey: 'heartRateDevice',
+      sourceLabel: 'HEART-RATE DEVICE'
+    });
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string>();
+  const [showPartnerTools, setShowPartnerTools] = useState(false);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState<string>();
+  const {
+    chooseProfileImage,
+    clearProfileImage,
+    isPickingImage,
+    profileImageMessage,
+    profileImageUri
+  } = useProfileImagePicker();
+  const profileStats: readonly ProfileStat[] = [
+    { value: String(currentStreak), label: 'PERSONAL STREAK', accent: 'cyan' },
+    { value: String(verifiedSessionCount), label: 'VERIFIED', accent: 'green' },
+    {
+      value: String(totalEntries),
+      label: 'PRIZE DRAW ENTRIES',
+      accent: 'pink'
+    }
+  ];
+  const { data: payoutClaim } = useCurrentUserPayout(user?.uid);
+  const settingsGroups = getSettingsRows(
+    creatorApplicationSubmitted,
+    verificationPreference.sourceLabel,
+    Boolean(payoutClaim)
+  );
+  const providerLabel = formatProviderLabel(user?.providerIds ?? []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (!user) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    void Promise.all([
+      hasSubmittedCreatorApplication(user.uid),
+      getVerificationPreference(user.uid)
+    ]).then(([submitted, preference]) => {
+      if (mounted) {
+        setCreatorApplicationSubmitted(submitted);
+        setVerificationPreference(preference);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  async function performSignOut() {
+    setSigningOut(true);
+    setSignOutError(undefined);
+    try {
+      await signOutUser();
+      router.replace('/');
+    } catch {
+      setSignOutError('SIGN-OUT COULD NOT BE COMPLETED. TRY AGAIN.');
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  async function updateNotifications(enabled: boolean) {
+    setNotificationBusy(true);
+    setNotificationMessage(undefined);
+    try {
+      const updated = await setCompetitionRemindersEnabled(enabled);
+
+      if (!updated) {
+        setNotificationMessage(
+          enabled
+            ? 'NOTIFICATION PERMISSION IS OFF. ENABLE IT IN YOUR DEVICE SETTINGS, THEN TRY AGAIN.'
+            : 'REMINDERS COULD NOT BE UPDATED. TRY AGAIN.'
+        );
+      }
+    } finally {
+      setNotificationBusy(false);
+    }
+  }
 
   return (
     <ScreenContainer>
       <SponsorBanner />
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileHeader}>
-          <View style={styles.profileAvatar}>
-            <TerminalText glow style={styles.profileAvatarText} tone="cyan" variant="value">
-              GR
-            </TerminalText>
-          </View>
+          <ProfileAvatar
+            imageUri={profileImageUri}
+            initials={publicInitials}
+            showStatus={Boolean(user?.emailVerified)}
+          />
           <TerminalText glow style={styles.profileName} tone="cyan" variant="title">
-            GHOST_RUNNER
+            {publicName}
           </TerminalText>
-          <HUDBorderBox style={styles.profileTierBadge} tone="cyan">
-            <TerminalText glow tone="cyan" variant="micro">
-              NEW MEMBER // TORONTO
+          <CompactTextButton
+            label="EDIT ALIAS"
+            onPress={() => router.push('/identity?source=profile' as Href)}
+          />
+          <View style={styles.profileImageActions}>
+            <CyberButtonOutline
+              disabled={isPickingImage}
+              label={isPickingImage ? 'PREPARING...' : profileImageUri ? 'CHANGE PICTURE' : 'ADD PICTURE'}
+              onPress={chooseProfileImage}
+              style={styles.profileImageButton}
+            />
+            {profileImageUri ? (
+              <CyberButtonOutline
+                label="REMOVE"
+                onPress={clearProfileImage}
+                style={styles.profileImageButton}
+                tone="red"
+              />
+            ) : null}
+          </View>
+          {profileImageMessage ? (
+            <TerminalText style={styles.profileImageMessage} tone="muted" variant="caption">
+              {profileImageMessage}
             </TerminalText>
-          </HUDBorderBox>
+          ) : null}
         </View>
+
+        <HUDBorderBox style={styles.accountCard} tone="cyan">
+          <TerminalText tone="dim" variant="label">
+            ACCOUNT SECURITY
+          </TerminalText>
+          <View style={styles.accountRow}>
+            <View style={styles.profileImageCopy}>
+              <TerminalText tone="text" uppercase={false} variant="body">
+                {user?.email ?? 'PREVIEW ACCOUNT'}
+              </TerminalText>
+              <TerminalText tone="muted" variant="micro">
+                {user
+                  ? `${providerLabel} // ${user.emailVerified ? 'VERIFIED' : 'EMAIL CHECK REQUIRED'}`
+                  : 'ACCOUNT DETAILS APPEAR AFTER SIGN IN'}
+              </TerminalText>
+            </View>
+          </View>
+          {user && !user.emailVerified ? (
+            <CyberButtonOutline
+              label="VERIFY EMAIL ->"
+              onPress={() => router.push('/verify-email?next=profile' as Href)}
+              style={styles.accountAction}
+              tone="amber"
+            />
+          ) : null}
+        </HUDBorderBox>
 
         <View style={styles.statsRow}>
           {profileStats.map((stat) => (
@@ -130,105 +326,125 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <HUDBorderBox style={styles.identityCard} tone="cyan">
-          <TerminalText tone="dim" variant="label">
-            PUBLIC IDENTITY
-          </TerminalText>
-          <View style={styles.segmentGroup}>
-            <SegmentButton
-              active={identityMode === 'private'}
-              label="PRIVATE"
-              onPress={() => setIdentityMode('private')}
-            />
-            <SegmentButton
-              active={identityMode === 'alias'}
-              label="ALIAS"
-              onPress={() => setIdentityMode('alias')}
-            />
-            <SegmentButton
-              active={identityMode === 'real'}
-              label="REAL"
-              onPress={() => setIdentityMode('real')}
-            />
+        <HUDBorderBox style={styles.regionCard} tone="cyan">
+          <View style={styles.regionCopy}>
+            <TerminalText tone="dim" variant="label">
+              COMPETITION REGION
+            </TerminalText>
+            <TerminalText glow tone="cyan" variant="body">
+              {competitionRegion.label}
+            </TerminalText>
+            <TerminalText tone={regionVerification?.status === 'verified' ? 'green' : 'amber'} variant="caption">
+              {regionVerification
+                ? regionVerification.status === 'verified'
+                  ? 'VERIFIED BY DEVICE LOCATION'
+                  : 'POSTAL MATCH // LOCATION RECHECK REQUIRED'
+                : 'LOCATION VERIFICATION REQUIRED'}
+            </TerminalText>
           </View>
-          <TerminalText style={styles.identityHelp} tone="muted" variant="body">
-            CONTROLS LEADERBOARDS, PAIRINGS & WINNER POSTS. PAYOUT
-            VERIFICATION STAYS PRIVATE.
-          </TerminalText>
+          <CyberButtonOutline
+            label="REVERIFY"
+            onPress={() => router.push('/region?source=profile' as Href)}
+            style={styles.regionButton}
+          />
         </HUDBorderBox>
 
-        <HUDBorderBox style={styles.settingsCard} tone="muted">
-          {settingsRows.map((row) => (
+        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
+          COMPETITION
+        </TerminalText>
+        <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="muted">
+          {settingsGroups.competition.map((row) => (
             <SettingsItem key={row.title} row={row} />
           ))}
         </HUDBorderBox>
 
+        <HUDBorderBox
+          glow={remindersEnabled}
+          style={styles.notificationCard}
+          tone={remindersEnabled ? 'cyan' : 'muted'}
+        >
+          <View style={styles.notificationCopy}>
+            <TerminalText glow={remindersEnabled} tone={remindersEnabled ? 'cyan' : 'text'} variant="body">
+              COMPETITION REMINDERS
+            </TerminalText>
+            <TerminalText tone="muted" variant="caption">
+              WEEKLY GOAL, PERIOD MATCH AND BONUS DAY ALERTS
+            </TerminalText>
+            <TerminalText tone={remindersEnabled ? 'green' : 'dim'} variant="micro">
+              {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
+            </TerminalText>
+          </View>
+          <Switch
+            accessibilityLabel="Competition reminders"
+            disabled={notificationBusy}
+            onValueChange={(enabled) => void updateNotifications(enabled)}
+            thumbColor={remindersEnabled ? colors.cyan : colors.dim}
+            trackColor={{ false: colors.panelSoft, true: colors.surfaceCyanActive }}
+            value={remindersEnabled}
+          />
+        </HUDBorderBox>
+        {notificationMessage ? (
+          <TerminalText style={styles.notificationMessage} tone="amber" variant="caption">
+            {notificationMessage}
+          </TerminalText>
+        ) : null}
+
         <CyberButtonOutline
-          label="SIGN OUT"
-          onPress={() => router.replace('/welcome')}
+          label={showPartnerTools ? 'HIDE PARTNER OPTIONS' : 'PARTNER WITH GOGYMGO'}
+          onPress={() => setShowPartnerTools((current) => !current)}
+          style={styles.partnerToggle}
+        />
+        {showPartnerTools ? (
+          <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="cyan">
+            {settingsGroups.partnerships.map((row) => (
+              <SettingsItem key={row.title} row={row} />
+            ))}
+          </HUDBorderBox>
+        ) : null}
+
+        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
+          LEGAL + PRIVACY
+        </TerminalText>
+        <HUDBorderBox style={styles.settingsCard} tone="muted">
+          {settingsGroups.legal.map((row) => (
+            <SettingsItem key={row.title} row={row} />
+          ))}
+        </HUDBorderBox>
+
+        {signOutError ? <AuthStatusNotice message={signOutError} tone="red" /> : null}
+        <CyberButtonOutline
+          disabled={signingOut}
+          label={signingOut ? 'SIGNING OUT...' : 'SIGN OUT'}
+          onPress={performSignOut}
           style={styles.signOutButton}
-          tone="pink"
+          tone="red"
         />
-        <CyberButtonOutline
-          label="BACK"
-          onPress={() => router.push('/home')}
-          style={styles.backButton}
-        />
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
-function SponsorBanner() {
-  return (
-    <HUDBorderBox style={styles.sponsorBanner} tone="muted">
-      <View style={styles.sponsorMark}>
-        <TerminalText glow tone="pink" variant="title">
-          V
-        </TerminalText>
-      </View>
-      <View style={styles.sponsorCopy}>
-        <TerminalText tone="dim" variant="micro">
-          SPONSOR SIGNAL
-        </TerminalText>
-        <TerminalText style={styles.sponsorTitle} tone="text" variant="body">
-          SPONSORED BY VOLT
-        </TerminalText>
-        <TerminalText tone="muted" variant="body">
-          PRIZE POOL PARTNER
-        </TerminalText>
-      </View>
-    </HUDBorderBox>
-  );
-}
+function formatProviderLabel(providerIds: readonly string[]) {
+  const labels = providerIds.map((providerId) => {
+    if (providerId === 'password') {
+      return 'EMAIL';
+    }
+    if (providerId === 'google.com') {
+      return 'GOOGLE';
+    }
+    if (providerId === 'apple.com') {
+      return 'APPLE';
+    }
+    return providerId.toUpperCase();
+  });
 
-function SegmentButton({
-  active,
-  label,
-  onPress
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[styles.segmentButton, active ? styles.segmentButtonActive : styles.segmentButtonIdle]}
-    >
-      <TerminalText glow={active} tone={active ? 'cyan' : 'dim'} variant="micro">
-        {label}
-      </TerminalText>
-    </Pressable>
-  );
+  return labels.length > 0 ? labels.join(' + ') : 'FIREBASE';
 }
 
 function SettingsItem({ row }: { row: SettingsRow }) {
   const router = useRouter();
   const isPressable = Boolean(row.route);
-  const statusTone = row.tone === 'pink' ? 'pink' : 'cyan';
+  const statusTone = row.tone;
 
   return (
     <Pressable
@@ -268,33 +484,6 @@ function SettingsItem({ row }: { row: SettingsRow }) {
 }
 
 const styles = StyleSheet.create({
-  sponsorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
-  },
-  sponsorMark: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  sponsorCopy: {
-    flex: 1
-  },
-  sponsorTitle: {
-    marginTop: 1,
-    fontFamily: fontFamilies.terminal
-  },
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
@@ -306,30 +495,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 22
   },
-  profileAvatar: {
-    width: 84,
-    height: 84,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderCyanStrong,
-    borderRadius: 24,
-    backgroundColor: colors.borderCyanSubtle,
-    ...cyberGlow.cyan
-  },
-  profileAvatarText: {
-    fontFamily: fontFamilies.display
-  },
   profileName: {
     marginTop: spacing.md,
     fontFamily: fontFamilies.display
   },
-  profileTierBadge: {
-    width: 'auto',
-    marginTop: 6,
-    paddingVertical: 5,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.sm
+  accountCard: {
+    gap: spacing.sm,
+    marginBottom: 14,
+    padding: spacing.lg
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  profileImageCopy: {
+    gap: spacing.xs
+  },
+  profileImageButton: {
+    flex: 1,
+    minHeight: 44
+  },
+  profileImageActions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md
+  },
+  profileImageMessage: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
+  },
+  accountAction: {
+    marginTop: spacing.xs
   },
   statsRow: {
     flexDirection: 'row',
@@ -349,40 +546,50 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.terminal,
     textAlign: 'center'
   },
-  identityCard: {
+  regionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     marginBottom: 14,
     padding: spacing.lg
   },
-  segmentGroup: {
-    flexDirection: 'row',
-    gap: 5,
-    marginTop: 11,
-    padding: spacing.xs,
-    borderRadius: radii.md,
-    backgroundColor: colors.blackAlpha25
-  },
-  segmentButton: {
+  regionCopy: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderRadius: 9
+    gap: spacing.xs
   },
-  segmentButtonActive: {
-    borderColor: colors.borderCyanHeavy,
-    backgroundColor: colors.surfaceCyanProgress,
-    ...cyberGlow.cyan
-  },
-  segmentButtonIdle: {
-    borderColor: colors.transparent
-  },
-  identityHelp: {
-    marginTop: 10,
-    fontFamily: fontFamilies.terminal
+  regionButton: {
+    width: 112,
+    minHeight: 44
   },
   settingsCard: {
     overflow: 'hidden',
     padding: 0
+  },
+  settingsGroup: {
+    marginBottom: spacing.lg
+  },
+  sectionLabel: {
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs
+  },
+  partnerToggle: {
+    marginBottom: spacing.lg
+  },
+  notificationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.lg
+  },
+  notificationCopy: {
+    flex: 1,
+    gap: spacing.xs
+  },
+  notificationMessage: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
   },
   settingsRow: {
     flexDirection: 'row',
@@ -407,9 +614,6 @@ const styles = StyleSheet.create({
   },
   signOutButton: {
     marginTop: spacing.lg
-  },
-  backButton: {
-    marginTop: 10
   },
   pressed: {
     opacity: 0.74,

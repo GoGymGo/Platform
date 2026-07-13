@@ -6,11 +6,9 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +16,26 @@
       }
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      "expo-asset",
+      "expo-splash-screen",
+      "expo-status-bar",
+      "expo-notifications",
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoGymGo uses your location once to place you in the correct regional competition. GoGymGo does not track your location in the background."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GoGymGo lets you choose an optional profile image for your public profile.",
+          "cameraPermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

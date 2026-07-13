@@ -1,7 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import {
+  ScreenScrollView,
   CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
@@ -9,6 +10,7 @@ import {
 } from '@/components/cyber';
 import { biometricConsentCopy, type LegalDocument } from '@/constants/legal';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { goBackOrReplace } from '@/navigation/goBack';
 
 type LegalTone = 'cyan' | 'pink';
 
@@ -67,7 +69,7 @@ export function LegalConsentCheckbox({
             {label}
           </TerminalText>
           {helper ? (
-            <TerminalText style={styles.checkboxHelper} tone="muted" variant="micro">
+            <TerminalText style={styles.checkboxHelper} tone="muted" variant="caption">
               {helper}
             </TerminalText>
           ) : null}
@@ -104,8 +106,38 @@ export function BiometricCameraConsentBanner({
 }: BiometricCameraConsentBannerProps) {
   const router = useRouter();
   const bannerBody = compact
-    ? 'LOCAL PRESENCE CHECK ONLY. NO BIOMETRIC DATA, CAMERA FRAMES OR IMAGERY IS STORED OR TRANSMITTED.'
+    ? 'Local presence check only. No biometric data, camera frames or imagery is stored or transmitted.'
     : biometricConsentCopy.body;
+
+  if (compact && checked) {
+    return (
+      <HUDBorderBox glow style={[styles.cameraBannerAccepted, style]} tone="cyan">
+        <View style={styles.acceptedStatus}>
+          <TerminalText glow tone="green" variant="label">
+            CONSENT ON FILE
+          </TerminalText>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/biometric-camera-consent' as Href)}
+            style={({ pressed }) => [styles.policyButton, pressed ? styles.pressed : null]}
+          >
+            <TerminalText glow tone="cyan" variant="micro">
+              VIEW NOTICE
+            </TerminalText>
+          </Pressable>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onToggle}
+          style={({ pressed }) => [styles.withdrawButton, pressed ? styles.pressed : null]}
+        >
+          <TerminalText tone="dim" variant="micro">
+            WITHDRAW CONSENT
+          </TerminalText>
+        </Pressable>
+      </HUDBorderBox>
+    );
+  }
 
   return (
     <HUDBorderBox glow={checked} style={[styles.cameraBanner, style]} tone={checked ? 'cyan' : 'muted'}>
@@ -123,7 +155,7 @@ export function BiometricCameraConsentBanner({
           </TerminalText>
         </Pressable>
       </View>
-      <TerminalText style={styles.bannerCopy} tone="muted" variant="micro">
+      <TerminalText style={styles.bannerCopy} tone="muted" uppercase={false} variant="caption">
         {bannerBody}
       </TerminalText>
       <LegalConsentCheckbox
@@ -152,12 +184,12 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
         </View>
         <CyberButtonOutline
           label="CLOSE"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/')}
           style={styles.closeButton}
         />
       </View>
 
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.documentContent}
         showsVerticalScrollIndicator={false}
@@ -197,7 +229,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
             </HUDBorderBox>
           ))}
         </View>
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
@@ -231,11 +263,11 @@ const styles = StyleSheet.create({
     flex: 1
   },
   checkboxLabel: {
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   checkboxHelper: {
     marginTop: spacing.xs,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   linkRow: {
     flexDirection: 'row',
@@ -251,6 +283,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md
   },
+  cameraBannerAccepted: {
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md
+  },
+  acceptedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm
+  },
   bannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -258,7 +301,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   policyButton: {
-    minHeight: 30,
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
@@ -266,8 +309,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     backgroundColor: colors.surfaceCyanGhost
   },
+  withdrawButton: {
+    minHeight: 44,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    paddingRight: spacing.md
+  },
   bannerCopy: {
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   bannerCheckbox: {
     marginTop: spacing.xs
@@ -293,7 +342,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: 104,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   documentContent: {
@@ -307,7 +356,7 @@ const styles = StyleSheet.create({
   },
   documentIntroCopy: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   sectionList: {
     gap: spacing.md
@@ -316,11 +365,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg
   },
   sectionHeading: {
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.display
   },
   sectionBody: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   bulletList: {
     gap: spacing.sm,
@@ -341,7 +390,7 @@ const styles = StyleSheet.create({
   },
   bulletText: {
     flex: 1,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   pressed: {
     opacity: 0.74,

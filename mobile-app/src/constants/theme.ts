@@ -1,8 +1,12 @@
-import { DarkTheme } from '@react-navigation/native';
+import { DarkTheme } from 'expo-router/react-navigation';
 import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 type GlowViewStyle = ViewStyle & {
   boxShadow?: string;
+};
+
+type GlowTextStyle = TextStyle & {
+  textShadow?: string;
 };
 
 export const colors = {
@@ -25,7 +29,7 @@ export const colors = {
   textOnPrimary: '#04282A',
   textDisabled: '#8FA0A8',
   muted: '#7D949B',
-  dim: '#5D7A82',
+  dim: '#66858D',
 
   // Status / feedback
   statusSuccess: '#4DFF88',
@@ -78,7 +82,7 @@ export const colors = {
   borderCyanGlow: 'rgba(52, 229, 232, 0.72)',
   cyanGlow: 'rgba(52, 229, 232, 0.34)',
 
-  // Pink states: prize, creator payout, sponsor, urgent, destructive
+  // Pink states: prize, multiplier, payout and confirmed sponsor value
   surfacePinkGhost: 'rgba(255, 45, 155, 0.035)',
   surfacePinkFaint: 'rgba(255, 45, 155, 0.055)',
   surfacePinkSoft: 'rgba(255, 45, 155, 0.07)',
@@ -94,6 +98,23 @@ export const colors = {
   borderPinkHeavy: 'rgba(255, 45, 155, 0.5)',
   borderPinkGlow: 'rgba(255, 45, 155, 0.72)',
   pinkGlow: 'rgba(255, 45, 155, 0.34)',
+
+  // Status states: verified/success, caution/pending, invalid/destructive
+  surfaceSuccess: 'rgba(77, 255, 136, 0.08)',
+  surfaceSuccessActive: 'rgba(77, 255, 136, 0.16)',
+  borderSuccess: 'rgba(77, 255, 136, 0.38)',
+  borderSuccessGlow: 'rgba(77, 255, 136, 0.72)',
+  successGlow: 'rgba(77, 255, 136, 0.3)',
+  surfaceWarning: 'rgba(255, 224, 102, 0.08)',
+  surfaceWarningActive: 'rgba(255, 224, 102, 0.15)',
+  borderWarning: 'rgba(255, 224, 102, 0.38)',
+  borderWarningGlow: 'rgba(255, 224, 102, 0.68)',
+  warningGlow: 'rgba(255, 224, 102, 0.28)',
+  surfaceError: 'rgba(255, 0, 0, 0.07)',
+  surfaceErrorActive: 'rgba(255, 0, 0, 0.14)',
+  borderError: 'rgba(255, 0, 0, 0.38)',
+  borderErrorGlow: 'rgba(255, 0, 0, 0.68)',
+  errorGlow: 'rgba(255, 0, 0, 0.26)',
 
   // Muted states
   surfaceMutedGlow: 'rgba(125, 148, 155, 0.12)',
@@ -127,12 +148,14 @@ export const colorRoles = {
 } as const;
 
 export const fontFamilies = {
+  body: 'Rajdhani-Medium',
+  bodyStrong: 'Rajdhani-SemiBold',
   display: 'Orbitron-Bold',
   terminal: 'ShareTechMono-Regular'
 } as const;
 
 export const fontSizes = {
-  micro: 9,
+  micro: 10,
   label: 11,
   button: 13,
   body: 14,
@@ -158,7 +181,7 @@ export const fontSizes = {
 } as const;
 
 export const lineHeights = {
-  micro: 13,
+  micro: 14,
   label: 16,
   button: 18,
   body: 20,
@@ -175,7 +198,7 @@ export const lineHeights = {
 export const letterSpacings = {
   none: 0,
   tight: 0,
-  micro: 1.8,
+  micro: 1.4,
   button: 0,
   label: 2.2
 } as const;
@@ -206,9 +229,15 @@ export const typography = {
     lineHeight: lineHeights.label
   },
   body: {
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     fontSize: fontSizes.body,
     lineHeight: lineHeights.body
+  },
+  caption: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.label,
+    letterSpacing: letterSpacings.none,
+    lineHeight: lineHeights.label
   },
   micro: {
     fontFamily: fontFamilies.terminal,
@@ -268,6 +297,45 @@ export const cyberGlow = {
         elevation: 8
       }
     }) ?? {},
+  green:
+    Platform.select<GlowViewStyle>({
+      web: {
+        boxShadow: `0 0 20px ${colors.successGlow}`
+      },
+      default: {
+        shadowColor: colors.statusSuccess,
+        shadowOpacity: 0.34,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 7
+      }
+    }) ?? {},
+  amber:
+    Platform.select<GlowViewStyle>({
+      web: {
+        boxShadow: `0 0 20px ${colors.warningGlow}`
+      },
+      default: {
+        shadowColor: colors.statusWarning,
+        shadowOpacity: 0.32,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 7
+      }
+    }) ?? {},
+  red:
+    Platform.select<GlowViewStyle>({
+      web: {
+        boxShadow: `0 0 20px ${colors.errorGlow}`
+      },
+      default: {
+        shadowColor: colors.statusError,
+        shadowOpacity: 0.3,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 7
+      }
+    }) ?? {},
   muted:
     Platform.select<GlowViewStyle>({
       web: {
@@ -284,22 +352,61 @@ export const cyberGlow = {
 } as const;
 
 export const textGlow = {
-  cyan: {
-    textShadowColor: colors.borderCyanGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10
-  },
-  pink: {
-    textShadowColor: colors.borderPinkGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10
-  },
-  muted: {
-    textShadowColor: colors.textMutedGlow,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6
-  }
-} satisfies Record<string, TextStyle>;
+  cyan:
+    Platform.select<GlowTextStyle>({
+      web: { textShadow: `0 0 10px ${colors.borderCyanGlow}` },
+      default: {
+        textShadowColor: colors.borderCyanGlow,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10
+      }
+    }) ?? {},
+  pink:
+    Platform.select<GlowTextStyle>({
+      web: { textShadow: `0 0 10px ${colors.borderPinkGlow}` },
+      default: {
+        textShadowColor: colors.borderPinkGlow,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10
+      }
+    }) ?? {},
+  green:
+    Platform.select<GlowTextStyle>({
+      web: { textShadow: `0 0 10px ${colors.borderSuccessGlow}` },
+      default: {
+        textShadowColor: colors.borderSuccessGlow,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10
+      }
+    }) ?? {},
+  amber:
+    Platform.select<GlowTextStyle>({
+      web: { textShadow: `0 0 10px ${colors.borderWarningGlow}` },
+      default: {
+        textShadowColor: colors.borderWarningGlow,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10
+      }
+    }) ?? {},
+  red:
+    Platform.select<GlowTextStyle>({
+      web: { textShadow: `0 0 10px ${colors.borderErrorGlow}` },
+      default: {
+        textShadowColor: colors.borderErrorGlow,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10
+      }
+    }) ?? {},
+  muted:
+    Platform.select<GlowTextStyle>({
+      web: { textShadow: `0 0 6px ${colors.textMutedGlow}` },
+      default: {
+        textShadowColor: colors.textMutedGlow,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 6
+      }
+    }) ?? {}
+} satisfies Record<string, GlowTextStyle>;
 
 export const goGymGoTheme = {
   ...DarkTheme,

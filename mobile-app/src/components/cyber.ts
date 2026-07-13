@@ -1,5 +1,6 @@
 import { createElement, type PropsWithChildren, type ReactNode } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,10 +15,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, cyberGlow, radii, spacing, textGlow, typography } from '@/constants/theme';
 
-type TerminalTone = 'cyan' | 'pink' | 'muted' | 'text' | 'dim';
-type TerminalVariant = 'display' | 'title' | 'value' | 'label' | 'body' | 'micro' | 'button';
-type HUDTone = 'cyan' | 'pink' | 'muted';
-type CyberButtonTone = 'cyan' | 'pink';
+export { ScreenScrollView } from './screenScrollView';
+
+type TerminalTone = 'cyan' | 'pink' | 'green' | 'amber' | 'red' | 'muted' | 'text' | 'dim';
+type TerminalVariant =
+  | 'display'
+  | 'title'
+  | 'value'
+  | 'label'
+  | 'body'
+  | 'caption'
+  | 'micro'
+  | 'button';
+type HUDTone = 'cyan' | 'pink' | 'green' | 'amber' | 'red' | 'muted';
+type CyberButtonTone = 'cyan' | 'pink' | 'green' | 'amber' | 'red';
 
 type ScreenContainerProps = PropsWithChildren<{
   contentStyle?: StyleProp<ViewStyle>;
@@ -50,6 +61,9 @@ type CyberButtonProps = {
 const terminalToneStyles: Record<TerminalTone, TextStyle> = {
   cyan: { color: colors.cyan },
   pink: { color: colors.pink },
+  green: { color: colors.statusSuccess },
+  amber: { color: colors.statusWarning },
+  red: { color: colors.statusError },
   muted: { color: colors.muted },
   text: { color: colors.text },
   dim: { color: colors.dim }
@@ -58,6 +72,9 @@ const terminalToneStyles: Record<TerminalTone, TextStyle> = {
 const terminalGlowStyles = {
   cyan: textGlow.cyan,
   pink: textGlow.pink,
+  green: textGlow.green,
+  amber: textGlow.amber,
+  red: textGlow.red,
   muted: textGlow.muted,
   text: textGlow.cyan,
   dim: textGlow.muted
@@ -71,6 +88,18 @@ const hudToneStyles: Record<HUDTone, ViewStyle> = {
   pink: {
     borderColor: colors.borderPinkStrong,
     backgroundColor: colors.surfacePinkFaint
+  },
+  green: {
+    borderColor: colors.borderSuccess,
+    backgroundColor: colors.surfaceSuccess
+  },
+  amber: {
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
+  },
+  red: {
+    borderColor: colors.borderError,
+    backgroundColor: colors.surfaceError
   },
   muted: {
     borderColor: colors.borderMuted,
@@ -86,6 +115,18 @@ const primaryToneStyles: Record<CyberButtonTone, ViewStyle> = {
   pink: {
     borderColor: colors.borderPinkGlow,
     backgroundColor: colors.surfacePinkActive
+  },
+  green: {
+    borderColor: colors.borderSuccessGlow,
+    backgroundColor: colors.surfaceSuccessActive
+  },
+  amber: {
+    borderColor: colors.borderWarningGlow,
+    backgroundColor: colors.surfaceWarningActive
+  },
+  red: {
+    borderColor: colors.borderErrorGlow,
+    backgroundColor: colors.surfaceErrorActive
   }
 };
 
@@ -97,8 +138,25 @@ const outlineToneStyles: Record<CyberButtonTone, ViewStyle> = {
   pink: {
     borderColor: colors.borderPinkStrong,
     backgroundColor: colors.surfacePinkGhost
+  },
+  green: {
+    borderColor: colors.borderSuccess,
+    backgroundColor: colors.surfaceSuccess
+  },
+  amber: {
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
+  },
+  red: {
+    borderColor: colors.borderError,
+    backgroundColor: colors.surfaceError
   }
 };
+
+const webFocusOutline = Platform.select({
+  web: { outlineColor: colors.cyan } as unknown as ViewStyle,
+  default: {}
+});
 
 export function ScreenContainer({
   children,
@@ -266,6 +324,9 @@ const cyberStyles = StyleSheet.create({
   body: {
     ...typography.body
   },
+  caption: {
+    ...typography.caption
+  },
   micro: {
     ...typography.micro
   },
@@ -289,7 +350,8 @@ const cyberStyles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderRadius: radii.lg
+    borderRadius: radii.lg,
+    ...webFocusOutline
   },
   buttonContent: {
     flexDirection: 'row',

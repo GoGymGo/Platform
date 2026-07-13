@@ -1,38 +1,103 @@
-import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { type Href, useRouter } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
-  CyberButtonOutline,
+  ScreenScrollView,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { BrandVideoAdPlaceholder } from '@/components/sponsor';
+import {
+  BrandVideoAdPlaceholder,
+  SponsorRail as SponsorBanner
+} from '@/components/sponsor';
+import { ProfileAvatar } from '@/components/profileAvatar';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import {
+  useCompetitionEnrollmentCount,
+  useCreatorWorkouts,
+  useCurrentUserPayout
+} from '@/data/appDataHooks';
+import { getPublicInitials } from '@/domain/profile';
+import { formatPayoutAmount, needsPayoutSetup } from '@/domain/payout';
+import { useProfile } from '@/state/profile';
+import { useAuth } from '@/state/auth';
+import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type HomeStat = {
   label: string;
-  tone: 'cyan' | 'text';
+  tone: 'cyan' | 'pink';
   value: string;
 };
 
-const weeklyGoal = 4;
-const completedSessions = 0;
-
-const stats: readonly HomeStat[] = [
-  { value: '1', label: 'CURRENT ENTRY', tone: 'text' },
-  { value: '0', label: 'THIS WEEK', tone: 'cyan' },
-  { value: '--', label: 'REGION RANK', tone: 'cyan' }
-];
-
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { profileImageUri, publicName } = useProfile();
+  const { enrollment } = useSponsorCampaign();
+  const publicInitials = getPublicInitials(publicName);
+  const {
+    activeSession,
+    competition,
+    competitionRegion,
+    currentWeekIndex,
+    currentWeekVerified,
+    prizeDrawEligible,
+    totalEntries,
+    verifiedSessionCount,
+    weeklyGoal
+  } = useWorkoutProgress();
+  const currentPeriod = competition.currentPeriod;
+  const completedSessions = Math.min(currentWeekVerified, weeklyGoal);
+  const remainingSessions = Math.max(weeklyGoal - completedSessions, 0);
+  const isBonusDayPhase = competition.phase === 'bonus-days';
+  const competitionNotStarted = competition.phase === 'before-month';
+  const competitionStartLabel = formatCampaignDate(`${competition.competitionMonthKey}-01`);
+  const [competitionYear, competitionMonth] = competition.competitionMonthKey.split('-').map(Number);
+  const competitionStartMonth = new Intl.DateTimeFormat('en-CA', { month: 'long' }).format(
+    new Date(competitionYear, competitionMonth - 1, 1, 12)
+  );
+  const {
+    data: currentEntrantsData,
+    isPending: currentEntrantsPending
+  } = useCompetitionEnrollmentCount(competitionRegion, competition.competitionMonthKey);
+  const { data: creatorWorkouts = [] } = useCreatorWorkouts();
+  const { data: payoutClaimData } = useCurrentUserPayout(user?.uid);
+  const currentEntrants = currentEntrantsData ?? null;
+  const payoutClaim = payoutClaimData ?? null;
+  const featuredCreatorWorkout =
+    creatorWorkouts.find((workout) => workout.joined) ?? null;
+  const launchConfirmed = currentEntrants !== null && currentEntrants >= enrollment.minimumEntrants;
+  const entrantsNeeded = currentEntrants === null
+    ? null
+    : Math.max(0, enrollment.minimumEntrants - currentEntrants);
+  const liveMultiplier = currentPeriod?.liveMultiplier ?? 0;
+  const stats: readonly HomeStat[] = [
+    {
+      value: String(totalEntries),
+      label: 'PRIZE DRAW ENTRIES',
+      tone: 'pink'
+    },
+    {
+      value: `${completedSessions}/${weeklyGoal}`,
+      label: competitionNotStarted ? 'PRE-COMP VERIFIED' : 'YOUR DAYS',
+      tone: 'cyan'
+    },
+    {
+      value: currentPeriod
+        ? `${Math.min(currentPeriod.opponentVerifiedCount, weeklyGoal)}/${weeklyGoal}`
+        : `--/${weeklyGoal}`,
+      label: currentPeriod ? 'MATCH DAYS' : 'MATCH PENDING',
+      tone: 'cyan'
+    }
+  ];
 
   return (
     <ScreenContainer>
       <SponsorBanner />
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -40,47 +105,83 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <TerminalText glow tone="cyan" variant="label">
-              ACCOUNT READY // TORONTO
+              ACCOUNT READY // {competitionRegion}
             </TerminalText>
             <TerminalText glow style={styles.username} tone="cyan" variant="title">
-              GHOST_RUNNER
+              {publicName}
             </TerminalText>
           </View>
-          <View style={styles.avatar}>
-            <TerminalText glow tone="cyan" variant="button">
-              GR
-            </TerminalText>
-            <View style={styles.avatarDot} />
-          </View>
+          <ProfileAvatar imageUri={profileImageUri} initials={publicInitials} showStatus size={46} />
         </View>
 
-        <BrandVideoAdPlaceholder
-          eventLabel="SIGNED-IN APP OPEN"
-          onPress={() => router.push('/sponsor-offer')}
-          placementLabel="APP OPEN"
-          style={styles.videoAd}
-        />
+        {needsPayoutSetup(payoutClaim) && payoutClaim ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/profile/payout')}
+            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+          >
+            <HUDBorderBox glow style={styles.payoutAlert} tone="pink">
+              <View style={styles.payoutAlertCopy}>
+                <TerminalText glow tone="pink" variant="label">
+                  YOU WON {formatPayoutAmount(payoutClaim)}
+                </TerminalText>
+                <TerminalText tone="text" uppercase={false} variant="body">
+                  Set up Hyperwallet to receive your prize.
+                </TerminalText>
+              </View>
+              <TerminalText glow tone="pink" variant="button">
+                -&gt;
+              </TerminalText>
+            </HUDBorderBox>
+          </Pressable>
+        ) : null}
 
         <HUDBorderBox glow style={styles.commitmentCard} tone="cyan">
           <View style={styles.commitmentHeader}>
             <View style={styles.commitmentTitleBlock}>
               <TerminalText glow tone="cyan" variant="label">
-                FIRST WEEK // READY
+                {isBonusDayPhase
+                  ? 'BONUS DAYS 29-31'
+                  : competitionNotStarted
+                    ? 'UPCOMING COMPETITION'
+                    : `WEEK ${currentWeekIndex ?? 1} // ${completedSessions > 0 ? 'IN MOTION' : 'READY'}`}
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
-                START YOUR FIRST SESSION
+                {isBonusDayPhase
+                  ? `ADD ${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} PER DAY`
+                  : competitionNotStarted
+                    ? 'YOUR WEEKLY GOAL IS SET'
+                    : verifiedSessionCount > 0
+                      ? 'KEEP BUILDING YOUR WEEK'
+                      : 'START YOUR FIRST SESSION'}
               </TerminalText>
-              <TerminalText style={styles.commitmentCopy} tone="muted" variant="body">
-                COMPLETE A VERIFIED 30-MINUTE WORKOUT TO ADD ENTRIES AND UNLOCK
-                YOUR FIRST WEEKLY PACT.
+              <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
+                {isBonusDayPhase
+                  ? `Verify one workout on each remaining day to add ${weeklyGoal} prize draw ${weeklyGoal === 1 ? 'entry' : 'entries'} per day.`
+                  : competitionNotStarted
+                    ? 'Check in and maintain an elevated heart rate for 30 minutes to verify your workout.'
+                    : remainingSessions > 0
+                      ? `Complete ${remainingSessions} more verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal. Only one workout per calendar day counts.`
+                      : 'Weekly goal hit. Check your Period Match to see whether a 2x or 3x bonus is active.'}
               </TerminalText>
+              {competitionNotStarted ? (
+                <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
+                  SCORING STARTS {competitionStartMonth.toUpperCase()} 1ST 12:00AM.
+                </TerminalText>
+              ) : null}
             </View>
             <View style={styles.multiplierBlock}>
               <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
-                1X
+                {competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
-                BASE
+                {competitionNotStarted
+                  ? 'DAY GOAL'
+                  : liveMultiplier === 3
+                    ? 'ARMED'
+                    : liveMultiplier === 2
+                      ? 'MATCH'
+                      : 'NO BONUS'}
               </TerminalText>
             </View>
           </View>
@@ -98,16 +199,44 @@ export default function HomeScreen() {
           </View>
 
           <CyberButtonPrimary
-            label="START 30-MIN SESSION"
-            onPress={() => router.push('/workout/check-in')}
+            label={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START VERIFIED WORKOUT ->'}
+            onPress={() => router.push(activeSession ? '/workout/active' : '/workout/check-in')}
           />
+
+          {competitionNotStarted ? (
+            <View style={styles.launchStatus}>
+              <View style={styles.launchHeader}>
+                <TerminalText tone="dim" variant="micro">
+                  REGIONAL LAUNCH
+                </TerminalText>
+                <TerminalText
+                  glow={launchConfirmed}
+                  tone={launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber'}
+                  variant="label"
+                >
+                  {currentEntrantsPending
+                    ? 'CHECKING REGISTRATION COUNT'
+                    : currentEntrants === null
+                      ? 'TOTAL NOT CONNECTED'
+                    : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`}
+                </TerminalText>
+              </View>
+              <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
+                {launchConfirmed
+                  ? 'Competition launch confirmed.'
+                  : entrantsNeeded === null
+                    ? 'The live registration total will appear when regional enrollment sync is available.'
+                    : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
+              </TerminalText>
+            </View>
+          ) : null}
         </HUDBorderBox>
 
         <View style={styles.statsRow}>
           {stats.map((stat) => (
             <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
               <TerminalText
-                glow={stat.tone !== 'text'}
+                glow
                 style={styles.statValue}
                 tone={stat.tone}
                 variant="value"
@@ -120,34 +249,33 @@ export default function HomeScreen() {
             </HUDBorderBox>
           ))}
         </View>
-        <TerminalText style={styles.oddsNote} tone="muted" variant="body">
-          YOUR SIGNUP ENTRY IS ACTIVE. VERIFIED WORKOUTS ADD MORE ENTRIES.
+        <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
+          {prizeDrawEligible
+            ? competitionNotStarted
+              ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
+              : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
+            : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
         </TerminalText>
+
+        <BrandVideoAdPlaceholder
+          compact
+          onPress={() => router.push('/sponsor-offer')}
+          placement="appOpen"
+          style={styles.videoAd}
+        />
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/squad')}
+          onPress={() => router.push('/calendar' as Href)}
           style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
         >
-          <HUDBorderBox style={styles.pactCard} tone="cyan">
-            <View style={styles.pactAvatars}>
-              <View style={styles.pactAvatarYou}>
-                <TerminalText style={styles.pactAvatarTextDark} tone="dim" variant="button">
-                  GR
-                </TerminalText>
-              </View>
-              <View style={styles.pactAvatarMatch}>
-                <TerminalText glow tone="text" variant="button">
-                  JX
-                </TerminalText>
-              </View>
-            </View>
-            <View style={styles.pactCopy}>
+          <HUDBorderBox style={styles.calendarCard} tone="cyan">
+            <View style={styles.calendarCopy}>
               <TerminalText glow tone="cyan" variant="micro">
-                WEEKLY PACT
+                WORKOUT CALENDAR
               </TerminalText>
-              <TerminalText style={styles.pactTitle} tone="text" uppercase variant="body">
-                UNLOCKS AFTER YOUR FIRST SESSION
+              <TerminalText style={styles.calendarTitle} tone="text" uppercase variant="body">
+                VIEW CHECKED DAYS AND PERSONAL GYM LOGS
               </TerminalText>
             </View>
             <TerminalText tone="cyan" variant="button">
@@ -158,14 +286,50 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/workouts/toronto-creator-workout')}
+          onPress={() => router.push('/squad')}
           style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
         >
-          <HUDBorderBox style={styles.workoutCard} tone="pink">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
+            <View style={styles.pactAvatars}>
+              <View style={styles.pactAvatarYou}>
+                <TerminalText style={styles.pactAvatarTextDark} tone="dim" variant="button">
+                  {publicInitials}
+                </TerminalText>
+              </View>
+              <View style={styles.pactAvatarMatch}>
+                <TerminalText tone="muted" variant="button">
+                  {getPublicInitials(currentPeriod?.opponentAlias ?? 'MATCH')}
+                </TerminalText>
+              </View>
+            </View>
+            <View style={styles.pactCopy}>
+              <TerminalText glow tone="cyan" variant="micro">
+                PERIOD MATCH
+              </TerminalText>
+              <TerminalText style={styles.pactTitle} tone="text" uppercase variant="body">
+                {isBonusDayPhase
+                  ? `BONUS DAYS 29-31 // +${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} EACH`
+                  : competitionNotStarted
+                    ? `MATCHING OPENS ${competitionStartLabel.toUpperCase()}`
+                    : `${currentPeriod?.opponentAlias ?? 'MATCHING IN PROGRESS'} // ${currentPeriod?.opponentVerifiedCount ?? 0}/${weeklyGoal}`}
+              </TerminalText>
+            </View>
+            <TerminalText tone="cyan" variant="button">
+              -&gt;
+            </TerminalText>
+          </HUDBorderBox>
+        </Pressable>
+
+        {featuredCreatorWorkout ? <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(`/workouts/${featuredCreatorWorkout.id}`)}
+          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+        >
+          <HUDBorderBox style={styles.workoutCard} tone="cyan">
             <View style={styles.videoPreview}>
               <View style={styles.videoBadgeRow}>
                 <View style={styles.creatorBadge}>
-                  <TerminalText glow tone="pink" variant="micro">
+                  <TerminalText glow tone="cyan" variant="micro">
                     CREATOR WORKOUT
                   </TerminalText>
                 </View>
@@ -176,84 +340,27 @@ export default function HomeScreen() {
                 </View>
               </View>
               <View style={styles.playCircle}>
-                <TerminalText glow tone="pink" variant="micro">
-                  PLAY
+                <TerminalText glow tone="cyan" variant="micro">
+                  VIEW
                 </TerminalText>
               </View>
             </View>
             <View style={styles.workoutCopy}>
               <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
-                TORONTO CREATOR WORKOUT
+                {featuredCreatorWorkout.name}
               </TerminalText>
-              <TerminalText tone="muted" variant="body">
-                OPTIONAL FOLLOW-ALONG WORKOUT // VERIFIED IN GOGYMGO
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                Optional follow-along workout. Session verification still happens in GoGymGo.
               </TerminalText>
             </View>
           </HUDBorderBox>
-        </Pressable>
-
-        <CyberButtonOutline
-          label="VIEW CREATOR WORKOUTS ->"
-          onPress={() => router.push('/workouts')}
-          style={styles.workoutsButton}
-          tone="cyan"
-        />
-      </ScrollView>
+        </Pressable> : null}
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
-function SponsorBanner() {
-  return (
-    <HUDBorderBox style={styles.topSponsorBanner} tone="muted">
-      <View style={styles.topSponsorMark}>
-        <TerminalText glow tone="pink" variant="title">
-          V
-        </TerminalText>
-      </View>
-      <View style={styles.topSponsorCopy}>
-        <TerminalText tone="dim" variant="micro">
-          SPONSOR SIGNAL
-        </TerminalText>
-        <TerminalText style={styles.topSponsorTitle} tone="text" variant="body">
-          SPONSORED BY VOLT
-        </TerminalText>
-        <TerminalText tone="muted" variant="body">
-          PRIZE POOL PARTNER
-        </TerminalText>
-      </View>
-    </HUDBorderBox>
-  );
-}
-
 const styles = StyleSheet.create({
-  topSponsorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
-  },
-  topSponsorMark: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  topSponsorCopy: {
-    flex: 1
-  },
-  topSponsorTitle: {
-    marginTop: 1,
-    fontFamily: fontFamilies.terminal
-  },
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
@@ -275,28 +382,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontFamily: fontFamilies.display
   },
-  avatar: {
-    width: 46,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderCyanProminent,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surfaceCyanProgress,
-    ...cyberGlow.cyan
-  },
-  avatarDot: {
-    width: 9,
-    height: 9,
-    borderWidth: 2,
-    borderColor: colors.background,
-    borderRadius: 5,
-    backgroundColor: colors.pink,
-    alignSelf: 'flex-end',
-    marginTop: -8,
-    marginRight: -2
-  },
   pressableCard: {
     width: '100%'
   },
@@ -306,6 +391,17 @@ const styles = StyleSheet.create({
   commitmentCard: {
     marginBottom: spacing.lg,
     padding: spacing.xl
+  },
+  payoutAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.lg
+  },
+  payoutAlertCopy: {
+    flex: 1,
+    gap: spacing.xs
   },
   commitmentHeader: {
     flexDirection: 'row',
@@ -325,7 +421,24 @@ const styles = StyleSheet.create({
   },
   commitmentCopy: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
+  },
+  launchStatus: {
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.whiteAlpha08
+  },
+  launchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md
+  },
+  scoringStartWarning: {
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.body
   },
   multiplierBlock: {
     alignItems: 'flex-end'
@@ -373,8 +486,22 @@ const styles = StyleSheet.create({
   },
   oddsNote: {
     marginBottom: spacing.md,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
+  },
+  calendarCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.lg
+  },
+  calendarCopy: {
+    flex: 1
+  },
+  calendarTitle: {
+    marginTop: 2,
+    fontFamily: fontFamilies.bodyStrong
   },
   pactCard: {
     flexDirection: 'row',
@@ -399,10 +526,10 @@ const styles = StyleSheet.create({
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
     borderRadius: radii.md,
-    backgroundColor: colors.pink,
+    backgroundColor: colors.panelSoft,
     marginLeft: -10
   },
   pactAvatarTextDark: {
@@ -414,7 +541,7 @@ const styles = StyleSheet.create({
   },
   pactTitle: {
     marginTop: 2,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.bodyStrong
   },
   workoutCard: {
     overflow: 'hidden',
@@ -426,7 +553,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.surfacePrizeDark
+    backgroundColor: colors.panelAlpha70
   },
   videoBadgeRow: {
     width: '100%',
@@ -439,7 +566,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.borderPink,
+    borderColor: colors.borderCyanQuiet,
     borderRadius: 5
   },
   channelBadge: {
@@ -455,10 +582,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderPinkHeavy,
+    borderColor: colors.borderCyanStrong,
     borderRadius: 25,
-    backgroundColor: colors.surfacePinkStrong,
-    ...cyberGlow.pink
+    backgroundColor: colors.surfaceCyanProgress,
+    ...cyberGlow.cyan
   },
   workoutCopy: {
     paddingVertical: 13,
@@ -467,9 +594,6 @@ const styles = StyleSheet.create({
   workoutTitle: {
     marginBottom: 3,
     fontFamily: fontFamilies.display
-  },
-  workoutsButton: {
-    marginTop: 0
   },
   pressed: {
     opacity: 0.74,

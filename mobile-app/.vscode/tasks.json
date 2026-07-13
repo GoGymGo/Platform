@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "GoGymGo: Start Web App",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "--max-old-space-size=1024",
+        "${workspaceFolder}/node_modules/expo/bin/cli",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "gogymgo-expo",
+        "pattern": {
+          "regexp": "^never-match-this-line$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting project|Starting Metro Bundler",
+          "endsPattern": "Waiting on http://localhost:8081"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": true
+      },
+      "runOptions": {
+        "runOn": "folderOpen",
+        "instanceLimit": 1
+      }
+    }
+  ]
+}

@@ -14,6 +14,7 @@ export default function ProfileLayout() {
   return (
     <Stack screenOptions={profileScreenOptions}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="payout" />
     </Stack>
   );
 }

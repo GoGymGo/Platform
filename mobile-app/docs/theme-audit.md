@@ -9,13 +9,40 @@
 
 ## Global Color Semantics Update
 
-- Tightened cyan/green usage for structural labels, active status, normal progress, verified-success states, tier/rank shells, routine CTAs, and back/skip/dismiss controls.
-- Reserved pink for sponsor marks/offers, draw entries, bonus/prize/reward moments, creator application or payout, urgent checkpoint alerts, and destructive/end-session confirmation.
+- Cyan is reserved for primary actions, navigation, selections, active progress, structural labels, ordinary information, tier/rank shells, and back/skip/dismiss controls.
+- Pink is reserved for confirmed sponsor marks/offers, Prize Draw Entries, bonus/prize/reward moments, creator applications or payouts, urgent checkpoint alerts, and other genuinely high-value moments. Creator-workout discovery and ordinary creator navigation use cyan.
+- The Join screen treats Creator, Sponsor, and Partner Gym as equal navigation destinations, so all three category labels use cyan; pink does not identify an ordinary navigation row.
+- Green now identifies verified, completed, and successful states. Amber identifies pending states, deadlines, cautions, and late-registration restrictions. Red identifies invalid input, errors, unavailable routes/sessions, and destructive confirmation.
+- Extended `TerminalText`, `HUDBorderBox`, `CyberButtonPrimary`, and `CyberButtonOutline` with centralized green, amber, and red semantic tones instead of using pink as a generic non-cyan fallback.
 - Updated the welcome loop so `SHOW UP`, `PROVE IT`, and `WIN` all use the unified cyan step treatment instead of making the third step pink.
 - Centralized raw brand colors, overlay colors, status colors, text colors, and typography scale tokens in `src/constants/theme.ts`.
 - Replaced app-level hardcoded hex/RGBA values with named semantic theme tokens and replaced screen-level numeric `fontSize` values with `fontSizes` tokens.
 - Verified that raw color values now live in `src/constants/theme.ts`; remaining `#142` matches are user-visible rank copy, not style values.
 - Aligned `app.json` Android adaptive icon background with the brand background and disabled Expo typed route generation after the generated Windows route file produced malformed backslash paths for the creator invite route.
+
+## Global UX Language And Hierarchy Update
+
+- Standardized player-facing terminology around `Scoring Week`, `Weekly Goal`, `Period Match`, `Matched Player`, `Period Match Bonus`, `Bonus Days 29-31`, `Category Score`, `Top Three Category Finishers`, and `Prize Draw Entries`.
+- Reserved `final draw weight`, period identifiers, and remainder-day identifiers for internal calculation/domain code; player-facing screens no longer expose those implementation terms.
+- Simplified Commitment by removing the duplicated collapsed bonus list. The page now presents the weekly goal, one-workout-per-day rule, zero-entry consequence, base projection, maximum prompt, and one calculator explanation before the detailed calculator is opened.
+- Saved the onboarding verification method as the user's default, surfaced it in Profile, and presented it first during later workout verification without removing either supported method.
+- Replaced fabricated leaderboard rank and estimated-odds values with an unsettled-rank state and the user's actual Prize Draw Entry count. Preview-only standings and results are labeled as sample data.
+- Added sponsor-pending states that say the prize pool will be announced instead of rendering `$0` beside finalized payout language.
+- Reduced sponsor interaction during trust- and safety-sensitive workout steps: check-in uses passive compact attribution and checkout sponsor attribution is non-interactive.
+- Reduced every unconfirmed sponsor placement to one compact amber pending row; full video-style sponsor inventory now appears only after a campaign is approved.
+- Moved the Commitment goal selector above registration and scoring explanation, separated pre-competition practice from active Prize Draw scoring on Home, and synchronized the Leaderboard category selector after stored-goal hydration.
+- Condensed Profile by moving picture controls into the header, adding an actionable email-verification state, grouping creator destinations, removing the tab-root Back button, and returning ordinary settings destinations to cyan.
+- Shortened account consent labels while preserving the linked legal detail, and changed verification setup from misleading connection language to explicit default-method selection language.
+
+## Global Typography Semantics Update
+
+- Added Rajdhani Medium and SemiBold as bundled Expo assets alongside Orbitron Bold and Share Tech Mono.
+- Applied Orbitron to major page titles, primary actions, and compact feature or rule-card headings.
+- Applied Share Tech Mono only to short HUD labels, step markers, metadata, statuses, timers, tab labels, and other compact technical readouts.
+- Applied Rajdhani to the shared body variant and semantic body, explanatory, legal, form-input, calculation, helper, and supporting-copy styles across the application.
+- Added a compact Rajdhani `caption` variant for explanatory helper text that must remain space-efficient. The mono `micro` variant is reserved for short HUD metadata, codes, statuses, dates, and telemetry rather than full sentences.
+- Preserved the existing centralized font-size tokens and semantic color assignments during the migration; this pass changes font roles without introducing new screen-local sizes or colors.
+- The page-specific font notes below describe the original HUD migration and are superseded by this global three-font role system where they refer to all copy as terminal text.
 
 ## Page 01 - `app/(onboarding)/welcome.tsx`
 
@@ -27,7 +54,7 @@
 - Applied cyan/pink neon glows through shared text and border primitives.
 - Updated the opening structure to match the reference flow: sponsor rail, system-status pill, GoGymGo wordmark, three step cards, sponsor line, free-entry card, then account actions.
 - Removed the height-aware hero spacer so the logo and three steps sit close together without a large empty gap.
-- Expanded the signup reward card to show the free entry, June prize pool, and a compact VOLT sponsor ad/attribution inside the same panel.
+- Expanded the signup reward card to show the banked free entry, first-verified-workout activation, projected campaign draw pool, and compact regional sponsor attribution inside the same panel.
 
 ### Step 2 - Native Purge & Types Audit
 
@@ -63,9 +90,10 @@
 
 ### Step 3 - Test Mock
 
-- Verified that selecting each identity radio option preserves checked state while the active row receives the cyan HUD border and glow.
-- Verified that anonymous mode keeps callsign generation and `SHUFFLE` updates the generated handle without leaving the page.
-- Verified that `CONTINUE ->` preserves navigation to `/creator`, while `BACK` calls `router.back()` from the standard outline HUD button.
+- Verified that Public Identity presents one required Alias field with no competing callsign or visibility-mode controls.
+- Verified that an existing saved public name pre-fills the Alias field and remains editable.
+- Verified that the optional profile-picture control reuses the shared picker, previews a saved picture, and keeps an initials avatar as the fallback.
+- Verified that `CONTINUE ->` persists the Alias and preserves navigation to `/creator`, while the standard compact back control calls `router.back()`.
 
 ## Page 03 - `app/+not-found.tsx`
 
@@ -237,7 +265,7 @@
 ### Step 1 - Write/Refactor
 
 - Re-skinned the loop explainer page with `ScreenContainer`, `HUDBorderBox`, `TerminalText`, `CyberButtonPrimary`, and `CyberButtonOutline`.
-- Converted the three loop steps and pairing bonus explanation into HUD panels.
+- Converted the three loop steps and Period Match Bonus explanation into HUD panels.
 - Replaced bonus rules, dismiss, commit, and back actions with cyber buttons.
 - Removed unused legacy rule-row styles from the previous version.
 
@@ -368,7 +396,7 @@
 ### Step 3 - Test Mock
 
 - Verified that `BACK` preserves `router.back()`.
-- Verified that prize stat cards preserve `15%`, `$10+`, and `0.6%` values.
+- Replaced the retired static prize stats with campaign-driven values for the 10% weighted winner pool, equal winner payout, and active-entry weight.
 - Verified that the odds bars preserve typed percentage widths for signup baseline and monthly entries.
 - Verified that payout verification copy remains separate from public profile language.
 
@@ -463,7 +491,7 @@
 
 - Verified that the QR verification card preserves navigation to `/qr-scanner`.
 - Verified that Scan QR remains the active cyan mode while BLE Beacon remains muted.
-- Verified that gym rows preserve ranks `01`, `02`, and `07`, including the `GHOST_RUNNER // YOU` current-user row.
+- Verified that gym rows preserve the ranked competitors and render the persisted public identity plus `// YOU` for the current-user row.
 - Verified that `BACK` preserves `router.back()`.
 
 ## Page 19 - `app/(tabs)/profile/index.tsx`
@@ -718,7 +746,7 @@
 ### Step 1 - Write/Refactor
 
 - Re-skinned the bonus rules modal with `ScreenContainer`, `HUDBorderBox`, `TerminalText`, `CyberButtonPrimary`, and `CyberButtonOutline`.
-- Converted the modal header, close control, hero copy, multiplier cards, pairing bonus callout, and return CTA into HUD surfaces.
+- Converted the modal header, close control, hero copy, multiplier cards, Period Match Bonus callout, and return CTA into HUD surfaces.
 - Converted multiplier descriptions to uppercase terminal copy while preserving the typed bonus-rule list.
 
 ### Step 2 - Native Purge & Types Audit
@@ -733,8 +761,8 @@
 
 - Verified that `CLOSE` preserves `router.back()` from the standard outline HUD button.
 - Verified that `GOT IT ->` preserves `router.back()` from the cyan primary HUD button.
-- Verified that 1-7x and x10 stay cyan commitment/perfect-month states while x2 and x3 stay pink partner-bonus states.
-- Verified that the pairing bonus callout states both paths: both succeed for 2x, or match misses plus extra verified workout for 3x and unearned bonus entries.
+- Verified that the base commitment reads `1-7 DAYS` in cyan, while true bonus values x2, x3, category podium multipliers, and x10 use pink.
+- Verified that the Period Match Bonus callout states both paths: both succeed for 2x, or the matched player misses plus an extra verified workout for 3x.
 
 ## Layout 31 - `app/(tabs)/_layout.tsx`
 
@@ -742,7 +770,7 @@
 
 - Re-skinned the visible bottom-tab typography by mapping tab labels and glyphs to `fontFamilies.terminal`.
 - Replaced the tab glyph renderer with `TerminalText` so visible tab typography flows through the shared HUD text primitive.
-- Preserved the existing tab route structure, active cyan tint, inactive muted tint, and dark HUD tab-bar shell.
+- Uses five visible tabs (Home, Calendar, Session, Ranks, Profile), active cyan tint, inactive muted tint, and a dark HUD tab-bar shell. Pact remains available from Home.
 - Applied uppercase label styling for the tab bar while keeping the two-letter terminal glyphs.
 
 ### Step 2 - Native Purge & Types Audit
@@ -1154,4 +1182,79 @@
 
 ### Step 3 - Test Mock
 
-- Verified by file inspection that optional creator/guide routes keep a Continue as Player path, Session exposes both verification starts, Profile routes Creator Workouts to the workout list, Draw avoids guaranteed-odds language, and workout completion matches a day-zero first-session state.
+- Verified by file inspection that onboarding keeps creator recruitment to one compact Apply as a Creator action, Session exposes both verification starts, Profile routes Creator Workouts to the workout list, Draw avoids guaranteed-odds language, and workout completion matches a day-zero first-session state.
+
+## UX Correction Pass - First-Workout Creator Invitation
+
+### Step 1 - Write/Refactor
+
+- Removed the standalone creator-pitch interruption from onboarding; its legacy route now forwards to the training-path page.
+- Added one compact Apply as a Creator button to the training-path page.
+- Routed the first successful verified-workout completion to Creator Details only when the user has not already applied or dismissed the prompt.
+- Replaced Continue as Player on Creator Details with a highlighted Don't Show This Again action below Apply as a Creator.
+- Kept Creator Details explicitly reachable from Profile and prevented manual calendar logs from triggering the prompt.
+
+### Step 2 - Native And Route Audit
+
+- Confirmed the changed screens remain React Native-only and contain no web tags, `className`, `onClick`, or `any` types.
+- Confirmed `/creator/invite` forwards to `/creator`, `/creator/guidelines?source=first-workout` renders both required actions, and all literal routes remain valid.
+
+### Step 3 - Test Mock
+
+- Verified the compact training-path page contains exactly one Apply as a Creator action.
+- Verified the detailed first-workout prompt orders Apply as a Creator first and the highlighted Don't Show This Again action second.
+
+## UX Correction Pass - Condensed Session Choice
+
+### Step 1 - Write/Refactor
+
+- Removed creator training selection from onboarding and routed Public Identity directly to Permissions.
+- Replaced the creator-selection route with a compatibility redirect to Session.
+- Condensed Session to two actions only: Follow Along With a Creator and Start My Own Workout.
+- Moved Heart-rate Device versus Partner Gym QR into a separate workout-verification method screen reached after workout type is chosen.
+- Routed creator workout starts through the same verification-method screen so both creator-led and self-directed workouts retain both approved verification paths.
+
+### Step 2 - Native And Route Audit
+
+- Confirmed the new Session and workout-method screens use React Native components and centralized theme tokens only.
+- Confirmed the compatibility creator routes, Creator Workouts list, creator detail start action, heart-rate check-in, and partner-gym QR routes remain connected.
+
+### Step 3 - Test Mock
+
+- Verified Session renders exactly two workout choices and no creator list, application action, verification note, or extra back button.
+- Verified Start My Own Workout opens verification-method selection and Follow Along With a Creator opens regional Creator Workouts.
+
+## UX Correction Pass - Perfect Month And Category Winners
+
+### Step 1 - Write/Refactor
+
+- Renamed Standard Perfect Month to Perfect Month and added the compact note that the base example excludes match and category winner bonuses.
+- Updated the 10x explanation across Commitment, How Scoring Works, Bonus Rules, and Commitment Rules to include 2x/3x match bonuses and earned category winner bonuses.
+- Added campaign-driven first-, second-, and third-place commitment-category calculations to the Commitment panel using the current `3x`, `2x`, and `1.5x` settings.
+- Reordered the calculator into a visible ladder: weekly base, match bonuses, category winner multipliers, then perfect-month 10x as the final monthly multiplier.
+- Replaced the expanded twelve-scenario wall with an interactive calculator using segmented match/category controls, a perfect-month toggle, and a zero-to-three month-end-day selector.
+- Replaced user-facing Category Podium Boost language with Category Winner Multipliers across rules, leaderboards, prize draw, and sponsor facts.
+
+### Step 2 - Calculation And Source Audit
+
+- Confirmed `calculateFinalPrizeDrawWeight` applies category multipliers to the actual match-adjusted four-period subtotal, adds eligible remainder-day entries, applies perfect-month 10x last, then adds the signup entry as flat weight.
+- Confirmed category values remain sponsor-campaign configuration rather than hardcoded screen constants.
+- Confirmed changed screens contain no web tags, `className`, `onClick`, inline font families, or `any` types.
+
+### Step 3 - Test Mock
+
+- Verified a four-day selection covers all `1x`, `2x`, and `3x` four-period totals across no-category, first, second, and third category outcomes. The `2x`/first-place path displays `32 x 3 = 96`, then `96 x 10 = 960`.
+- Verified a seven-day selection uses `28`, `56`, and `84` as its three possible all-period match totals and applies every configured category/perfect-month combination.
+- Verified the interactive four-day path `2x match`, `1st category`, `perfect month on`, and `0 remainder days` displays a projected prize draw weight of `960`; adding two remainder days now produces `(96 + 2) x 10 = 980`.
+- Verified How Scoring Works and the full rules repeat the same current multiplier values and calculation order.
+## July 12, 2026 UX And Data-State Pass
+
+- Added a required Competition Region onboarding step and Profile editor. Region now owns the local competition label, sponsor resolution and IANA time zone instead of relying on a hardcoded Toronto string.
+- Removed the cosmetic `NEW MEMBER` status badge. Profile now uses that space for functional region and exact verification-source information.
+- Persisted the exact selected watch, strap, phone source or partner gym. Profile and the workout-method screen display the saved label, and Profile editing returns to Profile.
+- Calendar uses practice language before a competition begins and does not call pre-start verified sessions competition credit.
+- Creator discovery uses one heading, one compact explanation, one campaign payout panel, and `LOCKED` for unavailable cards. Creator detail puts the verified-session CTA directly below the video and removes internal implementation terminology.
+- Prize Draw uses pink only for confirmed reward value. An unconfirmed pool is one amber pending state; potential category boosts are separated from earned entry progress.
+- Period Match removes the duplicated pre-start panel and false relative timing.
+- Winners Circle is gated on settled results. Demo results are labeled as samples; production empty states do not reveal fixture names or payouts.
+- Mock content is isolated behind `src/data/appData.ts`. Production-facing screens no longer import mock files directly, and simulated heart-rate telemetry is explicitly labeled in preview mode.

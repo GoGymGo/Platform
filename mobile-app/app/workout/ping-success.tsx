@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
 import {
@@ -7,23 +7,42 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function PingSuccessScreen() {
   const router = useRouter();
+  const { activeSession } = useWorkoutProgress();
+
+  if (!activeSession?.midSessionVerified) {
+    return (
+      <SessionUnavailable
+        body="COMPLETE THE MID-SESSION IDENTITY CHECK BEFORE OPENING THIS CONFIRMATION."
+        onAction={() => {
+          if (activeSession) {
+            router.replace('/workout/ping');
+          } else {
+            router.replace('/session' as Href);
+          }
+        }}
+        title="CHECKPOINT NOT CONFIRMED"
+      />
+    );
+  }
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <HUDBorderBox glow style={styles.successMark} tone="cyan">
-        <TerminalText glow style={styles.successMarkText} tone="cyan" variant="value">
+      <HUDBorderBox glow style={styles.successMark} tone="green">
+        <TerminalText glow style={styles.successMarkText} tone="green" variant="value">
           OK
         </TerminalText>
       </HUDBorderBox>
 
-      <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
+      <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
         CHECKPOINT CONFIRMED
       </TerminalText>
-      <TerminalText glow style={styles.title} tone="cyan" variant="title">
+      <TerminalText glow style={styles.title} tone="green" variant="title">
         YOU ARE GOOD TO KEEP GOING
       </TerminalText>
       <TerminalText style={styles.body} tone="muted" variant="body">
@@ -32,7 +51,7 @@ export default function PingSuccessScreen() {
 
       <CyberButtonPrimary
         label="BACK TO SESSION ->"
-        onPress={() => router.push('/workout/active')}
+        onPress={() => router.replace('/workout/active')}
       />
     </ScreenContainer>
   );
@@ -55,7 +74,7 @@ const styles = StyleSheet.create({
     padding: 0,
     borderRadius: 42,
     marginBottom: 18,
-    ...cyberGlow.cyan
+    ...cyberGlow.green
   },
   successMarkText: {
     fontFamily: fontFamilies.display
@@ -73,7 +92,7 @@ const styles = StyleSheet.create({
     maxWidth: 290,
     marginTop: spacing.md,
     marginBottom: 28,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   }
 });

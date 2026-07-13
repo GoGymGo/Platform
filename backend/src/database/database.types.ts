@@ -11,7 +11,7 @@ type NullableTimestamp = ColumnType<
   Date | string | null | undefined,
   Date | string | null
 >;
-type DateKey = ColumnType<string, Date | string, Date | string>;
+type DateKey = ColumnType<Date | string, Date | string, Date | string>;
 type BigInteger = ColumnType<string, bigint | number | string, never>;
 type MutableBigInteger = ColumnType<
   string,

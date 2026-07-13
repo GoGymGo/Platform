@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { normalizeDateKey } from '../../database/date-key';
 import { DatabaseService } from '../../database/database.service';
 import type { ClaimedPrivacyJob } from './privacy-operations.types';
 import { PrivacyOperationError } from './privacy-operations.types';
@@ -363,11 +364,18 @@ export class PrivacyExportBuilder {
             drawEntries,
             enrollments,
             entryLedger,
-            matchHistory,
+            matchHistory: matchHistory.map((match) => ({
+              ...match,
+              period_end_date: normalizeDateKey(match.period_end_date),
+              period_start_date: normalizeDateKey(match.period_start_date),
+            })),
             progress,
             rulesAcceptances,
             sessionEvents,
-            sessions,
+            sessions: sessions.map((session) => ({
+              ...session,
+              eligible_date: normalizeDateKey(session.eligible_date),
+            })),
             winnings,
           },
           creatorWorkouts,

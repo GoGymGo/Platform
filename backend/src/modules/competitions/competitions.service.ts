@@ -7,6 +7,7 @@ import {
 import { sql } from 'kysely';
 import type { JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
+import { normalizeDateKey } from '../../database/date-key';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { LedgerService } from '../ledger/ledger.service';
@@ -407,8 +408,8 @@ export class CompetitionsService {
                 opponent.public_identity_mode === 'private'
                   ? opponent.callsign
                   : opponent.public_name || opponent.callsign,
-              opponentVerifiedDateKeys: verifiedSessions.map(
-                (session) => session.eligible_date,
+              opponentVerifiedDateKeys: verifiedSessions.map((session) =>
+                normalizeDateKey(session.eligible_date),
               ),
               periodIndex: period.index,
               region: competition.metro_name.toUpperCase(),

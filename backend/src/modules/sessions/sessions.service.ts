@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type { Transaction } from 'kysely';
+import { normalizeDateKey } from '../../database/date-key';
 import type { Database, JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -352,7 +353,7 @@ export class SessionsService {
         return {
           completedAt: completedAt.toISOString(),
           competitionId: session.competition_id,
-          eligibleDate: session.eligible_date,
+          eligibleDate: normalizeDateKey(session.eligible_date),
           eligibleForReview: assessment.eligibleForReview,
           id: session.id,
           policyVersion: session.policy_version,
@@ -446,13 +447,14 @@ export class SessionsService {
           .where('status', '=', 'pending_review')
           .executeTakeFirstOrThrow();
         const rules = parseCompetitionRules(session.rules);
+        const eligibleDate = normalizeDateKey(session.eligible_date);
         await this.ledger.append(transaction, {
           categoryScoreDelta: rules.verifiedSessionCategoryScore,
           competitionId: session.competition_id,
           enrollmentId: session.enrollment_id,
           goalDays: session.goal_days,
           metadata: {
-            eligibleDate: session.eligible_date,
+            eligibleDate,
             reviewReason: input.reason,
           },
           policyVersion: session.rules_version,
@@ -491,7 +493,7 @@ export class SessionsService {
   private sessionJson(session: {
     completed_at: Date | null;
     competition_id: string;
-    eligible_date: string;
+    eligible_date: Date | string;
     id: string;
     policy_version: string;
     started_at: Date;
@@ -503,7 +505,7 @@ export class SessionsService {
     return {
       completedAt: session.completed_at?.toISOString() ?? null,
       competitionId: session.competition_id,
-      eligibleDate: session.eligible_date,
+      eligibleDate: normalizeDateKey(session.eligible_date),
       id: session.id,
       policyVersion: session.policy_version,
       startedAt: session.started_at.toISOString(),

@@ -437,11 +437,11 @@ describeWithDatabase('critical financial workflow', () => {
 
   async function winnerContext(drawId: string): Promise<WinnerContext> {
     const result = await migrated.pool.query<WinnerContext>(
-      `SELECT claim.id AS claim_id, user.email, user.firebase_uid,
-              user.id AS user_id
+      `SELECT claim.id AS claim_id, account_user.email,
+              account_user.firebase_uid, account_user.id AS user_id
        FROM draw_winners AS winner
        INNER JOIN payout_claims AS claim ON claim.draw_winner_id = winner.id
-       INNER JOIN users AS user ON user.id = winner.user_id
+       INNER JOIN users AS account_user ON account_user.id = winner.user_id
        WHERE winner.draw_id = $1
        ORDER BY winner.payout_rank
        LIMIT 1`,

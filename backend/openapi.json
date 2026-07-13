@@ -956,6 +956,34 @@
         "tags": ["provider webhooks"]
       }
     },
+    "/v1/operator/payout-claims/{claimId}/review": {
+      "get": {
+        "operationId": "getReview",
+        "parameters": [
+          {
+            "name": "claimId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorPayoutClaimReviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Get a privacy-safe authoritative payout claim review",
+        "tags": ["operator payouts"]
+      }
+    },
     "/v1/operator/payout-claims/{claimId}/approve": {
       "post": {
         "operationId": "approve",
@@ -2716,12 +2744,94 @@
         "properties": { "accepted": { "type": "boolean" } },
         "required": ["accepted"]
       },
+      "OperatorPayoutParticipantReviewDto": {
+        "type": "object",
+        "properties": {
+          "accountStatus": {
+            "type": "string",
+            "enum": ["active", "deleted", "suspended"]
+          },
+          "eligible": { "type": "boolean" },
+          "emailPresent": { "type": "boolean" },
+          "emailVerified": { "type": "boolean" }
+        },
+        "required": [
+          "accountStatus",
+          "eligible",
+          "emailPresent",
+          "emailVerified"
+        ]
+      },
+      "OperatorPayoutAccountReviewDto": {
+        "type": "object",
+        "properties": {
+          "provisioned": { "type": "boolean" },
+          "ready": { "type": "boolean" },
+          "payeeStatus": { "type": "string", "nullable": true }
+        },
+        "required": ["provisioned", "ready", "payeeStatus"]
+      },
+      "OperatorPayoutPaymentReviewDto": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "nullable": true } },
+        "required": ["status"]
+      },
+      "OperatorPayoutClaimReviewDto": {
+        "type": "object",
+        "properties": {
+          "amountMinor": { "type": "number" },
+          "approvedAt": { "type": "string", "nullable": true },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
+          "drawId": { "type": "string", "format": "uuid" },
+          "failureCode": { "type": "string", "nullable": true },
+          "id": { "type": "string", "format": "uuid" },
+          "participant": {
+            "$ref": "#/components/schemas/OperatorPayoutParticipantReviewDto"
+          },
+          "paidAt": { "type": "string", "nullable": true },
+          "payoutAccount": {
+            "$ref": "#/components/schemas/OperatorPayoutAccountReviewDto"
+          },
+          "payoutRank": { "type": "number", "minimum": 1 },
+          "payment": {
+            "$ref": "#/components/schemas/OperatorPayoutPaymentReviewDto"
+          },
+          "provider": { "type": "string", "enum": ["hyperwallet"] },
+          "status": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 },
+          "winnerId": { "type": "string", "format": "uuid" }
+        },
+        "required": [
+          "amountMinor",
+          "approvedAt",
+          "competitionId",
+          "competitionName",
+          "createdAt",
+          "currency",
+          "drawId",
+          "failureCode",
+          "id",
+          "participant",
+          "paidAt",
+          "payoutAccount",
+          "payoutRank",
+          "payment",
+          "provider",
+          "status",
+          "version",
+          "winnerId"
+        ]
+      },
       "OperatorPayoutActionDto": {
         "type": "object",
         "properties": {
+          "expectedVersion": { "type": "number", "minimum": 1 },
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 }
         },
-        "required": ["reason"]
+        "required": ["expectedVersion", "reason"]
       },
       "OperatorPayoutClaimResponseDto": {
         "type": "object",

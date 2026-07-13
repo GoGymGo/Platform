@@ -388,10 +388,63 @@ describeWithDatabase('critical financial workflow', () => {
       tokenIssuedAt: 1,
     };
 
+    const pendingReview = await payouts.getOperatorReview(
+      operatorPrincipal,
+      winner.claim_id,
+    );
+    expect(pendingReview).toMatchObject({
+      amountMinor: expect.any(Number),
+      competitionId: seeded.competitionId,
+      currency: 'CAD',
+      drawId: locked.drawId,
+      id: winner.claim_id,
+      participant: {
+        accountStatus: 'active',
+        eligible: true,
+        emailPresent: true,
+        emailVerified: true,
+      },
+      payoutAccount: {
+        payeeStatus: null,
+        provisioned: false,
+        ready: false,
+      },
+      payment: { status: null },
+      provider: 'hyperwallet',
+      status: 'pending_review',
+      version: 1,
+    });
+    const serializedReview = JSON.stringify(pendingReview);
+    expect(serializedReview).not.toContain(winner.email);
+    expect(serializedReview).not.toContain(winner.firebase_uid);
+    expect(serializedReview).not.toContain('provider_user_token');
+    expect(serializedReview).not.toContain('provider_payment_token');
+    await expect(
+      migrated.pool.query(
+        `UPDATE payout_claims
+         SET amount_minor = amount_minor + 1,
+             version = version + 1
+         WHERE id = $1`,
+        [winner.claim_id],
+      ),
+    ).rejects.toThrow(/payout claim financial identity is immutable/i);
+    await expect(
+      payouts.approve(
+        operatorPrincipal,
+        winner.claim_id,
+        'approve-stale-winning-claim',
+        pendingReview.version + 1,
+        'winner review used stale state',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PAYOUT_CLAIM_VERSION_STALE' },
+    });
+
     const approved = await payouts.approve(
       operatorPrincipal,
       winner.claim_id,
       'approve-winning-claim',
+      pendingReview.version,
       'winner review complete',
     );
     expect(approved.status).toBe('action_required');
@@ -400,6 +453,7 @@ describeWithDatabase('critical financial workflow', () => {
         operatorPrincipal,
         winner.claim_id,
         'approve-winning-claim',
+        pendingReview.version,
         'winner review complete',
       ),
     ).resolves.toEqual(approved);
@@ -447,10 +501,65 @@ describeWithDatabase('critical financial workflow', () => {
     await expect(webhooks.processPending()).resolves.toBe(1);
     await expect(webhooks.processPending()).resolves.toBe(0);
 
+    const readyReview = await payouts.getOperatorReview(
+      operatorPrincipal,
+      winner.claim_id,
+    );
+    expect(readyReview).toMatchObject({
+      id: winner.claim_id,
+      participant: { eligible: true },
+      payoutAccount: {
+        payeeStatus: 'PRE_ACTIVATED',
+        provisioned: true,
+        ready: true,
+      },
+      payment: { status: null },
+      status: 'ready',
+      version: 4,
+    });
+    expect(JSON.stringify(readyReview)).not.toContain(providerUserToken);
+    await expect(
+      payouts.release(
+        operatorPrincipal,
+        winner.claim_id,
+        'release-stale-winning-claim',
+        readyReview.version - 1,
+        'stale payout release review',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PAYOUT_CLAIM_VERSION_STALE' },
+    });
+    await migrated.pool.query(
+      `UPDATE users SET status = 'suspended' WHERE id = $1`,
+      [winner.user_id],
+    );
+    await expect(
+      payouts.release(
+        operatorPrincipal,
+        winner.claim_id,
+        'release-ineligible-winning-claim',
+        readyReview.version,
+        'winner account eligibility changed',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PAYOUT_WINNER_NOT_ELIGIBLE' },
+    });
+    await expect(
+      payouts.getOperatorReview(operatorPrincipal, winner.claim_id),
+    ).resolves.toMatchObject({
+      participant: { accountStatus: 'suspended', eligible: false },
+      version: readyReview.version,
+    });
+    await migrated.pool.query(
+      `UPDATE users SET status = 'active' WHERE id = $1`,
+      [winner.user_id],
+    );
+
     const released = await payouts.release(
       operatorPrincipal,
       winner.claim_id,
       'release-winning-claim',
+      readyReview.version,
       'approved for payout',
     );
     expect(released.status).toBe('processing');
@@ -459,10 +568,27 @@ describeWithDatabase('critical financial workflow', () => {
         operatorPrincipal,
         winner.claim_id,
         'release-winning-claim',
+        readyReview.version,
         'approved for payout',
       ),
     ).resolves.toEqual(released);
     expect(hyperwallet.createdPayments).toHaveLength(1);
+    await expect(
+      migrated.pool.query(
+        `UPDATE payout_payments
+         SET amount_minor = amount_minor + 1
+         WHERE payout_claim_id = $1`,
+        [winner.claim_id],
+      ),
+    ).rejects.toThrow(/payout payment financial identity is immutable/i);
+    await expect(
+      migrated.pool.query(
+        `UPDATE hyperwallet_users
+         SET provider_user_token = provider_user_token || '-changed'
+         WHERE user_id = $1`,
+        [winner.user_id],
+      ),
+    ).rejects.toThrow(/Hyperwallet payee identity is immutable/i);
 
     hyperwallet.addNotification({
       clientPaymentId: winner.claim_id,
@@ -502,6 +628,31 @@ describeWithDatabase('critical financial workflow', () => {
       { next_status: 'ready', source: 'hyperwallet_webhook' },
       { next_status: 'processing', source: 'operator_release' },
       { next_status: 'paid', source: 'hyperwallet_webhook' },
+    ]);
+
+    const audits = await migrated.pool.query<{
+      action: string;
+      next_state: { status: string; version: number };
+      previous_state: { status: string; version: number };
+    }>(
+      `SELECT action, previous_state, next_state
+       FROM operator_audit_events
+       WHERE entity_type = 'payout_claims'
+         AND entity_id = $1
+       ORDER BY id`,
+      [winner.claim_id],
+    );
+    expect(audits.rows).toEqual([
+      {
+        action: 'payout_claim.approved',
+        next_state: { status: 'action_required', version: 2 },
+        previous_state: { status: 'pending_review', version: 1 },
+      },
+      {
+        action: 'payout_claim.released',
+        next_state: { status: 'processing', version: 5 },
+        previous_state: { status: 'ready', version: 4 },
+      },
     ]);
   });
 

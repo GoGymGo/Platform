@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiHeader,
@@ -11,6 +19,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
   OperatorPayoutActionDto,
+  OperatorPayoutClaimReviewDto,
   OperatorPayoutClaimResponseDto,
   PayoutClaimResponseDto,
   PortalActionResponseDto,
@@ -40,7 +49,7 @@ export class PayoutsController {
   @ApiOkResponse({ type: PortalActionResponseDto })
   openPortal(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Param('claimId') claimId: string,
+    @Param('claimId', ParseUUIDPipe) claimId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
   ): Promise<PortalActionResponseDto> {
     return this.payouts.openPortal(
@@ -57,13 +66,25 @@ export class PayoutsController {
 export class OperatorPayoutsController {
   constructor(private readonly payouts: PayoutsService) {}
 
+  @Get(':claimId/review')
+  @ApiOperation({
+    summary: 'Get a privacy-safe authoritative payout claim review',
+  })
+  @ApiOkResponse({ type: OperatorPayoutClaimReviewDto })
+  getReview(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('claimId', ParseUUIDPipe) claimId: string,
+  ): Promise<OperatorPayoutClaimReviewDto> {
+    return this.payouts.getOperatorReview(principal, claimId);
+  }
+
   @Post(':claimId/approve')
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Approve a reviewed winner claim for payee setup' })
   @ApiOkResponse({ type: OperatorPayoutClaimResponseDto })
   approve(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Param('claimId') claimId: string,
+    @Param('claimId', ParseUUIDPipe) claimId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() request: OperatorPayoutActionDto,
   ): Promise<OperatorPayoutClaimResponseDto> {
@@ -71,6 +92,7 @@ export class OperatorPayoutsController {
       principal,
       claimId,
       requireIdempotencyKey(idempotencyKey),
+      request.expectedVersion,
       request.reason,
     );
   }
@@ -83,7 +105,7 @@ export class OperatorPayoutsController {
   @ApiOkResponse({ type: OperatorPayoutClaimResponseDto })
   release(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Param('claimId') claimId: string,
+    @Param('claimId', ParseUUIDPipe) claimId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() request: OperatorPayoutActionDto,
   ): Promise<OperatorPayoutClaimResponseDto> {
@@ -91,6 +113,7 @@ export class OperatorPayoutsController {
       principal,
       claimId,
       requireIdempotencyKey(idempotencyKey),
+      request.expectedVersion,
       request.reason,
     );
   }

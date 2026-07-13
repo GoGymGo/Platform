@@ -63,7 +63,7 @@ Server-authoritative Terms and Privacy publication, receipt, withdrawal, and enr
 
 The privacy-minimized manual workout review boundary and the provider/device controls that still block cash launch are documented in [session evidence review](docs/session-evidence-review.md).
 
-The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
+The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). The operator review and immutable money-movement controls are detailed in [payout operations](docs/payout-operations.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
 
 ## Module build order
 

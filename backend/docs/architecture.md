@@ -52,7 +52,7 @@ Each environment has one regional primary database with regional high availabili
 
 ## Payout risk boundary
 
-Hyperwallet hosts payee onboarding and bank-account collection. GoGymGo stores provider references and safe statuses, not bank credentials. Provider secrets remain server-side in Secret Manager. Every release/payment operation uses an immutable client payment ID, records an append-only audit trail, treats ambiguous submissions as uncertain, and reconciles provider state before an operator can retry.
+Hyperwallet hosts payee onboarding and bank-account collection. GoGymGo stores provider references and safe statuses, not bank credentials. Provider secrets remain server-side in Secret Manager. Before approval or release, an operator reads a privacy-safe authoritative claim review and returns its exact version; the row-locked decision rejects stale versions and revalidates the winner's active account and verified email. PostgreSQL makes claim ownership, amount, currency, provider, payment identity, and payee-token mapping immutable, validates state transitions, and requires claim versions to increment exactly once. Every release/payment operation uses an immutable client payment ID, records exact previous and next state in the append-only audit trail, treats ambiguous submissions as uncertain, and reconciles provider state before an operator can retry. See [payout operations](payout-operations.md).
 
 This lowers operational and data-security exposure, but it does not transfer every legal obligation. Hyperwallet program approval, prize-law review, tax reporting allocation, sanctions/eligibility rules, age rules, Quebec requirements, and competition terms still require qualified business/legal sign-off before production launch.
 

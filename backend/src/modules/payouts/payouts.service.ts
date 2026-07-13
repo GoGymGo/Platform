@@ -22,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   OperatorPayoutClaimResponseDto,
+  OperatorPayoutClaimReviewDto,
   PayoutClaimResponseDto,
   PortalActionResponseDto,
 } from './dto/payout.dto';
@@ -51,6 +52,7 @@ interface OperatorPayoutJson extends JsonObject {
 interface TransitionOptions {
   approvedByUserId?: string;
   eventId: string;
+  expectedVersion?: number;
   failureCode?: string | null;
   metadata?: JsonObject;
   nextStatus: PayoutClaimStatus;
@@ -291,22 +293,52 @@ export class PayoutsService {
     principal: AuthenticatedPrincipal,
     claimId: string,
     idempotencyKey: string,
+    expectedVersion: number,
     reason: string,
   ): Promise<OperatorPayoutClaimResponseDto> {
     const result = await this.idempotency.execute<OperatorPayoutJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
-        request: { claimId, reason },
+        request: { claimId, expectedVersion, reason },
         scope: 'operator:payout-claims:approve',
       },
       async (transaction) => {
-        const operator = await this.profiles.ensureUser(principal, transaction);
-        this.profiles.requireVerifiedEmail(operator);
-        this.assertPayoutOperator(operator.roles);
+        const operator = await this.requirePayoutOperator(
+          principal,
+          transaction,
+        );
+        const current = await transaction
+          .selectFrom('payout_claims as claim')
+          .innerJoin('users as participant', 'participant.id', 'claim.user_id')
+          .selectAll('claim')
+          .select([
+            'participant.email as participant_email',
+            'participant.email_verified as participant_email_verified',
+            'participant.status as participant_status',
+          ])
+          .where('claim.id', '=', claimId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!current) {
+          throw new NotFoundException({
+            code: 'PAYOUT_CLAIM_NOT_FOUND',
+            message: 'The payout claim was not found.',
+          });
+        }
+        this.assertExpectedVersion(current.version, expectedVersion);
+        if (current.status === 'action_required') {
+          return {
+            id: current.id,
+            status: current.status,
+            version: current.version,
+          };
+        }
+        this.assertWinnerEligible(current);
         const claim = await this.transitionClaim(transaction, claimId, {
           approvedByUserId: operator.id,
           eventId: idempotencyKey,
+          expectedVersion,
           metadata: { reason },
           nextStatus: 'action_required',
           source: 'operator_approval',
@@ -321,6 +353,8 @@ export class PayoutsService {
           action: 'payout_claim.approved',
           actorUserId: operator.id,
           claim,
+          previousStatus: current.status,
+          previousVersion: current.version,
           reason,
           requestId: idempotencyKey,
         });
@@ -335,18 +369,26 @@ export class PayoutsService {
     principal: AuthenticatedPrincipal,
     claimId: string,
     idempotencyKey: string,
+    expectedVersion: number,
     reason: string,
   ): Promise<OperatorPayoutClaimResponseDto> {
     const reservation = await this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        const operator = await this.profiles.ensureUser(principal, transaction);
-        this.profiles.requireVerifiedEmail(operator);
-        this.assertPayoutOperator(operator.roles);
+        const operator = await this.requirePayoutOperator(
+          principal,
+          transaction,
+        );
         const claim = await transaction
-          .selectFrom('payout_claims')
-          .selectAll()
-          .where('id', '=', claimId)
+          .selectFrom('payout_claims as claim')
+          .innerJoin('users as participant', 'participant.id', 'claim.user_id')
+          .selectAll('claim')
+          .select([
+            'participant.email as participant_email',
+            'participant.email_verified as participant_email_verified',
+            'participant.status as participant_status',
+          ])
+          .where('claim.id', '=', claimId)
           .forUpdate()
           .executeTakeFirst();
         if (!claim) {
@@ -364,12 +406,14 @@ export class PayoutsService {
             shouldSubmit: false,
           };
         }
+        this.assertExpectedVersion(claim.version, expectedVersion);
         if (claim.status !== 'ready') {
           throw new ConflictException({
             code: 'PAYOUT_CLAIM_NOT_READY',
             message: 'Only a ready payout claim can be released.',
           });
         }
+        this.assertWinnerEligible(claim);
 
         const providerUser = await transaction
           .selectFrom('hyperwallet_users')
@@ -389,6 +433,7 @@ export class PayoutsService {
           claim.id,
           {
             eventId: idempotencyKey,
+            expectedVersion,
             metadata: { reason },
             nextStatus: 'processing',
             source: 'operator_release',
@@ -414,6 +459,8 @@ export class PayoutsService {
           action: 'payout_claim.released',
           actorUserId: operator.id,
           claim: processingClaim,
+          previousStatus: claim.status,
+          previousVersion: claim.version,
           reason,
           requestId: idempotencyKey,
         });
@@ -544,6 +591,12 @@ export class PayoutsService {
         message: 'The payout claim was not found.',
       });
     }
+    if (
+      options.expectedVersion !== undefined &&
+      current.version !== options.expectedVersion
+    ) {
+      this.throwStaleClaimVersion(current.version, options.expectedVersion);
+    }
     if (current.status === options.nextStatus) {
       return current;
     }
@@ -652,6 +705,159 @@ export class PayoutsService {
     return this.programToken;
   }
 
+  async getOperatorReview(
+    principal: AuthenticatedPrincipal,
+    claimId: string,
+  ): Promise<OperatorPayoutClaimReviewDto> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.requirePayoutOperator(principal, transaction);
+        const claim = await transaction
+          .selectFrom('payout_claims as claim')
+          .innerJoin(
+            'draw_winners as winner',
+            'winner.id',
+            'claim.draw_winner_id',
+          )
+          .innerJoin('competition_draws as draw', 'draw.id', 'winner.draw_id')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'draw.competition_id',
+          )
+          .innerJoin('users as participant', 'participant.id', 'claim.user_id')
+          .select([
+            'claim.amount_minor',
+            'claim.approved_at',
+            'claim.created_at',
+            'claim.currency',
+            'claim.failure_code',
+            'claim.id',
+            'claim.paid_at',
+            'claim.provider',
+            'claim.status',
+            'claim.user_id',
+            'claim.version',
+            'competition.id as competition_id',
+            'competition.name as competition_name',
+            'draw.id as draw_id',
+            'participant.email as participant_email',
+            'participant.email_verified as participant_email_verified',
+            'participant.status as participant_status',
+            'winner.id as winner_id',
+            'winner.payout_rank',
+          ])
+          .where('claim.id', '=', claimId)
+          .executeTakeFirst();
+        if (!claim) {
+          throw new NotFoundException({
+            code: 'PAYOUT_CLAIM_NOT_FOUND',
+            message: 'The payout claim was not found.',
+          });
+        }
+
+        const [providerUser, payment] = await Promise.all([
+          this.programToken
+            ? transaction
+                .selectFrom('hyperwallet_users')
+                .select('provider_status')
+                .where('user_id', '=', claim.user_id)
+                .where('program_token', '=', this.programToken)
+                .executeTakeFirst()
+            : Promise.resolve(undefined),
+          transaction
+            .selectFrom('payout_payments')
+            .select('provider_status')
+            .where('payout_claim_id', '=', claim.id)
+            .executeTakeFirst(),
+        ]);
+        assertSupportedPayoutCurrency(claim.currency);
+        const participantEligible =
+          claim.participant_status === 'active' &&
+          Boolean(claim.participant_email) &&
+          claim.participant_email_verified;
+
+        return {
+          amountMinor: toSafeAmountMinor(claim.amount_minor),
+          approvedAt: claim.approved_at?.toISOString() ?? null,
+          competitionId: claim.competition_id,
+          competitionName: claim.competition_name,
+          createdAt: claim.created_at.toISOString(),
+          currency: claim.currency,
+          drawId: claim.draw_id,
+          failureCode: claim.failure_code,
+          id: claim.id,
+          paidAt: claim.paid_at?.toISOString() ?? null,
+          participant: {
+            accountStatus: claim.participant_status,
+            eligible: participantEligible,
+            emailPresent: Boolean(claim.participant_email),
+            emailVerified: claim.participant_email_verified,
+          },
+          payoutAccount: {
+            payeeStatus: providerUser?.provider_status ?? null,
+            provisioned: Boolean(providerUser),
+            ready: ['ready', 'processing', 'paid'].includes(claim.status),
+          },
+          payoutRank: claim.payout_rank,
+          payment: { status: payment?.provider_status ?? null },
+          provider: claim.provider,
+          status: claim.status,
+          version: claim.version,
+          winnerId: claim.winner_id,
+        };
+      });
+  }
+
+  private async requirePayoutOperator(
+    principal: AuthenticatedPrincipal,
+    transaction: Transaction<Database>,
+  ) {
+    const operator = await this.profiles.ensureUser(principal, transaction);
+    this.profiles.requireVerifiedEmail(operator);
+    this.assertPayoutOperator(operator.roles);
+    return operator;
+  }
+
+  private assertExpectedVersion(
+    currentVersion: number,
+    expectedVersion: number,
+  ): void {
+    if (currentVersion !== expectedVersion) {
+      this.throwStaleClaimVersion(currentVersion, expectedVersion);
+    }
+  }
+
+  private throwStaleClaimVersion(
+    currentVersion: number,
+    expectedVersion: number,
+  ): never {
+    throw new ConflictException({
+      code: 'PAYOUT_CLAIM_VERSION_STALE',
+      details: { currentVersion, expectedVersion },
+      message:
+        'The payout claim changed after it was reviewed. Refresh the claim before deciding it.',
+    });
+  }
+
+  private assertWinnerEligible(participant: {
+    participant_email: string | null;
+    participant_email_verified: boolean;
+    participant_status: string;
+  }): void {
+    if (participant.participant_status !== 'active') {
+      throw new ConflictException({
+        code: 'PAYOUT_WINNER_NOT_ELIGIBLE',
+        message: 'The winner account is not active for payout processing.',
+      });
+    }
+    this.profiles.requireVerifiedEmail({
+      email: participant.participant_email,
+      email_verified: participant.participant_email_verified,
+    });
+  }
+
   private assertPayoutOperator(roles: readonly string[]): void {
     if (
       !roles.some((role) =>
@@ -671,6 +877,8 @@ export class PayoutsService {
       action: string;
       actorUserId: string;
       claim: Selectable<PayoutClaimsTable>;
+      previousStatus: PayoutClaimStatus;
+      previousVersion: number;
       reason: string;
       requestId: string;
     },
@@ -687,7 +895,10 @@ export class PayoutsService {
           status: input.claim.status,
           version: input.claim.version,
         },
-        previous_state: null,
+        previous_state: {
+          status: input.previousStatus,
+          version: input.previousVersion,
+        },
         reason: input.reason,
         request_id: input.requestId,
       })

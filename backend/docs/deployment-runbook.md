@@ -42,7 +42,7 @@ Terraform creates secret containers but never secret versions, preventing secret
 
 - Cloud Run restarts the API only when the dependency-free `/v1/health` liveness probe fails.
 - The external `/v1/health/ready` check covers PostgreSQL and a database-backed worker heartbeat without coupling worker failure to API process restarts.
-- `GET /v1/operator/system-health` requires an audited database-backed operator and adds queue depths, uncertain payments, pending webhooks, privacy work, and the last safe worker failure code.
+- `GET /v1/operator/system-health` requires a database-backed operator and adds queue depths, uncertain payments, pending webhooks, profile-media cleanup, privacy work, and the last safe worker failure code.
 - Application logs contain request/trace correlation fields and safe error types, never exception messages. Log-based metrics alert on API 5xx responses and worker batch failures.
 - When OTLP is enabled, HTTP, Express, PostgreSQL, worker spans, batch duration, result counts, and failure counters export to the configured collector. Keep OTLP disabled unless an HTTPS collector endpoint is configured.
 
@@ -54,6 +54,7 @@ Enable `PRIVACY_OPERATIONS_ENABLED` only after all of the following are true:
 - `PRIVACY_PSEUDONYMIZATION_KEY` is a random secret of at least 32 characters stored only in Secret Manager. Rotating this key requires a written migration plan because it changes deterministic deleted-account identifiers.
 - The worker service account has only object create/get/delete permissions on the export bucket and delete permission on user-content objects.
 - The identity used to create V4 signed URLs can perform the requested object read and has `iam.serviceAccounts.signBlob`. Signed URLs expire after at most 15 minutes; the default is five minutes.
+- Profile-media upload actions are restricted to exact-size create-only writes under `avatars/`; verify the API has only conditional object creator/viewer grants and the worker owns deletion.
 - Bucket logs, Cloud Audit Logs, lifecycle deletion, public access prevention, and uniform bucket-level access have been verified in staging.
 
 The worker runs only operator-approved requests in `processing`. It uses PostgreSQL leases and append-only request events, retries failures without storing exception text or personal data, and never deletes competition, payout, fraud, or operator-audit records. Account deletion instead removes direct identifiers and pseudonymizes the retained record graph. See [privacy operations](privacy-operations.md).

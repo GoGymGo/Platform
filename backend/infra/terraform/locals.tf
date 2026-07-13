@@ -31,6 +31,10 @@ locals {
       NODE_ENV                         = "production"
       OPENAPI_ENABLED                  = "false"
       OTEL_ENABLED                     = tostring(local.otel_enabled)
+      PROFILE_MEDIA_ENABLED            = tostring(var.profile_media_enabled)
+      PROFILE_MEDIA_MAX_BYTES          = "2097152"
+      PROFILE_MEDIA_READ_TTL_SECONDS   = "300"
+      PROFILE_MEDIA_UPLOAD_TTL_SECONDS = "300"
       PRIVACY_DOWNLOAD_URL_TTL_SECONDS = "300"
       PRIVACY_EXPORT_BUCKET            = google_storage_bucket.privacy_exports.name
       PRIVACY_EXPORT_RETENTION_DAYS    = "7"

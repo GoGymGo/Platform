@@ -1,7 +1,9 @@
 import { Storage } from '@google-cloud/storage';
 import type {
+  CreateSignedUploadUrlInput,
   PrivateObjectStorage,
   PutPrivateJsonInput,
+  SignedUploadAction,
 } from './private-object-storage';
 import { PrivateObjectStorageError } from './private-object-storage';
 
@@ -72,6 +74,121 @@ export class GoogleCloudPrivateObjectStorage implements PrivateObjectStorage {
       return url;
     } catch {
       throw new PrivateObjectStorageError('SIGNED_URL_CREATE_FAILED');
+    }
+  }
+
+  async createSignedUploadUrl(
+    input: CreateSignedUploadUrlInput,
+  ): Promise<SignedUploadAction> {
+    this.assertLocation(input.bucket, input.objectKey);
+    if (
+      input.expiresAt.getTime() <= Date.now() ||
+      !Number.isSafeInteger(input.contentLength) ||
+      input.contentLength < 1 ||
+      !input.contentType.trim() ||
+      !input.mediaId.trim()
+    ) {
+      throw new PrivateObjectStorageError('SIGNED_UPLOAD_INPUT_INVALID');
+    }
+    const headers = {
+      'cache-control': 'private, no-store, max-age=0',
+      'content-type': input.contentType,
+      'x-goog-content-length-range': `${input.contentLength},${input.contentLength}`,
+      'x-goog-if-generation-match': '0',
+      'x-goog-meta-media-id': input.mediaId,
+    };
+    try {
+      const [url] = await this.storage
+        .bucket(input.bucket)
+        .file(input.objectKey)
+        .getSignedUrl({
+          action: 'write',
+          contentType: input.contentType,
+          expires: input.expiresAt,
+          extensionHeaders: {
+            'cache-control': headers['cache-control'],
+            'x-goog-content-length-range':
+              headers['x-goog-content-length-range'],
+            'x-goog-if-generation-match': headers['x-goog-if-generation-match'],
+            'x-goog-meta-media-id': headers['x-goog-meta-media-id'],
+          },
+          version: 'v4',
+        });
+      return { headers, url };
+    } catch {
+      throw new PrivateObjectStorageError('SIGNED_UPLOAD_URL_CREATE_FAILED');
+    }
+  }
+
+  async getObjectMetadata(bucket: string, objectKey: string) {
+    this.assertLocation(bucket, objectKey);
+    try {
+      const [metadata] = await this.storage
+        .bucket(bucket)
+        .file(objectKey)
+        .getMetadata();
+      const contentLength = Number(metadata.size);
+      const contentEncoding = metadata.contentEncoding;
+      const contentType = metadata.contentType;
+      const generation = metadata.generation;
+      if (
+        !Number.isSafeInteger(contentLength) ||
+        contentLength < 1 ||
+        (contentEncoding !== undefined &&
+          contentEncoding !== null &&
+          typeof contentEncoding !== 'string') ||
+        typeof contentType !== 'string' ||
+        !contentType.trim() ||
+        typeof generation !== 'string' ||
+        !generation.trim()
+      ) {
+        throw new PrivateObjectStorageError('OBJECT_METADATA_INVALID');
+      }
+      const mediaId = metadata.metadata?.['media-id'];
+      return {
+        contentEncoding: contentEncoding ?? null,
+        contentLength,
+        contentType,
+        generation,
+        mediaId: typeof mediaId === 'string' ? mediaId : null,
+      };
+    } catch (error) {
+      if (error instanceof PrivateObjectStorageError) {
+        throw error;
+      }
+      if (this.hasCode(error, 404)) {
+        throw new PrivateObjectStorageError('OBJECT_NOT_FOUND');
+      }
+      throw new PrivateObjectStorageError('OBJECT_METADATA_READ_FAILED');
+    }
+  }
+
+  async readObjectPrefix(
+    bucket: string,
+    objectKey: string,
+    length: number,
+  ): Promise<Buffer> {
+    this.assertLocation(bucket, objectKey);
+    if (!Number.isSafeInteger(length) || length < 1 || length > 64) {
+      throw new PrivateObjectStorageError('OBJECT_PREFIX_LENGTH_INVALID');
+    }
+    try {
+      const [data] = await this.storage
+        .bucket(bucket)
+        .file(objectKey)
+        .download({ end: length - 1, start: 0 });
+      if (!Buffer.isBuffer(data) || data.length < length) {
+        throw new PrivateObjectStorageError('OBJECT_PREFIX_INVALID');
+      }
+      return data.subarray(0, length);
+    } catch (error) {
+      if (error instanceof PrivateObjectStorageError) {
+        throw error;
+      }
+      if (this.hasCode(error, 404)) {
+        throw new PrivateObjectStorageError('OBJECT_NOT_FOUND');
+      }
+      throw new PrivateObjectStorageError('OBJECT_PREFIX_READ_FAILED');
     }
   }
 

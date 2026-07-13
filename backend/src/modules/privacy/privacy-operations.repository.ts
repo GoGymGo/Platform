@@ -103,6 +103,12 @@ export class PrivacyOperationsRepository {
       .where('request_type', '=', 'export')
       .where('result_object_key', 'is not', null)
       .execute();
+    const profileMedia = await this.database.connection
+      .selectFrom('profile_media')
+      .select(['expires_at', 'object_key'])
+      .where('user_id', '=', job.userId)
+      .where('object_deleted_at', 'is', null)
+      .execute();
     const [openPayout, openCompetition] = await Promise.all([
       this.database.connection
         .selectFrom('payout_claims')
@@ -129,7 +135,16 @@ export class PrivacyOperationsRepository {
     ]);
 
     return {
-      avatarObjectKey: user.avatar_object_key,
+      activeMediaUploadExpiresAt:
+        profileMedia
+          .map((item) => item.expires_at)
+          .sort((left, right) => right.getTime() - left.getTime())[0] ?? null,
+      avatarObjectKeys: [
+        ...new Set([
+          ...profileMedia.map((item) => item.object_key),
+          ...(user.avatar_object_key ? [user.avatar_object_key] : []),
+        ]),
+      ],
       exportObjectKeys: exports.flatMap((item) =>
         item.result_object_key ? [item.result_object_key] : [],
       ),
@@ -272,6 +287,10 @@ export class PrivacyOperationsRepository {
         await transaction
           .deleteFrom('idempotency_keys')
           .where('actor_key', '=', `firebase:${user.firebase_uid}`)
+          .execute();
+        await transaction
+          .deleteFrom('profile_media')
+          .where('user_id', '=', request.user_id)
           .execute();
         await transaction
           .updateTable('profiles')

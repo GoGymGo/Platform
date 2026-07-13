@@ -3,6 +3,7 @@ import { CompetitionsModule } from '../competitions/competitions.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { PrivacyModule } from '../privacy/privacy.module';
+import { ProfilesModule } from '../profiles/profiles.module';
 import { OperationsWorkerService } from './operations-worker.service';
 import { WorkerObservabilityService } from './worker-observability.service';
 
@@ -13,6 +14,7 @@ import { WorkerObservabilityService } from './worker-observability.service';
     NotificationsModule,
     PayoutsModule,
     PrivacyModule,
+    ProfilesModule,
   ],
   providers: [OperationsWorkerService, WorkerObservabilityService],
 })

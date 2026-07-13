@@ -9,7 +9,8 @@ export interface ClaimedPrivacyJob {
 }
 
 export interface PrivacyDeletionContext {
-  avatarObjectKey: string | null;
+  activeMediaUploadExpiresAt: Date | null;
+  avatarObjectKeys: string[];
   exportObjectKeys: string[];
   firebaseUid: string;
   hasOpenCompetition: boolean;

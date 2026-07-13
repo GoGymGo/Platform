@@ -9,6 +9,7 @@ describe('GoogleCloudPrivateObjectStorage', () => {
   function setup() {
     const file = {
       delete: jest.fn(),
+      download: jest.fn(),
       getMetadata: jest.fn(),
       getSignedUrl: jest.fn(),
       save: jest.fn(),
@@ -94,5 +95,83 @@ describe('GoogleCloudPrivateObjectStorage', () => {
         'privacy-exports/user/request.json',
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it('creates a bounded single-write URL with exact upload constraints', async () => {
+    const { client, file } = setup();
+    const expiresAt = new Date(Date.now() + 60_000);
+    file.getSignedUrl.mockResolvedValue([
+      'https://storage.googleapis.com/upload',
+    ]);
+
+    await expect(
+      client.createSignedUploadUrl({
+        bucket: 'private-content',
+        contentLength: 512,
+        contentType: 'image/jpeg',
+        expiresAt,
+        mediaId: '10000000-0000-4000-8000-000000000001',
+        objectKey:
+          'avatars/20000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000001.jpg',
+      }),
+    ).resolves.toEqual({
+      headers: {
+        'cache-control': 'private, no-store, max-age=0',
+        'content-type': 'image/jpeg',
+        'x-goog-content-length-range': '512,512',
+        'x-goog-if-generation-match': '0',
+        'x-goog-meta-media-id': '10000000-0000-4000-8000-000000000001',
+      },
+      url: 'https://storage.googleapis.com/upload',
+    });
+    expect(file.getSignedUrl).toHaveBeenCalledWith({
+      action: 'write',
+      contentType: 'image/jpeg',
+      expires: expiresAt,
+      extensionHeaders: {
+        'cache-control': 'private, no-store, max-age=0',
+        'x-goog-content-length-range': '512,512',
+        'x-goog-if-generation-match': '0',
+        'x-goog-meta-media-id': '10000000-0000-4000-8000-000000000001',
+      },
+      version: 'v4',
+    });
+  });
+
+  it('reads normalized upload metadata and fails closed when it is missing', async () => {
+    const { client, file } = setup();
+    file.getMetadata.mockResolvedValue([
+      {
+        contentType: 'image/jpeg',
+        generation: '1234',
+        metadata: { 'media-id': 'media-1' },
+        size: '512',
+      },
+    ]);
+
+    await expect(
+      client.getObjectMetadata('private-content', 'avatars/user/media.jpg'),
+    ).resolves.toEqual({
+      contentEncoding: null,
+      contentLength: 512,
+      contentType: 'image/jpeg',
+      generation: '1234',
+      mediaId: 'media-1',
+    });
+
+    file.getMetadata.mockRejectedValue({ code: 404 });
+    await expect(
+      client.getObjectMetadata('private-content', 'avatars/user/missing.jpg'),
+    ).rejects.toMatchObject({ code: 'OBJECT_NOT_FOUND' });
+  });
+
+  it('reads only a bounded object prefix for media signature validation', async () => {
+    const { client, file } = setup();
+    file.download.mockResolvedValue([Buffer.from('0123456789abcdef')]);
+
+    await expect(
+      client.readObjectPrefix('private-content', 'avatars/user/media.jpg', 12),
+    ).resolves.toEqual(Buffer.from('0123456789ab'));
+    expect(file.download).toHaveBeenCalledWith({ end: 11, start: 0 });
   });
 });

@@ -10,6 +10,7 @@ cors_origins = [
 # gates are complete. Secret values never belong in this file or Terraform state.
 hyperwallet_enabled          = false
 privacy_operations_enabled   = false
+profile_media_enabled        = false
 push_notifications_enabled   = false
 otel_exporter_otlp_endpoint  = null
 monitoring_notification_channels = []

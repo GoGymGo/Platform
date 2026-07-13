@@ -21,7 +21,7 @@ The worker:
 
 - defers deletion while an active competition or non-final payout still requires the account, leaving access intact for operator review;
 - deletes the Firebase account, treating an already-absent user as success;
-- deletes the stored profile avatar and every previous privacy-export object;
+- enumerates and deletes every active, pending, rejected, superseded, removed, or expired profile-media object that has not already been deleted, plus every previous privacy-export object;
 - removes push tokens and queued/sent notification records;
 - removes idempotency records keyed by the former Firebase UID;
 - removes public profile identity and replaces Firebase UID and callsign with namespace-separated HMAC pseudonyms;

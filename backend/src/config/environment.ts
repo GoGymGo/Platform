@@ -76,6 +76,25 @@ export const environmentSchema = z
       .default('postgresql://gogymgo:gogymgo@localhost:5432/gogymgo'),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
     GCP_STORAGE_BUCKET: optionalTrimmedString,
+    PROFILE_MEDIA_ENABLED: booleanString.default(false),
+    PROFILE_MEDIA_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(12)
+      .max(5 * 1_024 * 1_024)
+      .default(2 * 1_024 * 1_024),
+    PROFILE_MEDIA_UPLOAD_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(900)
+      .default(300),
+    PROFILE_MEDIA_READ_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(900)
+      .default(300),
     PRIVACY_OPERATIONS_ENABLED: booleanString.default(false),
     PRIVACY_EXPORT_BUCKET: optionalTrimmedString,
     PRIVACY_EXPORT_RETENTION_DAYS: z.coerce
@@ -216,6 +235,15 @@ export const environmentSchema = z
           path: ['PRIVACY_PSEUDONYMIZATION_KEY'],
         });
       }
+    }
+
+    if (environment.PROFILE_MEDIA_ENABLED && !environment.GCP_STORAGE_BUCKET) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'GCP_STORAGE_BUCKET is required when PROFILE_MEDIA_ENABLED is true.',
+        path: ['GCP_STORAGE_BUCKET'],
+      });
     }
 
     if (

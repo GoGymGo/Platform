@@ -36,6 +36,30 @@ resource "google_storage_bucket_iam_member" "api_privacy_reader" {
   member = "serviceAccount:${google_service_account.api.email}"
 }
 
+resource "google_storage_bucket_iam_member" "api_content_creator" {
+  count  = var.profile_media_enabled ? 1 : 0
+  bucket = google_storage_bucket.user_content.name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${google_service_account.api.email}"
+
+  condition {
+    title      = "avatar_objects_only"
+    expression = "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.user_content.name}/objects/avatars/')"
+  }
+}
+
+resource "google_storage_bucket_iam_member" "api_content_viewer" {
+  count  = var.profile_media_enabled ? 1 : 0
+  bucket = google_storage_bucket.user_content.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.api.email}"
+
+  condition {
+    title      = "avatar_objects_only"
+    expression = "resource.name.startsWith('projects/_/buckets/${google_storage_bucket.user_content.name}/objects/avatars/')"
+  }
+}
+
 resource "google_storage_bucket_iam_member" "worker_privacy_admin" {
   bucket = google_storage_bucket.privacy_exports.name
   role   = "roles/storage.objectAdmin"

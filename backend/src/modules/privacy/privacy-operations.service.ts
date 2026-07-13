@@ -151,14 +151,19 @@ export class PrivacyOperationsService {
     if (context.hasOpenCompetition) {
       throw new PrivacyOperationError('OPEN_COMPETITION_REQUIRES_REVIEW');
     }
-    if (context.avatarObjectKey) {
+    if (
+      context.activeMediaUploadExpiresAt &&
+      context.activeMediaUploadExpiresAt.getTime() > Date.now()
+    ) {
+      throw new PrivacyOperationError('PROFILE_MEDIA_UPLOAD_ACTION_ACTIVE');
+    }
+    if (context.avatarObjectKeys.length > 0) {
       if (!this.contentBucket) {
         throw new PrivacyOperationError('USER_CONTENT_BUCKET_REQUIRED');
       }
-      await this.objectStorage.deleteObject(
-        this.contentBucket,
-        context.avatarObjectKey,
-      );
+      for (const objectKey of context.avatarObjectKeys) {
+        await this.objectStorage.deleteObject(this.contentBucket, objectKey);
+      }
     }
 
     const exportBucket = this.requireExportBucket();

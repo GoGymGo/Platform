@@ -66,8 +66,11 @@ describe('PrivacyOperationsService', () => {
       .mockResolvedValue({ sha256: 'a'.repeat(64) });
     const objectStorage: jest.Mocked<PrivateObjectStorage> = {
       createSignedReadUrl: jest.fn(),
+      createSignedUploadUrl: jest.fn(),
       deleteObject,
+      getObjectMetadata: jest.fn(),
       putJsonIfAbsent,
+      readObjectPrefix: jest.fn(),
     };
     const service = new PrivacyOperationsService(
       config,
@@ -127,7 +130,8 @@ describe('PrivacyOperationsService', () => {
       job: deletionJob,
     });
     repository.getDeletionContext.mockResolvedValue({
-      avatarObjectKey: 'avatars/me.jpg',
+      activeMediaUploadExpiresAt: null,
+      avatarObjectKeys: ['avatars/me.jpg', 'avatars/me-pending.jpg'],
       exportObjectKeys: ['privacy-exports/me/old.json'],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
@@ -147,6 +151,10 @@ describe('PrivacyOperationsService', () => {
       'avatars/me.jpg',
     );
     expect(calls.deleteObject).toHaveBeenCalledWith(
+      'user-content',
+      'avatars/me-pending.jpg',
+    );
+    expect(calls.deleteObject).toHaveBeenCalledWith(
       'private-exports',
       'privacy-exports/me/old.json',
     );
@@ -164,7 +172,8 @@ describe('PrivacyOperationsService', () => {
     const deletionJob = { ...exportJob, requestType: 'delete' as const };
     const { calls, repository, service } = setup({ job: deletionJob });
     repository.getDeletionContext.mockResolvedValue({
-      avatarObjectKey: null,
+      activeMediaUploadExpiresAt: null,
+      avatarObjectKeys: [],
       exportObjectKeys: [],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
@@ -182,6 +191,36 @@ describe('PrivacyOperationsService', () => {
     expect(calls.recordFailure).toHaveBeenCalledWith(
       deletionJob,
       'OPEN_PAYOUT_REQUIRES_REVIEW',
+    );
+  });
+
+  it('waits for signed avatar upload actions to expire before erasure', async () => {
+    const deletionJob = { ...exportJob, requestType: 'delete' as const };
+    const { calls, repository, service } = setup({
+      contentBucket: 'user-content',
+      job: deletionJob,
+    });
+    repository.getDeletionContext.mockResolvedValue({
+      activeMediaUploadExpiresAt: new Date(Date.now() + 60_000),
+      avatarObjectKeys: ['avatars/pending.jpg'],
+      exportObjectKeys: [],
+      firebaseUid: 'firebase-user',
+      hasOpenCompetition: false,
+      hasOpenPayout: false,
+      userId: deletionJob.userId,
+      userStatus: 'active',
+    });
+
+    await expect(service.processPending()).resolves.toEqual({
+      completed: 0,
+      expiredExportsDeleted: 0,
+      failed: 1,
+    });
+    expect(calls.deleteObject).not.toHaveBeenCalled();
+    expect(calls.deleteAccount).not.toHaveBeenCalled();
+    expect(calls.recordFailure).toHaveBeenCalledWith(
+      deletionJob,
+      'PROFILE_MEDIA_UPLOAD_ACTION_ACTIVE',
     );
   });
 

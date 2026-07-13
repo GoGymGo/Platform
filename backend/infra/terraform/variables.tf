@@ -203,6 +203,12 @@ variable "privacy_operations_enabled" {
   default     = false
 }
 
+variable "profile_media_enabled" {
+  description = "Enable private avatar upload, moderation, and cleanup operations."
+  type        = bool
+  default     = false
+}
+
 variable "push_notifications_enabled" {
   description = "Enable Expo push delivery after the access-token secret is populated."
   type        = bool

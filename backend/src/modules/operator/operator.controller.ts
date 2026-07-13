@@ -19,10 +19,12 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
   DecidePartnerApplicationDto,
+  DecideProfileMediaDto,
   DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
   LockDrawDto,
   OperatorActionResponseDto,
+  ProfileMediaReviewActionDto,
   OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
@@ -155,6 +157,36 @@ export class OperatorController {
     return this.operator.decidePrivacyRequest(
       principal,
       privacyRequestId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
+  @Get('profile-media/:mediaId/review-action')
+  @ApiOperation({
+    summary: 'Create a short-lived private avatar review action',
+  })
+  @ApiOkResponse({ type: ProfileMediaReviewActionDto })
+  getProfileMediaReviewAction(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('mediaId', ParseUUIDPipe) mediaId: string,
+  ): Promise<ProfileMediaReviewActionDto> {
+    return this.operator.getProfileMediaReviewAction(principal, mediaId);
+  }
+
+  @Post('profile-media/:mediaId/decision')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Approve or reject moderated avatar media' })
+  @ApiOkResponse({ type: OperatorActionResponseDto })
+  decideProfileMedia(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('mediaId', ParseUUIDPipe) mediaId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: DecideProfileMediaDto,
+  ): Promise<OperatorActionResponseDto> {
+    return this.operator.decideProfileMedia(
+      principal,
+      mediaId,
       requireIdempotencyKey(idempotencyKey),
       input,
     );

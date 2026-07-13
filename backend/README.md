@@ -34,15 +34,20 @@ The liveness route is `GET http://localhost:3000/v1/health`. In non-production e
 `npm run check` runs formatting verification, strict TypeScript compilation, ESLint, unit tests, HTTP end-to-end tests, OpenAPI generation, the mobile-to-API contract audit, the source-policy/secret audit, and a production build. Run `npm run audit:deps` separately when dependency metadata is available.
 
 Database integration tests use Testcontainers and require a running Docker engine. A missing Docker engine is an environment limitation, never a passing database test.
-With `RUN_DATABASE_INTEGRATION=true`, the suite also exercises both critical
-PostgreSQL-backed money paths. Evidence-to-ledger coverage proves enrollment
+With `RUN_DATABASE_INTEGRATION=true`, the suite also exercises the critical
+PostgreSQL-backed trust paths. Evidence-to-ledger coverage proves enrollment
 and session idempotency, evidence replay rejection, disqualification checks,
 one award per eligible day, and exact progress totals. Draw-to-payout coverage
 proves minimum entrants, resolved session reviews, disqualification filtering,
 retry-safe settlement, exact payout allocation, hosted-payee activation,
 duplicate webhook intake, payment release, and terminal reconciliation.
+Profile-media coverage proves exact constrained upload actions, retry conflicts,
+private completion, moderation-only activation, audited decisions, replacement
+isolation, and object cleanup without persisting signed URLs.
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
+
+The private avatar upload, moderation, cleanup, and privacy lifecycle is documented in [profile-media operations](docs/profile-media.md).
 
 The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
 

@@ -56,8 +56,11 @@ describe('PrivacyService download actions', () => {
     );
     const objectStorage: PrivateObjectStorage = {
       createSignedReadUrl,
+      createSignedUploadUrl: jest.fn(),
       deleteObject: jest.fn(),
+      getObjectMetadata: jest.fn(),
       putJsonIfAbsent: jest.fn(),
+      readObjectPrefix: jest.fn(),
     };
     const service = new PrivacyService(
       database,

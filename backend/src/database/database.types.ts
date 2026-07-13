@@ -62,6 +62,14 @@ export type PrivacyRequestType = 'delete' | 'export';
 export type PrivacyRequestStatus =
   'completed' | 'processing' | 'rejected' | 'requested';
 export type WorkerHeartbeatStatus = 'failed' | 'running' | 'stopping';
+export type ProfileMediaStatus =
+  | 'approved'
+  | 'expired'
+  | 'pending_review'
+  | 'pending_upload'
+  | 'rejected'
+  | 'removed'
+  | 'superseded';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -82,6 +90,26 @@ export interface ProfilesTable {
   avatar_object_key: string | null;
   privacy_settings: ColumnType<JsonValue, JsonValue, JsonValue>;
   version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ProfileMediaTable {
+  id: Generated<string>;
+  user_id: string;
+  request_key: string;
+  object_key: string;
+  content_type: string;
+  expected_size_bytes: number;
+  actual_size_bytes: number | null;
+  storage_generation: string | null;
+  status: ProfileMediaStatus;
+  expires_at: Timestamp;
+  completed_at: NullableTimestamp;
+  reviewed_at: NullableTimestamp;
+  reviewed_by_user_id: string | null;
+  decision_reason: string | null;
+  object_deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -503,6 +531,7 @@ export interface Database {
   payout_state_events: PayoutStateEventsTable;
   privacy_request_events: PrivacyRequestEventsTable;
   privacy_requests: PrivacyRequestsTable;
+  profile_media: ProfileMediaTable;
   profiles: ProfilesTable;
   provider_webhooks: ProviderWebhooksTable;
   push_devices: PushDevicesTable;

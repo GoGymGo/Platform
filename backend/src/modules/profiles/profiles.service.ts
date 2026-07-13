@@ -118,7 +118,7 @@ export class ProfilesService {
     return user;
   }
 
-  private async ensureProfile(
+  async ensureProfile(
     userId: string,
     executor: DatabaseExecutor,
   ): Promise<Selectable<ProfilesTable>> {

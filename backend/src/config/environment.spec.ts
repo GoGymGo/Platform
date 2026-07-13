@@ -14,6 +14,8 @@ describe('environment validation', () => {
     expect(environment.DATABASE_URL).toContain('localhost:5432');
     expect(environment.HYPERWALLET_ENABLED).toBe(false);
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
+    expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
+    expect(environment.PROFILE_MEDIA_MAX_BYTES).toBe(2 * 1_024 * 1_024);
     expect(environment.PRIVACY_EXPORT_RETENTION_DAYS).toBe(7);
     expect(environment.OTEL_ENABLED).toBe(false);
     expect(environment.WORKER_HEARTBEAT_INTERVAL_MS).toBe(30_000);
@@ -118,6 +120,25 @@ describe('environment validation', () => {
         RUNTIME_ROLE: 'worker',
       }),
     ).toThrow(/PRIVACY_PSEUDONYMIZATION_KEY is required by the worker/i);
+  });
+
+  it('requires a private content bucket when profile media is enabled', () => {
+    expect(() =>
+      validateEnvironment({
+        AUTH_MODE: 'test',
+        NODE_ENV: 'test',
+        PROFILE_MEDIA_ENABLED: 'true',
+      }),
+    ).toThrow(/GCP_STORAGE_BUCKET is required/i);
+
+    expect(
+      validateEnvironment({
+        AUTH_MODE: 'test',
+        GCP_STORAGE_BUCKET: 'private-content',
+        NODE_ENV: 'test',
+        PROFILE_MEDIA_ENABLED: 'true',
+      }).PROFILE_MEDIA_ENABLED,
+    ).toBe(true);
   });
 
   it('requires the Expo access token only in the sending worker', () => {

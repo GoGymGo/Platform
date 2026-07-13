@@ -94,6 +94,8 @@ resource "google_cloud_run_v2_service" "api" {
     google_service_account_iam_member.api_signing,
     google_service_networking_connection.private_services,
     google_sql_database.application,
+    google_storage_bucket_iam_member.api_content_creator,
+    google_storage_bucket_iam_member.api_content_viewer,
     google_storage_bucket_iam_member.api_privacy_reader,
   ]
 

@@ -46,6 +46,25 @@ export class PrivacyExportBuilder {
           .where('user.id', '=', job.userId)
           .executeTakeFirstOrThrow();
 
+        const profileMedia = await transaction
+          .selectFrom('profile_media')
+          .select([
+            'id',
+            'content_type',
+            'expected_size_bytes',
+            'actual_size_bytes',
+            'status',
+            'expires_at',
+            'completed_at',
+            'reviewed_at',
+            'object_deleted_at',
+            'created_at',
+            'updated_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('created_at')
+          .execute();
+
         const regionVerifications = await transaction
           .selectFrom('region_verifications as verification')
           .innerJoin(
@@ -385,6 +404,7 @@ export class PrivacyExportBuilder {
           partnerApplications,
           payoutData: { payoutClaims, payoutProfiles },
           privacyRequests,
+          profileMedia,
           regionVerifications,
           request: {
             id: request.id,

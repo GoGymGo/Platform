@@ -12,14 +12,17 @@ import type { Database, JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { DrawsService } from '../draws/draws.service';
 import { ProfilesService } from '../profiles/profiles.service';
+import { ProfileMediaModerationService } from '../profiles/profile-media-moderation.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { resolveWorkerHealth } from '../operations/operational-health';
 import type {
   DecidePartnerApplicationDto,
+  DecideProfileMediaDto,
   DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
   LockDrawDto,
   OperatorActionResponseDto,
+  ProfileMediaReviewActionDto,
   OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
@@ -33,6 +36,7 @@ export class OperatorService {
     private readonly config: ConfigService<Environment, true>,
     private readonly draws: DrawsService,
     private readonly profiles: ProfilesService,
+    private readonly profileMedia: ProfileMediaModerationService,
     private readonly sessions: SessionsService,
   ) {}
 
@@ -49,6 +53,7 @@ export class OperatorService {
           competitionStartsDue,
           notificationsPending,
           paymentsUncertain,
+          profileMediaCleanupPending,
           privacyOperationsPending,
           webhooksPending,
         ] = await Promise.all([
@@ -81,6 +86,20 @@ export class OperatorService {
             .where('provider_status', 'in', [
               'SUBMITTING',
               'SUBMISSION_UNCERTAIN',
+            ])
+            .executeTakeFirstOrThrow(),
+          transaction
+            .selectFrom('profile_media')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('object_deleted_at', 'is', null)
+            .where('expires_at', '<=', now)
+            .where('status', 'in', [
+              'pending_upload',
+              'rejected',
+              'removed',
+              'superseded',
             ])
             .executeTakeFirstOrThrow(),
           transaction
@@ -123,6 +142,9 @@ export class OperatorService {
             competitionStartsDue: Number(competitionStartsDue.count),
             notificationsPending: Number(notificationsPending.count),
             paymentsUncertain: Number(paymentsUncertain.count),
+            profileMediaCleanupPending: Number(
+              profileMediaCleanupPending.count,
+            ),
             privacyOperationsPending: Number(privacyOperationsPending.count),
             webhooksPending: Number(webhooksPending.count),
           },
@@ -148,7 +170,7 @@ export class OperatorService {
       .transaction()
       .execute(async (transaction) => {
         await this.requireOperator(principal, transaction);
-        const [sessions, regions, payouts, partners, privacy] =
+        const [sessions, regions, payouts, partners, privacy, profileMedia] =
           await Promise.all([
             transaction
               .selectFrom('workout_sessions')
@@ -192,6 +214,13 @@ export class OperatorService {
               .orderBy('requested_at')
               .limit(100)
               .execute(),
+            transaction
+              .selectFrom('profile_media')
+              .select(['created_at', 'id', 'status'])
+              .where('status', '=', 'pending_review')
+              .orderBy('created_at')
+              .limit(100)
+              .execute(),
           ]);
 
         return [
@@ -207,6 +236,7 @@ export class OperatorService {
             kind: 'privacy_request' as const,
             status: item.status,
           })),
+          ...profileMedia.map((item) => this.queueItem(item, 'profile_media')),
         ].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
       });
   }
@@ -353,6 +383,30 @@ export class OperatorService {
       reason: input.reason,
       requestId,
       table: 'privacy_requests',
+    });
+  }
+
+  async getProfileMediaReviewAction(
+    principal: AuthenticatedPrincipal,
+    mediaId: string,
+  ): Promise<ProfileMediaReviewActionDto> {
+    await this.getOperatorId(principal);
+    return this.profileMedia.createReviewAction(mediaId);
+  }
+
+  async decideProfileMedia(
+    principal: AuthenticatedPrincipal,
+    mediaId: string,
+    requestId: string,
+    input: DecideProfileMediaDto,
+  ): Promise<OperatorActionResponseDto> {
+    const operatorId = await this.getOperatorId(principal);
+    return this.profileMedia.decide({
+      decision: input.decision,
+      mediaId,
+      operatorUserId: operatorId,
+      reason: input.reason,
+      requestId,
     });
   }
 

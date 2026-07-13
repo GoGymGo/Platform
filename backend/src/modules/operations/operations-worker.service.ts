@@ -4,12 +4,15 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { HyperwalletWebhooksService } from '../payouts/webhooks/hyperwallet-webhooks.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
+import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
 
 export interface WorkerRunResult {
   competitionsActivated: number;
   competitionsCancelled: number;
   notificationsSent: number;
   paymentsReconciled: number;
+  profileMediaCleanupFailed: number;
+  profileMediaDeleted: number;
   privacyExportsDeleted: number;
   privacyOperationsCompleted: number;
   privacyOperationsFailed: number;
@@ -22,6 +25,7 @@ export class OperationsWorkerService {
     private readonly competitions: CompetitionLifecycleService,
     private readonly notifications: NotificationsService,
     private readonly payouts: PayoutsService,
+    private readonly profileMedia: ProfileMediaCleanupService,
     private readonly privacy: PrivacyOperationsService,
     private readonly webhooks: HyperwalletWebhooksService,
   ) {}
@@ -30,6 +34,7 @@ export class OperationsWorkerService {
     const competitions = await this.competitions.processDueStarts();
     const webhooksProcessed = await this.webhooks.processPending();
     const paymentsReconciled = await this.payouts.reconcileUncertainPayments();
+    const profileMedia = await this.profileMedia.process();
     const privacy = await this.privacy.processPending();
     const notificationsSent = await this.notifications.processPending();
     return {
@@ -37,6 +42,8 @@ export class OperationsWorkerService {
       competitionsCancelled: competitions.cancelled,
       notificationsSent,
       paymentsReconciled,
+      profileMediaCleanupFailed: profileMedia.failed,
+      profileMediaDeleted: profileMedia.deleted,
       privacyExportsDeleted: privacy.expiredExportsDeleted,
       privacyOperationsCompleted: privacy.completed,
       privacyOperationsFailed: privacy.failed,

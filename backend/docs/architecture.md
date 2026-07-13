@@ -54,13 +54,14 @@ This lowers operational and data-security exposure, but it does not transfer eve
 - API, worker, and migration use distinct service accounts and explicit runtime roles. The API cannot read the privacy-pseudonymization or Expo worker secrets; the worker cannot read Hyperwallet webhook credentials. IAM grants are per bucket, per secret, and per workload.
 - Terraform creates secret containers only. Secret versions are populated out of band so credentials do not enter Git history, Terraform state, Expo variables, image layers, or CI logs.
 - User content and privacy exports use separate private buckets with public-access prevention and uniform bucket-level access. Privacy exports expire after seven days and do not use soft delete or object versioning.
+- Avatar uploads use five-minute V4 create-only actions bound to exact content type and length. New media remains owner-private and pending moderation; only an audited operator approval can activate it. The API can create/read only the `avatars/` prefix, while worker-only deletion handles rejection, replacement, removal, expiry, and erasure.
 - Account erasure is an approved, leased worker operation that removes direct identity/content while preserving legally necessary pseudonymized payout, competition, fraud, ledger, and audit evidence.
 
 ## Health and observability
 
 - `/v1/health` is dependency-free API liveness and is the Cloud Run startup/liveness probe.
 - `/v1/health/ready` checks PostgreSQL and the durable worker heartbeat; an external uptime check alerts without forcing an otherwise healthy API process to restart.
-- `/v1/operator/system-health` adds queue depth, uncertain payments, pending webhooks, privacy work, and safe worker failure codes for authorized operators.
+- `/v1/operator/system-health` adds queue depth, uncertain payments, pending webhooks, profile-media cleanup, privacy work, and safe worker failure codes for authorized operators.
 - Structured logs redact authentication, financial, location, and evidence fields. Error logs contain safe error types, status, request IDs, and trace correlation—not exception messages.
 - Optional OpenTelemetry exports HTTP, Express, PostgreSQL, and worker traces/metrics to an HTTPS collector. Log-based metrics alert on API server errors and worker batch failures; Cloud Monitoring also watches readiness and Cloud SQL CPU.
 

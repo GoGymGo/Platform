@@ -98,6 +98,37 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication before creating or completing avatar uploads', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/me/avatar-upload')
+      .set('Idempotency-Key', 'avatar-e2e-upload')
+      .send({ contentLength: 512, contentType: 'image/jpeg' })
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+    await request(app.getHttpServer())
+      .post(
+        '/v1/me/avatar-upload/10000000-0000-4000-8000-000000000001/complete',
+      )
+      .expect(401);
+  });
+
+  it('requires an operator token before private avatar review access', () => {
+    return request(app.getHttpServer())
+      .get(
+        '/v1/operator/profile-media/10000000-0000-4000-8000-000000000001/review-action',
+      )
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
   it('requires authentication before administrative configuration changes', () => {
     return request(app.getHttpServer())
       .post('/v1/operator/configuration/competitions')

@@ -54,6 +54,110 @@
         "tags": ["push devices"]
       }
     },
+    "/v1/me/avatar-upload": {
+      "post": {
+        "operationId": "createUpload",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateAvatarUploadDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAvatarUploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create an exact-size private avatar upload action",
+        "tags": ["profiles"]
+      }
+    },
+    "/v1/me/avatar-upload/{mediaId}/complete": {
+      "post": {
+        "operationId": "completeUpload",
+        "parameters": [
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarUploadCompletionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Verify a private avatar upload for moderation",
+        "tags": ["profiles"]
+      }
+    },
+    "/v1/me/avatar": {
+      "get": {
+        "operationId": "getAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarStateResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Get private owner avatar and moderation state",
+        "tags": ["profiles"]
+      },
+      "delete": {
+        "operationId": "removeAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveAvatarResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Remove active and pending avatar media",
+        "tags": ["profiles"]
+      }
+    },
     "/v1/me": {
       "get": {
         "operationId": "getMe",
@@ -680,6 +784,76 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Start or reject a privacy request",
+        "tags": ["operator"]
+      }
+    },
+    "/v1/operator/profile-media/{mediaId}/review-action": {
+      "get": {
+        "operationId": "getProfileMediaReviewAction",
+        "parameters": [
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileMediaReviewActionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a short-lived private avatar review action",
+        "tags": ["operator"]
+      }
+    },
+    "/v1/operator/profile-media/{mediaId}/decision": {
+      "post": {
+        "operationId": "decideProfileMedia",
+        "parameters": [
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DecideProfileMediaDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Approve or reject moderated avatar media",
         "tags": ["operator"]
       }
     },
@@ -1555,6 +1729,104 @@
         },
         "required": ["id", "provider", "platform", "enabled"]
       },
+      "CreateAvatarUploadDto": {
+        "type": "object",
+        "properties": {
+          "contentLength": {
+            "type": "number",
+            "maximum": 5242880,
+            "minimum": 12
+          },
+          "contentType": {
+            "type": "string",
+            "enum": ["image/jpeg", "image/png", "image/webp"]
+          }
+        },
+        "required": ["contentLength", "contentType"]
+      },
+      "AvatarUploadActionDto": {
+        "type": "object",
+        "properties": {
+          "method": { "type": "string", "enum": ["PUT"] },
+          "headers": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "url": { "type": "string", "format": "uri" }
+        },
+        "required": ["method", "headers", "url"]
+      },
+      "CreateAvatarUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "contentType": { "type": "string" },
+          "contentLength": { "type": "number" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["pending_upload"] },
+          "upload": { "$ref": "#/components/schemas/AvatarUploadActionDto" }
+        },
+        "required": [
+          "id",
+          "contentType",
+          "contentLength",
+          "expiresAt",
+          "status",
+          "upload"
+        ]
+      },
+      "AvatarUploadCompletionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["approved", "pending_review"] }
+        },
+        "required": ["id", "status"]
+      },
+      "AvatarMediaDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "contentType": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "readUrl": { "type": "string", "nullable": true },
+          "readUrlExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "contentType",
+          "createdAt",
+          "readUrl",
+          "readUrlExpiresAt",
+          "status"
+        ]
+      },
+      "AvatarStateResponseDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [{ "$ref": "#/components/schemas/AvatarMediaDto" }]
+          },
+          "latest": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [{ "$ref": "#/components/schemas/AvatarMediaDto" }]
+          }
+        },
+        "required": ["active", "latest"]
+      },
+      "RemoveAvatarResponseDto": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "enum": ["removed"] } },
+        "required": ["status"]
+      },
       "PrivacySettingsDto": {
         "type": "object",
         "properties": {
@@ -1849,6 +2121,7 @@
               "partner_application",
               "payout_claim",
               "privacy_request",
+              "profile_media",
               "region_verification",
               "workout_session"
             ]
@@ -1865,6 +2138,7 @@
           "notificationsPending": { "type": "number", "minimum": 0 },
           "paymentsUncertain": { "type": "number", "minimum": 0 },
           "privacyOperationsPending": { "type": "number", "minimum": 0 },
+          "profileMediaCleanupPending": { "type": "number", "minimum": 0 },
           "webhooksPending": { "type": "number", "minimum": 0 }
         },
         "required": [
@@ -1872,6 +2146,7 @@
           "notificationsPending",
           "paymentsUncertain",
           "privacyOperationsPending",
+          "profileMediaCleanupPending",
           "webhooksPending"
         ]
       },
@@ -1969,6 +2244,33 @@
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
           "decision": { "type": "string", "enum": ["processing", "rejected"] }
+        },
+        "required": ["reason", "decision"]
+      },
+      "ProfileMediaReviewActionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "contentType": { "type": "string" },
+          "contentLength": { "type": "number" },
+          "submittedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "url": { "type": "string", "format": "uri" }
+        },
+        "required": [
+          "id",
+          "contentType",
+          "contentLength",
+          "submittedAt",
+          "expiresAt",
+          "url"
+        ]
+      },
+      "DecideProfileMediaDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "decision": { "type": "string", "enum": ["approved", "rejected"] }
         },
         "required": ["reason", "decision"]
       },

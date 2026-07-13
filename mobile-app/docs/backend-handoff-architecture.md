@@ -132,7 +132,7 @@ Do not add Plaid, Stripe Financial Connections, or another bank-linking SDK for 
 All routes are versioned under `/v1`. Mutations accept `Idempotency-Key` where a retry could duplicate value.
 Payout responses use integer `amountMinor` or `payoutPoolAmountMinor` fields plus ISO currency; the frontend repository converts those values to display units at its boundary.
 
-- `GET /me`, `PATCH /me`, `POST /me/avatar-upload`
+- `GET /me`, `PATCH /me`, `POST /me/avatar-upload`, `POST /me/avatar-upload/{mediaId}/complete`, `GET /me/avatar`, `DELETE /me/avatar`
 - `GET /regions`, `POST /me/region-verifications`
 - `GET /competitions/current`, `POST /competitions/:id/enrollments`
 - `GET /competitions/:monthKey/matches?goal=&region=`

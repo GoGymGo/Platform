@@ -12,6 +12,8 @@ const WORKER_RESULT_KEYS = [
   'competitionsCancelled',
   'notificationsSent',
   'paymentsReconciled',
+  'profileMediaCleanupFailed',
+  'profileMediaDeleted',
   'privacyExportsDeleted',
   'privacyOperationsCompleted',
   'privacyOperationsFailed',

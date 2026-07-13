@@ -46,6 +46,7 @@ describeWithDatabase('database migrations', () => {
         'payout_claims',
         'payout_payments',
         'payout_state_events',
+        'profile_media',
         'profiles',
         'privacy_request_events',
         'privacy_requests',
@@ -256,5 +257,64 @@ describeWithDatabase('database migrations', () => {
         [event.rows[0].id],
       ),
     ).rejects.toThrow(/append-only/i);
+  });
+
+  it('constrains profile-media sizes and moderated states', async () => {
+    const user = await pool.query<{ id: string }>(
+      `INSERT INTO users (firebase_uid)
+       VALUES ('profile-media-constraint-user')
+       RETURNING id`,
+    );
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, status, expires_at)
+         VALUES ($1, 'too-large', 'avatars/too-large.jpg', 'image/jpeg',
+                 5242881, 'pending_upload', current_timestamp + interval '5 minutes')`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/profile_media_expected_size_valid/i);
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, status, expires_at, reviewed_at,
+            reviewed_by_user_id, decision_reason)
+         VALUES ($1, 'invalid-approval', 'avatars/invalid-approval.jpg', 'image/jpeg',
+                 512, 'approved', current_timestamp + interval '5 minutes',
+                 current_timestamp, $1, 'constraint test decision')`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/profile_media_completion_consistent/i);
+
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, actual_size_bytes, storage_generation,
+            status, expires_at, completed_at, reviewed_at,
+            reviewed_by_user_id, decision_reason)
+         VALUES ($1, 'approved-one', 'avatars/approved-one.jpg', 'image/jpeg',
+                 512, 512, 'generation-one', 'approved',
+                 current_timestamp + interval '5 minutes', current_timestamp,
+                 current_timestamp, $1, 'constraint test approval')`,
+        [user.rows[0].id],
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, actual_size_bytes, storage_generation,
+            status, expires_at, completed_at, reviewed_at,
+            reviewed_by_user_id, decision_reason)
+         VALUES ($1, 'approved-two', 'avatars/approved-two.jpg', 'image/jpeg',
+                 512, 512, 'generation-two', 'approved',
+                 current_timestamp + interval '5 minutes', current_timestamp,
+                 current_timestamp, $1, 'constraint test approval')`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/profile_media_one_approved_per_user/i);
   });
 });

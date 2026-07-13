@@ -78,6 +78,37 @@ export class DecidePrivacyRequestDto extends OperatorReasonDto {
   decision!: 'processing' | 'rejected';
 }
 
+export enum ProfileMediaDecisionDto {
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}
+
+export class DecideProfileMediaDto extends OperatorReasonDto {
+  @ApiProperty({ enum: ProfileMediaDecisionDto, type: String })
+  @IsEnum(ProfileMediaDecisionDto)
+  decision!: 'approved' | 'rejected';
+}
+
+export class ProfileMediaReviewActionDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ type: String })
+  contentType!: string;
+
+  @ApiProperty({ type: Number })
+  contentLength!: number;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  submittedAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
+
+  @ApiProperty({ format: 'uri', type: String })
+  url!: string;
+}
+
 export class OperatorActionResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -95,6 +126,7 @@ export class OperatorWorkQueueItemDto {
       'partner_application',
       'payout_claim',
       'privacy_request',
+      'profile_media',
       'region_verification',
       'workout_session',
     ],
@@ -104,6 +136,7 @@ export class OperatorWorkQueueItemDto {
     | 'partner_application'
     | 'payout_claim'
     | 'privacy_request'
+    | 'profile_media'
     | 'region_verification'
     | 'workout_session';
 
@@ -126,6 +159,9 @@ export class OperatorQueueDepthsDto {
 
   @ApiProperty({ minimum: 0, type: Number })
   privacyOperationsPending!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  profileMediaCleanupPending!: number;
 
   @ApiProperty({ minimum: 0, type: Number })
   webhooksPending!: number;

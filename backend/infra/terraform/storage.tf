@@ -7,6 +7,19 @@ resource "google_storage_bucket" "user_content" {
   uniform_bucket_level_access = true
   labels                      = local.labels
 
+  cors {
+    origin = var.cors_origins
+    method = ["GET", "HEAD", "PUT"]
+    response_header = [
+      "Cache-Control",
+      "Content-Type",
+      "x-goog-content-length-range",
+      "x-goog-if-generation-match",
+      "x-goog-meta-media-id",
+    ]
+    max_age_seconds = 300
+  }
+
   soft_delete_policy {
     retention_duration_seconds = 0
   }

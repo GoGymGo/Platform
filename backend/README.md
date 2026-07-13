@@ -49,12 +49,17 @@ isolation, and object cleanup without persisting signed URLs.
 Account-legal coverage proves jurisdiction fallback without locale fallback,
 immutable publication and withdrawal, exact receipt actions and content hashes,
 stale-bundle invalidation, privacy-export inclusion, and enrollment linkage.
+Session-review coverage proves deterministic server evidence snapshots, safe
+operator aggregates, stale-review rejection, typed fail-closed findings, and
+ledger awards bound to the exact reviewed snapshot.
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
 
 The private avatar upload, moderation, cleanup, and privacy lifecycle is documented in [profile-media operations](docs/profile-media.md).
 
 Server-authoritative Terms and Privacy publication, receipt, withdrawal, and enrollment controls are documented in [account legal documents](docs/legal-documents.md).
+
+The privacy-minimized manual workout review boundary and the provider/device controls that still block cash launch are documented in [session evidence review](docs/session-evidence-review.md).
 
 The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
 

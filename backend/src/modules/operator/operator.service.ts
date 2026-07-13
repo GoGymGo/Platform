@@ -23,6 +23,7 @@ import type {
   LockDrawDto,
   OperatorActionResponseDto,
   ProfileMediaReviewActionDto,
+  SessionEvidenceReviewResponseDto,
   OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
@@ -249,16 +250,25 @@ export class OperatorService {
   ): Promise<OperatorActionResponseDto> {
     const operatorId = await this.getOperatorId(principal);
     const verified = await this.sessions.verifySession({
+      evidenceSnapshotSha256: input.evidenceSnapshotSha256,
+      findings: input.findings,
       operatorUserId: operatorId,
       reason: input.reason,
       requestId,
       sessionId,
-      trustedEvidenceSummary: input.trustedEvidenceSummary as JsonObject,
     });
     return {
       id: sessionId,
       status: verified ? 'verified' : 'already_verified',
     };
+  }
+
+  async getSessionEvidenceReview(
+    principal: AuthenticatedPrincipal,
+    sessionId: string,
+  ): Promise<SessionEvidenceReviewResponseDto> {
+    await this.getOperatorId(principal);
+    return this.sessions.getEvidenceReview(sessionId);
   }
 
   async lockDraw(

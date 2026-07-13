@@ -5,6 +5,7 @@ export const competitionRulesSchema = z
   .object({
     minSessionMinutes: z.number().int().min(10).max(240),
     minHeartRateSamples: z.number().int().min(0).max(10_000),
+    requireDeviceAttestation: z.boolean(),
     requireFaceCheck: z.boolean(),
     requireGymQr: z.boolean(),
     signupPrizeDrawEntries: z.number().int().min(1).max(1_000),

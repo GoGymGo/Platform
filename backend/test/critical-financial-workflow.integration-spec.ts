@@ -41,6 +41,7 @@ const competitionRules = {
   payoutExponent: 0.8,
   payoutPoolAmountMinor: 10_000,
   payoutWinnerCount: 3,
+  requireDeviceAttestation: false,
   requireFaceCheck: false,
   requireGymQr: false,
   signupPrizeDrawEntries: 1,

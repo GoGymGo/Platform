@@ -535,6 +535,34 @@
         "tags": ["operator"]
       }
     },
+    "/v1/operator/sessions/{sessionId}/review": {
+      "get": {
+        "operationId": "getSessionEvidenceReview",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionEvidenceReviewResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Get a privacy-minimized, server-bound session evidence review",
+        "tags": ["operator"]
+      }
+    },
     "/v1/operator/sessions/{sessionId}/verify": {
       "post": {
         "operationId": "verifySession",
@@ -2369,13 +2397,168 @@
         },
         "required": ["checkedAt", "database", "queues", "worker"]
       },
+      "DeviceAttestationReviewDto": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "number", "minimum": 0 },
+          "minimumRequiredCount": { "type": "number", "minimum": 0 },
+          "required": { "type": "boolean" },
+          "trustStates": { "type": "array", "items": { "type": "string" } },
+          "uniqueTokenCount": { "type": "number", "minimum": 0 }
+        },
+        "required": [
+          "count",
+          "minimumRequiredCount",
+          "required",
+          "trustStates",
+          "uniqueTokenCount"
+        ]
+      },
+      "FaceCheckReviewDto": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "number", "minimum": 0 },
+          "minimumRequiredCount": { "type": "number", "minimum": 0 },
+          "required": { "type": "boolean" },
+          "trustStates": { "type": "array", "items": { "type": "string" } },
+          "maximumConfidence": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0,
+            "nullable": true
+          }
+        },
+        "required": [
+          "count",
+          "minimumRequiredCount",
+          "required",
+          "trustStates",
+          "maximumConfidence"
+        ]
+      },
+      "GymQrReviewDto": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "number", "minimum": 0 },
+          "minimumRequiredCount": { "type": "number", "minimum": 0 },
+          "required": { "type": "boolean" },
+          "trustStates": { "type": "array", "items": { "type": "string" } },
+          "uniquePayloadCount": { "type": "number", "minimum": 0 }
+        },
+        "required": [
+          "count",
+          "minimumRequiredCount",
+          "required",
+          "trustStates",
+          "uniquePayloadCount"
+        ]
+      },
+      "HeartRateReviewDto": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "number", "minimum": 0 },
+          "minimumRequiredCount": { "type": "number", "minimum": 0 },
+          "required": { "type": "boolean" },
+          "trustStates": { "type": "array", "items": { "type": "string" } },
+          "averageBpm": { "type": "number", "nullable": true },
+          "maximumBpm": { "type": "number", "nullable": true },
+          "minimumBpm": { "type": "number", "nullable": true }
+        },
+        "required": [
+          "count",
+          "minimumRequiredCount",
+          "required",
+          "trustStates",
+          "averageBpm",
+          "maximumBpm",
+          "minimumBpm"
+        ]
+      },
+      "SessionEvidenceReviewGroupsDto": {
+        "type": "object",
+        "properties": {
+          "deviceAttestation": {
+            "$ref": "#/components/schemas/DeviceAttestationReviewDto"
+          },
+          "faceCheck": { "$ref": "#/components/schemas/FaceCheckReviewDto" },
+          "gymQr": { "$ref": "#/components/schemas/GymQrReviewDto" },
+          "heartRate": { "$ref": "#/components/schemas/HeartRateReviewDto" }
+        },
+        "required": ["deviceAttestation", "faceCheck", "gymQr", "heartRate"]
+      },
+      "SessionEvidenceReviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": { "type": "string", "format": "uuid" },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "durationMinutes": { "type": "number", "minimum": 0 },
+          "eligibleDate": { "type": "string", "format": "date" },
+          "evidence": {
+            "$ref": "#/components/schemas/SessionEvidenceReviewGroupsDto"
+          },
+          "evidenceSnapshotSha256": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "limitations": { "type": "array", "items": { "type": "string" } },
+          "minimumDurationMinutes": { "type": "number", "minimum": 0 },
+          "policyVersion": { "type": "string" },
+          "sessionId": { "type": "string", "format": "uuid" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string" }
+        },
+        "required": [
+          "competitionId",
+          "completedAt",
+          "durationMinutes",
+          "eligibleDate",
+          "evidence",
+          "evidenceSnapshotSha256",
+          "limitations",
+          "minimumDurationMinutes",
+          "policyVersion",
+          "sessionId",
+          "startedAt",
+          "status"
+        ]
+      },
+      "SessionEvidenceFindingsDto": {
+        "type": "object",
+        "properties": {
+          "deviceAttestation": {
+            "type": "string",
+            "enum": ["approved", "not_required", "rejected"]
+          },
+          "faceCheck": {
+            "type": "string",
+            "enum": ["approved", "not_required", "rejected"]
+          },
+          "gymQr": {
+            "type": "string",
+            "enum": ["approved", "not_required", "rejected"]
+          },
+          "heartRate": {
+            "type": "string",
+            "enum": ["approved", "not_required", "rejected"]
+          }
+        },
+        "required": ["deviceAttestation", "faceCheck", "gymQr", "heartRate"]
+      },
       "VerifySessionDto": {
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "trustedEvidenceSummary": { "type": "object" }
+          "evidenceSnapshotSha256": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "findings": {
+            "$ref": "#/components/schemas/SessionEvidenceFindingsDto"
+          }
         },
-        "required": ["reason", "trustedEvidenceSummary"]
+        "required": ["reason", "evidenceSnapshotSha256", "findings"]
       },
       "OperatorActionResponseDto": {
         "type": "object",
@@ -2665,6 +2848,7 @@
         "properties": {
           "minSessionMinutes": { "type": "number" },
           "minHeartRateSamples": { "type": "number" },
+          "requireDeviceAttestation": { "type": "boolean" },
           "requireFaceCheck": { "type": "boolean" },
           "requireGymQr": { "type": "boolean" },
           "signupPrizeDrawEntries": { "type": "number" },
@@ -2677,6 +2861,7 @@
         "required": [
           "minSessionMinutes",
           "minHeartRateSamples",
+          "requireDeviceAttestation",
           "requireFaceCheck",
           "requireGymQr",
           "signupPrizeDrawEntries",

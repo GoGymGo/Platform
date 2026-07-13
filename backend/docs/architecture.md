@@ -42,6 +42,8 @@ Competition enrollment takes a row lock on the authoritative competition before 
 
 Legal documents are immutable content-hashed records with append-only publication and withdrawal events. The current bundle resolves each document key from exact subdivision to country to global scope but never crosses locales. A user submits all required document receipts atomically; competition enrollment stores and validates the exact server-timestamped receipt bundle for that competition jurisdiction. Missing, foreign, incomplete, jurisdiction-mismatched, or superseded bundles fail closed.
 
+Workout submissions remain untrusted until review. An operator first reads a privacy-minimized server summary whose SHA-256 commits to the exact immutable session, rules, and event set. Approval must return that digest plus typed findings for every evidence category; the transaction recomputes the digest, rejects stale reviews, requires every rule-required category to be approved, derives its own verification summary, and binds the ledger/audit records to the snapshot. This is an accountable manual fallback, not provider attestation. Cash launch still requires approved server-side device, signed-QR, wearable, and liveness integrations for every evidence type required by policy.
+
 The first production stage uses database-backed work queues. This keeps a payout or privacy state transition and its queued work in one transaction. Add Pub/Sub or Cloud Tasks only when queue latency, connection pressure, or independently scaling consumers demonstrate a need; introducing either earlier would add duplicate-delivery and cross-system consistency work without reducing current financial risk.
 
 Each environment has one regional primary database with regional high availability, private networking, automated backups, and point-in-time recovery. North America-wide client access does not require an active-active financial ledger. A single writer avoids conflicting payout and draw decisions; add a read strategy or disaster-recovery replica only after recovery targets and jurisdictional requirements are approved.
@@ -78,7 +80,8 @@ The architecture is code-complete only after these external gates are satisfied 
 2. a least-privilege PostgreSQL login and Secret Manager versions;
 3. Hyperwallet account/program approval, hosted-portal URLs, webhook registration, and end-to-end UAT payouts/refunds/reconciliation;
 4. Expo credentials and real-device notification testing;
-5. counsel-approved legal document publication for every enabled jurisdiction/locale, mobile stale-document UAT, emergency withdrawal rehearsal, privacy export/erasure rehearsal, restore rehearsal, operator bootstrap, incident runbooks, and legal/compliance approval;
-6. load tests that confirm API instance limits, worker count, and database connection budgets before raising them.
+5. server-side Apple App Attest/Google Play Integrity validation, partner-signed QR verification, and approved wearable/liveness integrations for every required competition evidence type, with replay/outage/appeal UAT on real devices;
+6. counsel-approved legal document publication for every enabled jurisdiction/locale, mobile stale-document UAT, emergency withdrawal rehearsal, privacy export/erasure rehearsal, restore rehearsal, operator bootstrap, incident runbooks, and legal/compliance approval;
+7. load tests that confirm API instance limits, worker count, and database connection budgets before raising them.
 
 The infrastructure implementation is in [Terraform](../infra/terraform/README.md), and release/incident procedures are in the [deployment runbook](deployment-runbook.md).

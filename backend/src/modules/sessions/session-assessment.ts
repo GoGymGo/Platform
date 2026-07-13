@@ -33,6 +33,9 @@ export function assessSessionSubmission(
   if (count('heart_rate_sample') < rules.minHeartRateSamples) {
     violations.push('insufficient_heart_rate_samples');
   }
+  if (rules.requireDeviceAttestation && count('device_attestation') === 0) {
+    violations.push('device_attestation_missing');
+  }
   if (rules.requireFaceCheck && count('face_check') === 0) {
     violations.push('face_check_missing');
   }

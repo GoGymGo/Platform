@@ -6,6 +6,7 @@ const validRules = {
   payoutExponent: 0.5,
   payoutPoolAmountMinor: 2_000_000,
   payoutWinnerCount: 1_500,
+  requireDeviceAttestation: true,
   requireFaceCheck: true,
   requireGymQr: false,
   signupPrizeDrawEntries: 1,

@@ -22,6 +22,9 @@ export class CompetitionRulesResponseDto {
   minHeartRateSamples!: number;
 
   @ApiProperty({ type: Boolean })
+  requireDeviceAttestation!: boolean;
+
+  @ApiProperty({ type: Boolean })
   requireFaceCheck!: boolean;
 
   @ApiProperty({ type: Boolean })

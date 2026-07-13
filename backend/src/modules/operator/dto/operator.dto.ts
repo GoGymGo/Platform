@@ -1,13 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
-  IsObject,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  ValidateNested,
 } from 'class-validator';
 
 export class OperatorReasonDto {
@@ -17,10 +18,131 @@ export class OperatorReasonDto {
   reason!: string;
 }
 
+export enum SessionEvidenceFindingDto {
+  APPROVED = 'approved',
+  NOT_REQUIRED = 'not_required',
+  REJECTED = 'rejected',
+}
+
+export class SessionEvidenceFindingsDto {
+  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
+  @IsEnum(SessionEvidenceFindingDto)
+  deviceAttestation!: 'approved' | 'not_required' | 'rejected';
+
+  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
+  @IsEnum(SessionEvidenceFindingDto)
+  faceCheck!: 'approved' | 'not_required' | 'rejected';
+
+  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
+  @IsEnum(SessionEvidenceFindingDto)
+  gymQr!: 'approved' | 'not_required' | 'rejected';
+
+  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
+  @IsEnum(SessionEvidenceFindingDto)
+  heartRate!: 'approved' | 'not_required' | 'rejected';
+}
+
 export class VerifySessionDto extends OperatorReasonDto {
-  @ApiProperty({ type: Object })
-  @IsObject()
-  trustedEvidenceSummary!: Record<string, unknown>;
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  @Matches(/^[a-f0-9]{64}$/i)
+  evidenceSnapshotSha256!: string;
+
+  @ApiProperty({ type: SessionEvidenceFindingsDto })
+  @Type(() => SessionEvidenceFindingsDto)
+  @ValidateNested()
+  findings!: SessionEvidenceFindingsDto;
+}
+
+export class SessionEvidenceCategoryReviewDto {
+  @ApiProperty({ minimum: 0, type: Number })
+  count!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  minimumRequiredCount!: number;
+
+  @ApiProperty({ type: Boolean })
+  required!: boolean;
+
+  @ApiProperty({ isArray: true, type: String })
+  trustStates!: string[];
+}
+
+export class DeviceAttestationReviewDto extends SessionEvidenceCategoryReviewDto {
+  @ApiProperty({ minimum: 0, type: Number })
+  uniqueTokenCount!: number;
+}
+
+export class FaceCheckReviewDto extends SessionEvidenceCategoryReviewDto {
+  @ApiProperty({ maximum: 1, minimum: 0, nullable: true, type: Number })
+  maximumConfidence!: number | null;
+}
+
+export class GymQrReviewDto extends SessionEvidenceCategoryReviewDto {
+  @ApiProperty({ minimum: 0, type: Number })
+  uniquePayloadCount!: number;
+}
+
+export class HeartRateReviewDto extends SessionEvidenceCategoryReviewDto {
+  @ApiProperty({ nullable: true, type: Number })
+  averageBpm!: number | null;
+
+  @ApiProperty({ nullable: true, type: Number })
+  maximumBpm!: number | null;
+
+  @ApiProperty({ nullable: true, type: Number })
+  minimumBpm!: number | null;
+}
+
+export class SessionEvidenceReviewGroupsDto {
+  @ApiProperty({ type: DeviceAttestationReviewDto })
+  deviceAttestation!: DeviceAttestationReviewDto;
+
+  @ApiProperty({ type: FaceCheckReviewDto })
+  faceCheck!: FaceCheckReviewDto;
+
+  @ApiProperty({ type: GymQrReviewDto })
+  gymQr!: GymQrReviewDto;
+
+  @ApiProperty({ type: HeartRateReviewDto })
+  heartRate!: HeartRateReviewDto;
+}
+
+export class SessionEvidenceReviewResponseDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  completedAt!: string;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  durationMinutes!: number;
+
+  @ApiProperty({ format: 'date', type: String })
+  eligibleDate!: string;
+
+  @ApiProperty({ type: SessionEvidenceReviewGroupsDto })
+  evidence!: SessionEvidenceReviewGroupsDto;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  evidenceSnapshotSha256!: string;
+
+  @ApiProperty({ isArray: true, type: String })
+  limitations!: string[];
+
+  @ApiProperty({ minimum: 0, type: Number })
+  minimumDurationMinutes!: number;
+
+  @ApiProperty({ type: String })
+  policyVersion!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  sessionId!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  startedAt!: string;
+
+  @ApiProperty({ type: String })
+  status!: string;
 }
 
 export class LockDrawDto extends OperatorReasonDto {

@@ -7,6 +7,7 @@ const rules: CompetitionRules = {
   payoutExponent: 0.5,
   payoutPoolAmountMinor: 1_000_000,
   payoutWinnerCount: 100,
+  requireDeviceAttestation: false,
   requireFaceCheck: true,
   requireGymQr: false,
   signupPrizeDrawEntries: 1,
@@ -58,5 +59,33 @@ describe('session submission assessment', () => {
       'insufficient_heart_rate_samples',
       'face_check_missing',
     ]);
+  });
+
+  it('enforces device attestation when the competition policy requires it', () => {
+    const assessment = assessSessionSubmission(
+      new Date('2026-07-12T10:00:00Z'),
+      new Date('2026-07-12T10:30:00Z'),
+      [
+        {
+          eventType: 'heart_rate_sample',
+          occurredAt: new Date('2026-07-12T10:05:00Z'),
+        },
+        {
+          eventType: 'heart_rate_sample',
+          occurredAt: new Date('2026-07-12T10:15:00Z'),
+        },
+        {
+          eventType: 'face_check',
+          occurredAt: new Date('2026-07-12T10:12:00Z'),
+        },
+      ],
+      { ...rules, requireDeviceAttestation: true },
+    );
+
+    expect(assessment).toMatchObject({
+      eligibleForReview: false,
+      status: 'rejected',
+      violations: ['device_attestation_missing'],
+    });
   });
 });

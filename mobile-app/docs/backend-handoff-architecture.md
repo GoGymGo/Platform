@@ -140,6 +140,7 @@ Payout responses use integer `amountMinor` or `payoutPoolAmountMinor` fields plu
 - `GET /competitions/:monthKey/matches?goal=&region=`
 - `GET /competitions/:monthKey/enrollment-count?region=`
 - `POST /sessions`, `POST /sessions/:id/events`, `POST /sessions/:id/complete`
+- `GET /operator/sessions/:id/review`, `POST /operator/sessions/:id/verify` (operator-only; approval is bound to the returned evidence snapshot)
 - `GET /me/progress`, `GET /leaderboards/current?goal=`
 - `GET /creator-workouts`
 - `GET /results/settled-competition`, `GET /results/payout-winners`
@@ -177,7 +178,7 @@ Do not hard-code "North America" as one ruleset. Store country, subdivision, cur
 2. Establish the OpenAPI contract and generated mobile types before wiring screens.
 3. Implement Auth, Profiles, Regions, Competitions, Sessions, and Ledger first.
 4. Replace preview reads with React Query hooks and render explicit loading, empty, offline, and error states.
-5. Add signed QR verification and real device evidence only after server replay/fraud rules exist.
+5. Integrate the server-defined evidence contract, then add partner-signed QR, Apple App Attest/Google Play Integrity, and approved wearable/liveness verification with replay and provider-outage rules. Manual operator review is implemented but does not make client evidence cryptographically trusted.
 6. Complete Hyperwallet UAT onboarding, webhook reconciliation, operations runbooks, and sandbox payout E2E tests.
 7. Replace `src/services/legalAcceptance.ts` as the authority: fetch and render the server bundle, submit the exact receipt actions, refresh status after sign-in/account switching, and pass `receiptBundleId` during competition enrollment. AsyncStorage may cache UI state only.
 8. Complete the remaining admin configuration tooling, observability, infrastructure automation, device-level E2E coverage, and alerting. Privacy export/deletion, account legal receipts, competition-rules acceptance, rate limits, and the backend HTTP/migration test foundations are implemented.

@@ -58,6 +58,7 @@ const competitionRules = {
   payoutExponent: 0.8,
   payoutPoolAmountMinor: 10_000,
   payoutWinnerCount: 3,
+  requireDeviceAttestation: true,
   requireFaceCheck: true,
   requireGymQr: true,
   signupPrizeDrawEntries: 5,
@@ -222,6 +223,17 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toMatchObject({
       response: { code: 'SESSION_EVENT_REPLAY_MISMATCH' },
     });
+    await sessions.appendEvent(
+      userPrincipal,
+      created.id,
+      'session-device-attestation',
+      {
+        deviceEvidenceToken: 'signed-device-attestation',
+        eventId: '10000000-0000-4000-8000-000000000005',
+        eventType: 'device_attestation',
+        occurredAt: evidenceTimes[4],
+      },
+    );
 
     const completed = await sessions.complete(
       userPrincipal,
@@ -262,11 +274,51 @@ describeWithDatabase('critical session and ledger workflow', () => {
        WHERE id = $1`,
       [enrollment.id],
     );
+    const evidenceReview = await sessions.getEvidenceReview(created.id);
+    expect(evidenceReview).toMatchObject({
+      evidence: {
+        deviceAttestation: { count: 1, required: true },
+        faceCheck: { count: 1, required: true },
+        gymQr: { count: 1, required: true, uniquePayloadCount: 1 },
+        heartRate: { count: 2, required: true },
+      },
+      status: 'pending_review',
+    });
+    expect(JSON.stringify(evidenceReview)).not.toContain(
+      'signed-gym-credential',
+    );
+    await expect(
+      verifySession(created.id, 'verify-stale-session', '0'.repeat(64)),
+    ).rejects.toMatchObject({
+      response: { code: 'SESSION_REVIEW_SNAPSHOT_STALE' },
+    });
+    await expect(
+      sessions.verifySession({
+        evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
+        findings: {
+          deviceAttestation: 'approved',
+          faceCheck: 'rejected',
+          gymQr: 'approved',
+          heartRate: 'approved',
+        },
+        operatorUserId,
+        reason: 'required evidence rejection integration test',
+        requestId: 'verify-rejected-evidence',
+        sessionId: created.id,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'SESSION_REQUIRED_EVIDENCE_NOT_APPROVED' },
+    });
+    await expect(verifiedLedgerCount(created.id)).resolves.toBe(0);
     await expect(verifySession(created.id, 'verify-session')).resolves.toBe(
       true,
     );
     await expect(
-      verifySession(created.id, 'verify-session-retry'),
+      verifySession(
+        created.id,
+        'verify-session-retry',
+        evidenceReview.evidenceSnapshotSha256,
+      ),
     ).resolves.toBe(false);
 
     const progress = await migrated.pool.query<{
@@ -296,12 +348,15 @@ describeWithDatabase('critical session and ledger workflow', () => {
        WHERE session_id = $1`,
       [created.id],
     );
-    expect(storedEvidence.rows[0].event_count).toBe('4');
+    expect(storedEvidence.rows[0].event_count).toBe('5');
     expect(storedEvidence.rows[0].payloads).not.toContain(
       'signed-gym-credential',
     );
     expect(storedEvidence.rows[0].payloads).not.toContain(
       'changed-gym-credential',
+    );
+    expect(storedEvidence.rows[0].payloads).not.toContain(
+      'signed-device-attestation',
     );
 
     const duplicateDay = await migrated.pool.query<{ id: string }>(
@@ -433,16 +488,26 @@ describeWithDatabase('critical session and ledger workflow', () => {
     });
   });
 
-  function verifySession(sessionId: string, requestId: string) {
+  async function verifySession(
+    sessionId: string,
+    requestId: string,
+    evidenceSnapshotSha256?: string,
+  ) {
+    const resolvedSnapshotSha256 =
+      evidenceSnapshotSha256 ??
+      (await sessions.getEvidenceReview(sessionId)).evidenceSnapshotSha256;
     return sessions.verifySession({
+      evidenceSnapshotSha256: resolvedSnapshotSha256,
+      findings: {
+        deviceAttestation: 'approved',
+        faceCheck: 'approved',
+        gymQr: 'approved',
+        heartRate: 'approved',
+      },
       operatorUserId,
       reason: 'trusted evidence reviewed in integration test',
       requestId,
       sessionId,
-      trustedEvidenceSummary: {
-        deviceAttestation: 'reviewed',
-        evidenceTrust: 'operator_verified',
-      },
     });
   }
 
@@ -762,13 +827,14 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
   }
 
-  function buildEvidenceTimes(): [string, string, string, string] {
+  function buildEvidenceTimes(): [string, string, string, string, string] {
     const now = Date.now();
     return [
       new Date(now - 9 * 60_000).toISOString(),
       new Date(now - 7 * 60_000).toISOString(),
       new Date(now - 5 * 60_000).toISOString(),
       new Date(now - 3 * 60_000).toISOString(),
+      new Date(now - 2 * 60_000).toISOString(),
     ];
   }
 });

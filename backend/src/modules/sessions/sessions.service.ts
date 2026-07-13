@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import type { Transaction } from 'kysely';
 import { normalizeDateKey } from '../../database/date-key';
-import type { Database, JsonObject } from '../../database/database.types';
+import type {
+  Database,
+  JsonObject,
+  JsonValue,
+} from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { stableJson } from '../../common/idempotency/stable-json';
@@ -24,6 +28,12 @@ import type {
   SessionResponseDto,
 } from './dto/session.dto';
 import { assessSessionSubmission } from './session-assessment';
+import {
+  buildSessionEvidenceReview,
+  type SessionEvidenceFindings,
+  type SessionEvidenceReview,
+  unapprovedRequiredEvidence,
+} from './session-evidence-review';
 import { buildSessionEventPayload } from './session-event-payload';
 
 interface SessionJson extends JsonObject {
@@ -50,11 +60,12 @@ interface CompletionJson extends SessionJson {
 }
 
 export interface VerifySessionInput {
+  evidenceSnapshotSha256: string;
+  findings: SessionEvidenceFindings;
   operatorUserId: string;
   reason: string;
   requestId: string;
   sessionId: string;
-  trustedEvidenceSummary: JsonObject;
 }
 
 @Injectable()
@@ -387,9 +398,12 @@ export class SessionsService {
             'enrollment.goal_days',
             'enrollment.status as enrollment_status',
             'session.competition_id',
+            'session.completed_at',
             'session.eligible_date',
             'session.enrollment_id',
             'session.id',
+            'session.policy_version',
+            'session.started_at',
             'session.status',
             'session.user_id',
           ])
@@ -435,13 +449,50 @@ export class SessionsService {
           });
         }
 
+        const evidenceReview = await this.buildEvidenceReview(
+          transaction,
+          session,
+        );
+        if (
+          evidenceReview.evidenceSnapshotSha256 !==
+          input.evidenceSnapshotSha256.toLowerCase()
+        ) {
+          throw new ConflictException({
+            code: 'SESSION_REVIEW_SNAPSHOT_STALE',
+            message:
+              'The session evidence changed or this approval references a different review snapshot.',
+          });
+        }
+        const unapproved = unapprovedRequiredEvidence(
+          evidenceReview,
+          input.findings,
+        );
+        if (
+          unapproved.length > 0 ||
+          Object.values(input.findings).includes('rejected')
+        ) {
+          throw new UnprocessableEntityException({
+            code: 'SESSION_REQUIRED_EVIDENCE_NOT_APPROVED',
+            details: { categories: unapproved },
+            message:
+              'Every required evidence category must be explicitly approved and no submitted finding may be rejected.',
+          });
+        }
+
         const now = new Date();
+        const verificationSummary: JsonObject = {
+          evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
+          evidenceTrust: 'operator_manual_review',
+          findings: input.findings,
+          limitations: evidenceReview.limitations,
+          reviewedAt: now.toISOString(),
+        };
         await transaction
           .updateTable('workout_sessions')
           .set({
             status: 'verified',
             updated_at: now,
-            verification_summary: input.trustedEvidenceSummary,
+            verification_summary: verificationSummary,
           })
           .where('id', '=', session.id)
           .where('status', '=', 'pending_review')
@@ -455,6 +506,7 @@ export class SessionsService {
           goalDays: session.goal_days,
           metadata: {
             eligibleDate,
+            evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
             reviewReason: input.reason,
           },
           policyVersion: session.rules_version,
@@ -467,6 +519,91 @@ export class SessionsService {
         await this.appendOperatorAudit(transaction, input, session.user_id);
         return true;
       });
+  }
+
+  async getEvidenceReview(sessionId: string): Promise<SessionEvidenceReview> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const session = await transaction
+          .selectFrom('workout_sessions as session')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'session.competition_id',
+          )
+          .select([
+            'competition.rules',
+            'session.competition_id',
+            'session.completed_at',
+            'session.eligible_date',
+            'session.id',
+            'session.policy_version',
+            'session.started_at',
+            'session.status',
+          ])
+          .where('session.id', '=', sessionId)
+          .executeTakeFirst();
+        if (!session) {
+          throw new NotFoundException({
+            code: 'SESSION_NOT_FOUND',
+            message: 'The session was not found.',
+          });
+        }
+        if (session.status !== 'pending_review') {
+          throw new ConflictException({
+            code: 'SESSION_NOT_REVIEWABLE',
+            message: 'Only a pending-review session can be reviewed.',
+          });
+        }
+        return this.buildEvidenceReview(transaction, session);
+      });
+  }
+
+  private async buildEvidenceReview(
+    transaction: Transaction<Database>,
+    session: {
+      competition_id: string;
+      completed_at: Date | null;
+      eligible_date: Date | string;
+      id: string;
+      policy_version: string;
+      rules: JsonValue;
+      started_at: Date;
+      status: string;
+    },
+  ): Promise<SessionEvidenceReview> {
+    if (!session.completed_at) {
+      throw new ConflictException({
+        code: 'SESSION_NOT_COMPLETED',
+        message: 'A session must be completed before evidence review.',
+      });
+    }
+    const events = await transaction
+      .selectFrom('session_events')
+      .selectAll()
+      .where('session_id', '=', session.id)
+      .orderBy('occurred_at')
+      .orderBy('id')
+      .execute();
+    return buildSessionEvidenceReview({
+      competitionId: session.competition_id,
+      completedAt: session.completed_at,
+      eligibleDate: normalizeDateKey(session.eligible_date),
+      events: events.map((event) => ({
+        clientEventId: event.client_event_id,
+        eventType: event.event_type,
+        id: event.id,
+        occurredAt: event.occurred_at,
+        payload: event.payload,
+        receivedAt: event.received_at,
+      })),
+      policyVersion: session.policy_version,
+      rules: parseCompetitionRules(session.rules),
+      sessionId: session.id,
+      startedAt: session.started_at,
+      status: session.status,
+    });
   }
 
   private appendOperatorAudit(
@@ -482,7 +619,12 @@ export class SessionsService {
         created_at: new Date(),
         entity_id: input.sessionId,
         entity_type: 'workout_sessions',
-        next_state: { status: 'verified', subjectUserId },
+        next_state: {
+          evidenceSnapshotSha256: input.evidenceSnapshotSha256.toLowerCase(),
+          findings: input.findings,
+          status: 'verified',
+          subjectUserId,
+        },
         previous_state: { status: 'pending_review' },
         reason: input.reason,
         request_id: input.requestId,

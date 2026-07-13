@@ -25,6 +25,7 @@ import {
   LockDrawDto,
   OperatorActionResponseDto,
   ProfileMediaReviewActionDto,
+  SessionEvidenceReviewResponseDto,
   OperatorSystemHealthResponseDto,
   OperatorWorkQueueItemDto,
   SettleDrawDto,
@@ -54,6 +55,18 @@ export class OperatorController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<OperatorSystemHealthResponseDto> {
     return this.operator.getSystemHealth(principal);
+  }
+
+  @Get('sessions/:sessionId/review')
+  @ApiOperation({
+    summary: 'Get a privacy-minimized, server-bound session evidence review',
+  })
+  @ApiOkResponse({ type: SessionEvidenceReviewResponseDto })
+  getSessionEvidenceReview(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ): Promise<SessionEvidenceReviewResponseDto> {
+    return this.operator.getSessionEvidenceReview(principal, sessionId);
   }
 
   @Post('sessions/:sessionId/verify')

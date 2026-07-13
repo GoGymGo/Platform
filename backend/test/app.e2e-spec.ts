@@ -188,6 +188,17 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires an operator token before session evidence review access', () => {
+    return request(app.getHttpServer())
+      .get('/v1/operator/sessions/10000000-0000-4000-8000-000000000001/review')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
   it('requires authentication before administrative configuration changes', () => {
     return request(app.getHttpServer())
       .post('/v1/operator/configuration/competitions')

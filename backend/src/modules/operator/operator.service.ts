@@ -436,6 +436,7 @@ export class OperatorService {
     transaction: Transaction<Database>,
   ) {
     const user = await this.profiles.ensureUser(principal, transaction);
+    this.profiles.requireVerifiedEmail(user);
     if (
       !user.roles.some((role) =>
         ['admin', 'fraud_operator', 'operator'].includes(role),

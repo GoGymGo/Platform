@@ -24,6 +24,14 @@ const userPrincipal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 
+const unverifiedPrincipal: AuthenticatedPrincipal = {
+  email: 'unverified-session-user@integration.test',
+  emailVerified: false,
+  firebaseUid: 'unverified-critical-session-user',
+  roles: ['user'],
+  tokenIssuedAt: 1,
+};
+
 const operatorPrincipal: AuthenticatedPrincipal = {
   email: 'session-operator@integration.test',
   emailVerified: true,
@@ -113,6 +121,22 @@ describeWithDatabase('critical session and ledger workflow', () => {
 
   it('accepts evidence once and awards the verified day exactly once', async () => {
     const fixture = await seedRegistrationCompetition();
+    await expect(
+      competitions.enroll(
+        unverifiedPrincipal,
+        fixture.competitionId,
+        'unverified-session-workflow-enrollment',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'VERIFIED_EMAIL_REQUIRED' },
+    });
     const enrollment = await competitions.enroll(
       userPrincipal,
       fixture.competitionId,
@@ -254,6 +278,21 @@ describeWithDatabase('critical session and ledger workflow', () => {
         {},
       ),
     ).resolves.toEqual(completed);
+
+    await migrated.pool.query(
+      `UPDATE users SET email_verified = false WHERE firebase_uid = $1`,
+      [userPrincipal.firebaseUid],
+    );
+    await expect(
+      verifySession(created.id, 'verify-unverified-session'),
+    ).rejects.toMatchObject({
+      response: { code: 'VERIFIED_EMAIL_REQUIRED' },
+    });
+    await expect(verifiedLedgerCount(created.id)).resolves.toBe(0);
+    await migrated.pool.query(
+      `UPDATE users SET email_verified = true WHERE firebase_uid = $1`,
+      [userPrincipal.firebaseUid],
+    );
 
     await migrated.pool.query(
       `UPDATE competition_enrollments

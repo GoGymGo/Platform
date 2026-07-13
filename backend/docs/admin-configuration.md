@@ -1,6 +1,6 @@
 # Administrative configuration operations
 
-GoGymGo configuration changes are authenticated server operations, not direct database edits or Expo-controlled settings. Every command requires a Firebase bearer token, an `Idempotency-Key`, and an active database user with the exact `admin` role. The database role is authoritative; token claims cannot promote an existing account.
+GoGymGo configuration changes are authenticated server operations, not direct database edits or Expo-controlled settings. Every command requires a Firebase bearer token, an `Idempotency-Key`, a Firebase-verified email, and an active database user with the exact `admin` role. The database role is authoritative; token claims cannot promote an existing account.
 
 ## Supported commands
 
@@ -20,7 +20,7 @@ The worker changes a published competition from `registration` to `active` at it
 
 ## First administrator bootstrap
 
-There is deliberately no public role-grant endpoint. A user must sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:
+There is deliberately no public role-grant endpoint. A user must verify their Firebase email and sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:
 
 ```powershell
 $env:BOOTSTRAP_ADMIN_FIREBASE_UID='<firebase uid>'

@@ -21,6 +21,7 @@ describe('AdminAuthorizationService', () => {
         id: 'user-1',
         roles: ['user'],
       }),
+      requireVerifiedEmail: jest.fn(),
     } as unknown as ProfilesService;
     const service = new AdminAuthorizationService(profiles);
 
@@ -33,6 +34,7 @@ describe('AdminAuthorizationService', () => {
     const admin = { id: 'admin-1', roles: ['admin', 'user'] };
     const profiles = {
       ensureUser: jest.fn().mockResolvedValue(admin),
+      requireVerifiedEmail: jest.fn(),
     } as unknown as ProfilesService;
     const service = new AdminAuthorizationService(profiles);
 

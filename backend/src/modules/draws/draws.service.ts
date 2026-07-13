@@ -123,10 +123,14 @@ export class DrawsService {
         }
 
         const activeEnrollments = await transaction
-          .selectFrom('competition_enrollments')
+          .selectFrom('competition_enrollments as enrollment')
+          .innerJoin('users as user', 'user.id', 'enrollment.user_id')
           .select((expression) => expression.fn.countAll<number>().as('count'))
-          .where('competition_id', '=', competition.id)
-          .where('status', '=', 'active')
+          .where('enrollment.competition_id', '=', competition.id)
+          .where('enrollment.status', '=', 'active')
+          .where('user.email', 'is not', null)
+          .where('user.email_verified', '=', true)
+          .where('user.status', '=', 'active')
           .executeTakeFirstOrThrow();
         if (Number(activeEnrollments.count) < competition.minimum_entrants) {
           throw new ConflictException({
@@ -143,6 +147,7 @@ export class DrawsService {
             'enrollment.id',
             'progress.enrollment_id',
           )
+          .innerJoin('users as user', 'user.id', 'progress.user_id')
           .select([
             'progress.enrollment_id',
             'progress.prize_draw_entries',
@@ -152,6 +157,9 @@ export class DrawsService {
           .where('enrollment.competition_id', '=', competition.id)
           .where('enrollment.status', '=', 'active')
           .where('progress.prize_draw_entries', '>', 0)
+          .where('user.email', 'is not', null)
+          .where('user.email_verified', '=', true)
+          .where('user.status', '=', 'active')
           .orderBy('progress.user_id')
           .execute();
         if (progress.length === 0) {

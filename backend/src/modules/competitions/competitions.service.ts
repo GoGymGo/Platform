@@ -144,6 +144,7 @@ export class CompetitionsService {
       },
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(user);
         const now = new Date();
         const competition = await transaction
           .selectFrom('competitions')
@@ -360,9 +361,13 @@ export class CompetitionsService {
         'policy.id',
         'competition.region_policy_id',
       )
+      .innerJoin('users as user', 'user.id', 'enrollment.user_id')
       .select((expression) => expression.fn.countAll<number>().as('count'))
       .where('competition.month_key', '=', monthKey)
       .where('enrollment.status', '=', 'active')
+      .where('user.email', 'is not', null)
+      .where('user.email_verified', '=', true)
+      .where('user.status', '=', 'active')
       .where(
         sql<boolean>`(lower(policy.code) = lower(${region}) OR lower(policy.metro_name) = lower(${region}))`,
       )

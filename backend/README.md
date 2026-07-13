@@ -5,6 +5,7 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 ## Trust boundaries
 
 - Firebase Admin verifies the bearer token and supplies the account identity. Client-supplied user IDs are never authoritative.
+- Accounts must remain active and have a current Firebase-verified email for enrollment, workout evidence/awards, privileged operations, draw eligibility, and payout onboarding.
 - PostgreSQL/PostGIS is the source of truth and durable job queue. Workers claim jobs with bounded database leases; Redis is not required for the initial production system.
 - Money is stored as integer minor units with an ISO currency.
 - Retryable and money-affecting mutations require an idempotency key.

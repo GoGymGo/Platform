@@ -26,6 +26,7 @@ flowchart LR
 
 - The app may display progress, but only the API can create verified sessions, competition entries, winners, or payouts.
 - Firebase UID is the account identity. The API verifies every Firebase ID token and derives the user from the token; it never trusts a user ID supplied by the client.
+- A current Firebase-verified email is required before competition enrollment and remains a server-side precondition through evidence awards, operator actions, draw eligibility, and Hyperwallet onboarding. The app must handle `VERIFIED_EMAIL_REQUIRED` by sending the user through Firebase verification and refreshing their ID token.
 - Every write that can award money uses an idempotency key and an append-only audit event.
 - Workout evidence is uploaded as events. Server policy decides whether it is valid and records the policy version used.
 - Hyperwallet API credentials, user tokens, payment tokens, webhook processing, and payout decisions remain server-side.

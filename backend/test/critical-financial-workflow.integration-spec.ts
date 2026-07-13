@@ -210,10 +210,40 @@ describeWithDatabase('critical financial workflow', () => {
   });
 
   it('settles an immutable draw and payout exactly once through provider webhooks', async () => {
-    const seeded = await seedCompetition('complete-workflow', 101, 1);
+    const seeded = await seedCompetition('complete-workflow', 103, 1);
     const seedReveal = 'a'.repeat(64);
     const seedCommitment = buildSeedCommitment(seedReveal);
     const operatorUser = await operatorUserId();
+
+    await migrated.pool.query(
+      `UPDATE users
+       SET email_verified = false
+       WHERE id = (
+         SELECT enrollment.user_id
+         FROM competition_enrollments AS enrollment
+         INNER JOIN users AS user_account ON user_account.id = enrollment.user_id
+         WHERE enrollment.competition_id = $1
+           AND enrollment.status = 'active'
+         ORDER BY user_account.firebase_uid
+         LIMIT 1
+       )`,
+      [seeded.competitionId],
+    );
+    await migrated.pool.query(
+      `UPDATE users
+       SET status = 'suspended'
+       WHERE id = (
+         SELECT enrollment.user_id
+         FROM competition_enrollments AS enrollment
+         INNER JOIN users AS user_account ON user_account.id = enrollment.user_id
+         WHERE enrollment.competition_id = $1
+           AND enrollment.status = 'active'
+           AND user_account.email_verified = true
+         ORDER BY user_account.firebase_uid
+         LIMIT 1
+       )`,
+      [seeded.competitionId],
+    );
 
     const unresolvedSession = await migrated.pool.query<{ id: string }>(
       `INSERT INTO workout_sessions
@@ -256,6 +286,20 @@ describeWithDatabase('critical financial workflow', () => {
       seedCommitment,
     });
     expect(locked.entrantCount).toBe(100);
+    await expect(
+      migrated.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+         FROM draw_entries AS entry
+         INNER JOIN users AS user_account ON user_account.id = entry.user_id
+         WHERE entry.draw_id = $1
+           AND (
+             user_account.status <> 'active'
+             OR user_account.email IS NULL
+             OR user_account.email_verified = false
+           )`,
+        [locked.drawId],
+      ),
+    ).resolves.toMatchObject({ rows: [{ count: '0' }] });
     await expect(
       draws.lock({
         competitionId: seeded.competitionId,

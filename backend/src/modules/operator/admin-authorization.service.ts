@@ -13,6 +13,7 @@ export class AdminAuthorizationService {
     transaction: Transaction<Database>,
   ) {
     const user = await this.profiles.ensureUser(principal, transaction);
+    this.profiles.requireVerifiedEmail(user);
     if (!user.roles.includes('admin')) {
       throw new ForbiddenException({
         code: 'ADMIN_REQUIRED',

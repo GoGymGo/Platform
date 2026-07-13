@@ -95,6 +95,7 @@ export class SessionsService {
       },
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(user);
         const now = new Date();
         const enrollment = await transaction
           .selectFrom('competition_enrollments as enrollment')
@@ -200,6 +201,7 @@ export class SessionsService {
       },
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(user);
         const session = await transaction
           .selectFrom('workout_sessions')
           .selectAll()
@@ -295,6 +297,7 @@ export class SessionsService {
       },
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(user);
         const session = await transaction
           .selectFrom('workout_sessions as session')
           .innerJoin(
@@ -392,11 +395,18 @@ export class SessionsService {
             'competition.id',
             'session.competition_id',
           )
+          .innerJoin(
+            'users as participant',
+            'participant.id',
+            'session.user_id',
+          )
           .select([
             'competition.rules',
             'competition.rules_version',
             'enrollment.goal_days',
             'enrollment.status as enrollment_status',
+            'participant.email as participant_email',
+            'participant.email_verified as participant_email_verified',
             'session.competition_id',
             'session.completed_at',
             'session.eligible_date',
@@ -432,6 +442,10 @@ export class SessionsService {
               'A session cannot be verified after its competition enrollment is no longer active.',
           });
         }
+        this.profiles.requireVerifiedEmail({
+          email: session.participant_email,
+          email_verified: session.participant_email_verified,
+        });
 
         const alreadyVerified = await transaction
           .selectFrom('workout_sessions')

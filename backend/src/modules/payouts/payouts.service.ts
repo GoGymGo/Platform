@@ -233,13 +233,7 @@ export class PayoutsService {
             message: 'Payouts are not enabled for this competition region.',
           });
         }
-        if (!user.email || !user.email_verified) {
-          throw new ConflictException({
-            code: 'VERIFIED_EMAIL_REQUIRED',
-            message:
-              'A verified email address is required before payout setup.',
-          });
-        }
+        this.profiles.requireVerifiedEmail(user);
         if (
           ![
             'action_required',
@@ -308,6 +302,7 @@ export class PayoutsService {
       },
       async (transaction) => {
         const operator = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(operator);
         this.assertPayoutOperator(operator.roles);
         const claim = await this.transitionClaim(transaction, claimId, {
           approvedByUserId: operator.id,
@@ -346,6 +341,7 @@ export class PayoutsService {
       .transaction()
       .execute(async (transaction) => {
         const operator = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(operator);
         this.assertPayoutOperator(operator.roles);
         const claim = await transaction
           .selectFrom('payout_claims')

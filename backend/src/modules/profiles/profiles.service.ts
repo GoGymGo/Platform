@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
@@ -116,6 +117,17 @@ export class ProfilesService {
     }
 
     return user;
+  }
+
+  requireVerifiedEmail<
+    T extends Pick<Selectable<UsersTable>, 'email' | 'email_verified'>,
+  >(user: T): asserts user is T & { email: string; email_verified: true } {
+    if (!user.email || !user.email_verified) {
+      throw new ConflictException({
+        code: 'VERIFIED_EMAIL_REQUIRED',
+        message: 'A verified email address is required for this action.',
+      });
+    }
   }
 
   async ensureProfile(

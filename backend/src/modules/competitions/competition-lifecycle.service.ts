@@ -53,12 +53,16 @@ export class CompetitionLifecycleService {
           }
 
           const enrollmentCount = await transaction
-            .selectFrom('competition_enrollments')
+            .selectFrom('competition_enrollments as enrollment')
+            .innerJoin('users as user', 'user.id', 'enrollment.user_id')
             .select((expression) =>
               expression.fn.countAll<number>().as('count'),
             )
-            .where('competition_id', '=', competition.id)
-            .where('status', '=', 'active')
+            .where('enrollment.competition_id', '=', competition.id)
+            .where('enrollment.status', '=', 'active')
+            .where('user.email', 'is not', null)
+            .where('user.email_verified', '=', true)
+            .where('user.status', '=', 'active')
             .executeTakeFirstOrThrow();
           const activeEntrants = Number(enrollmentCount.count);
           const nextStatus = resolveCompetitionStart(

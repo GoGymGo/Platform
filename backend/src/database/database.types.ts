@@ -453,6 +453,16 @@ export interface PayoutStateEventsTable {
   created_at: Timestamp;
 }
 
+export interface PayoutReleaseControlTable {
+  control_key: 'global';
+  paused: boolean;
+  reason: string;
+  changed_by_user_id: string | null;
+  version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface PartnerApplicationsTable {
   id: Generated<string>;
   application_type: PartnerApplicationType;
@@ -580,6 +590,7 @@ export interface Database {
   partner_applications: PartnerApplicationsTable;
   payout_claims: PayoutClaimsTable;
   payout_payments: PayoutPaymentsTable;
+  payout_release_control: PayoutReleaseControlTable;
   payout_state_events: PayoutStateEventsTable;
   privacy_request_events: PrivacyRequestEventsTable;
   privacy_requests: PrivacyRequestsTable;

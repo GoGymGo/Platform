@@ -61,7 +61,9 @@ The worker runs only operator-approved requests in `processing`. It uses Postgre
 
 ## Payout incident rule
 
-Never retry an uncertain payout by creating a new client payment ID. The claim ID is the immutable `clientPaymentId`; the worker reconciles it against Hyperwallet. If reconciliation still returns no payment, pause the claim for operator review before any manual retry.
+Pause new release reservations first with `POST /v1/operator/payout-release-control/status-action`, using the version from `GET /v1/operator/payout-release-control`, an incident-specific idempotency key, and the approved incident reason. Confirm the returned state is paused before rotating credentials, disabling Hyperwallet, or changing provider connectivity. The pause serializes against new reservations but does not cancel a reservation that already committed.
+
+Never retry an uncertain payout by creating a new client payment ID. The claim ID is the immutable `clientPaymentId`; the worker reconciles it against Hyperwallet. If reconciliation still returns no payment, keep global releases paused and hold the claim for operator review before any manual provider action. Do not resume until every already-processing or uncertain payment is accounted for and the incident owner approves the exact versioned resume action.
 
 ## Backup and rollback
 

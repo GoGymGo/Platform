@@ -98,6 +98,17 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires an operator token before payout release control access', async () => {
+    await request(app.getHttpServer())
+      .get('/v1/operator/payout-release-control')
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/v1/operator/payout-release-control/status-action')
+      .set('Idempotency-Key', 'payout-release-control-e2e')
+      .send({})
+      .expect(401);
+  });
+
   it('requires authentication before competition enrollment', () => {
     return request(app.getHttpServer())
       .post('/v1/competitions/10000000-0000-4000-8000-000000000001/enrollments')

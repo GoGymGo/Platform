@@ -956,6 +956,65 @@
         "tags": ["provider webhooks"]
       }
     },
+    "/v1/operator/payout-release-control": {
+      "get": {
+        "operationId": "get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutReleaseControlResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Get the global payout release safety control",
+        "tags": ["operator payouts"]
+      }
+    },
+    "/v1/operator/payout-release-control/status-action": {
+      "post": {
+        "operationId": "change",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutReleaseControlActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutReleaseControlResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Pause or resume new payout release reservations",
+        "tags": ["operator payouts"]
+      }
+    },
     "/v1/operator/payout-claims/{claimId}/review": {
       "get": {
         "operationId": "getReview",
@@ -2744,6 +2803,24 @@
         "properties": { "accepted": { "type": "boolean" } },
         "required": ["accepted"]
       },
+      "PayoutReleaseControlResponseDto": {
+        "type": "object",
+        "properties": {
+          "paused": { "type": "boolean" },
+          "reason": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": ["paused", "reason", "version"]
+      },
+      "PayoutReleaseControlActionDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": { "type": "number", "minimum": 1 },
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": { "type": "string", "enum": ["pause", "resume"] }
+        },
+        "required": ["expectedVersion", "reason", "action"]
+      },
       "OperatorPayoutParticipantReviewDto": {
         "type": "object",
         "properties": {
@@ -2799,6 +2876,9 @@
           "payment": {
             "$ref": "#/components/schemas/OperatorPayoutPaymentReviewDto"
           },
+          "releaseControl": {
+            "$ref": "#/components/schemas/PayoutReleaseControlResponseDto"
+          },
           "provider": { "type": "string", "enum": ["hyperwallet"] },
           "status": { "type": "string" },
           "version": { "type": "number", "minimum": 1 },
@@ -2819,6 +2899,7 @@
           "payoutAccount",
           "payoutRank",
           "payment",
+          "releaseControl",
           "provider",
           "status",
           "version",

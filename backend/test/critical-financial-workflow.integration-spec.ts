@@ -7,6 +7,7 @@ import { buildSeedCommitment } from '../src/modules/draws/draw-algorithm';
 import { DrawsService } from '../src/modules/draws/draws.service';
 import type { ExpoPushClient } from '../src/modules/notifications/expo-push.client';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
+import { AdminAuthorizationService } from '../src/modules/operator/admin-authorization.service';
 import type {
   CreateHyperwalletPaymentInput,
   CreateHyperwalletUserInput,
@@ -15,6 +16,7 @@ import type {
   HyperwalletPayment,
   HyperwalletUser,
 } from '../src/modules/payouts/hyperwallet/hyperwallet.types';
+import { PayoutReleaseControlService } from '../src/modules/payouts/payout-release-control.service';
 import { PayoutsService } from '../src/modules/payouts/payouts.service';
 import { HyperwalletWebhooksService } from '../src/modules/payouts/webhooks/hyperwallet-webhooks.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
@@ -32,6 +34,14 @@ const operatorPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-workflow-operator',
   roles: ['payout_operator'],
+  tokenIssuedAt: 1,
+};
+
+const adminPrincipal: AuthenticatedPrincipal = {
+  email: 'admin@integration.test',
+  emailVerified: true,
+  firebaseUid: 'critical-workflow-admin',
+  roles: ['admin'],
   tokenIssuedAt: 1,
 };
 
@@ -139,9 +149,12 @@ describeWithDatabase('critical financial workflow', () => {
   let database: DatabaseService;
   let draws: DrawsService;
   let hyperwallet: FakeHyperwalletClient;
+  let idempotency: IdempotencyService;
   let migrated: MigratedPostgisTestDatabase;
+  let notifications: NotificationsService;
   let payouts: PayoutsService;
   let profiles: ProfilesService;
+  let releaseControl: PayoutReleaseControlService;
   let webhooks: HyperwalletWebhooksService;
 
   beforeAll(async () => {
@@ -157,14 +170,18 @@ describeWithDatabase('critical financial workflow', () => {
       PUSH_NOTIFICATIONS_ENABLED: 'false',
     });
     database = new DatabaseService(config);
-    const idempotency = new IdempotencyService(database);
+    idempotency = new IdempotencyService(database);
     profiles = new ProfilesService(database);
-    const notifications = new NotificationsService(
+    notifications = new NotificationsService(
       database,
       idempotency,
       profiles,
       disabledPushClient,
       config,
+    );
+    releaseControl = new PayoutReleaseControlService(
+      idempotency,
+      new AdminAuthorizationService(profiles),
     );
     hyperwallet = new FakeHyperwalletClient();
     payouts = new PayoutsService(
@@ -172,12 +189,14 @@ describeWithDatabase('critical financial workflow', () => {
       idempotency,
       notifications,
       profiles,
+      releaseControl,
       config,
       hyperwallet,
     );
     draws = new DrawsService(database, payouts);
     webhooks = new HyperwalletWebhooksService(database, payouts, hyperwallet);
     await profiles.ensureUser(operatorPrincipal, database.connection);
+    await profiles.ensureUser(adminPrincipal, database.connection);
   });
 
   afterAll(async () => {
@@ -514,10 +533,122 @@ describeWithDatabase('critical financial workflow', () => {
         ready: true,
       },
       payment: { status: null },
+      releaseControl: {
+        paused: true,
+        version: 1,
+      },
       status: 'ready',
       version: 4,
     });
     expect(JSON.stringify(readyReview)).not.toContain(providerUserToken);
+    const disabledPayouts = new PayoutsService(
+      database,
+      idempotency,
+      notifications,
+      profiles,
+      releaseControl,
+      createTestConfig(migrated.databaseUrl, {
+        HYPERWALLET_ENABLED: 'false',
+      }),
+      hyperwallet,
+    );
+    await expect(
+      disabledPayouts.release(
+        operatorPrincipal,
+        winner.claim_id,
+        'release-provider-disabled',
+        readyReview.version,
+        'provider disabled safety check',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PAYOUT_PROVIDER_UNAVAILABLE' },
+    });
+    await expect(
+      payouts.release(
+        operatorPrincipal,
+        winner.claim_id,
+        'release-while-paused',
+        readyReview.version,
+        'global payout safety lock check',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PAYOUT_RELEASES_PAUSED' },
+    });
+    await expect(
+      migrated.pool.query<{
+        payment_count: string;
+        status: string;
+        version: number;
+      }>(
+        `SELECT claim.status, claim.version,
+                count(payment.id)::text AS payment_count
+         FROM payout_claims AS claim
+         LEFT JOIN payout_payments AS payment
+           ON payment.payout_claim_id = claim.id
+         WHERE claim.id = $1
+         GROUP BY claim.id`,
+        [winner.claim_id],
+      ),
+    ).resolves.toMatchObject({
+      rows: [{ payment_count: '0', status: 'ready', version: 4 }],
+    });
+    await expect(
+      payouts.changeReleaseControl(
+        operatorPrincipal,
+        'resume-release-control-non-admin',
+        {
+          action: 'resume',
+          expectedVersion: readyReview.releaseControl.version,
+          reason: 'non administrator cannot resume payouts',
+        },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'ADMIN_REQUIRED' } });
+    await expect(
+      payouts.changeReleaseControl(
+        adminPrincipal,
+        'resume-release-control-stale',
+        {
+          action: 'resume',
+          expectedVersion: readyReview.releaseControl.version + 1,
+          reason: 'stale payout release control review',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PAYOUT_RELEASE_CONTROL_VERSION_STALE' },
+    });
+    const resumedControl = await payouts.changeReleaseControl(
+      adminPrincipal,
+      'resume-release-control',
+      {
+        action: 'resume',
+        expectedVersion: readyReview.releaseControl.version,
+        reason: 'provider and payout operations approved for integration test',
+      },
+    );
+    expect(resumedControl).toEqual({
+      paused: false,
+      reason: 'provider and payout operations approved for integration test',
+      version: 2,
+    });
+    await expect(
+      migrated.pool.query(
+        `DELETE FROM payout_release_control WHERE control_key = 'global'`,
+      ),
+    ).rejects.toThrow(/payout release control cannot be deleted/i);
+    await expect(
+      payouts.changeReleaseControl(adminPrincipal, 'resume-release-control', {
+        action: 'resume',
+        expectedVersion: readyReview.releaseControl.version,
+        reason: 'provider and payout operations approved for integration test',
+      }),
+    ).resolves.toEqual(resumedControl);
+    await expect(
+      payouts.getOperatorReview(operatorPrincipal, winner.claim_id),
+    ).resolves.toMatchObject({
+      releaseControl: resumedControl,
+      status: 'ready',
+      version: readyReview.version,
+    });
     await expect(
       payouts.release(
         operatorPrincipal,
@@ -652,6 +783,24 @@ describeWithDatabase('critical financial workflow', () => {
         action: 'payout_claim.released',
         next_state: { status: 'processing', version: 5 },
         previous_state: { status: 'ready', version: 4 },
+      },
+    ]);
+
+    const controlAudits = await migrated.pool.query<{
+      action: string;
+      next_state: { paused: boolean; version: number };
+      previous_state: { paused: boolean; version: number };
+    }>(
+      `SELECT action, previous_state, next_state
+       FROM operator_audit_events
+       WHERE entity_type = 'payout_release_control'
+       ORDER BY id`,
+    );
+    expect(controlAudits.rows).toEqual([
+      {
+        action: 'payout_release_control.resumed',
+        next_state: { paused: false, version: 2 },
+        previous_state: { paused: true, version: 1 },
       },
     ]);
   });

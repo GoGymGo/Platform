@@ -21,6 +21,8 @@ import {
   OperatorPayoutActionDto,
   OperatorPayoutClaimReviewDto,
   OperatorPayoutClaimResponseDto,
+  PayoutReleaseControlActionDto,
+  PayoutReleaseControlResponseDto,
   PayoutClaimResponseDto,
   PortalActionResponseDto,
 } from './dto/payout.dto';
@@ -115,6 +117,40 @@ export class OperatorPayoutsController {
       requireIdempotencyKey(idempotencyKey),
       request.expectedVersion,
       request.reason,
+    );
+  }
+}
+
+@ApiTags('operator payouts')
+@ApiBearerAuth('firebase')
+@Controller('operator/payout-release-control')
+export class OperatorPayoutReleaseControlController {
+  constructor(private readonly payouts: PayoutsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Get the global payout release safety control' })
+  @ApiOkResponse({ type: PayoutReleaseControlResponseDto })
+  get(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<PayoutReleaseControlResponseDto> {
+    return this.payouts.getReleaseControl(principal);
+  }
+
+  @Post('status-action')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Pause or resume new payout release reservations',
+  })
+  @ApiOkResponse({ type: PayoutReleaseControlResponseDto })
+  change(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() request: PayoutReleaseControlActionDto,
+  ): Promise<PayoutReleaseControlResponseDto> {
+    return this.payouts.changeReleaseControl(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      request,
     );
   }
 }

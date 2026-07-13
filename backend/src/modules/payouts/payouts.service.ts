@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { sql } from 'kysely';
@@ -23,6 +24,8 @@ import { ProfilesService } from '../profiles/profiles.service';
 import type {
   OperatorPayoutClaimResponseDto,
   OperatorPayoutClaimReviewDto,
+  PayoutReleaseControlActionDto,
+  PayoutReleaseControlResponseDto,
   PayoutClaimResponseDto,
   PortalActionResponseDto,
 } from './dto/payout.dto';
@@ -34,6 +37,7 @@ import type {
 import { HYPERWALLET_CLIENT } from './hyperwallet/hyperwallet.types';
 import { assertSupportedPayoutCurrency } from './hyperwallet/money';
 import { assertPayoutTransition } from './payout-state-machine';
+import { PayoutReleaseControlService } from './payout-release-control.service';
 import { payoutStatusFromPaymentStatus } from './provider-status';
 
 interface SettledWinner {
@@ -61,6 +65,7 @@ interface TransitionOptions {
 
 @Injectable()
 export class PayoutsService {
+  private readonly providerEnabled: boolean;
   private readonly programToken: string | undefined;
 
   constructor(
@@ -68,10 +73,12 @@ export class PayoutsService {
     private readonly idempotency: IdempotencyService,
     private readonly notifications: NotificationsService,
     private readonly profiles: ProfilesService,
+    private readonly releaseControl: PayoutReleaseControlService,
     config: ConfigService<Environment, true>,
     @Inject(HYPERWALLET_CLIENT)
     private readonly hyperwallet: HyperwalletClient,
   ) {
+    this.providerEnabled = config.get('HYPERWALLET_ENABLED', { infer: true });
     this.programToken = config.get('HYPERWALLET_PROGRAM_TOKEN', {
       infer: true,
     });
@@ -192,6 +199,7 @@ export class PayoutsService {
     claimId: string,
     idempotencyKey: string,
   ): Promise<PortalActionResponseDto> {
+    this.assertProviderEnabled();
     const context = await this.database.connection
       .transaction()
       .execute(async (transaction) => {
@@ -372,6 +380,7 @@ export class PayoutsService {
     expectedVersion: number,
     reason: string,
   ): Promise<OperatorPayoutClaimResponseDto> {
+    this.assertProviderEnabled();
     const reservation = await this.database.connection
       .transaction()
       .execute(async (transaction) => {
@@ -379,6 +388,7 @@ export class PayoutsService {
           principal,
           transaction,
         );
+        await this.releaseControl.assertReleaseAllowed(transaction);
         const claim = await transaction
           .selectFrom('payout_claims as claim')
           .innerJoin('users as participant', 'participant.id', 'claim.user_id')
@@ -526,6 +536,9 @@ export class PayoutsService {
   }
 
   async reconcileUncertainPayments(limit = 25): Promise<number> {
+    if (!this.providerEnabled) {
+      return 0;
+    }
     const payments = await this.database.connection
       .selectFrom('payout_payments')
       .select(['client_payment_id', 'id', 'payout_claim_id'])
@@ -697,12 +710,21 @@ export class PayoutsService {
 
   private requireProgramToken(): string {
     if (!this.programToken) {
-      throw new ConflictException({
+      throw new ServiceUnavailableException({
         code: 'PAYOUT_PROVIDER_UNAVAILABLE',
         message: 'The payout provider is not configured in this environment.',
       });
     }
     return this.programToken;
+  }
+
+  private assertProviderEnabled(): void {
+    if (!this.providerEnabled) {
+      throw new ServiceUnavailableException({
+        code: 'PAYOUT_PROVIDER_UNAVAILABLE',
+        message: 'The payout provider is not enabled in this environment.',
+      });
+    }
   }
 
   async getOperatorReview(
@@ -757,7 +779,7 @@ export class PayoutsService {
           });
         }
 
-        const [providerUser, payment] = await Promise.all([
+        const [providerUser, payment, releaseControl] = await Promise.all([
           this.programToken
             ? transaction
                 .selectFrom('hyperwallet_users')
@@ -771,6 +793,7 @@ export class PayoutsService {
             .select('provider_status')
             .where('payout_claim_id', '=', claim.id)
             .executeTakeFirst(),
+          this.releaseControl.get(transaction),
         ]);
         assertSupportedPayoutCurrency(claim.currency);
         const participantEligible =
@@ -803,11 +826,31 @@ export class PayoutsService {
           payoutRank: claim.payout_rank,
           payment: { status: payment?.provider_status ?? null },
           provider: claim.provider,
+          releaseControl,
           status: claim.status,
           version: claim.version,
           winnerId: claim.winner_id,
         };
       });
+  }
+
+  async getReleaseControl(
+    principal: AuthenticatedPrincipal,
+  ): Promise<PayoutReleaseControlResponseDto> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.requirePayoutOperator(principal, transaction);
+        return this.releaseControl.get(transaction);
+      });
+  }
+
+  changeReleaseControl(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    input: PayoutReleaseControlActionDto,
+  ): Promise<PayoutReleaseControlResponseDto> {
+    return this.releaseControl.change(principal, idempotencyKey, input);
   }
 
   private async requirePayoutOperator(

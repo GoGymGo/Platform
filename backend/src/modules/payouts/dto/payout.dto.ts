@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsString, Length, Min } from 'class-validator';
+import { IsEnum, IsInt, IsString, Length, Min } from 'class-validator';
 import type { PayoutClaimStatus } from '../../../database/database.types';
 
 export type PublicPayoutClaimStatus =
@@ -77,6 +77,28 @@ export class OperatorPayoutPaymentReviewDto {
   status!: string | null;
 }
 
+export class PayoutReleaseControlResponseDto {
+  @ApiProperty({ type: Boolean })
+  paused!: boolean;
+
+  @ApiProperty({ type: String })
+  reason!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
+}
+
+export enum PayoutReleaseControlAction {
+  PAUSE = 'pause',
+  RESUME = 'resume',
+}
+
+export class PayoutReleaseControlActionDto extends OperatorPayoutActionDto {
+  @ApiProperty({ enum: PayoutReleaseControlAction, type: String })
+  @IsEnum(PayoutReleaseControlAction)
+  action!: 'pause' | 'resume';
+}
+
 export class OperatorPayoutClaimReviewDto {
   @ApiProperty({ type: Number })
   amountMinor!: number;
@@ -119,6 +141,9 @@ export class OperatorPayoutClaimReviewDto {
 
   @ApiProperty({ type: OperatorPayoutPaymentReviewDto })
   payment!: OperatorPayoutPaymentReviewDto;
+
+  @ApiProperty({ type: PayoutReleaseControlResponseDto })
+  releaseControl!: PayoutReleaseControlResponseDto;
 
   @ApiProperty({ enum: ['hyperwallet'], type: String })
   provider!: 'hyperwallet';

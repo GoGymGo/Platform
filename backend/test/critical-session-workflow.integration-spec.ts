@@ -416,8 +416,8 @@ describeWithDatabase('critical session and ledger workflow', () => {
       [fixture.competitionId],
     );
     expect(counts.rows[0]).toEqual({
-      acceptances: 1,
-      enrollments: 1,
+      acceptances: 100,
+      enrollments: 100,
       ledger_entries: 1,
     });
   });
@@ -554,7 +554,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
           rules, minimum_entrants, entrant_cap, registration_opens_at,
           registration_closes_at, starts_at, ends_at)
        VALUES ($1, '2030-02', 'Critical Capped Enrollment Competition',
-               'registration', 'CAD', 'rules-v1', $2::jsonb, 1, 1,
+               'registration', 'CAD', 'rules-v1', $2::jsonb, 100, 100,
                $3, $4, $5, $6)
        RETURNING id`,
       [
@@ -571,6 +571,44 @@ describeWithDatabase('critical session and ledger workflow', () => {
          (competition_id, goal_days, label)
        VALUES ($1, 3, 'Three days'), ($1, 4, 'Four days')`,
       [competition.rows[0].id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO users (firebase_uid, email_verified)
+       SELECT 'capped-seeded-user-' || sequence::text, TRUE
+       FROM generate_series(1, 99) AS sequence`,
+    );
+    await migrated.pool.query(
+      `INSERT INTO region_verifications
+         (user_id, region_policy_id, method, status, evidence_metadata,
+          policy_version, verified_at)
+       SELECT id, $1, 'manual_review', 'approved', '{}'::jsonb,
+              'policy-v1', current_timestamp
+       FROM users
+       WHERE firebase_uid LIKE 'capped-seeded-user-%'`,
+      [region.rows[0].id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_rule_acceptances
+         (competition_id, user_id, rules_version, age_eligibility_attested)
+       SELECT $1, id, 'rules-v1', TRUE
+       FROM users
+       WHERE firebase_uid LIKE 'capped-seeded-user-%'`,
+      [competition.rows[0].id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_enrollments
+         (competition_id, user_id, goal_days, region_verification_id,
+          rules_acceptance_id, status)
+       SELECT $1, user_account.id, 3, verification.id, acceptance.id, 'active'
+       FROM users AS user_account
+       INNER JOIN region_verifications AS verification
+         ON verification.user_id = user_account.id
+        AND verification.region_policy_id = $2
+       INNER JOIN competition_rule_acceptances AS acceptance
+         ON acceptance.user_id = user_account.id
+        AND acceptance.competition_id = $1
+       WHERE user_account.firebase_uid LIKE 'capped-seeded-user-%'`,
+      [competition.rows[0].id, region.rows[0].id],
     );
     return {
       competitionId: competition.rows[0].id,

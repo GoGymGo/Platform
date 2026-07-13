@@ -11,6 +11,18 @@ export function renderNotification(
   payload: JsonObject,
 ): PushContent {
   switch (template) {
+    case 'competition_cancelled':
+      return {
+        body: 'This competition was cancelled. No workout or payout action is required.',
+        data: {
+          competitionId:
+            typeof payload.competitionId === 'string'
+              ? payload.competitionId
+              : null,
+          route: '/competitions',
+        },
+        title: 'GoGymGo competition cancelled',
+      };
     case 'payout_action_required':
       return {
         body: 'Set up your hosted Hyperwallet account so your prize can be paid.',

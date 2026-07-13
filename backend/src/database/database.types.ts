@@ -164,6 +164,7 @@ export interface CompetitionsTable {
   currency: string;
   rules_version: string;
   rules: ColumnType<JsonValue, JsonValue, JsonValue>;
+  configuration_version: Generated<number>;
   minimum_entrants: number;
   entrant_cap: number | null;
   registration_opens_at: Timestamp;
@@ -460,6 +461,7 @@ export interface CreatorWorkoutsTable {
   published_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
+  version: Generated<number>;
 }
 
 export interface Database {

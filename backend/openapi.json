@@ -98,6 +98,294 @@
         "tags": ["profiles"]
       }
     },
+    "/v1/operator/configuration/region-policies": {
+      "post": {
+        "operationId": "createRegionPolicy",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateRegionPolicyDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegionPolicyResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a versioned regional operating policy",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/competitions": {
+      "post": {
+        "operationId": "createCompetition",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompetitionDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a competition draft",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/competitions/{competitionId}": {
+      "put": {
+        "operationId": "updateCompetition",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompetitionDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Replace a versioned competition draft",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/competitions/{competitionId}/status-action": {
+      "post": {
+        "operationId": "changeCompetitionStatus",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompetitionStatusActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Publish or cancel a competition",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/creator-workouts": {
+      "post": {
+        "operationId": "createWorkout",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCreatorWorkoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create an unpublished creator workout",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/creator-workouts/{workoutId}": {
+      "put": {
+        "operationId": "updateWorkout",
+        "parameters": [
+          {
+            "name": "workoutId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCreatorWorkoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Replace an unpublished creator workout",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/creator-workouts/{workoutId}/status-action": {
+      "post": {
+        "operationId": "changeWorkoutStatus",
+        "parameters": [
+          {
+            "name": "workoutId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatorWorkoutStatusActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Publish or unpublish a creator workout",
+        "tags": ["operator-configuration"]
+      }
+    },
     "/v1/operator/work-queue": {
       "get": {
         "operationId": "listWorkQueue",
@@ -664,6 +952,145 @@
         "tags": ["sessions"]
       }
     },
+    "/v1/competitions/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the authenticated user current regional competition",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{competitionId}/enrollments": {
+      "post": {
+        "operationId": "enroll",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateEnrollmentDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Enroll the authenticated eligible user in a goal bracket",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/enrollment-count": {
+      "get": {
+        "operationId": "getEnrollmentCount",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentCountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the active enrollment count for a regional competition",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/matches": {
+      "get": {
+        "operationId": "getMatches",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitionMatchResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the authenticated entrant weekly competition matches",
+        "tags": ["competitions"]
+      }
+    },
     "/v1/me/privacy-requests": {
       "post": {
         "operationId": "create",
@@ -984,149 +1411,17 @@
         "tags": ["competition results"]
       }
     },
-    "/v1/competitions/current": {
-      "get": {
-        "operationId": "getCurrent",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CompetitionResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return the authenticated user current regional competition",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{competitionId}/enrollments": {
-      "post": {
-        "operationId": "enroll",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateEnrollmentDto" }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnrollmentResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Enroll the authenticated eligible user in a goal bracket",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{monthKey}/enrollment-count": {
-      "get": {
-        "operationId": "getEnrollmentCount",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "region",
-            "required": true,
-            "in": "query",
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnrollmentCountResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Return the active enrollment count for a regional competition",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{monthKey}/matches": {
-      "get": {
-        "operationId": "getMatches",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "region",
-            "required": true,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "goal",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CompetitionMatchResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return the authenticated entrant weekly competition matches",
-        "tags": ["competitions"]
-      }
-    },
     "/v1/creator-workouts": {
       "get": {
         "operationId": "listPublished",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "region",
+            "required": false,
+            "in": "query",
+            "schema": { "example": "victoria-bc", "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -1304,6 +1599,222 @@
             "$ref": "#/components/schemas/UpdatePrivacySettingsDto"
           }
         }
+      },
+      "CreateRegionPolicyDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "code": {
+            "type": "string",
+            "example": "victoria-bc",
+            "maxLength": 64
+          },
+          "countryCode": { "type": "string", "example": "CA" },
+          "subdivisionCode": { "type": "string", "example": "BC" },
+          "metroName": { "type": "string", "maxLength": 120 },
+          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
+          "timezone": {
+            "type": "string",
+            "example": "America/Vancouver",
+            "maxLength": 64
+          },
+          "languageCodes": { "type": "array", "items": { "type": "string" } },
+          "minimumAge": { "type": "number", "maximum": 99, "minimum": 13 },
+          "competitionEnabled": { "type": "boolean" },
+          "payoutEnabled": { "type": "boolean" },
+          "boundaryVersion": { "type": "string", "maxLength": 64 },
+          "policyVersion": { "type": "string", "maxLength": 64 },
+          "validFrom": { "type": "string", "format": "date-time" },
+          "validTo": { "type": "string", "format": "date-time" },
+          "boundary": { "type": "object" }
+        },
+        "required": [
+          "reason",
+          "code",
+          "countryCode",
+          "subdivisionCode",
+          "metroName",
+          "currency",
+          "timezone",
+          "languageCodes",
+          "minimumAge",
+          "competitionEnabled",
+          "payoutEnabled",
+          "boundaryVersion",
+          "policyVersion",
+          "validFrom",
+          "boundary"
+        ]
+      },
+      "AdminRegionPolicyResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "policyVersion": { "type": "string" }
+        },
+        "required": ["id", "code", "policyVersion"]
+      },
+      "GoalBracketDto": {
+        "type": "object",
+        "properties": {
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "label": { "type": "string", "maxLength": 80 }
+        },
+        "required": ["goalDays", "label"]
+      },
+      "CreateCompetitionDraftDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "monthKey": { "type": "string", "example": "2026-08" },
+          "name": { "type": "string", "maxLength": 160 },
+          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
+          "rulesVersion": { "type": "string", "maxLength": 64 },
+          "rules": { "type": "object" },
+          "minimumEntrants": { "type": "number", "minimum": 100 },
+          "entrantCap": { "type": "number", "minimum": 100, "nullable": true },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" },
+          "goalBrackets": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GoalBracketDto" }
+          }
+        },
+        "required": [
+          "reason",
+          "regionPolicyId",
+          "monthKey",
+          "name",
+          "currency",
+          "rulesVersion",
+          "rules",
+          "minimumEntrants",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt",
+          "goalBrackets"
+        ]
+      },
+      "AdminEntityResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": ["id", "status", "version"]
+      },
+      "UpdateCompetitionDraftDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "monthKey": { "type": "string", "example": "2026-08" },
+          "name": { "type": "string", "maxLength": 160 },
+          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
+          "rulesVersion": { "type": "string", "maxLength": 64 },
+          "rules": { "type": "object" },
+          "minimumEntrants": { "type": "number", "minimum": 100 },
+          "entrantCap": { "type": "number", "minimum": 100, "nullable": true },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" },
+          "goalBrackets": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GoalBracketDto" }
+          },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "reason",
+          "regionPolicyId",
+          "monthKey",
+          "name",
+          "currency",
+          "rulesVersion",
+          "rules",
+          "minimumEntrants",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt",
+          "goalBrackets",
+          "expectedVersion"
+        ]
+      },
+      "CompetitionStatusActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": { "type": "string", "enum": ["cancel", "publish"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "action", "expectedVersion"]
+      },
+      "CreateCreatorWorkoutDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "creatorUserId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "maxLength": 160 },
+          "creatorName": { "type": "string", "maxLength": 120 },
+          "videoUrl": { "type": "string", "format": "uri" },
+          "thumbnailUrl": { "type": "string", "format": "uri" },
+          "durationMinutes": { "type": "number", "maximum": 240, "minimum": 1 },
+          "workoutStyle": { "type": "string", "maxLength": 120 },
+          "sponsorName": { "type": "string", "maxLength": 120 },
+          "regionCodes": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "reason",
+          "title",
+          "creatorName",
+          "videoUrl",
+          "durationMinutes",
+          "workoutStyle",
+          "regionCodes"
+        ]
+      },
+      "UpdateCreatorWorkoutDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "creatorUserId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "maxLength": 160 },
+          "creatorName": { "type": "string", "maxLength": 120 },
+          "videoUrl": { "type": "string", "format": "uri" },
+          "thumbnailUrl": { "type": "string", "format": "uri" },
+          "durationMinutes": { "type": "number", "maximum": 240, "minimum": 1 },
+          "workoutStyle": { "type": "string", "maxLength": 120 },
+          "sponsorName": { "type": "string", "maxLength": 120 },
+          "regionCodes": { "type": "array", "items": { "type": "string" } },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "reason",
+          "title",
+          "creatorName",
+          "videoUrl",
+          "durationMinutes",
+          "workoutStyle",
+          "regionCodes",
+          "expectedVersion"
+        ]
+      },
+      "CreatorWorkoutStatusActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": { "type": "string", "enum": ["publish", "unpublish"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "action", "expectedVersion"]
       },
       "OperatorWorkQueueItemDto": {
         "type": "object",
@@ -1588,6 +2099,137 @@
           "violations"
         ]
       },
+      "CompetitionRulesResponseDto": {
+        "type": "object",
+        "properties": {
+          "minSessionMinutes": { "type": "number" },
+          "minHeartRateSamples": { "type": "number" },
+          "requireFaceCheck": { "type": "boolean" },
+          "requireGymQr": { "type": "boolean" },
+          "signupPrizeDrawEntries": { "type": "number" },
+          "verifiedSessionCategoryScore": { "type": "number" },
+          "verifiedSessionPrizeDrawEntries": { "type": "number" },
+          "payoutPoolAmountMinor": { "type": "number" },
+          "payoutWinnerCount": { "type": "number" },
+          "payoutExponent": { "type": "number" }
+        },
+        "required": [
+          "minSessionMinutes",
+          "minHeartRateSamples",
+          "requireFaceCheck",
+          "requireGymQr",
+          "signupPrizeDrawEntries",
+          "verifiedSessionCategoryScore",
+          "verifiedSessionPrizeDrawEntries",
+          "payoutPoolAmountMinor",
+          "payoutWinnerCount",
+          "payoutExponent"
+        ]
+      },
+      "CompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "monthKey": { "type": "string" },
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "registration",
+              "active",
+              "settling",
+              "settled",
+              "cancelled"
+            ]
+          },
+          "currency": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "rulesVersion": { "type": "string" },
+          "rules": {
+            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
+          },
+          "goalDays": { "type": "array", "items": { "type": "number" } },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "monthKey",
+          "name",
+          "status",
+          "currency",
+          "regionCode",
+          "regionName",
+          "rulesVersion",
+          "rules",
+          "goalDays",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "CreateEnrollmentDto": {
+        "type": "object",
+        "properties": {
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "regionVerificationId": { "type": "string", "format": "uuid" },
+          "rulesAccepted": { "type": "boolean", "enum": [true] },
+          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
+        },
+        "required": [
+          "goalDays",
+          "regionVerificationId",
+          "rulesAccepted",
+          "ageEligibilityAttested"
+        ]
+      },
+      "EnrollmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "goalDays": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "withdrawn", "disqualified"]
+          },
+          "enrolledAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
+      },
+      "EnrollmentCountResponseDto": {
+        "type": "object",
+        "properties": { "count": { "type": "number" } },
+        "required": ["count"]
+      },
+      "CompetitionMatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": ["matched", "searching", "solo"]
+          },
+          "opponentAlias": { "type": "string" },
+          "opponentVerifiedDateKeys": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "region": { "type": "string" }
+        },
+        "required": [
+          "availability",
+          "opponentAlias",
+          "opponentVerifiedDateKeys",
+          "periodIndex",
+          "region"
+        ]
+      },
       "CreatePrivacyRequestDto": {
         "type": "object",
         "properties": {
@@ -1817,137 +2459,6 @@
           "payoutWinnerCount"
         ]
       },
-      "CompetitionRulesResponseDto": {
-        "type": "object",
-        "properties": {
-          "minSessionMinutes": { "type": "number" },
-          "minHeartRateSamples": { "type": "number" },
-          "requireFaceCheck": { "type": "boolean" },
-          "requireGymQr": { "type": "boolean" },
-          "signupPrizeDrawEntries": { "type": "number" },
-          "verifiedSessionCategoryScore": { "type": "number" },
-          "verifiedSessionPrizeDrawEntries": { "type": "number" },
-          "payoutPoolAmountMinor": { "type": "number" },
-          "payoutWinnerCount": { "type": "number" },
-          "payoutExponent": { "type": "number" }
-        },
-        "required": [
-          "minSessionMinutes",
-          "minHeartRateSamples",
-          "requireFaceCheck",
-          "requireGymQr",
-          "signupPrizeDrawEntries",
-          "verifiedSessionCategoryScore",
-          "verifiedSessionPrizeDrawEntries",
-          "payoutPoolAmountMinor",
-          "payoutWinnerCount",
-          "payoutExponent"
-        ]
-      },
-      "CompetitionResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "monthKey": { "type": "string" },
-          "name": { "type": "string" },
-          "status": {
-            "type": "string",
-            "enum": [
-              "draft",
-              "registration",
-              "active",
-              "settling",
-              "settled",
-              "cancelled"
-            ]
-          },
-          "currency": { "type": "string" },
-          "regionCode": { "type": "string" },
-          "regionName": { "type": "string" },
-          "rulesVersion": { "type": "string" },
-          "rules": {
-            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
-          },
-          "goalDays": { "type": "array", "items": { "type": "number" } },
-          "registrationOpensAt": { "type": "string", "format": "date-time" },
-          "registrationClosesAt": { "type": "string", "format": "date-time" },
-          "startsAt": { "type": "string", "format": "date-time" },
-          "endsAt": { "type": "string", "format": "date-time" }
-        },
-        "required": [
-          "id",
-          "monthKey",
-          "name",
-          "status",
-          "currency",
-          "regionCode",
-          "regionName",
-          "rulesVersion",
-          "rules",
-          "goalDays",
-          "registrationOpensAt",
-          "registrationClosesAt",
-          "startsAt",
-          "endsAt"
-        ]
-      },
-      "CreateEnrollmentDto": {
-        "type": "object",
-        "properties": {
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "regionVerificationId": { "type": "string", "format": "uuid" },
-          "rulesAccepted": { "type": "boolean", "enum": [true] },
-          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
-        },
-        "required": [
-          "goalDays",
-          "regionVerificationId",
-          "rulesAccepted",
-          "ageEligibilityAttested"
-        ]
-      },
-      "EnrollmentResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "goalDays": { "type": "number" },
-          "status": {
-            "type": "string",
-            "enum": ["active", "withdrawn", "disqualified"]
-          },
-          "enrolledAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
-      },
-      "EnrollmentCountResponseDto": {
-        "type": "object",
-        "properties": { "count": { "type": "number" } },
-        "required": ["count"]
-      },
-      "CompetitionMatchResponseDto": {
-        "type": "object",
-        "properties": {
-          "availability": {
-            "type": "string",
-            "enum": ["matched", "searching", "solo"]
-          },
-          "opponentAlias": { "type": "string" },
-          "opponentVerifiedDateKeys": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
-          "region": { "type": "string" }
-        },
-        "required": [
-          "availability",
-          "opponentAlias",
-          "opponentVerifiedDateKeys",
-          "periodIndex",
-          "region"
-        ]
-      },
       "CreatorWorkoutResponseDto": {
         "type": "object",
         "properties": {
@@ -1955,9 +2466,31 @@
           "joined": { "type": "boolean" },
           "name": { "type": "string" },
           "reward": { "type": "string" },
-          "timing": { "type": "string" }
+          "timing": { "type": "string" },
+          "creatorName": { "type": "string" },
+          "durationMinutes": { "type": "number", "maximum": 240, "minimum": 1 },
+          "regionCodes": { "type": "array", "items": { "type": "string" } },
+          "sponsorName": { "type": "string", "nullable": true },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "videoUrl": { "type": "string", "format": "uri" },
+          "workoutStyle": { "type": "string" }
         },
-        "required": ["id", "joined", "name", "reward", "timing"]
+        "required": [
+          "id",
+          "joined",
+          "name",
+          "reward",
+          "timing",
+          "creatorName",
+          "durationMinutes",
+          "regionCodes",
+          "videoUrl",
+          "workoutStyle"
+        ]
       },
       "CategoryLeaderboardRowDto": {
         "type": "object",

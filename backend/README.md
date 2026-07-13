@@ -35,6 +35,8 @@ The liveness route is `GET http://localhost:3000/v1/health`. In non-production e
 
 Database integration tests use Testcontainers and require a running Docker engine. A missing Docker engine is an environment limitation, never a passing database test.
 
+Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](docs/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
+
 ## Module build order
 
 1. Platform configuration, health, errors, logging, security, and OpenAPI.

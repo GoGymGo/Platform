@@ -84,6 +84,28 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication before administrative configuration changes', () => {
+    return request(app.getHttpServer())
+      .post('/v1/operator/configuration/competitions')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('validates public creator-workout region filters before database access', () => {
+    return request(app.getHttpServer())
+      .get('/v1/creator-workouts?region=NOT_VALID!')
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+        });
+      });
+  });
+
   it('keeps the provider webhook closed when Hyperwallet is disabled', () => {
     return request(app.getHttpServer())
       .post('/v1/webhooks/hyperwallet')

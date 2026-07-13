@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ProfilesModule } from '../profiles/profiles.module';
+import { CompetitionLifecycleService } from './competition-lifecycle.service';
 import { CompetitionsController } from './competitions.controller';
 import { CompetitionsService } from './competitions.service';
 
 @Module({
   controllers: [CompetitionsController],
-  exports: [CompetitionsService],
-  imports: [ProfilesModule],
-  providers: [CompetitionsService],
+  exports: [CompetitionLifecycleService, CompetitionsService],
+  imports: [NotificationsModule, ProfilesModule],
+  providers: [CompetitionLifecycleService, CompetitionsService],
 })
 export class CompetitionsModule {}

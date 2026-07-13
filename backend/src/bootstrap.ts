@@ -19,7 +19,7 @@ export function configureApplication(app: INestApplication): void {
   app.use(helmet());
   app.enableCors({
     credentials: true,
-    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: allowedOrigins,
   });
   app.useGlobalPipes(

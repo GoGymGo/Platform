@@ -147,6 +147,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     await reload(currentUser);
+    await currentUser.getIdToken(true);
     const refreshedUser = mapFirebaseUser(currentUser);
     setUser(refreshedUser);
     return refreshedUser;

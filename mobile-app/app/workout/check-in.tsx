@@ -12,10 +12,7 @@ import {
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SponsorRail } from '@/components/sponsor';
-import {
-  demoVerificationRegionCode,
-  isDemoVerificationEnabled
-} from '@/config/demoVerification';
+import { isDemoVerificationEnabled } from '@/config/demoVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { createDemoCheckIn } from '@/services/demoVerification';

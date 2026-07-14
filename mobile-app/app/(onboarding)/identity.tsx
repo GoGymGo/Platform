@@ -7,6 +7,7 @@ import {
   View
 } from 'react-native';
 
+import { AuthStatusNotice } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonOutline,
@@ -51,6 +52,8 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
   const [alias, setAlias] = useState(
     initialIdentity?.displayName || initialIdentity?.callsign || ''
   );
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const {
     chooseProfileImage,
     clearProfileImage,
@@ -63,19 +66,26 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
 
   const handleContinue = async () => {
     const normalizedAlias = alias.trim();
+    setSaveError('');
+    setSaving(true);
+    try {
+      await setPublicIdentity({
+        callsign: normalizedAlias,
+        displayName: normalizedAlias,
+        mode: 'alias'
+      });
 
-    await setPublicIdentity({
-      callsign: normalizedAlias,
-      displayName: normalizedAlias,
-      mode: 'alias'
-    });
+      if (source === 'profile') {
+        router.replace('/profile');
+        return;
+      }
 
-    if (source === 'profile') {
-      router.replace('/profile');
-      return;
+      router.push('/region');
+    } catch {
+      setSaveError('YOUR ALIAS COULD NOT BE SAVED. CHECK THE API AND TRY AGAIN.');
+    } finally {
+      setSaving(false);
     }
-
-    router.push('/region');
   };
 
   return (
@@ -162,9 +172,17 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             ) : null}
           </View>
 
+          {saveError ? (
+            <AuthStatusNotice message={saveError} tone="amber" />
+          ) : null}
+
           <CyberButtonPrimary
-            disabled={!identityIsValid}
-            label={source === 'profile' ? 'SAVE ALIAS ->' : 'CONTINUE ->'}
+            disabled={!identityIsValid || saving}
+            label={saving
+              ? 'SAVING ALIAS...'
+              : source === 'profile'
+                ? 'SAVE ALIAS ->'
+                : 'CONTINUE ->'}
             onPress={handleContinue}
             style={styles.primaryButton}
           />

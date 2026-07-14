@@ -27,6 +27,7 @@ import type {
 
 interface EnrollmentJson extends JsonObject {
   competitionId: string;
+  competitionMode: 'cash' | 'non_cash_demo';
   enrolledAt: string;
   goalDays: number;
   id: string;
@@ -68,6 +69,7 @@ export class CompetitionsService {
             'competition.ends_at',
             'competition.id',
             'competition.month_key',
+            'competition.mode',
             'competition.name',
             'competition.registration_closes_at',
             'competition.registration_opens_at',
@@ -107,17 +109,60 @@ export class CompetitionsService {
           goalDays: brackets.map((bracket) => bracket.goal_days),
           id: competition.id,
           monthKey: competition.month_key,
+          mode: competition.mode,
           name: competition.name,
           regionCode: competition.region_code,
           regionName: competition.region_name,
           registrationClosesAt:
             competition.registration_closes_at.toISOString(),
           registrationOpensAt: competition.registration_opens_at.toISOString(),
-          rules: parseCompetitionRules(competition.rules),
+          rules: parseCompetitionRules(competition.rules, competition.mode),
           rulesVersion: competition.rules_version,
           startsAt: competition.starts_at.toISOString(),
           status: competition.status,
         };
+      });
+  }
+
+  async getCurrentEnrollment(
+    principal: AuthenticatedPrincipal,
+  ): Promise<EnrollmentResponseDto | null> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const user = await this.profiles.ensureUser(principal, transaction);
+        const enrollment = await transaction
+          .selectFrom('competition_enrollments as enrollment')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'enrollment.competition_id',
+          )
+          .select([
+            'competition.id as competition_id',
+            'competition.mode as competition_mode',
+            'enrollment.enrolled_at',
+            'enrollment.goal_days',
+            'enrollment.id',
+            'enrollment.status',
+          ])
+          .where('enrollment.user_id', '=', user.id)
+          .where('enrollment.status', '=', 'active')
+          .where('competition.status', 'in', ['registration', 'active'])
+          .where('competition.ends_at', '>', new Date())
+          .orderBy('enrollment.enrolled_at', 'desc')
+          .executeTakeFirst();
+
+        return enrollment
+          ? {
+              competitionId: enrollment.competition_id,
+              competitionMode: enrollment.competition_mode,
+              enrolledAt: enrollment.enrolled_at.toISOString(),
+              goalDays: enrollment.goal_days,
+              id: enrollment.id,
+              status: enrollment.status,
+            }
+          : null;
       });
   }
 
@@ -135,7 +180,7 @@ export class CompetitionsService {
           ageEligibilityAttested: request.ageEligibilityAttested,
           competitionId,
           goalDays: request.goalDays,
-          legalReceiptBundleId: request.legalReceiptBundleId,
+          legalReceiptBundleId: request.legalReceiptBundleId ?? null,
           regionVerificationId: request.regionVerificationId,
           rulesAccepted: request.rulesAccepted,
         },
@@ -168,6 +213,21 @@ export class CompetitionsService {
             message: 'Registration is not open for this competition.',
           });
         }
+        const isNonCashDemo = competition.mode === 'non_cash_demo';
+        if (isNonCashDemo && request.legalReceiptBundleId) {
+          throw new UnprocessableEntityException({
+            code: 'DEMO_LEGAL_RECEIPT_NOT_USED',
+            message:
+              'The non-cash demo does not collect competition legal receipts.',
+          });
+        }
+        if (!isNonCashDemo && !request.legalReceiptBundleId) {
+          throw new UnprocessableEntityException({
+            code: 'LEGAL_RECEIPT_BUNDLE_REQUIRED',
+            message:
+              'A current legal receipt bundle is required for cash competition enrollment.',
+          });
+        }
 
         const existingEnrollment = await transaction
           .selectFrom('competition_enrollments as enrollment')
@@ -196,7 +256,7 @@ export class CompetitionsService {
             existingEnrollment.region_verification_id !==
               request.regionVerificationId ||
             existingEnrollment.legal_receipt_bundle_id !==
-              request.legalReceiptBundleId
+              (request.legalReceiptBundleId ?? null)
           ) {
             throw new ConflictException({
               code: 'COMPETITION_ENROLLMENT_ALREADY_EXISTS',
@@ -206,6 +266,7 @@ export class CompetitionsService {
           }
           return {
             competitionId: competition.id,
+            competitionMode: competition.mode,
             enrolledAt: existingEnrollment.enrolled_at.toISOString(),
             goalDays: existingEnrollment.goal_days,
             id: existingEnrollment.id,
@@ -278,21 +339,27 @@ export class CompetitionsService {
             message: 'The competition has reached its entrant cap.',
           });
         }
-        await this.legalDocuments.assertCurrentReceiptBundle(
-          transaction,
-          user.id,
-          `${verification.country_code}-${verification.subdivision_code}`,
-          request.legalReceiptBundleId,
-        );
+        if (!isNonCashDemo) {
+          await this.legalDocuments.assertCurrentReceiptBundle(
+            transaction,
+            user.id,
+            `${verification.country_code}-${verification.subdivision_code}`,
+            request.legalReceiptBundleId!,
+          );
+        }
 
         const acceptance = await transaction
           .insertInto('competition_rule_acceptances')
           .values({
             accepted_at: now,
-            account_legal_receipt_bundle_id: request.legalReceiptBundleId,
+            account_legal_receipt_bundle_id:
+              request.legalReceiptBundleId ?? null,
             age_eligibility_attested: request.ageEligibilityAttested,
             competition_id: competition.id,
-            metadata: { source: 'mobile' },
+            metadata: {
+              competitionMode: competition.mode,
+              source: 'mobile',
+            },
             rules_version: competition.rules_version,
             user_id: user.id,
           })
@@ -319,23 +386,26 @@ export class CompetitionsService {
           .returningAll()
           .executeTakeFirstOrThrow();
 
-        const rules = parseCompetitionRules(competition.rules);
-        await this.ledger.append(transaction, {
-          categoryScoreDelta: 0,
-          competitionId: competition.id,
-          enrollmentId: enrollment.id,
-          goalDays: enrollment.goal_days,
-          metadata: { source: 'competition_enrollment' },
-          policyVersion: competition.rules_version,
-          prizeDrawEntriesDelta: rules.signupPrizeDrawEntries,
-          reason: 'enrollment',
-          sourceEventId: enrollment.id,
-          userId: user.id,
-          verifiedDaysDelta: 0,
-        });
+        if (!isNonCashDemo) {
+          const rules = parseCompetitionRules(competition.rules, 'cash');
+          await this.ledger.append(transaction, {
+            categoryScoreDelta: 0,
+            competitionId: competition.id,
+            enrollmentId: enrollment.id,
+            goalDays: enrollment.goal_days,
+            metadata: { source: 'competition_enrollment' },
+            policyVersion: competition.rules_version,
+            prizeDrawEntriesDelta: rules.signupPrizeDrawEntries,
+            reason: 'enrollment',
+            sourceEventId: enrollment.id,
+            userId: user.id,
+            verifiedDaysDelta: 0,
+          });
+        }
 
         return {
           competitionId: competition.id,
+          competitionMode: competition.mode,
           enrolledAt: enrollment.enrolled_at.toISOString(),
           goalDays: enrollment.goal_days,
           id: enrollment.id,

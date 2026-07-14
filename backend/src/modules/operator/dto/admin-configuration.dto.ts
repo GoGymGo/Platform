@@ -9,6 +9,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -20,6 +21,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import type { CompetitionMode } from '../../../database/database.types';
 import { OperatorReasonDto } from './operator.dto';
 
 export class CreateRegionPolicyDto extends OperatorReasonDto {
@@ -111,6 +113,15 @@ export class GoalBracketDto {
 }
 
 export class CreateCompetitionDraftDto extends OperatorReasonDto {
+  @ApiPropertyOptional({
+    default: 'cash',
+    enum: ['cash', 'non_cash_demo'],
+    type: String,
+  })
+  @IsOptional()
+  @IsIn(['cash', 'non_cash_demo'])
+  mode?: CompetitionMode;
+
   @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
   regionPolicyId!: string;

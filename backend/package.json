@@ -35,6 +35,7 @@
     "audit:contract": "node scripts/audit-frontend-contract.mjs",
     "audit:deps": "npm audit --omit=dev --audit-level=high",
     "admin:bootstrap": "ts-node --project tsconfig.json scripts/bootstrap-admin.ts",
+    "bootstrap:bc-demo": "tsx --env-file=.env scripts/bootstrap-bc-demo.ts",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm run test && npm run test:e2e && npm run test:integration && npm run openapi:generate && npm run format:check && npm run audit:contract && npm run audit:source && npm run build"
   },
   "dependencies": {

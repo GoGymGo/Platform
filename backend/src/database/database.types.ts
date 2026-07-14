@@ -28,6 +28,7 @@ export type RegionVerificationStatus =
 export type IdempotencyState = 'completed' | 'processing';
 export type CompetitionStatus =
   'active' | 'cancelled' | 'draft' | 'registration' | 'settled' | 'settling';
+export type CompetitionMode = 'cash' | 'non_cash_demo';
 export type EnrollmentStatus = 'active' | 'disqualified' | 'withdrawn';
 export type CompetitionMatchStatus =
   'cancelled' | 'matched' | 'searching' | 'settled';
@@ -194,6 +195,7 @@ export interface CompetitionsTable {
   region_policy_id: string;
   month_key: string;
   name: string;
+  mode: CompetitionMode;
   status: CompetitionStatus;
   currency: string;
   rules_version: string;

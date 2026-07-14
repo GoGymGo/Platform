@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -13,6 +13,8 @@ import { Public } from '../auth/public.decorator';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import {
   CreateRegionVerificationDto,
+  CurrentRegionVerificationQueryDto,
+  CurrentRegionVerificationResponseDto,
   RegionPolicyResponseDto,
   RegionVerificationResponseDto,
 } from './dto/region.dto';
@@ -29,6 +31,20 @@ export class RegionsController {
   @ApiOkResponse({ isArray: true, type: RegionPolicyResponseDto })
   listRegions(): Promise<RegionPolicyResponseDto[]> {
     return this.regions.listRegions();
+  }
+
+  @Get('me/region-verifications/current')
+  @ApiBearerAuth('firebase')
+  @ApiOperation({
+    summary:
+      'Read the latest regional eligibility review for the signed-in user',
+  })
+  @ApiOkResponse({ type: CurrentRegionVerificationResponseDto })
+  getCurrentVerification(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Query() query: CurrentRegionVerificationQueryDto,
+  ): Promise<CurrentRegionVerificationResponseDto | null> {
+    return this.regions.getCurrentVerification(principal, query.regionCode);
   }
 
   @Post('me/region-verifications')

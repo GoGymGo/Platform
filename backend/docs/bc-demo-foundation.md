@@ -65,6 +65,27 @@ Re-running the command must report `regionCreated=false`,
 bootstrap-owned legacy disabled draft is upgraded once to the guarded
 non-cash mode.
 
+## Least-privilege demo operator
+
+After the Firebase account has a verified email and has signed in once, assign
+only the local BC review role:
+
+```powershell
+$env:CONFIRM_BC_DEMO_OPERATOR_BOOTSTRAP='yes'
+$env:BC_DEMO_OPERATOR_FIREBASE_UID='<firebase uid>'
+$env:BC_DEMO_OPERATOR_REASON='Authorize this account to review local BC demo submissions.'
+npm.cmd run bootstrap:bc-demo-operator
+Remove-Item Env:CONFIRM_BC_DEMO_OPERATOR_BOOTSTRAP
+Remove-Item Env:BC_DEMO_OPERATOR_FIREBASE_UID
+Remove-Item Env:BC_DEMO_OPERATOR_REASON
+```
+
+The command is localhost-only, requires the disabled BC foundation to remain
+unchanged, and accepts only an active database account with a verified email.
+It normalizes the account to `user` plus `operator`, removing a temporary local
+`admin` grant, and records `user.bc_demo_operator_bootstrapped` in the
+append-only operator audit ledger. It never grants payout or Hyperwallet roles.
+
 ## Required work before any cash launch
 
 1. Obtain legal review for BC eligibility, contest structure, age requirements,

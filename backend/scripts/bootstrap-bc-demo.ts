@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import {
+  assertLocalDatabaseUrl,
   bootstrapBcDemoFoundation,
   getDefaultBcDemoMonthKey,
 } from '../src/foundation/bc-demo-foundation';
@@ -8,15 +9,6 @@ function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
   return value;
-}
-
-function assertLocalDatabase(databaseUrl: string): void {
-  const hostname = new URL(databaseUrl).hostname;
-  if (!['127.0.0.1', '::1', 'localhost'].includes(hostname)) {
-    throw new Error(
-      'The BC demo bootstrap is local-only and refuses a remote database host.',
-    );
-  }
 }
 
 async function main(): Promise<void> {
@@ -35,7 +27,7 @@ async function main(): Promise<void> {
   const reason = requiredEnvironment('BC_DEMO_BOOTSTRAP_REASON');
   const monthKey =
     process.env.BC_DEMO_COMPETITION_MONTH?.trim() || getDefaultBcDemoMonthKey();
-  assertLocalDatabase(databaseUrl);
+  assertLocalDatabaseUrl(databaseUrl, 'The BC demo bootstrap');
 
   const pool = new Pool({
     application_name: 'gogymgo-bc-demo-bootstrap',

@@ -46,6 +46,23 @@ The command defaults to the next calendar month in `America/Vancouver`. Set
 needed. Re-running the command is safe: it verifies and reuses the same records,
 and refuses to proceed if either record has been activated or changed.
 
+After a verified Firebase account has signed in once, assign only the local BC
+review role with the separate least-privilege bootstrap:
+
+```powershell
+$env:CONFIRM_BC_DEMO_OPERATOR_BOOTSTRAP='yes'
+$env:BC_DEMO_OPERATOR_FIREBASE_UID='<firebase uid>'
+$env:BC_DEMO_OPERATOR_REASON='Authorize this account to review local BC demo submissions.'
+npm.cmd run bootstrap:bc-demo-operator
+Remove-Item Env:CONFIRM_BC_DEMO_OPERATOR_BOOTSTRAP
+Remove-Item Env:BC_DEMO_OPERATOR_FIREBASE_UID
+Remove-Item Env:BC_DEMO_OPERATOR_REASON
+```
+
+This command refuses remote databases and unsafe BC foundation state. It
+replaces a temporary local `admin` grant with `operator`, records the change in
+the append-only audit ledger, and grants no payout or Hyperwallet role.
+
 The connected client paths, disabled enrollment boundary and remaining legal
 and backend prerequisites are documented in
 [the BC demo foundation handoff](docs/bc-demo-foundation.md).

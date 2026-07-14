@@ -1325,6 +1325,27 @@
         "tags": ["competitions"]
       }
     },
+    "/v1/competitions/current/enrollment": {
+      "get": {
+        "operationId": "getCurrentEnrollment",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the authenticated user current active enrollment",
+        "tags": ["competitions"]
+      }
+    },
     "/v1/competitions/{competitionId}/enrollments": {
       "post": {
         "operationId": "enroll",
@@ -1871,6 +1892,34 @@
         "tags": ["regions"]
       }
     },
+    "/v1/me/region-verifications/current": {
+      "get": {
+        "operationId": "getCurrentVerification",
+        "parameters": [
+          {
+            "name": "regionCode",
+            "required": true,
+            "in": "query",
+            "schema": { "example": "CA-BC-DEMO", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentRegionVerificationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Read the latest regional eligibility review for the signed-in user",
+        "tags": ["regions"]
+      }
+    },
     "/v1/me/region-verifications": {
       "post": {
         "operationId": "createVerification",
@@ -1980,6 +2029,42 @@
         },
         "summary": "List the currently published creator workouts",
         "tags": ["creator workouts"]
+      }
+    },
+    "/v1/demo-verifications/check-ins": {
+      "post": {
+        "operationId": "createCheckIn",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateDemoCheckInDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoCheckInResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a non-eligible Canada demo checkpoint without collecting evidence",
+        "tags": ["demo-verification"]
       }
     },
     "/v1/leaderboards/current": {
@@ -2306,6 +2391,11 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "mode": {
+            "type": "string",
+            "default": "cash",
+            "enum": ["cash", "non_cash_demo"]
+          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
@@ -2352,6 +2442,11 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "mode": {
+            "type": "string",
+            "default": "cash",
+            "enum": ["cash", "non_cash_demo"]
+          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
@@ -2471,7 +2566,12 @@
             ]
           },
           "status": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "createdAt": { "type": "string", "format": "date-time" },
+          "regionCode": { "type": "string", "example": "CA-BC-DEMO" },
+          "verificationMethod": {
+            "type": "string",
+            "enum": ["device_location", "manual_review", "postal_code"]
+          }
         },
         "required": ["id", "kind", "status", "createdAt"]
       },
@@ -3137,6 +3237,7 @@
               "cancelled"
             ]
           },
+          "mode": { "type": "string", "enum": ["cash", "non_cash_demo"] },
           "currency": { "type": "string" },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
@@ -3155,6 +3256,7 @@
           "monthKey",
           "name",
           "status",
+          "mode",
           "currency",
           "regionCode",
           "regionName",
@@ -3165,6 +3267,31 @@
           "registrationClosesAt",
           "startsAt",
           "endsAt"
+        ]
+      },
+      "EnrollmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionMode": {
+            "type": "string",
+            "enum": ["cash", "non_cash_demo"]
+          },
+          "goalDays": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "withdrawn", "disqualified"]
+          },
+          "enrolledAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "competitionMode",
+          "goalDays",
+          "status",
+          "enrolledAt"
         ]
       },
       "CreateEnrollmentDto": {
@@ -3179,24 +3306,9 @@
         "required": [
           "goalDays",
           "regionVerificationId",
-          "legalReceiptBundleId",
           "rulesAccepted",
           "ageEligibilityAttested"
         ]
-      },
-      "EnrollmentResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "goalDays": { "type": "number" },
-          "status": {
-            "type": "string",
-            "enum": ["active", "withdrawn", "disqualified"]
-          },
-          "enrolledAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
       },
       "EnrollmentCountResponseDto": {
         "type": "object",
@@ -3637,6 +3749,50 @@
           "validTo"
         ]
       },
+      "CurrentRegionVerificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "method": {
+            "type": "string",
+            "enum": ["device_location", "postal_code", "manual_review"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "approved", "rejected", "expired"]
+          },
+          "policyVersion": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "regionCode": { "type": "string", "example": "CA-BC-DEMO" },
+          "regionName": {
+            "type": "string",
+            "example": "British Columbia Demo"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "method",
+          "status",
+          "policyVersion",
+          "createdAt",
+          "regionCode",
+          "regionName",
+          "reviewedAt",
+          "expiresAt"
+        ]
+      },
       "CreateRegionVerificationDto": {
         "type": "object",
         "properties": {
@@ -3729,6 +3885,45 @@
           "regionCodes",
           "videoUrl",
           "workoutStyle"
+        ]
+      },
+      "CreateDemoCheckInDto": {
+        "type": "object",
+        "properties": {
+          "regionCode": {
+            "type": "string",
+            "enum": ["CA-BC"],
+            "example": "CA-BC"
+          },
+          "checkpointType": { "type": "string", "enum": ["session_start"] }
+        },
+        "required": ["regionCode", "checkpointType"]
+      },
+      "DemoCheckInResponseDto": {
+        "type": "object",
+        "properties": {
+          "demo": { "type": "boolean" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "id": { "type": "string", "format": "uuid" },
+          "issuedAt": { "type": "string", "format": "date-time" },
+          "outcome": { "type": "string", "enum": ["simulated"] },
+          "provider": { "type": "string", "enum": ["canada_demo"] },
+          "regionCode": {
+            "type": "string",
+            "enum": ["CA-BC"],
+            "example": "CA-BC"
+          },
+          "checkpointType": { "type": "string", "enum": ["session_start"] }
+        },
+        "required": [
+          "demo",
+          "expiresAt",
+          "id",
+          "issuedAt",
+          "outcome",
+          "provider",
+          "regionCode",
+          "checkpointType"
         ]
       },
       "CategoryLeaderboardRowDto": {

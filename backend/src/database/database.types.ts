@@ -28,6 +28,7 @@ export type RegionVerificationStatus =
 export type IdempotencyState = 'completed' | 'processing';
 export type CompetitionStatus =
   'active' | 'cancelled' | 'draft' | 'registration' | 'settled' | 'settling';
+export type CompetitionMode = 'cash' | 'non_cash_demo';
 export type EnrollmentStatus = 'active' | 'disqualified' | 'withdrawn';
 export type CompetitionMatchStatus =
   'cancelled' | 'matched' | 'searching' | 'settled';
@@ -73,6 +74,8 @@ export type ProfileMediaStatus =
 export type LegalReceiptRequirement = 'accept' | 'acknowledge' | 'none';
 export type LegalDocumentState = 'published' | 'withdrawn';
 export type LegalReceiptAction = 'accept' | 'acknowledge';
+export type DemoVerificationCheckpointType = 'session_start';
+export type DemoVerificationOutcome = 'simulated';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -192,6 +195,7 @@ export interface CompetitionsTable {
   region_policy_id: string;
   month_key: string;
   name: string;
+  mode: CompetitionMode;
   status: CompetitionStatus;
   currency: string;
   rules_version: string;
@@ -326,6 +330,19 @@ export interface SessionEventsTable {
   occurred_at: Timestamp;
   received_at: Timestamp;
   payload: ColumnType<JsonValue, JsonValue, never>;
+}
+
+export interface DemoVerificationCheckpointsTable {
+  id: Generated<string>;
+  user_id: string;
+  provider: 'canada_demo';
+  region_code: string;
+  checkpoint_type: DemoVerificationCheckpointType;
+  outcome: DemoVerificationOutcome;
+  demo: true;
+  issued_at: Timestamp;
+  expires_at: Timestamp;
+  created_at: Timestamp;
 }
 
 export interface EntryLedgerTable {
@@ -579,6 +596,7 @@ export interface Database {
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;
   draw_winners: DrawWinnersTable;
+  demo_verification_checkpoints: DemoVerificationCheckpointsTable;
   entry_ledger: EntryLedgerTable;
   creator_workouts: CreatorWorkoutsTable;
   hyperwallet_users: HyperwalletUsersTable;

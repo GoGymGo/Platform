@@ -9,8 +9,8 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
-import type { CreatorWorkoutPreview } from '@/data/appData';
+import { colors, componentSizes, cyberGlow, fontFamilies, interactionStates, radii, spacing } from '@/constants/theme';
+import type { CreatorWorkout } from '@/data/appData';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
 import { getCreatorWorkoutsReturnTarget } from '@/navigation/creatorWorkouts';
 import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
@@ -72,7 +72,7 @@ export default function WorkoutsScreen() {
 
         <HUDBorderBox style={styles.sponsorCard} tone="muted">
           <View style={[styles.sponsorCardMark, !sponsorConfirmed && styles.sponsorCardMarkPending]}>
-            <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
+            <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'amber'} variant="title">
               {campaign.sponsor.mark}
             </TerminalText>
           </View>
@@ -106,7 +106,7 @@ export default function WorkoutsScreen() {
 function WorkoutCard({
   workout
 }: {
-  workout: CreatorWorkoutPreview;
+  workout: CreatorWorkout;
 }) {
   const router = useRouter();
   const badgeTone = workout.joined ? 'cyan' : 'muted';
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -209,8 +209,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfacePinkSoft
   },
   sponsorCardMarkPending: {
-    borderColor: colors.borderCyanSubtle,
-    backgroundColor: colors.surfaceCyanFaint
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
   },
   sponsorCardCopy: {
     flex: 1
@@ -223,7 +223,8 @@ const styles = StyleSheet.create({
     gap: 13
   },
   pressableCard: {
-    width: '100%'
+    width: '100%',
+    ...interactionStates.webFocus
   },
   workoutCard: {
     overflow: 'hidden',
@@ -309,7 +310,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

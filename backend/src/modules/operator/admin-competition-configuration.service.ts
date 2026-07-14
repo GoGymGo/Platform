@@ -7,6 +7,7 @@ import {
 import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type {
+  CompetitionMode,
   CompetitionStatus,
   JsonObject,
 } from '../../database/database.types';
@@ -91,6 +92,7 @@ export class AdminCompetitionConfigurationService {
             ends_at: validated.schedule.endsAt,
             entrant_cap: input.entrantCap ?? null,
             minimum_entrants: input.minimumEntrants,
+            mode: input.mode ?? 'cash',
             month_key: input.monthKey,
             name: input.name.trim(),
             region_policy_id: input.regionPolicyId,
@@ -210,6 +212,7 @@ export class AdminCompetitionConfigurationService {
             ends_at: validated.schedule.endsAt,
             entrant_cap: input.entrantCap ?? null,
             minimum_entrants: input.minimumEntrants,
+            mode: input.mode ?? 'cash',
             month_key: input.monthKey,
             name: input.name.trim(),
             region_policy_id: input.regionPolicyId,
@@ -377,7 +380,7 @@ export class AdminCompetitionConfigurationService {
 
   private validateDraft(input: CreateCompetitionDraftDto) {
     const schedule = parseCompetitionSchedule(input);
-    const rules = parseAdminCompetitionRules(input.rules);
+    const rules = parseAdminCompetitionRules(input.rules, input.mode ?? 'cash');
     assertUniqueGoalBrackets(input.goalBrackets);
     if (
       input.entrantCap !== undefined &&
@@ -431,6 +434,7 @@ export class AdminCompetitionConfigurationService {
     competition: {
       ends_at: Date;
       id: string;
+      mode: CompetitionMode;
       region_policy_id: string;
       registration_closes_at: Date;
       registration_opens_at: Date;
@@ -442,6 +446,13 @@ export class AdminCompetitionConfigurationService {
       throw new ConflictException({
         code: 'COMPETITION_CANNOT_BE_PUBLISHED',
         message: 'Only a draft competition can be published.',
+      });
+    }
+    if (competition.mode === 'non_cash_demo') {
+      throw new ConflictException({
+        code: 'DEMO_COMPETITION_ADMIN_PUBLISH_DISABLED',
+        message:
+          'Non-cash demo competitions can only be activated by the guarded local foundation bootstrap.',
       });
     }
     const now = new Date();
@@ -543,6 +554,7 @@ export class AdminCompetitionConfigurationService {
       currency: input.currency,
       endsAt: input.endsAt,
       monthKey: input.monthKey,
+      mode: input.mode ?? 'cash',
       regionPolicyId: input.regionPolicyId,
       rulesVersion: input.rulesVersion,
       startsAt: input.startsAt,

@@ -11,9 +11,9 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, componentSizes, fontFamilies, fontSizes, interactionStates, spacing } from '@/constants/theme';
 import type { CategoryLeaderboardRow } from '@/data/appData';
-import { useAppData, useCategoryLeaderboard } from '@/data/appDataHooks';
+import { useCategoryLeaderboard } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
 import { useProfile } from '@/state/profile';
 import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
@@ -31,19 +31,14 @@ export default function LeaderboardScreen() {
   } = useWorkoutProgress();
   const [selectedGoal, setSelectedGoal] = useState<GoalCategory | null>(null);
   const [showRankingRules, setShowRankingRules] = useState(false);
-  const [showPreviewStandings, setShowPreviewStandings] = useState(false);
   const displayedGoal = selectedGoal ?? (weeklyGoal as GoalCategory);
-  const { mode: appDataMode } = useAppData();
   const { data: selectedLeaderboard, isPending: leaderboardPending } =
     useCategoryLeaderboard(displayedGoal);
   const competitionNotStarted = competition.phase === 'before-month';
   const hasSettledWeek = competition.periodResults.some((period) => period.status === 'settled');
   const categoryScore = competition.periodEntriesBeforePerfectMonth;
   const sponsorConfirmed = campaign.status === 'approved';
-  const previewMode = appDataMode === 'demo';
-  const standingsVisible = previewMode
-    ? showPreviewStandings
-    : !competitionNotStarted;
+  const standingsVisible = !competitionNotStarted;
 
   return (
     <ScreenContainer>
@@ -120,14 +115,6 @@ export default function LeaderboardScreen() {
           )}
         </HUDBorderBox>
 
-        {previewMode ? (
-          <CyberButtonOutline
-            label={showPreviewStandings ? 'HIDE SAMPLE RANKINGS' : 'PREVIEW SAMPLE RANKINGS'}
-            onPress={() => setShowPreviewStandings((current) => !current)}
-            style={styles.previewStandingsButton}
-          />
-        ) : null}
-
         {standingsVisible ? <>
         <View style={styles.categorySection}>
           <TerminalText glow tone="cyan" variant="label">
@@ -163,7 +150,7 @@ export default function LeaderboardScreen() {
           <View style={styles.topTenHeader}>
             <View style={styles.topTenHeading}>
               <TerminalText glow tone="cyan" variant="label">
-                {previewMode ? 'PREVIEW TOP 10' : 'TOP 10'}{' // '}{displayedGoal}-DAY CATEGORY
+                TOP 10{' // '}{displayedGoal}-DAY CATEGORY
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Top three finishers receive 3x, 2x and 1.5x entry boosts.
@@ -196,12 +183,6 @@ export default function LeaderboardScreen() {
               </HUDBorderBox>
             ) : null}
           </View>
-
-          {previewMode ? (
-            <TerminalText tone="amber" variant="caption">
-              SAMPLE STANDINGS // LIVE DATA NOT CONNECTED
-            </TerminalText>
-          ) : null}
 
           <CompactTextButton
             label={showRankingRules ? 'HIDE RANKING RULES' : 'HOW RANKING WORKS'}
@@ -304,7 +285,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -358,13 +339,10 @@ const styles = StyleSheet.create({
   },
   metricDivider: {
     width: 1,
-    backgroundColor: colors.borderCyanSubtle
+    backgroundColor: colors.divider
   },
   categorySection: {
     gap: spacing.sm,
-    marginBottom: spacing.lg
-  },
-  previewStandingsButton: {
     marginBottom: spacing.lg
   },
   categorySelector: {
@@ -374,7 +352,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   categoryOption: {
     minWidth: 0,
@@ -382,7 +360,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 5
+    borderRadius: 5,
+    ...interactionStates.webFocus
   },
   categoryOptionSelected: {
     backgroundColor: colors.surfaceCyanActive
@@ -403,7 +382,7 @@ const styles = StyleSheet.create({
   },
   topTenList: {
     borderTopWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   emptyStandings: {
     gap: spacing.sm,
@@ -420,7 +399,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.xs,
     borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   currentUserRow: {
     borderLeftWidth: 2,
@@ -461,7 +440,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md
   },
   pressableCard: {
-    width: '100%'
+    width: '100%',
+    ...interactionStates.webFocus
   },
   drawCard: {
     flexDirection: 'row',
@@ -481,7 +461,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

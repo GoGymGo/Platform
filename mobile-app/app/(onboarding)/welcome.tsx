@@ -3,14 +3,13 @@ import { StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail } from '@/components/sponsor';
-import { isLocalPreviewEnabled } from '@/config/firebase';
+import { isDemoVerificationEnabled } from '@/config/demoVerification';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import {
   formatCampaignCurrency,
@@ -91,26 +90,28 @@ export default function WelcomeScreen() {
 
           <HUDBorderBox glow style={styles.entryPanel} tone="cyan">
             <TerminalText style={styles.entryIntro} tone="muted" variant="label">
-              ON SIGNUP YOU RECEIVE A
+              {isDemoVerificationEnabled ? 'BRITISH COLUMBIA DEMO' : 'ON SIGNUP YOU RECEIVE A'}
             </TerminalText>
             <TerminalText glow style={styles.entryTitle} tone="pink" variant="value">
-              FREE ENTRY
+              {isDemoVerificationEnabled ? 'NO ENTRY CREATED' : 'FREE ENTRY'}
             </TerminalText>
             <TerminalText style={styles.entryActivation} tone="muted" variant="micro">
-              INTO THE MONTHLY PRIZE DRAW
+              {isDemoVerificationEnabled ? 'DRAFT FOUNDATION ONLY' : 'INTO THE MONTHLY PRIZE DRAW'}
             </TerminalText>
             <View style={styles.entryDetailRow}>
               <View style={[styles.prizeBlock, !sponsorConfirmed && styles.pendingPrizeBlock]}>
                 <TerminalText tone="muted" variant="micro">
-                  PROJECTED DRAW POOL
+                  {isDemoVerificationEnabled ? 'PAYOUT STATUS' : 'PROJECTED DRAW POOL'}
                 </TerminalText>
                 <TerminalText
                   glow
                   style={[styles.prizeValue, !sponsorConfirmed && styles.prizePending]}
-                  tone={sponsorConfirmed ? 'pink' : 'cyan'}
+                  tone={sponsorConfirmed ? 'pink' : 'amber'}
                   variant="title"
                 >
-                  {sponsorConfirmed
+                  {isDemoVerificationEnabled
+                    ? 'DISABLED'
+                    : sponsorConfirmed
                     ? formatCampaignCurrency(economics.prizeDrawAmount)
                     : 'PUBLISHED\nSOON'}
                 </TerminalText>
@@ -128,10 +129,12 @@ export default function WelcomeScreen() {
             </View>
             <TerminalText
               style={styles.drawLabel}
-              tone={sponsorConfirmed ? 'pink' : 'cyan'}
+              tone={sponsorConfirmed ? 'pink' : 'amber'}
               variant="label"
             >
-              15% OF PLAYERS GET PAID
+              {isDemoVerificationEnabled
+                ? 'NO ENROLLMENT // NO WINNERS // NO PAYOUTS'
+                : '15% OF PLAYERS GET PAID'}
             </TerminalText>
           </HUDBorderBox>
 
@@ -140,12 +143,6 @@ export default function WelcomeScreen() {
               label="CREATE ACCOUNT ->"
               onPress={() => router.push('/join')}
             />
-            {isLocalPreviewEnabled ? (
-              <CyberButtonOutline
-                label="PREVIEW APP FLOW"
-                onPress={() => router.push('/identity')}
-              />
-            ) : null}
           </View>
         </View>
       </ScreenScrollView>
@@ -287,8 +284,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfacePinkSoft
   },
   pendingPrizeBlock: {
-    borderColor: colors.borderCyanSubtle,
-    backgroundColor: colors.surfaceCyanFaint
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
   },
   prizeValue: {
     marginTop: 2,
@@ -312,7 +309,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCyanWhisper
   },
   pendingSponsorAd: {
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
   },
   sponsorAdCopy: {
     flex: 1

@@ -9,7 +9,16 @@ import {
 
 import { HUDBorderBox, TerminalText } from '@/components/cyber';
 import type { SponsorPlacementKey } from '@/config/sponsorCampaigns';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import {
+  borders,
+  colors,
+  componentSizes,
+  cyberGlow,
+  fontFamilies,
+  interactionStates,
+  radii,
+  spacing
+} from '@/constants/theme';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 type SponsorTone = 'cyan' | 'pink' | 'amber';
@@ -45,7 +54,7 @@ export function SponsorRail({
   const resolvedMark = mark ?? campaign.sponsor.mark;
   const resolvedSponsorName = sponsorName ?? campaign.sponsor.railName;
   const resolvedSubtitle = subtitle ?? campaign.sponsor.subtitle;
-  const sponsorTone: SponsorTone = campaign.status === 'approved' ? 'pink' : 'cyan';
+  const sponsorTone: SponsorTone = campaign.status === 'approved' ? 'pink' : 'amber';
 
   return (
     <HUDBorderBox
@@ -96,7 +105,7 @@ export function BrandVideoAdPlaceholder({
   const { campaign, getPlacement } = useSponsorCampaign();
   const creative = getPlacement(placement);
   const sponsorConfirmed = campaign.status === 'approved';
-  const resolvedTone: SponsorTone = sponsorConfirmed ? tone : 'cyan';
+  const resolvedTone: SponsorTone = sponsorConfirmed ? tone : 'amber';
   const resolvedCtaLabel = sponsorConfirmed
     ? ctaLabel ?? creative.ctaLabel
     : 'ANNOUNCEMENT SOON';
@@ -109,13 +118,13 @@ export function BrandVideoAdPlaceholder({
   if (!sponsorConfirmed) {
     return (
       <HUDBorderBox style={[styles.pendingCard, style]} tone="muted">
-        <View style={[styles.brandMark, styles.brandMarkCyan, styles.pendingMark]}>
-          <TerminalText glow tone="cyan" variant="label">
+        <View style={[styles.brandMark, styles.brandMarkAmber, styles.pendingMark]}>
+          <TerminalText glow tone="amber" variant="label">
             {campaign.sponsor.mark}
           </TerminalText>
         </View>
         <View style={styles.pendingCopy}>
-          <TerminalText glow tone="cyan" variant="micro">
+          <TerminalText glow tone="amber" variant="micro">
             {`GOGYMGO CAMPAIGN // ${resolvedPlacementLabel}`}
           </TerminalText>
           <TerminalText style={styles.pendingTitle} tone="text" variant="body">
@@ -215,6 +224,7 @@ export function BrandVideoAdPlaceholder({
 
   return (
     <Pressable
+      accessibilityLabel={`${resolvedSponsorName}: ${resolvedCtaLabel}`}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.pressable, pressed ? styles.pressed : null]}
@@ -242,7 +252,7 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.sponsorBorder,
     borderRadius: radii.sm,
     backgroundColor: colors.surfacePinkSoft
@@ -265,7 +275,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.terminal
   },
   pressable: {
-    width: '100%'
+    width: '100%',
+    borderRadius: radii.lg,
+    ...interactionStates.webFocus
   },
   card: {
     gap: spacing.md,
@@ -286,7 +298,7 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderRadius: 9
   },
   brandMarkPink: {
@@ -294,8 +306,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfacePinkSoft
   },
   sponsorMarkPending: {
-    borderColor: colors.borderCyanMedium,
-    backgroundColor: colors.surfaceCyanSoft
+    borderColor: colors.borderWarning,
+    backgroundColor: colors.surfaceWarning
   },
   pendingCard: {
     flexDirection: 'row',
@@ -336,8 +348,8 @@ const styles = StyleSheet.create({
     minHeight: 116,
     justifyContent: 'space-between',
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.whiteAlpha10,
+    borderWidth: borders.hairline,
+    borderColor: colors.borderDefault,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceVideoDark
   },
@@ -358,11 +370,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.md
   },
   playButton: {
-    width: 48,
-    height: 48,
+    width: componentSizes.minimumTouchTarget + spacing.xs,
+    height: componentSizes.minimumTouchTarget + spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderRadius: 24
   },
   playButtonPink: {
@@ -397,7 +409,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

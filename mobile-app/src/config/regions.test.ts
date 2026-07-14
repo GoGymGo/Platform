@@ -10,8 +10,8 @@ import {
 
 describe('competition regions', () => {
   it('hydrates a supported region', () => {
-    assert.deepEqual(parseCompetitionRegion('{"id":"vancouver"}'),
-      competitionRegions.find((region) => region.id === 'vancouver')
+    assert.deepEqual(parseCompetitionRegion('{"id":"bc"}'),
+      competitionRegions.find((region) => region.id === 'bc')
     );
   });
 
@@ -20,22 +20,26 @@ describe('competition regions', () => {
     assert.deepEqual(parseCompetitionRegion('{"id":"unknown"}'), defaultCompetitionRegion);
   });
 
-  it('hydrates verified region metadata', () => {
+  it('hydrates a server-pending BC region submission', () => {
     assert.deepEqual(
       parseCompetitionRegionVerification(
-        '{"id":"calgary","method":"device-location","status":"verified","verifiedAt":"2026-07-12T12:00:00.000Z"}'
+        '{"backendVerificationId":"10000000-0000-4000-8000-000000000001","expiresAt":null,"id":"bc","method":"device-location","policyVersion":"bc-demo-foundation-v1","reviewedAt":null,"status":"pending","submittedAt":"2026-07-12T12:00:00.000Z"}'
       ),
       {
+        backendVerificationId: '10000000-0000-4000-8000-000000000001',
+        expiresAt: null,
         method: 'device-location',
-        region: competitionRegions.find((region) => region.id === 'calgary'),
-        status: 'verified',
-        verifiedAt: '2026-07-12T12:00:00.000Z'
+        policyVersion: 'bc-demo-foundation-v1',
+        region: competitionRegions.find((region) => region.id === 'bc'),
+        reviewedAt: null,
+        status: 'pending',
+        submittedAt: '2026-07-12T12:00:00.000Z'
       }
     );
   });
 
   it('rejects incomplete or legacy verification metadata', () => {
-    assert.equal(parseCompetitionRegionVerification('{"id":"toronto"}'), null);
-    assert.equal(parseCompetitionRegionVerification('{"id":"unknown","method":"postal-code","status":"provisional","verifiedAt":"today"}'), null);
+    assert.equal(parseCompetitionRegionVerification('{"id":"bc"}'), null);
+    assert.equal(parseCompetitionRegionVerification('{"id":"unknown","method":"postal-code","status":"pending","submittedAt":"today"}'), null);
   });
 });

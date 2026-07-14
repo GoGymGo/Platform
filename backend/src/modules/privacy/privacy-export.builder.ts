@@ -199,6 +199,23 @@ export class PrivacyExportBuilder {
           .orderBy('event.received_at')
           .execute();
 
+        const demoVerificationCheckpoints = await transaction
+          .selectFrom('demo_verification_checkpoints')
+          .select([
+            'id',
+            'provider',
+            'region_code',
+            'checkpoint_type',
+            'outcome',
+            'demo',
+            'issued_at',
+            'expires_at',
+            'created_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('issued_at')
+          .execute();
+
         const progress = await transaction
           .selectFrom('competition_progress')
           .select([
@@ -412,6 +429,7 @@ export class PrivacyExportBuilder {
           account,
           accountLegalReceipts,
           competitionData: {
+            demoVerificationCheckpoints,
             drawEntries,
             enrollments,
             entryLedger,
@@ -442,7 +460,7 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 2,
+          schemaVersion: 3,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',

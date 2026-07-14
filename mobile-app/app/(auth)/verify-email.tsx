@@ -14,7 +14,6 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { getAuthErrorMessage } from '@/domain/auth';
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { spacing } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 
@@ -113,12 +112,6 @@ export default function VerifyEmailScreen() {
             label={busyAction === 'resend' ? 'SENDING...' : 'RESEND EMAIL'}
             onPress={resendVerification}
           />
-          {isLocalPreviewEnabled ? (
-            <CyberButtonOutline
-              label="PREVIEW APP FLOW"
-              onPress={() => router.push('/identity')}
-            />
-          ) : null}
           <CyberButtonOutline
             disabled={Boolean(busyAction)}
             label={busyAction === 'signout' ? 'SIGNING OUT...' : 'USE ANOTHER ACCOUNT'}

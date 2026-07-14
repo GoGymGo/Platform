@@ -27,7 +27,11 @@ export function ProfileAvatar({
   const borderRadius = Math.round(size * 0.28);
 
   return (
-    <View style={[styles.wrapper, { height: size, width: size }, style]}>
+    <View
+      accessibilityLabel={showStatus ? 'Profile status active' : undefined}
+      accessible={showStatus}
+      style={[styles.wrapper, { height: size, width: size }, style]}
+    >
       <View style={[styles.avatar, { borderRadius }]}>
         {imageUri ? (
           <Image

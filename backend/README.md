@@ -12,6 +12,8 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 - Hyperwallet credentials, webhooks, user/payment tokens, and hosted portal actions remain server-side.
 - GoGymGo never accepts bank-account, tax-form, or identity-document fields.
 - Account legal documents and receipts are versioned, content-hashed, append-only, and server-timestamped; local device state is never authoritative competition consent.
+- The optional British Columbia, Canada demo-verification adapter stores only an expiring simulated checkpoint. It cannot run in production and never creates competition credit, prize eligibility, or payout state.
+- The local BC demo foundation bootstrap accepts only a localhost database, requires explicit confirmation and an audit reason, and creates only a disabled BC policy plus a guarded zero-value `non_cash_demo` competition. Approved users may create a demo enrollment, but database triggers prohibit entry, scoring, draw, winner, payout, and Hyperwallet state.
 
 ## Local foundation
 
@@ -28,6 +30,42 @@ npm.cmd install
 npm.cmd run check
 npm.cmd run start:dev
 ```
+
+To create or verify the disabled BC demo foundation in the local database:
+
+```powershell
+$env:CONFIRM_BC_DEMO_BOOTSTRAP='yes'
+$env:BC_DEMO_BOOTSTRAP_REASON='Create the local BC backend foundation for development.'
+npm.cmd run bootstrap:bc-demo
+Remove-Item Env:CONFIRM_BC_DEMO_BOOTSTRAP
+Remove-Item Env:BC_DEMO_BOOTSTRAP_REASON
+```
+
+The command defaults to the next calendar month in `America/Vancouver`. Set
+`BC_DEMO_COMPETITION_MONTH=YYYY-MM` only when a specific local demo month is
+needed. Re-running the command is safe: it verifies and reuses the same records,
+and refuses to proceed if either record has been activated or changed.
+
+After a verified Firebase account has signed in once, assign only the local BC
+review role with the separate least-privilege bootstrap:
+
+```powershell
+$env:CONFIRM_BC_DEMO_OPERATOR_BOOTSTRAP='yes'
+$env:BC_DEMO_OPERATOR_FIREBASE_UID='<firebase uid>'
+$env:BC_DEMO_OPERATOR_REASON='Authorize this account to review local BC demo submissions.'
+npm.cmd run bootstrap:bc-demo-operator
+Remove-Item Env:CONFIRM_BC_DEMO_OPERATOR_BOOTSTRAP
+Remove-Item Env:BC_DEMO_OPERATOR_FIREBASE_UID
+Remove-Item Env:BC_DEMO_OPERATOR_REASON
+```
+
+This command refuses remote databases and unsafe BC foundation state. It
+replaces a temporary local `admin` grant with `operator`, records the change in
+the append-only audit ledger, and grants no payout or Hyperwallet role.
+
+The connected client paths, disabled enrollment boundary and remaining legal
+and backend prerequisites are documented in
+[the BC demo foundation handoff](docs/bc-demo-foundation.md).
 
 The liveness route is `GET http://localhost:3000/v1/health`. In non-production environments, Swagger UI is available at `http://localhost:3000/docs` and the generated contract is committed as `openapi.json`.
 

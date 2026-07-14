@@ -13,7 +13,8 @@ import {
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { isDemoVerificationEnabled } from '@/config/demoVerification';
+import { colors, componentSizes, fontFamilies, interactionStates, spacing } from '@/constants/theme';
 import { useCurrentUserPayout } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
@@ -26,6 +27,7 @@ import {
 import { useProfile } from '@/state/profile';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
+import { useDemoEnrollment } from '@/state/demoEnrollment';
 
 type ProfileStat = {
   accent: 'cyan' | 'green' | 'pink';
@@ -138,7 +140,8 @@ function getSettingsRows(
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOutUser, user } = useAuth();
-  const { publicName } = useProfile();
+  const { publicName, roles } = useProfile();
+  const { demoEnrollment } = useDemoEnrollment();
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const publicInitials = getPublicInitials(publicName);
   const {
@@ -172,7 +175,11 @@ export default function ProfileScreen() {
     { value: String(verifiedSessionCount), label: 'VERIFIED', accent: 'green' },
     {
       value: String(totalEntries),
-      label: 'PRIZE DRAW ENTRIES',
+      label: isDemoVerificationEnabled
+        ? demoEnrollment
+          ? 'DEMO ENROLLED // NO PRIZES'
+          : 'DEMO // NOT ENROLLED'
+        : 'PRIZE DRAW ENTRIES',
       accent: 'pink'
     }
   ];
@@ -183,6 +190,9 @@ export default function ProfileScreen() {
     Boolean(payoutClaim)
   );
   const providerLabel = formatProviderLabel(user?.providerIds ?? []);
+  const isOperator = roles.some((role) =>
+    ['admin', 'fraud_operator', 'operator'].includes(role)
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -289,7 +299,7 @@ export default function ProfileScreen() {
           <View style={styles.accountRow}>
             <View style={styles.profileImageCopy}>
               <TerminalText tone="text" uppercase={false} variant="body">
-                {user?.email ?? 'PREVIEW ACCOUNT'}
+                {user?.email ?? 'ACCOUNT EMAIL UNAVAILABLE'}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
                 {user
@@ -334,20 +344,36 @@ export default function ProfileScreen() {
             <TerminalText glow tone="cyan" variant="body">
               {competitionRegion.label}
             </TerminalText>
-            <TerminalText tone={regionVerification?.status === 'verified' ? 'green' : 'amber'} variant="caption">
+            <TerminalText tone="amber" variant="caption">
               {regionVerification
-                ? regionVerification.status === 'verified'
-                  ? 'VERIFIED BY DEVICE LOCATION'
-                  : 'POSTAL MATCH // LOCATION RECHECK REQUIRED'
-                : 'LOCATION VERIFICATION REQUIRED'}
+                ? `SERVER REVIEW // ${regionVerification.status.toUpperCase()}`
+                : 'BC REGION SUBMISSION REQUIRED'}
             </TerminalText>
           </View>
           <CyberButtonOutline
-            label="REVERIFY"
+            label={regionVerification?.status === 'approved' ? 'VIEW' : 'CHECK STATUS'}
             onPress={() => router.push('/region?source=profile' as Href)}
             style={styles.regionButton}
           />
         </HUDBorderBox>
+
+        {isOperator ? (
+          <HUDBorderBox style={styles.regionCard} tone="green">
+            <View style={styles.regionCopy}>
+              <TerminalText tone="green" variant="label">
+                OPERATOR TOOLS
+              </TerminalText>
+              <TerminalText tone="muted" variant="caption">
+                APPROVE OR REJECT PENDING BC DEMO REGION SUBMISSIONS
+              </TerminalText>
+            </View>
+            <CyberButtonOutline
+              label="OPEN QUEUE"
+              onPress={() => router.push('/profile/region-reviews' as Href)}
+              style={styles.regionButton}
+            />
+          </HUDBorderBox>
+        ) : null}
 
         <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
           COMPETITION
@@ -488,7 +514,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   profileHeader: {
@@ -598,7 +624,8 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.whiteAlpha05
+    borderBottomColor: colors.whiteAlpha05,
+    ...interactionStates.webFocus
   },
   settingsCopy: {
     flex: 1
@@ -616,7 +643,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

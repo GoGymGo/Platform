@@ -48,6 +48,18 @@ export class CompetitionsController {
     return this.competitions.getCurrent(principal);
   }
 
+  @Get('current/enrollment')
+  @ApiBearerAuth('firebase')
+  @ApiOperation({
+    summary: 'Return the authenticated user current active enrollment',
+  })
+  @ApiOkResponse({ type: EnrollmentResponseDto })
+  getCurrentEnrollment(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<EnrollmentResponseDto | null> {
+    return this.competitions.getCurrentEnrollment(principal);
+  }
+
   @Post(':competitionId/enrollments')
   @ApiBearerAuth('firebase')
   @ApiHeader({ name: 'Idempotency-Key', required: true })

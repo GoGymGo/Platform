@@ -271,6 +271,15 @@ export class OperatorWorkQueueItemDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
+
+  @ApiPropertyOptional({ example: 'CA-BC-DEMO', type: String })
+  regionCode?: string;
+
+  @ApiPropertyOptional({
+    enum: ['device_location', 'manual_review', 'postal_code'],
+    type: String,
+  })
+  verificationMethod?: string;
 }
 
 export class OperatorQueueDepthsDto {

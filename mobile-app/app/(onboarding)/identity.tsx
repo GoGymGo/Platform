@@ -4,10 +4,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  TextInput,
   View
 } from 'react-native';
 
+import { AuthStatusNotice } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonOutline,
@@ -15,10 +15,11 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { FormTextInput } from '@/components/formTextInput';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -51,6 +52,8 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
   const [alias, setAlias] = useState(
     initialIdentity?.displayName || initialIdentity?.callsign || ''
   );
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const {
     chooseProfileImage,
     clearProfileImage,
@@ -63,19 +66,26 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
 
   const handleContinue = async () => {
     const normalizedAlias = alias.trim();
+    setSaveError('');
+    setSaving(true);
+    try {
+      await setPublicIdentity({
+        callsign: normalizedAlias,
+        displayName: normalizedAlias,
+        mode: 'alias'
+      });
 
-    await setPublicIdentity({
-      callsign: normalizedAlias,
-      displayName: normalizedAlias,
-      mode: 'alias'
-    });
+      if (source === 'profile') {
+        router.replace('/profile');
+        return;
+      }
 
-    if (source === 'profile') {
-      router.replace('/profile');
-      return;
+      router.push('/region');
+    } catch {
+      setSaveError('YOUR ALIAS COULD NOT BE SAVED. CHECK THE API AND TRY AGAIN.');
+    } finally {
+      setSaving(false);
     }
-
-    router.push('/region');
   };
 
   return (
@@ -113,16 +123,13 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             <TerminalText tone="dim" variant="micro">
               ALIAS
             </TerminalText>
-            <TextInput
+            <FormTextInput
               accessibilityLabel="Alias"
               autoCapitalize="words"
               autoCorrect={false}
               maxLength={24}
               onChangeText={setAlias}
               placeholder="Enter your alias"
-              placeholderTextColor={colors.dim}
-              selectionColor={colors.cyan}
-              style={styles.input}
               value={alias}
             />
           </View>
@@ -165,9 +172,17 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             ) : null}
           </View>
 
+          {saveError ? (
+            <AuthStatusNotice message={saveError} tone="amber" />
+          ) : null}
+
           <CyberButtonPrimary
-            disabled={!identityIsValid}
-            label={source === 'profile' ? 'SAVE ALIAS ->' : 'CONTINUE ->'}
+            disabled={!identityIsValid || saving}
+            label={saving
+              ? 'SAVING ALIAS...'
+              : source === 'profile'
+                ? 'SAVE ALIAS ->'
+                : 'CONTINUE ->'}
             onPress={handleContinue}
             style={styles.primaryButton}
           />
@@ -208,17 +223,6 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: spacing.xs,
     marginTop: spacing.sm
-  },
-  input: {
-    minHeight: 50,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyanMedium,
-    borderRadius: radii.sm,
-    color: colors.text,
-    backgroundColor: colors.panelAlpha70,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.control
   },
   pictureSection: {
     alignItems: 'center',

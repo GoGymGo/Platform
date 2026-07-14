@@ -1,9 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 import {
-  competitionRulesSchema,
+  parseCompetitionRules,
   type CompetitionRules,
 } from '../competitions/competition-rules';
+import type { CompetitionMode } from '../../database/database.types';
 
 const positionSchema = z.tuple([
   z.number().min(-180).max(180),
@@ -103,13 +104,16 @@ export function assertUniqueGoalBrackets(
   }
 }
 
-export function parseAdminCompetitionRules(value: unknown): CompetitionRules {
-  const parsed = competitionRulesSchema.safeParse(value);
-  if (!parsed.success) {
+export function parseAdminCompetitionRules(
+  value: unknown,
+  mode: CompetitionMode = 'cash',
+): CompetitionRules {
+  try {
+    return parseCompetitionRules(value as never, mode);
+  } catch {
     throw new BadRequestException({
       code: 'COMPETITION_RULES_INVALID',
       message: 'The competition rules do not match the supported rule schema.',
     });
   }
-  return parsed.data;
 }

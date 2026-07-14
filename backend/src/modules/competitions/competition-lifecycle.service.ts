@@ -38,6 +38,7 @@ export class CompetitionLifecycleService {
               'configuration_version',
               'id',
               'minimum_entrants',
+              'mode',
               'starts_at',
               'status',
             ])
@@ -68,6 +69,7 @@ export class CompetitionLifecycleService {
           const nextStatus = resolveCompetitionStart(
             competition.minimum_entrants,
             activeEntrants,
+            competition.mode,
           );
 
           await transaction
@@ -125,9 +127,11 @@ export class CompetitionLifecycleService {
                 version: competition.configuration_version,
               },
               reason:
-                nextStatus === 'active'
-                  ? 'Scheduled competition start reached.'
-                  : 'Minimum entrant threshold was not reached.',
+                competition.mode === 'non_cash_demo'
+                  ? 'Scheduled non-cash demo start reached.'
+                  : nextStatus === 'active'
+                    ? 'Scheduled competition start reached.'
+                    : 'Minimum entrant threshold was not reached.',
               request_id: `worker:competition-start:${competition.id}`,
             })
             .executeTakeFirstOrThrow();

@@ -16,9 +16,10 @@ This repository contains the active GoGymGo React Native frontend.
 
 - `mobile-app/` - Active React Native, Expo Router and TypeScript application.
 - `mobile-app/app/` - File-based routes for authentication, onboarding, tabs, workouts and modals.
-- `mobile-app/src/` - Shared components, theme, domain calculations, state and preview data.
+- `mobile-app/src/` - Shared components, theme, production API contracts, domain calculations and state.
 - `mobile-app/docs/` - Product, design, compliance and migration documentation.
 - `mobile-app/docs/backend-handoff-architecture.md` - Chosen backend, payout, trust-boundary and integration plan.
+- `mobile-app/docs/frontend-backend-handoff.md` - Current frontend contracts, unavailable integrations and backend implementation order.
 
 ## App Commands
 
@@ -33,8 +34,8 @@ npx.cmd expo-doctor@latest
 npm.cmd audit --omit=dev
 ```
 
-`npm.cmd run check` runs TypeScript, Expo lint, domain unit tests and the
-source/route integrity audit.
+`npm.cmd run check` runs TypeScript, Expo lint, domain unit tests, the
+source/route integrity audit and the production-readiness audit.
 
 Firebase Authentication code is included but requires a Firebase project before account actions can reach a live service. See `mobile-app/docs/Firebase_Auth_Setup.md` and `mobile-app/.env.example`.
 

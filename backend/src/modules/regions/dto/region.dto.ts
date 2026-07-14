@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsLatitude,
   IsLongitude,
+  Matches,
   IsOptional,
   IsPostalCode,
   IsString,
@@ -91,6 +92,12 @@ export class CreateRegionVerificationDto {
   postalCode?: string;
 }
 
+export class CurrentRegionVerificationQueryDto {
+  @ApiProperty({ example: 'CA-BC-DEMO', type: String })
+  @Matches(/^[A-Z]{2}-[A-Z0-9-]{1,32}$/)
+  regionCode!: string;
+}
+
 export class RegionVerificationResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -115,4 +122,18 @@ export class RegionVerificationResponseDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
+}
+
+export class CurrentRegionVerificationResponseDto extends RegionVerificationResponseDto {
+  @ApiProperty({ example: 'CA-BC-DEMO', type: String })
+  regionCode!: string;
+
+  @ApiProperty({ example: 'British Columbia Demo', type: String })
+  regionName!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  reviewedAt!: string | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  expiresAt!: string | null;
 }

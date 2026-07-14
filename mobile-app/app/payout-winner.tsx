@@ -1,5 +1,5 @@
 import { Redirect, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
 import {
@@ -21,7 +21,17 @@ export default function PayoutWinnerScreen() {
   const { data: claim, isPending } = useCurrentUserPayout(user?.uid);
 
   if (isPending) {
-    return null;
+    return (
+      <ScreenContainer contentStyle={styles.loading}>
+        <ActivityIndicator
+          accessibilityLabel="Loading"
+          accessibilityLiveRegion="polite"
+          accessibilityRole="progressbar"
+          color={colors.cyan}
+          size="large"
+        />
+      </ScreenContainer>
+    );
   }
 
   if (!claim) {
@@ -30,12 +40,20 @@ export default function PayoutWinnerScreen() {
   const confirmedClaim = claim;
 
   async function continueToPayout() {
-    await markPayoutWinnerNoticeSeen(user?.uid ?? 'local-preview', confirmedClaim.id);
+    if (!user) {
+      router.replace('/sign-in');
+      return;
+    }
+    await markPayoutWinnerNoticeSeen(user.uid, confirmedClaim.id);
     router.replace('/profile/payout');
   }
 
   async function returnHome() {
-    await markPayoutWinnerNoticeSeen(user?.uid ?? 'local-preview', confirmedClaim.id);
+    if (!user) {
+      router.replace('/sign-in');
+      return;
+    }
+    await markPayoutWinnerNoticeSeen(user.uid, confirmedClaim.id);
     router.replace('/home');
   }
 
@@ -88,6 +106,11 @@ export default function PayoutWinnerScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl
+  },
   screen: {
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,

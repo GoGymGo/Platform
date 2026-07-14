@@ -76,6 +76,13 @@ export class DrawsService {
             message: 'The competition was not found.',
           });
         }
+        if (competition.mode === 'non_cash_demo') {
+          throw new ConflictException({
+            code: 'DEMO_COMPETITION_DRAWS_DISABLED',
+            message:
+              'Draw creation is disabled for non-cash demo competitions.',
+          });
+        }
 
         const existing = await transaction
           .selectFrom('competition_draws')

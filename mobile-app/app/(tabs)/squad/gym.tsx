@@ -9,7 +9,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { colors, componentSizes, fontFamilies, interactionStates, spacing, fontSizes } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 export default function GymCompetitionScreen() {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -125,7 +125,8 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressableCard: {
-    width: '100%'
+    width: '100%',
+    ...interactionStates.webFocus
   },
   checkInCard: {
     alignItems: 'center',
@@ -175,7 +176,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.borderMuted
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

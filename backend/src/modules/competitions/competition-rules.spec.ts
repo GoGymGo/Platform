@@ -27,4 +27,20 @@ describe('versioned competition rules', () => {
       parseCompetitionRules({ ...validRules, clientCanVerify: true }),
     ).toThrow();
   });
+
+  it('accepts only zero-value rules for a non-cash demo', () => {
+    const demoRules = {
+      ...validRules,
+      payoutExponent: 0,
+      payoutPoolAmountMinor: 0,
+      payoutWinnerCount: 0,
+      signupPrizeDrawEntries: 0,
+      verifiedSessionCategoryScore: 0,
+      verifiedSessionPrizeDrawEntries: 0,
+    };
+    expect(parseCompetitionRules(demoRules, 'non_cash_demo')).toEqual(
+      demoRules,
+    );
+    expect(() => parseCompetitionRules(validRules, 'non_cash_demo')).toThrow();
+  });
 });

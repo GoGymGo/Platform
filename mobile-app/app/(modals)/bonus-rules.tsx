@@ -76,7 +76,7 @@ export default function BonusRulesModal() {
   ];
 
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer contentStyle={styles.screen} surface="modal">
       <View style={styles.header}>
         <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
           BONUS RULES
@@ -153,7 +153,7 @@ function RuleCard({ rule }: { rule: BonusRule }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.surfaceModal
   },
   header: {
     flexDirection: 'row',
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderCyanMuted,
     borderRadius: 12,
-    backgroundColor: colors.backgroundAlpha72
+    backgroundColor: colors.surfaceOverlay
   },
   ruleValue: {
     fontFamily: fontFamilies.display,

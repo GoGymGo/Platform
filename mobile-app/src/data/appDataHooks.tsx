@@ -14,7 +14,6 @@ import {
 } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import {
   createAppDataSource,
   type AppDataMode,
@@ -45,12 +44,8 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       }
     })
   );
-  const mode: AppDataMode = isLocalPreviewEnabled
-    ? 'demo'
-    : api
-      ? 'api'
-      : 'unavailable';
-  const source = useMemo(() => createAppDataSource(mode, api), [api, mode]);
+  const source = useMemo(() => createAppDataSource(api), [api]);
+  const mode: AppDataMode = source.mode;
   const authenticatedQueriesEnabled = mode !== 'api' || Boolean(user);
   const value = useMemo(
     () => ({ authenticatedQueriesEnabled, mode, source }),

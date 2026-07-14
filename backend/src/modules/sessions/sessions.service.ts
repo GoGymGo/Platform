@@ -111,6 +111,7 @@ export class SessionsService {
           )
           .select([
             'competition.ends_at',
+            'competition.mode',
             'competition.rules_version',
             'competition.starts_at',
             'competition.status as competition_status',
@@ -126,6 +127,13 @@ export class SessionsService {
             code: 'ACTIVE_ENROLLMENT_NOT_FOUND',
             message:
               'An active enrollment is required to start a competition session.',
+          });
+        }
+        if (enrollment.mode === 'non_cash_demo') {
+          throw new ConflictException({
+            code: 'DEMO_COMPETITION_SESSIONS_DISABLED',
+            message:
+              'Competition workout sessions are disabled for the non-cash demo.',
           });
         }
         if (

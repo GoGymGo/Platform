@@ -13,7 +13,8 @@ import {
   SponsorRail as SponsorBanner
 } from '@/components/sponsor';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { isDemoVerificationEnabled } from '@/config/demoVerification';
+import { colors, componentSizes, cyberGlow, fontFamilies, interactionStates, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
   useCreatorWorkouts,
@@ -25,6 +26,7 @@ import { useProfile } from '@/state/profile';
 import { useAuth } from '@/state/auth';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
+import { useDemoEnrollment } from '@/state/demoEnrollment';
 
 type HomeStat = {
   label: string;
@@ -37,6 +39,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { profileImageUri, publicName } = useProfile();
   const { enrollment } = useSponsorCampaign();
+  const { demoEnrollment } = useDemoEnrollment();
   const publicInitials = getPublicInitials(publicName);
   const {
     activeSession,
@@ -77,7 +80,11 @@ export default function HomeScreen() {
   const stats: readonly HomeStat[] = [
     {
       value: String(totalEntries),
-      label: 'PRIZE DRAW ENTRIES',
+      label: isDemoVerificationEnabled
+        ? demoEnrollment
+          ? 'DEMO ENROLLED // NO PRIZES'
+          : 'DEMO // NOT ENROLLED'
+        : 'PRIZE DRAW ENTRIES',
       tone: 'pink'
     },
     {
@@ -250,7 +257,11 @@ export default function HomeScreen() {
           ))}
         </View>
         <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
-          {prizeDrawEligible
+          {isDemoVerificationEnabled
+            ? demoEnrollment
+              ? 'Your zero-value BC demo enrollment is active. It creates no prize draw entries, winner eligibility or payout state.'
+              : 'BC demo mode creates no prize draw entries, winner eligibility or payout state.'
+            : prizeDrawEligible
             ? competitionNotStarted
               ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
               : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
@@ -365,7 +376,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: 132,
+    paddingBottom: componentSizes.tabScreenBottomInset,
     backgroundColor: colors.background
   },
   header: {
@@ -383,7 +394,8 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressableCard: {
-    width: '100%'
+    width: '100%',
+    ...interactionStates.webFocus
   },
   videoAd: {
     marginBottom: spacing.lg,
@@ -553,7 +565,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   videoBadgeRow: {
     width: '100%',
@@ -596,7 +608,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+    ...interactionStates.pressed
   }
 });

@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
+import { AuthStatusNotice } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonPrimary,
@@ -11,7 +12,8 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { SponsorRail } from '@/components/sponsor';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, fontFamilies, fontSizes, interactionStates, spacing } from '@/constants/theme';
+import { isDemoVerificationEnabled } from '@/config/demoVerification';
 import {
   calculateWeeklyMatchEntries,
   type WeeklyMatchMultiplier
@@ -37,6 +39,7 @@ import {
 import { goBackOrReplace } from '@/navigation/goBack';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useCompetitionRegion } from '@/state/competitionRegion';
+import { useDemoEnrollment } from '@/state/demoEnrollment';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const dayOptions = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -51,7 +54,8 @@ type CategoryRank = 0 | 1 | 2 | 3;
 
 export default function CommitmentScreen() {
   const router = useRouter();
-  const { competitionRegion } = useCompetitionRegion();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
+  const { enrollInDemo } = useDemoEnrollment();
   const { campaign, enrollment } = useSponsorCampaign();
   const categoryOptions = [
     { label: 'NONE', value: 0 },
@@ -92,6 +96,8 @@ export default function CommitmentScreen() {
   const [bonusDays, setBonusDays] = useState<RemainderDayCount>(0);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showCalculation, setShowCalculation] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState('');
   const baseMonthEntries = days * 4;
   const weeklyMatchEntries = calculateWeeklyMatchEntries(days, weeklyMatchMultipliers);
   const matchAdjustedEntries = weeklyMatchEntries.reduce(
@@ -155,9 +161,29 @@ export default function CommitmentScreen() {
     }
   }
 
-  function confirmWeeklyGoal() {
-    setWeeklyGoal(days);
-    router.push('/entry-confirmed');
+  async function confirmWeeklyGoal() {
+    if (enrolling) {
+      return;
+    }
+    if (regionVerification?.status !== 'approved') {
+      setEnrollmentError(
+        'AN APPROVED BC REGION REVIEW IS REQUIRED BEFORE DEMO ENROLLMENT.'
+      );
+      return;
+    }
+    setEnrolling(true);
+    setEnrollmentError('');
+    try {
+      await enrollInDemo(days, regionVerification.backendVerificationId);
+      setWeeklyGoal(days);
+      router.push('/entry-confirmed');
+    } catch {
+      setEnrollmentError(
+        'THE NON-CASH DEMO ENROLLMENT COULD NOT BE CREATED. CHECK THE API AND TRY AGAIN.'
+      );
+    } finally {
+      setEnrolling(false);
+    }
   }
 
   return (
@@ -180,9 +206,22 @@ export default function CommitmentScreen() {
           CHOOSE YOUR WEEKLY GOAL
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Choose 1-7 verified days. The same goal repeats across four scoring
-          weeks, and only one workout per calendar day counts.
+          {isDemoVerificationEnabled
+            ? 'Choose a 1-7 day goal to test the enrollment setup. Demo workouts do not earn competition credit.'
+            : 'Choose 1-7 verified days. The same goal repeats across four scoring weeks, and only one workout per calendar day counts.'}
         </TerminalText>
+
+        {isDemoVerificationEnabled ? (
+          <HUDBorderBox style={styles.lateGoalNotice} tone="muted">
+            <TerminalText glow tone="amber" variant="label">
+              BC NON-CASH DEMO // NO PRIZES
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              Confirming creates a zero-value demo enrollment only. It creates
+              no prize draw entry, winner eligibility, payout or Hyperwallet account.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : null}
 
         {lateRegistrationActive ? (
           <View style={styles.lateGoalNotice}>
@@ -247,10 +286,14 @@ export default function CommitmentScreen() {
         </View>
 
         <CyberButtonPrimary
-          label="CONFIRM WEEKLY GOAL ->"
-          onPress={confirmWeeklyGoal}
+          disabled={enrolling || regionVerification?.status !== 'approved'}
+          label={enrolling ? 'CREATING DEMO ENROLLMENT...' : 'CONFIRM DEMO GOAL ->'}
+          onPress={() => void confirmWeeklyGoal()}
           style={styles.topConfirmButton}
         />
+        {enrollmentError ? (
+          <AuthStatusNotice message={enrollmentError} tone="amber" />
+        ) : null}
 
         <HUDBorderBox style={styles.registrationStrip} tone="muted">
           <TerminalText tone="dim" variant="micro">
@@ -260,34 +303,44 @@ export default function CommitmentScreen() {
             {formatCampaignDate(upcomingCompetitionDates.startDateKey)} - {formatCampaignDate(upcomingCompetitionDates.endDateKey)}
           </TerminalText>
           <TerminalText glow tone="cyan" variant="label">
-            REGISTRATION OPEN
+            {isDemoVerificationEnabled ? 'NON-CASH DEMO // NO PRIZES' : 'REGISTRATION OPEN'}
           </TerminalText>
           <TerminalText style={styles.registrationPolicy} tone="dim" variant="micro">
-            {enrollment.minimumEntrants} REGION MINIMUM // {sponsorCap}
+            {isDemoVerificationEnabled
+              ? 'OPERATOR-APPROVED BC USERS ONLY'
+              : `${enrollment.minimumEntrants} REGION MINIMUM // ${sponsorCap}`}
           </TerminalText>
           <TerminalText style={styles.registrationPolicy} tone="muted" variant="caption">
-            LATE REGISTRATION CLOSES AT 11:59 PM ON DAY 6.
+            {isDemoVerificationEnabled
+              ? 'DEMO ENROLLMENT CLOSES WHEN THE DEMO MONTH STARTS.'
+              : 'LATE REGISTRATION CLOSES AT 11:59 PM ON DAY 6.'}
           </TerminalText>
         </HUDBorderBox>
 
         <HUDBorderBox style={styles.contestOverview} tone="muted">
           <TerminalText glow tone="cyan" variant="label">
-            HOW THE COMPETITION WORKS
+            {isDemoVerificationEnabled ? 'WHAT THIS DEMO TESTS' : 'HOW THE COMPETITION WORKS'}
           </TerminalText>
           <ContestStep
-            detail="Keep the same Weekly Goal for four scoring weeks."
+            detail={isDemoVerificationEnabled
+              ? 'Save one Weekly Goal as your zero-value demo preference.'
+              : 'Keep the same Weekly Goal for four scoring weeks.'}
             label="SET YOUR GOAL"
             number="01"
           />
           <ContestStep
-            detail="Hit it each week. Miss it and that week earns 0 ENTRIES."
+            detail={isDemoVerificationEnabled
+              ? 'Use the separate demo check-in to test presence confirmation. No competition credit is recorded.'
+              : 'Hit it each week. Miss it and that week earns 0 ENTRIES.'}
             label="SHOW UP AND VERIFY"
             number="02"
-            warning="0 ENTRIES"
+            warning={isDemoVerificationEnabled ? 'NO CREDIT' : '0 ENTRIES'}
           />
           <ContestStep
-            detail="A new Period Match appears each scoring week. Other bonuses appear when they become available."
-            label="UNLOCK BONUSES"
+            detail={isDemoVerificationEnabled
+              ? 'Entry scoring, matches, draws, winners and payouts remain disabled.'
+              : 'A new Period Match appears each scoring week. Other bonuses appear when they become available.'}
+            label={isDemoVerificationEnabled ? 'KEEP MONEY FEATURES OFF' : 'UNLOCK BONUSES'}
             number="03"
           />
         </HUDBorderBox>
@@ -295,13 +348,15 @@ export default function CommitmentScreen() {
         <HUDBorderBox style={styles.baseProjection} tone="cyan">
           <View>
             <TerminalText tone="muted" variant="micro">
-              YOUR FOUR-WEEK BASE
+              {isDemoVerificationEnabled ? 'DEMO FINANCIAL STATE' : 'YOUR FOUR-WEEK BASE'}
             </TerminalText>
             <TerminalText glow style={styles.baseProjectionValue} tone="cyan" variant="title">
-              {days} X 4 = {baseMonthEntries} ENTRIES
+              {isDemoVerificationEnabled
+                ? 'NO ENTRIES CREATED'
+                : `${days} X 4 = ${baseMonthEntries} ENTRIES`}
             </TerminalText>
           </View>
-          {!showCalculator ? (
+          {!isDemoVerificationEnabled && !showCalculator ? (
             <TerminalText glow style={styles.bonusPrompt} tone="pink" variant="body">
               SEE HOW {baseMonthEntries} BASE ENTRIES COULD BECOME{' '}
               {maximumPotentialEntries.toLocaleString()} IN THIS {competitionDayCount}-DAY
@@ -309,16 +364,20 @@ export default function CommitmentScreen() {
             </TerminalText>
           ) : null}
           <TerminalText tone="dim" uppercase={false} variant="caption">
-            Open How Scoring Works to try each week&apos;s Period Match result, your category finish, Bonus Days 29-31 and the final Perfect Month 10x.
+            {isDemoVerificationEnabled
+              ? 'The demo records only enrollment state. All scoring and money-related state remains zero.'
+              : 'Open How Scoring Works to try each week’s Period Match result, your category finish, Bonus Days 29-31 and the final Perfect Month 10x.'}
           </TerminalText>
-          <CompactTextButton
-            label={showCalculator ? 'HIDE HOW SCORING WORKS' : 'SEE HOW SCORING WORKS ->'}
-            onPress={() => setShowCalculator((current) => !current)}
-            tone={showCalculator ? 'muted' : 'cyan'}
-          />
+          {!isDemoVerificationEnabled ? (
+            <CompactTextButton
+              label={showCalculator ? 'HIDE HOW SCORING WORKS' : 'SEE HOW SCORING WORKS ->'}
+              onPress={() => setShowCalculator((current) => !current)}
+              tone={showCalculator ? 'muted' : 'cyan'}
+            />
+          ) : null}
         </HUDBorderBox>
 
-        {showCalculator ? (
+        {showCalculator && !isDemoVerificationEnabled ? (
         <HUDBorderBox glow style={styles.calculationPanel} tone="cyan">
           <TerminalText glow tone="cyan" variant="label">
             HOW SCORING WORKS
@@ -449,8 +508,9 @@ export default function CommitmentScreen() {
 
         <View style={styles.actions}>
           <CyberButtonPrimary
-            label="CONFIRM WEEKLY GOAL ->"
-            onPress={confirmWeeklyGoal}
+            disabled={enrolling || regionVerification?.status !== 'approved'}
+            label={enrolling ? 'CREATING DEMO ENROLLMENT...' : 'CONFIRM DEMO GOAL ->'}
+            onPress={() => void confirmWeeklyGoal()}
           />
         </View>
       </ScreenScrollView>
@@ -784,7 +844,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderRadius: 8
+    borderRadius: 8,
+    ...interactionStates.webFocus
   },
   dayButtonActive: {
     borderColor: colors.borderCyanBright,
@@ -792,7 +853,7 @@ const styles = StyleSheet.create({
   },
   dayButtonIdle: {
     borderColor: colors.whiteAlpha08,
-    backgroundColor: colors.panelAlpha45
+    backgroundColor: colors.surfaceBase
   },
   dayButtonUnavailable: {
     opacity: 0.35,
@@ -839,7 +900,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   weeklyMatchLabel: {
     width: 92,
@@ -857,7 +918,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 5
+    borderRadius: 5,
+    ...interactionStates.webFocus
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -866,7 +928,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.surfaceInteractive
   },
   segment: {
     minWidth: 0,
@@ -875,7 +937,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
-    borderRadius: 5
+    borderRadius: 5,
+    ...interactionStates.webFocus
   },
   segmentLabel: {
     width: '100%',
@@ -905,7 +968,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.divider
   },
   toggleCopy: {
     flex: 1,
@@ -933,7 +996,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: colors.borderCyanSubtle
+    backgroundColor: colors.divider
   },
   resultPanel: {
     alignItems: 'center',

@@ -15,6 +15,7 @@ export default function ProfileLayout() {
     <Stack screenOptions={profileScreenOptions}>
       <Stack.Screen name="index" />
       <Stack.Screen name="payout" />
+      <Stack.Screen name="region-reviews" />
     </Stack>
   );
 }

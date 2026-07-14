@@ -10,7 +10,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { colors, fontFamilies, interactionStates, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
@@ -113,7 +113,7 @@ export default function CommitmentRulesModal() {
   );
 
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer contentStyle={styles.screen} surface="modal">
       <View style={styles.header}>
         <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
           COMMITMENT RULES
@@ -196,7 +196,10 @@ function RuleRow({
       accessibilityRole="button"
       accessibilityState={{ expanded }}
       onPress={onToggle}
-      style={({ pressed }) => pressed ? styles.rulePressed : null}
+      style={({ pressed }) => [
+        styles.rulePressable,
+        pressed ? styles.rulePressed : null
+      ]}
     >
       <HUDBorderBox glow={expanded && rule.tone === 'pink'} style={styles.ruleRow} tone={rule.tone}>
         <View style={styles.ruleIndexBox}>
@@ -227,7 +230,7 @@ function RuleRow({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.surfaceModal
   },
   header: {
     flexDirection: 'row',
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderCyanSubtle
+    borderBottomColor: colors.divider
   },
   headerLabel: {
     flex: 1,
@@ -286,7 +289,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderCyanMuted,
     borderRadius: 10,
-    backgroundColor: colors.backgroundAlpha72
+    backgroundColor: colors.surfaceOverlay
   },
   ruleCopy: {
     flex: 1
@@ -306,7 +309,10 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   rulePressed: {
-    opacity: 0.76
+    ...interactionStates.pressed
+  },
+  rulePressable: {
+    ...interactionStates.webFocus
   },
   summaryCard: {
     marginBottom: spacing.xl,

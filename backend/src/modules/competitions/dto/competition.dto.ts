@@ -3,13 +3,15 @@ import {
   Equals,
   IsBoolean,
   IsInt,
+  IsOptional,
   IsString,
   IsUUID,
   Max,
   Min,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type {
+  CompetitionMode,
   CompetitionStatus,
   EnrollmentStatus,
 } from '../../../database/database.types';
@@ -71,6 +73,9 @@ export class CompetitionResponseDto {
   })
   status!: CompetitionStatus;
 
+  @ApiProperty({ enum: ['cash', 'non_cash_demo'], type: String })
+  mode!: CompetitionMode;
+
   @ApiProperty({ type: String })
   currency!: string;
 
@@ -113,9 +118,10 @@ export class CreateEnrollmentDto {
   @IsUUID()
   regionVerificationId!: string;
 
-  @ApiProperty({ format: 'uuid', type: String })
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
   @IsUUID()
-  legalReceiptBundleId!: string;
+  legalReceiptBundleId?: string;
 
   @ApiProperty({ enum: [true], type: Boolean })
   @Equals(true)
@@ -134,6 +140,9 @@ export class EnrollmentResponseDto {
 
   @ApiProperty({ format: 'uuid', type: String })
   competitionId!: string;
+
+  @ApiProperty({ enum: ['cash', 'non_cash_demo'], type: String })
+  competitionMode!: CompetitionMode;
 
   @ApiProperty({ type: Number })
   goalDays!: number;

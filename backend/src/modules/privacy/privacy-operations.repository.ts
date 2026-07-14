@@ -293,6 +293,10 @@ export class PrivacyOperationsRepository {
           .where('user_id', '=', request.user_id)
           .execute();
         await transaction
+          .deleteFrom('demo_verification_checkpoints')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
           .updateTable('profiles')
           .set({
             avatar_object_key: null,

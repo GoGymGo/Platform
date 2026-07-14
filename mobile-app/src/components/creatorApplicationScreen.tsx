@@ -21,6 +21,7 @@ import {
   type CreatorApplicationErrors
 } from '@/domain/creatorApplication';
 import { submitCreatorApplication } from '@/services/creatorApplication';
+import { isApiUnavailableError } from '@/services/api/availability';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import {
   dismissCreatorInvite,
@@ -77,8 +78,10 @@ export default function CreatorApplicationScreen() {
       await submitCreatorApplication(api, user.uid, input);
       await recordCreatorApplication(user.uid);
       setSubmitted(true);
-    } catch {
-      setSubmissionError('CREATOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+    } catch (error) {
+      setSubmissionError(isApiUnavailableError(error)
+        ? 'CREATOR APPLICATIONS REQUIRE A CONFIGURED API.'
+        : 'CREATOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
     } finally {
       setSubmitting(false);
     }

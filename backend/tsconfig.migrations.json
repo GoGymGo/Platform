@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "incremental": false,
+    "outDir": "./dist/migrations",
+    "rootDir": "./migrations",
+    "sourceMap": false
+  },
+  "include": ["migrations/**/*.ts"]
+}

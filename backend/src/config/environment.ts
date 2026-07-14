@@ -32,6 +32,7 @@ export const environmentSchema = z
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
       .default('info'),
+    PRETTY_LOGS_ENABLED: booleanString.default(true),
     CORS_ORIGINS: z
       .string()
       .default(

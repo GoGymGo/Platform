@@ -11,6 +11,7 @@ describe('environment validation', () => {
     expect(environment.PORT).toBe(3000);
     expect(environment.RUNTIME_ROLE).toBe('api');
     expect(environment.OPENAPI_ENABLED).toBe(true);
+    expect(environment.PRETTY_LOGS_ENABLED).toBe(true);
     expect(environment.DATABASE_URL).toContain('localhost:5432');
     expect(environment.DEMO_VERIFICATION_ENABLED).toBe(false);
     expect(environment.DEMO_VERIFICATION_REGION_CODE).toBe('CA-BC');

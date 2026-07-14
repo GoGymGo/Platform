@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
@@ -10,16 +10,23 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
-import { BrandVideoAdPlaceholder } from '@/components/sponsor';
+import { SponsorRail } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
   const router = useRouter();
-  const [cameraConsentAccepted, setCameraConsentAccepted] = useState(false);
+  const { startWorkoutSession } = useWorkoutProgress();
+  const {
+    accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
+    toggle: toggleCameraConsent
+  } = useBiometricCameraConsent();
 
   return (
     <ScreenContainer>
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
@@ -35,13 +42,7 @@ export default function CheckInScreen() {
           </TerminalText>
         </View>
 
-        <BrandVideoAdPlaceholder
-          compact
-          eventLabel="WORKOUT START CHECK-IN"
-          onPress={() => router.push('/sponsor-offer')}
-          placementLabel="WORKOUT START"
-          style={styles.videoAd}
-        />
+        <SponsorRail compact />
 
         <View style={styles.centerContent}>
           <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
@@ -53,7 +54,7 @@ export default function CheckInScreen() {
             NATIVE BIOMETRIC CHECK
           </TerminalText>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            VERIFY IT'S YOU TO START
+            {"VERIFY IT'S YOU TO START"}
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" variant="body">
             THE DEVICE CONFIRMS PRESENCE ONLY. GOGYMGO STORES THE CHECKPOINT
@@ -64,16 +65,19 @@ export default function CheckInScreen() {
         <BiometricCameraConsentBanner
           checked={cameraConsentAccepted}
           compact
-          onToggle={() => setCameraConsentAccepted((current) => !current)}
+          onToggle={toggleCameraConsent}
           style={styles.cameraConsent}
         />
 
         <CyberButtonPrimary
-          disabled={!cameraConsentAccepted}
+          disabled={!cameraConsentReady || !cameraConsentAccepted}
           label="VERIFY BIOMETRIC ->"
-          onPress={() => router.push('/workout/active')}
+          onPress={() => {
+            startWorkoutSession('heartRate');
+            router.push('/workout/active');
+          }}
         />
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
@@ -95,16 +99,13 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 96,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   stepLabel: {
     flex: 1,
     fontFamily: fontFamilies.terminal,
     textAlign: 'right'
-  },
-  videoAd: {
-    marginBottom: spacing.md
   },
   centerContent: {
     width: '100%',
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
   body: {
     maxWidth: 290,
     marginTop: spacing.md,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   cameraConsent: {

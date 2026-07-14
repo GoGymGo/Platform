@@ -1,21 +1,26 @@
-import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { useCreatorWorkouts } from '@/data/appDataHooks';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 type RuleItem = {
   body: string;
 };
 
 const ruleItems: readonly RuleItem[] = [
-  { body: 'FREE TO JOIN // STANDARD SIGNUP ENTRY APPLIES.' },
+  { body: 'FREE TO JOIN // YOUR FREE PRIZE DRAW ENTRY IS SECURED IMMEDIATELY.' },
   {
     body: 'CREATOR PAYOUT IS BASED ON GOGYMGO SELECTION AND VERIFIED COMPLETIONS, NOT YOUTUBE VIEWS.'
   },
@@ -25,11 +30,44 @@ const ruleItems: readonly RuleItem[] = [
 
 export default function WorkoutDetailScreen() {
   const router = useRouter();
+  const { campaign } = useSponsorCampaign();
+  const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
+  const { data: creatorWorkouts = [], isPending } = useCreatorWorkouts();
+  const workout = creatorWorkouts.find((item) => item.id === workoutId);
+  const sponsorConfirmed = campaign.status === 'approved';
+
+  if (isPending) {
+    return null;
+  }
+
+  if (!workout?.joined) {
+    return (
+      <ScreenContainer contentStyle={styles.unavailableScreen}>
+        <HUDBorderBox glow style={styles.unavailableCard} tone="red">
+          <TerminalText glow tone="red" variant="label">
+            WORKOUT UNAVAILABLE
+          </TerminalText>
+          <TerminalText glow style={styles.unavailableTitle} tone="text" variant="title">
+            WORKOUT NOT AVAILABLE YET
+          </TerminalText>
+          <TerminalText style={styles.unavailableBody} tone="muted" variant="body">
+            THIS CREATOR SLOT IS STILL IN SUBMISSION OR REVIEW. RETURN TO THE
+            WORKOUT LIST FOR THE CURRENT FEATURED SESSION.
+          </TerminalText>
+          <CyberButtonPrimary
+            label="BACK TO CREATOR WORKOUTS ->"
+            onPress={() => router.replace('/workouts')}
+            style={styles.unavailableAction}
+          />
+        </HUDBorderBox>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
       <SponsorBanner />
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -37,11 +75,11 @@ export default function WorkoutDetailScreen() {
         <View style={styles.header}>
           <CyberButtonOutline
             label="BACK"
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/workouts')}
             style={styles.backButton}
           />
           <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-            CREATOR WORKOUT // TORONTO
+            CREATOR WORKOUT // {campaign.region}
           </TerminalText>
         </View>
 
@@ -52,10 +90,10 @@ export default function WorkoutDetailScreen() {
             </TerminalText>
           </View>
           <View style={styles.creatorCopy}>
-            <TerminalText style={styles.creatorTitle} tone="text" uppercase variant="body">
-              TORONTO CREATOR WORKOUT
+              <TerminalText style={styles.creatorTitle} tone="text" uppercase variant="body">
+              {workout.name}
             </TerminalText>
-            <TerminalText tone="muted" variant="body">
+            <TerminalText style={styles.metadataBody} tone="muted" variant="body">
               LED BY APEX ATHLETICS // OFFICIAL GOGYMGO CHANNEL
             </TerminalText>
           </View>
@@ -70,7 +108,7 @@ export default function WorkoutDetailScreen() {
             </View>
             <View style={styles.channelRow}>
               <TerminalText style={styles.youtubeLogo} tone="pink" variant="micro">
-                YT
+                YOUTUBE
               </TerminalText>
               <TerminalText style={styles.channelText} tone="muted" variant="micro">
                 GOGYMGO OFFICIAL CHANNEL
@@ -79,100 +117,31 @@ export default function WorkoutDetailScreen() {
           </View>
         </View>
         <TerminalText style={styles.youtubeFootnote} tone="dim" variant="micro">
-          YOUTUBE PLAYER // NO SPONSOR OVERLAYS // CONTROLS & ADS UNTOUCHED
+          VIDEO PLAYS ON THE OFFICIAL GOGYMGO YOUTUBE CHANNEL.
         </TerminalText>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/sponsor-offer')}
-          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-        >
-          <HUDBorderBox style={styles.safeSponsorCard} tone="muted">
-            <View style={styles.safeSponsorMark}>
-              <TerminalText glow tone="pink" variant="title">
-                V
-              </TerminalText>
-            </View>
-            <View style={styles.safeSponsorCopy}>
-              <TerminalText tone="dim" variant="micro">
-                SPONSOR AREA // SAFE-ZONE
-              </TerminalText>
-              <TerminalText style={styles.safeSponsorTitle} tone="text" variant="body">
-                VOLT ENERGY // TORONTO SPONSOR
-              </TerminalText>
-              <TerminalText tone="muted" variant="body">
-                FUNDS PRIZE POOL + CREATOR PAYOUT
-              </TerminalText>
-            </View>
-          </HUDBorderBox>
-        </Pressable>
+        <TerminalText style={styles.startHelper} tone="cyan" uppercase={false} variant="body">
+          Start your verified GoGymGo session first, then play the video. The
+          video alone does not count as a verified workout.
+        </TerminalText>
 
-        <HUDBorderBox style={styles.selectionCard} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
-            CREATOR SELECTION
+        <CyberButtonPrimary
+          label="START VERIFIED SESSION ->"
+          onPress={() => router.push('/workout/method')}
+          style={styles.startButton}
+          tone="cyan"
+        />
+
+        <HUDBorderBox style={styles.selectionCard} tone={sponsorConfirmed ? 'pink' : 'cyan'}>
+          <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="label">
+            {sponsorConfirmed ? `${campaign.sponsor.displayName} CREATOR PAYOUT` : 'REGIONAL CREATOR CAMPAIGN'}
           </TerminalText>
           <TerminalText style={styles.selectionCopy} tone="muted" variant="body">
-            LOCAL CREATORS SUBMIT MONTHLY FOLLOW-ALONG WORKOUTS. GOGYMGO
-            SELECTS THE STRONGEST REGIONAL VIDEO FOR THE OFFICIAL CHANNEL, AND
-            THE SELECTED CREATOR EARNS A SPONSOR-FUNDED PAYOUT.
+            {sponsorConfirmed
+              ? `SPONSOR FUNDING SUPPORTS THE SELECTED ${campaign.region} WORKOUT LEADER.`
+              : 'CREATOR PAYOUT DETAILS ARE PUBLISHED WITH THE REGIONAL CAMPAIGN.'}
           </TerminalText>
         </HUDBorderBox>
-
-        <HUDBorderBox style={styles.verificationCard} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
-            MVP VERIFICATION PLACEHOLDER
-          </TerminalText>
-          <TerminalText style={styles.verificationCopy} tone="muted" variant="body">
-            CHECK-IN, MID-WORKOUT PING AND CHECKOUT WILL USE IOS FACE ID OR
-            ANDROID BIOMETRICPROMPT THROUGH THE DEVICE OS. GOGYMGO RECEIVES
-            CHECKPOINT RESULTS ONLY, NOT FACE SCANS OR BIOMETRIC DATA.
-          </TerminalText>
-          <View style={styles.verificationList}>
-            <View style={styles.verificationItem}>
-              <TerminalText glow tone="cyan" variant="micro">
-                01
-              </TerminalText>
-              <TerminalText style={styles.verificationItemText} tone="muted" variant="micro">
-                SERVER CHALLENGE
-              </TerminalText>
-            </View>
-            <View style={styles.verificationItem}>
-              <TerminalText glow tone="cyan" variant="micro">
-                02
-              </TerminalText>
-              <TerminalText style={styles.verificationItemText} tone="muted" variant="micro">
-                OS BIOMETRIC PROMPT
-              </TerminalText>
-            </View>
-            <View style={styles.verificationItem}>
-              <TerminalText glow tone="cyan" variant="micro">
-                03
-              </TerminalText>
-              <TerminalText style={styles.verificationItemText} tone="muted" variant="micro">
-                SIGNED CHECKPOINT EVENT
-              </TerminalText>
-            </View>
-          </View>
-        </HUDBorderBox>
-
-        <View style={styles.rewardRow}>
-          <HUDBorderBox style={styles.rewardCard} tone="cyan">
-            <TerminalText tone="muted" variant="micro">
-              USER REWARD
-            </TerminalText>
-            <TerminalText style={styles.rewardValue} tone="text" variant="body">
-              PRIZE DRAW ENTRIES
-            </TerminalText>
-          </HUDBorderBox>
-          <HUDBorderBox style={styles.rewardCard} tone="pink">
-            <TerminalText tone="muted" variant="micro">
-              CREATOR PAYOUT
-            </TerminalText>
-            <TerminalText glow style={styles.rewardValue} tone="pink" variant="body">
-              $1,000 SPONSOR POOL
-            </TerminalText>
-          </HUDBorderBox>
-        </View>
 
         <HUDBorderBox style={styles.rulesCard} tone="muted">
           <TerminalText tone="dim" variant="label">
@@ -192,67 +161,31 @@ export default function WorkoutDetailScreen() {
           </View>
         </HUDBorderBox>
 
-        <CyberButtonPrimary
-          label="START VERIFIED SESSION ->"
-          onPress={() => router.push('/workout/check-in')}
-          style={styles.startButton}
-          tone="pink"
-        />
-      </ScrollView>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
-function SponsorBanner() {
-  return (
-    <HUDBorderBox style={styles.sponsorBanner} tone="muted">
-      <View style={styles.sponsorMark}>
-        <TerminalText glow tone="pink" variant="title">
-          V
-        </TerminalText>
-      </View>
-      <View style={styles.sponsorCopy}>
-        <TerminalText tone="dim" variant="micro">
-          SPONSOR SIGNAL
-        </TerminalText>
-        <TerminalText style={styles.sponsorTitle} tone="text" variant="body">
-          SPONSORED BY VOLT
-        </TerminalText>
-        <TerminalText tone="muted" variant="body">
-          PRIZE POOL PARTNER
-        </TerminalText>
-      </View>
-    </HUDBorderBox>
-  );
-}
-
 const styles = StyleSheet.create({
-  sponsorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
-  },
-  sponsorMark: {
-    width: 32,
-    height: 32,
+  unavailableScreen: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePinkSoft
+    padding: spacing.screenX,
+    backgroundColor: colors.background
   },
-  sponsorCopy: {
-    flex: 1
+  unavailableCard: {
+    padding: spacing.xxl
   },
-  sponsorTitle: {
-    marginTop: 1,
-    fontFamily: fontFamilies.terminal
+  unavailableTitle: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.display
+  },
+  unavailableBody: {
+    marginTop: spacing.md,
+    fontFamily: fontFamilies.body
+  },
+  unavailableAction: {
+    marginTop: spacing.xl
   },
   content: {
     flexGrow: 1,
@@ -269,7 +202,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 96,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   headerLabel: {
@@ -301,6 +234,9 @@ const styles = StyleSheet.create({
   creatorTitle: {
     marginBottom: 2,
     fontFamily: fontFamilies.display
+  },
+  metadataBody: {
+    fontFamily: fontFamilies.terminal
   },
   youtubeFrame: {
     overflow: 'hidden',
@@ -376,7 +312,7 @@ const styles = StyleSheet.create({
   },
   selectionCopy: {
     marginTop: 7,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   verificationCard: {
     marginTop: spacing.md,
@@ -385,7 +321,7 @@ const styles = StyleSheet.create({
   },
   verificationCopy: {
     marginTop: 7,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   verificationList: {
     gap: spacing.sm,
@@ -398,7 +334,7 @@ const styles = StyleSheet.create({
   },
   verificationItemText: {
     flex: 1,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.display
   },
   rewardRow: {
     flexDirection: 'row',
@@ -428,10 +364,15 @@ const styles = StyleSheet.create({
   },
   ruleText: {
     flex: 1,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   startButton: {
     marginTop: 18
+  },
+  startHelper: {
+    marginTop: spacing.md,
+    fontFamily: fontFamilies.body,
+    textAlign: 'center'
   },
   pressed: {
     opacity: 0.74,

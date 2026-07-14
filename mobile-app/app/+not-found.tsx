@@ -14,22 +14,21 @@ export default function NotFoundScreen() {
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <HUDBorderBox glow style={styles.card} tone="pink">
-        <TerminalText glow tone="pink" variant="label">
+      <HUDBorderBox glow style={styles.card} tone="red">
+        <TerminalText glow tone="red" variant="label">
           ROUTE OFFLINE
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          SCREEN NOT READY
+          SCREEN NOT FOUND
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" variant="body">
-          GOGYMGO IS MOVING PAGE BY PAGE INTO THE NATIVE HUD. RETURN TO THE
-          OPENING FLOW.
+          THIS LINK DOES NOT MATCH A GOGYMGO SCREEN. RETURN TO THE OPENING FLOW.
         </TerminalText>
         <View style={styles.action}>
           <CyberButtonPrimary
             label="BACK TO START ->"
-            onPress={() => router.replace('/welcome')}
-            tone="pink"
+            onPress={() => router.replace('/')}
+            tone="cyan"
           />
         </View>
       </HUDBorderBox>
@@ -56,7 +55,7 @@ const styles = StyleSheet.create({
   },
   body: {
     marginTop: spacing.md,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   action: {
     marginTop: spacing.xl

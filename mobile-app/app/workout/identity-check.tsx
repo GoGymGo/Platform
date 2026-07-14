@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -10,18 +9,37 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function IdentityCheckScreen() {
   const router = useRouter();
-  const [cameraConsentAccepted, setCameraConsentAccepted] = useState(false);
+  const { activeSession } = useWorkoutProgress();
+  const {
+    accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
+    toggle: toggleCameraConsent
+  } = useBiometricCameraConsent();
+
+  if (!activeSession || activeSession.verificationMethod !== 'partnerGymQr') {
+    return (
+      <SessionUnavailable
+        body="SCAN A PARTNER-GYM ENTRY QR BEFORE THE IDENTITY CHECK."
+        onAction={() => router.replace('/qr-scanner')}
+        title="ENTRY QR REQUIRED"
+      />
+    );
+  }
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
         <CyberButtonOutline
           label="BACK"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/qr-scanner')}
           style={styles.backButton}
         />
         <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
@@ -50,14 +68,14 @@ export default function IdentityCheckScreen() {
       <BiometricCameraConsentBanner
         checked={cameraConsentAccepted}
         compact
-        onToggle={() => setCameraConsentAccepted((current) => !current)}
+        onToggle={toggleCameraConsent}
         style={styles.cameraConsent}
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentAccepted}
+        disabled={!cameraConsentReady || !cameraConsentAccepted}
         label="CONTINUE TO SESSION ->"
-        onPress={() => router.push('/workout/active')}
+        onPress={() => router.replace('/workout/active')}
       />
     </ScreenContainer>
   );
@@ -80,7 +98,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 96,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   stepLabel: {
@@ -118,7 +136,7 @@ const styles = StyleSheet.create({
   body: {
     maxWidth: 290,
     marginTop: spacing.md,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   cameraConsent: {

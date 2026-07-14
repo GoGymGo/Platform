@@ -1,5 +1,6 @@
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 
+import { AuthGate } from '@/components/auth';
 import { colors } from '@/constants/theme';
 
 const modalScreenOptions = {
@@ -11,7 +12,9 @@ const modalScreenOptions = {
 } as const;
 
 export default function ModalLayout() {
-  return (
+  const segments = useSegments();
+  const activeRoute = segments[segments.length - 1];
+  const stack = (
     <Stack screenOptions={modalScreenOptions}>
       <Stack.Screen name="bonus-rules" />
       <Stack.Screen name="biometric-camera-consent" />
@@ -22,4 +25,6 @@ export default function ModalLayout() {
       <Stack.Screen name="terms-of-service" />
     </Stack>
   );
+
+  return activeRoute === 'qr-scanner' ? <AuthGate>{stack}</AuthGate> : stack;
 }

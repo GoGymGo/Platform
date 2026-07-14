@@ -1,0 +1,11 @@
+{
+  "explorer.compactFolders": false,
+  "workbench.browser.openLocalhostLinks": true,
+  "workbench.browser.showInTitleBar": true,
+  "files.exclude": {
+    "**/.codex-*.log": true,
+    "**/expo-web.err.log": true,
+    "**/expo-web.out.log": true
+  },
+  "task.allowAutomaticTasks": "on"
+}

@@ -1,5 +1,4 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -10,13 +9,29 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { sessionTimeScale } from '@/config/runtime';
+import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function QrScannerModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
+  const { activeSession, startWorkoutSession } = useWorkoutProgress();
   const isExitScan = params.mode === 'exit';
-  const [cameraConsentAccepted, setCameraConsentAccepted] = useState(false);
+  const {
+    accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
+    toggle: toggleCameraConsent
+  } = useBiometricCameraConsent();
+  const exitReady = Boolean(
+    activeSession?.verificationMethod === 'partnerGymQr' &&
+      activeSession.midSessionVerified &&
+      getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale) >=
+        workoutRules.minimumSessionSeconds
+  );
 
   const ctaLabel = isExitScan
     ? 'SCAN EXIT QR - FINISH ->'
@@ -35,7 +50,10 @@ export default function QrScannerModal() {
         </TerminalText>
         <CyberButtonOutline
           label="CLOSE"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(
+            router,
+            isExitScan ? '/workout/active' : '/workout/method'
+          )}
           style={styles.closeButton}
         />
       </View>
@@ -65,38 +83,33 @@ export default function QrScannerModal() {
           </View>
         </HUDBorderBox>
 
-        <View style={styles.modeRow}>
-          <HUDBorderBox style={styles.modeCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="micro">
-              SCAN QR
-            </TerminalText>
-          </HUDBorderBox>
-          <HUDBorderBox style={styles.modeCard} tone="muted">
-            <TerminalText tone="muted" variant="micro">
-              PHONE BEACON
-            </TerminalText>
-          </HUDBorderBox>
-        </View>
-
-        <TerminalText style={styles.note} tone="dim" variant="micro">
-          SIGNED // TIME-BOUND // ENTRY + EXIT REQUIRED
+        <TerminalText style={styles.note} tone="dim" variant="caption">
+          ENTRY AND EXIT SCANS ARE BOTH REQUIRED TO VERIFY THIS SESSION.
         </TerminalText>
       </View>
 
       <BiometricCameraConsentBanner
         checked={cameraConsentAccepted}
         compact
-        onToggle={() => setCameraConsentAccepted((current) => !current)}
+        onToggle={toggleCameraConsent}
         style={styles.cameraConsent}
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentAccepted}
+        disabled={!cameraConsentReady || !cameraConsentAccepted || (isExitScan && !exitReady)}
         label={ctaLabel}
-        onPress={() =>
-          router.push(isExitScan ? '/workout/complete' : '/workout/identity-check')
-        }
+        onPress={() => {
+          if (!isExitScan) {
+            startWorkoutSession('partnerGymQr');
+          }
+          router.replace(isExitScan ? '/workout/complete' : '/workout/identity-check');
+        }}
       />
+      {isExitScan && !exitReady ? (
+        <TerminalText style={styles.exitHelp} tone="amber" variant="caption">
+          EXIT UNLOCKS AFTER 30:00 AND THE MID-SESSION CHECK.
+        </TerminalText>
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -122,7 +135,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: 104,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   centerContent: {
@@ -139,7 +152,7 @@ const styles = StyleSheet.create({
     maxWidth: 290,
     marginTop: spacing.md,
     marginBottom: spacing.xl,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   scanFrame: {
@@ -173,23 +186,17 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.surfaceCyanSoft
   },
-  modeRow: {
-    flexDirection: 'row',
-    gap: 9,
-    width: '100%'
-  },
-  modeCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 11,
-    borderRadius: radii.md
-  },
   note: {
     marginTop: spacing.md,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   cameraConsent: {
     marginBottom: spacing.md
+  },
+  exitHelp: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.body,
+    textAlign: 'center'
   }
 });

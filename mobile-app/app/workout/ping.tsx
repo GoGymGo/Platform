@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -10,7 +10,11 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { getMidSessionGraceSecondsRemaining } from '@/domain/workoutProgress';
+import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatGrace(secondsRemaining: number) {
   const minutes = Math.floor(secondsRemaining / 60);
@@ -20,67 +24,100 @@ function formatGrace(secondsRemaining: number) {
 
 export default function PingScreen() {
   const router = useRouter();
-  const [secondsRemaining, setSecondsRemaining] = useState(108);
-  const [cameraConsentAccepted, setCameraConsentAccepted] = useState(false);
+  const { activeSession, markMidSessionVerified } = useWorkoutProgress();
+  const {
+    accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
+    toggle: toggleCameraConsent
+  } = useBiometricCameraConsent();
+  const [secondsRemaining, setSecondsRemaining] = useState(() =>
+    getMidSessionGraceSecondsRemaining(activeSession?.midSessionCheckPromptedAt ?? null)
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setSecondsRemaining((currentSeconds) => Math.max(0, currentSeconds - 1));
+      setSecondsRemaining(
+        getMidSessionGraceSecondsRemaining(
+          activeSession?.midSessionCheckPromptedAt ?? null
+        )
+      );
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [activeSession?.midSessionCheckPromptedAt]);
 
   const graceClock = useMemo(
     () => formatGrace(secondsRemaining),
     [secondsRemaining]
   );
+  if (!activeSession) {
+    return (
+      <SessionUnavailable
+        body="START A VERIFIED SESSION BEFORE OPENING A MID-SESSION CHECK."
+        onAction={() => router.replace('/session' as Href)}
+      />
+    );
+  }
+
+  if (!activeSession.midSessionCheckPrompted && !activeSession.midSessionVerified) {
+    return (
+      <SessionUnavailable
+        actionLabel="RETURN TO ACTIVE SESSION ->"
+        body="THE RANDOM FACE CHECK HAS NOT BEEN TRIGGERED YET. KEEP THE ACTIVE SESSION OPEN AND GOGYMGO WILL PROMPT YOU AUTOMATICALLY."
+        onAction={() => router.replace('/workout/active')}
+        title="FACE CHECK ARMED"
+      />
+    );
+  }
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <HUDBorderBox glow style={styles.pingPill} tone="pink">
+      <HUDBorderBox glow style={styles.pingPill} tone="amber">
         <View style={styles.pingDot} />
-        <TerminalText glow tone="pink" variant="micro">
-          RANDOM PING // MIN 16:42
+        <TerminalText glow tone="amber" variant="micro">
+          AUTOMATIC FACE CHECK // ACTION REQUIRED
         </TerminalText>
       </HUDBorderBox>
 
-      <HUDBorderBox glow style={styles.timerFrame} tone="pink">
+      <HUDBorderBox glow style={styles.timerFrame} tone="amber">
         <View style={styles.timerInner}>
-          <TerminalText glow style={styles.timerValue} tone="pink" variant="display">
+          <TerminalText glow style={styles.timerValue} tone="amber" variant="display">
             {graceClock}
           </TerminalText>
-          <TerminalText tone="pink" variant="micro">
+          <TerminalText tone="amber" variant="micro">
             GRACE LEFT
           </TerminalText>
         </View>
       </HUDBorderBox>
 
-      <TerminalText glow style={styles.title} tone="pink" variant="title">
+      <TerminalText glow style={styles.title} tone="amber" variant="title">
         VERIFY NOW TO KEEP IT VALID
       </TerminalText>
-      <TerminalText style={styles.body} tone="pink" variant="body">
-        MISS THIS CHECKPOINT AND THIS WORKOUT CANNOT COUNT. USE THE LOCAL
-        BIOMETRIC PROMPT, THEN BACK TO IT.
+      <TerminalText style={styles.body} tone="muted" variant="body">
+        YOUR RANDOM MID-WORKOUT CHECK IS READY. MISS THIS CHECKPOINT AND THIS
+        WORKOUT CANNOT COUNT. USE THE LOCAL BIOMETRIC PROMPT, THEN BACK TO IT.
       </TerminalText>
 
       <BiometricCameraConsentBanner
         checked={cameraConsentAccepted}
         compact
-        onToggle={() => setCameraConsentAccepted((current) => !current)}
+        onToggle={toggleCameraConsent}
         style={styles.cameraConsent}
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentAccepted}
+        disabled={!cameraConsentReady || !cameraConsentAccepted || secondsRemaining === 0}
         label="VERIFY BIOMETRIC ->"
-        onPress={() => router.push('/workout/ping-success')}
-        tone="pink"
+        onPress={() => {
+          markMidSessionVerified();
+          router.replace('/workout/ping-success');
+        }}
+        tone="amber"
       />
 
       <CyberButtonOutline
         label="BACK TO SESSION"
-        onPress={() => router.push('/workout/active')}
+        onPress={() => router.replace('/workout/active')}
         style={styles.backButton}
       />
     </ScreenContainer>
@@ -110,8 +147,8 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.pink,
-    ...cyberGlow.pink
+    backgroundColor: colors.statusWarning,
+    ...cyberGlow.amber
   },
   timerFrame: {
     width: 170,
@@ -128,7 +165,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.surfacePinkStrong,
+    borderColor: colors.borderWarning,
     borderRadius: 64
   },
   timerValue: {
@@ -145,7 +182,7 @@ const styles = StyleSheet.create({
     maxWidth: 290,
     marginTop: spacing.md,
     marginBottom: 30,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   backButton: {

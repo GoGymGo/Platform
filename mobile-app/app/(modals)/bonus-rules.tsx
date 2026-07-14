@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
@@ -9,6 +10,9 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type RuleTone = 'cyan' | 'pink';
 
@@ -21,7 +25,7 @@ type BonusRule = {
 
 const bonusRules: readonly BonusRule[] = [
   {
-    value: '1-7x',
+    value: '1-7 DAYS',
     label: 'HIT YOUR GOAL BY DAYS PICKED',
     description:
       'CHOOSE 1 TO 7 VERIFIED WORKOUT DAYS PER WEEK. HIGHER COMMITMENTS CAN EARN MORE ENTRIES WHEN COMPLETED.',
@@ -29,44 +33,62 @@ const bonusRules: readonly BonusRule[] = [
   },
   {
     value: 'x2',
-    label: 'YOU + MATCH BOTH SUCCEED',
+    label: 'YOU + MATCHED PLAYER BOTH SUCCEED',
     description:
-      'WHEN BOTH PEOPLE IN A WEEKLY PAIRING HIT THE SAME GOAL, BOTH RECEIVE THE PARTNER BONUS.',
-    tone: 'pink'
+      'WHEN YOU AND YOUR PERIOD MATCH BOTH HIT THE SAME WEEKLY GOAL, YOU BOTH RECEIVE THE 2X PERIOD MATCH BONUS.',
+    tone: 'cyan'
   },
   {
     value: 'x3',
-    label: 'MATCH MISSES + YOU DO EXTRA DAY',
+    label: 'MATCHED PLAYER MISSES + YOU DO EXTRA DAY',
     description:
-      'IF YOUR MATCH MISSES, ONE EXTRA VERIFIED WORKOUT CAN CLAIM THEIR UNEARNED BONUS ENTRIES.',
+      'IF YOUR MATCHED PLAYER MISSES, ONE EXTRA VERIFIED WORKOUT ACTIVATES YOUR 3X PERIOD MATCH BONUS. 3X IS AUTOMATIC WHEN YOUR GOAL ALREADY USES EVERY AVAILABLE DAY.',
     tone: 'pink'
   },
   {
     value: 'x10',
     label: 'PERFECT MONTH',
     description:
-      'COMPLETE THE COMMITTED WEEKLY GOAL ACROSS THE FULL MONTH TO UNLOCK THE PERFECT-MONTH MULTIPLIER.',
-    tone: 'cyan'
+      'THE 10X PERFECT-MONTH BONUS APPLIES TO ALL PRIZE DRAW ENTRIES EARNED ACROSS THE FOUR SCORING WEEKS, INCLUDING PERIOD MATCH BONUSES, CATEGORY-FINISH BONUSES AND BONUS DAYS 29-31.',
+    tone: 'pink'
   }
 ];
 
 export default function BonusRulesModal() {
   const router = useRouter();
+  const { campaign } = useSponsorCampaign();
+  const { weeklyGoal } = useWorkoutProgress();
+  const rulesWithCategoryWinners: readonly BonusRule[] = [
+    ...bonusRules.slice(0, 3),
+    {
+      value: `${campaign.economics.categoryPodiumMultipliers[1]}x / ${campaign.economics.categoryPodiumMultipliers[2]}x / ${campaign.economics.categoryPodiumMultipliers[3]}x`,
+      label: 'TOP THREE CATEGORY FINISHERS',
+      description: 'THE TOP THREE FINISHERS IN EACH COMMITMENT CATEGORY MULTIPLY THEIR ACTUAL FOUR-WEEK TOTAL AFTER 1X, 2X OR 3X PERIOD MATCH RESULTS. BONUS DAYS 29-31 ARE ADDED NEXT, THEN PERFECT-MONTH 10X IS APPLIED LAST.',
+      tone: 'pink'
+    },
+    ...bonusRules.slice(3),
+    {
+      value: `+${weeklyGoal} / DAY`,
+      label: 'BONUS DAYS 29-31',
+      description: `WHEN THE MONTH HAS DAYS 29-31, EACH VERIFIED BONUS DAY ADDS ${weeklyGoal} PRIZE DRAW ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'}, EQUAL TO YOUR SELECTED WEEKLY GOAL, BEFORE THE FINAL PERFECT-MONTH 10X.`,
+      tone: 'pink'
+    }
+  ];
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
-        <TerminalText glow style={styles.headerLabel} tone="pink" variant="label">
+        <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
           BONUS RULES
         </TerminalText>
         <CyberButtonOutline
           label="CLOSE"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/how-it-works')}
           style={styles.closeButton}
         />
       </View>
 
-      <ScrollView
+      <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -83,24 +105,27 @@ export default function BonusRulesModal() {
         </View>
 
         <View style={styles.rulesList}>
-          {bonusRules.map((rule) => (
+          {rulesWithCategoryWinners.map((rule) => (
             <RuleCard key={rule.value} rule={rule} />
           ))}
         </View>
 
         <HUDBorderBox glow style={styles.callout} tone="cyan">
           <TerminalText glow style={styles.calloutLabel} tone="cyan" variant="label">
-            PAIRING BONUS
+            PERIOD MATCH BONUS
           </TerminalText>
           <TerminalText style={styles.calloutCopy} tone="muted" variant="body">
-            BOTH HIT THE GOAL: YOU BOTH EARN 2X. IF YOUR MATCH MISSES: COMPLETE
-            ONE EXTRA VERIFIED WORKOUT TO EARN 3X AND CLAIM THEIR UNEARNED BONUS
-            ENTRIES.
+            BOTH HIT THE GOAL: YOU BOTH EARN 2X. IF YOUR MATCHED PLAYER MISSES: COMPLETE
+            ONE EXTRA VERIFIED WORKOUT TO EARN 3X. SEVEN-DAY PLAYERS ACTIVATE
+            3X AUTOMATICALLY WHEN THEIR MATCHED PLAYER MISSES.
           </TerminalText>
         </HUDBorderBox>
 
-        <CyberButtonPrimary label="GOT IT ->" onPress={() => router.back()} />
-      </ScrollView>
+        <CyberButtonPrimary
+          label="GOT IT ->"
+          onPress={() => goBackOrReplace(router, '/how-it-works')}
+        />
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
@@ -139,7 +164,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.surfacePinkStrong
+    borderBottomColor: colors.surfaceCyanActive
   },
   headerLabel: {
     flex: 1,
@@ -147,7 +172,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: 104,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   content: {
@@ -165,7 +190,7 @@ const styles = StyleSheet.create({
   },
   body: {
     marginTop: spacing.md,
-    fontFamily: fontFamilies.terminal,
+    fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   rulesList: {
@@ -199,11 +224,11 @@ const styles = StyleSheet.create({
     flex: 1
   },
   ruleLabel: {
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.display
   },
   ruleDescription: {
     marginTop: spacing.xs,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   },
   callout: {
     marginBottom: spacing.xl,
@@ -214,6 +239,6 @@ const styles = StyleSheet.create({
   },
   calloutCopy: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.terminal
+    fontFamily: fontFamilies.body
   }
 });

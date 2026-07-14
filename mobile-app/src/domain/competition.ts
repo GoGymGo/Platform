@@ -1,0 +1,407 @@
+export type CompetitionPeriodIndex = 1 | 2 | 3 | 4;
+
+export type CurrentWeekProgress = {
+  index: CompetitionPeriodIndex | null;
+  verifiedCount: number;
+};
+
+export type MatchAvailability = 'matched' | 'searching' | 'solo';
+
+export type CompetitionPhase =
+  | 'before-month'
+  | 'scoring-period'
+  | 'bonus-days'
+  | 'complete';
+
+export type CompetitionPeriod = {
+  dateKeys: readonly string[];
+  endDateKey: string;
+  index: CompetitionPeriodIndex;
+  startDateKey: string;
+};
+
+export type CompetitionMatch = {
+  availability: MatchAvailability;
+  opponentAlias: string;
+  opponentVerifiedDateKeys: readonly string[];
+  periodIndex: CompetitionPeriodIndex;
+  region: string;
+};
+
+export type CompetitionPeriodStatus = 'future' | 'in-progress' | 'settled' | 'ineligible';
+
+export type CompetitionPeriodResult = {
+  availability: MatchAvailability;
+  bonusWorkoutCompleted: boolean;
+  entries: number;
+  finalMultiplier: 0 | 1 | 2 | 3;
+  index: CompetitionPeriodIndex;
+  liveMultiplier: 0 | 1 | 2 | 3;
+  opponentAlias: string;
+  opponentGoalMet: boolean;
+  opponentVerifiedCount: number;
+  opponentVerifiedDateKeys: readonly string[];
+  period: CompetitionPeriod;
+  region: string;
+  status: CompetitionPeriodStatus;
+  userGoalMet: boolean;
+  userVerifiedCount: number;
+  userVerifiedDateKeys: readonly string[];
+};
+
+export type MonthlyCompetitionResult = {
+  bonusDateKeys: readonly string[];
+  bonusDayEntries: number;
+  competitionMonthKey: string;
+  currentPeriod: CompetitionPeriodResult | null;
+  phase: CompetitionPhase;
+  perfectMonthAchieved: boolean;
+  perfectMonthEligible: boolean;
+  perfectMonthMultiplier: 1 | 10;
+  periodEntriesBeforePerfectMonth: number;
+  periodResults: readonly CompetitionPeriodResult[];
+  totalCompetitionEntries: number;
+  weeklyGoal: number;
+};
+
+export type EvaluateMonthlyCompetitionInput = {
+  competitionMonthKey: string;
+  eligibleFromDateKey?: string;
+  matches: readonly CompetitionMatch[];
+  perfectMonthEligible?: boolean;
+  referenceDateKey: string;
+  userVerifiedDateKeys: readonly string[];
+  weeklyGoal: number;
+};
+
+export const competitionRules = {
+  firstBonusDay: 29,
+  maximumWeeklyGoal: 7,
+  minimumWeeklyGoal: 1,
+  perfectMonthMultiplier: 10,
+  scoringPeriodCount: 4
+} as const;
+
+const periodBounds = [
+  [1, 7],
+  [8, 14],
+  [15, 21],
+  [22, 28]
+] as const;
+
+export function evaluateMonthlyCompetition({
+  competitionMonthKey,
+  eligibleFromDateKey = `${competitionMonthKey}-01`,
+  matches,
+  perfectMonthEligible = true,
+  referenceDateKey,
+  userVerifiedDateKeys,
+  weeklyGoal
+}: EvaluateMonthlyCompetitionInput): MonthlyCompetitionResult {
+  const goal = clampWeeklyGoal(weeklyGoal);
+  const calendar = buildCompetitionCalendar(competitionMonthKey);
+  const visibleUserDates = uniqueDateKeys(userVerifiedDateKeys).filter(
+    (dateKey) =>
+      dateKey.startsWith(`${competitionMonthKey}-`) &&
+      dateKey >= eligibleFromDateKey &&
+      dateKey <= referenceDateKey
+  );
+
+  const periodResults = calendar.periods.map((period) => {
+    const periodEligible = period.endDateKey >= eligibleFromDateKey;
+    const match = matches.find((candidate) => candidate.periodIndex === period.index);
+    const availability = match?.availability ?? 'solo';
+    const eligiblePeriodDateKeys = period.dateKeys.filter(
+      (dateKey) => dateKey >= eligibleFromDateKey
+    );
+    const userDates = periodEligible ? datesInsidePeriod(visibleUserDates, period) : [];
+    const opponentDates = periodEligible
+      ? datesInsidePeriod(
+          uniqueDateKeys(match?.opponentVerifiedDateKeys ?? []).filter(
+            (dateKey) => dateKey <= referenceDateKey
+          ),
+          period
+        )
+      : [];
+    const status = periodEligible
+      ? getPeriodStatus(period, referenceDateKey)
+      : 'ineligible';
+    const userGoalMet = userDates.length >= goal;
+    const opponentGoalMet = availability === 'matched' && opponentDates.length >= goal;
+    const bonusWorkoutCompleted =
+      userGoalMet &&
+      (goal >= eligiblePeriodDateKeys.length || userDates.length > goal);
+    const liveMultiplier = getLiveMultiplier({
+      availability,
+      bonusWorkoutCompleted,
+      opponentGoalMet,
+      userGoalMet
+    });
+    const finalMultiplier = status === 'settled'
+      ? getFinalMultiplier({
+          availability,
+          bonusWorkoutCompleted,
+          opponentGoalMet,
+          userGoalMet
+        })
+      : 0;
+
+    return {
+      availability,
+      bonusWorkoutCompleted,
+      entries: goal * finalMultiplier,
+      finalMultiplier,
+      index: period.index,
+      liveMultiplier,
+      opponentAlias: match?.opponentAlias ?? 'SOLO MODE',
+      opponentGoalMet,
+      opponentVerifiedCount: opponentDates.length,
+      opponentVerifiedDateKeys: opponentDates,
+      period,
+      region: match?.region ?? 'YOUR REGION',
+      status,
+      userGoalMet,
+      userVerifiedCount: userDates.length,
+      userVerifiedDateKeys: userDates
+    } satisfies CompetitionPeriodResult;
+  });
+
+  const eligiblePeriodResults = periodResults.filter(
+    (period) => period.status !== 'ineligible'
+  );
+  const allPeriodsSettled =
+    eligiblePeriodResults.length > 0 &&
+    eligiblePeriodResults.every((period) => period.status === 'settled');
+  const perfectMonthAchieved =
+    perfectMonthEligible &&
+    allPeriodsSettled &&
+    eligiblePeriodResults.every((period) => period.userGoalMet);
+  const perfectMonthMultiplier = perfectMonthAchieved
+    ? competitionRules.perfectMonthMultiplier
+    : 1;
+  const periodEntriesBeforePerfectMonth = periodResults.reduce(
+    (total, period) => total + period.entries,
+    0
+  );
+  const bonusDateKeys = visibleUserDates.filter((dateKey) =>
+    calendar.bonusDateKeys.includes(dateKey)
+  );
+  const bonusDayEntries = bonusDateKeys.length * goal;
+  const phase = getCompetitionPhase(calendar, referenceDateKey);
+
+  return {
+    bonusDateKeys,
+    bonusDayEntries,
+    competitionMonthKey,
+    currentPeriod:
+      phase === 'scoring-period'
+        ? periodResults.find((period) => period.status === 'in-progress') ?? null
+        : null,
+    phase,
+    perfectMonthAchieved,
+    perfectMonthEligible,
+    perfectMonthMultiplier,
+    periodEntriesBeforePerfectMonth,
+    periodResults,
+    totalCompetitionEntries:
+      (periodEntriesBeforePerfectMonth + bonusDayEntries) * perfectMonthMultiplier,
+    weeklyGoal: goal
+  };
+}
+
+export function buildCompetitionCalendar(monthKey: string) {
+  const { month, year } = parseMonthKey(monthKey);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const periods = periodBounds.map(([startDay, endDay], index) => {
+    const periodIndex = (index + 1) as CompetitionPeriodIndex;
+
+    return {
+      dateKeys: buildDateKeyRange(monthKey, startDay, endDay),
+      endDateKey: formatMonthDay(monthKey, endDay),
+      index: periodIndex,
+      startDateKey: formatMonthDay(monthKey, startDay)
+    } satisfies CompetitionPeriod;
+  });
+  const bonusDateKeys = daysInMonth >= competitionRules.firstBonusDay
+    ? buildDateKeyRange(monthKey, competitionRules.firstBonusDay, daysInMonth)
+    : [];
+
+  return {
+    bonusDateKeys,
+    competitionEndDateKey: formatMonthDay(monthKey, daysInMonth),
+    competitionStartDateKey: formatMonthDay(monthKey, 1),
+    periods
+  } as const;
+}
+
+export function getCompetitionMonthKey(dateKey: string) {
+  return dateKey.slice(0, 7);
+}
+
+export function getCompetitionRegionDateKey(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric'
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  return `${values.get('year')}-${values.get('month')}-${values.get('day')}`;
+}
+
+export function isCompetitionBonusDay(dateKey: string) {
+  const monthKey = getCompetitionMonthKey(dateKey);
+
+  return buildCompetitionCalendar(monthKey).bonusDateKeys.includes(dateKey);
+}
+
+export function getCurrentWeekProgress(
+  referenceDateKey: string,
+  verifiedDateKeys: readonly string[]
+): CurrentWeekProgress {
+  const day = Number(referenceDateKey.slice(-2));
+
+  if (!Number.isInteger(day) || day < 1 || day > 28) {
+    return { index: null, verifiedCount: 0 };
+  }
+
+  const index = Math.ceil(day / 7) as CompetitionPeriodIndex;
+  const startDay = (index - 1) * 7 + 1;
+  const startDateKey = formatMonthDay(getCompetitionMonthKey(referenceDateKey), startDay);
+  const endDateKey = formatMonthDay(getCompetitionMonthKey(referenceDateKey), startDay + 6);
+  const verifiedCount = uniqueDateKeys(verifiedDateKeys).filter(
+    (dateKey) => dateKey >= startDateKey && dateKey <= endDateKey
+  ).length;
+
+  return { index, verifiedCount };
+}
+
+export function clampWeeklyGoal(goal: number) {
+  const finiteGoal = Number.isFinite(goal) ? Math.round(goal) : 4;
+
+  return Math.min(
+    competitionRules.maximumWeeklyGoal,
+    Math.max(competitionRules.minimumWeeklyGoal, finiteGoal)
+  );
+}
+
+function getCompetitionPhase(
+  calendar: ReturnType<typeof buildCompetitionCalendar>,
+  referenceDateKey: string
+): CompetitionPhase {
+  if (referenceDateKey < calendar.competitionStartDateKey) {
+    return 'before-month';
+  }
+
+  if (referenceDateKey > calendar.competitionEndDateKey) {
+    return 'complete';
+  }
+
+  if (calendar.bonusDateKeys.includes(referenceDateKey)) {
+    return 'bonus-days';
+  }
+
+  return 'scoring-period';
+}
+
+function getPeriodStatus(
+  period: CompetitionPeriod,
+  referenceDateKey: string
+): CompetitionPeriodStatus {
+  if (referenceDateKey < period.startDateKey) {
+    return 'future';
+  }
+
+  return referenceDateKey <= period.endDateKey ? 'in-progress' : 'settled';
+}
+
+function getLiveMultiplier({
+  availability,
+  bonusWorkoutCompleted,
+  opponentGoalMet,
+  userGoalMet
+}: {
+  availability: MatchAvailability;
+  bonusWorkoutCompleted: boolean;
+  opponentGoalMet: boolean;
+  userGoalMet: boolean;
+}): 0 | 1 | 2 | 3 {
+  if (!userGoalMet) {
+    return 0;
+  }
+
+  if (availability !== 'matched') {
+    return 1;
+  }
+
+  if (opponentGoalMet) {
+    return 2;
+  }
+
+  return bonusWorkoutCompleted ? 3 : 1;
+}
+
+function getFinalMultiplier({
+  availability,
+  bonusWorkoutCompleted,
+  opponentGoalMet,
+  userGoalMet
+}: {
+  availability: MatchAvailability;
+  bonusWorkoutCompleted: boolean;
+  opponentGoalMet: boolean;
+  userGoalMet: boolean;
+}): 0 | 1 | 2 | 3 {
+  if (!userGoalMet) {
+    return 0;
+  }
+
+  if (availability !== 'matched') {
+    return 1;
+  }
+
+  if (opponentGoalMet) {
+    return 2;
+  }
+
+  return bonusWorkoutCompleted ? 3 : 1;
+}
+
+function datesInsidePeriod(
+  dateKeys: readonly string[],
+  period: CompetitionPeriod
+) {
+  return dateKeys.filter(
+    (dateKey) => dateKey >= period.startDateKey && dateKey <= period.endDateKey
+  );
+}
+
+function uniqueDateKeys(dateKeys: readonly string[]) {
+  return Array.from(new Set(dateKeys)).sort();
+}
+
+function buildDateKeyRange(monthKey: string, startDay: number, endDay: number) {
+  return Array.from(
+    { length: Math.max(0, endDay - startDay + 1) },
+    (_, index) => formatMonthDay(monthKey, startDay + index)
+  );
+}
+
+function formatMonthDay(monthKey: string, day: number) {
+  return `${monthKey}-${String(day).padStart(2, '0')}`;
+}
+
+function parseMonthKey(monthKey: string) {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    throw new Error(`Invalid competition month key: ${monthKey}`);
+  }
+
+  const [year, month] = monthKey.split('-').map(Number);
+
+  if (month < 1 || month > 12) {
+    throw new Error(`Invalid competition month key: ${monthKey}`);
+  }
+
+  return { month, year };
+}

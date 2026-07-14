@@ -530,7 +530,7 @@
 
 ### WRITE
 - Converted the bonus rules panel into a native React Native modal route.
-- Preserved the 1-7x, x2, x3, and x10 bonus language, plus the pairing bonus explanation.
+- Clarified base commitment as `1-7 DAYS`; preserved x2, x3, and x10 as actual bonus language plus the pairing-bonus explanation.
 - Used Expo Router navigation: both close actions call `router.back()`.
 
 ### AUDIT

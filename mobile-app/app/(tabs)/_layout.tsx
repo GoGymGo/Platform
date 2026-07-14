@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View, type ColorValue, type ViewStyle } from 'react-native';
 
+import { AuthGate } from '@/components/auth';
 import { colors, fontFamilies, fontSizes } from '@/constants/theme';
 
 const tabScreenOptions = {
@@ -20,12 +21,17 @@ const tabScreenOptions = {
     fontSize: fontSizes.micro,
     letterSpacing: 1.1,
     textTransform: 'uppercase'
-  }
+  },
+  tabBarItemStyle: Platform.select({
+    web: { outlineColor: colors.cyan } as unknown as ViewStyle,
+    default: {}
+  })
 } as const;
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={tabScreenOptions}>
+    <AuthGate>
+      <Tabs screenOptions={tabScreenOptions}>
       <Tabs.Screen
         name="home/index"
         options={{
@@ -34,9 +40,9 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="leaderboard"
+        name="calendar"
         options={{
-          title: 'Ranks',
+          title: 'Calendar',
           tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
         }}
       />
@@ -44,10 +50,16 @@ export default function TabsLayout() {
         name="session"
         options={{
           title: 'Session',
-          tabBarActiveTintColor: colors.pink,
           tabBarIcon: ({ color, focused }) => (
-            <SessionGlyph color={focused ? colors.pink : color} focused={focused} />
+            <SessionGlyph color={color} focused={focused} />
           )
+        }}
+      />
+      <Tabs.Screen
+        name="leaderboard"
+        options={{
+          title: 'Ranks',
+          tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
         }}
       />
       <Tabs.Screen
@@ -60,8 +72,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="squad"
         options={{
-          title: 'Pact',
-          tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
+          href: null,
+          title: 'Period Match',
         }}
       />
       <Tabs.Screen
@@ -71,11 +83,12 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
         }}
       />
-    </Tabs>
+      </Tabs>
+    </AuthGate>
   );
 }
 
-function TabGlyph({ color, focused }: { color: string; focused: boolean }) {
+function TabGlyph({ color, focused }: { color: ColorValue; focused: boolean }) {
   return (
     <View
       style={[
@@ -89,7 +102,7 @@ function TabGlyph({ color, focused }: { color: string; focused: boolean }) {
   );
 }
 
-function SessionGlyph({ color, focused }: { color: string; focused: boolean }) {
+function SessionGlyph({ color, focused }: { color: ColorValue; focused: boolean }) {
   return (
     <View
       style={[
@@ -119,10 +132,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 14,
-    backgroundColor: colors.surfacePinkGhost
+    backgroundColor: colors.surfaceCyanGhost
   },
   sessionGlyphActive: {
-    backgroundColor: colors.surfacePinkActive
+    backgroundColor: colors.surfaceCyanActive
   },
   sessionGlyphCore: {
     width: 9,

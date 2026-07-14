@@ -3,6 +3,7 @@ import { DatabaseService } from '../src/database/database.service';
 import {
   BC_DEMO_REGION_CODE,
   bootstrapBcDemoFoundation,
+  bootstrapBcDemoOperator,
 } from '../src/foundation/bc-demo-foundation';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
@@ -36,6 +37,14 @@ const operatorPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'bc-demo-operator',
   roles: ['operator'],
+  tokenIssuedAt: 1,
+};
+
+const bootstrapOperatorPrincipal: AuthenticatedPrincipal = {
+  email: 'bc-demo-bootstrap-operator@integration.test',
+  emailVerified: true,
+  firebaseUid: 'bc-demo-bootstrap-operator',
+  roles: ['admin', 'user'],
   tokenIssuedAt: 1,
 };
 
@@ -76,6 +85,7 @@ describeWithDatabase('BC demo foundation', () => {
       sessions,
     );
     await profiles.ensureUser(operatorPrincipal, database.connection);
+    await profiles.ensureUser(bootstrapOperatorPrincipal, database.connection);
   });
 
   afterAll(async () => {
@@ -109,6 +119,47 @@ describeWithDatabase('BC demo foundation', () => {
       competitionUpdated: false,
       regionCreated: false,
     });
+
+    await expect(
+      bootstrapBcDemoOperator(
+        migrated.pool,
+        bootstrapOperatorPrincipal.firebaseUid,
+        'Assign the least-privilege BC demo review role in the integration test.',
+      ),
+    ).resolves.toEqual({ changed: true, roles: ['operator', 'user'] });
+    await expect(
+      bootstrapBcDemoOperator(
+        migrated.pool,
+        bootstrapOperatorPrincipal.firebaseUid,
+        'Verify the least-privilege BC demo review role is idempotent.',
+      ),
+    ).resolves.toEqual({ changed: false, roles: ['operator', 'user'] });
+    const bootstrappedOperator = await migrated.pool.query<{
+      roles: string[];
+    }>(
+      `SELECT roles
+       FROM users
+       WHERE firebase_uid = $1`,
+      [bootstrapOperatorPrincipal.firebaseUid],
+    );
+    expect(bootstrappedOperator.rows[0].roles.sort()).toEqual([
+      'operator',
+      'user',
+    ]);
+    const operatorAudit = await migrated.pool.query<{
+      next_state: { roles: string[] };
+      previous_state: { roles: string[] };
+    }>(
+      `SELECT previous_state, next_state
+       FROM operator_audit_events
+       WHERE action = 'user.bc_demo_operator_bootstrapped'`,
+    );
+    expect(operatorAudit.rows).toEqual([
+      {
+        next_state: { roles: ['operator', 'user'] },
+        previous_state: { roles: ['admin', 'user'] },
+      },
+    ]);
 
     const policy = await database.connection
       .selectFrom('region_policies')
@@ -277,7 +328,7 @@ describeWithDatabase('BC demo foundation', () => {
       [BC_DEMO_REGION_CODE],
     );
     expect(state.rows[0]).toEqual({
-      audit_events: 3,
+      audit_events: 4,
       competitions: 1,
       draws: 0,
       enrollments: 1,
@@ -300,6 +351,13 @@ describeWithDatabase('BC demo foundation', () => {
         migrated.pool,
         '2026-08',
         'Integration test must reject an unsafe existing region.',
+      ),
+    ).rejects.toThrow('not in the required disabled state');
+    await expect(
+      bootstrapBcDemoOperator(
+        migrated.pool,
+        bootstrapOperatorPrincipal.firebaseUid,
+        'Unsafe BC foundation state must block operator assignment.',
       ),
     ).rejects.toThrow('not in the required disabled state');
   });

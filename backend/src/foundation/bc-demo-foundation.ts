@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { parseCompetitionRules } from '../modules/competitions/competition-rules';
 
@@ -6,6 +7,7 @@ export const BC_DEMO_POLICY_VERSION = 'bc-demo-foundation-v1';
 export const BC_DEMO_RULES_VERSION = 'bc-demo-non-cash-v1';
 
 const REGION_LOCK_KEY = 'gogymgo:bc-demo-foundation';
+const OPERATOR_LOCK_KEY = 'gogymgo:bc-demo-operator';
 const REGION_VALID_FROM = new Date('2026-01-01T08:00:00.000Z');
 const COMPETITION_NAME = 'BC NON-CASH DEMO - NO PRIZES';
 const LEGACY_COMPETITION_NAME = 'BC SAFE DEMO DRAFT - DO NOT PUBLISH';
@@ -54,6 +56,13 @@ interface CompetitionRow {
   status: string;
 }
 
+interface DemoOperatorUserRow {
+  email_verified: boolean;
+  id: string;
+  roles: string[];
+  status: string;
+}
+
 export interface BcDemoFoundationResult {
   competitionCreated: boolean;
   competitionId: string;
@@ -66,6 +75,23 @@ export interface BcDemoFoundationResult {
     competitionEnabled: false;
     payoutEnabled: false;
   };
+}
+
+export interface BcDemoOperatorResult {
+  changed: boolean;
+  roles: ['operator', 'user'];
+}
+
+export function assertLocalDatabaseUrl(
+  databaseUrl: string,
+  operation: string,
+): void {
+  const hostname = new URL(databaseUrl).hostname;
+  if (!['127.0.0.1', '::1', 'localhost'].includes(hostname)) {
+    throw new Error(
+      `${operation} is local-only and refuses a remote database host.`,
+    );
+  }
 }
 
 export function getDefaultBcDemoMonthKey(now = new Date()): string {
@@ -241,6 +267,110 @@ export async function bootstrapBcDemoFoundation(
   }
 }
 
+export async function bootstrapBcDemoOperator(
+  pool: Pool,
+  firebaseUid: string,
+  reason: string,
+): Promise<BcDemoOperatorResult> {
+  const normalizedUid = firebaseUid.trim();
+  if (!normalizedUid || normalizedUid.length > 128) {
+    throw new Error(
+      'The BC demo operator Firebase UID must contain 1 to 128 characters.',
+    );
+  }
+  if (reason.trim().length < 8 || reason.length > 500) {
+    throw new Error(
+      'The BC demo operator reason must contain 8 to 500 characters.',
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+      OPERATOR_LOCK_KEY,
+    ]);
+
+    const region = await findRegion(client, BC_DEMO_REGION_CODE);
+    if (!region) {
+      throw new Error(
+        'The disabled BC demo foundation must exist before an operator is assigned.',
+      );
+    }
+    assertSafeRegion(region);
+
+    const competitions = await findRegionCompetitions(client, region.id);
+    if (competitions.length === 0) {
+      throw new Error(
+        'A safe BC non-cash demo competition must exist before an operator is assigned.',
+      );
+    }
+    competitions.forEach(assertSafeCompetition);
+
+    const userResult = await client.query<DemoOperatorUserRow>(
+      `SELECT id, email_verified, roles, status
+       FROM users
+       WHERE firebase_uid = $1
+       FOR UPDATE`,
+      [normalizedUid],
+    );
+    if (userResult.rowCount !== 1) {
+      throw new Error(
+        'The Firebase account must sign in once before the BC demo operator role can be assigned.',
+      );
+    }
+
+    const user = userResult.rows[0];
+    if (user.status !== 'active' || !user.email_verified) {
+      throw new Error(
+        'The BC demo operator account must be active with a verified email.',
+      );
+    }
+
+    const allowedCurrentRoles = new Set(['admin', 'operator', 'user']);
+    if (user.roles.some((role) => !allowedCurrentRoles.has(role))) {
+      throw new Error(
+        'The account has an incompatible privileged role. No changes were made.',
+      );
+    }
+
+    const nextRoles = ['operator', 'user'] as const;
+    const currentRoles = [...new Set(user.roles)].sort();
+    const changed = currentRoles.join(',') !== nextRoles.join(',');
+    if (changed) {
+      await client.query(
+        `UPDATE users
+         SET roles = $1, updated_at = current_timestamp
+         WHERE id = $2`,
+        [nextRoles, user.id],
+      );
+      await client.query(
+        `INSERT INTO operator_audit_events
+           (actor_user_id, action, entity_type, entity_id, previous_state,
+            next_state, reason, request_id)
+         VALUES
+           (NULL, 'user.bc_demo_operator_bootstrapped', 'users', $1,
+            $2::jsonb, $3::jsonb, $4, $5)`,
+        [
+          user.id,
+          JSON.stringify({ roles: currentRoles }),
+          JSON.stringify({ roles: nextRoles }),
+          reason,
+          `bootstrap-bc-demo-operator:${randomUUID()}`,
+        ],
+      );
+    }
+
+    await client.query('COMMIT');
+    return { changed, roles: [...nextRoles] };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 type DatabaseClient = PoolClient;
 
 async function findRegion(
@@ -271,6 +401,21 @@ async function findCompetition(
     [regionPolicyId, monthKey],
   );
   return result.rows[0];
+}
+
+async function findRegionCompetitions(
+  client: DatabaseClient,
+  regionPolicyId: string,
+): Promise<CompetitionRow[]> {
+  const result = await client.query<CompetitionRow>(
+    `SELECT id, currency, minimum_entrants, mode, name, rules,
+            rules_version, status
+     FROM competitions
+     WHERE region_policy_id = $1
+     FOR SHARE`,
+    [regionPolicyId],
+  );
+  return result.rows;
 }
 
 function assertSafeRegion(region: RegionRow): void {

@@ -171,7 +171,7 @@ export class OperatorService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        await this.requireOperator(principal, transaction);
+        const operator = await this.requireOperator(principal, transaction);
         const [sessions, regions, payouts, partners, privacy, profileMedia] =
           await Promise.all([
             transaction
@@ -196,6 +196,7 @@ export class OperatorService {
                 'region.code as region_code',
               ])
               .where('verification.status', '=', 'pending')
+              .where('verification.user_id', '!=', operator.id)
               .orderBy('verification.created_at')
               .limit(100)
               .execute(),
@@ -369,6 +370,12 @@ export class OperatorService {
             message: 'Only a pending region verification can be decided.',
           });
         }
+        if (current.user_id === operator.id) {
+          throw new ForbiddenException({
+            code: 'REGION_VERIFICATION_SELF_REVIEW_FORBIDDEN',
+            message: 'Operators cannot review their own region verification.',
+          });
+        }
         const expiresAt =
           input.decision === 'approved'
             ? input.expiresAt
@@ -380,6 +387,7 @@ export class OperatorService {
           .set({
             decision_reason: input.reason,
             expires_at: expiresAt,
+            reviewed_by_user_id: operator.id,
             status: input.decision,
             verified_at: new Date(),
           })

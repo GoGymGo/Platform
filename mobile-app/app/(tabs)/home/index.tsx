@@ -22,6 +22,7 @@ import {
 } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { formatPayoutAmount, needsPayoutSetup } from '@/domain/payout';
+import { bcDemoRegionCode } from '@/services/regionFoundation';
 import { useProfile } from '@/state/profile';
 import { useAuth } from '@/state/auth';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
@@ -65,17 +66,44 @@ export default function HomeScreen() {
   const {
     data: currentEntrantsData,
     isPending: currentEntrantsPending
-  } = useCompetitionEnrollmentCount(competitionRegion, competition.competitionMonthKey);
+  } = useCompetitionEnrollmentCount(
+    isDemoVerificationEnabled ? bcDemoRegionCode : competitionRegion,
+    competition.competitionMonthKey
+  );
   const { data: creatorWorkouts = [] } = useCreatorWorkouts();
   const { data: payoutClaimData } = useCurrentUserPayout(user?.uid);
   const currentEntrants = currentEntrantsData ?? null;
   const payoutClaim = payoutClaimData ?? null;
   const featuredCreatorWorkout =
     creatorWorkouts.find((workout) => workout.joined) ?? null;
-  const launchConfirmed = currentEntrants !== null && currentEntrants >= enrollment.minimumEntrants;
-  const entrantsNeeded = currentEntrants === null
+  const launchConfirmed = !isDemoVerificationEnabled &&
+    currentEntrants !== null &&
+    currentEntrants >= enrollment.minimumEntrants;
+  const entrantsNeeded = isDemoVerificationEnabled || currentEntrants === null
     ? null
     : Math.max(0, enrollment.minimumEntrants - currentEntrants);
+  const enrollmentStatusLabel = isDemoVerificationEnabled
+    ? 'DEMO ENROLLMENT'
+    : 'REGIONAL LAUNCH';
+  const enrollmentStatusValue = currentEntrantsPending
+    ? `CHECKING ${isDemoVerificationEnabled ? 'DEMO ENROLLMENT' : 'REGISTRATION'} COUNT`
+    : currentEntrants === null
+      ? 'TOTAL NOT CONNECTED'
+      : isDemoVerificationEnabled
+        ? `${currentEntrants.toLocaleString()} ACTIVE DEMO ${currentEntrants === 1 ? 'ENROLLMENT' : 'ENROLLMENTS'}`
+        : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`;
+  const enrollmentStatusTone = isDemoVerificationEnabled
+    ? currentEntrants === null ? 'dim' : 'green'
+    : launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber';
+  const enrollmentStatusCopy = isDemoVerificationEnabled
+    ? currentEntrants === null
+      ? 'The live demo enrollment total will appear when regional enrollment sync is available.'
+      : `${currentEntrants} zero-value BC demo ${currentEntrants === 1 ? 'enrollment is' : 'enrollments are'} active. No launch minimum applies.`
+    : launchConfirmed
+      ? 'Competition launch confirmed.'
+      : entrantsNeeded === null
+        ? 'The live registration total will appear when regional enrollment sync is available.'
+        : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`;
   const liveMultiplier = currentPeriod?.liveMultiplier ?? 0;
   const stats: readonly HomeStat[] = [
     {
@@ -214,26 +242,18 @@ export default function HomeScreen() {
             <View style={styles.launchStatus}>
               <View style={styles.launchHeader}>
                 <TerminalText tone="dim" variant="micro">
-                  REGIONAL LAUNCH
+                  {enrollmentStatusLabel}
                 </TerminalText>
                 <TerminalText
-                  glow={launchConfirmed}
-                  tone={launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber'}
+                  glow={isDemoVerificationEnabled ? currentEntrants !== null : launchConfirmed}
+                  tone={enrollmentStatusTone}
                   variant="label"
                 >
-                  {currentEntrantsPending
-                    ? 'CHECKING REGISTRATION COUNT'
-                    : currentEntrants === null
-                      ? 'TOTAL NOT CONNECTED'
-                    : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`}
+                  {enrollmentStatusValue}
                 </TerminalText>
               </View>
-              <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
-                {launchConfirmed
-                  ? 'Competition launch confirmed.'
-                  : entrantsNeeded === null
-                    ? 'The live registration total will appear when regional enrollment sync is available.'
-                    : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
+              <TerminalText tone={isDemoVerificationEnabled || launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
+                {enrollmentStatusCopy}
               </TerminalText>
             </View>
           ) : null}

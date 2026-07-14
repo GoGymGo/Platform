@@ -201,6 +201,58 @@ describeWithDatabase('BC demo foundation', () => {
     await expect(
       regions.getCurrentVerification(userPrincipal, BC_DEMO_REGION_CODE),
     ).resolves.toEqual(expect.objectContaining({ status: 'approved' }));
+    const [reviewedVerification, reviewingOperator] = await Promise.all([
+      database.connection
+        .selectFrom('region_verifications')
+        .select('reviewed_by_user_id')
+        .where('id', '=', submitted.id)
+        .executeTakeFirstOrThrow(),
+      database.connection
+        .selectFrom('users')
+        .select('id')
+        .where('firebase_uid', '=', operatorPrincipal.firebaseUid)
+        .executeTakeFirstOrThrow(),
+    ]);
+    expect(reviewedVerification.reviewed_by_user_id).toBe(reviewingOperator.id);
+
+    const selfSubmitted = await regions.createVerification(
+      operatorPrincipal,
+      'bc-demo-self-region-submission',
+      {
+        method: 'postal_code',
+        postalCode: 'V8W 1P6',
+        regionPolicyId: policy.id,
+      },
+    );
+    await expect(
+      operator.listWorkQueue(operatorPrincipal),
+    ).resolves.not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: selfSubmitted.id }),
+      ]),
+    );
+    await expect(
+      operator.decideRegionVerification(
+        operatorPrincipal,
+        selfSubmitted.id,
+        'bc-demo-self-region-decision',
+        {
+          decision: 'approved',
+          reason: 'An operator must not approve their own BC verification.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'REGION_VERIFICATION_SELF_REVIEW_FORBIDDEN',
+      }),
+    });
+    await expect(
+      database.connection
+        .selectFrom('region_verifications')
+        .select(['reviewed_by_user_id', 'status'])
+        .where('id', '=', selfSubmitted.id)
+        .executeTakeFirstOrThrow(),
+    ).resolves.toEqual({ reviewed_by_user_id: null, status: 'pending' });
 
     const currentCompetition = await competitions.getCurrent(userPrincipal);
     expect(currentCompetition).toEqual(

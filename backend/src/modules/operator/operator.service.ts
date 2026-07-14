@@ -182,10 +182,21 @@ export class OperatorService {
               .limit(100)
               .execute(),
             transaction
-              .selectFrom('region_verifications')
-              .select(['created_at', 'id', 'status'])
-              .where('status', '=', 'pending')
-              .orderBy('created_at')
+              .selectFrom('region_verifications as verification')
+              .innerJoin(
+                'region_policies as region',
+                'region.id',
+                'verification.region_policy_id',
+              )
+              .select([
+                'verification.created_at',
+                'verification.id',
+                'verification.method',
+                'verification.status',
+                'region.code as region_code',
+              ])
+              .where('verification.status', '=', 'pending')
+              .orderBy('verification.created_at')
               .limit(100)
               .execute(),
             transaction
@@ -227,7 +238,11 @@ export class OperatorService {
 
         return [
           ...sessions.map((item) => this.queueItem(item, 'workout_session')),
-          ...regions.map((item) => this.queueItem(item, 'region_verification')),
+          ...regions.map((item) => ({
+            ...this.queueItem(item, 'region_verification'),
+            regionCode: item.region_code,
+            verificationMethod: item.method,
+          })),
           ...payouts.map((item) => this.queueItem(item, 'payout_claim')),
           ...partners.map((item) =>
             this.queueItem(item, 'partner_application'),

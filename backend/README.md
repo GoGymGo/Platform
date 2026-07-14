@@ -13,6 +13,7 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 - GoGymGo never accepts bank-account, tax-form, or identity-document fields.
 - Account legal documents and receipts are versioned, content-hashed, append-only, and server-timestamped; local device state is never authoritative competition consent.
 - The optional British Columbia, Canada demo-verification adapter stores only an expiring simulated checkpoint. It cannot run in production and never creates competition credit, prize eligibility, or payout state.
+- The local BC demo foundation bootstrap accepts only a localhost database, requires explicit confirmation and an audit reason, and creates only a disabled BC policy plus a guarded zero-value `non_cash_demo` competition. Approved users may create a demo enrollment, but database triggers prohibit entry, scoring, draw, winner, payout, and Hyperwallet state.
 
 ## Local foundation
 
@@ -29,6 +30,25 @@ npm.cmd install
 npm.cmd run check
 npm.cmd run start:dev
 ```
+
+To create or verify the disabled BC demo foundation in the local database:
+
+```powershell
+$env:CONFIRM_BC_DEMO_BOOTSTRAP='yes'
+$env:BC_DEMO_BOOTSTRAP_REASON='Create the local BC backend foundation for development.'
+npm.cmd run bootstrap:bc-demo
+Remove-Item Env:CONFIRM_BC_DEMO_BOOTSTRAP
+Remove-Item Env:BC_DEMO_BOOTSTRAP_REASON
+```
+
+The command defaults to the next calendar month in `America/Vancouver`. Set
+`BC_DEMO_COMPETITION_MONTH=YYYY-MM` only when a specific local demo month is
+needed. Re-running the command is safe: it verifies and reuses the same records,
+and refuses to proceed if either record has been activated or changed.
+
+The connected client paths, disabled enrollment boundary and remaining legal
+and backend prerequisites are documented in
+[the BC demo foundation handoff](docs/bc-demo-foundation.md).
 
 The liveness route is `GET http://localhost:3000/v1/health`. In non-production environments, Swagger UI is available at `http://localhost:3000/docs` and the generated contract is committed as `openapi.json`.
 

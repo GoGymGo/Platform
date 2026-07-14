@@ -13,10 +13,7 @@ import {
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
 import { SponsorRail } from '@/components/sponsor';
-import type {
-  CompetitionRegion,
-  CompetitionRegionVerificationMethod
-} from '@/config/regions';
+import type { CompetitionRegion } from '@/config/regions';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import {
   isCompleteCanadianPostalCode,
@@ -25,12 +22,13 @@ import {
 } from '@/domain/competitionRegionVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { verifyCompetitionRegionWithDeviceLocation } from '@/services/competitionRegionVerification';
+import type { BcRegionEvidence } from '@/services/regionFoundation';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 
 type VerificationState =
   | 'idle'
   | 'checking'
-  | 'verified'
+  | 'candidate-found'
   | 'permission-denied'
   | 'location-unavailable'
   | 'unsupported-region';
@@ -40,31 +38,40 @@ export default function RegionScreen() {
   const { source } = useLocalSearchParams<{ source?: string }>();
   const {
     competitionRegion,
+    refreshCompetitionRegionVerification,
     regionVerification,
     verifyCompetitionRegion
   } = useCompetitionRegion();
   const [candidateRegion, setCandidateRegion] = useState<CompetitionRegion | null>(null);
-  const [verificationMethod, setVerificationMethod] =
-    useState<CompetitionRegionVerificationMethod | null>(null);
+  const [candidateEvidence, setCandidateEvidence] =
+    useState<BcRegionEvidence | null>(null);
   const [verificationState, setVerificationState] = useState<VerificationState>('idle');
   const [postalCode, setPostalCode] = useState('');
   const [postalError, setPostalError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [showPostalFallback, setShowPostalFallback] = useState(false);
   const isProfileSource = source === 'profile';
-  const candidateIsVerified = verificationMethod === 'device-location';
+  const reviewLocked =
+    regionVerification?.status === 'approved' ||
+    regionVerification?.status === 'pending';
 
   async function checkDeviceLocation() {
     setPostalError('');
+    setSubmitError('');
     setCandidateRegion(null);
-    setVerificationMethod(null);
+    setCandidateEvidence(null);
     setVerificationState('checking');
 
     const result = await verifyCompetitionRegionWithDeviceLocation();
 
-    if (result.status === 'verified') {
+    if (result.status === 'candidate-found') {
       setCandidateRegion(result.region);
-      setVerificationMethod('device-location');
-      setVerificationState('verified');
+      setCandidateEvidence({
+        ...result.coordinates,
+        method: 'device-location'
+      });
+      setVerificationState('candidate-found');
       return;
     }
 
@@ -85,25 +92,58 @@ export default function RegionScreen() {
 
     if (!region) {
       setCandidateRegion(null);
-      setVerificationMethod(null);
+      setCandidateEvidence(null);
       setVerificationState('unsupported-region');
       setPostalError('GOGYMGO IS NOT ACTIVE IN THIS POSTAL AREA YET.');
       return;
     }
 
     setPostalError('');
+    setSubmitError('');
     setCandidateRegion(region);
-    setVerificationMethod('postal-code');
-    setVerificationState('verified');
+    setCandidateEvidence({ method: 'postal-code', postalCode: normalizedPostalCode });
+    setVerificationState('candidate-found');
   }
 
-  async function continueWithVerifiedRegion() {
-    if (!candidateRegion || !verificationMethod) {
+  async function submitRegionForReview() {
+    if (!candidateRegion || !candidateEvidence || submitting) {
       return;
     }
 
-    await verifyCompetitionRegion(candidateRegion, verificationMethod);
-    router.replace(isProfileSource ? '/profile' : '/consents');
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      await verifyCompetitionRegion(candidateRegion, candidateEvidence);
+      setCandidateRegion(null);
+      setCandidateEvidence(null);
+      setVerificationState('idle');
+    } catch {
+      setSubmitError(
+        'BC REGION REVIEW COULD NOT BE SUBMITTED. CHECK THE API AND TRY AGAIN.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleReviewAction() {
+    if (regionVerification?.status === 'approved') {
+      router.replace(isProfileSource ? '/profile' : '/consents');
+      return;
+    }
+    if (regionVerification?.status === 'pending') {
+      setSubmitError('');
+      setSubmitting(true);
+      try {
+        await refreshCompetitionRegionVerification();
+      } catch {
+        setSubmitError('REVIEW STATUS COULD NOT BE REFRESHED. TRY AGAIN.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+    await submitRegionForReview();
   }
 
   return (
@@ -126,11 +166,11 @@ export default function RegionScreen() {
         />
 
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          {isProfileSource ? 'REVERIFY YOUR REGION' : 'VERIFY YOUR REGION'}
+          {isProfileSource ? 'RESUBMIT YOUR BC REGION' : 'CONFIRM YOUR BC REGION'}
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" variant="body">
-          YOUR VERIFIED LOCATION SETS YOUR REGIONAL COMPETITION, SPONSOR, PRIZE DRAW
-          AND MONTHLY TIME ZONE.
+          BRITISH COLUMBIA IS THE ONLY DEMO REGION. YOUR SUBMISSION SETS THE
+          PACIFIC TIME ZONE, BUT THE SERVER MUST REVIEW ELIGIBILITY.
         </TerminalText>
 
         <HUDBorderBox style={styles.privacyCard} tone="cyan">
@@ -139,31 +179,38 @@ export default function RegionScreen() {
           </TerminalText>
           <TerminalText tone="muted" variant="body">
             GOGYMGO CHECKS YOUR LOCATION WHILE THIS SCREEN IS OPEN. WE SAVE YOUR
-            VERIFIED REGION, NOT YOUR EXACT LOCATION, AND NEVER TRACK YOU IN THE
-            BACKGROUND.
+            BC REGION SUBMISSION, NOT YOUR EXACT LOCATION, AND NEVER TRACK YOU
+            IN THE BACKGROUND.
           </TerminalText>
         </HUDBorderBox>
 
-        {isProfileSource && regionVerification ? (
+        {regionVerification ? (
           <HUDBorderBox style={styles.currentCard} tone="muted">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
                 <TerminalText tone="dim" variant="label">
-                  CURRENT VERIFIED REGION
+                  CURRENT REGION SUBMISSION
                 </TerminalText>
                 <TerminalText tone="text" variant="body">
                   {competitionRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText tone={regionVerification.status === 'verified' ? 'green' : 'amber'} variant="label">
-                {regionVerification.status === 'verified' ? 'VERIFIED' : 'PROVISIONAL'}
+              <TerminalText tone="amber" variant="label">
+                {regionVerification.status.toUpperCase()}
               </TerminalText>
             </View>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              {regionVerification.status === 'pending'
+                ? 'An operator must approve this submission before demo enrollment is available.'
+                : regionVerification.status === 'approved'
+                  ? 'Your BC demo eligibility is approved. You may continue.'
+                  : 'Submit a new BC check to continue with demo enrollment.'}
+            </TerminalText>
           </HUDBorderBox>
         ) : null}
 
         <CyberButtonPrimary
-          disabled={verificationState === 'checking'}
+          disabled={verificationState === 'checking' || reviewLocked}
           label={verificationState === 'checking' ? 'CHECKING LOCATION...' : 'USE MY LOCATION ->'}
           onPress={() => void checkDeviceLocation()}
           style={styles.primaryAction}
@@ -188,6 +235,10 @@ export default function RegionScreen() {
           />
         ) : null}
 
+        {submitError ? (
+          <AuthStatusNotice message={submitError} tone="amber" />
+        ) : null}
+
         {verificationState === 'permission-denied' ? (
           <CyberButtonOutline
             label="OPEN DEVICE SETTINGS"
@@ -197,6 +248,7 @@ export default function RegionScreen() {
 
         <CyberButtonOutline
           label={showPostalFallback ? 'HIDE POSTAL CODE' : 'VERIFY WITH POSTAL CODE'}
+          disabled={reviewLocked}
           onPress={() => setShowPostalFallback((visible) => !visible)}
         />
 
@@ -227,32 +279,41 @@ export default function RegionScreen() {
         ) : null}
 
         {candidateRegion ? (
-          <HUDBorderBox glow style={styles.verifiedCard} tone={candidateIsVerified ? 'green' : 'amber'}>
+          <HUDBorderBox glow style={styles.verifiedCard} tone="amber">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
-                <TerminalText tone={candidateIsVerified ? 'green' : 'amber'} variant="label">
-                  REGION FOUND
+                <TerminalText tone="amber" variant="label">
+                  BC CANDIDATE FOUND
                 </TerminalText>
                 <TerminalText glow tone="cyan" variant="title">
                   {candidateRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText glow tone={candidateIsVerified ? 'green' : 'amber'} variant="label">
-                {candidateIsVerified ? 'VERIFIED' : 'PROVISIONAL'}
+              <TerminalText glow tone="amber" variant="label">
+                READY TO SUBMIT
               </TerminalText>
             </View>
             <TerminalText tone="muted" variant="caption">
-              {candidateIsVerified
-                ? `YOU WILL COMPETE IN ${candidateRegion.label} AND SEE SPONSOR CAMPAIGNS FOR THIS REGION.`
-                : `YOUR POSTAL CODE MATCHES ${candidateRegion.label}. REVERIFY BY DEVICE LOCATION BEFORE COMPETITION ELIGIBILITY IS FINAL.`}
+              {`THIS CHECK ONLY PREPARES A ${candidateRegion.label} REVIEW. IT DOES NOT ENROLL YOU, CREATE AN ENTRY OR ENABLE A PAYOUT.`}
             </TerminalText>
           </HUDBorderBox>
         ) : null}
 
         <CyberButtonPrimary
-          disabled={!candidateRegion || !verificationMethod}
-          label={isProfileSource ? 'SAVE VERIFIED REGION ->' : 'CONTINUE ->'}
-          onPress={() => void continueWithVerifiedRegion()}
+          disabled={
+            submitting ||
+            (!reviewLocked && (!candidateRegion || !candidateEvidence))
+          }
+          label={submitting
+            ? 'CHECKING BC REVIEW...'
+            : regionVerification?.status === 'approved'
+              ? isProfileSource
+                ? 'RETURN TO PROFILE ->'
+                : 'CONTINUE WITH APPROVED BC REGION ->'
+              : regionVerification?.status === 'pending'
+                ? 'CHECK REVIEW STATUS'
+                : 'SUBMIT BC REGION FOR REVIEW ->'}
+          onPress={() => void handleReviewAction()}
           style={styles.continueAction}
         />
       </ScreenScrollView>

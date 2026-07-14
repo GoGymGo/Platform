@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { competitionConfig } from '@/config/competition';
+import { isDemoVerificationEnabled } from '@/config/demoVerification';
 import {
   evaluateMonthlyCompetition,
   getCompetitionMonthKey,
@@ -122,6 +123,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
   const [weeklyGoal, setWeeklyGoalState] = useState<number>(
     workoutRules.defaultWeeklyGoal
   );
+  const signupEntries = isDemoVerificationEnabled ? 0 : workoutRules.signupEntries;
 
   useEffect(() => {
     let active = true;
@@ -537,8 +539,8 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     });
     const competitionEntries = competition.totalCompetitionEntries;
     const verifiedSessionCount = verifiedDateKeys.length;
-    const prizeDrawEligible = hasActivePrizeDrawEntry(workoutRules.signupEntries);
-    const totalEntries = workoutRules.signupEntries + competitionEntries;
+    const prizeDrawEligible = hasActivePrizeDrawEntry(signupEntries);
+    const totalEntries = signupEntries + competitionEntries;
     const calendarWeekProgress = getCurrentWeekProgress(
       referenceDateKey,
       verifiedDateKeys
@@ -569,7 +571,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       totalEntries,
       verifiedSessionCount
     };
-  }, [competitionMatches, competitionRegion.timeZone, logs, registrationCompetitionMonthKey, registrationDateKey, weeklyGoal]);
+  }, [competitionMatches, competitionRegion.timeZone, logs, registrationCompetitionMonthKey, registrationDateKey, signupEntries, weeklyGoal]);
 
   const value = useMemo<WorkoutProgressContextValue>(
     () => ({
@@ -597,7 +599,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       remindersEnabled,
       setCompetitionRemindersEnabled,
       setWeeklyGoal,
-      signupEntries: workoutRules.signupEntries,
+      signupEntries,
       startWorkoutSession,
       totalEntries: derived.totalEntries,
       triggerMidSessionCheck,
@@ -618,6 +620,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       remindersEnabled,
       setCompetitionRemindersEnabled,
       setWeeklyGoal,
+      signupEntries,
       startWorkoutSession,
       triggerMidSessionCheck,
       weeklyGoal

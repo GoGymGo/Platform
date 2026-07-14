@@ -10,6 +10,7 @@ import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompetitionsModule } from './modules/competitions/competitions.module';
 import { DrawsModule } from './modules/draws/draws.module';
+import { DemoVerificationModule } from './modules/verification/demo-verification.module';
 import { CreatorWorkoutsModule } from './modules/creator-workouts/creator-workouts.module';
 import { HealthModule } from './modules/health/health.module';
 import { LeaderboardsModule } from './modules/leaderboards/leaderboards.module';
@@ -113,6 +114,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
     ResultsModule,
     CompetitionsModule,
     CreatorWorkoutsModule,
+    DemoVerificationModule,
     SessionsModule,
     LeaderboardsModule,
     LegalModule,

@@ -1982,6 +1982,42 @@
         "tags": ["creator workouts"]
       }
     },
+    "/v1/demo-verifications/check-ins": {
+      "post": {
+        "operationId": "createCheckIn",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateDemoCheckInDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoCheckInResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a non-eligible Canada demo checkpoint without collecting evidence",
+        "tags": ["demo-verification"]
+      }
+    },
     "/v1/leaderboards/current": {
       "get": {
         "operationId": "getCurrentLeaderboard",
@@ -3729,6 +3765,45 @@
           "regionCodes",
           "videoUrl",
           "workoutStyle"
+        ]
+      },
+      "CreateDemoCheckInDto": {
+        "type": "object",
+        "properties": {
+          "regionCode": {
+            "type": "string",
+            "enum": ["CA-BC"],
+            "example": "CA-BC"
+          },
+          "checkpointType": { "type": "string", "enum": ["session_start"] }
+        },
+        "required": ["regionCode", "checkpointType"]
+      },
+      "DemoCheckInResponseDto": {
+        "type": "object",
+        "properties": {
+          "demo": { "type": "boolean" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "id": { "type": "string", "format": "uuid" },
+          "issuedAt": { "type": "string", "format": "date-time" },
+          "outcome": { "type": "string", "enum": ["simulated"] },
+          "provider": { "type": "string", "enum": ["canada_demo"] },
+          "regionCode": {
+            "type": "string",
+            "enum": ["CA-BC"],
+            "example": "CA-BC"
+          },
+          "checkpointType": { "type": "string", "enum": ["session_start"] }
+        },
+        "required": [
+          "demo",
+          "expiresAt",
+          "id",
+          "issuedAt",
+          "outcome",
+          "provider",
+          "regionCode",
+          "checkpointType"
         ]
       },
       "CategoryLeaderboardRowDto": {

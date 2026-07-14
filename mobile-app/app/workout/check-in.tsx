@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -11,15 +12,52 @@ import {
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SponsorRail } from '@/components/sponsor';
+import {
+  demoVerificationRegionCode,
+  isDemoVerificationEnabled
+} from '@/config/demoVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { createDemoCheckIn } from '@/services/demoVerification';
+import { useApi } from '@/state/api';
 
 export default function CheckInScreen() {
   const router = useRouter();
-  const {
-    accepted: cameraConsentAccepted,
-    toggle: toggleCameraConsent
-  } = useBiometricCameraConsent();
+  const { api } = useApi();
+  const [checkpointRecorded, setCheckpointRecorded] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
+  const { accepted: cameraConsentAccepted, toggle: toggleCameraConsent } =
+    useBiometricCameraConsent();
+  const demoAvailable = isDemoVerificationEnabled;
+  const buttonLabel = !isDemoVerificationEnabled
+    ? 'IDENTITY PROVIDER REQUIRED'
+    : !api
+        ? 'API REQUIRED'
+        : checkpointRecorded
+          ? 'DEMO CHECK-IN RECORDED'
+          : !cameraConsentAccepted
+            ? 'ACCEPT NOTICE TO CONTINUE'
+            : submitting
+              ? 'VERIFYING DEMO CHECK-IN...'
+              : 'RUN DEMO CHECK-IN ->';
+
+  async function verifyDemoCheckIn() {
+    if (!cameraConsentAccepted || !demoAvailable || !api) {
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmissionError(undefined);
+    try {
+      await createDemoCheckIn(api);
+      setCheckpointRecorded(true);
+    } catch {
+      setSubmissionError('DEMO CHECK-IN COULD NOT BE VERIFIED. CHECK THE LOCAL API AND TRY AGAIN.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <ScreenContainer>
@@ -54,8 +92,8 @@ export default function CheckInScreen() {
             {"VERIFY IT'S YOU TO START"}
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" variant="body">
-            THE DEVICE CONFIRMS PRESENCE ONLY. GOGYMGO STORES THE CHECKPOINT
-            RESULT, NOT FACE DATA OR BIOMETRIC DATA.
+            THE DEVICE CONFIRMS PRESENCE ONLY. GOGYMGO STORES THE CHECKPOINT RESULT, NOT FACE DATA
+            OR BIOMETRIC DATA.
           </TerminalText>
         </View>
 
@@ -67,12 +105,23 @@ export default function CheckInScreen() {
         />
 
         <CyberButtonPrimary
-          disabled
-          label="IDENTITY PROVIDER REQUIRED"
-          onPress={() => undefined}
+          disabled={
+            !cameraConsentAccepted || !demoAvailable || !api || checkpointRecorded || submitting
+          }
+          label={buttonLabel}
+          onPress={() => void verifyDemoCheckIn()}
         />
-        <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
-          CHECK-IN WILL UNLOCK WHEN THE BACKEND IDENTITY AND HEART-RATE PROVIDERS ARE CONNECTED.
+        <TerminalText
+          style={styles.integrationNote}
+          tone={submissionError ? 'red' : checkpointRecorded ? 'green' : 'amber'}
+          variant="caption"
+        >
+          {submissionError ??
+            (checkpointRecorded
+              ? 'SIMULATED CHECKPOINT RECORDED. NO WORKOUT SESSION, COMPETITION CREDIT, PRIZE ELIGIBILITY OR PAYOUT STATE WAS CREATED.'
+              : demoAvailable
+                ? 'BRITISH COLUMBIA, CANADA DEMO ONLY. THIS SIMULATES A SHORT-LIVED, NON-ELIGIBLE CHECKPOINT WITHOUT CAMERA, BIOMETRIC, HEALTH OR PAYMENT DATA.'
+                : 'CHECK-IN WILL UNLOCK WHEN THE BACKEND IDENTITY AND HEART-RATE PROVIDERS ARE CONNECTED.')}
         </TerminalText>
       </ScreenScrollView>
     </ScreenContainer>

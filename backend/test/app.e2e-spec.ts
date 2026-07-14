@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/bootstrap';
+import { DatabaseService } from '../src/database/database.service';
 
 describe('platform foundation (e2e)', () => {
   let app: INestApplication<App>;
@@ -15,7 +16,16 @@ describe('platform foundation (e2e)', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(DatabaseService)
+      .useValue({
+        connection: {
+          selectFrom: () => {
+            throw new Error('Database dependency is unavailable in e2e tests.');
+          },
+        },
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
@@ -120,6 +130,19 @@ describe('platform foundation (e2e)', () => {
         regionVerificationId: '20000000-0000-4000-8000-000000000002',
         rulesAccepted: true,
       })
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('requires authentication before creating a demo verification checkpoint', () => {
+    return request(app.getHttpServer())
+      .post('/v1/demo-verifications/check-ins')
+      .set('Idempotency-Key', 'demo-check-in-e2e')
+      .send({ checkpointType: 'session_start', regionCode: 'CA-BC' })
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({

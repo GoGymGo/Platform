@@ -42,6 +42,9 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
       useFactory: (config: ConfigService<Environment, true>) => {
         const isProduction =
           config.get('NODE_ENV', { infer: true }) === 'production';
+        const prettyLogsEnabled = config.get('PRETTY_LOGS_ENABLED', {
+          infer: true,
+        });
         const revision =
           process.env.K_REVISION ?? process.env.CLOUD_RUN_REVISION;
 
@@ -81,12 +84,13 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
                 ? suppliedRequestId
                 : randomUUID();
             },
-            transport: isProduction
-              ? undefined
-              : {
-                  target: 'pino-pretty',
-                  options: { colorize: true, singleLine: true },
-                },
+            transport:
+              !isProduction && prettyLogsEnabled
+                ? {
+                    target: 'pino-pretty',
+                    options: { colorize: true, singleLine: true },
+                  }
+                : undefined,
           },
         };
       },

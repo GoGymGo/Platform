@@ -12,6 +12,7 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 - Hyperwallet credentials, webhooks, user/payment tokens, and hosted portal actions remain server-side.
 - GoGymGo never accepts bank-account, tax-form, or identity-document fields.
 - Account legal documents and receipts are versioned, content-hashed, append-only, and server-timestamped; local device state is never authoritative competition consent.
+- The optional British Columbia, Canada demo-verification adapter stores only an expiring simulated checkpoint. It cannot run in production and never creates competition credit, prize eligibility, or payout state.
 
 ## Local foundation
 

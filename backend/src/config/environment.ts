@@ -70,6 +70,14 @@ export const environmentSchema = z
     AUTH_MODE: z.enum(['firebase', 'test']).default('firebase'),
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
+    DEMO_VERIFICATION_ENABLED: booleanString.default(false),
+    DEMO_VERIFICATION_REGION_CODE: z.literal('CA-BC').default('CA-BC'),
+    DEMO_VERIFICATION_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(900)
+      .default(300),
     DATABASE_URL: z
       .string()
       .url()
@@ -135,6 +143,17 @@ export const environmentSchema = z
     HYPERWALLET_WEBHOOK_PASSWORD: optionalTrimmedString,
   })
   .superRefine((environment, context) => {
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.DEMO_VERIFICATION_ENABLED
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'DEMO_VERIFICATION_ENABLED cannot be true in production.',
+        path: ['DEMO_VERIFICATION_ENABLED'],
+      });
+    }
+
     if (
       environment.NODE_ENV === 'production' &&
       environment.AUTH_MODE !== 'firebase'

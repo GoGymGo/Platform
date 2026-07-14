@@ -281,7 +281,7 @@ describeWithDatabase('critical account legal receipt workflow', () => {
             receipt_action: 'acknowledge',
           }),
         ]),
-        schemaVersion: 2,
+        schemaVersion: 3,
       }),
     );
   });

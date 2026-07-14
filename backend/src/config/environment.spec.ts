@@ -12,6 +12,9 @@ describe('environment validation', () => {
     expect(environment.RUNTIME_ROLE).toBe('api');
     expect(environment.OPENAPI_ENABLED).toBe(true);
     expect(environment.DATABASE_URL).toContain('localhost:5432');
+    expect(environment.DEMO_VERIFICATION_ENABLED).toBe(false);
+    expect(environment.DEMO_VERIFICATION_REGION_CODE).toBe('CA-BC');
+    expect(environment.DEMO_VERIFICATION_TTL_SECONDS).toBe(300);
     expect(environment.HYPERWALLET_ENABLED).toBe(false);
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
@@ -58,6 +61,17 @@ describe('environment validation', () => {
     expect(() =>
       validateEnvironment({ NODE_ENV: 'production', AUTH_MODE: 'firebase' }),
     ).toThrow(/FIREBASE_PROJECT_ID is required/i);
+  });
+
+  it('never permits the demo verification adapter in production', () => {
+    expect(() =>
+      validateEnvironment({
+        AUTH_MODE: 'firebase',
+        DEMO_VERIFICATION_ENABLED: 'true',
+        FIREBASE_PROJECT_ID: 'gogymgo-production',
+        NODE_ENV: 'production',
+      }),
+    ).toThrow(/DEMO_VERIFICATION_ENABLED cannot be true in production/i);
   });
 
   it('requires every server-side Hyperwallet setting when payouts are enabled', () => {

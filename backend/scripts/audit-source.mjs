@@ -1,14 +1,10 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
+import { promisify } from 'node:util';
 
 const root = process.cwd();
-const ignoredDirectories = new Set([
-  '.git',
-  '.terraform',
-  'coverage',
-  'dist',
-  'node_modules',
-]);
+const execFileAsync = promisify(execFile);
 const prohibitedExtensions = new Set(['.jks', '.key', '.p12', '.pfx', '.pem']);
 const prohibitedContent = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
@@ -16,27 +12,25 @@ const prohibitedContent = [
   /sk_(?:live|test)_[A-Za-z0-9]{16,}/,
 ];
 
-async function listFiles(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
+async function listFiles() {
+  const { stdout } = await execFileAsync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+      windowsHide: true,
+    },
+  );
 
-  for (const entry of entries) {
-    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) {
-      continue;
-    }
-
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await listFiles(path)));
-    } else {
-      files.push(path);
-    }
-  }
-
-  return files;
+  return stdout
+    .split('\0')
+    .filter(Boolean)
+    .map((path) => join(root, path));
 }
 
-const files = await listFiles(root);
+const files = await listFiles();
 const violations = [];
 
 for (const file of files) {

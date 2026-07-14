@@ -73,6 +73,8 @@ export type ProfileMediaStatus =
 export type LegalReceiptRequirement = 'accept' | 'acknowledge' | 'none';
 export type LegalDocumentState = 'published' | 'withdrawn';
 export type LegalReceiptAction = 'accept' | 'acknowledge';
+export type DemoVerificationCheckpointType = 'session_start';
+export type DemoVerificationOutcome = 'simulated';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -328,6 +330,19 @@ export interface SessionEventsTable {
   payload: ColumnType<JsonValue, JsonValue, never>;
 }
 
+export interface DemoVerificationCheckpointsTable {
+  id: Generated<string>;
+  user_id: string;
+  provider: 'canada_demo';
+  region_code: string;
+  checkpoint_type: DemoVerificationCheckpointType;
+  outcome: DemoVerificationOutcome;
+  demo: true;
+  issued_at: Timestamp;
+  expires_at: Timestamp;
+  created_at: Timestamp;
+}
+
 export interface EntryLedgerTable {
   id: Generated<string>;
   competition_id: string;
@@ -579,6 +594,7 @@ export interface Database {
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;
   draw_winners: DrawWinnersTable;
+  demo_verification_checkpoints: DemoVerificationCheckpointsTable;
   entry_ledger: EntryLedgerTable;
   creator_workouts: CreatorWorkoutsTable;
   hyperwallet_users: HyperwalletUsersTable;

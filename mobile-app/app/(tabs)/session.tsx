@@ -6,7 +6,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, componentSizes, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function SessionTabRoute() {
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   screen: {
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.xxl,
-    paddingBottom: componentSizes.tabBarHeight,
+    paddingBottom: 78,
     backgroundColor: colors.background
   },
   header: {

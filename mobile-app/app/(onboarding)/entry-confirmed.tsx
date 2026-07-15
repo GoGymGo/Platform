@@ -11,18 +11,15 @@ import {
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
 import { SponsorRail } from '@/components/sponsor';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { getCompetitionRegionDateKey } from '@/domain/competition';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
-import { useDemoEnrollment } from '@/state/demoEnrollment';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function EntryConfirmedScreen() {
   const router = useRouter();
   const { enrollment } = useSponsorCampaign();
-  const { demoEnrollment } = useDemoEnrollment();
   const {
     competition,
     competitionEntryStartDateKey,
@@ -62,27 +59,15 @@ export default function EntryConfirmedScreen() {
 
         <HUDBorderBox glow style={styles.confirmationMark} tone="green">
           <TerminalText glow tone="green" variant="label">
-            {isDemoVerificationEnabled
-              ? demoEnrollment
-                ? 'DEMO ENROLLED'
-                : 'NOT ENROLLED'
-              : 'CONFIRMED'}
+            CONFIRMED
           </TerminalText>
         </HUDBorderBox>
 
         <TerminalText glow style={styles.title} tone="green" variant="title">
-          {isDemoVerificationEnabled
-            ? demoEnrollment
-              ? 'NON-CASH DEMO ACTIVE'
-              : 'DEMO ENROLLMENT MISSING'
-            : "YOU'RE REGISTERED"}
+          {"YOU'RE REGISTERED"}
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          {isDemoVerificationEnabled
-            ? demoEnrollment
-              ? 'Your zero-value BC demo enrollment is recorded. No prize entry, winner eligibility, payout or Hyperwallet account was created.'
-              : 'A demo enrollment was not confirmed. Return to your weekly goal and try again.'
-            : canChangeGoal
+          {canChangeGoal
             ? `Your Weekly Goal is set for this month. You can change it before scoring begins on ${competitionStartLabel}.`
             : 'Your Weekly Goal is locked because competition scoring has started.'}
         </TerminalText>
@@ -96,27 +81,15 @@ export default function EntryConfirmedScreen() {
             label="SCORING START"
             value={formatCampaignDate(competitionEntryStartDateKey).toUpperCase()}
           />
-          <SummaryRow
-            label={isDemoVerificationEnabled ? 'DEMO ENROLLMENT' : 'FREE PRIZE DRAW ENTRY'}
-            value={isDemoVerificationEnabled
-              ? demoEnrollment
-                ? 'ACTIVE // ZERO VALUE'
-                : 'NOT CREATED'
-              : `${signupEntries}`}
-            tone="pink"
-          />
+          <SummaryRow label="FREE PRIZE DRAW ENTRY" value={`${signupEntries}`} tone="pink" />
         </HUDBorderBox>
 
         <HUDBorderBox style={styles.activationNote} tone="muted">
           <TerminalText glow tone="cyan" variant="label">
-            {isDemoVerificationEnabled ? 'BC DEMO STATUS' : 'PRIZE DRAW STATUS'}
+            PRIZE DRAW STATUS
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            {isDemoVerificationEnabled
-              ? demoEnrollment
-                ? 'This enrollment is for product testing only. Competition workout scoring, entries, draws, winners and payouts stay disabled.'
-                : 'No demo enrollment exists for this account.'
-              : competitionActive && lateRegistration
+            {competitionActive && lateRegistration
               ? `Your free Prize Draw Entry is secured. Scoring starts on your registration day with your ${weeklyGoal}-day goal.`
               : competitionActive
                 ? 'Your free Prize Draw Entry is secured. Competition scoring is active, and verified workouts now count toward your Weekly Goal.'
@@ -126,17 +99,16 @@ export default function EntryConfirmedScreen() {
 
         <HUDBorderBox style={styles.payoutNote} tone="cyan">
           <TerminalText glow tone="cyan" variant="label">
-            {isDemoVerificationEnabled ? 'PAYOUTS DISABLED' : 'IF YOU WIN MONEY'}
+            IF YOU WIN MONEY
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            {isDemoVerificationEnabled
-              ? 'Hyperwallet is not connected in this demo and no payout can be initiated.'
-              : 'GoGymGo will notify you and ask you to create a Hyperwallet payout account. You will connect your bank securely with Hyperwallet only after a prize is confirmed.'}
+            GoGymGo will notify you and ask you to create a Hyperwallet payout account.
+            You will connect your bank securely with Hyperwallet only after a prize is confirmed.
           </TerminalText>
         </HUDBorderBox>
 
         <View style={styles.actions}>
-          {canChangeGoal && !isDemoVerificationEnabled ? (
+          {canChangeGoal ? (
             <CyberButtonOutline
               label="CHANGE WEEKLY GOAL"
               onPress={() => router.replace('/commitment')}

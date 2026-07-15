@@ -6,7 +6,7 @@ import { colors } from '@/constants/theme';
 const modalScreenOptions = {
   headerShown: false,
   contentStyle: {
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   animation: 'slide_from_bottom'
 } as const;

@@ -9,22 +9,33 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function QrScannerModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
+  const { activeSession, startWorkoutSession } = useWorkoutProgress();
   const isExitScan = params.mode === 'exit';
   const {
     accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const exitReady = Boolean(
+    activeSession?.verificationMethod === 'partnerGymQr' &&
+      activeSession.midSessionVerified &&
+      getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale) >=
+        workoutRules.minimumSessionSeconds
+  );
 
   const ctaLabel = isExitScan
-    ? 'EXIT QR PROVIDER REQUIRED'
-    : 'QR SCANNER CONNECTION REQUIRED';
+    ? 'SCAN EXIT QR - FINISH ->'
+    : 'SCAN ENTRY QR - CONTINUE ->';
   const title = isExitScan ? 'SCAN EXIT QR' : 'SCAN GYM QR';
   const subtitle = isExitScan
     ? 'THE EXIT CODE ENDS THE VERIFIED PARTNER-GYM SESSION.'
@@ -32,7 +43,7 @@ export default function QrScannerModal() {
   const stepLabel = isExitScan ? 'EXIT QR // 4 OF 4' : 'ENTRY QR // 1 OF 4';
 
   return (
-    <ScreenContainer contentStyle={styles.screen} surface="modal">
+    <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
         <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
           {stepLabel}
@@ -85,13 +96,20 @@ export default function QrScannerModal() {
       />
 
       <CyberButtonPrimary
-        disabled
+        disabled={!cameraConsentReady || !cameraConsentAccepted || (isExitScan && !exitReady)}
         label={ctaLabel}
-        onPress={() => undefined}
+        onPress={() => {
+          if (!isExitScan) {
+            startWorkoutSession('partnerGymQr');
+          }
+          router.replace(isExitScan ? '/workout/complete' : '/workout/identity-check');
+        }}
       />
-      <TerminalText style={styles.exitHelp} tone="amber" variant="caption">
-        SCANNING WILL UNLOCK WHEN SIGNED PARTNER-GYM QR VALIDATION IS CONNECTED.
-      </TerminalText>
+      {isExitScan && !exitReady ? (
+        <TerminalText style={styles.exitHelp} tone="amber" variant="caption">
+          EXIT UNLOCKS AFTER 30:00 AND THE MID-SESSION CHECK.
+        </TerminalText>
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -102,7 +120,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',

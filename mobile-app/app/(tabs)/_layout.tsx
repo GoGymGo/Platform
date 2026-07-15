@@ -2,35 +2,19 @@ import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, type ColorValue, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
-import {
-  borders,
-  colors,
-  componentSizes,
-  fontFamilies,
-  fontSizes,
-  interactionStates,
-  spacing
-} from '@/constants/theme';
+import { colors, fontFamilies, fontSizes } from '@/constants/theme';
 
 const tabScreenOptions = {
   headerShown: false,
   tabBarActiveTintColor: colors.cyan,
   tabBarInactiveTintColor: colors.dim,
   tabBarStyle: {
-    height: componentSizes.tabBarHeight,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.borderDefault,
-    backgroundColor: colors.surfaceRaised,
-    ...(Platform.select<ViewStyle>({
-      web: {
-        width: '100%',
-        maxWidth: componentSizes.screenMaxWidth,
-        alignSelf: 'center'
-      },
-      default: {}
-    }) ?? {})
+    height: 78,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceCyanActive,
+    backgroundColor: colors.background
   },
   tabBarLabelStyle: {
     fontFamily: fontFamilies.terminal,
@@ -39,10 +23,9 @@ const tabScreenOptions = {
     textTransform: 'uppercase'
   },
   tabBarItemStyle: Platform.select({
-    web: interactionStates.webFocus as unknown as ViewStyle,
-    default: { minHeight: componentSizes.minimumTouchTarget }
-  }),
-  tabBarActiveBackgroundColor: colors.surfaceCyanGhost
+    web: { outlineColor: colors.cyan } as unknown as ViewStyle,
+    default: {}
+  })
 } as const;
 
 export default function TabsLayout() {
@@ -137,14 +120,14 @@ function SessionGlyph({ color, focused }: { color: ColorValue; focused: boolean 
 
 const styles = StyleSheet.create({
   glyph: {
-    width: componentSizes.iconSmall,
+    width: 18,
     height: 5,
     borderWidth: 1,
     borderRadius: 5
   },
   sessionGlyph: {
-    width: componentSizes.iconMedium,
-    height: componentSizes.iconMedium,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

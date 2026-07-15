@@ -2,7 +2,6 @@ import * as Linking from 'expo-linking';
 
 import { canOpenPayoutPortal, type PayoutClaim } from '@/domain/payout';
 import type { ApiClient } from '@/services/api/client';
-import { requireApiClient } from '@/services/api/availability';
 import { createUserStorage } from '@/services/storage/userStorage';
 
 const winnerNoticeStorageKey = '@gogymgo/payout-winner-notice';
@@ -44,13 +43,15 @@ export async function openHyperwalletPortal(
     return false;
   }
 
-  const portalUrl = await requireApiClient(api).request<{ portalUrl: string }>(
-    `/v1/payout-claims/${encodeURIComponent(claim.id)}/portal-action`,
-    {
-      idempotencyKey: `payout-portal:${claim.id}`,
-      method: 'POST'
-    }
-  ).then((action) => action.portalUrl);
+  const portalUrl = api
+    ? await api.request<{ portalUrl: string }>(
+        `/v1/payout-claims/${encodeURIComponent(claim.id)}/portal-action`,
+        {
+          idempotencyKey: `payout-portal:${claim.id}`,
+          method: 'POST'
+        }
+      ).then((action) => action.portalUrl)
+    : claim.portalUrl;
 
   if (!portalUrl) {
     return false;

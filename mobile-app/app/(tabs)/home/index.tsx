@@ -13,8 +13,7 @@ import {
   SponsorRail as SponsorBanner
 } from '@/components/sponsor';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
-import { colors, componentSizes, cyberGlow, fontFamilies, interactionStates, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
   useCreatorWorkouts,
@@ -22,12 +21,10 @@ import {
 } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { formatPayoutAmount, needsPayoutSetup } from '@/domain/payout';
-import { bcDemoRegionCode } from '@/services/regionFoundation';
 import { useProfile } from '@/state/profile';
 import { useAuth } from '@/state/auth';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
-import { useDemoEnrollment } from '@/state/demoEnrollment';
 
 type HomeStat = {
   label: string;
@@ -40,7 +37,6 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { profileImageUri, publicName } = useProfile();
   const { enrollment } = useSponsorCampaign();
-  const { demoEnrollment } = useDemoEnrollment();
   const publicInitials = getPublicInitials(publicName);
   const {
     activeSession,
@@ -66,53 +62,22 @@ export default function HomeScreen() {
   const {
     data: currentEntrantsData,
     isPending: currentEntrantsPending
-  } = useCompetitionEnrollmentCount(
-    isDemoVerificationEnabled ? bcDemoRegionCode : competitionRegion,
-    competition.competitionMonthKey
-  );
+  } = useCompetitionEnrollmentCount(competitionRegion, competition.competitionMonthKey);
   const { data: creatorWorkouts = [] } = useCreatorWorkouts();
   const { data: payoutClaimData } = useCurrentUserPayout(user?.uid);
   const currentEntrants = currentEntrantsData ?? null;
   const payoutClaim = payoutClaimData ?? null;
   const featuredCreatorWorkout =
     creatorWorkouts.find((workout) => workout.joined) ?? null;
-  const launchConfirmed = !isDemoVerificationEnabled &&
-    currentEntrants !== null &&
-    currentEntrants >= enrollment.minimumEntrants;
-  const entrantsNeeded = isDemoVerificationEnabled || currentEntrants === null
+  const launchConfirmed = currentEntrants !== null && currentEntrants >= enrollment.minimumEntrants;
+  const entrantsNeeded = currentEntrants === null
     ? null
     : Math.max(0, enrollment.minimumEntrants - currentEntrants);
-  const enrollmentStatusLabel = isDemoVerificationEnabled
-    ? 'DEMO ENROLLMENT'
-    : 'REGIONAL LAUNCH';
-  const enrollmentStatusValue = currentEntrantsPending
-    ? `CHECKING ${isDemoVerificationEnabled ? 'DEMO ENROLLMENT' : 'REGISTRATION'} COUNT`
-    : currentEntrants === null
-      ? 'TOTAL NOT CONNECTED'
-      : isDemoVerificationEnabled
-        ? `${currentEntrants.toLocaleString()} ACTIVE DEMO ${currentEntrants === 1 ? 'ENROLLMENT' : 'ENROLLMENTS'}`
-        : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`;
-  const enrollmentStatusTone = isDemoVerificationEnabled
-    ? currentEntrants === null ? 'dim' : 'green'
-    : launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber';
-  const enrollmentStatusCopy = isDemoVerificationEnabled
-    ? currentEntrants === null
-      ? 'The live demo enrollment total will appear when regional enrollment sync is available.'
-      : `${currentEntrants} zero-value BC demo ${currentEntrants === 1 ? 'enrollment is' : 'enrollments are'} active. No launch minimum applies.`
-    : launchConfirmed
-      ? 'Competition launch confirmed.'
-      : entrantsNeeded === null
-        ? 'The live registration total will appear when regional enrollment sync is available.'
-        : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`;
   const liveMultiplier = currentPeriod?.liveMultiplier ?? 0;
   const stats: readonly HomeStat[] = [
     {
       value: String(totalEntries),
-      label: isDemoVerificationEnabled
-        ? demoEnrollment
-          ? 'DEMO ENROLLED // NO PRIZES'
-          : 'DEMO // NOT ENROLLED'
-        : 'PRIZE DRAW ENTRIES',
+      label: 'PRIZE DRAW ENTRIES',
       tone: 'pink'
     },
     {
@@ -242,18 +207,26 @@ export default function HomeScreen() {
             <View style={styles.launchStatus}>
               <View style={styles.launchHeader}>
                 <TerminalText tone="dim" variant="micro">
-                  {enrollmentStatusLabel}
+                  REGIONAL LAUNCH
                 </TerminalText>
                 <TerminalText
-                  glow={isDemoVerificationEnabled ? currentEntrants !== null : launchConfirmed}
-                  tone={enrollmentStatusTone}
+                  glow={launchConfirmed}
+                  tone={launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber'}
                   variant="label"
                 >
-                  {enrollmentStatusValue}
+                  {currentEntrantsPending
+                    ? 'CHECKING REGISTRATION COUNT'
+                    : currentEntrants === null
+                      ? 'TOTAL NOT CONNECTED'
+                    : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`}
                 </TerminalText>
               </View>
-              <TerminalText tone={isDemoVerificationEnabled || launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
-                {enrollmentStatusCopy}
+              <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
+                {launchConfirmed
+                  ? 'Competition launch confirmed.'
+                  : entrantsNeeded === null
+                    ? 'The live registration total will appear when regional enrollment sync is available.'
+                    : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
               </TerminalText>
             </View>
           ) : null}
@@ -277,11 +250,7 @@ export default function HomeScreen() {
           ))}
         </View>
         <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
-          {isDemoVerificationEnabled
-            ? demoEnrollment
-              ? 'Your zero-value BC demo enrollment is active. It creates no prize draw entries, winner eligibility or payout state.'
-              : 'BC demo mode creates no prize draw entries, winner eligibility or payout state.'
-            : prizeDrawEligible
+          {prizeDrawEligible
             ? competitionNotStarted
               ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
               : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
@@ -396,7 +365,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
@@ -414,8 +383,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressableCard: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   videoAd: {
     marginBottom: spacing.lg,
@@ -585,7 +553,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.surfaceInteractive
+    backgroundColor: colors.panelAlpha70
   },
   videoBadgeRow: {
     width: '100%',
@@ -628,6 +596,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

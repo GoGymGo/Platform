@@ -20,6 +20,7 @@ export default function IdentityCheckScreen() {
   const { activeSession } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
 
@@ -72,13 +73,10 @@ export default function IdentityCheckScreen() {
       />
 
       <CyberButtonPrimary
-        disabled
-        label="IDENTITY PROVIDER REQUIRED"
-        onPress={() => undefined}
+        disabled={!cameraConsentReady || !cameraConsentAccepted}
+        label="CONTINUE TO SESSION ->"
+        onPress={() => router.replace('/workout/active')}
       />
-      <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
-        THIS CHECKPOINT WILL UNLOCK AFTER THE IDENTITY PROVIDER RETURNS VERIFIED EVIDENCE.
-      </TerminalText>
     </ScreenContainer>
   );
 }
@@ -143,10 +141,5 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
-  },
-  integrationNote: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   }
 });

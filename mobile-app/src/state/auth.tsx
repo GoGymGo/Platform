@@ -32,6 +32,7 @@ import {
   socialProviderAvailability,
   type SocialUserCredential
 } from '@/services/auth/socialAuth';
+import { recordAccountLegalAcceptance } from '@/services/legalAcceptance';
 
 export type AuthenticatedUser = {
   displayName: string | null;
@@ -96,6 +97,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void sendEmailVerification(credential.user).catch(() => {
       // The verification screen offers an explicit resend action.
     });
+    void recordAccountLegalAcceptance(credential.user.uid).catch(() => {
+      // Account creation must not fail after Firebase has already created the user.
+      // The production API will record the authoritative acceptance separately.
+    });
+
     const result = mapCredential(credential, true);
     setUser(result.user);
     return result;
@@ -115,6 +121,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signInWithGoogle = useCallback(async () => {
     const credential = await signInWithGoogleProvider(requireFirebaseAuth());
     const result = mapSocialCredential(credential);
+    if (result.isNewUser) {
+      void recordAccountLegalAcceptance(result.user.uid).catch(() => {
+        // The production API will retry the authoritative acceptance record.
+      });
+    }
     setUser(result.user);
     return result;
   }, []);
@@ -122,6 +133,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signInWithApple = useCallback(async () => {
     const credential = await signInWithAppleProvider(requireFirebaseAuth());
     const result = mapSocialCredential(credential);
+    if (result.isNewUser) {
+      void recordAccountLegalAcceptance(result.user.uid).catch(() => {
+        // The production API will retry the authoritative acceptance record.
+      });
+    }
     setUser(result.user);
     return result;
   }, []);
@@ -147,7 +163,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     await reload(currentUser);
-    await currentUser.getIdToken(true);
     const refreshedUser = mapFirebaseUser(currentUser);
     setUser(refreshedUser);
     return refreshedUser;

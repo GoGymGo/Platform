@@ -12,7 +12,7 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { SponsorRail } from '@/components/sponsor';
-import { colors, fontFamilies, interactionStates, spacing } from '@/constants/theme';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 type JoinOption = {
@@ -175,11 +175,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   optionPressable: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   optionPressed: {
-    ...interactionStates.pressed
+    opacity: 0.72
   },
   optionRow: {
     minHeight: 64,

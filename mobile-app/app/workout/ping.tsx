@@ -24,9 +24,10 @@ function formatGrace(secondsRemaining: number) {
 
 export default function PingScreen() {
   const router = useRouter();
-  const { activeSession } = useWorkoutProgress();
+  const { activeSession, markMidSessionVerified } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
   const [secondsRemaining, setSecondsRemaining] = useState(() =>
@@ -105,14 +106,14 @@ export default function PingScreen() {
       />
 
       <CyberButtonPrimary
-        disabled
-        label="IDENTITY PROVIDER REQUIRED"
-        onPress={() => undefined}
+        disabled={!cameraConsentReady || !cameraConsentAccepted || secondsRemaining === 0}
+        label="VERIFY BIOMETRIC ->"
+        onPress={() => {
+          markMidSessionVerified();
+          router.replace('/workout/ping-success');
+        }}
         tone="amber"
       />
-      <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
-        THIS CHECKPOINT CANNOT PASS UNTIL VERIFIED PROVIDER EVIDENCE IS RETURNED.
-      </TerminalText>
 
       <CyberButtonOutline
         label="BACK TO SESSION"
@@ -189,10 +190,5 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
-  },
-  integrationNote: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   }
 });

@@ -45,7 +45,7 @@ export default function SponsorOfferModal() {
   };
 
   return (
-    <ScreenContainer contentStyle={styles.sheet} surface="modal">
+    <ScreenContainer contentStyle={styles.sheet}>
       <View style={styles.header}>
         <TerminalText glow tone={screenTone} variant="label">
           {sponsorConfirmed ? 'SPONSOR OFFER' : 'SPONSOR ANNOUNCEMENT'}
@@ -108,7 +108,7 @@ export default function SponsorOfferModal() {
 const styles = StyleSheet.create({
   sheet: {
     flex: 1,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',

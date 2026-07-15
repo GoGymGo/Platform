@@ -86,8 +86,49 @@ const defaultPlacements: Record<SponsorPlacementKey, SponsorPlacementCreative> =
   }
 };
 
+const sponsorCampaigns: readonly SponsorCampaign[] = [
+  {
+    economics: defaultCampaignEconomics,
+    enrollmentPolicy: {
+      maximumEntrants: null,
+      minimumEntrants: 100
+    },
+    id: 'toronto-2026-07-volt',
+    monthKey: '2026-07',
+    placements: defaultPlacements,
+    projectedVerifiedUsersByGoal: {
+      1: 800,
+      2: 1_300,
+      3: 1_700,
+      4: 2_200,
+      5: 1_700,
+      6: 1_300,
+      7: 1_000
+    },
+    region: 'TORONTO',
+    sponsor: {
+      displayName: 'VOLT ENERGY',
+      mark: 'V',
+      offerCode: 'GOGYMGO15',
+      offerHeadline: '15% OFF RECOVERY FUEL',
+      offerTitle: 'VOLT RECOVERY FUEL',
+      railName: 'SPONSORED BY VOLT',
+      shortName: 'VOLT',
+      subtitle: 'REGIONAL CAMPAIGN PARTNER'
+    },
+    status: 'approved'
+  }
+];
+
 export function resolveSponsorCampaign(region: string, monthKey: string) {
-  return createNeutralCampaign(region, monthKey);
+  return (
+    sponsorCampaigns.find(
+      (campaign) =>
+        campaign.region === region &&
+        campaign.monthKey === monthKey &&
+        campaign.status === 'approved'
+    ) ?? createNeutralCampaign(region, monthKey)
+  );
 }
 
 function createNeutralCampaign(region: string, monthKey: string): SponsorCampaign {

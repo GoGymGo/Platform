@@ -10,7 +10,7 @@ import {
 } from '@/components/cyber';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, componentSizes, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { getPublicInitials } from '@/domain/profile';
 import { formatDateKey, useWorkoutProgress } from '@/state/workoutProgress';
 import { useProfile } from '@/state/profile';
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.divider
+    borderTopColor: colors.borderCyanSubtle
   },
   dailyRow: {
     flexDirection: 'row',
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   },
   dailyCellOpen: {
     borderColor: colors.borderMuted,
-    backgroundColor: colors.surfaceBase
+    backgroundColor: colors.panelAlpha45
   },
   dailyCellCyan: {
     borderColor: colors.borderCyanBright,

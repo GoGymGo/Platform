@@ -91,10 +91,11 @@ describe('workout progress calculations', () => {
     );
   });
 
-  it('derives elapsed session time from the real clock', () => {
+  it('derives elapsed session time with an explicit preview scale', () => {
     const startedAt = new Date(2026, 6, 9, 11, 59, 50).toISOString();
 
     assert.equal(getSessionElapsedSeconds(startedAt, referenceDate), 10);
+    assert.equal(getSessionElapsedSeconds(startedAt, referenceDate, 23), 230);
   });
 
   it('places the automatic face check inside the configured middle window', () => {

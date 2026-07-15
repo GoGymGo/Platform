@@ -15,7 +15,6 @@ import { AuthProvider, useAuth } from '@/state/auth';
 import { ApiProvider } from '@/state/api';
 import { ProfileProvider } from '@/state/profile';
 import { CompetitionRegionProvider } from '@/state/competitionRegion';
-import { DemoEnrollmentProvider } from '@/state/demoEnrollment';
 import { SponsorCampaignProvider } from '@/state/sponsorCampaign';
 import { WorkoutProgressProvider } from '@/state/workoutProgress';
 
@@ -70,11 +69,10 @@ function AuthenticatedApp() {
   return (
     <ApiProvider>
       <AppDataProvider key={accountKey}>
-        <ProfileProvider key={`profile-${accountKey}`}>
+        <ProfileProvider>
           <CompetitionRegionProvider>
-            <DemoEnrollmentProvider>
-              <WorkoutProgressProvider>
-                <SponsorCampaignProvider>
+            <WorkoutProgressProvider>
+              <SponsorCampaignProvider>
               <StatusBar style="light" />
               <Stack initialRouteName="index" screenOptions={screenOptions}>
                 <Stack.Screen name="index" />
@@ -92,9 +90,8 @@ function AuthenticatedApp() {
                   }}
                 />
               </Stack>
-                </SponsorCampaignProvider>
-              </WorkoutProgressProvider>
-            </DemoEnrollmentProvider>
+              </SponsorCampaignProvider>
+            </WorkoutProgressProvider>
           </CompetitionRegionProvider>
         </ProfileProvider>
       </AppDataProvider>

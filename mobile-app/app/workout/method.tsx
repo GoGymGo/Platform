@@ -9,7 +9,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, interactionStates, spacing, fontSizes } from '@/constants/theme';
+import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
@@ -160,8 +160,7 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   pressable: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   optionCard: {
     flexDirection: 'row',
@@ -192,6 +191,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

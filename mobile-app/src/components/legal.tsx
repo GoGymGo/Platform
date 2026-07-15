@@ -9,16 +9,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { biometricConsentCopy, type LegalDocument } from '@/constants/legal';
-import {
-  borders,
-  colors,
-  componentSizes,
-  cyberGlow,
-  fontFamilies,
-  interactionStates,
-  radii,
-  spacing
-} from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 type LegalTone = 'cyan' | 'pink';
@@ -60,16 +51,10 @@ export function LegalConsentCheckbox({
 
   return (
     <Pressable
-      accessibilityHint={helper}
-      accessibilityLabel={label}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       onPress={onToggle}
-      style={({ pressed }) => [
-        styles.pressable,
-        pressed ? styles.pressed : null,
-        style
-      ]}
+      style={style}
     >
       <HUDBorderBox glow={checked} style={styles.checkboxRow} tone={activeTone}>
         <View style={[styles.checkboxMark, checked ? styles.checkboxMarkActive : styles.checkboxMarkIdle]}>
@@ -126,13 +111,12 @@ export function BiometricCameraConsentBanner({
 
   if (compact && checked) {
     return (
-      <HUDBorderBox glow style={[styles.cameraBannerAccepted, style]} tone="green">
+      <HUDBorderBox glow style={[styles.cameraBannerAccepted, style]} tone="cyan">
         <View style={styles.acceptedStatus}>
           <TerminalText glow tone="green" variant="label">
             CONSENT ON FILE
           </TerminalText>
           <Pressable
-            accessibilityLabel="VIEW NOTICE"
             accessibilityRole="button"
             onPress={() => router.push('/biometric-camera-consent' as Href)}
             style={({ pressed }) => [styles.policyButton, pressed ? styles.pressed : null]}
@@ -143,7 +127,6 @@ export function BiometricCameraConsentBanner({
           </Pressable>
         </View>
         <Pressable
-          accessibilityLabel="WITHDRAW CONSENT"
           accessibilityRole="button"
           onPress={onToggle}
           style={({ pressed }) => [styles.withdrawButton, pressed ? styles.pressed : null]}
@@ -163,7 +146,6 @@ export function BiometricCameraConsentBanner({
           {biometricConsentCopy.title}
         </TerminalText>
         <Pressable
-          accessibilityLabel="VIEW NOTICE"
           accessibilityRole="button"
           onPress={() => router.push('/biometric-camera-consent' as Href)}
           style={({ pressed }) => [styles.policyButton, pressed ? styles.pressed : null]}
@@ -190,7 +172,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
   const router = useRouter();
 
   return (
-    <ScreenContainer surface="modal">
+    <ScreenContainer>
       <View style={styles.documentHeader}>
         <View style={styles.documentTitleGroup}>
           <TerminalText glow tone="cyan" variant="label">
@@ -212,7 +194,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
         contentContainerStyle={styles.documentContent}
         showsVerticalScrollIndicator={false}
       >
-        <HUDBorderBox style={styles.documentIntro} tone="cyan">
+        <HUDBorderBox glow style={styles.documentIntro} tone="cyan">
           <TerminalText tone="dim" variant="micro">
             EFFECTIVE // {document.effectiveDate}
           </TerminalText>
@@ -265,7 +247,7 @@ const styles = StyleSheet.create({
     height: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: borders.hairline,
+    borderWidth: 1,
     borderRadius: 7
   },
   checkboxMarkActive: {
@@ -293,7 +275,7 @@ const styles = StyleSheet.create({
   },
   linkButton: {
     flex: 1,
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm
   },
@@ -319,21 +301,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   policyButton: {
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
-    borderWidth: borders.hairline,
-    borderColor: colors.borderInteractive,
+    borderWidth: 1,
+    borderColor: colors.borderCyanButton,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceInteractive,
-    ...interactionStates.webFocus
+    backgroundColor: colors.surfaceCyanGhost
   },
   withdrawButton: {
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     alignSelf: 'flex-start',
     justifyContent: 'center',
-    paddingRight: spacing.md,
-    ...interactionStates.webFocus
+    paddingRight: spacing.md
   },
   bannerCopy: {
     fontFamily: fontFamilies.body
@@ -351,7 +331,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.whiteAlpha07,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   documentTitleGroup: {
     flex: 1
@@ -362,14 +342,14 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: 104,
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     paddingVertical: spacing.sm
   },
   documentContent: {
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   documentIntro: {
     marginBottom: spacing.lg
@@ -413,10 +393,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   pressed: {
-    ...interactionStates.pressed
-  },
-  pressable: {
-    borderRadius: radii.lg,
-    ...interactionStates.webFocus
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

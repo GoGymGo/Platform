@@ -20,7 +20,6 @@ import {
   type SponsorApplicationErrors
 } from '@/domain/sponsorApplication';
 import { recordSponsorApplication } from '@/services/sponsorApplication';
-import { isApiUnavailableError } from '@/services/api/availability';
 import { useApi } from '@/state/api';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
@@ -52,10 +51,8 @@ export default function SponsorApplicationScreen() {
     try {
       await recordSponsorApplication(api, input);
       setSubmitted(true);
-    } catch (error) {
-      setSubmissionError(isApiUnavailableError(error)
-        ? 'SPONSOR APPLICATIONS REQUIRE A CONFIGURED API.'
-        : 'SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+    } catch {
+      setSubmissionError('SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
     } finally {
       setSubmitting(false);
     }
@@ -99,7 +96,7 @@ export default function SponsorApplicationScreen() {
           />
         </View>
 
-        <HUDBorderBox style={styles.form} tone="muted">
+        <HUDBorderBox style={styles.form} tone="cyan">
           <AuthTextField
             error={errors.companyName}
             label="COMPANY NAME"
@@ -170,13 +167,13 @@ const styles = StyleSheet.create({
   },
   valueList: {
     borderTopWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   valueRow: {
     gap: spacing.xs,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   valueText: {
     fontFamily: fontFamilies.body

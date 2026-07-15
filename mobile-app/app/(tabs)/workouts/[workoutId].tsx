@@ -10,7 +10,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, componentSizes, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
@@ -276,6 +276,9 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontFamily: fontFamilies.terminal,
     textAlign: 'center'
+  },
+  pressableCard: {
+    width: '100%'
   },
   safeSponsorCard: {
     flexDirection: 'row',
@@ -370,5 +373,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
+  },
+  pressed: {
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

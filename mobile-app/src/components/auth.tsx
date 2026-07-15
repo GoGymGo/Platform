@@ -17,16 +17,8 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail } from '@/components/sponsor';
-import {
-  borders,
-  colors,
-  componentSizes,
-  fontFamilies,
-  fontSizes,
-  interactionStates,
-  radii,
-  spacing
-} from '@/constants/theme';
+import { isLocalPreviewEnabled } from '@/config/firebase';
+import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 
 type AuthScreenShellProps = PropsWithChildren<{
@@ -97,47 +89,24 @@ export function AuthScreenShell({
 }
 
 export function AuthTextField({
-  accessibilityHint,
-  editable = true,
   error,
   label,
-  onBlur,
   onChangeText,
-  onFocus,
   secureTextEntry = false,
   value,
   ...inputProps
 }: AuthTextFieldProps) {
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.fieldShell}>
       <TerminalText tone={error ? 'red' : 'dim'} variant="micro">
         {label}
       </TerminalText>
-      <View
-        style={[
-          styles.inputShell,
-          focused ? styles.inputFocused : null,
-          error ? styles.inputError : null,
-          !editable ? styles.inputDisabled : null
-        ]}
-      >
+      <View style={[styles.inputShell, error ? styles.inputError : null]}>
         <TextInput
-          accessibilityHint={error ?? accessibilityHint}
           accessibilityLabel={label}
-          accessibilityState={{ disabled: !editable }}
-          editable={editable}
-          onBlur={(event) => {
-            setFocused(false);
-            onBlur?.(event);
-          }}
           onChangeText={onChangeText}
-          onFocus={(event) => {
-            setFocused(true);
-            onFocus?.(event);
-          }}
           placeholderTextColor={colors.dim}
           secureTextEntry={secureTextEntry && !passwordVisible}
           selectionColor={colors.cyan}
@@ -189,13 +158,7 @@ export function AuthStatusNotice({
   tone?: 'cyan' | 'pink' | 'green' | 'amber' | 'red';
 }) {
   return (
-    <HUDBorderBox
-      accessibilityLabel={message}
-      accessibilityLiveRegion={tone === 'red' ? 'assertive' : 'polite'}
-      accessibilityRole={tone === 'red' ? 'alert' : 'text'}
-      style={styles.notice}
-      tone={tone}
-    >
+    <HUDBorderBox style={styles.notice} tone={tone}>
       <TerminalText tone={tone} uppercase={false} variant="body">
         {message}
       </TerminalText>
@@ -209,6 +172,9 @@ export function AuthGate({
 }: PropsWithChildren<{ allowUnverified?: boolean }>) {
   const { firebaseConfigured, loading, user } = useAuth();
 
+  if (isLocalPreviewEnabled) {
+    return children;
+  }
   if (loading) {
     return <AuthLoadingScreen />;
   }
@@ -225,7 +191,7 @@ export function AuthGate({
 export function AuthLoadingScreen() {
   return (
     <ScreenContainer>
-      <View accessibilityLiveRegion="polite" style={styles.loading}>
+      <View style={styles.loading}>
         <TerminalText glow tone="cyan" variant="label">
           CHECKING ACCOUNT SESSION
         </TerminalText>
@@ -249,19 +215,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg
   },
   backButton: {
-    width: componentSizes.minimumTouchTarget,
-    height: componentSizes.minimumTouchTarget,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.borderInteractive,
+    borderWidth: 1,
+    borderColor: colors.borderCyanButton,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceInteractive,
-    ...interactionStates.webFocus
+    backgroundColor: colors.surfaceCyanGhost
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.7
   },
   header: {
     gap: spacing.sm,
@@ -275,40 +240,30 @@ const styles = StyleSheet.create({
     gap: spacing.xs
   },
   inputShell: {
-    minHeight: componentSizes.inputHeight,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: borders.hairline,
-    borderColor: colors.borderInteractive,
+    borderWidth: 1,
+    borderColor: colors.borderCyanMedium,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceInteractive
+    backgroundColor: colors.panelAlpha70
   },
   input: {
     minWidth: 0,
-    minHeight: componentSizes.inputHeight - borders.focus,
+    minHeight: 50,
     flex: 1,
     paddingHorizontal: spacing.lg,
     color: colors.text,
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.control,
-    outlineWidth: 0
+    fontSize: fontSizes.control
   },
   inputError: {
-    borderColor: colors.borderError,
-    backgroundColor: colors.surfaceError
-  },
-  inputFocused: {
-    borderColor: colors.borderFocus,
-    backgroundColor: colors.surfaceRaised
-  },
-  inputDisabled: {
-    borderColor: colors.borderMutedDisabled,
-    backgroundColor: colors.surfaceDisabled,
-    ...interactionStates.disabled
+    borderColor: colors.borderPinkHeavy,
+    backgroundColor: colors.surfacePinkSoft
   },
   visibilityButton: {
     minWidth: 54,
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.xs

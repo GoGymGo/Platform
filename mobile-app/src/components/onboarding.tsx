@@ -1,16 +1,7 @@
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { TerminalText } from '@/components/cyber';
-import {
-  borders,
-  colors,
-  componentSizes,
-  cyberGlow,
-  fontFamilies,
-  interactionStates,
-  radii,
-  spacing
-} from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 
 type OnboardingHeaderProps = {
   label: string;
@@ -25,6 +16,11 @@ type CompactTextButtonProps = {
   onPress: () => void;
   tone?: 'cyan' | 'pink' | 'muted';
 };
+
+const webFocusOutline = Platform.select({
+  web: { outlineColor: colors.cyan } as unknown as ViewStyle,
+  default: {}
+});
 
 export function OnboardingHeader({
   label,
@@ -63,11 +59,7 @@ export function OnboardingHeader({
         </TerminalText>
       </View>
       {progressWidth ? (
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={{ max: 100, min: 0, now: Math.max(0, Math.min(100, progress ?? 0)) }}
-          style={styles.progressTrack}
-        >
+        <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
       ) : null}
@@ -97,24 +89,24 @@ export function CompactTextButton({
 
 const styles = StyleSheet.create({
   headerRow: {
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm
   },
   backButton: {
-    width: componentSizes.minimumTouchTarget,
-    height: componentSizes.minimumTouchTarget,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: borders.hairline,
-    borderColor: colors.borderInteractive,
+    borderWidth: 1,
+    borderColor: colors.borderCyanButton,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceInteractive,
-    ...interactionStates.webFocus
+    backgroundColor: colors.surfaceCyanGhost,
+    ...webFocusOutline
   },
   backPlaceholder: {
-    width: componentSizes.minimumTouchTarget
+    width: 44
   },
   stepText: {
     flex: 1,
@@ -138,13 +130,13 @@ const styles = StyleSheet.create({
     ...cyberGlow.cyan
   },
   textButton: {
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    ...interactionStates.webFocus
+    ...webFocusOutline
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.7
   }
 });

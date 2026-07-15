@@ -17,12 +17,6 @@ import {
   type PublicIdentity
 } from '@/domain/profile';
 import { createUserStorage } from '@/services/storage/userStorage';
-import {
-  getAccountProfile,
-  toPublicIdentity,
-  updateAccountPublicIdentity
-} from '@/services/profile';
-import { useApi } from '@/state/api';
 import { useAuth } from '@/state/auth';
 
 type ProfileContextValue = {
@@ -32,7 +26,6 @@ type ProfileContextValue = {
   profileReady: boolean;
   publicIdentity: PublicIdentity;
   publicName: string;
-  roles: readonly string[];
   removeProfileImage: () => Promise<void>;
   setIdentityMode: (mode: IdentityMode) => Promise<void>;
   setProfileImage: (uri: string) => Promise<void>;
@@ -44,7 +37,6 @@ const publicIdentityStorageKey = '@gogymgo/public-identity';
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: PropsWithChildren) {
-  const { api } = useApi();
   const { loading: authLoading, user } = useAuth();
   const userId = user?.uid ?? null;
   const userStorage = useMemo(
@@ -55,7 +47,6 @@ export function ProfileProvider({ children }: PropsWithChildren) {
   const [profileReady, setProfileReady] = useState(false);
   const [publicIdentity, setPublicIdentityState] = useState<PublicIdentity>(defaultPublicIdentity);
   const [hasPublicIdentity, setHasPublicIdentity] = useState(false);
-  const [roles, setRoles] = useState<readonly string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -77,14 +68,11 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       };
     }
 
-    void (async () => {
-      let storedIdentity: PublicIdentity | null = null;
-
-      try {
-        const [storedImage, storedIdentityValue] = await Promise.all([
-          userStorage.getItem(profileImageStorageKey),
-          userStorage.getItem(publicIdentityStorageKey)
-        ]);
+    void Promise.all([
+      userStorage.getItem(profileImageStorageKey),
+      userStorage.getItem(publicIdentityStorageKey)
+    ])
+      .then(([storedImage, storedIdentity]) => {
         if (!active) {
           return;
         }
@@ -93,48 +81,25 @@ export function ProfileProvider({ children }: PropsWithChildren) {
           setProfileImageUri(storedImage);
         }
 
-        storedIdentity = parseStoredPublicIdentity(storedIdentityValue);
-        if (storedIdentity) {
-          setPublicIdentityState(storedIdentity);
+        const parsedIdentity = parseStoredPublicIdentity(storedIdentity);
+        if (parsedIdentity) {
+          setPublicIdentityState(parsedIdentity);
           setHasPublicIdentity(true);
         }
-      } catch {
+      })
+      .catch(() => {
         // Generated profile defaults remain available when storage cannot be read.
-      }
-
-      if (api && userId) {
-        try {
-          const serverProfile = await getAccountProfile(api);
-          const serverIdentity = toPublicIdentity(serverProfile);
-          if (!active) {
-            return;
-          }
-          setPublicIdentityState(serverIdentity);
-          setHasPublicIdentity(true);
-          setRoles(serverProfile.roles);
-          await userStorage.setItem(
-            publicIdentityStorageKey,
-            JSON.stringify(serverIdentity)
-          );
-        } catch {
-          // Authenticated server state wins when available; stored state remains the fallback.
+      })
+      .finally(() => {
+        if (active) {
+          setProfileReady(true);
         }
-      }
-
-      if (active) {
-        setProfileReady(true);
-      }
-    })().catch(() => {
-      if (active) {
-        // A usable generated identity remains available after an unexpected load error.
-        setProfileReady(true);
-      }
-    });
+      });
 
     return () => {
       active = false;
     };
-  }, [api, authLoading, userId, userStorage]);
+  }, [authLoading, userStorage]);
 
   const setProfileImage = useCallback(async (uri: string) => {
     setProfileImageUri(uri);
@@ -158,24 +123,18 @@ export function ProfileProvider({ children }: PropsWithChildren) {
 
   const setPublicIdentity = useCallback(async (identity: PublicIdentity) => {
     const normalized = normalizePublicIdentity(identity);
-    const nextIdentity = api && userId
-      ? toPublicIdentity(await updateAccountPublicIdentity(api, normalized))
-      : normalized;
-    setPublicIdentityState(nextIdentity);
+    setPublicIdentityState(normalized);
     setHasPublicIdentity(true);
 
     try {
-      await userStorage?.setItem(publicIdentityStorageKey, JSON.stringify(nextIdentity));
+      await userStorage?.setItem(publicIdentityStorageKey, JSON.stringify(normalized));
     } catch {
       // Keep the selected identity for the active session if persistence fails.
     }
-  }, [api, userId, userStorage]);
+  }, [userStorage]);
 
   const setIdentityMode = useCallback(async (mode: IdentityMode) => {
-    const normalized = normalizePublicIdentity({ ...publicIdentity, mode });
-    const nextIdentity = api && userId
-      ? toPublicIdentity(await updateAccountPublicIdentity(api, normalized))
-      : normalized;
+    const nextIdentity = normalizePublicIdentity({ ...publicIdentity, mode });
     setPublicIdentityState(nextIdentity);
     setHasPublicIdentity(true);
 
@@ -184,7 +143,7 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     } catch {
       // Keep the selected mode for the active session if persistence fails.
     }
-  }, [api, publicIdentity, userId, userStorage]);
+  }, [publicIdentity, userStorage]);
 
   const publicName = resolvePublicName(publicIdentity);
   const value = useMemo<ProfileContextValue>(
@@ -195,7 +154,6 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       profileReady,
       publicIdentity,
       publicName,
-      roles,
       removeProfileImage,
       setIdentityMode,
       setProfileImage,
@@ -208,7 +166,6 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       publicIdentity,
       publicName,
       removeProfileImage,
-      roles,
       setIdentityMode,
       setProfileImage,
       setPublicIdentity

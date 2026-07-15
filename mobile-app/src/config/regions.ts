@@ -5,25 +5,20 @@ export type CompetitionRegion = {
 };
 
 export type CompetitionRegionVerificationMethod = 'device-location' | 'postal-code';
-export type CompetitionRegionVerificationStatus =
-  | 'approved'
-  | 'expired'
-  | 'pending'
-  | 'rejected';
+export type CompetitionRegionVerificationStatus = 'verified' | 'provisional';
 
 export type CompetitionRegionVerification = {
-  backendVerificationId: string;
-  expiresAt: string | null;
   method: CompetitionRegionVerificationMethod;
-  policyVersion: string;
   region: CompetitionRegion;
-  reviewedAt: string | null;
   status: CompetitionRegionVerificationStatus;
-  submittedAt: string;
+  verifiedAt: string;
 };
 
 export const competitionRegions: readonly CompetitionRegion[] = [
-  { id: 'bc', label: 'BRITISH COLUMBIA', timeZone: 'America/Vancouver' }
+  { id: 'toronto', label: 'TORONTO', timeZone: 'America/Toronto' },
+  { id: 'vancouver', label: 'VANCOUVER', timeZone: 'America/Vancouver' },
+  { id: 'calgary', label: 'CALGARY', timeZone: 'America/Edmonton' },
+  { id: 'montreal', label: 'MONTREAL', timeZone: 'America/Toronto' }
 ];
 
 export const defaultCompetitionRegion = competitionRegions[0];
@@ -51,14 +46,10 @@ export function parseCompetitionRegionVerification(
 
   try {
     const parsed = JSON.parse(value) as {
-      backendVerificationId?: unknown;
-      expiresAt?: unknown;
       id?: unknown;
       method?: unknown;
-      policyVersion?: unknown;
-      reviewedAt?: unknown;
       status?: unknown;
-      submittedAt?: unknown;
+      verifiedAt?: unknown;
     };
     const region = competitionRegions.find((candidate) => candidate.id === parsed.id);
     const method = parsed.method;
@@ -66,29 +57,14 @@ export function parseCompetitionRegionVerification(
     if (
       !region ||
       (method !== 'device-location' && method !== 'postal-code') ||
-      !['approved', 'expired', 'pending', 'rejected'].includes(
-        parsed.status as string
-      ) ||
-      typeof parsed.backendVerificationId !== 'string' ||
-      typeof parsed.policyVersion !== 'string' ||
-      !(parsed.expiresAt === null || typeof parsed.expiresAt === 'string') ||
-      !(parsed.reviewedAt === null || typeof parsed.reviewedAt === 'string') ||
-      typeof parsed.submittedAt !== 'string' ||
-      Number.isNaN(Date.parse(parsed.submittedAt))
+      (parsed.status !== 'verified' && parsed.status !== 'provisional') ||
+      typeof parsed.verifiedAt !== 'string' ||
+      Number.isNaN(Date.parse(parsed.verifiedAt))
     ) {
       return null;
     }
 
-    return {
-      backendVerificationId: parsed.backendVerificationId,
-      expiresAt: parsed.expiresAt,
-      method,
-      policyVersion: parsed.policyVersion,
-      region,
-      reviewedAt: parsed.reviewedAt,
-      status: parsed.status as CompetitionRegionVerificationStatus,
-      submittedAt: parsed.submittedAt
-    };
+    return { method, region, status: parsed.status, verifiedAt: parsed.verifiedAt };
   } catch {
     return null;
   }

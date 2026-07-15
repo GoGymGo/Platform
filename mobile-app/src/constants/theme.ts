@@ -13,8 +13,8 @@ export const colors = {
   // Primary / brand
   background: '#080B0E',
   page: '#080B0E',
-  panel: '#0C131B',
-  panelSoft: '#111A23',
+  panel: '#0B1118',
+  panelSoft: '#0F1720',
   transparent: 'transparent',
   cyan: '#34E5E8',
   cyanSoft: '#9FF3F5',
@@ -25,40 +25,34 @@ export const colors = {
   green: '#4DFF88',
 
   // Typography / text
-  text: '#EEF8F9',
+  text: '#E9F7F8',
   textOnPrimary: '#04282A',
-  textDisabled: '#87999F',
-  muted: '#A0B2B7',
-  dim: '#80979E',
+  textDisabled: '#8FA0A8',
+  muted: '#7D949B',
+  dim: '#66858D',
 
   // Status / feedback
   statusSuccess: '#4DFF88',
-  statusError: '#FF6678',
+  statusError: '#FF0000',
   statusWarning: '#FFE066',
   statusInfo: '#34E5E8',
-
-  // Semantic surfaces and borders
-  surfaceBase: '#080B0E',
-  surfaceRaised: '#0C131B',
-  surfaceInteractive: '#111A23',
-  surfaceModal: '#101821',
-  surfaceDisabled: '#121920',
-  surfaceOverlay: 'rgba(5, 8, 11, 0.78)',
-  borderSubtle: 'rgba(160, 178, 183, 0.12)',
-  borderDefault: 'rgba(160, 178, 183, 0.22)',
-  borderInteractive: 'rgba(160, 178, 183, 0.34)',
-  borderFocus: 'rgba(52, 229, 232, 0.72)',
-  divider: 'rgba(160, 178, 183, 0.14)',
-  rewardAccent: '#FF2D9B',
 
   // Backgrounds / surfaces
   surfacePrizeDark: '#1A0C1F',
   surfaceVideoDark: '#1A1015',
+  backgroundAlpha72: 'rgba(8, 11, 14, 0.72)',
+  panelAlpha45: 'rgba(13, 22, 34, 0.45)',
+  panelAlpha50: 'rgba(13, 22, 34, 0.5)',
+  panelAlpha70: 'rgba(13, 22, 34, 0.7)',
+  panelAlpha84: 'rgba(11, 17, 24, 0.84)',
+  blackAlpha25: 'rgba(0, 0, 0, 0.25)',
   whiteAlpha05: 'rgba(255, 255, 255, 0.05)',
   whiteAlpha06: 'rgba(255, 255, 255, 0.06)',
   whiteAlpha07: 'rgba(255, 255, 255, 0.07)',
   whiteAlpha08: 'rgba(255, 255, 255, 0.08)',
   whiteAlpha10: 'rgba(255, 255, 255, 0.1)',
+  whiteAlpha12: 'rgba(255, 255, 255, 0.12)',
+  whiteAlpha15: 'rgba(255, 255, 255, 0.15)',
 
   // Cyan states: active, selected, progress, verified, safe
   surfaceCyanGhost: 'rgba(52, 229, 232, 0.035)',
@@ -71,6 +65,7 @@ export const colors = {
   surfaceCyanActive: 'rgba(52, 229, 232, 0.16)',
   surfaceCyanStrong: 'rgba(52, 229, 232, 0.18)',
   borderCyanHairline: 'rgba(52, 229, 232, 0.16)',
+  borderCyanSubtle: 'rgba(52, 229, 232, 0.18)',
   borderCyanSoft: 'rgba(52, 229, 232, 0.22)',
   borderCyanMuted: 'rgba(52, 229, 232, 0.24)',
   borderCyanLight: 'rgba(52, 229, 232, 0.25)',
@@ -115,21 +110,21 @@ export const colors = {
   borderWarning: 'rgba(255, 224, 102, 0.38)',
   borderWarningGlow: 'rgba(255, 224, 102, 0.68)',
   warningGlow: 'rgba(255, 224, 102, 0.28)',
-  surfaceError: 'rgba(255, 102, 120, 0.08)',
-  surfaceErrorActive: 'rgba(255, 102, 120, 0.15)',
-  borderError: 'rgba(255, 102, 120, 0.42)',
-  borderErrorGlow: 'rgba(255, 102, 120, 0.7)',
-  errorGlow: 'rgba(255, 102, 120, 0.24)',
+  surfaceError: 'rgba(255, 0, 0, 0.07)',
+  surfaceErrorActive: 'rgba(255, 0, 0, 0.14)',
+  borderError: 'rgba(255, 0, 0, 0.38)',
+  borderErrorGlow: 'rgba(255, 0, 0, 0.68)',
+  errorGlow: 'rgba(255, 0, 0, 0.26)',
 
   // Muted states
-  surfaceMutedGlow: 'rgba(160, 178, 183, 0.1)',
-  borderMutedDisabled: 'rgba(160, 178, 183, 0.14)',
-  borderMuted: 'rgba(160, 178, 183, 0.22)',
-  textMutedGlow: 'rgba(160, 178, 183, 0.3)',
+  surfaceMutedGlow: 'rgba(125, 148, 155, 0.12)',
+  borderMutedDisabled: 'rgba(125, 148, 155, 0.16)',
+  borderMuted: 'rgba(125, 148, 155, 0.22)',
+  textMutedGlow: 'rgba(125, 148, 155, 0.36)',
 
   // Backward-compatible aliases used by navigation and legacy surfaces
-  border: 'rgba(160, 178, 183, 0.22)',
-  borderStrong: 'rgba(160, 178, 183, 0.34)',
+  border: 'rgba(52, 229, 232, 0.18)',
+  borderStrong: 'rgba(52, 229, 232, 0.55)',
   sponsorBorder: 'rgba(255, 45, 155, 0.28)',
   gridLine: 'rgba(52, 229, 232, 0.08)'
 } as const;
@@ -137,17 +132,10 @@ export const colors = {
 export const colorRoles = {
   primary: colors.cyan,
   secondary: colors.pink,
-  rewardAccent: colors.rewardAccent,
+  accent: colors.pink,
   background: colors.background,
-  surfaceBase: colors.surfaceBase,
-  surfaceRaised: colors.surfaceRaised,
-  surfaceInteractive: colors.surfaceInteractive,
-  surfaceModal: colors.surfaceModal,
-  surfaceDisabled: colors.surfaceDisabled,
-  borderSubtle: colors.borderSubtle,
-  borderDefault: colors.borderDefault,
-  borderInteractive: colors.borderInteractive,
-  borderFocus: colors.borderFocus,
+  surface: colors.panel,
+  surfaceRaised: colors.panelSoft,
   textPrimary: colors.text,
   textSecondary: colors.muted,
   textTertiary: colors.dim,
@@ -280,39 +268,6 @@ export const radii = {
   md: 11,
   lg: 13,
   xl: 14
-} as const;
-
-export const componentSizes = {
-  minimumTouchTarget: 44,
-  inputHeight: 52,
-  buttonHeight: 54,
-  tabBarHeight: 78,
-  tabScreenBottomInset: 132,
-  screenMaxWidth: 430,
-  iconSmall: 18,
-  iconMedium: 28
-} as const;
-
-export const borders = {
-  hairline: 1,
-  focus: 2
-} as const;
-
-export const interactionStates = {
-  pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }]
-  } satisfies ViewStyle,
-  disabled: {
-    opacity: 0.5
-  } satisfies ViewStyle,
-  webFocus:
-    Platform.select<ViewStyle>({
-      web: {
-        outlineColor: colors.borderFocus
-      } as unknown as ViewStyle,
-      default: {}
-    }) ?? {}
 } as const;
 
 export const cyberGlow = {

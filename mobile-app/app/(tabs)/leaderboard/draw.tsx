@@ -10,8 +10,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
-import { colors, componentSizes, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { calculateRankedPrizeDrawPayouts } from '@/domain/campaignEconomics';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -20,7 +19,6 @@ import {
   useSponsorCampaign
 } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
-import { useDemoEnrollment } from '@/state/demoEnrollment';
 
 type PrizeStat = {
   label: string;
@@ -38,9 +36,7 @@ export default function DrawScreen() {
   const [showEntryDetails, setShowEntryDetails] = useState(false);
   const [showPayoutDetails, setShowPayoutDetails] = useState(false);
   const { campaign, economics } = useSponsorCampaign();
-  const sponsorConfirmed =
-    !isDemoVerificationEnabled && campaign.status === 'approved';
-  const { demoEnrollment } = useDemoEnrollment();
+  const sponsorConfirmed = campaign.status === 'approved';
   const {
     competition,
     competitionEntries,
@@ -89,7 +85,7 @@ export default function DrawScreen() {
 
         <HUDBorderBox glow style={styles.prizePanel} tone={sponsorConfirmed ? 'pink' : 'cyan'}>
           <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="label">
-            {isDemoVerificationEnabled ? 'BC NON-CASH DEMO' : 'REGIONAL PRIZE DRAW'}
+            REGIONAL PRIZE DRAW
           </TerminalText>
           <TerminalText
             glow
@@ -97,16 +93,10 @@ export default function DrawScreen() {
             tone="text"
             variant="display"
           >
-            {sponsorConfirmed
-              ? formatCampaignCurrency(economics.prizeDrawAmount)
-              : isDemoVerificationEnabled
-                ? 'NO PRIZE DRAW IN DEMO'
-                : 'PRIZE DETAILS PUBLISHED SOON'}
+            {sponsorConfirmed ? formatCampaignCurrency(economics.prizeDrawAmount) : 'PRIZE DETAILS PUBLISHED SOON'}
           </TerminalText>
           <TerminalText style={styles.prizeMeta} tone="muted" variant="micro">
-            {isDemoVerificationEnabled
-              ? 'NON-CASH PRODUCT DEMO // ZERO PRIZE VALUE'
-              : sponsorConfirmed
+            {sponsorConfirmed
               ? `CAD // 15% OF PLAYERS GET PAID // FUNDED BY ${campaign.sponsor.shortName}`
               : '15% OF PLAYERS GET PAID // FINAL AMOUNTS PUBLISHED BEFORE THE COMPETITION'}
           </TerminalText>
@@ -131,44 +121,27 @@ export default function DrawScreen() {
 
         <HUDBorderBox style={styles.entryPanel} tone="cyan">
           <TerminalText glow tone="cyan" variant="label">
-            {isDemoVerificationEnabled ? 'BC DEMO STATUS' : 'YOUR PRIZE DRAW STATUS'}
+            YOUR PRIZE DRAW STATUS
           </TerminalText>
           <View style={styles.entrySummary}>
-            <EntrySummaryRow
-              label={isDemoVerificationEnabled ? 'ENROLLMENT' : 'FREE ENTRY'}
-              value={isDemoVerificationEnabled
-                ? demoEnrollment
-                  ? 'ACTIVE // ZERO VALUE'
-                  : 'NOT CREATED'
-                : `${signupEntries} SECURED`}
-            />
+            <EntrySummaryRow label="FREE ENTRY" value={`${signupEntries} SECURED`} />
             <EntrySummaryRow
               label="COMPETITION ENTRIES"
-              value={isDemoVerificationEnabled
-                ? 'DISABLED'
-                : competitionNotStarted
-                  ? 'STARTS SOON'
-                  : String(competitionEntries)}
+              value={competitionNotStarted ? 'STARTS SOON' : String(competitionEntries)}
             />
             <EntrySummaryRow label="TOTAL ENTRIES" value={String(totalEntries)} tone="pink" />
           </View>
           <TerminalText style={styles.entryStatusCopy} tone="muted" uppercase={false} variant="body">
-            {isDemoVerificationEnabled
-              ? demoEnrollment
-                ? 'The BC non-cash demo enrollment is active. It creates no entries, winners, payouts or Hyperwallet state.'
-                : 'No BC demo enrollment exists. The demo creates no entries, winners, payouts or Hyperwallet state.'
-              : competitionNotStarted
+            {competitionNotStarted
               ? `Your free entry is active. Competition scoring begins ${competitionStartLabel}.`
               : 'More Prize Draw Entries improve your chance of being selected for a payout.'}
           </TerminalText>
-          {!isDemoVerificationEnabled ? (
-            <CyberButtonOutline
-              label={showEntryDetails ? 'HIDE HOW ENTRIES GROW' : 'HOW ENTRIES GROW'}
-              onPress={() => setShowEntryDetails((current) => !current)}
-              style={styles.entryDetailsButton}
-            />
-          ) : null}
-          {showEntryDetails && !isDemoVerificationEnabled ? (
+          <CyberButtonOutline
+            label={showEntryDetails ? 'HIDE HOW ENTRIES GROW' : 'HOW ENTRIES GROW'}
+            onPress={() => setShowEntryDetails((current) => !current)}
+            style={styles.entryDetailsButton}
+          />
+          {showEntryDetails ? (
             <HUDBorderBox style={styles.entryDetails} tone="muted">
               <TerminalText glow tone="cyan" variant="label">
                 MATCH + CATEGORY + PERFECT MONTH
@@ -310,7 +283,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
@@ -376,7 +349,7 @@ const styles = StyleSheet.create({
   },
   entrySummary: {
     borderTopWidth: 1,
-    borderTopColor: colors.divider
+    borderTopColor: colors.borderCyanSubtle
   },
   entrySummaryRow: {
     minHeight: 48,
@@ -385,7 +358,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.divider
+    borderBottomColor: colors.borderCyanSubtle
   },
   entryStatusCopy: {
     fontFamily: fontFamilies.body

@@ -1,11 +1,11 @@
-import { createElement, useState, type PropsWithChildren, type ReactNode } from 'react';
+import { createElement, type PropsWithChildren, type ReactNode } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
   type GestureResponderEvent,
-  type AccessibilityProps,
   type PressableStateCallbackType,
   type StyleProp,
   type TextStyle,
@@ -13,17 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  borders,
-  colors,
-  componentSizes,
-  cyberGlow,
-  interactionStates,
-  radii,
-  spacing,
-  textGlow,
-  typography
-} from '@/constants/theme';
+import { colors, cyberGlow, radii, spacing, textGlow, typography } from '@/constants/theme';
 
 export { ScreenScrollView } from './screenScrollView';
 
@@ -43,7 +33,6 @@ type CyberButtonTone = 'cyan' | 'pink' | 'green' | 'amber' | 'red';
 type ScreenContainerProps = PropsWithChildren<{
   contentStyle?: StyleProp<ViewStyle>;
   frameStyle?: StyleProp<ViewStyle>;
-  surface?: 'base' | 'modal';
 }>;
 
 type TerminalTextProps = {
@@ -56,17 +45,12 @@ type TerminalTextProps = {
 };
 
 type HUDBorderBoxProps = PropsWithChildren<{
-  accessibilityLabel?: AccessibilityProps['accessibilityLabel'];
-  accessibilityLiveRegion?: AccessibilityProps['accessibilityLiveRegion'];
-  accessibilityRole?: AccessibilityProps['accessibilityRole'];
   glow?: boolean;
   style?: StyleProp<ViewStyle>;
   tone?: HUDTone;
 }>;
 
 type CyberButtonProps = {
-  accessibilityHint?: string;
-  accessibilityLabel?: string;
   disabled?: boolean;
   label: string;
   onPress?: (event: GestureResponderEvent) => void;
@@ -98,8 +82,8 @@ const terminalGlowStyles = {
 
 const hudToneStyles: Record<HUDTone, ViewStyle> = {
   cyan: {
-    borderColor: colors.borderCyanMedium,
-    backgroundColor: colors.surfaceCyanWhisper
+    borderColor: colors.borderCyanStrong,
+    backgroundColor: colors.surfaceCyanFaint
   },
   pink: {
     borderColor: colors.borderPinkStrong,
@@ -118,8 +102,8 @@ const hudToneStyles: Record<HUDTone, ViewStyle> = {
     backgroundColor: colors.surfaceError
   },
   muted: {
-    borderColor: colors.borderDefault,
-    backgroundColor: colors.surfaceRaised
+    borderColor: colors.borderMuted,
+    backgroundColor: colors.panelAlpha84
   }
 };
 
@@ -169,21 +153,23 @@ const outlineToneStyles: Record<CyberButtonTone, ViewStyle> = {
   }
 };
 
+const webFocusOutline = Platform.select({
+  web: { outlineColor: colors.cyan } as unknown as ViewStyle,
+  default: {}
+});
+
 export function ScreenContainer({
   children,
   contentStyle,
-  frameStyle,
-  surface = 'base'
+  frameStyle
 }: ScreenContainerProps) {
-  const surfaceStyle = surface === 'modal' ? cyberStyles.modalSurface : cyberStyles.baseSurface;
-
   return createElement(
     SafeAreaView,
-    { style: [cyberStyles.safeArea, surfaceStyle] },
+    { style: cyberStyles.safeArea },
     createElement(
       View,
-      { style: [cyberStyles.frame, surfaceStyle, frameStyle] },
-      createElement(View, { style: [cyberStyles.content, surfaceStyle, contentStyle] }, children)
+      { style: [cyberStyles.frame, frameStyle] },
+      createElement(View, { style: [cyberStyles.content, contentStyle] }, children)
     )
   );
 }
@@ -216,9 +202,6 @@ export function TerminalText({
 }
 
 export function HUDBorderBox({
-  accessibilityLabel,
-  accessibilityLiveRegion,
-  accessibilityRole,
   children,
   glow = false,
   style,
@@ -227,9 +210,6 @@ export function HUDBorderBox({
   return createElement(
     View,
     {
-      accessibilityLabel,
-      accessibilityLiveRegion,
-      accessibilityRole,
       style: [
         cyberStyles.hudBox,
         hudToneStyles[tone],
@@ -242,82 +222,60 @@ export function HUDBorderBox({
 }
 
 export function CyberButtonPrimary({
-  accessibilityHint,
-  accessibilityLabel,
   disabled = false,
   label,
   onPress,
   style,
   tone = 'cyan'
 }: CyberButtonProps) {
-  const [focused, setFocused] = useState(false);
-
   return createElement(
     Pressable,
     {
       accessibilityRole: 'button',
-      accessibilityLabel: accessibilityLabel ?? label,
-      accessibilityHint,
-      accessibilityState: { disabled },
       disabled,
-      onBlur: () => setFocused(false),
-      onFocus: () => setFocused(true),
       onPress,
       style: ({ pressed }: PressableStateCallbackType) => [
         cyberStyles.buttonShell,
         primaryToneStyles[tone],
-        disabled ? null : cyberGlow[tone],
-        focused ? cyberStyles.focused : null,
+        cyberGlow[tone],
         pressed ? cyberStyles.pressed : null,
         disabled ? cyberStyles.disabled : null,
         style
       ]
     },
-    createElement(ButtonContent, { glow: true, label, tone })
+    createElement(ButtonContent, { label, tone })
   );
 }
 
 export function CyberButtonOutline({
-  accessibilityHint,
-  accessibilityLabel,
   disabled = false,
   label,
   onPress,
   style,
   tone = 'cyan'
 }: CyberButtonProps) {
-  const [focused, setFocused] = useState(false);
-
   return createElement(
     Pressable,
     {
       accessibilityRole: 'button',
-      accessibilityLabel: accessibilityLabel ?? label,
-      accessibilityHint,
-      accessibilityState: { disabled },
       disabled,
-      onBlur: () => setFocused(false),
-      onFocus: () => setFocused(true),
       onPress,
       style: ({ pressed }: PressableStateCallbackType) => [
         cyberStyles.buttonShell,
         outlineToneStyles[tone],
-        focused ? cyberStyles.focused : null,
         pressed ? cyberStyles.pressed : null,
         disabled ? cyberStyles.disabled : null,
         style
       ]
     },
-    createElement(ButtonContent, { glow: false, label, tone })
+    createElement(ButtonContent, { label, tone })
   );
 }
 
 function ButtonContent({
-  glow,
   label,
   tone
 }: {
-  glow: boolean;
   label: string;
   tone: CyberButtonTone;
 }) {
@@ -326,7 +284,7 @@ function ButtonContent({
     { style: cyberStyles.buttonContent },
     createElement(
       TerminalText,
-      { glow, tone, variant: 'button' },
+      { glow: true, tone, variant: 'button' },
       label
     )
   );
@@ -334,22 +292,19 @@ function ButtonContent({
 
 const cyberStyles = StyleSheet.create({
   safeArea: {
-    flex: 1
+    flex: 1,
+    backgroundColor: colors.background
   },
   frame: {
     flex: 1,
     width: '100%',
-    maxWidth: componentSizes.screenMaxWidth,
-    alignSelf: 'center'
+    maxWidth: 430,
+    alignSelf: 'center',
+    backgroundColor: colors.background
   },
   content: {
-    flex: 1
-  },
-  baseSurface: {
-    backgroundColor: colors.surfaceBase
-  },
-  modalSurface: {
-    backgroundColor: colors.surfaceModal
+    flex: 1,
+    backgroundColor: colors.background
   },
   terminalBase: {
     color: colors.text
@@ -384,19 +339,19 @@ const cyberStyles = StyleSheet.create({
   hudBox: {
     width: '100%',
     padding: spacing.lg,
-    borderWidth: borders.hairline,
+    borderWidth: 1,
     borderRadius: radii.lg,
-    backgroundColor: colors.surfaceRaised
+    backgroundColor: colors.panel
   },
   buttonShell: {
-    minHeight: componentSizes.buttonHeight,
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
-    borderWidth: borders.hairline,
+    borderWidth: 1,
     borderRadius: radii.lg,
-    ...interactionStates.webFocus
+    ...webFocusOutline
   },
   buttonContent: {
     flexDirection: 'row',
@@ -405,15 +360,12 @@ const cyberStyles = StyleSheet.create({
     gap: spacing.sm
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.72,
+    transform: [{ scale: 0.985 }]
   },
   disabled: {
-    ...interactionStates.disabled,
+    opacity: 0.42,
     borderColor: colors.borderMutedDisabled,
-    backgroundColor: colors.surfaceDisabled
-  },
-  focused: {
-    borderColor: colors.borderFocus,
-    ...cyberGlow.cyan
+    backgroundColor: colors.panelSoft
   }
 });

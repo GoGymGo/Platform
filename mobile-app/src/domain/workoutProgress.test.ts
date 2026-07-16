@@ -47,6 +47,7 @@ describe('workout progress calculations', () => {
       midSessionCheckPrompted: false,
       midSessionCheckPromptedAt: null,
       midSessionVerified: false,
+      serverManaged: true,
       startedAt: '2026-07-09T18:00:00.000Z',
       verificationMethod: 'heartRate'
     } as const;

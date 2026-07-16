@@ -14,7 +14,7 @@ export interface PrivacyDeletionContext {
   exportObjectKeys: string[];
   firebaseUid: string;
   hasOpenCompetition: boolean;
-  hasOpenPayout: boolean;
+  hasOpenRewardClaim: boolean;
   userId: string;
   userStatus: 'active' | 'deleted' | 'suspended';
 }

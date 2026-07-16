@@ -38,6 +38,21 @@ type LegalDocumentScreenProps = {
   document: LegalDocument;
 };
 
+function formatReadableLegalCopy(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/(^|[.!?]\s+)([a-z])/g, (_match, prefix: string, letter: string) =>
+      `${prefix}${letter.toUpperCase()}`
+    )
+    .replace(/\bgogymgo\b/gi, 'GoGymGo')
+    .replace(/\bqr\b/gi, 'QR')
+    .replace(/\bface id\b/gi, 'Face ID')
+    .replace(/\bos\b/gi, 'OS')
+    .replace(/\bus\b/gi, 'US')
+    .replace(/\bcanada\b/gi, 'Canada')
+    .replace(/\bcalifornia\b/gi, 'California');
+}
+
 export function LegalConsentCheckbox({
   checked,
   helper,
@@ -106,7 +121,7 @@ export function BiometricCameraConsentBanner({
 }: BiometricCameraConsentBannerProps) {
   const router = useRouter();
   const bannerBody = compact
-    ? 'Local presence check only. No biometric data, camera frames or imagery is stored or transmitted.'
+    ? 'Your phone handles the presence check. GoGymGo receives only a pass or fail result, never biometric data.'
     : biometricConsentCopy.body;
 
   if (compact && checked) {
@@ -199,7 +214,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
             EFFECTIVE // {document.effectiveDate}
           </TerminalText>
           <TerminalText style={styles.documentIntroCopy} tone="cyan" variant="body">
-            {document.intro}
+            {formatReadableLegalCopy(document.intro)}
           </TerminalText>
         </HUDBorderBox>
 
@@ -211,7 +226,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
               </TerminalText>
               {section.body ? (
                 <TerminalText style={styles.sectionBody} tone="muted" variant="body">
-                  {section.body}
+                  {formatReadableLegalCopy(section.body)}
                 </TerminalText>
               ) : null}
               {section.bullets ? (
@@ -220,7 +235,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
                     <View key={bullet} style={styles.bulletRow}>
                       <View style={styles.bulletDot} />
                       <TerminalText style={styles.bulletText} tone="muted" variant="body">
-                        {bullet}
+                      {formatReadableLegalCopy(bullet)}
                       </TerminalText>
                     </View>
                   ))}

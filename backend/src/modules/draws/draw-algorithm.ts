@@ -5,11 +5,6 @@ export interface WeightedDrawEntry {
   userId: string;
 }
 
-export interface RankedPayout {
-  amountMinor: number;
-  payoutRank: number;
-}
-
 class FenwickTree {
   private readonly tree: bigint[];
 
@@ -106,54 +101,6 @@ export function selectWeightedWinners(
   }
 
   return winners;
-}
-
-export function buildPayoutLadder(
-  payoutPoolAmountMinor: number,
-  winnerCount: number,
-  exponent: number,
-): RankedPayout[] {
-  if (
-    !Number.isSafeInteger(payoutPoolAmountMinor) ||
-    payoutPoolAmountMinor <= 0
-  ) {
-    throw new Error(
-      'Payout pool must be a positive safe integer in minor units.',
-    );
-  }
-  if (
-    !Number.isSafeInteger(winnerCount) ||
-    winnerCount <= 0 ||
-    winnerCount > payoutPoolAmountMinor
-  ) {
-    throw new Error(
-      'Winner count must be positive and cannot exceed the minor-unit payout pool.',
-    );
-  }
-  if (!Number.isFinite(exponent) || exponent <= 0 || exponent > 1) {
-    throw new Error(
-      'Payout exponent must be greater than zero and at most one.',
-    );
-  }
-
-  const weights = Array.from(
-    { length: winnerCount },
-    (_, index) => 1 / (index + 1) ** exponent,
-  );
-  const totalWeight = weights.reduce((total, weight) => total + weight, 0);
-  const amounts = weights.map((weight) =>
-    Math.floor((payoutPoolAmountMinor * weight) / totalWeight),
-  );
-  const allocated = amounts.reduce((total, amount) => total + amount, 0);
-
-  for (let index = 0; index < payoutPoolAmountMinor - allocated; index += 1) {
-    amounts[index] += 1;
-  }
-
-  return amounts.map((amountMinor, index) => ({
-    amountMinor,
-    payoutRank: index + 1,
-  }));
 }
 
 function randomBelow(

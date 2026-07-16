@@ -4,9 +4,6 @@ import { assessSessionSubmission } from './session-assessment';
 const rules: CompetitionRules = {
   minHeartRateSamples: 2,
   minSessionMinutes: 20,
-  payoutExponent: 0.5,
-  payoutPoolAmountMinor: 1_000_000,
-  payoutWinnerCount: 100,
   requireDeviceAttestation: false,
   requireFaceCheck: true,
   requireGymQr: false,

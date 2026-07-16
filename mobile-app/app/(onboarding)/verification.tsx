@@ -10,12 +10,12 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
+  getPreferenceOwnerId,
   saveVerificationPreference
 } from '@/state/onboardingPreferences';
 
@@ -87,6 +87,7 @@ const gymOptions: readonly GymOption[] = [
 export default function VerificationScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const { source } = useLocalSearchParams<{ source?: string }>();
   const [verificationPath, setVerificationPath] = useState<VerificationPath>('wearable');
   const [showAllDevices, setShowAllDevices] = useState(false);
@@ -94,15 +95,27 @@ export default function VerificationScreen() {
   const [selectedDevice, setSelectedDevice] = useState<DeviceKey | null>(null);
   const [gymQuery, setGymQuery] = useState('');
   const [selectedGym, setSelectedGym] = useState<GymKey | null>(null);
-  const [preferenceReady, setPreferenceReady] = useState(() => !user);
+  const [preferenceReady, setPreferenceReady] = useState(false);
   const [sourcePickerExpanded, setSourcePickerExpanded] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      return;
+    let active = true;
+
+    if (!preferenceOwnerId) {
+      void Promise.resolve().then(() => {
+        if (active) {
+          setPreferenceReady(true);
+        }
+      });
+      return () => {
+        active = false;
+      };
     }
 
-    void getVerificationPreference(user.uid).then((preference) => {
+    void getVerificationPreference(preferenceOwnerId).then((preference) => {
+      if (!active) {
+        return;
+      }
       if (preference.method === 'heartRate') {
         const savedDevice = deviceCatalog.find((device) => device.key === preference.sourceKey);
         setVerificationPath('wearable');
@@ -119,7 +132,11 @@ export default function VerificationScreen() {
       setSourcePickerExpanded(!savedGym);
       setPreferenceReady(true);
     });
-  }, [user]);
+
+    return () => {
+      active = false;
+    };
+  }, [preferenceOwnerId]);
 
   const visibleDevices = useMemo(() => {
     if (!showAllDevices) {
@@ -161,11 +178,11 @@ export default function VerificationScreen() {
       return;
     }
 
-    if (!user) {
+    if (!preferenceOwnerId) {
       return;
     }
 
-    await saveVerificationPreference(user.uid, {
+    await saveVerificationPreference(preferenceOwnerId, {
       method: verificationPath === 'wearable' ? 'heartRate' : 'partnerGymQr',
       sourceKey: selectedSource.key,
       sourceLabel: selectedSource.name
@@ -180,7 +197,6 @@ export default function VerificationScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -202,7 +218,7 @@ export default function VerificationScreen() {
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           Choose your default workout method. Every verified workout also
-          requires the mid-session identity check.
+          requires the mid-session device presence check.
         </TerminalText>
 
         <View accessibilityRole="radiogroup" style={styles.segmentedControl}>
@@ -220,7 +236,7 @@ export default function VerificationScreen() {
 
         {!preferenceReady ? (
           <HUDBorderBox style={styles.loadingSource} tone="muted">
-            <TerminalText glow tone="cyan" variant="label">
+            <TerminalText glow live="polite" tone="cyan" variant="label">
               LOADING SAVED VERIFICATION
             </TerminalText>
           </HUDBorderBox>
@@ -366,6 +382,8 @@ function SearchField({
       </TerminalText>
       <TextInput
         accessibilityLabel={label}
+        allowFontScaling
+        maxFontSizeMultiplier={2}
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={onChangeText}

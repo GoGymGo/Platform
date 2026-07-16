@@ -14,7 +14,7 @@ export default function LeaderboardLayout() {
   return (
     <Stack screenOptions={leaderboardScreenOptions}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="draw" />
+      <Stack.Screen name="rewards" />
     </Stack>
   );
 }

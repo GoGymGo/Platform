@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -30,6 +30,7 @@ export default function WorkoutCompleteScreen() {
     currentStreak,
     currentWeekIndex,
     currentWeekVerified,
+    sessionActionError,
     totalEntries,
     verifiedSessionCount,
     weeklyGoal
@@ -39,15 +40,24 @@ export default function WorkoutCompleteScreen() {
   const [completedDateKey] = useState(() => activeSession?.dateKey ?? null);
   const [wasFirstVerifiedWorkout] = useState(() => verifiedSessionCount === 0);
   const [completionResult, setCompletionResult] = useState<
-    CompleteWorkoutResult | 'pending'
+    CompleteWorkoutResult | 'pending' | 'submission-failed'
   >('pending');
+
+  const submitCompletion = useCallback(async () => {
+    setCompletionResult('pending');
+    try {
+      setCompletionResult(await completeActiveWorkout());
+    } catch {
+      setCompletionResult('submission-failed');
+    }
+  }, [completeActiveWorkout]);
 
   useEffect(() => {
     if (hadActiveSession && !didCompleteSession.current) {
       didCompleteSession.current = true;
-      setCompletionResult(completeActiveWorkout());
+      void submitCompletion();
     }
-  }, [completeActiveWorkout, hadActiveSession]);
+  }, [hadActiveSession, submitCompletion]);
 
   const progressSlots = useMemo(
     () =>
@@ -79,7 +89,7 @@ export default function WorkoutCompleteScreen() {
   if (!hadActiveSession) {
     return (
       <SessionUnavailable
-        body="A SESSION MUST PASS CHECK-IN, THE 30-MINUTE TIMER, MID-SESSION CHECK AND CHECK-OUT BEFORE ENTRIES CAN BE AWARDED."
+        body="A session must pass check-in, the 30-minute timer, the mid-session presence check, and check-out before entries can be awarded."
         onAction={() => {
           if (completionResult === 'no-active-session') {
             router.replace('/session' as Href);
@@ -102,10 +112,43 @@ export default function WorkoutCompleteScreen() {
       <SessionUnavailable
         actionLabel="RETURN TO SESSION ->"
         body={completionResult === 'heart-rate-target-not-met'
-          ? 'THE HEART-RATE PATH DID NOT MAINTAIN THE REQUIRED 30-MINUTE AVERAGE. THIS SESSION CANNOT EARN COMPETITION CREDIT.'
-          : 'THE SESSION COULD NOT BE COMPLETED BECAUSE A REQUIRED TIMER OR FACE-CHECK CONDITION DID NOT PASS.'}
+          ? 'The heart-rate path did not maintain the required 30-minute average. This session cannot earn competition credit.'
+          : 'The session could not be completed because a required timer or presence-check condition did not pass.'}
         onAction={() => router.replace('/session' as Href)}
         title="VERIFICATION INCOMPLETE"
+      />
+    );
+  }
+
+  if (completionResult === 'submission-failed') {
+    return (
+      <SessionUnavailable
+        actionLabel="TRY SUBMISSION AGAIN ->"
+        body={sessionActionError ?? 'Your workout remains open on this device. Check your connection and submit it again.'}
+        onAction={() => void submitCompletion()}
+        title="SESSION NOT SUBMITTED"
+      />
+    );
+  }
+
+  if (completionResult === 'pending-review') {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO HOME ->"
+        body="Your workout and evidence were submitted successfully. Competition credit and entries will appear only after server review approves the session."
+        onAction={() => router.replace('/home')}
+        title="SESSION PENDING REVIEW"
+      />
+    );
+  }
+
+  if (completionResult === 'rejected') {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO HOME ->"
+        body="The submitted workout did not meet the competition's server-side duration or evidence requirements, so no credit or entries were awarded."
+        onAction={() => router.replace('/home')}
+        title="SESSION NOT ELIGIBLE"
       />
     );
   }
@@ -114,7 +157,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <ScreenContainer contentStyle={styles.pendingScreen}>
         <TerminalText glow tone="cyan" variant="label">
-          FINALIZING VERIFIED SESSION
+          SUBMITTING SESSION EVIDENCE
         </TerminalText>
       </ScreenContainer>
     );
@@ -190,7 +233,7 @@ export default function WorkoutCompleteScreen() {
                 ? 'This session builds your personal workout history only. Competition credit begins when scoring opens.'
               : remainingSessions > 0
                 ? `Complete ${remainingSessions} more verified ${remainingSessions === 1 ? 'session' : 'sessions'} to hit this week's goal.`
-                : 'Weekly Goal hit. Your Period Match multiplier is ready to settle.'}
+                : 'Weekly Goal hit. Your Weekly Challenge multiplier is ready to settle.'}
           </TerminalText>
         </HUDBorderBox>
 

@@ -12,7 +12,6 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   hasCreatorApplicationErrors,
@@ -34,7 +33,8 @@ const requirements = [
   '20-45 MINUTE FOLLOW-ALONG WORKOUT',
   'CLEAR COACHING, EQUIPMENT AND REGION',
   'SAFE MOVEMENT, CLEAN AUDIO AND CONTENT RIGHTS',
-  'SPONSOR DISCLOSURE AND REVIEW APPROVAL'
+  'SPONSOR + SYNTHETIC MEDIA DISCLOSURE',
+  'VIDEO EDITING, BRAND PLACEMENT + AI ADAPTATION RIGHTS'
 ] as const;
 
 export default function CreatorApplicationScreen() {
@@ -93,7 +93,6 @@ export default function CreatorApplicationScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -116,8 +115,9 @@ export default function CreatorApplicationScreen() {
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           Submit a local follow-along workout for review. Selected creators can
-          lead their region and receive a sponsor-funded payout. Submissions do
-          not add prize draw entries.
+          lead their region and receive featured brand support. Submissions do
+          not add prize draw entries. Approved creators submit videos through
+          the Creator Catalog with a separate, explicit content-rights receipt.
         </TerminalText>
 
         <View style={styles.requirements}>
@@ -184,7 +184,7 @@ export default function CreatorApplicationScreen() {
 
         <View style={styles.actions}>
           {submitted ? (
-            <CyberButtonOutline label="BACK TO GOGYMGO" onPress={() => router.replace('/home')} />
+            <CyberButtonOutline label="OPEN CREATOR CATALOG" onPress={() => router.replace('/workouts')} />
           ) : null}
           {openedAfterFirstWorkout && !submitted ? (
             <CyberButtonPrimary label="DON'T SHOW THIS AGAIN" onPress={dismissPrompt} />

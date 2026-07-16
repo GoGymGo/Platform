@@ -109,12 +109,12 @@ export class PrivacyOperationsRepository {
       .where('user_id', '=', job.userId)
       .where('object_deleted_at', 'is', null)
       .execute();
-    const [openPayout, openCompetition] = await Promise.all([
+    const [openRewardClaim, openCompetition] = await Promise.all([
       this.database.connection
-        .selectFrom('payout_claims')
+        .selectFrom('reward_awards')
         .select('id')
         .where('user_id', '=', job.userId)
-        .where('status', 'not in', ['cancelled', 'paid'])
+        .where('status', 'in', ['awarded', 'claimed'])
         .executeTakeFirst(),
       this.database.connection
         .selectFrom('competition_enrollments as enrollment')
@@ -150,7 +150,7 @@ export class PrivacyOperationsRepository {
       ),
       firebaseUid: user.firebase_uid,
       hasOpenCompetition: Boolean(openCompetition),
-      hasOpenPayout: Boolean(openPayout),
+      hasOpenRewardClaim: Boolean(openRewardClaim),
       userId: user.user_id,
       userStatus: user.user_status,
     };
@@ -297,6 +297,32 @@ export class PrivacyOperationsRepository {
           .where('user_id', '=', request.user_id)
           .execute();
         await transaction
+          .deleteFrom('social_challenges')
+          .where('owner_user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .deleteFrom('social_challenge_members')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .deleteFrom('friend_requests')
+          .where((expression) =>
+            expression.or([
+              expression('requester_user_id', '=', request.user_id),
+              expression('recipient_user_id', '=', request.user_id),
+            ]),
+          )
+          .execute();
+        await transaction
+          .deleteFrom('friendships')
+          .where((expression) =>
+            expression.or([
+              expression('user_a_id', '=', request.user_id),
+              expression('user_b_id', '=', request.user_id),
+            ]),
+          )
+          .execute();
+        await transaction
           .updateTable('profiles')
           .set({
             avatar_object_key: null,
@@ -304,6 +330,7 @@ export class PrivacyOperationsRepository {
             privacy_settings: { showRegion: false, showStats: false },
             public_identity_mode: 'private',
             public_name: null,
+            screen_name: pseudonymousCallsign.replaceAll('-', '_'),
             updated_at: now,
             version: sql<number>`version + 1`,
           })
@@ -355,7 +382,7 @@ export class PrivacyOperationsRepository {
               'account_legal_receipts',
               'competition_integrity',
               'fraud_and_eligibility',
-              'payout_and_financial',
+              'reward_award_integrity',
               'operator_audit',
             ],
           },

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -26,13 +26,13 @@ import {
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
 import { shouldPresentWinnersCircleForLogin } from '@/services/winnersCircle';
-import { shouldPresentPayoutWinnerNotice } from '@/services/payouts';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { source: appDataSource } = useAppData();
+  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { social, source: appDataSource } = useAppData();
   const { competitionRegion } = useCompetitionRegion();
   const {
     appleSignInAvailable,
@@ -49,26 +49,28 @@ export default function SignInScreen() {
   const [submitting, setSubmitting] = useState(false);
   const completeSignIn = async (result: AuthSignInResult) => {
     if (!result.user.emailVerified) {
-      router.replace({ pathname: '/verify-email', params: { next: 'home' } });
+      router.replace({
+        pathname: '/verify-email',
+        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+      });
       return;
+    }
+    if (challengeInvite) {
+      await social.redeemContactInvitation(challengeInvite);
     }
     if (result.isNewUser) {
       router.replace('/identity');
       return;
     }
 
-    const [payoutClaim, settledCompetition] = await Promise.all([
-      appDataSource.getCurrentUserPayout(result.user.uid).catch(() => null),
-      appDataSource.getSettledCompetition().catch(() => null)
-    ]);
-    const showPayoutWinner = await shouldPresentPayoutWinnerNotice(
-      result.user.uid,
-      payoutClaim
-    );
-    if (showPayoutWinner) {
-      router.replace('/payout-winner');
+    if (challengeInvite) {
+      router.replace('/squad/social');
       return;
     }
+
+    const settledCompetition = await appDataSource
+      .getSettledCompetition()
+      .catch(() => null);
 
     const showWinnersCircle = await shouldPresentWinnersCircleForLogin(
       result.user.uid,
@@ -123,24 +125,23 @@ export default function SignInScreen() {
       return;
     }
     if (!user.emailVerified) {
-      router.replace('/verify-email');
+      router.replace({
+        pathname: '/verify-email',
+        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+      });
       return;
     }
 
     setSubmitting(true);
     try {
-      const [payoutClaim, settledCompetition] = await Promise.all([
-        appDataSource.getCurrentUserPayout(user.uid).catch(() => null),
-        appDataSource.getSettledCompetition().catch(() => null)
-      ]);
-      const showPayoutWinner = await shouldPresentPayoutWinnerNotice(
-        user.uid,
-        payoutClaim
-      );
-      if (showPayoutWinner) {
-        router.replace('/payout-winner');
+      if (challengeInvite) {
+        await social.redeemContactInvitation(challengeInvite);
+        router.replace('/squad/social');
         return;
       }
+      const settledCompetition = await appDataSource
+        .getSettledCompetition()
+        .catch(() => null);
 
       const showWinnersCircle = await shouldPresentWinnersCircleForLogin(
         user.uid,

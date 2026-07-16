@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -25,9 +25,12 @@ import {
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
+import { useAppData } from '@/data/appDataHooks';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { social } = useAppData();
   const {
     appleSignInAvailable,
     createAccount,
@@ -43,7 +46,10 @@ export default function SignUpScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const accountLegalAccepted = privacyAccepted && termsAccepted;
-  const completeSocialSignIn = (result: AuthSignInResult) => {
+  const completeSocialSignIn = async (result: AuthSignInResult) => {
+    if (challengeInvite) {
+      await social.redeemContactInvitation(challengeInvite);
+    }
     router.replace(result.isNewUser ? '/identity' : '/home');
   };
   const {
@@ -74,7 +80,7 @@ export default function SignUpScreen() {
       await createAccount(email, password);
       router.replace({
         pathname: '/verify-email',
-        params: { next: 'identity' }
+        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'identity' }
       });
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
@@ -85,7 +91,7 @@ export default function SignUpScreen() {
 
   return (
     <AuthScreenShell
-      description="Create one secure account for your commitment, verified workouts, entries and payouts."
+      description="Create one secure account for your commitment, verified workouts, entries and brand rewards."
       eyebrow="ACCOUNT SETUP"
       onBack={() => router.replace('/join')}
       title="CREATE YOUR ACCOUNT"

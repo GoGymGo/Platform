@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Buffer } from 'node:buffer';
 
 const booleanString = z
   .enum(['true', 'false'])
@@ -131,17 +132,7 @@ export const environmentSchema = z
       .url()
       .default('https://exp.host/--/api/v2/push/send'),
     EXPO_PUSH_ACCESS_TOKEN: optionalTrimmedString,
-    HYPERWALLET_ENABLED: booleanString.default(false),
-    HYPERWALLET_API_URL: z
-      .string()
-      .url()
-      .default('https://uat-api.paylution.com/rest/v4'),
-    HYPERWALLET_PORTAL_URL: optionalUrl,
-    HYPERWALLET_PROGRAM_TOKEN: optionalTrimmedString,
-    HYPERWALLET_USERNAME: optionalTrimmedString,
-    HYPERWALLET_PASSWORD: optionalTrimmedString,
-    HYPERWALLET_WEBHOOK_USERNAME: optionalTrimmedString,
-    HYPERWALLET_WEBHOOK_PASSWORD: optionalTrimmedString,
+    REWARD_CODE_ENCRYPTION_KEY: optionalTrimmedString,
   })
   .superRefine((environment, context) => {
     if (
@@ -177,37 +168,15 @@ export const environmentSchema = z
       });
     }
 
-    if (environment.HYPERWALLET_ENABLED) {
-      const requiredKeys = [
-        'HYPERWALLET_PORTAL_URL',
-        'HYPERWALLET_PROGRAM_TOKEN',
-        'HYPERWALLET_USERNAME',
-        'HYPERWALLET_PASSWORD',
-      ] as const;
-
-      for (const key of requiredKeys) {
-        if (!environment[key]) {
-          context.addIssue({
-            code: 'custom',
-            message: `${key} is required when HYPERWALLET_ENABLED is true.`,
-            path: [key],
-          });
-        }
-      }
-
-      if (environment.RUNTIME_ROLE === 'api') {
-        for (const key of [
-          'HYPERWALLET_WEBHOOK_USERNAME',
-          'HYPERWALLET_WEBHOOK_PASSWORD',
-        ] as const) {
-          if (!environment[key]) {
-            context.addIssue({
-              code: 'custom',
-              message: `${key} is required by the API when HYPERWALLET_ENABLED is true.`,
-              path: [key],
-            });
-          }
-        }
+    if (environment.REWARD_CODE_ENCRYPTION_KEY) {
+      const key = Buffer.from(environment.REWARD_CODE_ENCRYPTION_KEY, 'base64');
+      if (key.length !== 32) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'REWARD_CODE_ENCRYPTION_KEY must be a base64-encoded 32-byte key.',
+          path: ['REWARD_CODE_ENCRYPTION_KEY'],
+        });
       }
     }
 

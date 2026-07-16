@@ -7,6 +7,7 @@ import {
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
@@ -14,6 +15,7 @@ import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { getMidSessionGraceSecondsRemaining } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatGrace(secondsRemaining: number) {
@@ -30,6 +32,7 @@ export default function PingScreen() {
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const { busy, buttonLabel, message, verify } = usePresenceVerification();
   const [secondsRemaining, setSecondsRemaining] = useState(() =>
     getMidSessionGraceSecondsRemaining(activeSession?.midSessionCheckPromptedAt ?? null)
   );
@@ -50,10 +53,19 @@ export default function PingScreen() {
     () => formatGrace(secondsRemaining),
     [secondsRemaining]
   );
+
+  async function confirmPresence() {
+    if (!(await verify())) {
+      return;
+    }
+
+    markMidSessionVerified();
+    router.replace('/workout/ping-success');
+  }
   if (!activeSession) {
     return (
       <SessionUnavailable
-        body="START A VERIFIED SESSION BEFORE OPENING A MID-SESSION CHECK."
+        body="Start a verified session before opening a mid-session presence check."
         onAction={() => router.replace('/session' as Href)}
       />
     );
@@ -63,19 +75,24 @@ export default function PingScreen() {
     return (
       <SessionUnavailable
         actionLabel="RETURN TO ACTIVE SESSION ->"
-        body="THE RANDOM FACE CHECK HAS NOT BEEN TRIGGERED YET. KEEP THE ACTIVE SESSION OPEN AND GOGYMGO WILL PROMPT YOU AUTOMATICALLY."
+        body="The random presence check has not been triggered yet. GoGymGo will send a local alert when it is ready."
         onAction={() => router.replace('/workout/active')}
-        title="FACE CHECK ARMED"
+        title="PRESENCE CHECK ARMED"
       />
     );
   }
 
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
       <HUDBorderBox glow style={styles.pingPill} tone="amber">
         <View style={styles.pingDot} />
         <TerminalText glow tone="amber" variant="micro">
-          AUTOMATIC FACE CHECK // ACTION REQUIRED
+          AUTOMATIC PRESENCE CHECK // ACTION REQUIRED
         </TerminalText>
       </HUDBorderBox>
 
@@ -93,9 +110,9 @@ export default function PingScreen() {
       <TerminalText glow style={styles.title} tone="amber" variant="title">
         VERIFY NOW TO KEEP IT VALID
       </TerminalText>
-      <TerminalText style={styles.body} tone="muted" variant="body">
-        YOUR RANDOM MID-WORKOUT CHECK IS READY. MISS THIS CHECKPOINT AND THIS
-        WORKOUT CANNOT COUNT. USE THE LOCAL BIOMETRIC PROMPT, THEN BACK TO IT.
+      <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+        Your random mid-workout check is ready. Complete the secure device
+        prompt before the timer ends or this workout cannot count.
       </TerminalText>
 
       <BiometricCameraConsentBanner
@@ -106,27 +123,30 @@ export default function PingScreen() {
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentReady || !cameraConsentAccepted || secondsRemaining === 0}
-        label="VERIFY BIOMETRIC ->"
-        onPress={() => {
-          markMidSessionVerified();
-          router.replace('/workout/ping-success');
-        }}
+        disabled={!cameraConsentReady || !cameraConsentAccepted || secondsRemaining === 0 || busy}
+        label={busy ? 'CHECKING DEVICE...' : buttonLabel}
+        onPress={() => void confirmPresence()}
         tone="amber"
       />
+      {message ? (
+        <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+          {message}
+        </TerminalText>
+      ) : null}
 
       <CyberButtonOutline
         label="BACK TO SESSION"
         onPress={() => router.replace('/workout/active')}
         style={styles.backButton}
       />
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
@@ -190,5 +210,9 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
+  },
+  statusMessage: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
   }
 });

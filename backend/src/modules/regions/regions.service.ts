@@ -56,7 +56,6 @@ export class RegionsService {
       languageCodes: policy.language_codes,
       metroName: policy.metro_name,
       minimumAge: policy.minimum_age,
-      payoutEnabled: policy.payout_enabled,
       policyVersion: policy.policy_version,
       subdivisionCode: policy.subdivision_code,
       timezone: policy.timezone,

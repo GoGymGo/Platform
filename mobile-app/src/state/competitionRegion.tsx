@@ -27,7 +27,13 @@ type CompetitionRegionContextValue = {
   regionReady: boolean;
   verifyCompetitionRegion: (
     region: CompetitionRegion,
-    method: CompetitionRegionVerificationMethod
+    method: CompetitionRegionVerificationMethod,
+    serverVerification?: {
+      id: string;
+      regionCode?: string;
+      regionPolicyId: string;
+      status: 'approved' | 'expired' | 'pending' | 'rejected';
+    }
   ) => Promise<void>;
 };
 
@@ -91,13 +97,24 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
 
   const verifyCompetitionRegion = useCallback(async (
     region: CompetitionRegion,
-    method: CompetitionRegionVerificationMethod
+    method: CompetitionRegionVerificationMethod,
+    serverVerification?: {
+      id: string;
+      regionCode?: string;
+      regionPolicyId: string;
+      status: 'approved' | 'expired' | 'pending' | 'rejected';
+    }
   ) => {
-    const status = method === 'device-location' ? 'verified' : 'provisional';
+    const status = serverVerification
+      ? serverVerification.status === 'approved' ? 'verified' : 'provisional'
+      : method === 'device-location' ? 'verified' : 'provisional';
     const verification = {
       method,
       region,
+      regionCode: serverVerification?.regionCode ?? null,
+      regionPolicyId: serverVerification?.regionPolicyId ?? null,
       status,
+      verificationId: serverVerification?.id ?? null,
       verifiedAt: new Date().toISOString()
     } satisfies CompetitionRegionVerification;
 
@@ -106,7 +123,15 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
     try {
       await userStorage?.setItem(
         competitionRegionStorageKey,
-        JSON.stringify({ id: region.id, method, status, verifiedAt: verification.verifiedAt })
+        JSON.stringify({
+          id: region.id,
+          method,
+          regionCode: verification.regionCode,
+          regionPolicyId: verification.regionPolicyId,
+          status,
+          verificationId: verification.verificationId,
+          verifiedAt: verification.verifiedAt
+        })
       );
     } catch {
       // The verified region remains active in memory until persistence recovers.

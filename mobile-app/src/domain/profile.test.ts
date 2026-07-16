@@ -21,7 +21,7 @@ describe('public profile identity', () => {
       '@camtrains'
     );
     assert.equal(
-      resolvePublicName({ callsign: 'GHOST-1234', displayName: 'Cameron Wilson', mode: 'real' }),
+      resolvePublicName({ callsign: 'GHOST-1234', displayName: 'Cameron Wilson', mode: 'real_name' }),
       'Cameron Wilson'
     );
   });

@@ -1,19 +1,19 @@
 # GoGymGo API
 
-GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. The Expo application is an untrusted client: this service verifies identity, applies competition policy, records append-only entry and audit ledgers, settles winners, and controls every payout transition.
+GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. The Expo application is an untrusted client: this service verifies identity, applies competition policy, records append-only entry and audit ledgers, settles winners, and controls every reward award and claim.
 
 ## Trust boundaries
 
 - Firebase Admin verifies the bearer token and supplies the account identity. Client-supplied user IDs are never authoritative.
-- Accounts must remain active and have a current Firebase-verified email for enrollment, workout evidence/awards, privileged operations, draw eligibility, and payout onboarding.
+- Accounts must remain active and have a current Firebase-verified email for enrollment, workout evidence/awards, privileged operations, draw eligibility, and reward claims.
 - PostgreSQL/PostGIS is the source of truth and durable job queue. Workers claim jobs with bounded database leases; Redis is not required for the initial production system.
-- Money is stored as integer minor units with an ISO currency.
-- Retryable and money-affecting mutations require an idempotency key.
-- Hyperwallet credentials, webhooks, user/payment tokens, and hosted portal actions remain server-side.
-- GoGymGo never accepts bank-account, tax-form, or identity-document fields.
+- Retryable award, claim, and operator mutations require an idempotency key.
+- Coupon codes are encrypted at rest and disclosed only to the authenticated winner after an idempotent claim.
+- Physical rewards use sponsor-provided claim instructions or secure claim links; GoGymGo does not collect shipping addresses in this version.
+- GoGymGo has no payment-provider, bank-account, tax-form, or cash-payout surface.
 - Account legal documents and receipts are versioned, content-hashed, append-only, and server-timestamped; local device state is never authoritative competition consent.
-- The optional British Columbia, Canada demo-verification adapter stores only an expiring simulated checkpoint. It cannot run in production and never creates competition credit, prize eligibility, or payout state.
-- The local BC demo foundation bootstrap accepts only a localhost database, requires explicit confirmation and an audit reason, and creates only a disabled BC policy plus a guarded zero-value `non_cash_demo` competition. Approved users may create a demo enrollment, but database triggers prohibit entry, scoring, draw, winner, payout, and Hyperwallet state.
+- The optional British Columbia, Canada demo-verification adapter stores only an expiring simulated checkpoint. It cannot run in production and never creates competition credit or prize eligibility.
+- The local BC demo foundation bootstrap accepts only a localhost database, requires explicit confirmation and an audit reason, and creates a disabled BC policy, a registration-stage contest, and a published physical reward for marketplace development.
 
 ## Local foundation
 
@@ -27,6 +27,7 @@ Requirements:
 ```powershell
 Copy-Item .env.example .env
 npm.cmd install
+npm.cmd run migrate:up
 npm.cmd run check
 npm.cmd run start:dev
 ```
@@ -60,12 +61,24 @@ Remove-Item Env:BC_DEMO_OPERATOR_REASON
 ```
 
 This command refuses remote databases and unsafe BC foundation state. It
-replaces a temporary local `admin` grant with `operator`, records the change in
-the append-only audit ledger, and grants no payout or Hyperwallet role.
+replaces a temporary local `admin` grant with `operator` and records the change
+in the append-only audit ledger.
 
 The connected client paths, disabled enrollment boundary and remaining legal
 and backend prerequisites are documented in
 [the BC demo foundation handoff](docs/bc-demo-foundation.md).
+
+The verified workout streak schema, API contract, badge integration, migration
+steps, and reward semantics are documented in
+[gym streak rewards](docs/streak-rewards.md).
+
+The screen-name search, friend-consent, named challenge, invitation, privacy,
+migration, API, and Squad UI integration are documented in
+[friends and social challenges](docs/social-challenges.md).
+
+The physical-prize and coupon-code schema, APIs, operator workflow, encryption,
+migration, and mobile marketplace are documented in
+[brand rewards marketplace](docs/brand-rewards-marketplace.md).
 
 The liveness route is `GET http://localhost:3000/v1/health`. In non-production environments, Swagger UI is available at `http://localhost:3000/docs` and the generated contract is committed as `openapi.json`.
 
@@ -78,10 +91,10 @@ With `RUN_DATABASE_INTEGRATION=true`, the suite also exercises the critical
 PostgreSQL-backed trust paths. Evidence-to-ledger coverage proves enrollment
 and session idempotency, serialized entrant caps, inactive re-enrollment
 rejection, evidence replay rejection, disqualification checks, one award per
-eligible day, and exact progress totals. Draw-to-payout coverage
-proves minimum entrants, resolved session reviews, disqualification filtering,
-retry-safe settlement, exact payout allocation, hosted-payee activation,
-duplicate webhook intake, payment release, and terminal reconciliation.
+eligible day, and exact progress totals. Draw-to-reward coverage proves minimum
+entrants, resolved session reviews, disqualification filtering, retry-safe
+settlement, inventory-bounded selection, one award per winner, and idempotent
+reward claims.
 Profile-media coverage proves exact constrained upload actions, retry conflicts,
 private completion, moderation-only activation, audited decisions, replacement
 isolation, and object cleanup without persisting signed URLs.
@@ -99,16 +112,16 @@ The private avatar upload, moderation, cleanup, and privacy lifecycle is documen
 
 Server-authoritative Terms and Privacy publication, receipt, withdrawal, and enrollment controls are documented in [account legal documents](docs/legal-documents.md).
 
-The privacy-minimized manual workout review boundary and the provider/device controls that still block cash launch are documented in [session evidence review](docs/session-evidence-review.md).
+The privacy-minimized manual workout review boundary and device controls required for production contests are documented in [session evidence review](docs/session-evidence-review.md).
 
-The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). The operator review and immutable money-movement controls are detailed in [payout operations](docs/payout-operations.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, payout-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
+The production topology and risk decisions are recorded in [the backend architecture](docs/architecture.md). Reward operations are detailed in [brand rewards marketplace](docs/brand-rewards-marketplace.md). Provisioning lives in [the Terraform foundation](infra/terraform/README.md), and ordered release, rollback, reward-incident, and privacy controls live in [the deployment runbook](docs/deployment-runbook.md).
 
 ## Module build order
 
 1. Platform configuration, health, errors, logging, security, and OpenAPI.
 2. PostgreSQL migrations, Firebase authentication, accounts, profiles, and regions.
 3. Competitions, enrollments, sessions, append-only entry ledger, and leaderboards.
-4. Draw settlement, payout claims, Hyperwallet adapter/webhooks, and reconciliation.
+4. Draw settlement, regional reward inventory, awards, claims, and coupon-code encryption.
 5. Notifications, partnerships, moderation/admin, and executable privacy operations.
 6. Observability, infrastructure provisioning, and deployment hardening.
 

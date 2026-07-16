@@ -1,3 +1,4 @@
+import type { StreakCounts } from '@/domain/streaks';
 export type CompetitionPeriodIndex = 1 | 2 | 3 | 4;
 
 export type CurrentWeekProgress = {
@@ -23,6 +24,11 @@ export type CompetitionPeriod = {
 export type CompetitionMatch = {
   availability: MatchAvailability;
   opponentAlias: string;
+  opponentBestStreak?: number;
+  opponentCurrentStreak?: number;
+  opponentMonthlyVerifiedDays?: number;
+  opponentStreaks?: StreakCounts;
+  opponentUserId?: string | null;
   opponentVerifiedDateKeys: readonly string[];
   periodIndex: CompetitionPeriodIndex;
   region: string;
@@ -38,7 +44,12 @@ export type CompetitionPeriodResult = {
   index: CompetitionPeriodIndex;
   liveMultiplier: 0 | 1 | 2 | 3;
   opponentAlias: string;
+  opponentBestStreak: number;
+  opponentCurrentStreak: number;
   opponentGoalMet: boolean;
+  opponentMonthlyVerifiedDays: number;
+  opponentStreaks: StreakCounts;
+  opponentUserId: string | null;
   opponentVerifiedCount: number;
   opponentVerifiedDateKeys: readonly string[];
   period: CompetitionPeriod;
@@ -154,7 +165,17 @@ export function evaluateMonthlyCompetition({
       index: period.index,
       liveMultiplier,
       opponentAlias: match?.opponentAlias ?? 'SOLO MODE',
+      opponentBestStreak: match?.opponentBestStreak ?? 0,
+      opponentCurrentStreak: match?.opponentCurrentStreak ?? 0,
       opponentGoalMet,
+      opponentMonthlyVerifiedDays: match?.opponentMonthlyVerifiedDays ?? 0,
+      opponentStreaks: match?.opponentStreaks ?? {
+        daily: match?.opponentCurrentStreak ?? 0,
+        monthly: 0,
+        weekly: 0,
+        yearly: 0
+      },
+      opponentUserId: match?.opponentUserId ?? null,
       opponentVerifiedCount: opponentDates.length,
       opponentVerifiedDateKeys: opponentDates,
       period,
@@ -208,6 +229,27 @@ export function evaluateMonthlyCompetition({
     weeklyGoal: goal
   };
 }
+
+export type EligibleWeeklyChallengePartner = {
+  alias: string;
+  goalDays: number;
+  requestStatus: 'available' | 'pending';
+  streaks: StreakCounts;
+  userId: string;
+};
+
+export type WeeklyChallengeRequest = {
+  competitionId: string;
+  createdAt: string;
+  direction: 'incoming' | 'outgoing';
+  goalDays: number;
+  id: string;
+  partnerAlias: string;
+  partnerStreaks: StreakCounts;
+  partnerUserId: string;
+  periodIndex: CompetitionPeriodIndex;
+  status: 'accepted' | 'cancelled' | 'declined' | 'pending';
+};
 
 export function buildCompetitionCalendar(monthKey: string) {
   const { month, year } = parseMonthKey(monthKey);

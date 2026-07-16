@@ -4,7 +4,11 @@ import { resolveCompetitionRegionFromCoordinates } from '@/domain/competitionReg
 import type { CompetitionRegion } from '@/config/regions';
 
 export type DeviceRegionVerificationResult =
-  | { status: 'verified'; region: CompetitionRegion }
+  | {
+      coordinates: { latitude: number; longitude: number };
+      region: CompetitionRegion;
+      status: 'verified';
+    }
   | { status: 'permission-denied' }
   | { status: 'location-unavailable' }
   | { status: 'unsupported-region' };
@@ -28,7 +32,16 @@ export async function verifyCompetitionRegionWithDeviceLocation(): Promise<Devic
     });
     const region = resolveCompetitionRegionFromCoordinates(location.coords);
 
-    return region ? { status: 'verified', region } : { status: 'unsupported-region' };
+    return region
+      ? {
+          coordinates: {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+          },
+          region,
+          status: 'verified'
+        }
+      : { status: 'unsupported-region' };
   } catch {
     return { status: 'location-unavailable' };
   }

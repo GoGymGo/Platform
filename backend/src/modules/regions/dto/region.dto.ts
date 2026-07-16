@@ -45,9 +45,6 @@ export class RegionPolicyResponseDto {
   @ApiProperty({ type: Boolean })
   competitionEnabled!: boolean;
 
-  @ApiProperty({ type: Boolean })
-  payoutEnabled!: boolean;
-
   @ApiProperty({ type: String })
   policyVersion!: string;
 

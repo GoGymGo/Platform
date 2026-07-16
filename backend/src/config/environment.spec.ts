@@ -5,7 +5,7 @@ describe('environment validation', () => {
     const environment = validateEnvironment({
       NODE_ENV: 'test',
       AUTH_MODE: 'test',
-      HYPERWALLET_PORTAL_URL: '',
+      REWARD_CODE_ENCRYPTION_KEY: '',
     });
 
     expect(environment.PORT).toBe(3000);
@@ -16,16 +16,13 @@ describe('environment validation', () => {
     expect(environment.DEMO_VERIFICATION_ENABLED).toBe(false);
     expect(environment.DEMO_VERIFICATION_REGION_CODE).toBe('CA-BC');
     expect(environment.DEMO_VERIFICATION_TTL_SECONDS).toBe(300);
-    expect(environment.HYPERWALLET_ENABLED).toBe(false);
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_MAX_BYTES).toBe(2 * 1_024 * 1_024);
     expect(environment.PRIVACY_EXPORT_RETENTION_DAYS).toBe(7);
     expect(environment.OTEL_ENABLED).toBe(false);
     expect(environment.WORKER_HEARTBEAT_INTERVAL_MS).toBe(30_000);
-    expect(environment.HYPERWALLET_API_URL).toBe(
-      'https://uat-api.paylution.com/rest/v4',
-    );
+    expect(environment.REWARD_CODE_ENCRYPTION_KEY).toBeUndefined();
   });
 
   it('requires an OTLP endpoint and service name when telemetry is enabled', () => {
@@ -75,29 +72,21 @@ describe('environment validation', () => {
     ).toThrow(/DEMO_VERIFICATION_ENABLED cannot be true in production/i);
   });
 
-  it('requires every server-side Hyperwallet setting when payouts are enabled', () => {
+  it('requires coupon encryption keys to decode to exactly 32 bytes', () => {
     expect(() =>
       validateEnvironment({
         NODE_ENV: 'test',
         AUTH_MODE: 'test',
-        HYPERWALLET_ENABLED: 'true',
+        REWARD_CODE_ENCRYPTION_KEY: Buffer.from('too-short').toString('base64'),
       }),
-    ).toThrow(/HYPERWALLET_PORTAL_URL is required/i);
-  });
-
-  it('does not expose API-only webhook secrets to the worker', () => {
+    ).toThrow(/32-byte key/i);
     expect(
       validateEnvironment({
         AUTH_MODE: 'test',
-        HYPERWALLET_ENABLED: 'true',
-        HYPERWALLET_PASSWORD: 'password',
-        HYPERWALLET_PORTAL_URL: 'https://payee.example.com',
-        HYPERWALLET_PROGRAM_TOKEN: 'program-token',
-        HYPERWALLET_USERNAME: 'username',
         NODE_ENV: 'test',
-        RUNTIME_ROLE: 'worker',
-      }).HYPERWALLET_ENABLED,
-    ).toBe(true);
+        REWARD_CODE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      }).REWARD_CODE_ENCRYPTION_KEY,
+    ).toBeDefined();
   });
 
   it('requires Firebase, a private bucket, and a pseudonymization key for privacy execution', () => {

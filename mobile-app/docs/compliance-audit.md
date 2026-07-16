@@ -27,7 +27,7 @@ This audit maps the current Expo Router app to the North American privacy and bi
 
 ## Legal Copy Coverage
 
-- Privacy Policy covers account data, workout verification events, sponsor/creator interaction events, payout provider flows, CCPA/CPRA-style California rights, PIPEDA-style Canadian rights, retention, and contact/request placeholders.
+- Privacy Policy covers account data, workout verification events, sponsor/creator interactions, reward claims, CCPA/CPRA-style California rights, PIPEDA-style Canadian rights, retention, and contact/request placeholders.
 - Terms of Service covers account eligibility, workout verification rules, biometric/camera prompts, prize draw entries, creators/sponsors, acceptable use, and product limits.
 - Biometric / Camera Consent states that GoGymGo does not store or transmit biometric identifiers, faceprints, face geometry, Face ID scans, selfie images, camera frames, raw camera streams, biometric data, or imagery.
 - Biometric / Camera Consent states that GoGymGo may store only non-biometric checkpoint results, timestamps, QR results, session IDs, device integrity signals, and fraud-review status.
@@ -74,4 +74,4 @@ This audit maps the current Expo Router app to the North American privacy and bi
 
 - Replace placeholder legal contact details with verified production email, mailing address, request workflow, and app-store privacy nutrition labels.
 - Have counsel confirm whether any stored checkpoint result, fraud score, or device integrity event is treated as biometric information in specific US states or Canadian provinces.
-- Add official sweepstakes rules, regional eligibility rules, tax language, payout terms, sponsor disclosure templates, and data-retention schedule before launch.
+- Add official contest rules, regional eligibility, physical/coupon fulfillment terms, sponsor disclosure templates, and a data-retention schedule before launch.

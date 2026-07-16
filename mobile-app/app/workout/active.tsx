@@ -1,11 +1,20 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Platform,
+  StyleSheet,
+  View
+} from 'react-native';
 
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
+  ScreenScrollView,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
@@ -23,16 +32,21 @@ function formatClock(totalSeconds: number) {
 }
 
 export default function ActiveWorkoutScreen() {
+  useKeepAwake('gogymgo-active-workout');
   const router = useRouter();
   const { mode: appDataMode, source: appDataSource } = useAppData();
   const {
     activeSession,
     cancelActiveWorkout,
+    midSessionAlertsReady,
     recordHeartRateSample,
+    sessionActionError,
+    sessionActionPending,
     triggerMidSessionCheck
   } = useWorkoutProgress();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const cancelDialogRef = useRef<View>(null);
   const activeSessionStartedAt = activeSession?.startedAt;
 
   useEffect(() => {
@@ -86,7 +100,7 @@ export default function ActiveWorkoutScreen() {
           ? 'FINISH & CHECK OUT ->'
           : minimumReached
             ? !midSessionVerified
-              ? 'MID-SESSION FACE CHECK REQUIRED'
+              ? 'MID-SESSION PRESENCE CHECK REQUIRED'
               : `AVERAGE MUST REACH ${workoutRules.minimumAverageHeartRateBpm} BPM`
             : 'FINISH UNLOCKS AT 30:00',
       heartRate: telemetry?.heartRate ?? 0,
@@ -125,14 +139,19 @@ export default function ActiveWorkoutScreen() {
   if (!activeSession) {
     return (
       <SessionUnavailable
-        body="START FROM THE SESSION TAB SO CHECK-IN, TIMER AND CHECKPOINTS CAN BE TRACKED TOGETHER."
+        body="Start from the Session tab so check-in, the timer, and verification checkpoints can be tracked together."
         onAction={() => router.replace('/session' as Href)}
       />
     );
   }
 
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <HUDBorderBox style={styles.recordingPill} tone="cyan">
           <View style={styles.recordingDot} />
@@ -165,7 +184,7 @@ export default function ActiveWorkoutScreen() {
               START
             </TerminalText>
             <TerminalText tone="dim" variant="micro">
-              MID-PING
+            CHECK
             </TerminalText>
             <TerminalText tone="dim" variant="micro">
               END
@@ -255,13 +274,30 @@ export default function ActiveWorkoutScreen() {
             : 'PARTNER GYM CHECK-IN ACTIVE'}
         />
         <SessionStatusRow
-          label="FACE CHECK"
+          label="PRESENCE CHECK"
           tone={activeSession.midSessionVerified
             ? 'green'
             : activeSession.midSessionCheckPrompted ? 'amber' : 'cyan'}
           value={activeSession.midSessionVerified
             ? 'VERIFIED'
             : activeSession.midSessionCheckPrompted ? 'ACTION REQUIRED' : 'WILL APPEAR AUTOMATICALLY'}
+        />
+        <SessionStatusRow
+          label="ALERT"
+          tone={activeSession.midSessionVerified
+            ? 'green'
+            : activeSession.midSessionCheckPrompted
+              ? 'amber'
+              : midSessionAlertsReady
+                ? 'green'
+                : 'amber'}
+          value={activeSession.midSessionVerified
+            ? 'COMPLETED'
+            : activeSession.midSessionCheckPrompted
+              ? 'OPEN PRESENCE CHECK'
+              : midSessionAlertsReady
+                ? 'PUSH + HAPTIC ARMED'
+                : 'SCREEN AWAKE // KEEP APP OPEN'}
         />
         <SessionStatusRow
           label="SESSION SAVE"
@@ -280,7 +316,7 @@ export default function ActiveWorkoutScreen() {
       <View style={styles.actionRow}>
         {activeSession.midSessionCheckPrompted && !activeSession.midSessionVerified ? (
           <CyberButtonOutline
-            label="COMPLETE FACE CHECK"
+            label="COMPLETE PRESENCE CHECK"
             onPress={() => router.push('/workout/ping')}
             style={styles.actionButton}
             tone="amber"
@@ -288,6 +324,7 @@ export default function ActiveWorkoutScreen() {
         ) : null}
 
         <CyberButtonOutline
+          accessibilityHint="End this workout without earning verification credit"
           label="END SESSION"
           onPress={() => setShowCancelConfirm(true)}
           style={styles.actionButton}
@@ -295,38 +332,86 @@ export default function ActiveWorkoutScreen() {
         />
       </View>
 
-      {showCancelConfirm ? (
-        <HUDBorderBox glow style={styles.confirmCard} tone="red">
-          <TerminalText style={styles.confirmCopy} tone="red" variant="body">
-            END THIS SESSION? PROGRESS FROM THIS WORKOUT WILL NOT COUNT.
-          </TerminalText>
-          <View style={styles.confirmRow}>
-            <CyberButtonOutline
-              label="KEEP GOING"
-              onPress={() => setShowCancelConfirm(false)}
-              style={styles.confirmButton}
-            />
-
-            <CyberButtonOutline
-              label="END NOW"
-              onPress={() => {
-                cancelActiveWorkout();
-                router.replace('/home');
-              }}
-              style={styles.confirmButton}
-              tone="red"
-            />
-          </View>
-        </HUDBorderBox>
-      ) : null}
-
       <CyberButtonOutline
-        label="LEAVE SCREEN // SESSION CONTINUES"
+        accessibilityHint="Go to Home while this workout continues in the background"
+        label={midSessionAlertsReady
+          ? 'GO TO HOME // ALERT ARMED'
+          : 'GO TO HOME // SESSION CONTINUES'}
         onPress={() => {
           router.replace('/home');
         }}
         style={styles.backButton}
       />
+      <TerminalText live="polite" style={styles.alertHelp} tone="amber" uppercase={false} variant="caption">
+        Your screen stays awake while this timer is open. If you leave the app,
+        return promptly for presence checks; device settings can delay alerts.
+      </TerminalText>
+      </ScreenScrollView>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setShowCancelConfirm(false)}
+        onShow={() => {
+          if (Platform.OS === 'web') {
+            const dialog = cancelDialogRef.current as unknown as { focus?: () => void };
+            dialog.focus?.();
+            return;
+          }
+
+          const node = findNodeHandle(cancelDialogRef.current);
+          if (node) {
+            AccessibilityInfo.setAccessibilityFocus(node);
+          }
+        }}
+        transparent
+        visible={showCancelConfirm}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            accessibilityLabel="End session confirmation"
+            accessibilityRole="alert"
+            accessibilityViewIsModal
+            ref={cancelDialogRef}
+            style={styles.modalDialog}
+            tabIndex={-1}
+          >
+            <HUDBorderBox glow style={styles.confirmCard} tone="red">
+              <TerminalText glow tone="red" variant="label">
+                END SESSION?
+              </TerminalText>
+              <TerminalText style={styles.confirmCopy} tone="text" uppercase={false} variant="body">
+                Progress from this workout will not count. This cannot be undone.
+              </TerminalText>
+              <View style={styles.confirmRow}>
+                <CyberButtonOutline
+                  label="KEEP GOING"
+                  onPress={() => setShowCancelConfirm(false)}
+                  style={styles.confirmButton}
+                />
+                <CyberButtonOutline
+                  disabled={sessionActionPending}
+                  label="END SESSION"
+                  onPress={() => {
+                    void cancelActiveWorkout().then((cancelled) => {
+                      if (cancelled) {
+                        setShowCancelConfirm(false);
+                        router.replace('/home');
+                      }
+                    });
+                  }}
+                  style={styles.confirmButton}
+                  tone="red"
+                />
+              </View>
+              {sessionActionError ? (
+                <TerminalText live="assertive" tone="red" uppercase={false} variant="caption">
+                  {sessionActionError}
+                </TerminalText>
+              ) : null}
+            </HUDBorderBox>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -354,7 +439,7 @@ function SessionStatusRow({
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: 26,
@@ -389,9 +474,8 @@ const styles = StyleSheet.create({
     textAlign: 'right'
   },
   centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center'
+    width: '100%',
+    alignItems: 'center'
   },
   clock: {
     marginTop: 6,
@@ -431,7 +515,10 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 126,
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 18
   },
   metricValue: {
@@ -440,6 +527,7 @@ const styles = StyleSheet.create({
   },
   telemetryNotice: {
     gap: spacing.xs,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
     padding: spacing.md
   },
@@ -475,8 +563,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm
   },
   confirmCard: {
-    marginTop: 10,
-    padding: spacing.md
+    padding: spacing.lg
   },
   confirmCopy: {
     marginBottom: 10,
@@ -497,5 +584,20 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginTop: 10,
     paddingVertical: 11
+  },
+  alertHelp: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.blackAlpha80
+  },
+  modalDialog: {
+    width: '100%',
+    maxWidth: 460
   }
 });

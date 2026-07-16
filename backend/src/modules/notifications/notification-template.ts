@@ -13,7 +13,7 @@ export function renderNotification(
   switch (template) {
     case 'competition_cancelled':
       return {
-        body: 'This competition was cancelled. No workout or payout action is required.',
+        body: 'This competition was cancelled. No further workout action is required.',
         data: {
           competitionId:
             typeof payload.competitionId === 'string'
@@ -23,14 +23,14 @@ export function renderNotification(
         },
         title: 'GoGymGo competition cancelled',
       };
-    case 'payout_action_required':
+    case 'reward_awarded':
       return {
-        body: 'Set up your hosted Hyperwallet account so your prize can be paid.',
+        body: 'You won a brand reward. Open My Rewards to claim it.',
         data: {
-          claimId: typeof payload.claimId === 'string' ? payload.claimId : null,
-          route: '/profile/payout',
+          awardId: typeof payload.awardId === 'string' ? payload.awardId : null,
+          route: '/rewards/awards',
         },
-        title: 'Your GoGymGo prize is ready',
+        title: 'You won a GoGymGo reward',
       };
     default:
       throw new Error('Unknown notification template.');

@@ -9,7 +9,6 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
-  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -21,7 +20,6 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import type { CompetitionMode } from '../../../database/database.types';
 import { OperatorReasonDto } from './operator.dto';
 
 export class CreateRegionPolicyDto extends OperatorReasonDto {
@@ -71,10 +69,6 @@ export class CreateRegionPolicyDto extends OperatorReasonDto {
   @IsBoolean()
   competitionEnabled!: boolean;
 
-  @ApiProperty({ type: Boolean })
-  @IsBoolean()
-  payoutEnabled!: boolean;
-
   @ApiProperty({ maxLength: 64, type: String })
   @IsString()
   @Length(1, 64)
@@ -113,15 +107,6 @@ export class GoalBracketDto {
 }
 
 export class CreateCompetitionDraftDto extends OperatorReasonDto {
-  @ApiPropertyOptional({
-    default: 'cash',
-    enum: ['cash', 'non_cash_demo'],
-    type: String,
-  })
-  @IsOptional()
-  @IsIn(['cash', 'non_cash_demo'])
-  mode?: CompetitionMode;
-
   @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
   regionPolicyId!: string;
@@ -134,10 +119,6 @@ export class CreateCompetitionDraftDto extends OperatorReasonDto {
   @IsString()
   @Length(2, 160)
   name!: string;
-
-  @ApiProperty({ enum: ['CAD', 'MXN', 'USD'], type: String })
-  @Matches(/^(CAD|MXN|USD)$/)
-  currency!: string;
 
   @ApiProperty({ maxLength: 64, type: String })
   @IsString()

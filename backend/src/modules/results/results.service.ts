@@ -1,43 +1,65 @@
 import { Injectable } from '@nestjs/common';
+import { sql } from 'kysely';
 import { DatabaseService } from '../../database/database.service';
-import { parseCompetitionRules } from '../competitions/competition-rules';
 import type {
-  PayoutWinnerResponseDto,
+  RewardWinnerResponseDto,
   SettledCompetitionResponseDto,
 } from './dto/result.dto';
+import { loadPublicStreaks } from '../streaks/public-streaks';
 
 @Injectable()
 export class ResultsService {
   constructor(private readonly database: DatabaseService) {}
 
-  async getPayoutWinners(): Promise<PayoutWinnerResponseDto[]> {
+  async getRewardWinners(): Promise<RewardWinnerResponseDto[]> {
     const latestDraw = await this.latestSettledDraw();
     if (!latestDraw) {
       return [];
     }
 
     const winners = await this.database.connection
-      .selectFrom('draw_winners as winner')
-      .innerJoin('profiles as profile', 'profile.user_id', 'winner.user_id')
+      .selectFrom('reward_awards as award')
+      .innerJoin('profiles as profile', 'profile.user_id', 'award.user_id')
+      .innerJoin(
+        'reward_catalog_items as reward',
+        'reward.id',
+        'award.reward_catalog_item_id',
+      )
       .select([
         'profile.callsign',
         'profile.public_identity_mode',
         'profile.public_name',
-        'winner.amount_minor',
-        'winner.payout_rank',
+        'award.user_id',
+        'award.award_rank',
+        'reward.reward_type',
+        'reward.sponsor_name',
+        'reward.title',
       ])
-      .where('winner.draw_id', '=', latestDraw.id)
-      .orderBy('winner.payout_rank')
+      .where('award.draw_id', '=', latestDraw.id)
+      .where('award.status', '!=', 'cancelled')
+      .orderBy('award.award_rank')
       .limit(10)
       .execute();
+    const streaksByUser = await loadPublicStreaks(
+      this.database.connection,
+      winners.map((winner) => winner.user_id),
+    );
 
     return winners.map((winner) => ({
       alias:
         winner.public_identity_mode === 'private'
           ? winner.callsign
           : (winner.public_name ?? winner.callsign),
-      amountMinor: this.safeMinorUnits(winner.amount_minor),
-      payoutRank: winner.payout_rank,
+      awardRank: winner.award_rank,
+      rewardTitle: winner.title,
+      rewardType: winner.reward_type,
+      sponsorName: winner.sponsor_name,
+      streaks: streaksByUser.get(winner.user_id) ?? {
+        daily: 0,
+        monthly: 0,
+        weekly: 0,
+        yearly: 0,
+      },
     }));
   }
 
@@ -47,11 +69,10 @@ export class ResultsService {
       return null;
     }
 
-    const rules = parseCompetitionRules(latestDraw.rules);
     return {
-      payoutExponent: rules.payoutExponent,
-      payoutPoolAmountMinor: rules.payoutPoolAmountMinor,
-      payoutWinnerCount: rules.payoutWinnerCount,
+      competitionName: latestDraw.competition_name,
+      monthKey: latestDraw.month_key,
+      rewardCount: Number(latestDraw.reward_count),
     };
   }
 
@@ -63,18 +84,21 @@ export class ResultsService {
         'competition.id',
         'draw.competition_id',
       )
-      .select(['competition.rules', 'draw.id', 'draw.settled_at'])
+      .select([
+        'competition.month_key',
+        'competition.name as competition_name',
+        'draw.id',
+        'draw.settled_at',
+        sql<string>`(
+          SELECT COUNT(*)
+          FROM reward_awards AS award
+          WHERE award.draw_id = draw.id
+            AND award.status <> 'cancelled'
+        )`.as('reward_count'),
+      ])
       .where('draw.status', '=', 'settled')
       .where('competition.status', '=', 'settled')
       .orderBy('draw.settled_at', 'desc')
       .executeTakeFirst();
-  }
-
-  private safeMinorUnits(value: string): number {
-    const amount = Number(value);
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      throw new Error('Payout result amount is outside the supported range.');
-    }
-    return amount;
   }
 }

@@ -21,7 +21,6 @@ services:
     environment: &runtime_environment
       AUTH_MODE: test
       DATABASE_URL: postgresql://gogymgo:gogymgo@database:5432/gogymgo
-      HYPERWALLET_ENABLED: 'false'
       PRETTY_LOGS_ENABLED: 'false'
       NODE_ENV: development
       OPENAPI_ENABLED: 'true'
@@ -34,6 +33,7 @@ services:
     build: .
     environment:
       <<: *runtime_environment
+      REWARD_CODE_ENCRYPTION_KEY: ${REWARD_CODE_ENCRYPTION_KEY:?Set REWARD_CODE_ENCRYPTION_KEY in backend/.env}
       RUNTIME_ROLE: api
     depends_on:
       migrate:

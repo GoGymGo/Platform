@@ -31,6 +31,7 @@
     "migrate:down": "node-pg-migrate down --tsx --envPath .env --migrations-dir migrations",
     "migrate:deploy": "node-pg-migrate up --migrations-dir dist/migrations --database-url-var DATABASE_URL",
     "openapi:generate": "ts-node --project tsconfig.json scripts/generate-openapi.ts",
+    "secret:reward-code:local": "node scripts/configure-local-reward-key.mjs",
     "audit:source": "node scripts/audit-source.mjs",
     "audit:contract": "node scripts/audit-frontend-contract.mjs",
     "audit:deps": "npm audit --omit=dev --audit-level=high",

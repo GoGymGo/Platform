@@ -12,7 +12,10 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
+import {
+  useCreateRegionVerification,
+  useRegionPolicies
+} from '@/data/accountReadinessHooks';
 import type {
   CompetitionRegion,
   CompetitionRegionVerificationMethod
@@ -34,6 +37,8 @@ type VerificationState =
   | 'verified'
   | 'permission-denied'
   | 'location-unavailable'
+  | 'review-pending'
+  | 'service-error'
   | 'unsupported-region';
 
 export default function RegionScreen() {
@@ -44,6 +49,8 @@ export default function RegionScreen() {
     regionVerification,
     verifyCompetitionRegion
   } = useCompetitionRegion();
+  const regionPolicies = useRegionPolicies();
+  const createRegionVerification = useCreateRegionVerification();
   const [candidateRegion, setCandidateRegion] = useState<CompetitionRegion | null>(null);
   const [verificationMethod, setVerificationMethod] =
     useState<CompetitionRegionVerificationMethod | null>(null);
@@ -51,6 +58,10 @@ export default function RegionScreen() {
   const [postalCode, setPostalCode] = useState('');
   const [postalError, setPostalError] = useState('');
   const [showPostalFallback, setShowPostalFallback] = useState(false);
+  const [deviceCoordinates, setDeviceCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const isProfileSource = source === 'profile';
   const candidateIsVerified = verificationMethod === 'device-location';
 
@@ -63,6 +74,7 @@ export default function RegionScreen() {
     const result = await verifyCompetitionRegionWithDeviceLocation();
 
     if (result.status === 'verified') {
+      setDeviceCoordinates(result.coordinates);
       setCandidateRegion(result.region);
       setVerificationMethod('device-location');
       setVerificationState('verified');
@@ -75,6 +87,7 @@ export default function RegionScreen() {
 
   function checkPostalCode() {
     const normalizedPostalCode = normalizeCanadianPostalCode(postalCode);
+    setDeviceCoordinates(null);
     setPostalCode(normalizedPostalCode);
 
     if (!isCompleteCanadianPostalCode(normalizedPostalCode)) {
@@ -111,18 +124,56 @@ export default function RegionScreen() {
       return;
     }
 
-    await verifyCompetitionRegion(candidateRegion, verificationMethod);
-    router.replace(isProfileSource ? '/profile' : '/consents');
+    await submitRegionVerification(candidateRegion, verificationMethod);
   }
 
   async function continueWithPreviewRegion() {
-    await verifyCompetitionRegion(competitionRegion, 'postal-code');
-    router.replace(isProfileSource ? '/profile' : '/consents');
+    await submitRegionVerification(competitionRegion, 'postal-code');
+  }
+
+  async function submitRegionVerification(
+    region: CompetitionRegion,
+    method: CompetitionRegionVerificationMethod
+  ) {
+    const policy = regionPolicies.data?.find(
+      ({ metroName }) => metroName.toUpperCase() === region.label.toUpperCase()
+    );
+    if (!policy) {
+      setVerificationState('service-error');
+      return;
+    }
+
+    setVerificationState('checking');
+    try {
+      const serverVerification = await createRegionVerification.mutateAsync({
+        ...(method === 'device-location' && deviceCoordinates
+          ? deviceCoordinates
+          : {}),
+        ...(method === 'postal-code' && postalCode ? { postalCode } : {}),
+        method: method === 'device-location' ? 'device_location' : 'postal_code',
+        regionPolicyId: policy.id
+      });
+      await verifyCompetitionRegion(region, method, {
+        id: serverVerification.id,
+        regionCode: serverVerification.regionCode ?? policy.code,
+        regionPolicyId: serverVerification.regionPolicyId,
+        status: serverVerification.status
+      });
+
+      if (serverVerification.status !== 'approved') {
+        setVerificationState('review-pending');
+        return;
+      }
+
+      setVerificationState('verified');
+      router.replace(isProfileSource ? '/profile' : '/consents');
+    } catch {
+      setVerificationState('service-error');
+    }
   }
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -218,6 +269,18 @@ export default function RegionScreen() {
             tone="amber"
           />
         ) : null}
+        {verificationState === 'review-pending' ? (
+          <AuthStatusNotice
+            message="YOUR REGION CHECK WAS SUBMITTED FOR REVIEW. RETURN HERE AFTER APPROVAL TO CONTINUE COMPETITION REGISTRATION."
+            tone="amber"
+          />
+        ) : null}
+        {verificationState === 'service-error' || regionPolicies.isError ? (
+          <AuthStatusNotice
+            message="REGION VERIFICATION COULD NOT BE COMPLETED. CHECK YOUR CONNECTION AND TRY AGAIN."
+            tone="red"
+          />
+        ) : null}
 
         {verificationState === 'permission-denied' ? (
           <CyberButtonOutline
@@ -281,8 +344,17 @@ export default function RegionScreen() {
         ) : null}
 
         <CyberButtonPrimary
-          disabled={!candidateRegion || !verificationMethod}
-          label={isProfileSource ? 'SAVE VERIFIED REGION ->' : 'CONTINUE ->'}
+          disabled={
+            !candidateRegion ||
+            !verificationMethod ||
+            createRegionVerification.isPending ||
+            regionPolicies.isLoading
+          }
+          label={createRegionVerification.isPending
+            ? 'SUBMITTING REGION...'
+            : isProfileSource
+              ? 'SAVE VERIFIED REGION ->'
+              : 'CONTINUE ->'}
           onPress={() => void continueWithVerifiedRegion()}
           style={styles.continueAction}
         />

@@ -18,7 +18,7 @@ export default function PingSuccessScreen() {
   if (!activeSession?.midSessionVerified) {
     return (
       <SessionUnavailable
-        body="COMPLETE THE MID-SESSION IDENTITY CHECK BEFORE OPENING THIS CONFIRMATION."
+        body="Complete the mid-session presence check before opening this confirmation."
         onAction={() => {
           if (activeSession) {
             router.replace('/workout/ping');
@@ -45,8 +45,8 @@ export default function PingSuccessScreen() {
       <TerminalText glow style={styles.title} tone="green" variant="title">
         YOU ARE GOOD TO KEEP GOING
       </TerminalText>
-      <TerminalText style={styles.body} tone="muted" variant="body">
-        THE MID-SESSION IDENTITY CHECK PASSED. YOUR WORKOUT REMAINS ELIGIBLE.
+      <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+        The mid-session presence check passed. Your workout remains eligible.
       </TerminalText>
 
       <CyberButtonPrimary

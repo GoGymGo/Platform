@@ -927,128 +927,12 @@
         "tags": ["operator"]
       }
     },
-    "/v1/webhooks/hyperwallet": {
+    "/v1/operator/reward-awards/{awardId}/status-action": {
       "post": {
-        "operationId": "receive",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/HyperwalletWebhookDto" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HyperwalletWebhookAcceptedDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "hyperwallet-webhook": [] }],
-        "summary": "Durably accept a Hyperwallet notification for reconciliation",
-        "tags": ["provider webhooks"]
-      }
-    },
-    "/v1/operator/payout-release-control": {
-      "get": {
-        "operationId": "get",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PayoutReleaseControlResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Get the global payout release safety control",
-        "tags": ["operator payouts"]
-      }
-    },
-    "/v1/operator/payout-release-control/status-action": {
-      "post": {
-        "operationId": "change",
+        "operationId": "changeStatus",
         "parameters": [
           {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PayoutReleaseControlActionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PayoutReleaseControlResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Pause or resume new payout release reservations",
-        "tags": ["operator payouts"]
-      }
-    },
-    "/v1/operator/payout-claims/{claimId}/review": {
-      "get": {
-        "operationId": "getReview",
-        "parameters": [
-          {
-            "name": "claimId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OperatorPayoutClaimReviewDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Get a privacy-safe authoritative payout claim review",
-        "tags": ["operator payouts"]
-      }
-    },
-    "/v1/operator/payout-claims/{claimId}/approve": {
-      "post": {
-        "operationId": "approve",
-        "parameters": [
-          {
-            "name": "claimId",
+            "name": "awardId",
             "required": true,
             "in": "path",
             "schema": { "type": "string" }
@@ -1065,7 +949,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OperatorPayoutActionDto"
+                "$ref": "#/components/schemas/RewardAwardStatusActionDto"
               }
             }
           }
@@ -1076,23 +960,61 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OperatorPayoutClaimResponseDto"
+                  "$ref": "#/components/schemas/AdminRewardAwardResponseDto"
                 }
               }
             }
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "Approve a reviewed winner claim for payee setup",
-        "tags": ["operator payouts"]
+        "summary": "Cancel, fulfill, or redeem a reward award",
+        "tags": ["operator-reward-awards"]
       }
     },
-    "/v1/operator/payout-claims/{claimId}/release": {
+    "/v1/operator/configuration/rewards": {
       "post": {
-        "operationId": "release",
+        "operationId": "create",
         "parameters": [
           {
-            "name": "claimId",
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRewardCatalogItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRewardResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a draft contest reward",
+        "tags": ["operator-rewards"]
+      }
+    },
+    "/v1/operator/configuration/rewards/{rewardId}": {
+      "put": {
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "rewardId",
             "required": true,
             "in": "path",
             "schema": { "type": "string" }
@@ -1109,7 +1031,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OperatorPayoutActionDto"
+                "$ref": "#/components/schemas/UpdateRewardCatalogItemDto"
               }
             }
           }
@@ -1120,20 +1042,144 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OperatorPayoutClaimResponseDto"
+                  "$ref": "#/components/schemas/AdminRewardResponseDto"
                 }
               }
             }
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "Release a ready claim to Hyperwallet exactly once",
-        "tags": ["operator payouts"]
+        "summary": "Replace a draft contest reward",
+        "tags": ["operator-rewards"]
       }
     },
-    "/v1/payout-claims/me": {
+    "/v1/operator/configuration/rewards/{rewardId}/status-action": {
+      "post": {
+        "operationId": "changeStatus",
+        "parameters": [
+          {
+            "name": "rewardId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RewardCatalogStatusActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRewardResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Publish or archive a contest reward",
+        "tags": ["operator-rewards"]
+      }
+    },
+    "/v1/operator/configuration/rewards/{rewardId}/coupon-codes": {
+      "post": {
+        "operationId": "addCouponCodes",
+        "parameters": [
+          {
+            "name": "rewardId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddRewardCouponCodesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedCouponCodesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Upload encrypted coupon-code inventory",
+        "tags": ["operator-rewards"]
+      }
+    },
+    "/v1/rewards/catalog": {
       "get": {
-        "operationId": "getMyClaim",
+        "operationId": "getCatalog",
+        "parameters": [
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "example": "victoria-bc", "type": "string" }
+          },
+          {
+            "name": "monthKey",
+            "required": false,
+            "in": "query",
+            "schema": { "example": "2026-08", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RewardCatalogItemResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List published contest rewards for a region",
+        "tags": ["rewards"]
+      }
+    },
+    "/v1/rewards/awards/me": {
+      "get": {
+        "operationId": "getMyAwards",
         "parameters": [],
         "responses": {
           "200": {
@@ -1141,23 +1187,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PayoutClaimResponseDto"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RewardAwardResponseDto"
+                  }
                 }
               }
             }
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "Return the current approved winner payout claim",
-        "tags": ["payouts"]
+        "summary": "List the authenticated user reward awards",
+        "tags": ["rewards"]
       }
     },
-    "/v1/payout-claims/{claimId}/portal-action": {
+    "/v1/rewards/awards/{awardId}/claim": {
       "post": {
-        "operationId": "openPortal",
+        "operationId": "claim",
         "parameters": [
           {
-            "name": "claimId",
+            "name": "awardId",
             "required": true,
             "in": "path",
             "schema": { "type": "string" }
@@ -1175,15 +1224,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortalActionResponseDto"
+                  "$ref": "#/components/schemas/ClaimRewardResponseDto"
                 }
               }
             }
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "Provision hosted payee setup and return the approved portal URL",
-        "tags": ["payouts"]
+        "summary": "Claim an awarded physical prize or coupon code",
+        "tags": ["rewards"]
       }
     },
     "/v1/sessions": {
@@ -1301,6 +1350,38 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Close a session and submit it for server-side evidence review",
+        "tags": ["sessions"]
+      }
+    },
+    "/v1/sessions/{sessionId}/cancel": {
+      "post": {
+        "operationId": "cancel",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionResponseDto" }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Cancel an active workout session without submitting it for review",
         "tags": ["sessions"]
       }
     },
@@ -1461,6 +1542,190 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Return the authenticated entrant weekly competition matches",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/weekly-challenges/eligible-partners": {
+      "get": {
+        "operationId": "listEligibleWeeklyChallengePartners",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 4, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleWeeklyChallengePartnerDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List accepted friends eligible for the same weekly commitment",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/weekly-challenges/requests": {
+      "get": {
+        "operationId": "listWeeklyChallengeRequests",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 4, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List my incoming and outgoing Weekly Challenge requests",
+        "tags": ["competitions"]
+      },
+      "post": {
+        "operationId": "createWeeklyChallengeRequest",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWeeklyChallengeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Request a known eligible friend as a Weekly Challenge partner",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/weekly-challenges/requests/{requestId}": {
+      "patch": {
+        "operationId": "respondToWeeklyChallengeRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklyChallengeRequestDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Accept or decline an incoming Weekly Challenge request",
         "tags": ["competitions"]
       }
     },
@@ -1958,9 +2223,9 @@
         "tags": ["regions"]
       }
     },
-    "/v1/results/payout-winners": {
+    "/v1/results/reward-winners": {
       "get": {
-        "operationId": "getPayoutWinners",
+        "operationId": "getRewardWinners",
         "parameters": [],
         "responses": {
           "200": {
@@ -1970,14 +2235,14 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PayoutWinnerResponseDto"
+                    "$ref": "#/components/schemas/RewardWinnerResponseDto"
                   }
                 }
               }
             }
           }
         },
-        "summary": "Return the public top payout results",
+        "summary": "Return the latest public reward winners",
         "tags": ["competition results"]
       }
     },
@@ -1997,7 +2262,7 @@
             }
           }
         },
-        "summary": "Return the latest settled payout rules summary",
+        "summary": "Return the latest settled reward contest summary",
         "tags": ["competition results"]
       }
     },
@@ -2028,6 +2293,136 @@
           }
         },
         "summary": "List the currently published creator workouts",
+        "tags": ["creator workouts"]
+      }
+    },
+    "/v1/creator-workouts/submissions": {
+      "post": {
+        "operationId": "createSubmission",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCreatorVideoSubmissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorVideoSubmissionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Submit a creator workout video and its rights attestation",
+        "tags": ["creator workouts"]
+      }
+    },
+    "/v1/creator-workouts/submissions/me": {
+      "get": {
+        "operationId": "listMySubmissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreatorVideoSubmissionResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List my creator video submissions",
+        "tags": ["creator workouts"]
+      }
+    },
+    "/v1/creator-workouts/{workoutId}/plans": {
+      "post": {
+        "operationId": "planWorkout",
+        "parameters": [
+          {
+            "name": "workoutId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCreatorWorkoutPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorWorkoutPlanResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Add a published creator workout to my calendar",
+        "tags": ["creator workouts"]
+      }
+    },
+    "/v1/creator-workouts/plans/me": {
+      "get": {
+        "operationId": "listMyPlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreatorWorkoutPlanResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List my planned creator workouts",
         "tags": ["creator workouts"]
       }
     },
@@ -2065,6 +2460,522 @@
         "security": [{ "firebase": [] }],
         "summary": "Create a non-eligible Canada demo checkpoint without collecting evidence",
         "tags": ["demo-verification"]
+      }
+    },
+    "/v1/social/users": {
+      "get": {
+        "operationId": "searchUsers",
+        "parameters": [
+          {
+            "name": "screenName",
+            "required": true,
+            "in": "query",
+            "description": "Case-insensitive partial alias match",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 24,
+              "pattern": "^[A-Za-z0-9_]+$",
+              "example": "GHOST",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSearchResultDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Search active users by unique alias",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friends": {
+      "get": {
+        "operationId": "listFriends",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/FriendResponseDto" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List accepted friends",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friend-requests": {
+      "get": {
+        "operationId": "listFriendRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FriendRequestResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List pending incoming and outgoing friend requests",
+        "tags": ["social"]
+      },
+      "post": {
+        "operationId": "sendFriendRequest",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendFriendRequestDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Send a consent-based friend request",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friend-requests/{requestId}": {
+      "patch": {
+        "operationId": "respondToFriendRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendRequestDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendRequestDecisionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Accept or decline an incoming friend request",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges": {
+      "get": {
+        "operationId": "listChallenges",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SocialChallengeResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List owned, joined, and pending social challenges",
+        "tags": ["social"]
+      },
+      "post": {
+        "operationId": "createChallenge",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSocialChallengeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialChallengeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a structured friend or regional challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/discover": {
+      "get": {
+        "operationId": "discoverChallenges",
+        "parameters": [
+          {
+            "name": "regionCode",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "maxLength": 32,
+              "example": "TORONTO",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SocialChallengeResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Discover open regional activity challenges",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/join": {
+      "post": {
+        "operationId": "joinRegionalChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Join an open regional activity challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/check-ins": {
+      "post": {
+        "operationId": "checkInToChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeCheckInResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Record one activity check-in for today",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/invitations": {
+      "post": {
+        "operationId": "inviteFriendToChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteChallengeFriendDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Invite an accepted friend to an owned challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/contact-invitations": {
+      "post": {
+        "operationId": "inviteContactToChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteChallengeContactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeContactInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create an email or phone invitation link for an owned challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenge-contact-invitations/redeem": {
+      "post": {
+        "operationId": "redeemContactInvitation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemChallengeContactInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Redeem an email or phone challenge invitation after sign-in",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/invitations/me": {
+      "patch": {
+        "operationId": "respondToChallengeInvitation",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeInvitationDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Accept or decline my challenge invitation",
+        "tags": ["social"]
+      }
+    },
+    "/v1/streaks/me": {
+      "get": {
+        "operationId": "getMyStreaks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreakSummaryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return active streak rewards from verified gym logs",
+        "tags": ["streaks"]
       }
     },
     "/v1/leaderboards/current": {
@@ -2119,7 +3030,7 @@
   },
   "info": {
     "title": "GoGymGo API",
-    "description": "Authoritative API for GoGymGo accounts, verified competition activity, ledgers, results, and payouts.",
+    "description": "Authoritative API for GoGymGo accounts, verified competition activity, regional brand rewards, claims, and results.",
     "version": "1.0.0",
     "contact": {}
   },
@@ -2132,11 +3043,6 @@
         "bearerFormat": "Firebase ID token",
         "type": "http",
         "description": "Firebase ID token verified by the GoGymGo API."
-      },
-      "hyperwallet-webhook": {
-        "type": "http",
-        "scheme": "basic",
-        "description": "Dedicated credentials configured only for Hyperwallet."
       }
     },
     "schemas": {
@@ -2269,6 +3175,7 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "callsign": { "type": "string" },
+          "screenName": { "type": "string" },
           "email": { "type": "string", "nullable": true },
           "emailVerified": { "type": "boolean" },
           "publicIdentityMode": {
@@ -2289,6 +3196,7 @@
         "required": [
           "id",
           "callsign",
+          "screenName",
           "email",
           "emailVerified",
           "publicIdentityMode",
@@ -2309,6 +3217,14 @@
       "UpdateMeDto": {
         "type": "object",
         "properties": {
+          "screenName": {
+            "type": "string",
+            "description": "Unique, case-insensitive alias used for friend search",
+            "example": "GHOST_RUNNER",
+            "maxLength": 24,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9_]+$"
+          },
           "publicIdentityMode": {
             "type": "string",
             "enum": ["private", "alias", "real_name"]
@@ -2345,7 +3261,6 @@
           "languageCodes": { "type": "array", "items": { "type": "string" } },
           "minimumAge": { "type": "number", "maximum": 99, "minimum": 13 },
           "competitionEnabled": { "type": "boolean" },
-          "payoutEnabled": { "type": "boolean" },
           "boundaryVersion": { "type": "string", "maxLength": 64 },
           "policyVersion": { "type": "string", "maxLength": 64 },
           "validFrom": { "type": "string", "format": "date-time" },
@@ -2363,7 +3278,6 @@
           "languageCodes",
           "minimumAge",
           "competitionEnabled",
-          "payoutEnabled",
           "boundaryVersion",
           "policyVersion",
           "validFrom",
@@ -2391,15 +3305,9 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "mode": {
-            "type": "string",
-            "default": "cash",
-            "enum": ["cash", "non_cash_demo"]
-          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
-          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
           "rulesVersion": { "type": "string", "maxLength": 64 },
           "rules": { "type": "object" },
           "minimumEntrants": { "type": "number", "minimum": 100 },
@@ -2418,7 +3326,6 @@
           "regionPolicyId",
           "monthKey",
           "name",
-          "currency",
           "rulesVersion",
           "rules",
           "minimumEntrants",
@@ -2442,15 +3349,9 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "mode": {
-            "type": "string",
-            "default": "cash",
-            "enum": ["cash", "non_cash_demo"]
-          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
-          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
           "rulesVersion": { "type": "string", "maxLength": 64 },
           "rules": { "type": "object" },
           "minimumEntrants": { "type": "number", "minimum": 100 },
@@ -2470,7 +3371,6 @@
           "regionPolicyId",
           "monthKey",
           "name",
-          "currency",
           "rulesVersion",
           "rules",
           "minimumEntrants",
@@ -2558,7 +3458,6 @@
             "type": "string",
             "enum": [
               "partner_application",
-              "payout_claim",
               "privacy_request",
               "profile_media",
               "region_verification",
@@ -2580,18 +3479,14 @@
         "properties": {
           "competitionStartsDue": { "type": "number", "minimum": 0 },
           "notificationsPending": { "type": "number", "minimum": 0 },
-          "paymentsUncertain": { "type": "number", "minimum": 0 },
           "privacyOperationsPending": { "type": "number", "minimum": 0 },
-          "profileMediaCleanupPending": { "type": "number", "minimum": 0 },
-          "webhooksPending": { "type": "number", "minimum": 0 }
+          "profileMediaCleanupPending": { "type": "number", "minimum": 0 }
         },
         "required": [
           "competitionStartsDue",
           "notificationsPending",
-          "paymentsUncertain",
           "privacyOperationsPending",
-          "profileMediaCleanupPending",
-          "webhooksPending"
+          "profileMediaCleanupPending"
         ]
       },
       "OperatorWorkerHealthDto": {
@@ -2888,179 +3783,230 @@
         },
         "required": ["reason", "decision"]
       },
-      "HyperwalletWebhookDto": {
+      "RewardAwardStatusActionDto": {
         "type": "object",
         "properties": {
-          "token": { "type": "string", "maxLength": 64 },
-          "type": { "type": "string", "maxLength": 160 },
-          "createdOn": { "type": "string", "format": "date-time" },
-          "data": { "type": "object" }
-        },
-        "required": ["token", "type"]
-      },
-      "HyperwalletWebhookAcceptedDto": {
-        "type": "object",
-        "properties": { "accepted": { "type": "boolean" } },
-        "required": ["accepted"]
-      },
-      "PayoutReleaseControlResponseDto": {
-        "type": "object",
-        "properties": {
-          "paused": { "type": "boolean" },
-          "reason": { "type": "string" },
-          "version": { "type": "number", "minimum": 1 }
-        },
-        "required": ["paused", "reason", "version"]
-      },
-      "PayoutReleaseControlActionDto": {
-        "type": "object",
-        "properties": {
-          "expectedVersion": { "type": "number", "minimum": 1 },
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "action": { "type": "string", "enum": ["pause", "resume"] }
-        },
-        "required": ["expectedVersion", "reason", "action"]
-      },
-      "OperatorPayoutParticipantReviewDto": {
-        "type": "object",
-        "properties": {
-          "accountStatus": {
+          "action": {
             "type": "string",
-            "enum": ["active", "deleted", "suspended"]
-          },
-          "eligible": { "type": "boolean" },
-          "emailPresent": { "type": "boolean" },
-          "emailVerified": { "type": "boolean" }
+            "enum": ["cancel", "fulfill", "redeem"]
+          }
         },
-        "required": [
-          "accountStatus",
-          "eligible",
-          "emailPresent",
-          "emailVerified"
-        ]
+        "required": ["reason", "action"]
       },
-      "OperatorPayoutAccountReviewDto": {
-        "type": "object",
-        "properties": {
-          "provisioned": { "type": "boolean" },
-          "ready": { "type": "boolean" },
-          "payeeStatus": { "type": "string", "nullable": true }
-        },
-        "required": ["provisioned", "ready", "payeeStatus"]
-      },
-      "OperatorPayoutPaymentReviewDto": {
-        "type": "object",
-        "properties": { "status": { "type": "string", "nullable": true } },
-        "required": ["status"]
-      },
-      "OperatorPayoutClaimReviewDto": {
-        "type": "object",
-        "properties": {
-          "amountMinor": { "type": "number" },
-          "approvedAt": { "type": "string", "nullable": true },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "competitionName": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
-          "drawId": { "type": "string", "format": "uuid" },
-          "failureCode": { "type": "string", "nullable": true },
-          "id": { "type": "string", "format": "uuid" },
-          "participant": {
-            "$ref": "#/components/schemas/OperatorPayoutParticipantReviewDto"
-          },
-          "paidAt": { "type": "string", "nullable": true },
-          "payoutAccount": {
-            "$ref": "#/components/schemas/OperatorPayoutAccountReviewDto"
-          },
-          "payoutRank": { "type": "number", "minimum": 1 },
-          "payment": {
-            "$ref": "#/components/schemas/OperatorPayoutPaymentReviewDto"
-          },
-          "releaseControl": {
-            "$ref": "#/components/schemas/PayoutReleaseControlResponseDto"
-          },
-          "provider": { "type": "string", "enum": ["hyperwallet"] },
-          "status": { "type": "string" },
-          "version": { "type": "number", "minimum": 1 },
-          "winnerId": { "type": "string", "format": "uuid" }
-        },
-        "required": [
-          "amountMinor",
-          "approvedAt",
-          "competitionId",
-          "competitionName",
-          "createdAt",
-          "currency",
-          "drawId",
-          "failureCode",
-          "id",
-          "participant",
-          "paidAt",
-          "payoutAccount",
-          "payoutRank",
-          "payment",
-          "releaseControl",
-          "provider",
-          "status",
-          "version",
-          "winnerId"
-        ]
-      },
-      "OperatorPayoutActionDto": {
-        "type": "object",
-        "properties": {
-          "expectedVersion": { "type": "number", "minimum": 1 },
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 }
-        },
-        "required": ["expectedVersion", "reason"]
-      },
-      "OperatorPayoutClaimResponseDto": {
+      "AdminRewardAwardResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "status": {
             "type": "string",
-            "enum": [
-              "pending_review",
-              "action_required",
-              "verification_pending",
-              "ready",
-              "processing",
-              "paid",
-              "failed",
-              "cancelled"
-            ]
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          }
+        },
+        "required": ["id", "status"]
+      },
+      "CreateRewardCatalogItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "sponsorName": { "type": "string", "maxLength": 120 },
+          "title": { "type": "string", "maxLength": 160 },
+          "description": { "type": "string", "maxLength": 2000 },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "imageUrl": { "type": "string", "format": "uri" },
+          "termsUrl": { "type": "string", "format": "uri" },
+          "claimUrl": { "type": "string", "format": "uri" },
+          "fulfillmentInstructions": { "type": "string", "maxLength": 2000 },
+          "inventoryTotal": {
+            "type": "number",
+            "maximum": 100000,
+            "minimum": 1
           },
-          "version": { "type": "number" }
+          "displayOrder": { "type": "number", "default": 0, "minimum": 0 },
+          "availableFrom": { "type": "string", "format": "date-time" },
+          "availableUntil": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "reason",
+          "competitionId",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "inventoryTotal"
+        ]
+      },
+      "AdminRewardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["archived", "draft", "published"]
+          },
+          "version": { "type": "number", "minimum": 1 }
         },
         "required": ["id", "status", "version"]
       },
-      "PayoutClaimResponseDto": {
+      "UpdateRewardCatalogItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "sponsorName": { "type": "string", "maxLength": 120 },
+          "title": { "type": "string", "maxLength": 160 },
+          "description": { "type": "string", "maxLength": 2000 },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "imageUrl": { "type": "string", "format": "uri" },
+          "termsUrl": { "type": "string", "format": "uri" },
+          "claimUrl": { "type": "string", "format": "uri" },
+          "fulfillmentInstructions": { "type": "string", "maxLength": 2000 },
+          "inventoryTotal": {
+            "type": "number",
+            "maximum": 100000,
+            "minimum": 1
+          },
+          "displayOrder": { "type": "number", "default": 0, "minimum": 0 },
+          "availableFrom": { "type": "string", "format": "date-time" },
+          "availableUntil": { "type": "string", "format": "date-time" },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "reason",
+          "competitionId",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "inventoryTotal",
+          "expectedVersion"
+        ]
+      },
+      "RewardCatalogStatusActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": { "type": "string", "enum": ["archive", "publish"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "action", "expectedVersion"]
+      },
+      "AddRewardCouponCodesDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "codes": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["reason", "codes"]
+      },
+      "AddedCouponCodesResponseDto": {
+        "type": "object",
+        "properties": {
+          "added": { "type": "number", "minimum": 1 },
+          "rewardId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["added", "rewardId"]
+      },
+      "RewardCatalogItemResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "amountMinor": { "type": "number" },
-          "competitionLabel": { "type": "string" },
-          "currency": { "type": "string", "enum": ["CAD", "MXN", "USD"] },
-          "provider": { "type": "string", "enum": ["hyperwallet"] },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "termsUrl": { "type": "string", "format": "uri", "nullable": true },
+          "inventoryRemaining": { "type": "number", "minimum": 0 },
+          "inventoryTotal": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "competitionName",
+          "monthKey",
+          "regionCode",
+          "regionName",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "inventoryRemaining",
+          "inventoryTotal"
+        ]
+      },
+      "RewardAwardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
           "status": {
             "type": "string",
-            "enum": ["action-required", "verification-pending", "ready", "paid"]
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "awardRank": { "type": "number", "minimum": 1 },
+          "awardedAt": { "type": "string", "format": "date-time" },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
           "id",
-          "amountMinor",
-          "competitionLabel",
-          "currency",
-          "provider",
-          "status"
+          "status",
+          "rewardType",
+          "sponsorName",
+          "title",
+          "awardRank",
+          "awardedAt"
         ]
       },
-      "PortalActionResponseDto": {
+      "ClaimRewardResponseDto": {
         "type": "object",
-        "properties": { "portalUrl": { "type": "string", "format": "uri" } },
-        "required": ["portalUrl"]
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "awardRank": { "type": "number", "minimum": 1 },
+          "awardedAt": { "type": "string", "format": "date-time" },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "couponCode": { "type": "string", "nullable": true },
+          "claimUrl": { "type": "string", "format": "uri", "nullable": true },
+          "fulfillmentInstructions": { "type": "string", "nullable": true }
+        },
+        "required": [
+          "id",
+          "status",
+          "rewardType",
+          "sponsorName",
+          "title",
+          "awardRank",
+          "awardedAt"
+        ]
       },
       "CreateSessionDto": {
         "type": "object",
@@ -3201,10 +4147,7 @@
           "requireGymQr": { "type": "boolean" },
           "signupPrizeDrawEntries": { "type": "number" },
           "verifiedSessionCategoryScore": { "type": "number" },
-          "verifiedSessionPrizeDrawEntries": { "type": "number" },
-          "payoutPoolAmountMinor": { "type": "number" },
-          "payoutWinnerCount": { "type": "number" },
-          "payoutExponent": { "type": "number" }
+          "verifiedSessionPrizeDrawEntries": { "type": "number" }
         },
         "required": [
           "minSessionMinutes",
@@ -3214,10 +4157,7 @@
           "requireGymQr",
           "signupPrizeDrawEntries",
           "verifiedSessionCategoryScore",
-          "verifiedSessionPrizeDrawEntries",
-          "payoutPoolAmountMinor",
-          "payoutWinnerCount",
-          "payoutExponent"
+          "verifiedSessionPrizeDrawEntries"
         ]
       },
       "CompetitionResponseDto": {
@@ -3237,8 +4177,6 @@
               "cancelled"
             ]
           },
-          "mode": { "type": "string", "enum": ["cash", "non_cash_demo"] },
-          "currency": { "type": "string" },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
           "rulesVersion": { "type": "string" },
@@ -3256,8 +4194,6 @@
           "monthKey",
           "name",
           "status",
-          "mode",
-          "currency",
           "regionCode",
           "regionName",
           "rulesVersion",
@@ -3274,10 +4210,6 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "competitionId": { "type": "string", "format": "uuid" },
-          "competitionMode": {
-            "type": "string",
-            "enum": ["cash", "non_cash_demo"]
-          },
           "goalDays": { "type": "number" },
           "status": {
             "type": "string",
@@ -3285,14 +4217,7 @@
           },
           "enrolledAt": { "type": "string", "format": "date-time" }
         },
-        "required": [
-          "id",
-          "competitionId",
-          "competitionMode",
-          "goalDays",
-          "status",
-          "enrolledAt"
-        ]
+        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
       },
       "CreateEnrollmentDto": {
         "type": "object",
@@ -3315,6 +4240,16 @@
         "properties": { "count": { "type": "number" } },
         "required": ["count"]
       },
+      "StreakCountsDto": {
+        "type": "object",
+        "properties": {
+          "daily": { "type": "number", "example": 3, "minimum": 0 },
+          "weekly": { "type": "number", "example": 4, "minimum": 0 },
+          "monthly": { "type": "number", "example": 2, "minimum": 0 },
+          "yearly": { "type": "number", "example": 1, "minimum": 0 }
+        },
+        "required": ["daily", "weekly", "monthly", "yearly"]
+      },
       "CompetitionMatchResponseDto": {
         "type": "object",
         "properties": {
@@ -3328,15 +4263,89 @@
             "items": { "type": "string" }
           },
           "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
-          "region": { "type": "string" }
+          "region": { "type": "string" },
+          "opponentUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "opponentCurrentStreak": { "type": "number" },
+          "opponentBestStreak": { "type": "number" },
+          "opponentMonthlyVerifiedDays": { "type": "number" },
+          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" }
         },
         "required": [
           "availability",
           "opponentAlias",
           "opponentVerifiedDateKeys",
           "periodIndex",
-          "region"
+          "region",
+          "opponentCurrentStreak",
+          "opponentBestStreak",
+          "opponentMonthlyVerifiedDays",
+          "opponentStreaks"
         ]
+      },
+      "EligibleWeeklyChallengePartnerDto": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string", "format": "uuid" },
+          "alias": { "type": "string" },
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "requestStatus": {
+            "type": "string",
+            "enum": ["available", "pending"]
+          },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": ["userId", "alias", "goalDays", "requestStatus", "streaks"]
+      },
+      "WeeklyChallengeRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
+          "partnerAlias": { "type": "string" },
+          "partnerUserId": { "type": "string", "format": "uuid" },
+          "partnerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["accepted", "cancelled", "declined", "pending"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "direction",
+          "partnerAlias",
+          "partnerUserId",
+          "partnerStreaks",
+          "periodIndex",
+          "goalDays",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CreateWeeklyChallengeRequestDto": {
+        "type": "object",
+        "properties": {
+          "region": { "type": "string" },
+          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "period": { "type": "number", "maximum": 4, "minimum": 1 },
+          "recipientUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["region", "goal", "period", "recipientUserId"]
+      },
+      "WeeklyChallengeRequestDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["decision"]
       },
       "LegalDocumentSectionDto": {
         "type": "object",
@@ -3721,7 +4730,6 @@
           "languageCodes": { "type": "array", "items": { "type": "string" } },
           "minimumAge": { "type": "number", "example": 19 },
           "competitionEnabled": { "type": "boolean" },
-          "payoutEnabled": { "type": "boolean" },
           "policyVersion": { "type": "string" },
           "boundaryVersion": { "type": "string" },
           "validFrom": { "type": "string", "format": "date-time" },
@@ -3742,7 +4750,6 @@
           "languageCodes",
           "minimumAge",
           "competitionEnabled",
-          "payoutEnabled",
           "policyVersion",
           "boundaryVersion",
           "validFrom",
@@ -3832,27 +4839,33 @@
           "createdAt"
         ]
       },
-      "PayoutWinnerResponseDto": {
+      "RewardWinnerResponseDto": {
         "type": "object",
         "properties": {
           "alias": { "type": "string" },
-          "amountMinor": { "type": "number" },
-          "payoutRank": { "type": "number" }
+          "awardRank": { "type": "number" },
+          "sponsorName": { "type": "string" },
+          "rewardTitle": { "type": "string" },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
         },
-        "required": ["alias", "amountMinor", "payoutRank"]
+        "required": [
+          "alias",
+          "awardRank",
+          "sponsorName",
+          "rewardTitle",
+          "rewardType",
+          "streaks"
+        ]
       },
       "SettledCompetitionResponseDto": {
         "type": "object",
         "properties": {
-          "payoutExponent": { "type": "number" },
-          "payoutPoolAmountMinor": { "type": "number" },
-          "payoutWinnerCount": { "type": "number" }
+          "competitionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "rewardCount": { "type": "number", "minimum": 0 }
         },
-        "required": [
-          "payoutExponent",
-          "payoutPoolAmountMinor",
-          "payoutWinnerCount"
-        ]
+        "required": ["competitionName", "monthKey", "rewardCount"]
       },
       "CreatorWorkoutResponseDto": {
         "type": "object",
@@ -3884,6 +4897,94 @@
           "durationMinutes",
           "regionCodes",
           "videoUrl",
+          "workoutStyle"
+        ]
+      },
+      "CreateCreatorVideoSubmissionDto": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "maxLength": 100 },
+          "videoUrl": { "type": "string", "format": "uri" },
+          "thumbnailUrl": { "type": "string", "format": "uri" },
+          "durationMinutes": { "type": "number", "maximum": 180, "minimum": 5 },
+          "workoutStyle": { "type": "string", "maxLength": 80 },
+          "regionCode": {
+            "type": "string",
+            "example": "victoria-bc",
+            "maxLength": 64
+          },
+          "sponsorDisclosure": { "type": "string", "maxLength": 500 },
+          "syntheticMediaDisclosed": { "type": "boolean" },
+          "notes": { "type": "string", "maxLength": 1000 },
+          "rightsAccepted": { "type": "boolean", "enum": [true] }
+        },
+        "required": [
+          "title",
+          "videoUrl",
+          "durationMinutes",
+          "workoutStyle",
+          "regionCode",
+          "syntheticMediaDisclosed",
+          "rightsAccepted"
+        ]
+      },
+      "CreatorVideoSubmissionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "videoUrl": { "type": "string", "format": "uri" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "in_review",
+              "rejected",
+              "submitted",
+              "withdrawn"
+            ]
+          },
+          "rightsVersion": { "type": "string" },
+          "rightsAcceptedAt": { "type": "string", "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "title",
+          "videoUrl",
+          "status",
+          "rightsVersion",
+          "rightsAcceptedAt",
+          "createdAt"
+        ]
+      },
+      "CreateCreatorWorkoutPlanDto": {
+        "type": "object",
+        "properties": {
+          "plannedDate": { "type": "string", "format": "date" },
+          "note": { "type": "string", "maxLength": 240 }
+        },
+        "required": ["plannedDate"]
+      },
+      "CreatorWorkoutPlanResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "workoutId": { "type": "string", "format": "uuid" },
+          "workoutName": { "type": "string" },
+          "creatorName": { "type": "string" },
+          "plannedDate": { "type": "string", "format": "date" },
+          "note": { "type": "string", "nullable": true },
+          "durationMinutes": { "type": "number", "maximum": 180, "minimum": 5 },
+          "workoutStyle": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "workoutId",
+          "workoutName",
+          "creatorName",
+          "plannedDate",
+          "durationMinutes",
           "workoutStyle"
         ]
       },
@@ -3926,15 +5027,369 @@
           "checkpointType"
         ]
       },
+      "UserSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "relationship": {
+            "type": "string",
+            "enum": ["none", "friend", "incoming_request", "outgoing_request"]
+          }
+        },
+        "required": ["screenName", "userId", "streaks", "relationship"]
+      },
+      "FriendResponseDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "friendsSince": { "type": "string", "format": "date-time" }
+        },
+        "required": ["screenName", "userId", "streaks", "friendsSince"]
+      },
+      "SocialUserSummaryDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": ["screenName", "userId", "streaks"]
+      },
+      "FriendRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "id": { "type": "string", "format": "uuid" },
+          "user": { "$ref": "#/components/schemas/SocialUserSummaryDto" }
+        },
+        "required": ["direction", "createdAt", "id", "user"]
+      },
+      "SendFriendRequestDto": {
+        "type": "object",
+        "properties": {
+          "recipientUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["recipientUserId"]
+      },
+      "FriendRequestDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["decision"]
+      },
+      "FriendRequestDecisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["requestId", "status"]
+      },
+      "SocialChallengeProgressDto": {
+        "type": "object",
+        "properties": {
+          "completedCount": { "type": "number", "minimum": 0 },
+          "completionPercent": {
+            "type": "number",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "targetTotal": { "type": "number", "minimum": 1 }
+        },
+        "required": ["completedCount", "completionPercent", "targetTotal"]
+      },
+      "SocialChallengeMemberDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "role": { "type": "string", "enum": ["owner", "member"] },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "declined"]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/SocialChallengeProgressDto"
+          }
+        },
+        "required": [
+          "screenName",
+          "userId",
+          "streaks",
+          "role",
+          "status",
+          "progress"
+        ]
+      },
+      "SocialChallengeResponseDto": {
+        "type": "object",
+        "properties": {
+          "createdAt": { "type": "string", "format": "date-time" },
+          "id": { "type": "string", "format": "uuid" },
+          "members": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SocialChallengeMemberDto" }
+          },
+          "myRole": { "type": "string", "enum": ["owner", "member"] },
+          "myStatus": {
+            "type": "string",
+            "enum": ["pending", "accepted", "not_joined"]
+          },
+          "name": { "type": "string" },
+          "ownerScreenName": { "type": "string" },
+          "ownerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "ownerUserId": { "type": "string", "format": "uuid" },
+          "challengeType": { "type": "string", "enum": ["friend", "regional"] },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "gym",
+              "running",
+              "walking",
+              "cycling",
+              "hiking",
+              "fitness_class",
+              "other"
+            ]
+          },
+          "activityLabel": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "targetCount": { "type": "number", "minimum": 1 },
+          "targetPeriod": { "type": "string", "enum": ["weekly", "monthly"] },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "regionCode": { "type": "string", "nullable": true },
+          "regionName": { "type": "string", "nullable": true },
+          "timezone": { "type": "string", "nullable": true },
+          "locationName": { "type": "string", "nullable": true },
+          "scheduledDays": { "type": "array", "items": { "type": "number" } },
+          "scheduledTime": { "type": "string", "nullable": true },
+          "participantLimit": { "type": "number", "nullable": true },
+          "participantCount": { "type": "number", "minimum": 1 },
+          "myProgress": {
+            "$ref": "#/components/schemas/SocialChallengeProgressDto"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "members",
+          "myRole",
+          "myStatus",
+          "name",
+          "ownerScreenName",
+          "ownerStreaks",
+          "ownerUserId",
+          "challengeType",
+          "activity",
+          "activityLabel",
+          "description",
+          "targetCount",
+          "targetPeriod",
+          "startDate",
+          "endDate",
+          "regionCode",
+          "regionName",
+          "timezone",
+          "locationName",
+          "scheduledDays",
+          "scheduledTime",
+          "participantLimit",
+          "participantCount",
+          "myProgress"
+        ]
+      },
+      "CreateSocialChallengeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "July Strength Sprint",
+            "maxLength": 80
+          },
+          "challengeType": { "type": "string", "enum": ["friend", "regional"] },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "gym",
+              "running",
+              "walking",
+              "cycling",
+              "hiking",
+              "fitness_class",
+              "other"
+            ]
+          },
+          "activityLabel": {
+            "type": "string",
+            "example": "Gym visits",
+            "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 240,
+            "nullable": true
+          },
+          "targetCount": {
+            "type": "number",
+            "example": 4,
+            "maximum": 31,
+            "minimum": 1
+          },
+          "targetPeriod": { "type": "string", "enum": ["weekly", "monthly"] },
+          "startDate": {
+            "type": "string",
+            "example": "2026-08-01",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2026-08-31",
+            "format": "date"
+          },
+          "regionCode": {
+            "type": "string",
+            "example": "TORONTO",
+            "maxLength": 32
+          },
+          "locationName": { "type": "string", "maxLength": 120 },
+          "scheduledDays": {
+            "example": [1, 3, 6],
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "scheduledTime": { "type": "string", "example": "09:00" },
+          "participantLimit": {
+            "type": "number",
+            "maximum": 500,
+            "minimum": 2
+          },
+          "invitedFriendUserIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        },
+        "required": [
+          "name",
+          "challengeType",
+          "activity",
+          "activityLabel",
+          "targetCount",
+          "targetPeriod",
+          "startDate",
+          "endDate",
+          "scheduledDays",
+          "invitedFriendUserIds"
+        ]
+      },
+      "ChallengeInvitationResponseDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "declined"]
+          },
+          "userId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["challengeId", "status", "userId"]
+      },
+      "ChallengeCheckInResponseDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": { "type": "string", "format": "uuid" },
+          "checkInId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string", "format": "date" },
+          "source": { "type": "string", "enum": ["manual", "verified_workout"] }
+        },
+        "required": ["challengeId", "checkInId", "eligibleDate", "source"]
+      },
+      "InviteChallengeFriendDto": {
+        "type": "object",
+        "properties": {
+          "friendUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["friendUserId"]
+      },
+      "InviteChallengeContactDto": {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destination": {
+            "type": "string",
+            "example": "friend@example.com",
+            "maxLength": 160
+          }
+        },
+        "required": ["channel", "destination"]
+      },
+      "ChallengeContactInvitationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "challengeId": { "type": "string", "format": "uuid" },
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destinationHint": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "joinUrl": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "challengeId",
+          "channel",
+          "destinationHint",
+          "expiresAt",
+          "joinUrl"
+        ]
+      },
+      "RedeemChallengeContactInvitationDto": {
+        "type": "object",
+        "properties": { "token": { "type": "string", "minLength": 20 } },
+        "required": ["token"]
+      },
+      "ChallengeInvitationDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["decision"]
+      },
+      "StreakSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "asOfDate": {
+            "type": "string",
+            "example": "2026-07-15",
+            "format": "date"
+          },
+          "timezone": { "type": "string", "example": "America/Vancouver" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": ["asOfDate", "timezone", "streaks"]
+      },
       "CategoryLeaderboardRowDto": {
         "type": "object",
         "properties": {
           "alias": { "type": "string" },
           "categoryEntries": { "type": "number" },
           "rank": { "type": "number" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
           "verifiedDays": { "type": "number" }
         },
-        "required": ["alias", "categoryEntries", "rank", "verifiedDays"]
+        "required": [
+          "alias",
+          "categoryEntries",
+          "rank",
+          "streaks",
+          "verifiedDays"
+        ]
       },
       "CategoryLeaderboardDto": {
         "type": "object",
@@ -3949,6 +5404,30 @@
         },
         "required": ["goal", "rows"]
       },
+      "CompetitionSessionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "cancelled",
+              "pending_review",
+              "rejected",
+              "verified"
+            ]
+          }
+        },
+        "required": ["id", "eligibleDate", "startedAt", "completedAt", "status"]
+      },
       "CompetitionProgressResponseDto": {
         "type": "object",
         "properties": {
@@ -3957,7 +5436,19 @@
           "verifiedDays": { "type": "number" },
           "categoryScore": { "type": "number" },
           "prizeDrawEntries": { "type": "number" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "monthKey": { "type": "string" },
+          "enrolledDateKey": { "type": "string" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "verifiedDateKeys": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompetitionSessionSummaryDto"
+            }
+          }
         },
         "required": [
           "competitionId",
@@ -3965,7 +5456,11 @@
           "verifiedDays",
           "categoryScore",
           "prizeDrawEntries",
-          "updatedAt"
+          "monthKey",
+          "enrolledDateKey",
+          "updatedAt",
+          "verifiedDateKeys",
+          "sessions"
         ]
       }
     }

@@ -31,7 +31,7 @@ export default function VerifyEmailScreen() {
   const [busyAction, setBusyAction] = useState<'check' | 'resend' | 'signout' | null>(null);
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<'green' | 'amber' | 'red'>('amber');
-  const nextRoute = next === 'identity' ? '/identity' : next === 'profile' ? '/profile' : '/home';
+  const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
 
   async function checkVerification() {
     setBusyAction('check');
@@ -39,7 +39,15 @@ export default function VerifyEmailScreen() {
     try {
       const refreshedUser = await refreshUser();
       if (refreshedUser?.emailVerified) {
-        router.replace(nextRoute);
+        router.replace(
+          challengeInvite
+            ? { pathname: '/join', params: { challengeInvite } }
+            : next === 'identity'
+              ? '/identity'
+              : next === 'profile'
+                ? '/profile'
+                : '/home'
+        );
         return;
       }
       setMessageTone('amber');

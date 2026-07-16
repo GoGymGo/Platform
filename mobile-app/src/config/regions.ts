@@ -10,7 +10,10 @@ export type CompetitionRegionVerificationStatus = 'verified' | 'provisional';
 export type CompetitionRegionVerification = {
   method: CompetitionRegionVerificationMethod;
   region: CompetitionRegion;
+  regionCode: string | null;
+  regionPolicyId: string | null;
   status: CompetitionRegionVerificationStatus;
+  verificationId: string | null;
   verifiedAt: string;
 };
 
@@ -48,7 +51,10 @@ export function parseCompetitionRegionVerification(
     const parsed = JSON.parse(value) as {
       id?: unknown;
       method?: unknown;
+      regionCode?: unknown;
+      regionPolicyId?: unknown;
       status?: unknown;
+      verificationId?: unknown;
       verifiedAt?: unknown;
     };
     const region = competitionRegions.find((candidate) => candidate.id === parsed.id);
@@ -64,7 +70,15 @@ export function parseCompetitionRegionVerification(
       return null;
     }
 
-    return { method, region, status: parsed.status, verifiedAt: parsed.verifiedAt };
+    return {
+      method,
+      region,
+      regionCode: typeof parsed.regionCode === 'string' ? parsed.regionCode : null,
+      regionPolicyId: typeof parsed.regionPolicyId === 'string' ? parsed.regionPolicyId : null,
+      status: parsed.status,
+      verificationId: typeof parsed.verificationId === 'string' ? parsed.verificationId : null,
+      verifiedAt: parsed.verifiedAt
+    };
   } catch {
     return null;
   }

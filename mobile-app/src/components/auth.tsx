@@ -13,10 +13,10 @@ import { useState, type PropsWithChildren, type ReactNode } from 'react';
 import {
   HUDBorderBox,
   ScreenContainer,
+  ScreenLoadingState,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail } from '@/components/sponsor';
 import { isLocalPreviewEnabled } from '@/config/firebase';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
@@ -56,7 +56,6 @@ export function AuthScreenShell({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <SponsorRail compact style={styles.sponsorRail} />
           {onBack ? (
             <Pressable
               accessibilityLabel="Back"
@@ -106,6 +105,8 @@ export function AuthTextField({
       <View style={[styles.inputShell, error ? styles.inputError : null]}>
         <TextInput
           accessibilityLabel={label}
+          allowFontScaling
+          maxFontSizeMultiplier={2}
           onChangeText={onChangeText}
           placeholderTextColor={colors.dim}
           secureTextEntry={secureTextEntry && !passwordVisible}
@@ -128,7 +129,7 @@ export function AuthTextField({
         ) : null}
       </View>
       {error ? (
-        <TerminalText tone="red" uppercase={false} variant="micro">
+        <TerminalText live="assertive" tone="red" uppercase={false} variant="micro">
           {error}
         </TerminalText>
       ) : null}
@@ -159,7 +160,7 @@ export function AuthStatusNotice({
 }) {
   return (
     <HUDBorderBox style={styles.notice} tone={tone}>
-      <TerminalText tone={tone} uppercase={false} variant="body">
+      <TerminalText live={tone === 'red' ? 'assertive' : 'polite'} tone={tone} uppercase={false} variant="body">
         {message}
       </TerminalText>
     </HUDBorderBox>
@@ -189,15 +190,7 @@ export function AuthGate({
 }
 
 export function AuthLoadingScreen() {
-  return (
-    <ScreenContainer>
-      <View style={styles.loading}>
-        <TerminalText glow tone="cyan" variant="label">
-          CHECKING ACCOUNT SESSION
-        </TerminalText>
-      </View>
-    </ScreenContainer>
-  );
+  return <ScreenLoadingState label="CHECKING ACCOUNT SESSION" />;
 }
 
 const styles = StyleSheet.create({

@@ -1,22 +1,9 @@
-import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
-import { DatabaseService } from '../src/database/database.service';
 import {
   BC_DEMO_REGION_CODE,
   bootstrapBcDemoFoundation,
   bootstrapBcDemoOperator,
 } from '../src/foundation/bc-demo-foundation';
-import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
-import { CompetitionsService } from '../src/modules/competitions/competitions.service';
-import { DrawsService } from '../src/modules/draws/draws.service';
-import { LedgerService } from '../src/modules/ledger/ledger.service';
-import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
-import { OperatorService } from '../src/modules/operator/operator.service';
-import { ProfileMediaModerationService } from '../src/modules/profiles/profile-media-moderation.service';
-import { ProfilesService } from '../src/modules/profiles/profiles.service';
-import { RegionsService } from '../src/modules/regions/regions.service';
-import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
-  createTestConfig,
   type MigratedPostgisTestDatabase,
   startMigratedPostgisTestDatabase,
 } from './support/postgis-test-database';
@@ -24,393 +11,133 @@ import {
 const describeWithDatabase =
   process.env.RUN_DATABASE_INTEGRATION === 'true' ? describe : describe.skip;
 
-const userPrincipal: AuthenticatedPrincipal = {
-  email: 'bc-demo-user@integration.test',
-  emailVerified: true,
-  firebaseUid: 'bc-demo-user',
-  roles: ['user'],
-  tokenIssuedAt: 1,
-};
-
-const operatorPrincipal: AuthenticatedPrincipal = {
-  email: 'bc-demo-operator@integration.test',
-  emailVerified: true,
-  firebaseUid: 'bc-demo-operator',
-  roles: ['operator'],
-  tokenIssuedAt: 1,
-};
-
-const bootstrapOperatorPrincipal: AuthenticatedPrincipal = {
-  email: 'bc-demo-bootstrap-operator@integration.test',
-  emailVerified: true,
-  firebaseUid: 'bc-demo-bootstrap-operator',
-  roles: ['admin', 'user'],
-  tokenIssuedAt: 1,
-};
-
-describeWithDatabase('BC demo foundation', () => {
+describeWithDatabase('BC brand-reward foundation', () => {
   jest.setTimeout(120_000);
 
-  let competitions: CompetitionsService;
-  let database: DatabaseService;
   let migrated: MigratedPostgisTestDatabase;
-  let operator: OperatorService;
-  let profiles: ProfilesService;
-  let regions: RegionsService;
-  let sessions: SessionsService;
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
-    const config = createTestConfig(migrated.databaseUrl);
-    database = new DatabaseService(config);
-    const idempotency = new IdempotencyService(database);
-    profiles = new ProfilesService(database);
-    const ledger = new LedgerService();
-    const legal = new LegalDocumentsService(database, idempotency, profiles);
-    regions = new RegionsService(database, idempotency, profiles);
-    competitions = new CompetitionsService(
-      database,
-      idempotency,
-      ledger,
-      legal,
-      profiles,
-    );
-    sessions = new SessionsService(database, idempotency, ledger, profiles);
-    operator = new OperatorService(
-      database,
-      config,
-      {} as DrawsService,
-      profiles,
-      {} as ProfileMediaModerationService,
-      sessions,
-    );
-    await profiles.ensureUser(operatorPrincipal, database.connection);
-    await profiles.ensureUser(bootstrapOperatorPrincipal, database.connection);
   });
 
   afterAll(async () => {
-    await database?.onApplicationShutdown();
     await migrated?.stop();
   });
 
-  it('supports reviewed demo enrollment while rejecting all entry and payout state', async () => {
+  it('seeds an idempotent region contest and physical reward without payment tables', async () => {
     const first = await bootstrapBcDemoFoundation(
       migrated.pool,
       '2026-08',
-      'Integration test for the local BC demo foundation.',
+      'Integration test for the BC brand-reward foundation.',
     );
     const retry = await bootstrapBcDemoFoundation(
       migrated.pool,
       '2026-08',
-      'Integration test for the local BC demo foundation.',
+      'Integration test for the BC brand-reward foundation.',
     );
 
     expect(first).toMatchObject({
       competitionCreated: true,
       competitionStatus: 'registration',
-      competitionUpdated: false,
       monthKey: '2026-08',
       regionCreated: true,
-      safety: { competitionEnabled: false, payoutEnabled: false },
+      rewardCreated: true,
+      safety: { brandRewardsOnly: true, competitionEnabled: true },
     });
     expect(retry).toEqual({
       ...first,
       competitionCreated: false,
-      competitionUpdated: false,
       regionCreated: false,
+      rewardCreated: false,
     });
 
+    const catalog = await migrated.pool.query<{
+      code: string;
+      reward_type: string;
+      status: string;
+      title: string;
+    }>(
+      `SELECT region.code, reward.reward_type, reward.status, reward.title
+       FROM reward_catalog_items AS reward
+       JOIN competitions AS competition ON competition.id = reward.competition_id
+       JOIN region_policies AS region ON region.id = competition.region_policy_id
+       WHERE reward.id = $1`,
+      [first.rewardId],
+    );
+    expect(catalog.rows[0]).toEqual({
+      code: BC_DEMO_REGION_CODE,
+      reward_type: 'physical',
+      status: 'published',
+      title: 'GoGymGo Starter Pack',
+    });
+
+    const removedTables = await migrated.pool.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public'
+         AND table_name IN (
+           'hyperwallet_users', 'payout_claims', 'payout_payments',
+           'payout_release_control', 'provider_webhooks'
+         )`,
+    );
+    expect(removedTables.rows).toEqual([]);
+
+    const users = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO users (firebase_uid, email_verified, roles, status)
+       SELECT 'reward-inventory-user-' || value, TRUE, ARRAY['user'], 'active'
+       FROM generate_series(1, 26) AS value
+       RETURNING id`,
+    );
+    const draw = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_draws
+         (competition_id, status, rules_version, seed_commitment,
+          entrant_snapshot_hash, entrant_count, total_entries)
+       VALUES ($1, 'locked', 'bc-demo-foundation-v1', repeat('a', 64),
+               repeat('b', 64), 26, 26)
+       RETURNING id`,
+      [first.competitionId],
+    );
+    await migrated.pool.query(
+      `INSERT INTO reward_awards
+         (draw_id, reward_catalog_item_id, user_id, award_rank, status)
+       SELECT $1, $2, user_id, rank::integer, 'awarded'
+       FROM unnest($3::uuid[]) WITH ORDINALITY AS selected(user_id, rank)`,
+      [
+        draw.rows[0].id,
+        first.rewardId,
+        users.rows.slice(0, 25).map((user) => user.id),
+      ],
+    );
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO reward_awards
+           (draw_id, reward_catalog_item_id, user_id, award_rank, status)
+         VALUES ($1, $2, $3, 26, 'awarded')`,
+        [draw.rows[0].id, first.rewardId, users.rows[25].id],
+      ),
+    ).rejects.toThrow('reward inventory exhausted');
+  });
+
+  it('assigns the least-privilege operator role idempotently', async () => {
+    await migrated.pool.query(
+      `INSERT INTO users
+         (firebase_uid, email, email_verified, roles, status)
+       VALUES ('bc-brand-operator', 'operator@example.test', TRUE,
+               ARRAY['admin', 'user'], 'active')`,
+    );
     await expect(
       bootstrapBcDemoOperator(
         migrated.pool,
-        bootstrapOperatorPrincipal.firebaseUid,
-        'Assign the least-privilege BC demo review role in the integration test.',
+        'bc-brand-operator',
+        'Assign local brand reward review access.',
       ),
     ).resolves.toEqual({ changed: true, roles: ['operator', 'user'] });
     await expect(
       bootstrapBcDemoOperator(
         migrated.pool,
-        bootstrapOperatorPrincipal.firebaseUid,
-        'Verify the least-privilege BC demo review role is idempotent.',
+        'bc-brand-operator',
+        'Confirm local brand reward review access.',
       ),
     ).resolves.toEqual({ changed: false, roles: ['operator', 'user'] });
-    const bootstrappedOperator = await migrated.pool.query<{
-      roles: string[];
-    }>(
-      `SELECT roles
-       FROM users
-       WHERE firebase_uid = $1`,
-      [bootstrapOperatorPrincipal.firebaseUid],
-    );
-    expect(bootstrappedOperator.rows[0].roles.sort()).toEqual([
-      'operator',
-      'user',
-    ]);
-    const operatorAudit = await migrated.pool.query<{
-      next_state: { roles: string[] };
-      previous_state: { roles: string[] };
-    }>(
-      `SELECT previous_state, next_state
-       FROM operator_audit_events
-       WHERE action = 'user.bc_demo_operator_bootstrapped'`,
-    );
-    expect(operatorAudit.rows).toEqual([
-      {
-        next_state: { roles: ['operator', 'user'] },
-        previous_state: { roles: ['admin', 'user'] },
-      },
-    ]);
-
-    const policy = await database.connection
-      .selectFrom('region_policies')
-      .select('id')
-      .where('code', '=', BC_DEMO_REGION_CODE)
-      .executeTakeFirstOrThrow();
-    const submitted = await regions.createVerification(
-      userPrincipal,
-      'bc-demo-region-submission',
-      {
-        method: 'postal_code',
-        postalCode: 'V8W 1P6',
-        regionPolicyId: policy.id,
-      },
-    );
-    await expect(
-      regions.getCurrentVerification(userPrincipal, BC_DEMO_REGION_CODE),
-    ).resolves.toEqual(expect.objectContaining({ status: 'pending' }));
-    await expect(operator.listWorkQueue(operatorPrincipal)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: submitted.id,
-          kind: 'region_verification',
-          regionCode: BC_DEMO_REGION_CODE,
-          status: 'pending',
-          verificationMethod: 'postal_code',
-        }),
-      ]),
-    );
-    await operator.decideRegionVerification(
-      operatorPrincipal,
-      submitted.id,
-      'bc-demo-region-decision',
-      {
-        decision: 'approved',
-        reason: 'BC demo eligibility approved in the integration test.',
-      },
-    );
-    await expect(
-      regions.getCurrentVerification(userPrincipal, BC_DEMO_REGION_CODE),
-    ).resolves.toEqual(expect.objectContaining({ status: 'approved' }));
-    const [reviewedVerification, reviewingOperator] = await Promise.all([
-      database.connection
-        .selectFrom('region_verifications')
-        .select('reviewed_by_user_id')
-        .where('id', '=', submitted.id)
-        .executeTakeFirstOrThrow(),
-      database.connection
-        .selectFrom('users')
-        .select('id')
-        .where('firebase_uid', '=', operatorPrincipal.firebaseUid)
-        .executeTakeFirstOrThrow(),
-    ]);
-    expect(reviewedVerification.reviewed_by_user_id).toBe(reviewingOperator.id);
-
-    const selfSubmitted = await regions.createVerification(
-      operatorPrincipal,
-      'bc-demo-self-region-submission',
-      {
-        method: 'postal_code',
-        postalCode: 'V8W 1P6',
-        regionPolicyId: policy.id,
-      },
-    );
-    await expect(
-      operator.listWorkQueue(operatorPrincipal),
-    ).resolves.not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: selfSubmitted.id }),
-      ]),
-    );
-    await expect(
-      operator.decideRegionVerification(
-        operatorPrincipal,
-        selfSubmitted.id,
-        'bc-demo-self-region-decision',
-        {
-          decision: 'approved',
-          reason: 'An operator must not approve their own BC verification.',
-        },
-      ),
-    ).rejects.toMatchObject({
-      response: expect.objectContaining({
-        code: 'REGION_VERIFICATION_SELF_REVIEW_FORBIDDEN',
-      }),
-    });
-    await expect(
-      database.connection
-        .selectFrom('region_verifications')
-        .select(['reviewed_by_user_id', 'status'])
-        .where('id', '=', selfSubmitted.id)
-        .executeTakeFirstOrThrow(),
-    ).resolves.toEqual({ reviewed_by_user_id: null, status: 'pending' });
-
-    const currentCompetition = await competitions.getCurrent(userPrincipal);
-    expect(currentCompetition).toEqual(
-      expect.objectContaining({
-        id: first.competitionId,
-        mode: 'non_cash_demo',
-        regionCode: BC_DEMO_REGION_CODE,
-        status: 'registration',
-      }),
-    );
-    expect(currentCompetition?.rules).toEqual(
-      expect.objectContaining({
-        payoutExponent: 0,
-        payoutPoolAmountMinor: 0,
-        payoutWinnerCount: 0,
-        signupPrizeDrawEntries: 0,
-        verifiedSessionCategoryScore: 0,
-        verifiedSessionPrizeDrawEntries: 0,
-      }),
-    );
-
-    const enrollmentRequest = {
-      ageEligibilityAttested: true as const,
-      goalDays: 4,
-      regionVerificationId: submitted.id,
-      rulesAccepted: true as const,
-    };
-    const enrollment = await competitions.enroll(
-      userPrincipal,
-      first.competitionId,
-      'bc-demo-enrollment',
-      enrollmentRequest,
-    );
-    await expect(
-      competitions.enroll(
-        userPrincipal,
-        first.competitionId,
-        'bc-demo-enrollment',
-        enrollmentRequest,
-      ),
-    ).resolves.toEqual(enrollment);
-    expect(enrollment).toEqual(
-      expect.objectContaining({
-        competitionMode: 'non_cash_demo',
-        goalDays: 4,
-        status: 'active',
-      }),
-    );
-    await expect(
-      competitions.getCurrentEnrollment(userPrincipal),
-    ).resolves.toEqual(enrollment);
-    await expect(
-      sessions.create(userPrincipal, 'bc-demo-session', {
-        competitionId: first.competitionId,
-      }),
-    ).rejects.toMatchObject({
-      response: expect.objectContaining({
-        code: 'DEMO_COMPETITION_SESSIONS_DISABLED',
-      }),
-    });
-
-    const user = await database.connection
-      .selectFrom('users')
-      .select('id')
-      .where('firebase_uid', '=', userPrincipal.firebaseUid)
-      .executeTakeFirstOrThrow();
-    await expect(
-      migrated.pool.query(
-        `INSERT INTO entry_ledger
-           (competition_id, enrollment_id, user_id, reason,
-            source_event_id, verified_days_delta, category_score_delta,
-            prize_draw_entries_delta, policy_version, metadata)
-         VALUES ($1, $2, $3, 'enrollment', $2, 0, 0, 1, $4, '{}'::jsonb)`,
-        [first.competitionId, enrollment.id, user.id, 'bc-demo-non-cash-v1'],
-      ),
-    ).rejects.toThrow(
-      'non-cash demo competitions cannot create financial or entry state',
-    );
-    await expect(
-      migrated.pool.query(
-        `INSERT INTO competition_progress
-           (competition_id, enrollment_id, user_id, goal_days)
-         VALUES ($1, $2, $3, 4)`,
-        [first.competitionId, enrollment.id, user.id],
-      ),
-    ).rejects.toThrow(
-      'non-cash demo competitions cannot create financial or entry state',
-    );
-    await expect(
-      migrated.pool.query(
-        `INSERT INTO competition_draws
-           (competition_id, rules_version, seed_commitment,
-            entrant_snapshot_hash, entrant_count, total_entries)
-         VALUES ($1, $2, $3, $3, 0, 0)`,
-        [first.competitionId, 'bc-demo-non-cash-v1', '0'.repeat(64)],
-      ),
-    ).rejects.toThrow(
-      'non-cash demo competitions cannot create financial or entry state',
-    );
-
-    const state = await migrated.pool.query<{
-      audit_events: number;
-      competitions: number;
-      enrollments: number;
-      entry_ledger: number;
-      progress: number;
-      draws: number;
-      payout_claims: number;
-      payout_payments: number;
-      regions: number;
-      rule_acceptances: number;
-    }>(
-      `SELECT
-         (SELECT count(*)::integer FROM region_policies
-          WHERE code = $1) AS regions,
-         (SELECT count(*)::integer FROM competitions) AS competitions,
-         (SELECT count(*)::integer FROM competition_enrollments) AS enrollments,
-         (SELECT count(*)::integer FROM competition_rule_acceptances) AS rule_acceptances,
-         (SELECT count(*)::integer FROM entry_ledger) AS entry_ledger,
-         (SELECT count(*)::integer FROM competition_progress) AS progress,
-         (SELECT count(*)::integer FROM competition_draws) AS draws,
-         (SELECT count(*)::integer FROM payout_claims) AS payout_claims,
-         (SELECT count(*)::integer FROM payout_payments) AS payout_payments,
-         (SELECT count(*)::integer FROM operator_audit_events) AS audit_events`,
-      [BC_DEMO_REGION_CODE],
-    );
-    expect(state.rows[0]).toEqual({
-      audit_events: 4,
-      competitions: 1,
-      draws: 0,
-      enrollments: 1,
-      entry_ledger: 0,
-      payout_claims: 0,
-      payout_payments: 0,
-      progress: 0,
-      regions: 1,
-      rule_acceptances: 1,
-    });
-
-    await migrated.pool.query(
-      `UPDATE region_policies
-       SET payout_enabled = true
-       WHERE id = $1`,
-      [first.regionPolicyId],
-    );
-    await expect(
-      bootstrapBcDemoFoundation(
-        migrated.pool,
-        '2026-08',
-        'Integration test must reject an unsafe existing region.',
-      ),
-    ).rejects.toThrow('not in the required disabled state');
-    await expect(
-      bootstrapBcDemoOperator(
-        migrated.pool,
-        bootstrapOperatorPrincipal.firebaseUid,
-        'Unsafe BC foundation state must block operator assignment.',
-      ),
-    ).rejects.toThrow('not in the required disabled state');
   });
 });

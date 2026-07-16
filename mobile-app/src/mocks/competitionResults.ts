@@ -1,25 +1,17 @@
-import {
-  goalCategories,
-  type GoalCategory,
-  type RankedPrizeDrawPayout
-} from '@/domain/campaignEconomics';
+import { goalCategories, type GoalCategory } from '@/domain/campaignEconomics';
+import type { StreakCounts } from '@/domain/streaks';
 
 export type CategoryLeaderboardRow = {
   alias: string;
   categoryEntries: number;
   rank: number;
+  streaks: StreakCounts;
   verifiedDays: number;
 };
 
 export type CategoryLeaderboard = {
   goal: GoalCategory;
   rows: readonly CategoryLeaderboardRow[];
-};
-
-export type PayoutWinner = {
-  alias: string;
-  amount: number;
-  payoutRank: number;
 };
 
 const aliasesByGoal: Record<GoalCategory, readonly string[]> = {
@@ -32,24 +24,18 @@ const aliasesByGoal: Record<GoalCategory, readonly string[]> = {
   7: ['MAX_SEVEN', 'NEONVIPER', 'KIRA_FLUX', 'BOLT_RUN', 'MARA_V', 'JAX_540', 'APEX_7', 'LUNA_X', 'NOVA_MAX', 'CORE_7']
 };
 
-const payoutAliases = [
-  'NEONVIPER',
-  'CORE_FOUR',
-  'SIX_SHIFT',
-  'LUNA_3',
-  'MAX_SEVEN',
-  'DUO_FIT',
-  'VOLT_5',
-  'NOVA_6',
-  'TRI_PULSE',
-  'ACE_ONE'
+const previewStreaks: readonly StreakCounts[] = [
+  { daily: 18, monthly: 5, weekly: 9, yearly: 2 },
+  { daily: 14, monthly: 3, weekly: 7, yearly: 1 },
+  { daily: 11, monthly: 2, weekly: 5, yearly: 0 },
+  { daily: 9, monthly: 1, weekly: 4, yearly: 0 },
+  { daily: 7, monthly: 1, weekly: 3, yearly: 0 },
+  { daily: 6, monthly: 0, weekly: 3, yearly: 0 },
+  { daily: 5, monthly: 0, weekly: 2, yearly: 0 },
+  { daily: 4, monthly: 0, weekly: 2, yearly: 0 },
+  { daily: 3, monthly: 0, weekly: 1, yearly: 0 },
+  { daily: 2, monthly: 0, weekly: 1, yearly: 0 }
 ] as const;
-
-export const completedCompetitionPreview = {
-  payoutExponent: 0.5,
-  payoutPoolAmount: 20_000,
-  payoutWinnerCount: 1_500
-} as const;
 
 export const categoryLeaderboards: readonly CategoryLeaderboard[] = goalCategories.map(
   (goal) => ({
@@ -58,6 +44,7 @@ export const categoryLeaderboards: readonly CategoryLeaderboard[] = goalCategori
       alias,
       categoryEntries: Math.max(goal, goal * 12 - index * goal),
       rank: index + 1,
+      streaks: previewStreaks[index],
       verifiedDays: Math.max(goal * 4, goal * 4 - Math.floor(index / 2))
     }))
   })
@@ -71,14 +58,4 @@ export function getCategoryLeaderboard(goal: GoalCategory) {
   }
 
   return leaderboard;
-}
-
-export function buildPayoutWinnerPreview(
-  payouts: readonly RankedPrizeDrawPayout[]
-): readonly PayoutWinner[] {
-  return payouts.slice(0, payoutAliases.length).map((payout, index) => ({
-    alias: payoutAliases[index],
-    amount: payout.amount,
-    payoutRank: payout.payoutRank
-  }));
 }

@@ -110,7 +110,6 @@ export class AdminRegionConfigurationService {
             language_codes: input.languageCodes,
             metro_name: input.metroName.trim(),
             minimum_age: input.minimumAge,
-            payout_enabled: input.payoutEnabled,
             policy_version: input.policyVersion,
             subdivision_code: input.subdivisionCode,
             timezone: input.timezone,
@@ -127,7 +126,6 @@ export class AdminRegionConfigurationService {
           nextState: {
             code: policy.code,
             competitionEnabled: input.competitionEnabled,
-            payoutEnabled: input.payoutEnabled,
             policyVersion: policy.policy_version,
           },
           previousState: null,

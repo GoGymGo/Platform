@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -29,6 +30,11 @@ import {
   EnrollmentCountQueryDto,
   EnrollmentCountResponseDto,
   EnrollmentResponseDto,
+  CreateWeeklyChallengeRequestDto,
+  EligibleWeeklyChallengePartnerDto,
+  WeeklyChallengePeriodQueryDto,
+  WeeklyChallengeRequestDecisionDto,
+  WeeklyChallengeRequestResponseDto,
 } from './dto/competition.dto';
 
 @ApiTags('competitions')
@@ -112,6 +118,84 @@ export class CompetitionsController {
       monthKey,
       query.goal,
       query.region,
+    );
+  }
+
+  @Get(':monthKey/weekly-challenges/eligible-partners')
+  @ApiBearerAuth('firebase')
+  @ApiOperation({
+    summary: 'List accepted friends eligible for the same weekly commitment',
+  })
+  @ApiOkResponse({ isArray: true, type: EligibleWeeklyChallengePartnerDto })
+  listEligibleWeeklyChallengePartners(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('monthKey') monthKey: string,
+    @Query() query: WeeklyChallengePeriodQueryDto,
+  ): Promise<EligibleWeeklyChallengePartnerDto[]> {
+    return this.competitions.listEligibleWeeklyChallengePartners(
+      principal,
+      monthKey,
+      query,
+    );
+  }
+
+  @Get(':monthKey/weekly-challenges/requests')
+  @ApiBearerAuth('firebase')
+  @ApiOperation({
+    summary: 'List my incoming and outgoing Weekly Challenge requests',
+  })
+  @ApiOkResponse({ isArray: true, type: WeeklyChallengeRequestResponseDto })
+  listWeeklyChallengeRequests(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('monthKey') monthKey: string,
+    @Query() query: WeeklyChallengePeriodQueryDto,
+  ): Promise<WeeklyChallengeRequestResponseDto[]> {
+    return this.competitions.listWeeklyChallengeRequests(
+      principal,
+      monthKey,
+      query,
+    );
+  }
+
+  @Post(':monthKey/weekly-challenges/requests')
+  @ApiBearerAuth('firebase')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Request a known eligible friend as a Weekly Challenge partner',
+  })
+  @ApiCreatedResponse({ type: WeeklyChallengeRequestResponseDto })
+  createWeeklyChallengeRequest(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('monthKey') monthKey: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: CreateWeeklyChallengeRequestDto,
+  ): Promise<WeeklyChallengeRequestResponseDto> {
+    return this.competitions.createWeeklyChallengeRequest(
+      principal,
+      monthKey,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
+  @Patch('weekly-challenges/requests/:requestId')
+  @ApiBearerAuth('firebase')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Accept or decline an incoming Weekly Challenge request',
+  })
+  @ApiOkResponse({ type: WeeklyChallengeRequestResponseDto })
+  respondToWeeklyChallengeRequest(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: WeeklyChallengeRequestDecisionDto,
+  ): Promise<WeeklyChallengeRequestResponseDto> {
+    return this.competitions.respondToWeeklyChallengeRequest(
+      principal,
+      requestId,
+      requireIdempotencyKey(idempotencyKey),
+      input.decision,
     );
   }
 }

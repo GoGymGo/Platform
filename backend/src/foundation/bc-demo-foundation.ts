@@ -1,79 +1,38 @@
-import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { parseCompetitionRules } from '../modules/competitions/competition-rules';
 
 export const BC_DEMO_REGION_CODE = 'CA-BC-DEMO';
-export const BC_DEMO_POLICY_VERSION = 'bc-demo-foundation-v1';
-export const BC_DEMO_RULES_VERSION = 'bc-demo-non-cash-v1';
+export const BC_DEMO_POLICY_VERSION = 'bc-brand-rewards-v1';
+export const BC_DEMO_RULES_VERSION = 'bc-brand-rewards-v1';
 
-const REGION_LOCK_KEY = 'gogymgo:bc-demo-foundation';
+const REGION_LOCK_KEY = 'gogymgo:bc-brand-rewards-foundation';
 const OPERATOR_LOCK_KEY = 'gogymgo:bc-demo-operator';
 const REGION_VALID_FROM = new Date('2026-01-01T08:00:00.000Z');
-const COMPETITION_NAME = 'BC NON-CASH DEMO - NO PRIZES';
-const LEGACY_COMPETITION_NAME = 'BC SAFE DEMO DRAFT - DO NOT PUBLISH';
-const LEGACY_RULES_VERSION = 'bc-demo-disabled-v1';
+const COMPETITION_NAME = 'BC Brand Rewards Challenge';
+const REWARD_TITLE = 'GoGymGo Starter Pack';
 const GOAL_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 const RULES = {
-  minSessionMinutes: 10,
   minHeartRateSamples: 0,
+  minSessionMinutes: 10,
   requireDeviceAttestation: false,
   requireFaceCheck: false,
   requireGymQr: false,
-  signupPrizeDrawEntries: 0,
-  verifiedSessionCategoryScore: 0,
-  verifiedSessionPrizeDrawEntries: 0,
-  payoutPoolAmountMinor: 0,
-  payoutWinnerCount: 0,
-  payoutExponent: 0,
+  signupPrizeDrawEntries: 1,
+  verifiedSessionCategoryScore: 1,
+  verifiedSessionPrizeDrawEntries: 1,
 } as const;
-
-interface RegionRow {
-  boundary_is_null: boolean;
-  boundary_version: string;
-  code: string;
-  competition_enabled: boolean;
-  country_code: string;
-  currency: string;
-  id: string;
-  language_codes: string[];
-  metro_name: string;
-  minimum_age: number;
-  payout_enabled: boolean;
-  policy_version: string;
-  subdivision_code: string;
-  timezone: string;
-  valid_to: Date | null;
-}
-
-interface CompetitionRow {
-  currency: string;
-  id: string;
-  minimum_entrants: number;
-  mode: string;
-  name: string;
-  rules: unknown;
-  rules_version: string;
-  status: string;
-}
-
-interface DemoOperatorUserRow {
-  email_verified: boolean;
-  id: string;
-  roles: string[];
-  status: string;
-}
 
 export interface BcDemoFoundationResult {
   competitionCreated: boolean;
   competitionId: string;
   competitionStatus: 'registration';
-  competitionUpdated: boolean;
   monthKey: string;
   regionCreated: boolean;
   regionPolicyId: string;
+  rewardCreated: boolean;
+  rewardId: string;
   safety: {
-    competitionEnabled: false;
-    payoutEnabled: false;
+    brandRewardsOnly: true;
+    competitionEnabled: true;
   };
 }
 
@@ -104,7 +63,6 @@ export function getDefaultBcDemoMonthKey(now = new Date()): string {
   const month = Number(parts.find((part) => part.type === 'month')?.value);
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
-
   return `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
 }
 
@@ -114,10 +72,7 @@ export async function bootstrapBcDemoFoundation(
   reason: string,
 ): Promise<BcDemoFoundationResult> {
   assertMonthKey(monthKey);
-  if (reason.trim().length < 8 || reason.length > 500) {
-    throw new Error('The bootstrap reason must contain 8 to 500 characters.');
-  }
-
+  assertReason(reason);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -125,139 +80,86 @@ export async function bootstrapBcDemoFoundation(
       REGION_LOCK_KEY,
     ]);
 
-    let regionCreated = false;
-    let region = await findRegion(client, BC_DEMO_REGION_CODE);
-    if (!region) {
-      const inserted = await client.query<RegionRow>(
-        `INSERT INTO region_policies
-           (code, country_code, subdivision_code, metro_name, currency,
-            timezone, language_codes, minimum_age, competition_enabled,
-            payout_enabled, boundary_version, policy_version, boundary,
-            valid_from, valid_to)
-         VALUES
-           ($1, 'CA', 'BC', 'British Columbia Demo', 'CAD',
-            'America/Vancouver', ARRAY['en-CA']::text[], 19, false,
-            false, 'not-configured-demo-v1', $2, NULL, $3, NULL)
-         RETURNING *, boundary IS NULL AS boundary_is_null`,
-        [BC_DEMO_REGION_CODE, BC_DEMO_POLICY_VERSION, REGION_VALID_FROM],
-      );
-      region = inserted.rows[0];
-      regionCreated = true;
-      await insertAuditEvent(client, {
-        action: 'foundation.bc_demo_region_created',
-        entityId: region.id,
-        entityType: 'region_policies',
-        nextState: {
-          code: region.code,
-          competitionEnabled: false,
-          payoutEnabled: false,
-          policyVersion: region.policy_version,
-        },
-        reason,
-      });
-    }
-    assertSafeRegion(region);
+    const regionResult = await client.query<{ id: string }>(
+      `SELECT id FROM region_policies WHERE code = $1 ORDER BY valid_from DESC LIMIT 1`,
+      [BC_DEMO_REGION_CODE],
+    );
+    const regionCreated = regionResult.rowCount === 0;
+    const regionPolicyId = regionCreated
+      ? await createRegion(client)
+      : regionResult.rows[0].id;
 
-    let competitionCreated = false;
-    let competitionUpdated = false;
-    let competition = await findCompetition(client, region.id, monthKey);
-    if (!competition) {
-      const periods = buildDraftPeriods(monthKey);
-      const inserted = await client.query<CompetitionRow>(
-        `INSERT INTO competitions
-           (region_policy_id, month_key, name, status, mode, currency, rules_version,
-            rules, minimum_entrants, entrant_cap, registration_opens_at,
-            registration_closes_at, starts_at, ends_at)
-         VALUES
-           ($1, $2, $3, 'registration', 'non_cash_demo', 'CAD', $4, $5::jsonb, 100, 100,
-            $6, $7, $8, $9)
-         RETURNING id, currency, minimum_entrants, mode, name, rules,
-                   rules_version, status`,
-        [
-          region.id,
-          monthKey,
-          COMPETITION_NAME,
-          BC_DEMO_RULES_VERSION,
-          JSON.stringify(RULES),
-          periods.registrationOpensAt,
-          periods.registrationClosesAt,
-          periods.startsAt,
-          periods.endsAt,
-        ],
+    if (!regionCreated) {
+      const state = await client.query<{
+        competition_enabled: boolean;
+        valid_to: Date | null;
+      }>(
+        `SELECT competition_enabled, valid_to FROM region_policies WHERE id = $1`,
+        [regionPolicyId],
       );
-      competition = inserted.rows[0];
-      competitionCreated = true;
-
-      for (const goalDays of GOAL_DAYS) {
-        await client.query(
-          `INSERT INTO competition_goal_brackets
-             (competition_id, goal_days, label)
-           VALUES ($1, $2, $3)`,
-          [competition.id, goalDays, `${goalDays} days per week`],
+      if (!state.rows[0]?.competition_enabled || state.rows[0].valid_to) {
+        throw new Error(
+          'The existing BC demo region is not in the required active brand-reward state.',
         );
       }
-      await insertAuditEvent(client, {
-        action: 'foundation.bc_demo_competition_created',
-        entityId: competition.id,
-        entityType: 'competitions',
-        nextState: {
-          monthKey,
-          regionPolicyId: region.id,
-          rulesVersion: BC_DEMO_RULES_VERSION,
-          mode: 'non_cash_demo',
-          status: 'registration',
-        },
-        reason,
-      });
-    } else if (isLegacyDisabledDraft(competition)) {
-      const upgraded = await client.query<CompetitionRow>(
-        `UPDATE competitions
-         SET name = $2,
-             status = 'registration',
-             mode = 'non_cash_demo',
-             rules_version = $3,
-             rules = $4::jsonb,
-             updated_at = now()
-         WHERE id = $1
-         RETURNING id, currency, minimum_entrants, mode, name, rules,
-                   rules_version, status`,
-        [
-          competition.id,
-          COMPETITION_NAME,
-          BC_DEMO_RULES_VERSION,
-          JSON.stringify(RULES),
-        ],
-      );
-      competition = upgraded.rows[0];
-      competitionUpdated = true;
-      await insertAuditEvent(client, {
-        action: 'foundation.bc_demo_competition_upgraded',
-        entityId: competition.id,
-        entityType: 'competitions',
-        nextState: {
-          mode: 'non_cash_demo',
-          rulesVersion: BC_DEMO_RULES_VERSION,
-          status: 'registration',
-        },
-        reason,
-      });
     }
-    assertSafeCompetition(competition);
-    await assertGoalBrackets(client, competition.id);
 
+    const competitionResult = await client.query<{
+      id: string;
+      status: 'registration';
+    }>(
+      `SELECT id, status
+       FROM competitions
+       WHERE region_policy_id = $1 AND month_key = $2`,
+      [regionPolicyId, monthKey],
+    );
+    const competitionCreated = competitionResult.rowCount === 0;
+    const competition = competitionCreated
+      ? await createCompetition(client, regionPolicyId, monthKey)
+      : competitionResult.rows[0];
+    if (competition.status !== 'registration') {
+      throw new Error(
+        'The existing BC demo competition is not open for registration.',
+      );
+    }
+
+    const rewardResult = await client.query<{ id: string }>(
+      `SELECT id
+       FROM reward_catalog_items
+       WHERE competition_id = $1 AND title = $2`,
+      [competition.id, REWARD_TITLE],
+    );
+    const rewardCreated = rewardResult.rowCount === 0;
+    const rewardId = rewardCreated
+      ? await createReward(client, competition.id)
+      : rewardResult.rows[0].id;
+
+    await client.query(
+      `INSERT INTO operator_audit_events
+         (actor_user_id, action, entity_type, entity_id,
+          previous_state, next_state, reason, request_id)
+       VALUES
+         (NULL, 'foundation.brand_rewards_ready', 'competitions', $1,
+          NULL, $2::jsonb, $3, $4)
+       ON CONFLICT DO NOTHING`,
+      [
+        competition.id,
+        JSON.stringify({ regionCode: BC_DEMO_REGION_CODE, rewardId }),
+        reason.trim(),
+        `foundation:brand-rewards:${monthKey}`,
+      ],
+    );
     await client.query('COMMIT');
     return {
       competitionCreated,
       competitionId: competition.id,
       competitionStatus: 'registration',
-      competitionUpdated,
       monthKey,
       regionCreated,
-      regionPolicyId: region.id,
-      safety: {
-        competitionEnabled: false,
-        payoutEnabled: false,
-      },
+      regionPolicyId,
+      rewardCreated,
+      rewardId,
+      safety: { brandRewardsOnly: true, competitionEnabled: true },
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -272,97 +174,57 @@ export async function bootstrapBcDemoOperator(
   firebaseUid: string,
   reason: string,
 ): Promise<BcDemoOperatorResult> {
-  const normalizedUid = firebaseUid.trim();
-  if (!normalizedUid || normalizedUid.length > 128) {
-    throw new Error(
-      'The BC demo operator Firebase UID must contain 1 to 128 characters.',
-    );
-  }
-  if (reason.trim().length < 8 || reason.length > 500) {
-    throw new Error(
-      'The BC demo operator reason must contain 8 to 500 characters.',
-    );
-  }
-
+  assertReason(reason);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
       OPERATOR_LOCK_KEY,
     ]);
-
-    const region = await findRegion(client, BC_DEMO_REGION_CODE);
-    if (!region) {
-      throw new Error(
-        'The disabled BC demo foundation must exist before an operator is assigned.',
-      );
-    }
-    assertSafeRegion(region);
-
-    const competitions = await findRegionCompetitions(client, region.id);
-    if (competitions.length === 0) {
-      throw new Error(
-        'A safe BC non-cash demo competition must exist before an operator is assigned.',
-      );
-    }
-    competitions.forEach(assertSafeCompetition);
-
-    const userResult = await client.query<DemoOperatorUserRow>(
+    const userResult = await client.query<{
+      email_verified: boolean;
+      id: string;
+      roles: string[];
+      status: string;
+    }>(
       `SELECT id, email_verified, roles, status
        FROM users
        WHERE firebase_uid = $1
        FOR UPDATE`,
-      [normalizedUid],
+      [firebaseUid.trim()],
     );
-    if (userResult.rowCount !== 1) {
-      throw new Error(
-        'The Firebase account must sign in once before the BC demo operator role can be assigned.',
-      );
-    }
-
     const user = userResult.rows[0];
-    if (user.status !== 'active' || !user.email_verified) {
+    if (!user || !user.email_verified || user.status !== 'active') {
       throw new Error(
-        'The BC demo operator account must be active with a verified email.',
+        'BC demo operator bootstrap requires an active, email-verified existing user.',
       );
     }
-
-    const allowedCurrentRoles = new Set(['admin', 'operator', 'user']);
-    if (user.roles.some((role) => !allowedCurrentRoles.has(role))) {
-      throw new Error(
-        'The account has an incompatible privileged role. No changes were made.',
-      );
-    }
-
-    const nextRoles = ['operator', 'user'] as const;
-    const currentRoles = [...new Set(user.roles)].sort();
-    const changed = currentRoles.join(',') !== nextRoles.join(',');
+    const roles: ['operator', 'user'] = ['operator', 'user'];
+    const changed =
+      user.roles.length !== roles.length ||
+      roles.some((role) => !user.roles.includes(role));
     if (changed) {
       await client.query(
-        `UPDATE users
-         SET roles = $1, updated_at = current_timestamp
-         WHERE id = $2`,
-        [nextRoles, user.id],
+        `UPDATE users SET roles = $1, updated_at = NOW() WHERE id = $2`,
+        [roles, user.id],
       );
       await client.query(
         `INSERT INTO operator_audit_events
-           (actor_user_id, action, entity_type, entity_id, previous_state,
-            next_state, reason, request_id)
-         VALUES
-           (NULL, 'user.bc_demo_operator_bootstrapped', 'users', $1,
-            $2::jsonb, $3::jsonb, $4, $5)`,
+           (actor_user_id, action, entity_type, entity_id,
+            previous_state, next_state, reason, request_id)
+         VALUES ($1, 'user.bc_demo_operator_bootstrapped', 'users', $1,
+                 $2::jsonb, $3::jsonb, $4, $5)`,
         [
           user.id,
-          JSON.stringify({ roles: currentRoles }),
-          JSON.stringify({ roles: nextRoles }),
-          reason,
-          `bootstrap-bc-demo-operator:${randomUUID()}`,
+          JSON.stringify({ roles: user.roles }),
+          JSON.stringify({ roles }),
+          reason.trim(),
+          `foundation:bc-demo-operator:${user.id}`,
         ],
       );
     }
-
     await client.query('COMMIT');
-    return { changed, roles: [...nextRoles] };
+    return { changed, roles };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -371,196 +233,103 @@ export async function bootstrapBcDemoOperator(
   }
 }
 
-type DatabaseClient = PoolClient;
-
-async function findRegion(
-  client: DatabaseClient,
-  code: string,
-): Promise<RegionRow | undefined> {
-  const result = await client.query<RegionRow>(
-    `SELECT *, boundary IS NULL AS boundary_is_null
-     FROM region_policies
-     WHERE code = $1 AND policy_version = $2
-     FOR UPDATE`,
-    [code, BC_DEMO_POLICY_VERSION],
+async function createRegion(client: PoolClient): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `INSERT INTO region_policies
+       (code, country_code, subdivision_code, metro_name, currency, timezone,
+        language_codes, minimum_age, competition_enabled, boundary_version,
+        policy_version, boundary, valid_from, valid_to)
+     VALUES
+       ($1, 'CA', 'BC', 'British Columbia Demo', 'CAD', 'America/Vancouver',
+        ARRAY['en-CA'], 19, TRUE, 'bc-demo-boundary-v1', $2,
+        ST_GeogFromText('POLYGON((-139 48,-114 48,-114 60,-139 60,-139 48))'),
+        $3, NULL)
+     RETURNING id`,
+    [BC_DEMO_REGION_CODE, BC_DEMO_POLICY_VERSION, REGION_VALID_FROM],
   );
-  return result.rows[0];
+  return result.rows[0].id;
 }
 
-async function findCompetition(
-  client: DatabaseClient,
+async function createCompetition(
+  client: PoolClient,
   regionPolicyId: string,
   monthKey: string,
-): Promise<CompetitionRow | undefined> {
-  const result = await client.query<CompetitionRow>(
-    `SELECT id, currency, minimum_entrants, mode, name, rules,
-            rules_version, status
-     FROM competitions
-     WHERE region_policy_id = $1 AND month_key = $2
-     FOR UPDATE`,
-    [regionPolicyId, monthKey],
+): Promise<{ id: string; status: 'registration' }> {
+  const { startsAt, endsAt, registrationOpensAt, registrationClosesAt } =
+    competitionDates(monthKey);
+  const result = await client.query<{ id: string; status: 'registration' }>(
+    `INSERT INTO competitions
+       (region_policy_id, month_key, name, status, rules_version, rules,
+        minimum_entrants, entrant_cap, registration_opens_at,
+        registration_closes_at, starts_at, ends_at)
+     VALUES ($1, $2, $3, 'registration', $4, $5::jsonb,
+             100, 10000, $6, $7, $8, $9)
+     RETURNING id, status`,
+    [
+      regionPolicyId,
+      monthKey,
+      COMPETITION_NAME,
+      BC_DEMO_RULES_VERSION,
+      JSON.stringify(RULES),
+      registrationOpensAt,
+      registrationClosesAt,
+      startsAt,
+      endsAt,
+    ],
+  );
+  await client.query(
+    `INSERT INTO competition_goal_brackets
+       (competition_id, goal_days, label)
+     SELECT $1, goal_day, goal_day || ' days per week'
+     FROM unnest($2::smallint[]) AS goal_day`,
+    [result.rows[0].id, GOAL_DAYS],
   );
   return result.rows[0];
 }
 
-async function findRegionCompetitions(
-  client: DatabaseClient,
-  regionPolicyId: string,
-): Promise<CompetitionRow[]> {
-  const result = await client.query<CompetitionRow>(
-    `SELECT id, currency, minimum_entrants, mode, name, rules,
-            rules_version, status
-     FROM competitions
-     WHERE region_policy_id = $1
-     FOR SHARE`,
-    [regionPolicyId],
-  );
-  return result.rows;
-}
-
-function assertSafeRegion(region: RegionRow): void {
-  const valid =
-    region.code === BC_DEMO_REGION_CODE &&
-    region.country_code === 'CA' &&
-    region.subdivision_code === 'BC' &&
-    region.metro_name === 'British Columbia Demo' &&
-    region.currency === 'CAD' &&
-    region.timezone === 'America/Vancouver' &&
-    region.language_codes.length === 1 &&
-    region.language_codes[0] === 'en-CA' &&
-    region.minimum_age === 19 &&
-    !region.competition_enabled &&
-    !region.payout_enabled &&
-    region.boundary_version === 'not-configured-demo-v1' &&
-    region.policy_version === BC_DEMO_POLICY_VERSION &&
-    region.boundary_is_null &&
-    region.valid_to === null;
-
-  if (!valid) {
-    throw new Error(
-      'The existing BC demo region is not in the required disabled state. No changes were made.',
-    );
-  }
-}
-
-function assertSafeCompetition(competition: CompetitionRow): void {
-  const parsedRules = parseCompetitionRules(
-    competition.rules as never,
-    'non_cash_demo',
-  );
-  const valid =
-    competition.status === 'registration' &&
-    competition.mode === 'non_cash_demo' &&
-    competition.name === COMPETITION_NAME &&
-    competition.currency === 'CAD' &&
-    competition.rules_version === BC_DEMO_RULES_VERSION &&
-    competition.minimum_entrants === 100 &&
-    Object.entries(RULES).every(
-      ([key, value]) => parsedRules[key as keyof typeof parsedRules] === value,
-    );
-
-  if (!valid) {
-    throw new Error(
-      'The existing BC demo competition is not the expected safe non-cash demo. No changes were made.',
-    );
-  }
-}
-
-function isLegacyDisabledDraft(competition: CompetitionRow): boolean {
-  if (
-    competition.status !== 'draft' ||
-    competition.mode !== 'cash' ||
-    competition.name !== LEGACY_COMPETITION_NAME ||
-    competition.currency !== 'CAD' ||
-    competition.rules_version !== LEGACY_RULES_VERSION ||
-    competition.minimum_entrants !== 100
-  ) {
-    return false;
-  }
-
-  try {
-    const legacy = parseCompetitionRules(competition.rules as never, 'cash');
-    return (
-      legacy.signupPrizeDrawEntries === 1 &&
-      legacy.payoutPoolAmountMinor === 1 &&
-      legacy.payoutWinnerCount === 1 &&
-      legacy.payoutExponent === 1 &&
-      legacy.verifiedSessionCategoryScore === 0 &&
-      legacy.verifiedSessionPrizeDrawEntries === 0
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function assertGoalBrackets(
-  client: DatabaseClient,
+async function createReward(
+  client: PoolClient,
   competitionId: string,
-): Promise<void> {
-  const result = await client.query<{ goal_days: number }>(
-    `SELECT goal_days
-     FROM competition_goal_brackets
-     WHERE competition_id = $1
-     ORDER BY goal_days`,
-    [competitionId],
+): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `INSERT INTO reward_catalog_items
+       (competition_id, sponsor_name, title, description, reward_type, status,
+        image_url, terms_url, claim_url, fulfillment_instructions,
+        inventory_total, display_order, version)
+     VALUES
+       ($1, 'GoGymGo Partner', $2,
+        'A demo bundle of gym accessories supplied by a participating brand.',
+        'physical', 'published', NULL, NULL, NULL,
+        'The local demo operator will coordinate pickup. No banking details are required.',
+        25, 1, 1)
+     RETURNING id`,
+    [competitionId, REWARD_TITLE],
   );
-  if (
-    result.rows.length !== GOAL_DAYS.length ||
-    result.rows.some((row, index) => row.goal_days !== GOAL_DAYS[index])
-  ) {
-    throw new Error(
-      'The existing BC demo competition has unexpected goal brackets. No changes were made.',
-    );
-  }
+  return result.rows[0].id;
 }
 
-async function insertAuditEvent(
-  client: DatabaseClient,
-  event: {
-    action: string;
-    entityId: string;
-    entityType: string;
-    nextState: Record<string, boolean | string>;
-    reason: string;
-  },
-): Promise<void> {
-  await client.query(
-    `INSERT INTO operator_audit_events
-       (actor_user_id, action, entity_type, entity_id, previous_state,
-        next_state, reason, request_id)
-     VALUES (NULL, $1, $2, $3, NULL, $4::jsonb, $5, $6)`,
-    [
-      event.action,
-      event.entityType,
-      event.entityId,
-      JSON.stringify(event.nextState),
-      event.reason,
-      `bootstrap-bc-demo:${event.action}`,
-    ],
-  );
-}
-
-function assertMonthKey(monthKey: string): void {
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
-    throw new Error('BC_DEMO_COMPETITION_MONTH must use YYYY-MM format.');
-  }
-}
-
-function buildDraftPeriods(monthKey: string): {
-  endsAt: Date;
-  registrationClosesAt: Date;
-  registrationOpensAt: Date;
-  startsAt: Date;
-} {
+function competitionDates(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number);
   const startsAt = new Date(Date.UTC(year, month - 1, 1, 8));
   const endsAt = new Date(Date.UTC(year, month, 1, 8));
-  const registrationOpensAt = new Date(Date.UTC(year, month - 2, 1, 8));
-
   return {
     endsAt,
     registrationClosesAt: startsAt,
-    registrationOpensAt,
+    registrationOpensAt: new Date(startsAt.getTime() - 28 * 86_400_000),
     startsAt,
   };
+}
+
+function assertMonthKey(monthKey: string): void {
+  if (!/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
+    throw new Error('BC demo competition month must use YYYY-MM format.');
+  }
+}
+
+function assertReason(reason: string): void {
+  if (reason.trim().length < 12 || reason.trim().length > 500) {
+    throw new Error(
+      'A bootstrap reason between 12 and 500 characters is required.',
+    );
+  }
 }

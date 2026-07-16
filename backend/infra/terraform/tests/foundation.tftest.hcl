@@ -46,7 +46,7 @@ run "safe_foundation_defaults" {
   }
 
   assert {
-    condition     = length(google_secret_manager_secret_iam_member.api) == 1 && length(google_secret_manager_secret_iam_member.worker) == 1
+    condition     = length(google_secret_manager_secret_iam_member.api) == 2 && length(google_secret_manager_secret_iam_member.worker) == 1
     error_message = "Disabled features must not grant access to their unused secrets."
   }
 
@@ -57,7 +57,7 @@ run "safe_foundation_defaults" {
 
   assert {
     condition     = google_cloud_run_v2_service_iam_member.public_api.member == "allUsers"
-    error_message = "The mobile API and Hyperwallet webhook ingress require public Cloud Run invocation; application authentication remains mandatory."
+    error_message = "The mobile API requires public Cloud Run invocation; application authentication remains mandatory."
   }
 }
 
@@ -65,9 +65,6 @@ run "feature_gates_mount_only_enabled_secrets" {
   command = plan
 
   variables {
-    hyperwallet_enabled         = true
-    hyperwallet_api_url         = "https://uat-api.paylution.com/rest/v4"
-    hyperwallet_portal_url      = "https://payee.example.com"
     privacy_operations_enabled  = true
     profile_media_enabled       = true
     push_notifications_enabled  = true
@@ -75,7 +72,7 @@ run "feature_gates_mount_only_enabled_secrets" {
   }
 
   assert {
-    condition     = length(google_secret_manager_secret_iam_member.api) == 6 && length(google_secret_manager_secret_iam_member.worker) == 6
+    condition     = length(google_secret_manager_secret_iam_member.api) == 2 && length(google_secret_manager_secret_iam_member.worker) == 3
     error_message = "Enabled providers must mount only the secrets required by each runtime."
   }
 
@@ -85,12 +82,12 @@ run "feature_gates_mount_only_enabled_secrets" {
   }
 
   assert {
-    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && !contains(keys(local.worker_secret_environment), "HYPERWALLET_WEBHOOK_USERNAME") && !contains(keys(local.worker_secret_environment), "HYPERWALLET_WEBHOOK_PASSWORD")
+    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && !contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
     error_message = "API-only and worker-only secrets must remain isolated."
   }
 
   assert {
-    condition     = local.api_environment.RUNTIME_ROLE == "api" && local.worker_environment.RUNTIME_ROLE == "worker" && local.api_environment.HYPERWALLET_ENABLED == "true" && local.api_environment.PRIVACY_OPERATIONS_ENABLED == "true" && local.api_environment.PROFILE_MEDIA_ENABLED == "true" && local.api_environment.PUSH_NOTIFICATIONS_ENABLED == "true" && local.api_environment.OTEL_ENABLED == "true"
+    condition     = local.api_environment.RUNTIME_ROLE == "api" && local.worker_environment.RUNTIME_ROLE == "worker" && local.api_environment.PRIVACY_OPERATIONS_ENABLED == "true" && local.api_environment.PROFILE_MEDIA_ENABLED == "true" && local.api_environment.PUSH_NOTIFICATIONS_ENABLED == "true" && local.api_environment.OTEL_ENABLED == "true"
     error_message = "Feature flags must reach the workload environment explicitly."
   }
 }

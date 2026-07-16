@@ -8,7 +8,6 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 
@@ -17,7 +16,6 @@ export default function GymCompetitionScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}

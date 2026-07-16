@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -11,9 +11,10 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useAppData } from '@/data/appDataHooks';
+import { useAuth } from '@/state/auth';
 
 type JoinOption = {
   category: string;
@@ -41,11 +42,15 @@ const applicationOptions: readonly JoinOption[] = [
 
 export default function JoinScreen() {
   const router = useRouter();
+  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { social } = useAppData();
+  const { user } = useAuth();
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [redeemingInvite, setRedeemingInvite] = useState(false);
   const [showPartnerOptions, setShowPartnerOptions] = useState(false);
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -68,17 +73,53 @@ export default function JoinScreen() {
           </TerminalText>
         </View>
 
+        {challengeInvite ? (
+          <HUDBorderBox glow style={styles.inviteCard} tone="pink">
+            <TerminalText glow tone="pink" variant="label">
+              FRIEND CHALLENGE INVITATION
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              You were invited to a private GoGymGo challenge. Sign in or create an
+              account, then accept the invitation.
+            </TerminalText>
+            {user ? (
+              <CyberButtonPrimary
+                disabled={redeemingInvite}
+                label={redeemingInvite ? 'ACCEPTING...' : 'ACCEPT CHALLENGE ->'}
+                onPress={() => {
+                  setRedeemingInvite(true);
+                  setInviteError(null);
+                  void social.redeemContactInvitation(challengeInvite)
+                    .then(() => router.replace('/squad/social'))
+                    .catch(() => setInviteError('This invitation is invalid, expired or already used.'))
+                    .finally(() => setRedeemingInvite(false));
+                }}
+                tone="pink"
+              />
+            ) : null}
+            {inviteError ? (
+              <TerminalText live="assertive" tone="red" uppercase={false} variant="caption">
+                {inviteError}
+              </TerminalText>
+            ) : null}
+          </HUDBorderBox>
+        ) : null}
+
         <View style={styles.section}>
           <TerminalText tone="dim" variant="label">
             FOR PLAYERS
           </TerminalText>
           <CyberButtonPrimary
             label="CREATE PLAYER ACCOUNT ->"
-            onPress={() => router.push('/sign-up')}
+            onPress={() => router.push(challengeInvite
+              ? { pathname: '/sign-up', params: { challengeInvite } }
+              : '/sign-up')}
           />
           <CyberButtonOutline
             label="SIGN IN TO EXISTING ACCOUNT"
-            onPress={() => router.push('/sign-in')}
+            onPress={() => router.push(challengeInvite
+              ? { pathname: '/sign-in', params: { challengeInvite } }
+              : '/sign-in')}
           />
         </View>
 
@@ -170,6 +211,10 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.md
+  },
+  inviteCard: {
+    gap: spacing.md,
+    padding: spacing.lg
   },
   partnerOptions: {
     gap: spacing.sm

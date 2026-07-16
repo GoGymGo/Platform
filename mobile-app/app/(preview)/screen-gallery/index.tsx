@@ -56,13 +56,13 @@ const screenGroups: readonly GalleryGroup[] = [
       { label: 'Workout Calendar', path: '/calendar' },
       { label: 'Leaderboard', path: '/leaderboard' },
       { label: 'Winners Circle', path: '/winners-circle' },
-      { label: 'Winner Payout Alert', path: '/payout-winner' },
-      { label: 'Hyperwallet Payout Account', path: '/profile/payout' },
-      { label: 'Prize Draw', path: '/leaderboard/draw' },
+      { label: 'My Rewards', path: '/rewards/awards' },
+      { label: 'Reward Marketplace', path: '/leaderboard/rewards' },
       { label: 'Start Session', path: '/session' },
-      { label: 'Period Match', path: '/squad' },
+      { label: 'Weekly Challenge', path: '/squad' },
       { label: 'Partner Gyms', path: '/squad/gym' },
-      { label: 'Profile', path: '/profile' }
+      { label: 'Profile', path: '/profile' },
+      { label: 'Partner Portal', path: '/partner' }
     ]
   },
   {
@@ -70,7 +70,7 @@ const screenGroups: readonly GalleryGroup[] = [
     screens: [
       { label: 'Choose Verification Method', path: '/workout/method' },
       { label: 'Workout Check In', path: '/workout/check-in' },
-      { label: 'Identity Check', path: '/workout/identity-check' },
+      { label: 'Presence Check', path: '/workout/identity-check' },
       { label: 'Active Workout', path: '/workout/active' },
       { label: 'Random Verification', path: '/workout/ping' },
       { label: 'Verification Success', path: '/workout/ping-success' },
@@ -85,7 +85,7 @@ const screenGroups: readonly GalleryGroup[] = [
       { label: 'Commitment Rules', path: '/commitment-rules' },
       { label: 'Sponsor Offer', path: '/sponsor-offer' },
       { label: 'QR Scanner', path: '/qr-scanner' },
-      { label: 'Camera Consent', path: '/biometric-camera-consent' },
+      { label: 'Presence / QR Consent', path: '/biometric-camera-consent' },
       { label: 'Privacy Policy', path: '/privacy-policy' },
       { label: 'Terms of Service', path: '/terms-of-service' },
       { label: 'Sponsor Application', path: '/sponsor/apply' },

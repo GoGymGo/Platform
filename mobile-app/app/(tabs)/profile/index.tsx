@@ -12,15 +12,20 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
+import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
-import { useCurrentUserPayout } from '@/data/appDataHooks';
+import { useMyStreaks } from '@/data/appDataHooks';
+import {
+  useFriendRequests,
+  useFriends,
+  useRespondToFriendRequest
+} from '@/data/socialHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
-  hasSubmittedCreatorApplication,
+  getPreferenceOwnerId,
   type VerificationPreference
 } from '@/state/onboardingPreferences';
 import { useProfile } from '@/state/profile';
@@ -44,13 +49,10 @@ type SettingsRow = {
 type SettingsGroups = {
   competition: readonly SettingsRow[];
   legal: readonly SettingsRow[];
-  partnerships: readonly SettingsRow[];
 };
 
 function getSettingsRows(
-  creatorApplicationSubmitted: boolean,
-  verificationSourceLabel: string,
-  hasPayoutClaim: boolean
+  verificationSourceLabel: string
 ): SettingsGroups {
   return {
     competition: [
@@ -69,47 +71,15 @@ function getSettingsRows(
       },
       {
         title: 'HOW GOGYMGO WORKS',
-        subtitle: 'GOALS, PERIOD MATCHES AND PRIZE DRAW ENTRIES',
+        subtitle: 'GOALS, WEEKLY CHALLENGES AND PRIZE DRAW ENTRIES',
         tone: 'cyan',
         route: '/how-it-works?from=profile' as Href
       },
       {
-        title: 'HYPERWALLET PAYOUT ACCOUNT',
-        subtitle: hasPayoutClaim
-          ? 'CONNECT A BANK ACCOUNT TO RECEIVE YOUR PRIZE'
-          : 'ONLY NEEDED IF YOU ARE SELECTED FOR A PAYOUT',
-        status: hasPayoutClaim ? 'ACTION REQUIRED' : 'NOT NEEDED',
-        tone: hasPayoutClaim ? 'green' : 'muted',
-        route: '/profile/payout' as Href
-      },
-    ],
-    partnerships: [
-      {
-        title: 'CREATOR WORKOUTS',
-        subtitle: 'FOLLOW A CREATOR OR START YOUR OWN WORKOUT',
-        tone: 'cyan',
-        route: '/workouts?source=profile'
-      },
-      {
-        title: 'APPLY AS A CREATOR',
-        subtitle: creatorApplicationSubmitted
-          ? 'CREATOR INTEREST RECORDED'
-          : 'SUBMIT LOCAL FOLLOW-ALONG WORKOUTS',
-        status: creatorApplicationSubmitted ? 'SUBMITTED' : undefined,
-        tone: creatorApplicationSubmitted ? 'green' : 'cyan',
-        route: '/creator/apply?source=profile' as Href
-      },
-      {
-        title: 'APPLY AS A SPONSOR',
-        subtitle: 'FUND A TARGETED REGIONAL CAMPAIGN',
-        tone: 'cyan',
-        route: '/sponsor/apply'
-      },
-      {
-        title: 'REGISTER A GYM',
-        subtitle: 'REQUEST A GOGYMGO QR CODE FOR YOUR LOCATION',
-        tone: 'cyan',
-        route: '/gym/register'
+        title: 'MY REWARDS',
+        subtitle: 'CLAIM PHYSICAL PRIZES AND COUPON CODES',
+        tone: 'green',
+        route: '/rewards/awards' as Href
       }
     ],
     legal: [
@@ -126,10 +96,16 @@ function getSettingsRows(
         route: '/terms-of-service' as Href
       },
       {
-        title: 'BIOMETRIC / CAMERA CONSENT',
-        subtitle: 'LOCAL CHECKS // NO IMAGERY STORED',
+        title: 'DEVICE PRESENCE / QR CAMERA CONSENT',
+        subtitle: 'LOCAL CHECKS // NO BIOMETRIC OR QR IMAGERY STORED',
         tone: 'muted',
         route: '/biometric-camera-consent' as Href
+      },
+      {
+        title: 'ACCOUNT DATA & DELETION',
+        subtitle: 'EXPORT DATA // REQUEST ACCOUNT DELETION',
+        tone: 'muted',
+        route: '/account-data' as Href
       }
     ]
   };
@@ -138,7 +114,12 @@ function getSettingsRows(
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOutUser, user } = useAuth();
+  const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const { publicName } = useProfile();
+  const { data: streakSummary } = useMyStreaks();
+  const friendsQuery = useFriends();
+  const friendRequestsQuery = useFriendRequests();
+  const respondToFriendRequest = useRespondToFriendRequest();
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const publicInitials = getPublicInitials(publicName);
   const {
@@ -148,7 +129,6 @@ export default function ProfileScreen() {
     totalEntries,
     verifiedSessionCount
   } = useWorkoutProgress();
-  const [creatorApplicationSubmitted, setCreatorApplicationSubmitted] = useState(false);
   const [verificationPreference, setVerificationPreference] =
     useState<VerificationPreference>({
       method: 'heartRate',
@@ -157,14 +137,16 @@ export default function ProfileScreen() {
     });
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string>();
-  const [showPartnerTools, setShowPartnerTools] = useState(false);
+  const [showLegal, setShowLegal] = useState(false);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState<string>();
+  const [friendMessage, setFriendMessage] = useState<string>();
   const {
     chooseProfileImage,
     clearProfileImage,
     isPickingImage,
     profileImageMessage,
+    profileImageStatus,
     profileImageUri
   } = useProfileImagePicker();
   const profileStats: readonly ProfileStat[] = [
@@ -176,36 +158,31 @@ export default function ProfileScreen() {
       accent: 'pink'
     }
   ];
-  const { data: payoutClaim } = useCurrentUserPayout(user?.uid);
-  const settingsGroups = getSettingsRows(
-    creatorApplicationSubmitted,
-    verificationPreference.sourceLabel,
-    Boolean(payoutClaim)
-  );
+  const settingsGroups = getSettingsRows(verificationPreference.sourceLabel);
   const providerLabel = formatProviderLabel(user?.providerIds ?? []);
+  const friends = friendsQuery.data ?? [];
+  const incomingFriendRequests = (friendRequestsQuery.data ?? []).filter(
+    ({ direction }) => direction === 'incoming'
+  );
 
   useEffect(() => {
     let mounted = true;
 
-    if (!user) {
+    if (!preferenceOwnerId) {
       return () => {
         mounted = false;
       };
     }
 
-    void Promise.all([
-      hasSubmittedCreatorApplication(user.uid),
-      getVerificationPreference(user.uid)
-    ]).then(([submitted, preference]) => {
+    void getVerificationPreference(preferenceOwnerId).then((preference) => {
       if (mounted) {
-        setCreatorApplicationSubmitted(submitted);
         setVerificationPreference(preference);
       }
     });
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [preferenceOwnerId]);
 
   async function performSignOut() {
     setSigningOut(true);
@@ -238,9 +215,20 @@ export default function ProfileScreen() {
     }
   }
 
+  async function respondToRequest(requestId: string, decision: 'accepted' | 'declined') {
+    setFriendMessage(undefined);
+    try {
+      await respondToFriendRequest.mutateAsync({ decision, requestId });
+      setFriendMessage(
+        decision === 'accepted' ? 'FRIEND REQUEST ACCEPTED.' : 'FRIEND REQUEST DECLINED.'
+      );
+    } catch {
+      setFriendMessage('FRIEND REQUEST COULD NOT BE UPDATED. TRY AGAIN.');
+    }
+  }
+
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -252,9 +240,15 @@ export default function ProfileScreen() {
             initials={publicInitials}
             showStatus={Boolean(user?.emailVerified)}
           />
-          <TerminalText glow style={styles.profileName} tone="cyan" variant="title">
-            {publicName}
-          </TerminalText>
+          <UserAlias
+            alias={publicName}
+            glow
+            streaks={streakSummary?.streaks}
+            style={styles.profileAlias}
+            textStyle={styles.profileName}
+            tone="cyan"
+            variant="title"
+          />
           <CompactTextButton
             label="EDIT ALIAS"
             onPress={() => router.push('/identity?source=profile' as Href)}
@@ -276,8 +270,13 @@ export default function ProfileScreen() {
             ) : null}
           </View>
           {profileImageMessage ? (
-            <TerminalText style={styles.profileImageMessage} tone="muted" variant="caption">
+            <TerminalText live="polite" style={styles.profileImageMessage} tone="muted" variant="caption">
               {profileImageMessage}
+            </TerminalText>
+          ) : null}
+          {profileImageStatus === 'pending_review' ? (
+            <TerminalText live="polite" style={styles.profileImageMessage} tone="amber" variant="caption">
+              PICTURE PENDING MODERATION
             </TerminalText>
           ) : null}
         </View>
@@ -326,6 +325,88 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
+          FRIENDS
+        </TerminalText>
+        <HUDBorderBox style={styles.friendsCard} tone="muted">
+          <View style={styles.friendsHeader}>
+            <View style={styles.friendsHeaderCopy}>
+              <TerminalText glow tone="cyan" variant="label">
+                YOUR FRIENDS // {friends.length}
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="caption">
+                Accept requests here or find someone by their GoGymGo alias.
+              </TerminalText>
+            </View>
+            {incomingFriendRequests.length > 0 ? (
+              <View style={styles.requestCount}>
+                <TerminalText glow tone="pink" variant="micro">
+                  {incomingFriendRequests.length} NEW
+                </TerminalText>
+              </View>
+            ) : null}
+          </View>
+
+          {incomingFriendRequests.map((request) => (
+            <View key={request.id} style={styles.friendRequestRow}>
+              <UserAlias
+                alias={request.user.screenName}
+                prefix="@"
+                streaks={request.user.streaks}
+                style={styles.friendIdentity}
+              />
+              <View style={styles.friendActions}>
+                <ProfileFriendAction
+                  disabled={respondToFriendRequest.isPending}
+                  label="ACCEPT"
+                  onPress={() => void respondToRequest(request.id, 'accepted')}
+                  tone="green"
+                />
+                <ProfileFriendAction
+                  disabled={respondToFriendRequest.isPending}
+                  label="DECLINE"
+                  onPress={() => void respondToRequest(request.id, 'declined')}
+                  tone="muted"
+                />
+              </View>
+            </View>
+          ))}
+
+          {friends.map((friend) => (
+            <View key={friend.userId} style={styles.friendRow}>
+              <UserAlias
+                alias={friend.screenName}
+                prefix="@"
+                streaks={friend.streaks}
+                style={styles.friendIdentity}
+              />
+              <TerminalText tone="green" variant="micro">
+                FRIEND
+              </TerminalText>
+            </View>
+          ))}
+
+          {!friendsQuery.isPending && friends.length === 0 && incomingFriendRequests.length === 0 ? (
+            <TerminalText tone="dim" uppercase={false} variant="body">
+              No friends yet. Search by alias or send a private challenge invitation.
+            </TerminalText>
+          ) : null}
+          {friendsQuery.isPending || friendRequestsQuery.isPending ? (
+            <TerminalText live="polite" tone="dim" variant="micro">
+              LOADING FRIENDS...
+            </TerminalText>
+          ) : null}
+          {friendMessage ? (
+            <TerminalText live="polite" tone="cyan" variant="micro">
+              {friendMessage}
+            </TerminalText>
+          ) : null}
+          <CyberButtonOutline
+            label="FIND + INVITE FRIENDS ->"
+            onPress={() => router.push('/squad/social' as Href)}
+          />
+        </HUDBorderBox>
+
         <HUDBorderBox style={styles.regionCard} tone="cyan">
           <View style={styles.regionCopy}>
             <TerminalText tone="dim" variant="label">
@@ -358,58 +439,63 @@ export default function ProfileScreen() {
           ))}
         </HUDBorderBox>
 
-        <HUDBorderBox
-          glow={remindersEnabled}
-          style={styles.notificationCard}
-          tone={remindersEnabled ? 'cyan' : 'muted'}
+        <Pressable
+          accessibilityHint="Turn Weekly Goal, Weekly Challenge and Bonus Day alerts on or off"
+          accessibilityLabel="Competition reminders"
+          accessibilityRole="switch"
+          accessibilityState={{ checked: remindersEnabled, disabled: notificationBusy }}
+          disabled={notificationBusy}
+          onPress={() => void updateNotifications(!remindersEnabled)}
+          style={({ pressed }) => pressed ? styles.pressed : null}
         >
-          <View style={styles.notificationCopy}>
-            <TerminalText glow={remindersEnabled} tone={remindersEnabled ? 'cyan' : 'text'} variant="body">
-              COMPETITION REMINDERS
-            </TerminalText>
-            <TerminalText tone="muted" variant="caption">
-              WEEKLY GOAL, PERIOD MATCH AND BONUS DAY ALERTS
-            </TerminalText>
-            <TerminalText tone={remindersEnabled ? 'green' : 'dim'} variant="micro">
-              {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
-            </TerminalText>
-          </View>
-          <Switch
-            accessibilityLabel="Competition reminders"
-            disabled={notificationBusy}
-            onValueChange={(enabled) => void updateNotifications(enabled)}
-            thumbColor={remindersEnabled ? colors.cyan : colors.dim}
-            trackColor={{ false: colors.panelSoft, true: colors.surfaceCyanActive }}
-            value={remindersEnabled}
-          />
-        </HUDBorderBox>
+          <HUDBorderBox
+            glow={remindersEnabled}
+            style={styles.notificationCard}
+            tone={remindersEnabled ? 'cyan' : 'muted'}
+          >
+            <View style={styles.notificationCopy}>
+              <TerminalText glow={remindersEnabled} tone={remindersEnabled ? 'cyan' : 'text'} variant="body">
+                COMPETITION REMINDERS
+              </TerminalText>
+              <TerminalText tone="muted" variant="caption">
+                WEEKLY GOAL, WEEKLY CHALLENGE AND BONUS DAY ALERTS
+              </TerminalText>
+              <TerminalText tone={remindersEnabled ? 'green' : 'dim'} variant="micro">
+                {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
+              </TerminalText>
+            </View>
+            <Switch
+              accessible={false}
+              pointerEvents="none"
+              thumbColor={remindersEnabled ? colors.cyan : colors.dim}
+              trackColor={{ false: colors.panelSoft, true: colors.surfaceCyanActive }}
+              value={remindersEnabled}
+            />
+          </HUDBorderBox>
+        </Pressable>
         {notificationMessage ? (
-          <TerminalText style={styles.notificationMessage} tone="amber" variant="caption">
+          <TerminalText live="assertive" style={styles.notificationMessage} tone="amber" uppercase={false} variant="caption">
             {notificationMessage}
           </TerminalText>
         ) : null}
 
         <CyberButtonOutline
-          label={showPartnerTools ? 'HIDE PARTNER OPTIONS' : 'PARTNER WITH GOGYMGO'}
-          onPress={() => setShowPartnerTools((current) => !current)}
+          label="PARTNER WITH GOGYMGO ->"
+          onPress={() => router.push('/partner' as Href)}
           style={styles.partnerToggle}
         />
-        {showPartnerTools ? (
-          <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="cyan">
-            {settingsGroups.partnerships.map((row) => (
+
+        <CyberButtonOutline
+          label={showLegal ? 'HIDE LEGAL & PRIVACY' : 'LEGAL & PRIVACY'}
+          onPress={() => setShowLegal((current) => !current)}
+        />
+        {showLegal ? (
+          <HUDBorderBox style={[styles.settingsCard, styles.legalCard]} tone="muted">
+            {settingsGroups.legal.map((row) => (
               <SettingsItem key={row.title} row={row} />
             ))}
           </HUDBorderBox>
         ) : null}
-
-        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
-          LEGAL + PRIVACY
-        </TerminalText>
-        <HUDBorderBox style={styles.settingsCard} tone="muted">
-          {settingsGroups.legal.map((row) => (
-            <SettingsItem key={row.title} row={row} />
-          ))}
-        </HUDBorderBox>
 
         {signOutError ? <AuthStatusNotice message={signOutError} tone="red" /> : null}
         <CyberButtonOutline
@@ -483,6 +569,36 @@ function SettingsItem({ row }: { row: SettingsRow }) {
   );
 }
 
+function ProfileFriendAction({
+  disabled,
+  label,
+  onPress,
+  tone
+}: {
+  disabled: boolean;
+  label: string;
+  onPress: () => void;
+  tone: 'green' | 'muted';
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.friendAction,
+        tone === 'green' ? styles.friendActionAccept : styles.friendActionMuted,
+        disabled ? styles.friendActionDisabled : null,
+        pressed ? styles.pressed : null
+      ]}
+    >
+      <TerminalText glow={tone === 'green'} tone={tone} variant="micro">
+        {label}
+      </TerminalText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
@@ -496,8 +612,11 @@ const styles = StyleSheet.create({
     marginBottom: 22
   },
   profileName: {
-    marginTop: spacing.md,
     fontFamily: fontFamilies.display
+  },
+  profileAlias: {
+    justifyContent: 'center',
+    marginTop: spacing.md
   },
   accountCard: {
     gap: spacing.sm,
@@ -532,6 +651,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: 18
+  },
+  friendsCard: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.lg
+  },
+  friendsHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
+  },
+  friendsHeaderCopy: {
+    flex: 1,
+    gap: spacing.xs
+  },
+  requestCount: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.borderPinkGlow,
+    borderRadius: 6,
+    backgroundColor: colors.surfacePink
+  },
+  friendRequestRow: {
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.whiteAlpha05
+  },
+  friendRow: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm
+  },
+  friendIdentity: {
+    flex: 1
+  },
+  friendActions: {
+    flexDirection: 'row',
+    gap: spacing.sm
+  },
+  friendAction: {
+    minWidth: 82,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderRadius: 6
+  },
+  friendActionAccept: {
+    borderColor: colors.borderSuccessGlow,
+    backgroundColor: colors.surfaceSuccess
+  },
+  friendActionMuted: {
+    borderColor: colors.borderMuted,
+    backgroundColor: colors.panelSoft
+  },
+  friendActionDisabled: {
+    opacity: 0.5
   },
   statCard: {
     flex: 1,
@@ -573,7 +754,10 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs
   },
   partnerToggle: {
-    marginBottom: spacing.lg
+    marginBottom: spacing.md
+  },
+  legalCard: {
+    marginTop: spacing.sm
   },
   notificationCard: {
     flexDirection: 'row',

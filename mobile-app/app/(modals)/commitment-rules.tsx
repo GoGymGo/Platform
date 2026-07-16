@@ -12,7 +12,7 @@ import {
 } from '@/components/cyber';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type RuleTone = 'cyan' | 'pink' | 'amber';
@@ -52,31 +52,31 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '05',
     title: 'VERIFY SESSIONS',
-    body: 'Heart-rate device or Partner Gym QR sessions must include quick identity checks.',
+    body: 'Heart-rate device and Partner Gym QR sessions include quick device presence checks.',
     tone: 'cyan'
   },
   {
     index: '06',
     title: 'WEEKLY 2X BONUS',
-    body: 'If you and your Period Match both hit the Weekly Goal, you both earn the 2x Period Match Bonus for that scoring week.',
+    body: 'If you and your Weekly Challenge partner both hit the Weekly Goal, you both earn the 2x Weekly Challenge Bonus for that scoring week.',
     tone: 'cyan'
   },
   {
     index: '07',
     title: 'MAKE-UP 3X BONUS',
-    body: 'If your matched player misses, complete one extra verified workout before the scoring week closes to earn the 3x Period Match Bonus.',
+    body: 'If your Weekly Challenge partner misses, complete one extra verified workout before the scoring week closes to earn the 3x Weekly Challenge Bonus.',
     tone: 'pink'
   },
   {
     index: '08',
     title: 'NO EXTRA DAY EXCEPTION',
-    body: 'A seven-day player, or a late entrant who fills every day remaining in scoring week 1, receives 3x automatically if their matched player misses.',
+    body: 'A seven-day player, or a late entrant who fills every day remaining in scoring week 1, receives 3x automatically if their Weekly Challenge partner misses.',
     tone: 'amber'
   },
   {
     index: '09',
     title: 'TOP THREE CATEGORY FINISHERS',
-    body: 'The Top Three Category Finishers multiply their actual four-week total after Period Match results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.',
+    body: 'The Top Three Category Finishers multiply their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.',
     tone: 'pink'
   },
   {
@@ -88,7 +88,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '11',
     title: 'PERFECT MONTH // FINAL 10X',
-    body: 'The Perfect Month 10x is applied last to the Period Match-adjusted, category-adjusted total plus all Bonus Day entries.',
+    body: 'The Perfect Month 10x is applied last to the Weekly Challenge-adjusted, category-adjusted total plus all Bonus Day entries.',
     tone: 'pink'
   }
 ];
@@ -102,7 +102,7 @@ export default function CommitmentRulesModal() {
     rule.index === '09'
       ? {
           ...rule,
-          body: `The Top Three Category Finishers receive ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x and ${campaign.economics.categoryPodiumMultipliers[3]}x multipliers on their actual four-week total after Period Match results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
+          body: `The Top Three Category Finishers receive ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x and ${campaign.economics.categoryPodiumMultipliers[3]}x multipliers on their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
         }
       : rule.index === '10'
         ? {
@@ -158,7 +158,7 @@ export default function CommitmentRulesModal() {
             CURRENT PRIZE DRAW
           </TerminalText>
           <TerminalText glow style={styles.summaryValue} tone="cyan" variant="title">
-            {formatCampaignCurrency(economics.prizeDrawAmount)} - {economics.prizeDrawWinnerCount.toLocaleString()} PROJECTED WINNERS
+            BRAND REWARDS - {economics.projectedRewardWinners.toLocaleString()} PROJECTED WINNERS
           </TerminalText>
           <TerminalText style={styles.summaryCopy} tone="muted" uppercase={false} variant="body">
             Hit all four Weekly Goals to unlock Prize Draw Entries and apply

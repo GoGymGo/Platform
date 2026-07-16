@@ -6,6 +6,7 @@ import {
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
@@ -14,8 +15,8 @@ import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type CheckoutMetric = {
@@ -25,14 +26,13 @@ type CheckoutMetric = {
 
 export default function CheckOutScreen() {
   const router = useRouter();
-  const { campaign } = useSponsorCampaign();
-  const sponsorConfirmed = campaign.status === 'approved';
   const { activeSession } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const { busy, buttonLabel, message, verify } = usePresenceVerification();
   const elapsedSeconds = activeSession
     ? getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale)
     : 0;
@@ -54,7 +54,7 @@ export default function CheckOutScreen() {
       ]
     : [
         { label: 'DURATION', value: '30:00' },
-        { label: 'FACE CHECK', value: 'PASS' },
+        { label: 'PRESENCE', value: 'PASS' },
         { label: 'GYM QR', value: 'READY' }
       ];
 
@@ -64,10 +64,10 @@ export default function CheckOutScreen() {
         actionLabel={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START A SESSION ->'}
         body={
           !activeSession
-            ? 'START A VERIFIED SESSION BEFORE OPENING CHECK-OUT.'
+            ? 'Start a verified session before opening check-out.'
             : activeSession.verificationMethod === 'heartRate' && !heartRateReady
-              ? `MAINTAIN AN AVERAGE OF AT LEAST ${workoutRules.minimumAverageHeartRateBpm} BPM ACROSS THE FULL 30-MINUTE SESSION.`
-              : 'THE 30-MINUTE MINIMUM AND AUTOMATIC FACE CHECK MUST BOTH PASS BEFORE CHECK-OUT.'
+              ? `Maintain an average of at least ${workoutRules.minimumAverageHeartRateBpm} BPM across the full 30-minute session.`
+              : 'The 30-minute minimum and automatic presence check must both pass before check-out.'
         }
         onAction={() => {
           if (activeSession) {
@@ -81,27 +81,22 @@ export default function CheckOutScreen() {
     );
   }
 
+  async function confirmPresence() {
+    if (await verify()) {
+      router.push('/workout/complete');
+    }
+  }
+
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
       <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
         CHECK-OUT // 3 OF 3
       </TerminalText>
-
-      <HUDBorderBox style={styles.sponsorCard} tone="muted">
-        <View style={[styles.sponsorMark, !sponsorConfirmed ? styles.sponsorMarkPending : null]}>
-          <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
-            {campaign.sponsor.mark}
-          </TerminalText>
-        </View>
-        <View style={styles.sponsorCopy}>
-          <TerminalText tone="dim" variant="micro">
-            SESSION SPONSOR
-          </TerminalText>
-          <TerminalText style={styles.sponsorText} tone="text" variant="body">
-            {campaign.sponsor.shortName} FUNDS THIS REGIONAL CAMPAIGN.
-          </TerminalText>
-        </View>
-      </HUDBorderBox>
 
       <View style={styles.centerContent}>
         <HUDBorderBox glow style={styles.successMark} tone="green">
@@ -138,23 +133,29 @@ export default function CheckOutScreen() {
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentReady || !cameraConsentAccepted}
-        label="VERIFY BIOMETRIC - FINISH ->"
-        onPress={() => router.push('/workout/complete')}
+        disabled={!cameraConsentReady || !cameraConsentAccepted || busy}
+        label={busy ? 'CHECKING DEVICE...' : buttonLabel.replace(' ->', ' & FINISH ->')}
+        onPress={() => void confirmPresence()}
       />
+      {message ? (
+        <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+          {message}
+        </TerminalText>
+      ) : null}
 
       <CyberButtonOutline
         label="BACK"
         onPress={() => goBackOrReplace(router, '/workout/active')}
         style={styles.backButton}
       />
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
@@ -164,36 +165,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontFamily: fontFamilies.terminal,
     textAlign: 'center'
-  },
-  sponsorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    marginTop: 14,
-    marginBottom: 20,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: 14
-  },
-  sponsorMark: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 9,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  sponsorMarkPending: {
-    borderColor: colors.borderCyanSoft,
-    backgroundColor: colors.surfaceCyanGhost
-  },
-  sponsorCopy: {
-    flex: 1
-  },
-  sponsorText: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.terminal
   },
   centerContent: {
     flex: 1,
@@ -250,4 +221,8 @@ const styles = StyleSheet.create({
   cameraConsent: {
     marginBottom: spacing.md
   },
+  statusMessage: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
+  }
 });

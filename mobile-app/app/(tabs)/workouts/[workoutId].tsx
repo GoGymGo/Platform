@@ -1,17 +1,19 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { AuthTextField } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenLoadingState,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
-import { useCreatorWorkouts } from '@/data/appDataHooks';
+import { useCreatorWorkouts, usePlanCreatorWorkout } from '@/data/appDataHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
@@ -20,24 +22,52 @@ type RuleItem = {
 };
 
 const ruleItems: readonly RuleItem[] = [
-  { body: 'FREE TO JOIN // YOUR FREE PRIZE DRAW ENTRY IS SECURED IMMEDIATELY.' },
+  { body: 'Free to join. Your free prize-draw entry is secured immediately.' },
   {
-    body: 'CREATOR PAYOUT IS BASED ON GOGYMGO SELECTION AND VERIFIED COMPLETIONS, NOT YOUTUBE VIEWS.'
+    body: 'Creator features are based on GoGymGo selection and verified completions, not YouTube views.'
   },
-  { body: 'SPONSOR CREATIVE STAYS OUTSIDE THE YOUTUBE PLAYER.' },
-  { body: 'USERS EARN ENTRIES ONLY AFTER HEART-RATE OR QR VERIFICATION.' }
+  { body: 'Sponsor creative stays outside the YouTube player.' },
+  { body: 'Users earn entries only after heart-rate or QR verification.' }
 ];
 
 export default function WorkoutDetailScreen() {
   const router = useRouter();
   const { campaign } = useSponsorCampaign();
   const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
-  const { data: creatorWorkouts = [], isPending } = useCreatorWorkouts();
+  const { data: creatorWorkouts = [], isError, isPending, refetch } = useCreatorWorkouts();
+  const planCreatorWorkout = usePlanCreatorWorkout();
+  const [plannedDate, setPlannedDate] = useState(() => nextDateKey());
+  const [planningFeedback, setPlanningFeedback] = useState<string | null>(null);
   const workout = creatorWorkouts.find((item) => item.id === workoutId);
   const sponsorConfirmed = campaign.status === 'approved';
 
   if (isPending) {
-    return null;
+    return (
+      <ScreenLoadingState
+        body="Loading the creator workout and verification details."
+        label="LOADING CREATOR WORKOUT"
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <ScreenContainer contentStyle={styles.unavailableScreen}>
+        <HUDBorderBox glow style={styles.unavailableCard} tone="red">
+          <TerminalText live="assertive" glow tone="red" variant="label">
+            WORKOUT COULD NOT LOAD
+          </TerminalText>
+          <TerminalText style={styles.unavailableBody} tone="muted" uppercase={false} variant="body">
+            Check your connection and try loading this creator workout again.
+          </TerminalText>
+          <CyberButtonPrimary
+            label="TRY AGAIN"
+            onPress={() => void refetch()}
+            style={styles.unavailableAction}
+          />
+        </HUDBorderBox>
+      </ScreenContainer>
+    );
   }
 
   if (!workout?.joined) {
@@ -50,9 +80,9 @@ export default function WorkoutDetailScreen() {
           <TerminalText glow style={styles.unavailableTitle} tone="text" variant="title">
             WORKOUT NOT AVAILABLE YET
           </TerminalText>
-          <TerminalText style={styles.unavailableBody} tone="muted" variant="body">
-            THIS CREATOR SLOT IS STILL IN SUBMISSION OR REVIEW. RETURN TO THE
-            WORKOUT LIST FOR THE CURRENT FEATURED SESSION.
+          <TerminalText style={styles.unavailableBody} tone="muted" uppercase={false} variant="body">
+            This creator slot is still in submission or review. Return to the
+            workout list for the current featured session.
           </TerminalText>
           <CyberButtonPrimary
             label="BACK TO CREATOR WORKOUTS ->"
@@ -66,7 +96,6 @@ export default function WorkoutDetailScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -86,7 +115,7 @@ export default function WorkoutDetailScreen() {
         <HUDBorderBox glow style={styles.creatorHeader} tone="cyan">
           <View style={styles.creatorAvatar}>
             <TerminalText style={styles.creatorAvatarText} tone="dim" variant="button">
-              AX
+              {creatorInitials(workout.creatorName)}
             </TerminalText>
           </View>
           <View style={styles.creatorCopy}>
@@ -94,12 +123,17 @@ export default function WorkoutDetailScreen() {
               {workout.name}
             </TerminalText>
             <TerminalText style={styles.metadataBody} tone="muted" variant="body">
-              LED BY APEX ATHLETICS // OFFICIAL GOGYMGO CHANNEL
+              LED BY {workout.creatorName} · {workout.durationMinutes} MIN {workout.workoutStyle}
             </TerminalText>
           </View>
         </HUDBorderBox>
 
-        <View style={styles.youtubeFrame}>
+        <Pressable
+          accessibilityLabel={`Play ${workout.name} by ${workout.creatorName}`}
+          accessibilityRole="link"
+          onPress={() => void Linking.openURL(workout.videoUrl)}
+          style={({ pressed }) => [styles.youtubeFrame, pressed ? styles.pressed : null]}
+        >
           <View style={styles.youtubePlayer}>
             <View style={styles.youtubePlay}>
               <TerminalText glow tone="text" variant="micro">
@@ -115,7 +149,7 @@ export default function WorkoutDetailScreen() {
               </TerminalText>
             </View>
           </View>
-        </View>
+        </Pressable>
         <TerminalText style={styles.youtubeFootnote} tone="dim" variant="micro">
           VIDEO PLAYS ON THE OFFICIAL GOGYMGO YOUTUBE CHANNEL.
         </TerminalText>
@@ -132,14 +166,51 @@ export default function WorkoutDetailScreen() {
           tone="cyan"
         />
 
+        <HUDBorderBox style={styles.planningCard} tone="cyan">
+          <TerminalText glow tone="cyan" variant="label">
+            ADD TO WORKOUT CALENDAR
+          </TerminalText>
+          <TerminalText style={styles.planningCopy} tone="muted" uppercase={false} variant="body">
+            Plan this creator video for a future day. Planning does not verify a workout or award entries.
+          </TerminalText>
+          <AuthTextField
+            autoCapitalize="none"
+            editable={!planCreatorWorkout.isPending}
+            keyboardType="numbers-and-punctuation"
+            label="PLANNED DATE // YYYY-MM-DD"
+            maxLength={10}
+            onChangeText={(value) => {
+              setPlannedDate(value);
+              setPlanningFeedback(null);
+            }}
+            placeholder={nextDateKey()}
+            value={plannedDate}
+          />
+          {planningFeedback ? (
+            <TerminalText live="polite" tone={planningFeedback.startsWith('PLANNED') ? 'green' : 'red'} uppercase={false} variant="caption">
+              {planningFeedback}
+            </TerminalText>
+          ) : null}
+          <CyberButtonOutline
+            disabled={planCreatorWorkout.isPending || !isFutureDateKey(plannedDate)}
+            label={planCreatorWorkout.isPending ? 'ADDING...' : 'ADD TO CALENDAR ->'}
+            onPress={() => void planCreatorWorkout.mutateAsync({
+              plannedDate,
+              workoutId: workout.id
+            })
+              .then(() => setPlanningFeedback(`PLANNED FOR ${plannedDate}. OPEN YOUR WORKOUT CALENDAR TO REVIEW IT.`))
+              .catch(() => setPlanningFeedback('THIS WORKOUT COULD NOT BE ADDED. CHECK THE DATE AND TRY AGAIN.'))}
+          />
+        </HUDBorderBox>
+
         <HUDBorderBox style={styles.selectionCard} tone={sponsorConfirmed ? 'pink' : 'cyan'}>
           <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="label">
-            {sponsorConfirmed ? `${campaign.sponsor.displayName} CREATOR PAYOUT` : 'REGIONAL CREATOR CAMPAIGN'}
+            {sponsorConfirmed ? `${campaign.sponsor.displayName} CREATOR FEATURE` : 'REGIONAL CREATOR CAMPAIGN'}
           </TerminalText>
           <TerminalText style={styles.selectionCopy} tone="muted" variant="body">
             {sponsorConfirmed
               ? `SPONSOR FUNDING SUPPORTS THE SELECTED ${campaign.region} WORKOUT LEADER.`
-              : 'CREATOR PAYOUT DETAILS ARE PUBLISHED WITH THE REGIONAL CAMPAIGN.'}
+              : 'CREATOR FEATURE DETAILS ARE PUBLISHED WITH THE REGIONAL CAMPAIGN.'}
           </TerminalText>
         </HUDBorderBox>
 
@@ -153,7 +224,7 @@ export default function WorkoutDetailScreen() {
                 <TerminalText glow tone="cyan" variant="micro">
                   OK
                 </TerminalText>
-                <TerminalText style={styles.ruleText} tone="muted" variant="body">
+                <TerminalText style={styles.ruleText} tone="muted" uppercase={false} variant="body">
                   {rule.body}
                 </TerminalText>
               </View>
@@ -164,6 +235,27 @@ export default function WorkoutDetailScreen() {
       </ScreenScrollView>
     </ScreenContainer>
   );
+}
+
+function nextDateKey() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isFutureDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const candidate = new Date(`${value}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return !Number.isNaN(candidate.getTime()) && candidate >= today;
+}
+
+function creatorInitials(value: string) {
+  return value.split(/\s+/).map((word) => word[0]).join('').slice(0, 2).toUpperCase();
 }
 
 const styles = StyleSheet.create({
@@ -368,6 +460,14 @@ const styles = StyleSheet.create({
   },
   startButton: {
     marginTop: 18
+  },
+  planningCard: {
+    gap: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.lg
+  },
+  planningCopy: {
+    fontFamily: fontFamilies.body
   },
   startHelper: {
     marginTop: spacing.md,

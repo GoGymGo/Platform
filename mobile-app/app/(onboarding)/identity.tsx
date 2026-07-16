@@ -4,10 +4,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  TextInput,
   View
 } from 'react-native';
 
+import { AuthTextField } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonOutline,
@@ -17,9 +17,10 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
+import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { useUpdateScreenName } from '@/data/socialHooks';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
+import { normalizeScreenName, validateScreenName } from '@/domain/social';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useProfile } from '@/state/profile';
@@ -31,7 +32,7 @@ export default function IdentityScreen() {
     return (
       <ScreenContainer>
         <View style={styles.loading}>
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText glow live="polite" tone="cyan" variant="label">
             LOADING PUBLIC IDENTITY
           </TerminalText>
         </View>
@@ -48,9 +49,11 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
   const router = useRouter();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const { setPublicIdentity } = useProfile();
+  const updateAlias = useUpdateScreenName();
   const [alias, setAlias] = useState(
     initialIdentity?.displayName || initialIdentity?.callsign || ''
   );
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     chooseProfileImage,
     clearProfileImage,
@@ -58,20 +61,36 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
     profileImageMessage,
     profileImageUri
   } = useProfileImagePicker();
-  const identityIsValid = alias.trim().length >= 2;
-  const avatarInitials = getPublicInitials(alias.trim() || 'GG');
+  const normalizedAlias = normalizeScreenName(alias);
+  const validationError = alias.length > 0 ? validateScreenName(alias) : null;
+  const identityIsValid = alias.length > 0 && !validateScreenName(alias);
+  const avatarInitials = getPublicInitials(normalizedAlias || 'GG');
+  const isEditing = source === 'profile' || source === 'social';
+  const returnRoute = source === 'social' ? '/squad/social' : '/profile';
 
   const handleContinue = async () => {
-    const normalizedAlias = alias.trim();
+    const error = validateScreenName(alias);
+    setSubmitError(error);
+    if (error) return;
 
-    await setPublicIdentity({
-      callsign: normalizedAlias,
-      displayName: normalizedAlias,
-      mode: 'alias'
-    });
+    try {
+      const profile = await updateAlias.mutateAsync(normalizedAlias);
+      await setPublicIdentity({
+        callsign: profile.screenName,
+        displayName: profile.screenName,
+        mode: 'alias'
+      });
+    } catch (mutationError) {
+      setSubmitError(
+        mutationError instanceof Error
+          ? mutationError.message.replace(/screen name/gi, 'alias')
+          : 'Your alias could not be saved. Try again.'
+      );
+      return;
+    }
 
-    if (source === 'profile') {
-      router.replace('/profile');
+    if (isEditing) {
+      router.replace(returnRoute);
       return;
     }
 
@@ -84,7 +103,6 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <SponsorBanner compact />
         <ScreenScrollView
           bounces={false}
           contentContainerStyle={styles.content}
@@ -92,40 +110,36 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
           showsVerticalScrollIndicator={false}
         >
           <OnboardingHeader
-            label={source === 'profile' ? 'EDIT ALIAS' : 'PUBLIC IDENTITY'}
+            label={isEditing ? 'EDIT ALIAS' : 'PUBLIC IDENTITY'}
             onBack={() => goBackOrReplace(
               router,
-              source === 'profile' ? '/profile' : '/'
+              isEditing ? returnRoute : '/'
             )}
-            progress={source === 'profile' ? 100 : 20}
-            step={source === 'profile' ? 'PROFILE' : 'STEP 01 / 05'}
+            progress={isEditing ? 100 : 20}
+            step={isEditing ? 'PROFILE' : 'STEP 01 / 05'}
           />
 
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             HOW SHOULD OTHERS SEE YOU?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            This is shown on leaderboards, Period Matches and community features.
+            This is shown on leaderboards, Weekly Challenges and community features.
             Personal details always stay private.
           </TerminalText>
 
-          <View style={styles.fieldGroup}>
-            <TerminalText tone="dim" variant="micro">
-              ALIAS
-            </TerminalText>
-            <TextInput
-              accessibilityLabel="Alias"
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={24}
-              onChangeText={setAlias}
-              placeholder="Enter your alias"
-              placeholderTextColor={colors.dim}
-              selectionColor={colors.cyan}
-              style={styles.input}
-              value={alias}
-            />
-          </View>
+          <AuthTextField
+            autoCapitalize="characters"
+            autoCorrect={false}
+            error={submitError ?? validationError ?? undefined}
+            label="ALIAS"
+            maxLength={24}
+            onChangeText={(value) => {
+              setAlias(value);
+              setSubmitError(null);
+            }}
+            placeholder="GHOST_RUNNER"
+            value={alias}
+          />
 
           <View style={styles.pictureSection}>
             <ProfileAvatar
@@ -166,8 +180,12 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
           </View>
 
           <CyberButtonPrimary
-            disabled={!identityIsValid}
-            label={source === 'profile' ? 'SAVE ALIAS ->' : 'CONTINUE ->'}
+            disabled={!identityIsValid || updateAlias.isPending}
+            label={updateAlias.isPending
+              ? 'SAVING ALIAS...'
+              : isEditing
+                ? 'SAVE ALIAS ->'
+                : 'CONTINUE ->'}
             onPress={handleContinue}
             style={styles.primaryButton}
           />
@@ -204,21 +222,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
-  },
-  fieldGroup: {
-    gap: spacing.xs,
-    marginTop: spacing.sm
-  },
-  input: {
-    minHeight: 50,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyanMedium,
-    borderRadius: radii.sm,
-    color: colors.text,
-    backgroundColor: colors.panelAlpha70,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.control
   },
   pictureSection: {
     alignItems: 'center',

@@ -84,9 +84,9 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
-  it('requires authentication before payout claim access', () => {
+  it('requires authentication before streak reward access', () => {
     return request(app.getHttpServer())
-      .get('/v1/payout-claims/me')
+      .get('/v1/streaks/me')
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({
@@ -95,11 +95,10 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
-  it('requires an operator token before payout claim review access', () => {
+  it('requires authentication before cancelling a workout session', () => {
     return request(app.getHttpServer())
-      .get(
-        '/v1/operator/payout-claims/10000000-0000-4000-8000-000000000001/review',
-      )
+      .post('/v1/sessions/10000000-0000-4000-8000-000000000001/cancel')
+      .set('Idempotency-Key', 'session-cancel-e2e')
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({
@@ -108,14 +107,81 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
-  it('requires an operator token before payout release control access', async () => {
+  it('requires authentication across friend and challenge routes', async () => {
     await request(app.getHttpServer())
-      .get('/v1/operator/payout-release-control')
+      .get('/v1/social/users?screenName=GHOST')
       .expect(401);
     await request(app.getHttpServer())
-      .post('/v1/operator/payout-release-control/status-action')
-      .set('Idempotency-Key', 'payout-release-control-e2e')
+      .get('/v1/social/friend-requests')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/social/challenges/discover?regionCode=TORONTO')
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/v1/social/challenges')
+      .set('Idempotency-Key', 'social-challenge-e2e')
+      .send({ name: 'July Strength Sprint' })
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+    await request(app.getHttpServer())
+      .post('/v1/social/challenges/10000000-0000-4000-8000-000000000001/join')
+      .set('Idempotency-Key', 'social-challenge-join-e2e')
+      .expect(401);
+    await request(app.getHttpServer())
+      .post(
+        '/v1/social/challenges/10000000-0000-4000-8000-000000000001/check-ins',
+      )
+      .set('Idempotency-Key', 'social-challenge-check-in-e2e')
+      .expect(401);
+  });
+
+  it('requires authentication before reward award access', () => {
+    return request(app.getHttpServer())
+      .get('/v1/rewards/awards/me')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('requires an operator token before reward configuration access', () => {
+    return request(app.getHttpServer())
+      .post('/v1/operator/configuration/rewards')
+      .set('Idempotency-Key', 'reward-create-e2e')
       .send({})
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('requires an operator token before reward fulfillment changes', () => {
+    return request(app.getHttpServer())
+      .post(
+        '/v1/operator/reward-awards/10000000-0000-4000-8000-000000000001/status-action',
+      )
+      .set('Idempotency-Key', 'reward-status-e2e')
+      .send({ action: 'redeem', reason: 'Confirm sponsor redemption.' })
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
+  it('requires authentication before a reward claim', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/rewards/awards/10000000-0000-4000-8000-000000000001/claim')
+      .set('Idempotency-Key', 'reward-claim-e2e')
       .expect(401);
   });
 
@@ -284,18 +350,10 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
-  it('keeps the provider webhook closed when Hyperwallet is disabled', () => {
+  it('does not expose the removed provider webhook route', () => {
     return request(app.getHttpServer())
       .post('/v1/webhooks/hyperwallet')
-      .send({ token: 'wbn-test', type: 'PAYMENTS.UPDATED' })
-      .expect(503)
-      .expect(({ body }) => {
-        expect(body).toEqual({
-          error: expect.objectContaining({
-            code: 'PAYOUT_PROVIDER_UNAVAILABLE',
-          }),
-        });
-      });
+      .expect(404);
   });
 
   afterEach(async () => {

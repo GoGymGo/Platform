@@ -21,11 +21,13 @@ import { OperatorModule } from './modules/operator/operator.module';
 import { OperationsModule } from './modules/operations/operations.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { PartnersModule } from './modules/partners/partners.module';
-import { PayoutsModule } from './modules/payouts/payouts.module';
+import { RewardsModule } from './modules/rewards/rewards.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { RegionsModule } from './modules/regions/regions.module';
 import { ResultsModule } from './modules/results/results.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
+import { SocialModule } from './modules/social/social.module';
+import { StreaksModule } from './modules/streaks/streaks.module';
 import { activeTraceLogFields } from './observability/log-correlation';
 import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.service';
 
@@ -64,8 +66,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
                 'req.body.password',
                 'req.body.token',
                 'req.body.idToken',
-                'req.body.bankAccount',
-                'req.body.taxId',
+                'req.body.codes',
                 'req.body.pushToken',
                 'req.body.deviceEvidenceToken',
                 'req.body.qrPayload',
@@ -120,9 +121,11 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
     CreatorWorkoutsModule,
     DemoVerificationModule,
     SessionsModule,
+    SocialModule,
+    StreaksModule,
     LeaderboardsModule,
     LegalModule,
-    PayoutsModule,
+    RewardsModule,
     PrivacyModule,
     DrawsModule,
   ],

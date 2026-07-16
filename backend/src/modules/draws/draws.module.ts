@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { PayoutsModule } from '../payouts/payouts.module';
+import { RewardsModule } from '../rewards/rewards.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { DrawsService } from './draws.service';
 
 @Module({
   exports: [DrawsService],
-  imports: [PayoutsModule],
+  imports: [NotificationsModule, RewardsModule],
   providers: [DrawsService],
 })
 export class DrawsModule {}

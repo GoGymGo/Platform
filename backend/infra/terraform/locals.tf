@@ -11,12 +11,8 @@ locals {
   runtime_secret_ids = {
     DATABASE_URL                 = "${local.name}-database-url"
     EXPO_PUSH_ACCESS_TOKEN       = "${local.name}-expo-push-access-token"
-    HYPERWALLET_PASSWORD         = "${local.name}-hyperwallet-password"
-    HYPERWALLET_PROGRAM_TOKEN    = "${local.name}-hyperwallet-program-token"
-    HYPERWALLET_USERNAME         = "${local.name}-hyperwallet-username"
-    HYPERWALLET_WEBHOOK_PASSWORD = "${local.name}-hyperwallet-webhook-password"
-    HYPERWALLET_WEBHOOK_USERNAME = "${local.name}-hyperwallet-webhook-username"
     PRIVACY_PSEUDONYMIZATION_KEY = "${local.name}-privacy-pseudonymization-key"
+    REWARD_CODE_ENCRYPTION_KEY   = "${local.name}-reward-code-encryption-key"
   }
 
   common_environment = merge(
@@ -26,7 +22,6 @@ locals {
       DATABASE_POOL_MAX                = "10"
       FIREBASE_PROJECT_ID              = var.project_id
       GCP_STORAGE_BUCKET               = google_storage_bucket.user_content.name
-      HYPERWALLET_ENABLED              = tostring(var.hyperwallet_enabled)
       LOG_LEVEL                        = var.log_level
       NODE_ENV                         = "production"
       OPENAPI_ENABLED                  = "false"
@@ -51,10 +46,6 @@ locals {
     local.otel_enabled ? {
       OTEL_EXPORTER_OTLP_ENDPOINT = var.otel_exporter_otlp_endpoint
     } : {},
-    var.hyperwallet_enabled ? {
-      HYPERWALLET_API_URL    = var.hyperwallet_api_url
-      HYPERWALLET_PORTAL_URL = var.hyperwallet_portal_url
-    } : {},
   )
 
   api_environment = merge(local.common_environment, {
@@ -67,24 +58,13 @@ locals {
     RUNTIME_ROLE      = "worker"
   })
 
-  hyperwallet_common_secret_environment = var.hyperwallet_enabled ? {
-    HYPERWALLET_PASSWORD      = local.runtime_secret_ids.HYPERWALLET_PASSWORD
-    HYPERWALLET_PROGRAM_TOKEN = local.runtime_secret_ids.HYPERWALLET_PROGRAM_TOKEN
-    HYPERWALLET_USERNAME      = local.runtime_secret_ids.HYPERWALLET_USERNAME
-  } : {}
-
-  api_secret_environment = merge(
-    { DATABASE_URL = local.runtime_secret_ids.DATABASE_URL },
-    local.hyperwallet_common_secret_environment,
-    var.hyperwallet_enabled ? {
-      HYPERWALLET_WEBHOOK_PASSWORD = local.runtime_secret_ids.HYPERWALLET_WEBHOOK_PASSWORD
-      HYPERWALLET_WEBHOOK_USERNAME = local.runtime_secret_ids.HYPERWALLET_WEBHOOK_USERNAME
-    } : {},
-  )
+  api_secret_environment = {
+    DATABASE_URL               = local.runtime_secret_ids.DATABASE_URL
+    REWARD_CODE_ENCRYPTION_KEY = local.runtime_secret_ids.REWARD_CODE_ENCRYPTION_KEY
+  }
 
   worker_secret_environment = merge(
     { DATABASE_URL = local.runtime_secret_ids.DATABASE_URL },
-    local.hyperwallet_common_secret_environment,
     var.privacy_operations_enabled ? {
       PRIVACY_PSEUDONYMIZATION_KEY = local.runtime_secret_ids.PRIVACY_PSEUDONYMIZATION_KEY
     } : {},

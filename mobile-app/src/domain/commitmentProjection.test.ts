@@ -12,12 +12,7 @@ import {
 
 const settings: CampaignEconomicsSettings = {
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
-  creatorPayoutPerVerifiedUser: 0.05,
-  goGymGoPerVerifiedUser: 0.95,
-  prizeDrawPayoutExponent: 0.5,
-  prizeDrawPerVerifiedUser: 2,
-  prizeDrawWinnerRate: 0.15,
-  sponsorPerVerifiedUser: 3
+  rewardWinnerRate: 0.15
 };
 
 const monthCases = [

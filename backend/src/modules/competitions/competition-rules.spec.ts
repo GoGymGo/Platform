@@ -3,9 +3,6 @@ import { parseCompetitionRules } from './competition-rules';
 const validRules = {
   minHeartRateSamples: 3,
   minSessionMinutes: 20,
-  payoutExponent: 0.5,
-  payoutPoolAmountMinor: 2_000_000,
-  payoutWinnerCount: 1_500,
   requireDeviceAttestation: true,
   requireFaceCheck: true,
   requireGymQr: false,
@@ -19,28 +16,9 @@ describe('versioned competition rules', () => {
     expect(parseCompetitionRules(validRules)).toEqual(validRules);
   });
 
-  it('rejects an unsafe payout exponent and unknown policy fields', () => {
-    expect(() =>
-      parseCompetitionRules({ ...validRules, payoutExponent: 1.1 }),
-    ).toThrow();
+  it('rejects unknown policy fields', () => {
     expect(() =>
       parseCompetitionRules({ ...validRules, clientCanVerify: true }),
     ).toThrow();
-  });
-
-  it('accepts only zero-value rules for a non-cash demo', () => {
-    const demoRules = {
-      ...validRules,
-      payoutExponent: 0,
-      payoutPoolAmountMinor: 0,
-      payoutWinnerCount: 0,
-      signupPrizeDrawEntries: 0,
-      verifiedSessionCategoryScore: 0,
-      verifiedSessionPrizeDrawEntries: 0,
-    };
-    expect(parseCompetitionRules(demoRules, 'non_cash_demo')).toEqual(
-      demoRules,
-    );
-    expect(() => parseCompetitionRules(validRules, 'non_cash_demo')).toThrow();
   });
 });

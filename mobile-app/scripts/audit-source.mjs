@@ -8,6 +8,19 @@ const sourceFiles = sourceRoots.flatMap((root) => collectSourceFiles(path.join(p
 const routePatterns = collectRoutePatterns(path.join(projectRoot, 'app'));
 const issues = [];
 const literalRoutes = new Set();
+const prohibitedRuntimeContent = [
+  /\bHYPERWALLET_[A-Z0-9_]+\b/,
+  /\/v1\/(?:payouts?|webhooks\/hyperwallet)\b/,
+  /\/(?:payout-winner|leaderboard\/draw|profile\/payout)\b/,
+];
+const prohibitedRuntimePaths = new Set([
+  'app/(tabs)/leaderboard/draw.tsx',
+  'app/(tabs)/profile/payout.tsx',
+  'app/payout-winner.tsx',
+  'src/domain/payout.ts',
+  'src/mocks/payout.ts',
+  'src/services/payouts.ts',
+]);
 
 for (const filePath of sourceFiles) {
   const sourceText = fs.readFileSync(filePath, 'utf8');
@@ -19,6 +32,16 @@ for (const filePath of sourceFiles) {
     filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   );
   const relativePath = path.relative(projectRoot, filePath).replaceAll('\\', '/');
+
+  if (prohibitedRuntimePaths.has(relativePath)) {
+    issues.push(`${relativePath}: obsolete payment runtime path`);
+  }
+
+  for (const pattern of prohibitedRuntimeContent) {
+    if (pattern.test(sourceText)) {
+      issues.push(`${relativePath}: obsolete payment-provider runtime reference`);
+    }
+  }
 
   if (relativePath !== 'src/constants/theme.ts') {
     const colorMatch = sourceText.match(/#[0-9a-f]{3,8}\b|rgba?\(/i);
@@ -39,6 +62,27 @@ for (const filePath of sourceFiles) {
 for (const route of literalRoutes) {
   if (!routePatterns.some((pattern) => pattern.test(route))) {
     issues.push(`broken literal route: ${route}`);
+  }
+}
+
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8')
+);
+const dependencies = {
+  ...packageJson.dependencies,
+  ...packageJson.devDependencies,
+};
+for (const dependency of [
+  '@hyperwallet/sdk',
+  '@paypal/checkout-server-sdk',
+  'braintree',
+  'hyperwallet-rest-sdk',
+  'paypal-rest-sdk',
+  'plaid',
+  'stripe',
+]) {
+  if (dependency in dependencies) {
+    issues.push(`package.json: obsolete payment dependency ${dependency}`);
   }
 }
 

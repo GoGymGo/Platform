@@ -10,9 +10,8 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
-import { getCompetitionRegionDateKey } from '@/domain/competition';
+import { useCurrentEnrollment } from '@/data/accountReadinessHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
@@ -20,19 +19,18 @@ import { useWorkoutProgress } from '@/state/workoutProgress';
 export default function EntryConfirmedScreen() {
   const router = useRouter();
   const { enrollment } = useSponsorCampaign();
+  const serverEnrollment = useCurrentEnrollment();
   const {
     competition,
     competitionEntryStartDateKey,
-    competitionTimeZone,
     lateRegistration,
     signupEntries,
     weeklyGoal
   } = useWorkoutProgress();
-  const currentDateKey = getCompetitionRegionDateKey(
-    new Date(),
-    competitionTimeZone
-  );
-  const canChangeGoal = currentDateKey < competitionEntryStartDateKey;
+  const confirmedEnrollment = serverEnrollment.data?.status === 'active'
+    ? serverEnrollment.data
+    : null;
+  const confirmedGoal = confirmedEnrollment?.goalDays ?? weeklyGoal;
   const competitionActive = competition.phase !== 'before-month';
   const competitionStartLabel = formatCampaignDate(
     competitionEntryStartDateKey
@@ -40,7 +38,6 @@ export default function EntryConfirmedScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -48,76 +45,89 @@ export default function EntryConfirmedScreen() {
       >
         <OnboardingHeader
           label="COMPLETE"
-          onBack={() => (
-            canChangeGoal
-              ? goBackOrReplace(router, '/commitment')
-              : router.replace('/home')
+          onBack={() => goBackOrReplace(
+            router,
+            confirmedEnrollment ? '/home' : '/commitment'
           )}
           progress={100}
           step="REGISTRATION"
         />
 
-        <HUDBorderBox glow style={styles.confirmationMark} tone="green">
-          <TerminalText glow tone="green" variant="label">
-            CONFIRMED
+        <HUDBorderBox
+          glow
+          style={styles.confirmationMark}
+          tone={confirmedEnrollment ? 'green' : 'amber'}
+        >
+          <TerminalText glow tone={confirmedEnrollment ? 'green' : 'amber'} variant="label">
+            {serverEnrollment.isLoading
+              ? 'CHECKING'
+              : confirmedEnrollment
+                ? 'CONFIRMED'
+                : 'NOT CONFIRMED'}
           </TerminalText>
         </HUDBorderBox>
 
-        <TerminalText glow style={styles.title} tone="green" variant="title">
-          {"YOU'RE REGISTERED"}
+        <TerminalText
+          glow
+          style={styles.title}
+          tone={confirmedEnrollment ? 'green' : 'amber'}
+          variant="title"
+        >
+          {confirmedEnrollment ? "YOU'RE REGISTERED" : 'REGISTRATION INCOMPLETE'}
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          {canChangeGoal
-            ? `Your Weekly Goal is set for this month. You can change it before scoring begins on ${competitionStartLabel}.`
-            : 'Your Weekly Goal is locked because competition scoring has started.'}
+          {confirmedEnrollment
+            ? `Your ${confirmedGoal}-day Weekly Goal is registered and locked for this competition. Scoring begins on ${competitionStartLabel}.`
+            : 'Return to registration to finish the legal, region, and competition checks.'}
         </TerminalText>
 
-        <HUDBorderBox style={styles.summaryPanel} tone="cyan">
+        {confirmedEnrollment ? <HUDBorderBox style={styles.summaryPanel} tone="cyan">
           <SummaryRow
             label="WEEKLY GOAL"
-            value={`${weeklyGoal} ${weeklyGoal === 1 ? 'DAY' : 'DAYS'}`}
+            value={`${confirmedGoal} ${confirmedGoal === 1 ? 'DAY' : 'DAYS'}`}
           />
           <SummaryRow
             label="SCORING START"
             value={formatCampaignDate(competitionEntryStartDateKey).toUpperCase()}
           />
           <SummaryRow label="FREE PRIZE DRAW ENTRY" value={`${signupEntries}`} tone="pink" />
-        </HUDBorderBox>
+        </HUDBorderBox> : null}
 
-        <HUDBorderBox style={styles.activationNote} tone="muted">
+        {confirmedEnrollment ? <HUDBorderBox style={styles.activationNote} tone="muted">
           <TerminalText glow tone="cyan" variant="label">
             PRIZE DRAW STATUS
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
             {competitionActive && lateRegistration
-              ? `Your free Prize Draw Entry is secured. Scoring starts on your registration day with your ${weeklyGoal}-day goal.`
+              ? `Your free Prize Draw Entry is secured. Scoring starts on your registration day with your ${confirmedGoal}-day goal.`
               : competitionActive
                 ? 'Your free Prize Draw Entry is secured. Competition scoring is active, and verified workouts now count toward your Weekly Goal.'
               : `Your free Prize Draw Entry is secured. The region needs ${enrollment.minimumEntrants} registered players to launch. If it does not launch, your entry carries forward.`}
           </TerminalText>
-        </HUDBorderBox>
+        </HUDBorderBox> : null}
 
-        <HUDBorderBox style={styles.payoutNote} tone="cyan">
+        {confirmedEnrollment ? <HUDBorderBox style={styles.rewardNote} tone="cyan">
           <TerminalText glow tone="cyan" variant="label">
-            IF YOU WIN MONEY
+            IF YOU WIN A REWARD
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            GoGymGo will notify you and ask you to create a Hyperwallet payout account.
-            You will connect your bank securely with Hyperwallet only after a prize is confirmed.
+            GoGymGo will notify you and place the physical prize or coupon code in
+            My Rewards. No payment account or banking setup is required.
           </TerminalText>
-        </HUDBorderBox>
+        </HUDBorderBox> : null}
 
         <View style={styles.actions}>
-          {canChangeGoal ? (
+          {confirmedEnrollment ? (
+            <CyberButtonPrimary
+              label="ENTER GOGYMGO ->"
+              onPress={() => router.replace('/home')}
+            />
+          ) : (
             <CyberButtonOutline
-              label="CHANGE WEEKLY GOAL"
+              label="RETURN TO REGISTRATION"
               onPress={() => router.replace('/commitment')}
             />
-          ) : null}
-          <CyberButtonPrimary
-            label="ENTER GOGYMGO ->"
-            onPress={() => router.replace('/home')}
-          />
+          )}
         </View>
       </ScreenScrollView>
     </ScreenContainer>
@@ -193,7 +203,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.lg
   },
-  payoutNote: {
+  rewardNote: {
     marginTop: spacing.md,
     gap: spacing.sm,
     padding: spacing.lg

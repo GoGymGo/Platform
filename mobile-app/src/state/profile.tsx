@@ -16,6 +16,8 @@ import {
   type IdentityMode,
   type PublicIdentity
 } from '@/domain/profile';
+import { useAppData } from '@/data/appDataHooks';
+import type { AvatarMedia } from '@/domain/accountSettings';
 import { createUserStorage } from '@/services/storage/userStorage';
 import { useAuth } from '@/state/auth';
 
@@ -23,6 +25,7 @@ type ProfileContextValue = {
   hasPublicIdentity: boolean;
   identityMode: IdentityMode;
   profileImageUri: string | null;
+  profileImageStatus: AvatarMedia['status'] | 'local' | null;
   profileReady: boolean;
   publicIdentity: PublicIdentity;
   publicName: string;
@@ -37,6 +40,7 @@ const publicIdentityStorageKey = '@gogymgo/public-identity';
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: PropsWithChildren) {
+  const { accountSettings, mode } = useAppData();
   const { loading: authLoading, user } = useAuth();
   const userId = user?.uid ?? null;
   const userStorage = useMemo(
@@ -44,6 +48,9 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     [userId]
   );
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [profileImageStatus, setProfileImageStatus] = useState<
+    AvatarMedia['status'] | 'local' | null
+  >(null);
   const [profileReady, setProfileReady] = useState(false);
   const [publicIdentity, setPublicIdentityState] = useState<PublicIdentity>(defaultPublicIdentity);
   const [hasPublicIdentity, setHasPublicIdentity] = useState(false);
@@ -70,15 +77,24 @@ export function ProfileProvider({ children }: PropsWithChildren) {
 
     void Promise.all([
       userStorage.getItem(profileImageStorageKey),
-      userStorage.getItem(publicIdentityStorageKey)
+      userStorage.getItem(publicIdentityStorageKey),
+      mode === 'api'
+        ? accountSettings.getAvatar().catch(() => null)
+        : Promise.resolve(null)
     ])
-      .then(([storedImage, storedIdentity]) => {
+      .then(([storedImage, storedIdentity, avatarState]) => {
         if (!active) {
           return;
         }
 
-        if (storedImage) {
+        if (mode === 'api') {
+          setProfileImageUri(avatarState?.active?.readUrl ?? null);
+          setProfileImageStatus(
+            avatarState?.latest?.status ?? avatarState?.active?.status ?? null
+          );
+        } else if (storedImage) {
           setProfileImageUri(storedImage);
+          setProfileImageStatus('local');
         }
 
         const parsedIdentity = parseStoredPublicIdentity(storedIdentity);
@@ -99,27 +115,44 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, [authLoading, userStorage]);
+  }, [accountSettings, authLoading, mode, userStorage]);
 
   const setProfileImage = useCallback(async (uri: string) => {
+    const previousImage = profileImageUri;
+    const previousStatus = profileImageStatus;
     setProfileImageUri(uri);
 
     try {
-      await userStorage?.setItem(profileImageStorageKey, uri);
-    } catch {
-      // Keep the selected image for the active session if persistence fails.
+      if (mode === 'api') {
+        const result = await accountSettings.uploadAvatar(uri);
+        setProfileImageStatus(result.status);
+        if (result.state.active?.readUrl) {
+          setProfileImageUri(result.state.active.readUrl);
+        }
+      } else {
+        setProfileImageStatus('local');
+        await userStorage?.setItem(profileImageStorageKey, uri);
+      }
+    } catch (error) {
+      setProfileImageUri(previousImage);
+      setProfileImageStatus(previousStatus);
+      throw error;
     }
-  }, [userStorage]);
+  }, [accountSettings, mode, profileImageStatus, profileImageUri, userStorage]);
 
   const removeProfileImage = useCallback(async () => {
-    setProfileImageUri(null);
-
     try {
-      await userStorage?.removeItem(profileImageStorageKey);
-    } catch {
-      // The generated avatar is already restored for the active session.
+      if (mode === 'api') {
+        await accountSettings.removeAvatar();
+      } else {
+        await userStorage?.removeItem(profileImageStorageKey);
+      }
+      setProfileImageUri(null);
+      setProfileImageStatus(null);
+    } catch (error) {
+      throw error;
     }
-  }, [userStorage]);
+  }, [accountSettings, mode, userStorage]);
 
   const setPublicIdentity = useCallback(async (identity: PublicIdentity) => {
     const normalized = normalizePublicIdentity(identity);
@@ -151,6 +184,7 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       hasPublicIdentity,
       identityMode: publicIdentity.mode,
       profileImageUri,
+      profileImageStatus,
       profileReady,
       publicIdentity,
       publicName,
@@ -162,6 +196,7 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     [
       hasPublicIdentity,
       profileImageUri,
+      profileImageStatus,
       profileReady,
       publicIdentity,
       publicName,

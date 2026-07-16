@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -6,28 +6,47 @@ import {
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { isGoGymGoPartnerCode } from '@/domain/partnerGymQr';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function IdentityCheckScreen() {
   const router = useRouter();
-  const { activeSession } = useWorkoutProgress();
+  const { qrPayload } = useLocalSearchParams<{ qrPayload?: string }>();
+  const {
+    sessionActionError,
+    sessionActionPending,
+    startWorkoutSession
+  } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const { busy, buttonLabel, message, verify } = usePresenceVerification();
 
-  if (!activeSession || activeSession.verificationMethod !== 'partnerGymQr') {
+  async function confirmPresence() {
+    if (
+      await verify() &&
+      qrPayload &&
+      await startWorkoutSession('partnerGymQr', qrPayload)
+    ) {
+      router.replace('/workout/active');
+    }
+  }
+
+  if (!qrPayload || !isGoGymGoPartnerCode(qrPayload, 'entry')) {
     return (
       <SessionUnavailable
-        body="SCAN A PARTNER-GYM ENTRY QR BEFORE THE IDENTITY CHECK."
+        body="Scan a partner-gym entry QR before the device presence check."
         onAction={() => router.replace('/qr-scanner')}
         title="ENTRY QR REQUIRED"
       />
@@ -35,7 +54,12 @@ export default function IdentityCheckScreen() {
   }
 
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <CyberButtonOutline
           label="BACK"
@@ -54,14 +78,14 @@ export default function IdentityCheckScreen() {
           </TerminalText>
         </HUDBorderBox>
         <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
-          NATIVE BIOMETRIC CHECK
+          LOCAL PRESENCE CHECK
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
           CONFIRM IT IS REALLY YOU
         </TerminalText>
-        <TerminalText style={styles.body} tone="muted" variant="body">
-          THE GYM QR PROVES WHERE THE SESSION STARTS. THE LOCAL BIOMETRIC
-          PROMPT CONFIRMS THE ACCOUNT HOLDER IS PRESENT.
+        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+          The gym QR confirms where the session starts. Your phone then uses
+          its own secure authentication prompt to confirm you are present.
         </TerminalText>
       </View>
 
@@ -73,17 +97,32 @@ export default function IdentityCheckScreen() {
       />
 
       <CyberButtonPrimary
-        disabled={!cameraConsentReady || !cameraConsentAccepted}
-        label="CONTINUE TO SESSION ->"
-        onPress={() => router.replace('/workout/active')}
+        disabled={
+          !cameraConsentReady ||
+          !cameraConsentAccepted ||
+          busy ||
+          sessionActionPending
+        }
+        label={sessionActionPending
+          ? 'STARTING SESSION...'
+          : busy
+            ? 'CHECKING DEVICE...'
+            : buttonLabel}
+        onPress={() => void confirmPresence()}
       />
+      {message || sessionActionError ? (
+        <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+          {sessionActionError ?? message}
+        </TerminalText>
+      ) : null}
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
@@ -141,5 +180,9 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
+  },
+  statusMessage: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
   }
 });

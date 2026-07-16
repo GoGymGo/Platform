@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -29,6 +30,9 @@ export class MeResponseDto {
 
   @ApiProperty({ type: String })
   callsign!: string;
+
+  @ApiProperty({ type: String })
+  screenName!: string;
 
   @ApiProperty({ nullable: true, type: String })
   email!: string | null;
@@ -68,6 +72,20 @@ export class UpdatePrivacySettingsDto {
 }
 
 export class UpdateMeDto {
+  @ApiPropertyOptional({
+    description: 'Unique, case-insensitive alias used for friend search',
+    example: 'GHOST_RUNNER',
+    maxLength: 24,
+    minLength: 3,
+    pattern: '^[A-Za-z0-9_]+$',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 24)
+  @Matches(/^[A-Za-z0-9_]+$/)
+  screenName?: string;
+
   @ApiPropertyOptional({ enum: publicIdentityModes, type: String })
   @IsOptional()
   @IsIn(publicIdentityModes)

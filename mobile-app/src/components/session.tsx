@@ -30,7 +30,7 @@ export function SessionUnavailable({
         <TerminalText glow style={styles.title} tone="text" variant="title">
           {title}
         </TerminalText>
-        <TerminalText style={styles.body} tone="muted" variant="body">
+        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           {body}
         </TerminalText>
         <CyberButtonPrimary

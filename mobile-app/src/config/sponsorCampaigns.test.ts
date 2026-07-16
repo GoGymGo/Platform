@@ -10,10 +10,7 @@ describe('regional sponsor campaign resolution', () => {
     assert.equal(campaign.id, 'toronto-2026-07-volt');
     assert.equal(campaign.sponsor.shortName, 'VOLT');
     assert.equal(campaign.status, 'approved');
-    assert.equal(campaign.economics.sponsorPerVerifiedUser, 3);
-    assert.equal(campaign.economics.prizeDrawPerVerifiedUser, 2);
-    assert.equal(campaign.economics.prizeDrawWinnerRate, 0.15);
-    assert.equal(campaign.economics.prizeDrawPayoutExponent, 0.5);
+    assert.equal(campaign.economics.rewardWinnerRate, 0.15);
     assert.equal(campaign.enrollmentPolicy.minimumEntrants, 100);
     assert.equal(campaign.enrollmentPolicy.maximumEntrants, null);
     assert.deepEqual(campaign.economics.categoryPodiumMultipliers, {

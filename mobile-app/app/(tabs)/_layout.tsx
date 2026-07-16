@@ -1,8 +1,11 @@
-import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View, type ColorValue, type ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs, useRouter } from 'expo-router';
+import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
-import { colors, fontFamilies, fontSizes } from '@/constants/theme';
+import { TerminalText } from '@/components/cyber';
+import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const tabScreenOptions = {
   headerShown: false,
@@ -29,117 +32,145 @@ const tabScreenOptions = {
 } as const;
 
 export default function TabsLayout() {
+  const router = useRouter();
+  const { activeSession } = useWorkoutProgress();
+
   return (
     <AuthGate>
-      <Tabs screenOptions={tabScreenOptions}>
-      <Tabs.Screen
-        name="home/index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          title: 'Calendar',
-          tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
-        }}
-      />
-      <Tabs.Screen
-        name="session"
-        options={{
-          title: 'Session',
-          tabBarIcon: ({ color, focused }) => (
-            <SessionGlyph color={color} focused={focused} />
-          )
-        }}
-      />
-      <Tabs.Screen
-        name="leaderboard"
-        options={{
-          title: 'Ranks',
-          tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
-        }}
-      />
-      <Tabs.Screen
-        name="workouts"
-        options={{
-          href: null,
-          title: 'Workouts'
-        }}
-      />
-      <Tabs.Screen
-        name="squad"
-        options={{
-          href: null,
-          title: 'Period Match',
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => <TabGlyph color={color} focused={focused} />
-        }}
-      />
-      </Tabs>
+      <View style={styles.layout}>
+        <Tabs screenOptions={tabScreenOptions}>
+          <Tabs.Screen
+            name="home/index"
+            options={{
+              title: 'Home',
+              tabBarAccessibilityLabel: 'Home tab',
+              tabBarIcon: ({ color, focused, size }) => (
+                <Ionicons color={color} name={focused ? 'home' : 'home-outline'} size={size} />
+              )
+            }}
+          />
+          <Tabs.Screen
+            name="calendar"
+            options={{
+              title: 'Log',
+              tabBarAccessibilityLabel: 'Workout history tab',
+              tabBarIcon: ({ color, focused, size }) => (
+                <Ionicons color={color} name={focused ? 'calendar' : 'calendar-outline'} size={size} />
+              )
+            }}
+          />
+          <Tabs.Screen
+            name="session"
+            options={{
+              title: activeSession ? 'Active' : 'Start',
+              tabBarBadge: activeSession ? 'LIVE' : undefined,
+              tabBarBadgeStyle: styles.liveBadge,
+              tabBarAccessibilityLabel: 'Start session tab',
+              tabBarIcon: ({ color, focused }) => (
+                <Ionicons color={color} name={focused ? 'play-circle' : 'play-circle-outline'} size={30} />
+              )
+            }}
+          />
+          <Tabs.Screen
+            name="leaderboard"
+            options={{
+              title: 'Ranks',
+              tabBarAccessibilityLabel: 'Competition rankings tab',
+              tabBarIcon: ({ color, focused, size }) => (
+                <Ionicons color={color} name={focused ? 'trophy' : 'trophy-outline'} size={size} />
+              )
+            }}
+          />
+          <Tabs.Screen
+            name="workouts"
+            options={{
+              href: null,
+              title: 'Workouts'
+            }}
+          />
+          <Tabs.Screen
+            name="squad"
+            options={{
+              href: null,
+              title: 'Weekly Challenge'
+            }}
+          />
+          <Tabs.Screen
+            name="profile"
+            options={{
+              title: 'Me',
+              tabBarAccessibilityLabel: 'Profile tab',
+              tabBarIcon: ({ color, focused, size }) => (
+                <Ionicons color={color} name={focused ? 'person' : 'person-outline'} size={size} />
+              )
+            }}
+          />
+        </Tabs>
+      {activeSession ? (
+        <Pressable
+          accessibilityHint="Return to the active workout timer"
+          accessibilityRole="button"
+          onPress={() => router.push('/workout/active')}
+          style={({ pressed }) => [styles.activeBanner, pressed ? styles.pressed : null]}
+        >
+          <View style={styles.liveDot} />
+          <View style={styles.activeCopy}>
+            <TerminalText glow tone="green" variant="micro">
+              SESSION ACTIVE
+            </TerminalText>
+            <TerminalText tone="text" uppercase={false} variant="body">
+              Tap to return to your timer and verification status.
+            </TerminalText>
+          </View>
+          <TerminalText glow tone="cyan" variant="button">
+            -&gt;
+          </TerminalText>
+        </Pressable>
+      ) : null}
+      </View>
     </AuthGate>
   );
 }
 
-function TabGlyph({ color, focused }: { color: ColorValue; focused: boolean }) {
-  return (
-    <View
-      style={[
-        styles.glyph,
-        {
-          backgroundColor: focused ? color : colors.transparent,
-          borderColor: color
-        }
-      ]}
-    />
-  );
-}
-
-function SessionGlyph({ color, focused }: { color: ColorValue; focused: boolean }) {
-  return (
-    <View
-      style={[
-        styles.sessionGlyph,
-        focused ? styles.sessionGlyphActive : null,
-        {
-          borderColor: color
-        }
-      ]}
-    >
-      <View style={[styles.sessionGlyphCore, { backgroundColor: color }]} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  glyph: {
-    width: 18,
-    height: 5,
-    borderWidth: 1,
-    borderRadius: 5
+  layout: {
+    flex: 1,
+    backgroundColor: colors.background
   },
-  sessionGlyph: {
-    width: 28,
-    height: 28,
+  liveBadge: {
+    color: colors.textOnPrimary,
+    backgroundColor: colors.statusSuccess,
+    fontFamily: fontFamilies.terminal,
+    fontSize: 9
+  },
+  activeBanner: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: 82,
+    left: spacing.md,
+    zIndex: 20,
+    minHeight: 58,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceCyanGhost
+    borderColor: colors.borderSuccessGlow,
+    borderRadius: 12,
+    backgroundColor: colors.panelAlpha84
   },
-  sessionGlyphActive: {
-    backgroundColor: colors.surfaceCyanActive
+  activeCopy: {
+    minWidth: 0,
+    flex: 1
   },
-  sessionGlyphCore: {
-    width: 9,
-    height: 9,
-    borderRadius: 5
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.statusSuccess
+  },
+  pressed: {
+    opacity: 0.72
   }
 });

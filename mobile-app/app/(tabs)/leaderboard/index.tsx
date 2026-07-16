@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -10,21 +10,23 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
+import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import type { CategoryLeaderboardRow } from '@/data/appData';
-import { useAppData, useCategoryLeaderboard } from '@/data/appDataHooks';
+import { useAppData, useCategoryLeaderboard, useMyStreaks } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
 import { useProfile } from '@/state/profile';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const goalCategories = [1, 2, 3, 4, 5, 6, 7] as const satisfies readonly GoalCategory[];
 
 export default function LeaderboardScreen() {
   const router = useRouter();
+  const { width: viewportWidth } = useWindowDimensions();
+  const compactRankings = viewportWidth < 360;
   const { publicName } = useProfile();
-  const { campaign, economics } = useSponsorCampaign();
+  const { campaign } = useSponsorCampaign();
   const {
     competition,
     weeklyGoal
@@ -36,6 +38,7 @@ export default function LeaderboardScreen() {
   const { mode: appDataMode } = useAppData();
   const { data: selectedLeaderboard, isPending: leaderboardPending } =
     useCategoryLeaderboard(displayedGoal);
+  const { data: streakSummary } = useMyStreaks();
   const competitionNotStarted = competition.phase === 'before-month';
   const hasSettledWeek = competition.periodResults.some((period) => period.status === 'settled');
   const categoryScore = competition.periodEntriesBeforePerfectMonth;
@@ -47,7 +50,6 @@ export default function LeaderboardScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorBanner compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -62,7 +64,7 @@ export default function LeaderboardScreen() {
           </TerminalText>
           <TerminalText style={styles.intro} tone="muted" uppercase={false} variant="body">
             Category Score determines your rank. Prize Draw Entries determine
-            your odds of being paid.
+            your odds of winning an available brand reward.
           </TerminalText>
         </View>
 
@@ -72,9 +74,12 @@ export default function LeaderboardScreen() {
               <TerminalText tone="dim" variant="label">
                 YOUR STANDING
               </TerminalText>
-              <TerminalText style={styles.myName} tone="text" uppercase={false} variant="body">
-                {publicName}
-              </TerminalText>
+              <UserAlias
+                alias={publicName}
+                streaks={streakSummary?.streaks}
+                textStyle={styles.myName}
+                uppercase={false}
+              />
             </View>
             <TerminalText glow tone="cyan" variant="label">
               {weeklyGoal}-DAY CATEGORY
@@ -95,7 +100,7 @@ export default function LeaderboardScreen() {
               <View style={styles.standingMetrics}>
                 <View style={styles.standingMetric}>
                   <TerminalText glow style={styles.standingValue} tone="cyan" variant="value">
-                    {hasSettledWeek ? 'SYNCING' : 'PENDING'}
+                    —
                   </TerminalText>
                   <TerminalText tone="muted" variant="micro">
                     CURRENT RANK
@@ -111,14 +116,21 @@ export default function LeaderboardScreen() {
                   </TerminalText>
                 </View>
               </View>
-              <TerminalText tone="dim" variant="caption">
+              <TerminalText live="polite" tone="dim" uppercase={false} variant="caption">
                 {hasSettledWeek
-                  ? 'CURRENT CATEGORY RANK UPDATES AFTER EACH SCORING WEEK.'
-                  : 'YOUR FIRST RANK APPEARS WHEN THE CURRENT SCORING WEEK SETTLES.'}
+                  ? 'Rank syncing. Category rankings update after each scoring week.'
+                  : 'Pending. Your first rank appears when the current scoring week settles.'}
               </TerminalText>
             </>
           )}
         </HUDBorderBox>
+
+        <CyberButtonOutline
+          accessibilityHint="Opens the current Weekly Challenge and weekly multiplier progress"
+          label="VIEW WEEKLY CHALLENGE ->"
+          onPress={() => router.push('/squad')}
+          style={styles.periodMatchButton}
+        />
 
         {previewMode ? (
           <CyberButtonOutline
@@ -177,6 +189,7 @@ export default function LeaderboardScreen() {
           <View style={styles.topTenList}>
             {selectedLeaderboard?.rows.map((row) => (
               <LeaderboardResultRow
+                compact={compactRankings}
                 isCurrentUser={row.alias.toLowerCase() === publicName.toLowerCase()}
                 key={row.rank}
                 multiplier={row.rank <= 3
@@ -213,7 +226,7 @@ export default function LeaderboardScreen() {
             <HUDBorderBox style={styles.rankingRules} tone="muted">
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Category Score updates after each scoring week settles and includes
-                that week&apos;s 1x, 2x or 3x Period Match result.
+                that week&apos;s 1x, 2x or 3x Weekly Challenge result.
               </TerminalText>
               <TerminalText tone="dim" uppercase={false} variant="caption">
                 Equal scores are resolved by verified competition days, then the
@@ -232,18 +245,18 @@ export default function LeaderboardScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/leaderboard/draw')}
+          onPress={() => router.push('/leaderboard/rewards')}
           style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
         >
           <HUDBorderBox glow={sponsorConfirmed} style={styles.drawCard} tone={sponsorConfirmed ? 'pink' : 'cyan'}>
             <View style={styles.drawCopy}>
               <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="micro">
-                PRIZE DRAW // 15% OF PLAYERS GET PAID
+                REGIONAL CONTEST // BRAND REWARDS
               </TerminalText>
               <TerminalText style={styles.drawTitle} tone="text" variant="body">
                 {sponsorConfirmed
-                  ? `${formatCampaignCurrency(economics.prizeDrawAmount)} PAYOUT POOL`
-                  : 'PRIZE DETAILS PUBLISHED SOON'}
+                  ? 'VIEW PHYSICAL PRIZES + COUPON CODES'
+                  : 'REWARD DETAILS PUBLISHED SOON'}
               </TerminalText>
             </View>
             <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="button">
@@ -257,16 +270,22 @@ export default function LeaderboardScreen() {
 }
 
 function LeaderboardResultRow({
+  compact,
   isCurrentUser,
   multiplier,
   row
 }: {
+  compact: boolean;
   isCurrentUser: boolean;
   multiplier?: number;
   row: CategoryLeaderboardRow;
 }) {
   return (
-    <View style={[styles.resultRow, isCurrentUser ? styles.currentUserRow : null]}>
+    <View style={[
+      styles.resultRow,
+      compact ? styles.resultRowCompact : null,
+      isCurrentUser ? styles.currentUserRow : null
+    ]}>
       <TerminalText
         glow={row.rank <= 3}
         style={styles.rankText}
@@ -276,9 +295,15 @@ function LeaderboardResultRow({
         {String(row.rank).padStart(2, '0')}
       </TerminalText>
       <View style={styles.resultCopy}>
-        <TerminalText style={styles.resultName} tone="text" variant="body">
-          {row.alias}
-        </TerminalText>
+        <UserAlias
+          alias={row.alias}
+          streaks={row.streaks}
+          style={[
+            styles.resultIdentity,
+            compact ? styles.resultIdentityCompact : null
+          ]}
+          textStyle={styles.resultName}
+        />
         {isCurrentUser ? (
           <TerminalText tone="cyan" variant="micro">
             YOU
@@ -364,6 +389,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.lg
   },
+  periodMatchButton: {
+    marginBottom: spacing.sm
+  },
   previewStandingsButton: {
     marginBottom: spacing.lg
   },
@@ -422,6 +450,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.borderCyanSubtle
   },
+  resultRowCompact: {
+    minHeight: 72
+  },
   currentUserRow: {
     borderLeftWidth: 2,
     borderLeftColor: colors.cyan,
@@ -436,7 +467,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flex: 1
   },
+  resultIdentity: {
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs
+  },
+  resultIdentityCompact: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2
+  },
   resultName: {
+    flexShrink: 1,
     fontFamily: fontFamilies.bodyStrong
   },
   multiplierBadge: {

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -9,13 +9,9 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail } from '@/components/sponsor';
 import { isLocalPreviewEnabled } from '@/config/firebase';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
-import {
-  formatCampaignCurrency,
-  useSponsorCampaign
-} from '@/state/sponsorCampaign';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 type Accent = 'cyan';
 
@@ -45,7 +41,9 @@ const welcomeSteps: readonly WelcomeStep[] = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { campaign, economics } = useSponsorCampaign();
+  const { width: viewportWidth } = useWindowDimensions();
+  const { campaign } = useSponsorCampaign();
+  const compactLogo = viewportWidth < 360;
   const sponsorConfirmed = campaign.status === 'approved';
 
   return (
@@ -55,7 +53,6 @@ export default function WelcomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <SponsorRail style={styles.sponsorBanner} />
 
         <View style={styles.introStack}>
           <View style={styles.statusRail}>
@@ -67,13 +64,28 @@ export default function WelcomeScreen() {
 
           <View style={styles.logoShell}>
             <View style={styles.logoRow}>
-              <TerminalText glow style={styles.logoWord} tone="cyan" variant="display">
+              <TerminalText
+                glow
+                style={[styles.logoWord, compactLogo ? styles.logoWordCompact : null]}
+                tone="cyan"
+                variant="display"
+              >
                 GO
               </TerminalText>
-              <TerminalText glow style={styles.logoWord} tone="pink" variant="display">
+              <TerminalText
+                glow
+                style={[styles.logoWord, compactLogo ? styles.logoWordCompact : null]}
+                tone="pink"
+                variant="display"
+              >
                 GYM
               </TerminalText>
-              <TerminalText glow style={styles.logoWord} tone="cyan" variant="display">
+              <TerminalText
+                glow
+                style={[styles.logoWord, compactLogo ? styles.logoWordCompact : null]}
+                tone="cyan"
+                variant="display"
+              >
                 GO
               </TerminalText>
             </View>
@@ -88,6 +100,24 @@ export default function WelcomeScreen() {
           <TerminalText style={styles.sponsorLine} tone="dim" variant="label">
             FREE TO PLAY // FUNDED BY SPONSORS
           </TerminalText>
+
+          <View style={styles.primaryActions}>
+            <CyberButtonPrimary
+              label="GET STARTED ->"
+              onPress={() => router.push('/join')}
+            />
+            <CyberButtonOutline
+              accessibilityHint="Open the returning player sign-in screen"
+              label="SIGN IN"
+              onPress={() => router.push('/sign-in')}
+            />
+            {isLocalPreviewEnabled ? (
+              <CyberButtonOutline
+                label="PREVIEW APP FLOW"
+                onPress={() => router.push('/identity')}
+              />
+            ) : null}
+          </View>
 
           <HUDBorderBox glow style={styles.entryPanel} tone="cyan">
             <TerminalText style={styles.entryIntro} tone="muted" variant="label">
@@ -110,9 +140,7 @@ export default function WelcomeScreen() {
                   tone={sponsorConfirmed ? 'pink' : 'cyan'}
                   variant="title"
                 >
-                  {sponsorConfirmed
-                    ? formatCampaignCurrency(economics.prizeDrawAmount)
-                    : 'PUBLISHED\nSOON'}
+                  {sponsorConfirmed ? 'PRIZES\n+ CODES' : 'PUBLISHED\nSOON'}
                 </TerminalText>
               </View>
               <View style={[styles.sponsorAd, !sponsorConfirmed && styles.pendingSponsorAd]}>
@@ -131,22 +159,10 @@ export default function WelcomeScreen() {
               tone={sponsorConfirmed ? 'pink' : 'cyan'}
               variant="label"
             >
-              15% OF PLAYERS GET PAID
+              PHYSICAL PRIZES + COUPON CODES
             </TerminalText>
           </HUDBorderBox>
 
-          <View style={styles.primaryActions}>
-            <CyberButtonPrimary
-              label="CREATE ACCOUNT ->"
-              onPress={() => router.push('/join')}
-            />
-            {isLocalPreviewEnabled ? (
-              <CyberButtonOutline
-                label="PREVIEW APP FLOW"
-                onPress={() => router.push('/identity')}
-              />
-            ) : null}
-          </View>
         </View>
       </ScreenScrollView>
     </ScreenContainer>
@@ -212,14 +228,18 @@ const styles = StyleSheet.create({
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap'
+    justifyContent: 'center'
   },
   logoWord: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.logo,
     lineHeight: 58,
     letterSpacing: 1.2
+  },
+  logoWordCompact: {
+    fontSize: 40,
+    lineHeight: 48,
+    letterSpacing: 0.7
   },
   primaryActions: {
     width: '100%',

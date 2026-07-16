@@ -1,11 +1,13 @@
 import { createElement, type PropsWithChildren, type ReactNode } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
   type GestureResponderEvent,
+  type AccessibilityRole,
   type PressableStateCallbackType,
   type StyleProp,
   type TextStyle,
@@ -36,8 +38,10 @@ type ScreenContainerProps = PropsWithChildren<{
 }>;
 
 type TerminalTextProps = {
+  accessibilityRole?: AccessibilityRole;
   children?: ReactNode;
   glow?: boolean;
+  live?: 'polite' | 'assertive';
   style?: StyleProp<TextStyle>;
   tone?: TerminalTone;
   uppercase?: boolean;
@@ -51,11 +55,17 @@ type HUDBorderBoxProps = PropsWithChildren<{
 }>;
 
 type CyberButtonProps = {
+  accessibilityHint?: string;
   disabled?: boolean;
   label: string;
   onPress?: (event: GestureResponderEvent) => void;
   style?: StyleProp<ViewStyle>;
   tone?: CyberButtonTone;
+};
+
+type ScreenLoadingStateProps = {
+  body?: string;
+  label?: string;
 };
 
 const terminalToneStyles: Record<TerminalTone, TextStyle> = {
@@ -175,8 +185,10 @@ export function ScreenContainer({
 }
 
 export function TerminalText({
+  accessibilityRole,
   children,
   glow = false,
+  live,
   style,
   tone = 'text',
   uppercase,
@@ -188,6 +200,11 @@ export function TerminalText({
   return createElement(
     Text,
     {
+      accessibilityLiveRegion: live,
+      accessibilityRole: accessibilityRole ?? (variant === 'title' ? 'header' : undefined),
+      allowFontScaling: true,
+      maxFontSizeMultiplier:
+        variant === 'display' || variant === 'value' ? 1.5 : 2,
       style: [
         cyberStyles.terminalBase,
         cyberStyles[variant],
@@ -198,6 +215,35 @@ export function TerminalText({
       ]
     },
     children
+  );
+}
+
+export function ScreenLoadingState({
+  body,
+  label = 'LOADING GOGYMGO'
+}: ScreenLoadingStateProps) {
+  return createElement(
+    ScreenContainer,
+    { contentStyle: cyberStyles.stateScreen },
+    createElement(ActivityIndicator, { color: colors.cyan, size: 'large' }),
+    createElement(
+      TerminalText,
+      { glow: true, live: 'polite', tone: 'cyan', variant: 'label' },
+      label
+    ),
+    body
+      ? createElement(
+          TerminalText,
+          {
+            live: 'polite',
+            style: cyberStyles.stateBody,
+            tone: 'muted',
+            uppercase: false,
+            variant: 'body'
+          },
+          body
+        )
+      : null
   );
 }
 
@@ -222,6 +268,7 @@ export function HUDBorderBox({
 }
 
 export function CyberButtonPrimary({
+  accessibilityHint,
   disabled = false,
   label,
   onPress,
@@ -232,6 +279,8 @@ export function CyberButtonPrimary({
     Pressable,
     {
       accessibilityRole: 'button',
+      accessibilityHint,
+      accessibilityState: { disabled },
       disabled,
       onPress,
       style: ({ pressed }: PressableStateCallbackType) => [
@@ -248,6 +297,7 @@ export function CyberButtonPrimary({
 }
 
 export function CyberButtonOutline({
+  accessibilityHint,
   disabled = false,
   label,
   onPress,
@@ -258,6 +308,8 @@ export function CyberButtonOutline({
     Pressable,
     {
       accessibilityRole: 'button',
+      accessibilityHint,
+      accessibilityState: { disabled },
       disabled,
       onPress,
       style: ({ pressed }: PressableStateCallbackType) => [
@@ -360,12 +412,22 @@ const cyberStyles = StyleSheet.create({
     gap: spacing.sm
   },
   pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.985 }]
+    opacity: 0.72
   },
   disabled: {
     opacity: 0.42,
     borderColor: colors.borderMutedDisabled,
     backgroundColor: colors.panelSoft
+  },
+  stateScreen: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xxl,
+    backgroundColor: colors.background
+  },
+  stateBody: {
+    maxWidth: 320,
+    textAlign: 'center'
   }
 });

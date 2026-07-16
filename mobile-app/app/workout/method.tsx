@@ -13,6 +13,7 @@ import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
+  getPreferenceOwnerId,
   savePreferredVerificationMethod,
   type PreferredVerificationMethod
 } from '@/state/onboardingPreferences';
@@ -26,13 +27,13 @@ type VerificationOption = {
 
 const verificationOptions: readonly VerificationOption[] = [
   {
-    body: 'USE YOUR LINKED WATCH, STRAP OR HEART-RATE SOURCE.',
+    body: 'Use your linked watch, strap, or heart-rate source.',
     method: 'heartRate',
     route: '/workout/check-in',
     title: 'HEART-RATE DEVICE'
   },
   {
-    body: 'SCAN IN AND OUT AT A PARTICIPATING PARTNER GYM.',
+    body: 'Scan in and out at a participating partner gym.',
     method: 'partnerGymQr',
     route: '/qr-scanner',
     title: 'PARTNER GYM QR'
@@ -42,6 +43,7 @@ const verificationOptions: readonly VerificationOption[] = [
 export default function WorkoutMethodScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('heartRate');
   const [preferredSourceLabel, setPreferredSourceLabel] = useState('HEART-RATE DEVICE');
   const orderedOptions = useMemo(
@@ -53,20 +55,20 @@ export default function WorkoutMethodScreen() {
   );
 
   useEffect(() => {
-    if (!user) {
+    if (!preferenceOwnerId) {
       return;
     }
 
-    void getVerificationPreference(user.uid).then((preference) => {
+    void getVerificationPreference(preferenceOwnerId).then((preference) => {
       setPreferredMethod(preference.method);
       setPreferredSourceLabel(preference.sourceLabel);
     });
-  }, [user]);
+  }, [preferenceOwnerId]);
 
   async function chooseMethod(option: VerificationOption) {
     setPreferredMethod(option.method);
-    if (user) {
-      await savePreferredVerificationMethod(user.uid, option.method);
+    if (preferenceOwnerId) {
+      await savePreferredVerificationMethod(preferenceOwnerId, option.method);
     }
     router.push(option.route);
   }
@@ -121,9 +123,9 @@ export default function WorkoutMethodScreen() {
           <TerminalText glow tone="cyan" variant="label">
             VERIFICATION RULE
           </TerminalText>
-          <TerminalText style={styles.noteCopy} tone="muted" variant="body">
-            YOUR DEFAULT METHOD APPEARS FIRST. BOTH METHODS REQUIRE CHECK-IN,
-            A MID-SESSION IDENTITY CHECK AND CHECK-OUT BEFORE THE WORKOUT COUNTS.
+          <TerminalText style={styles.noteCopy} tone="muted" uppercase={false} variant="body">
+            Your default method appears first. Both methods require check-in,
+            a mid-session presence check, and check-out before the workout counts.
           </TerminalText>
         </HUDBorderBox>
 

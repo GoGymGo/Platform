@@ -10,19 +10,34 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
   const router = useRouter();
-  const { startWorkoutSession } = useWorkoutProgress();
+  const {
+    sessionActionError,
+    sessionActionPending,
+    startWorkoutSession
+  } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const { busy, buttonLabel, message, verify } = usePresenceVerification();
+
+  async function confirmPresence() {
+    if (!(await verify())) {
+      return;
+    }
+
+    if (await startWorkoutSession('heartRate')) {
+      router.push('/workout/active');
+    }
+  }
 
   return (
     <ScreenContainer>
@@ -42,8 +57,6 @@ export default function CheckInScreen() {
           </TerminalText>
         </View>
 
-        <SponsorRail compact />
-
         <View style={styles.centerContent}>
           <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
             <TerminalText glow style={styles.scanIcon} tone="cyan" variant="value">
@@ -51,14 +64,14 @@ export default function CheckInScreen() {
             </TerminalText>
           </HUDBorderBox>
           <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
-            NATIVE BIOMETRIC CHECK
+            LOCAL PRESENCE CHECK
           </TerminalText>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             {"VERIFY IT'S YOU TO START"}
           </TerminalText>
-          <TerminalText style={styles.body} tone="muted" variant="body">
-            THE DEVICE CONFIRMS PRESENCE ONLY. GOGYMGO STORES THE CHECKPOINT
-            RESULT, NOT FACE DATA OR BIOMETRIC DATA.
+          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+            Your phone asks for Face ID, Touch ID, fingerprint, or its passcode.
+            GoGymGo receives only the pass or fail result, never biometric data.
           </TerminalText>
         </View>
 
@@ -70,13 +83,24 @@ export default function CheckInScreen() {
         />
 
         <CyberButtonPrimary
-          disabled={!cameraConsentReady || !cameraConsentAccepted}
-          label="VERIFY BIOMETRIC ->"
-          onPress={() => {
-            startWorkoutSession('heartRate');
-            router.push('/workout/active');
-          }}
+          disabled={
+            !cameraConsentReady ||
+            !cameraConsentAccepted ||
+            busy ||
+            sessionActionPending
+          }
+          label={sessionActionPending
+            ? 'STARTING SESSION...'
+            : busy
+              ? 'CHECKING DEVICE...'
+              : buttonLabel}
+          onPress={() => void confirmPresence()}
         />
+        {message || sessionActionError ? (
+          <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+            {sessionActionError ?? message}
+          </TerminalText>
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -143,5 +167,9 @@ const styles = StyleSheet.create({
   },
   cameraConsent: {
     marginBottom: spacing.md
+  },
+  statusMessage: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
   }
 });

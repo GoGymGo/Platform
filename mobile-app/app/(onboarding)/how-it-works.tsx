@@ -10,7 +10,6 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
@@ -20,7 +19,7 @@ const loopSteps = [
   ['COMMIT', 'Choose 1-7 verified workout days per week.'],
   ['VERIFY', 'Use a heart-rate device or partner-gym QR.'],
   ['BUILD ODDS', 'Earn prize draw entries through consistency.'],
-  ['GET PAID', 'If you win money, connect a bank account securely through Hyperwallet.']
+  ['CLAIM REWARD', 'If you win, claim the physical prize or coupon code in My Rewards.']
 ] as const;
 
 export default function HowItWorksScreen() {
@@ -57,7 +56,6 @@ export default function HowItWorksScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -97,7 +95,7 @@ export default function HowItWorksScreen() {
             BONUSES ARRIVE WHEN THEY MATTER
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Your Period Match appears when each scoring week starts. Category,
+            Your Weekly Challenge appears when each scoring week starts. Category,
             Bonus Day and Perfect Month results are introduced as they become active.
           </TerminalText>
           <CyberButtonPrimary
@@ -106,15 +104,14 @@ export default function HowItWorksScreen() {
           />
         </HUDBorderBox>
 
-        <HUDBorderBox style={styles.payoutNote} tone="cyan">
+        <HUDBorderBox style={styles.rewardNote} tone="cyan">
           <TerminalText glow tone="cyan" variant="label">
-            WINNER PAYOUTS // HYPERWALLET
+            BRAND REWARDS // NO PAYMENT SETUP
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            You do not need a payout account now. If you win money, GoGymGo will notify
-            you and unlock a secure Hyperwallet setup link in your Profile. Hyperwallet
-            collects your identity, tax and bank details directly so GoGymGo never stores
-            your full bank information.
+            If you win, GoGymGo will add the exact physical prize or coupon code to
+            My Rewards. Claim instructions are provided by the sponsoring brand, and
+            no bank account is connected to GoGymGo.
           </TerminalText>
         </HUDBorderBox>
 
@@ -123,10 +120,10 @@ export default function HowItWorksScreen() {
             SCORING ORDER
           </TerminalText>
           <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
-            01 // PERIOD MATCH BONUSES
+            01 // WEEKLY CHALLENGE BONUSES
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            You and your matched player both hit the goal: 2X each. If they miss and
+            You and your Weekly Challenge partner both hit the goal: 2X each. If they miss and
             you complete one extra verified workout, you earn 3X. When your goal uses
             every available day, 3X is automatic if they miss. Add the four settled
             weekly results.
@@ -136,7 +133,7 @@ export default function HowItWorksScreen() {
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
             Finishing first, second or third in your commitment category multiplies
-            the subtotal from your four Period Match results.
+            the subtotal from your four Weekly Challenge results.
           </TerminalText>
           {categoryMultipliers.map((multiplier, index) => (
             <TerminalText
@@ -146,7 +143,7 @@ export default function HowItWorksScreen() {
               uppercase={false}
               variant="body"
             >
-              {`${index + 1}${index === 0 ? 'st' : index === 1 ? 'nd' : 'rd'} place: ${multiplier}X your Period Match subtotal`}
+              {`${index + 1}${index === 0 ? 'st' : index === 1 ? 'nd' : 'rd'} place: ${multiplier}X your Weekly Challenge subtotal`}
             </TerminalText>
           ))}
           <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
@@ -165,7 +162,7 @@ export default function HowItWorksScreen() {
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
             Hit your weekly goal in all four scoring weeks to earn the Perfect Month.
-            Its final 10X multiplies the combined Period Match subtotal, category-finish
+            Its final 10X multiplies the combined Weekly Challenge subtotal, category-finish
             bonus and any Bonus Day entries.
           </TerminalText>
           <View style={styles.exampleBlock}>
@@ -173,14 +170,14 @@ export default function HowItWorksScreen() {
               EXAMPLE // 4-DAY GOAL
             </TerminalText>
             <TerminalText style={styles.exampleIntro} tone="muted" uppercase={false} variant="body">
-              You hit four verified workout days in all four weeks, you and your matched
-              player both hit each week, and you finish first in your category.
+              You hit four verified workout days in all four weeks, you and your Weekly
+              Challenge partner both hit each week, and you finish first in your category.
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
               Base month: 4 days x 4 weeks = 16
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
-              Period Match bonuses: 16 x 2 = 32
+              Weekly Challenge bonuses: 16 x 2 = 32
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
               First in category: 32 x 3 = 96
@@ -258,7 +255,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.lg
   },
-  payoutNote: {
+  rewardNote: {
     marginTop: spacing.lg,
     gap: spacing.sm,
     padding: spacing.lg

@@ -40,27 +40,29 @@ describeWithDatabase('database migrations', () => {
         'competition_progress',
         'competitions',
         'draw_entries',
-        'draw_winners',
         'demo_verification_checkpoints',
         'entry_ledger',
+        'friend_requests',
+        'friendships',
         'idempotency_keys',
         'legal_document_events',
         'legal_documents',
         'operator_audit_events',
         'partner_applications',
-        'payout_claims',
-        'payout_payments',
-        'payout_release_control',
-        'payout_state_events',
         'profile_media',
         'profiles',
         'privacy_request_events',
         'privacy_requests',
-        'provider_webhooks',
         'push_devices',
         'region_policies',
         'region_verifications',
+        'reward_awards',
+        'reward_catalog_items',
+        'reward_coupon_codes',
         'session_events',
+        'social_challenge_checkins',
+        'social_challenge_members',
+        'social_challenges',
         'users',
         'worker_heartbeats',
         'workout_sessions',
@@ -72,6 +74,74 @@ describeWithDatabase('database migrations', () => {
         "SELECT extname FROM pg_extension WHERE extname = 'btree_gist'",
       ),
     ).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  it('installs social identity, consent, and challenge constraints', async () => {
+    const profileColumn = await pool.query<{
+      data_type: string;
+      is_nullable: string;
+    }>(
+      `SELECT data_type, is_nullable
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'profiles'
+         AND column_name = 'screen_name'`,
+    );
+    const indexes = await pool.query<{ indexname: string }>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE schemaname = 'public'
+         AND indexname IN (
+           'profiles_screen_name_unique',
+           'friend_requests_one_pending_pair'
+         )`,
+    );
+    const constraints = await pool.query<{ conname: string }>(
+      `SELECT conname
+       FROM pg_constraint
+       WHERE conname IN (
+         'friend_requests_distinct_users',
+         'friendships_canonical_pair',
+         'social_challenge_owner_accepted',
+         'social_challenge_checkins_unique_day',
+         'social_challenges_dates_valid',
+         'social_challenges_name_valid'
+       )`,
+    );
+
+    expect(profileColumn.rows).toEqual([
+      { data_type: 'USER-DEFINED', is_nullable: 'NO' },
+    ]);
+    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+      expect.arrayContaining([
+        'friend_requests_one_pending_pair',
+        'profiles_screen_name_unique',
+      ]),
+    );
+    expect(constraints.rows.map((row) => row.conname)).toEqual(
+      expect.arrayContaining([
+        'friend_requests_distinct_users',
+        'friendships_canonical_pair',
+        'social_challenge_checkins_unique_day',
+        'social_challenge_owner_accepted',
+        'social_challenges_dates_valid',
+        'social_challenges_name_valid',
+      ]),
+    );
+  });
+
+  it('installs the verified gym-log index used by streak queries', async () => {
+    const index = await pool.query<{ indexdef: string }>(
+      `SELECT indexdef
+       FROM pg_indexes
+       WHERE schemaname = 'public'
+         AND indexname = 'workout_sessions_user_verified_eligible_date_idx'`,
+    );
+
+    expect(index.rows).toHaveLength(1);
+    expect(index.rows[0].indexdef).toMatch(
+      /\(user_id, eligible_date DESC\).*WHERE \(status = 'verified'/i,
+    );
   });
 
   it('constrains the durable worker heartbeat status', async () => {
@@ -101,11 +171,11 @@ describeWithDatabase('database migrations', () => {
         `INSERT INTO region_policies
            (code, country_code, subdivision_code, metro_name, currency,
             timezone, language_codes, minimum_age, competition_enabled,
-            payout_enabled, boundary_version, policy_version, boundary,
+             boundary_version, policy_version, boundary,
             valid_from, valid_to)
          VALUES
            ('integration-region', 'CA', 'BC', 'Integration Region', 'CAD',
-            'America/Vancouver', ARRAY['en-CA'], 19, TRUE, TRUE,
+             'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
             'boundary-v1', $1,
             ST_GeogFromText('SRID=4326;MULTIPOLYGON(((-123.5 48.3,-123.2 48.3,-123.2 48.6,-123.5 48.3)))'),
             $2, $3)`,
@@ -140,10 +210,10 @@ describeWithDatabase('database migrations', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-          payout_enabled, boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, valid_from)
        VALUES
          ('version-region', 'US', 'WA', 'Version Region', 'USD',
-          'America/Los_Angeles', ARRAY['en-US'], 18, TRUE, TRUE,
+           'America/Los_Angeles', ARRAY['en-US'], 18, TRUE,
           'boundary-v1', 'policy-v1', '2026-01-01T00:00:00.000Z')
        RETURNING id`,
     );
@@ -152,10 +222,10 @@ describeWithDatabase('database migrations', () => {
       id: string;
     }>(
       `INSERT INTO competitions
-         (region_policy_id, month_key, name, currency, rules_version, rules,
+         (region_policy_id, month_key, name, rules_version, rules,
           registration_opens_at, registration_closes_at, starts_at, ends_at)
        VALUES
-         ($1, '2026-09', 'Version Test', 'USD', 'rules-v1', '{}'::jsonb,
+         ($1, '2026-09', 'Version Test', 'rules-v1', '{}'::jsonb,
           '2026-08-01T00:00:00.000Z', '2026-08-31T00:00:00.000Z',
           '2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')
        RETURNING id, configuration_version`,
@@ -186,7 +256,7 @@ describeWithDatabase('database migrations', () => {
     ).rejects.toThrow(/creator_workouts_version_positive/i);
   });
 
-  it('installs append-only triggers for evidence, ledgers, snapshots, and winners', async () => {
+  it('installs append-only and reward-inventory integrity triggers', async () => {
     const triggers = await pool.query<{ trigger_name: string }>(
       `SELECT trigger_name
        FROM information_schema.triggers
@@ -200,18 +270,12 @@ describeWithDatabase('database migrations', () => {
         'account_legal_receipts_append_only',
         'account_legal_receipts_validate',
         'draw_entries_append_only',
-        'draw_winners_append_only',
         'demo_verification_checkpoints_immutable',
         'entry_ledger_append_only',
         'legal_document_events_append_only',
         'legal_documents_append_only',
         'operator_audit_events_append_only',
-        'hyperwallet_users_provider_identity',
-        'payout_claims_financial_integrity',
-        'payout_payments_financial_identity',
-        'payout_release_control_guard',
-        'payout_release_control_delete_guard',
-        'payout_state_events_append_only',
+        'reward_awards_inventory_guard',
         'privacy_request_events_append_only',
         'session_events_append_only',
       ]),

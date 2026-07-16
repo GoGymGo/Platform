@@ -4,7 +4,6 @@ import {
   parseCompetitionRules,
   type CompetitionRules,
 } from '../competitions/competition-rules';
-import type { CompetitionMode } from '../../database/database.types';
 
 const positionSchema = z.tuple([
   z.number().min(-180).max(180),
@@ -104,12 +103,9 @@ export function assertUniqueGoalBrackets(
   }
 }
 
-export function parseAdminCompetitionRules(
-  value: unknown,
-  mode: CompetitionMode = 'cash',
-): CompetitionRules {
+export function parseAdminCompetitionRules(value: unknown): CompetitionRules {
   try {
-    return parseCompetitionRules(value as never, mode);
+    return parseCompetitionRules(value as never);
   } catch {
     throw new BadRequestException({
       code: 'COMPETITION_RULES_INVALID',

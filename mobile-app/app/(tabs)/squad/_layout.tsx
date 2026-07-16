@@ -15,6 +15,7 @@ export default function SquadLayout() {
     <Stack screenOptions={squadScreenOptions}>
       <Stack.Screen name="index" />
       <Stack.Screen name="gym" />
+      <Stack.Screen name="social" />
     </Stack>
   );
 }

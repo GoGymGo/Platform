@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     const result = await bootstrapBcDemoOperator(pool, firebaseUid, reason);
     console.log(JSON.stringify(result, null, 2));
     console.log(
-      'Least-privilege BC demo operator access is ready; cash, payout, and Hyperwallet privileges were not granted.',
+      'Least-privilege BC demo operator access is ready for contest and reward review.',
     );
   } finally {
     await pool.end();

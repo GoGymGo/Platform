@@ -13,11 +13,6 @@ type NullableTimestamp = ColumnType<
 >;
 type DateKey = ColumnType<Date | string, Date | string, Date | string>;
 type BigInteger = ColumnType<string, bigint | number | string, never>;
-type MutableBigInteger = ColumnType<
-  string,
-  bigint | number | string,
-  bigint | number | string
->;
 
 export type AccountStatus = 'active' | 'deleted' | 'suspended';
 export type PublicIdentityMode = 'alias' | 'private' | 'real_name';
@@ -28,7 +23,6 @@ export type RegionVerificationStatus =
 export type IdempotencyState = 'completed' | 'processing';
 export type CompetitionStatus =
   'active' | 'cancelled' | 'draft' | 'registration' | 'settled' | 'settling';
-export type CompetitionMode = 'cash' | 'non_cash_demo';
 export type EnrollmentStatus = 'active' | 'disqualified' | 'withdrawn';
 export type CompetitionMatchStatus =
   'cancelled' | 'matched' | 'searching' | 'settled';
@@ -44,16 +38,10 @@ export type LedgerReason =
   | 'verified_session'
   | 'weekly_match';
 export type DrawStatus = 'cancelled' | 'locked' | 'settled';
-export type PayoutClaimStatus =
-  | 'action_required'
-  | 'cancelled'
-  | 'failed'
-  | 'paid'
-  | 'pending_review'
-  | 'processing'
-  | 'ready'
-  | 'verification_pending';
-export type ProviderWebhookState = 'failed' | 'processed' | 'received';
+export type RewardType = 'coupon' | 'physical';
+export type RewardCatalogStatus = 'archived' | 'draft' | 'published';
+export type RewardAwardStatus =
+  'awarded' | 'cancelled' | 'claimed' | 'fulfilled' | 'redeemed';
 export type PartnerApplicationType = 'creator' | 'gym' | 'sponsor';
 export type PartnerApplicationStatus =
   'approved' | 'in_review' | 'rejected' | 'submitted';
@@ -76,6 +64,28 @@ export type LegalDocumentState = 'published' | 'withdrawn';
 export type LegalReceiptAction = 'accept' | 'acknowledge';
 export type DemoVerificationCheckpointType = 'session_start';
 export type DemoVerificationOutcome = 'simulated';
+export type FriendRequestStatus = 'accepted' | 'declined' | 'pending';
+export type SocialChallengeStatus = 'active' | 'archived';
+export type SocialChallengeType = 'friend' | 'regional';
+export type SocialChallengeActivity =
+  | 'cycling'
+  | 'fitness_class'
+  | 'gym'
+  | 'hiking'
+  | 'other'
+  | 'running'
+  | 'walking';
+export type SocialChallengeTargetPeriod = 'monthly' | 'weekly';
+export type SocialChallengeCheckinSource = 'manual' | 'verified_workout';
+export type SocialChallengeMemberRole = 'member' | 'owner';
+export type SocialChallengeMemberStatus = 'accepted' | 'declined' | 'pending';
+export type ChallengeContactInvitationChannel = 'email' | 'phone';
+export type ChallengeContactInvitationStatus =
+  'claimed' | 'expired' | 'pending' | 'revoked';
+export type WeeklyChallengeRequestStatus =
+  'accepted' | 'cancelled' | 'declined' | 'pending';
+export type CreatorVideoSubmissionStatus =
+  'approved' | 'in_review' | 'rejected' | 'submitted' | 'withdrawn';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -91,11 +101,86 @@ export interface UsersTable {
 export interface ProfilesTable {
   user_id: string;
   callsign: string;
+  screen_name: string;
   public_identity_mode: PublicIdentityMode;
   public_name: string | null;
   avatar_object_key: string | null;
   privacy_settings: ColumnType<JsonValue, JsonValue, JsonValue>;
   version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface FriendRequestsTable {
+  id: Generated<string>;
+  requester_user_id: string;
+  recipient_user_id: string;
+  status: FriendRequestStatus;
+  responded_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface FriendshipsTable {
+  user_a_id: string;
+  user_b_id: string;
+  created_at: Timestamp;
+}
+
+export interface ChallengeContactInvitationsTable {
+  id: Generated<string>;
+  challenge_id: string;
+  inviter_user_id: string;
+  channel: ChallengeContactInvitationChannel;
+  destination_hash: string;
+  destination_hint: string;
+  invite_token_hash: string;
+  status: ChallengeContactInvitationStatus;
+  expires_at: Timestamp;
+  claimed_by_user_id: string | null;
+  created_at: Timestamp;
+  claimed_at: NullableTimestamp;
+}
+
+export interface SocialChallengesTable {
+  id: Generated<string>;
+  owner_user_id: string;
+  name: string;
+  challenge_type: SocialChallengeType;
+  activity: SocialChallengeActivity;
+  activity_label: string;
+  description: string | null;
+  target_count: number;
+  target_period: SocialChallengeTargetPeriod;
+  start_date: DateKey;
+  end_date: DateKey;
+  region_policy_id: string | null;
+  location_name: string | null;
+  scheduled_days: number[];
+  scheduled_time_local: string | null;
+  participant_limit: number | null;
+  status: SocialChallengeStatus;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface SocialChallengeCheckinsTable {
+  id: Generated<string>;
+  challenge_id: string;
+  user_id: string;
+  eligible_date: DateKey;
+  source: SocialChallengeCheckinSource;
+  workout_session_id: string | null;
+  created_at: Timestamp;
+}
+
+export interface SocialChallengeMembersTable {
+  challenge_id: string;
+  user_id: string;
+  role: SocialChallengeMemberRole;
+  status: SocialChallengeMemberStatus;
+  invited_by_user_id: string;
+  responded_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -131,7 +216,6 @@ export interface RegionPoliciesTable {
   language_codes: string[];
   minimum_age: number;
   competition_enabled: boolean;
-  payout_enabled: boolean;
   boundary_version: string;
   policy_version: string;
   boundary: unknown;
@@ -195,9 +279,7 @@ export interface CompetitionsTable {
   region_policy_id: string;
   month_key: string;
   name: string;
-  mode: CompetitionMode;
   status: CompetitionStatus;
-  currency: string;
   rules_version: string;
   rules: ColumnType<JsonValue, JsonValue, JsonValue>;
   configuration_version: Generated<number>;
@@ -302,6 +384,18 @@ export interface CompetitionMatchesTable {
   settled_at: NullableTimestamp;
 }
 
+export interface WeeklyChallengeRequestsTable {
+  id: Generated<string>;
+  competition_id: string;
+  period_index: number;
+  requester_user_id: string;
+  recipient_user_id: string;
+  goal_days: number;
+  status: WeeklyChallengeRequestStatus;
+  created_at: Timestamp;
+  responded_at: NullableTimestamp;
+}
+
 export interface WorkoutSessionsTable {
   id: Generated<string>;
   competition_id: string;
@@ -394,90 +488,50 @@ export interface DrawEntriesTable {
   created_at: Timestamp;
 }
 
-export interface DrawWinnersTable {
+export interface RewardCatalogItemsTable {
+  id: Generated<string>;
+  competition_id: string;
+  sponsor_name: string;
+  title: string;
+  description: string;
+  reward_type: RewardType;
+  status: RewardCatalogStatus;
+  image_url: string | null;
+  terms_url: string | null;
+  claim_url: string | null;
+  fulfillment_instructions: string | null;
+  inventory_total: number;
+  display_order: number;
+  available_from: NullableTimestamp;
+  available_until: NullableTimestamp;
+  version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface RewardAwardsTable {
   id: Generated<string>;
   draw_id: string;
+  reward_catalog_item_id: string;
   user_id: string;
-  payout_rank: number;
-  amount_minor: BigInteger;
-  currency: string;
-  created_at: Timestamp;
-}
-
-export interface PayoutClaimsTable {
-  id: Generated<string>;
-  draw_winner_id: string;
-  user_id: string;
-  status: PayoutClaimStatus;
-  provider: 'hyperwallet';
-  amount_minor: MutableBigInteger;
-  currency: string;
-  approved_by_user_id: string | null;
-  approved_at: NullableTimestamp;
-  paid_at: NullableTimestamp;
-  failure_code: string | null;
-  version: number;
-  created_at: Timestamp;
+  award_rank: number;
+  status: RewardAwardStatus;
+  awarded_at: Timestamp;
+  claimed_at: NullableTimestamp;
+  fulfilled_at: NullableTimestamp;
+  redeemed_at: NullableTimestamp;
   updated_at: Timestamp;
 }
 
-export interface HyperwalletUsersTable {
+export interface RewardCouponCodesTable {
   id: Generated<string>;
-  user_id: string;
-  program_token: string;
-  provider_user_token: string;
-  provider_status: string;
+  reward_catalog_item_id: string;
+  encrypted_code: string;
+  code_fingerprint: string;
+  assigned_award_id: string | null;
   created_at: Timestamp;
-  updated_at: Timestamp;
-}
-
-export interface PayoutPaymentsTable {
-  id: Generated<string>;
-  payout_claim_id: string;
-  client_payment_id: string;
-  provider_payment_token: string | null;
-  provider_status: string;
-  amount_minor: MutableBigInteger;
-  currency: string;
-  created_at: Timestamp;
-  updated_at: Timestamp;
-}
-
-export interface ProviderWebhooksTable {
-  provider_webhook_token: string;
-  provider: 'hyperwallet';
-  event_type: string;
-  provider_created_on: NullableTimestamp;
-  object_token: string | null;
-  object_status: string | null;
-  payload_hash: string | null;
-  normalized_payload: ColumnType<JsonValue, JsonValue, JsonValue>;
-  state: ProviderWebhookState;
-  attempt_count: number;
-  processing_error: string | null;
-  received_at: Timestamp;
-  processed_at: NullableTimestamp;
-}
-
-export interface PayoutStateEventsTable {
-  id: Generated<string>;
-  payout_claim_id: string;
-  previous_status: PayoutClaimStatus | null;
-  next_status: PayoutClaimStatus;
-  source: string;
-  source_event_id: string;
-  metadata: ColumnType<JsonValue, JsonValue, never>;
-  created_at: Timestamp;
-}
-
-export interface PayoutReleaseControlTable {
-  control_key: 'global';
-  paused: boolean;
-  reason: string;
-  changed_by_user_id: string | null;
-  version: number;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  assigned_at: NullableTimestamp;
+  redeemed_at: NullableTimestamp;
 }
 
 export interface PartnerApplicationsTable {
@@ -568,6 +622,35 @@ export interface CreatorWorkoutsTable {
   version: Generated<number>;
 }
 
+export interface CreatorVideoSubmissionsTable {
+  id: Generated<string>;
+  user_id: string;
+  title: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  duration_minutes: number;
+  workout_style: string;
+  region_code: string;
+  sponsor_disclosure: string | null;
+  synthetic_media_disclosed: boolean;
+  rights_version: string;
+  rights_accepted_at: Timestamp;
+  notes: string | null;
+  status: CreatorVideoSubmissionStatus;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface CreatorWorkoutPlansTable {
+  id: Generated<string>;
+  user_id: string;
+  creator_workout_id: string;
+  planned_date: DateKey;
+  note: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface WorkerHeartbeatsTable {
   worker_name: string;
   instance_id: string;
@@ -591,34 +674,39 @@ export interface Database {
   competition_enrollments: CompetitionEnrollmentsTable;
   competition_goal_brackets: CompetitionGoalBracketsTable;
   competition_matches: CompetitionMatchesTable;
+  weekly_challenge_requests: WeeklyChallengeRequestsTable;
   competition_progress: CompetitionProgressTable;
   competition_rule_acceptances: CompetitionRuleAcceptancesTable;
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;
-  draw_winners: DrawWinnersTable;
   demo_verification_checkpoints: DemoVerificationCheckpointsTable;
   entry_ledger: EntryLedgerTable;
+  friend_requests: FriendRequestsTable;
+  friendships: FriendshipsTable;
+  challenge_contact_invitations: ChallengeContactInvitationsTable;
   creator_workouts: CreatorWorkoutsTable;
-  hyperwallet_users: HyperwalletUsersTable;
+  creator_video_submissions: CreatorVideoSubmissionsTable;
+  creator_workout_plans: CreatorWorkoutPlansTable;
   idempotency_keys: IdempotencyKeysTable;
   legal_document_events: LegalDocumentEventsTable;
   legal_documents: LegalDocumentsTable;
   operator_audit_events: OperatorAuditEventsTable;
   notification_deliveries: NotificationDeliveriesTable;
   partner_applications: PartnerApplicationsTable;
-  payout_claims: PayoutClaimsTable;
-  payout_payments: PayoutPaymentsTable;
-  payout_release_control: PayoutReleaseControlTable;
-  payout_state_events: PayoutStateEventsTable;
   privacy_request_events: PrivacyRequestEventsTable;
   privacy_requests: PrivacyRequestsTable;
   profile_media: ProfileMediaTable;
   profiles: ProfilesTable;
-  provider_webhooks: ProviderWebhooksTable;
   push_devices: PushDevicesTable;
   region_policies: RegionPoliciesTable;
   region_verifications: RegionVerificationsTable;
+  reward_awards: RewardAwardsTable;
+  reward_catalog_items: RewardCatalogItemsTable;
+  reward_coupon_codes: RewardCouponCodesTable;
   session_events: SessionEventsTable;
+  social_challenge_members: SocialChallengeMembersTable;
+  social_challenge_checkins: SocialChallengeCheckinsTable;
+  social_challenges: SocialChallengesTable;
   users: UsersTable;
   worker_heartbeats: WorkerHeartbeatsTable;
   workout_sessions: WorkoutSessionsTable;

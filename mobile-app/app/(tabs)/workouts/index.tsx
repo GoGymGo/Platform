@@ -4,21 +4,21 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   ScreenScrollView,
   CyberButtonOutline,
+  CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import type { CreatorWorkoutPreview } from '@/data/appData';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
 import { getCreatorWorkoutsReturnTarget } from '@/navigation/creatorWorkouts';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function WorkoutsScreen() {
   const router = useRouter();
   const { source } = useLocalSearchParams<{ source?: string }>();
-  const { campaign, economics } = useSponsorCampaign();
+  const { campaign } = useSponsorCampaign();
   const sponsorConfirmed = campaign.status === 'approved';
   const { data: creatorWorkouts = [], isPending: creatorWorkoutsPending } =
     useCreatorWorkouts();
@@ -26,7 +26,6 @@ export default function WorkoutsScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -82,15 +81,29 @@ export default function WorkoutsScreen() {
             </TerminalText>
             <TerminalText style={styles.sponsorCardTitle} tone="text" variant="body">
               {sponsorConfirmed
-                ? `CREATOR PAYOUT POOL: ${formatCampaignCurrency(economics.creatorPayoutAmount)}`
+                ? 'SPONSORED CREATOR FEATURE'
                 : 'REGIONAL CREATOR CAMPAIGN'}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
               {sponsorConfirmed
                 ? `Sponsor funding supports the selected ${campaign.region} workout leader.`
-                : 'Creator payout details are published with the regional campaign.'}
+                : 'Creator feature details are published with the regional campaign.'}
             </TerminalText>
           </View>
+        </HUDBorderBox>
+
+        <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
+          <TerminalText glow tone="pink" variant="label">
+            CREATOR STUDIO
+          </TerminalText>
+          <TerminalText style={styles.creatorSubmitCopy} tone="muted" uppercase={false} variant="body">
+            Approved creators can submit hosted workout videos for review, including brand and AI-assisted adaptation permissions.
+          </TerminalText>
+          <CyberButtonPrimary
+            label="SUBMIT A CREATOR VIDEO ->"
+            onPress={() => router.push('/creator/submit')}
+            tone="pink"
+          />
         </HUDBorderBox>
 
         <CyberButtonOutline
@@ -148,9 +161,12 @@ function WorkoutCard({
           </TerminalText>
           <View style={styles.metaRow}>
             <TerminalText style={styles.rewardText} tone="muted" variant="body">
-              {workout.reward}
+              {workout.creatorName} · {workout.durationMinutes} MIN · {workout.workoutStyle}
             </TerminalText>
           </View>
+          <TerminalText style={styles.catalogDetail} tone="muted" uppercase={false} variant="caption">
+            {workout.reward}
+          </TerminalText>
           <TerminalText style={styles.timing} tone="dim" variant="micro">
             {workout.timing}
           </TerminalText>
@@ -197,6 +213,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingVertical: 14,
     paddingHorizontal: 15
+  },
+  creatorSubmitCard: {
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    padding: spacing.lg
+  },
+  creatorSubmitCopy: {
+    fontFamily: fontFamilies.body
   },
   sponsorCardMark: {
     width: 42,
@@ -274,7 +298,7 @@ const styles = StyleSheet.create({
   playCircleLocked: {
     borderColor: colors.borderMuted,
     backgroundColor: colors.panelSoft,
-    shadowOpacity: 0
+    boxShadow: 'none'
   },
   workoutCopy: {
     paddingVertical: 14,
@@ -297,6 +321,10 @@ const styles = StyleSheet.create({
   timing: {
     marginTop: spacing.sm,
     fontFamily: fontFamilies.terminal
+  },
+  catalogDetail: {
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.body
   },
   backButton: {
     marginTop: spacing.lg

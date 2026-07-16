@@ -1,4 +1,5 @@
 import { createUserStorage } from '@/services/storage/userStorage';
+import { isLocalPreviewEnabled } from '@/config/firebase';
 
 const preferenceKeys = {
   biometricCameraConsent: 'gogymgo:legal:biometric-camera-consent',
@@ -17,6 +18,10 @@ export type VerificationPreference = {
   sourceKey: string;
   sourceLabel: string;
 };
+
+export function getPreferenceOwnerId(userId: string | null | undefined) {
+  return userId ?? (isLocalPreviewEnabled ? 'local-preview' : null);
+}
 
 const defaultVerificationPreference: VerificationPreference = {
   method: 'heartRate',

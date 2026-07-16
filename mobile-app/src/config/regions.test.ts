@@ -28,7 +28,27 @@ describe('competition regions', () => {
       {
         method: 'device-location',
         region: competitionRegions.find((region) => region.id === 'calgary'),
+        regionCode: null,
+        regionPolicyId: null,
         status: 'verified',
+        verificationId: null,
+        verifiedAt: '2026-07-12T12:00:00.000Z'
+      }
+    );
+  });
+
+  it('hydrates authoritative region verification identifiers', () => {
+    assert.deepEqual(
+      parseCompetitionRegionVerification(
+        '{"id":"vancouver","method":"device-location","regionCode":"CA-BC-DEMO","regionPolicyId":"policy-1","status":"verified","verificationId":"verification-1","verifiedAt":"2026-07-12T12:00:00.000Z"}'
+      ),
+      {
+        method: 'device-location',
+        region: competitionRegions.find((region) => region.id === 'vancouver'),
+        regionCode: 'CA-BC-DEMO',
+        regionPolicyId: 'policy-1',
+        status: 'verified',
+        verificationId: 'verification-1',
         verifiedAt: '2026-07-12T12:00:00.000Z'
       }
     );

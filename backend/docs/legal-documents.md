@@ -42,7 +42,7 @@ The public document endpoint can return `configured: false` so pre-authenticatio
 
 ## Launch gates
 
-Before enabling account creation or cash competition enrollment in a jurisdiction:
+Before enabling account creation or reward-contest enrollment in a jurisdiction:
 
 - counsel approves and supplies the exact document content, action labels, scope, locale, effective time, and official competition rules;
 - an authorized administrator publishes and independently verifies the current bundle through the public endpoint;

@@ -22,13 +22,11 @@ import {
 import { recordSponsorApplication } from '@/services/sponsorApplication';
 import { useApi } from '@/state/api';
 import { useCompetitionRegion } from '@/state/competitionRegion';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function SponsorApplicationScreen() {
   const router = useRouter();
   const { api } = useApi();
   const { competitionRegion } = useCompetitionRegion();
-  const { campaign } = useSponsorCampaign();
   const [companyName, setCompanyName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [errors, setErrors] = useState<SponsorApplicationErrors>({});
@@ -91,8 +89,8 @@ export default function SponsorApplicationScreen() {
             value="APP OPEN, CHECK-IN, COMPLETION + RANKS"
           />
           <SponsorValue
-            label="CURRENT TARGET"
-            value={`${formatCampaignCurrency(campaign.economics.sponsorPerVerifiedUser)} PER VERIFIED USER`}
+            label="REWARD FORMAT"
+            value="PHYSICAL PRIZES + COUPON CODES"
           />
         </View>
 

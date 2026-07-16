@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -10,9 +10,9 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
+import { useCreatorWorkoutPlans } from '@/data/appDataHooks';
 import {
   formatDateKey,
   formatMonthLabel,
@@ -27,6 +27,8 @@ const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const { width: viewportWidth } = useWindowDimensions();
+  const compactCalendar = viewportWidth < 360;
   const {
     activeSession,
     addManualWorkoutLog,
@@ -45,6 +47,7 @@ export default function CalendarScreen() {
   const [manualTitle, setManualTitle] = useState('');
   const [manualDuration, setManualDuration] = useState('45');
   const [manualExercises, setManualExercises] = useState('');
+  const { data: creatorWorkoutPlans = [] } = useCreatorWorkoutPlans();
 
   const selectedLogs = useMemo(
     () => getLogsForDate(selectedDateKey),
@@ -55,6 +58,11 @@ export default function CalendarScreen() {
     [displayMonth, logs]
   );
   const selectedDateLabel = formatDateKey(selectedDateKey);
+  const selectedPlans = creatorWorkoutPlans.filter(({ plannedDate }) => plannedDate === selectedDateKey);
+  const plannedDateKeys = useMemo(
+    () => new Set(creatorWorkoutPlans.map(({ plannedDate }) => plannedDate)),
+    [creatorWorkoutPlans]
+  );
   const monthLabel = formatMonthLabel(displayMonth);
   const manualDurationMinutes = Number.parseInt(manualDuration, 10);
   const selectedDateIsFuture = parseDateKey(selectedDateKey).getTime() > new Date().setHours(23, 59, 59, 999);
@@ -99,14 +107,13 @@ export default function CalendarScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, compactCalendar ? styles.headerCompact : null]}>
           <View style={styles.headerCopy}>
             <TerminalText glow tone="cyan" variant="label">
               PERSONAL + VERIFIED HISTORY
@@ -115,7 +122,10 @@ export default function CalendarScreen() {
               WORKOUT CALENDAR
             </TerminalText>
           </View>
-          <HUDBorderBox style={styles.streakBadge} tone="cyan">
+          <HUDBorderBox
+            style={[styles.streakBadge, compactCalendar ? styles.streakBadgeCompact : null]}
+            tone="cyan"
+          >
             <TerminalText glow style={styles.streakValue} tone="cyan" variant="value">
               {currentStreak}
             </TerminalText>
@@ -185,10 +195,11 @@ export default function CalendarScreen() {
             <CalendarLegend color={colors.green} label="VERIFIED" />
             <CalendarLegend color={colors.dim} label="MANUAL" />
             <CalendarLegend color={colors.pink} label="BONUS" />
+            <CalendarLegend color={colors.amber} label="PLANNED" />
             <CalendarLegend color={colors.borderMuted} label="OPEN" />
           </View>
 
-          <View style={styles.weekdayRow}>
+          <View style={[styles.weekdayRow, compactCalendar ? styles.calendarGridCompact : null]}>
             {weekdayLabels.map((label, index) => (
               <TerminalText
                 key={`${label}-${index}`}
@@ -201,9 +212,10 @@ export default function CalendarScreen() {
             ))}
           </View>
 
-          <View style={styles.calendarGrid}>
+          <View style={[styles.calendarGrid, compactCalendar ? styles.calendarGridCompact : null]}>
             {calendarDays.map((day) => (
               <CalendarDayCell
+                compact={compactCalendar}
                 day={day}
                 key={day.dateKey}
                 onPress={() => {
@@ -211,6 +223,7 @@ export default function CalendarScreen() {
                   setShowManualLogForm(false);
                 }}
                 selected={day.dateKey === selectedDateKey}
+                planned={plannedDateKeys.has(day.dateKey)}
               />
             ))}
           </View>
@@ -244,6 +257,28 @@ export default function CalendarScreen() {
               </TerminalText>
             </HUDBorderBox>
           )}
+
+          {selectedPlans.length > 0 ? (
+            <View style={styles.planList}>
+              <TerminalText glow tone="amber" variant="micro">
+                PLANNED CREATOR WORKOUTS
+              </TerminalText>
+              {selectedPlans.map((plan) => (
+                <HUDBorderBox key={plan.id} style={styles.planRow} tone="amber">
+                  <View style={styles.planCopy}>
+                    <TerminalText tone="text" variant="body">{plan.workoutName}</TerminalText>
+                    <TerminalText tone="muted" uppercase={false} variant="caption">
+                      {plan.creatorName} · {plan.workoutStyle}
+                    </TerminalText>
+                  </View>
+                  <TerminalText glow tone="amber" variant="label">{plan.durationMinutes} MIN</TerminalText>
+                </HUDBorderBox>
+              ))}
+              <TerminalText tone="dim" uppercase={false} variant="caption">
+                Planned videos are scheduling aids only. Start a verified session when you train.
+              </TerminalText>
+            </View>
+          ) : null}
         </HUDBorderBox>
 
         <CyberButtonOutline
@@ -286,6 +321,8 @@ export default function CalendarScreen() {
             WORKOUT NAME // OPTIONAL
           </TerminalText>
           <TextInput
+            allowFontScaling
+            maxFontSizeMultiplier={2}
             accessibilityLabel="Workout name"
             autoCapitalize="sentences"
             maxLength={60}
@@ -300,6 +337,8 @@ export default function CalendarScreen() {
             DURATION // MINUTES
           </TerminalText>
           <TextInput
+            allowFontScaling
+            maxFontSizeMultiplier={2}
             accessibilityLabel="Workout duration in minutes"
             keyboardType="number-pad"
             maxLength={4}
@@ -314,6 +353,8 @@ export default function CalendarScreen() {
             EXERCISES, SETS + NOTES // OPTIONAL
           </TerminalText>
           <TextInput
+            allowFontScaling
+            maxFontSizeMultiplier={2}
             accessibilityLabel="Exercises, sets and workout notes"
             maxLength={500}
             multiline
@@ -379,12 +420,16 @@ function StatCard({
 }
 
 function CalendarDayCell({
+  compact,
   day,
   onPress,
+  planned,
   selected
 }: {
+  compact: boolean;
   day: CalendarDay;
   onPress: () => void;
+  planned: boolean;
   selected: boolean;
 }) {
   const hasWorkout = day.status !== 'empty';
@@ -392,16 +437,18 @@ function CalendarDayCell({
 
   return (
     <Pressable
-      accessibilityLabel={`${formatDateKey(day.dateKey)}. ${day.status === 'verified' ? 'Verified workout' : day.status === 'manual' ? 'Manual workout logged' : 'No workout logged'}`}
+      accessibilityLabel={`${formatDateKey(day.dateKey)}. ${day.status === 'verified' ? 'Verified workout' : day.status === 'manual' ? 'Manual workout logged' : 'No workout logged'}${planned ? '. Creator workout planned' : ''}`}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.dayCell,
+        compact ? styles.dayCellCompact : null,
         !day.inCurrentMonth ? styles.dayCellMuted : null,
         day.isToday ? styles.dayCellToday : null,
         hasWorkout ? styles.dayCellChecked : null,
         isVerified ? styles.dayCellVerified : null,
+        planned && !isVerified ? styles.dayCellPlanned : null,
         selected ? styles.dayCellSelected : null,
         pressed ? styles.pressed : null
       ]}
@@ -418,6 +465,8 @@ function CalendarDayCell({
         <TerminalText glow={isVerified} tone={isVerified ? 'green' : 'dim'} variant="micro">
           {isVerified ? 'OK' : 'LOG'}
         </TerminalText>
+      ) : planned ? (
+        <TerminalText glow tone="amber" variant="micro">PLAN</TerminalText>
       ) : null}
     </Pressable>
   );
@@ -484,6 +533,10 @@ const styles = StyleSheet.create({
   headerCopy: {
     flex: 1
   },
+  headerCompact: {
+    alignItems: 'stretch',
+    flexDirection: 'column'
+  },
   title: {
     marginTop: spacing.xs,
     fontFamily: fontFamilies.display,
@@ -495,6 +548,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md
+  },
+  streakBadgeCompact: {
+    width: '100%',
+    minHeight: 56,
+    flexDirection: 'row',
+    justifyContent: 'space-between'
   },
   streakValue: {
     fontFamily: fontFamilies.display
@@ -569,13 +628,15 @@ const styles = StyleSheet.create({
   },
   calendarGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: '-0.5%'
+    flexWrap: 'wrap'
+  },
+  calendarGridCompact: {
+    width: 308,
+    alignSelf: 'center'
   },
   dayCell: {
-    width: '13.28%',
+    width: '14.2857%',
     minHeight: 46,
-    marginHorizontal: '0.5%',
     marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -583,6 +644,10 @@ const styles = StyleSheet.create({
     borderColor: colors.borderMuted,
     borderRadius: radii.sm,
     backgroundColor: colors.panelAlpha45
+  },
+  dayCellCompact: {
+    width: 44,
+    minHeight: 48
   },
   dayCellMuted: {
     opacity: 0.42
@@ -615,6 +680,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSuccess,
     ...cyberGlow.green
   },
+  dayCellPlanned: {
+    borderColor: colors.amber,
+    backgroundColor: colors.surfaceWarning
+  },
   dayCellSelected: {
     borderColor: colors.borderCyanGlow,
     backgroundColor: colors.surfaceCyanStrong
@@ -625,6 +694,24 @@ const styles = StyleSheet.create({
   detailCard: {
     marginBottom: spacing.md,
     padding: spacing.lg
+  },
+  planList: {
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderMuted
+  },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md
+  },
+  planCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2
   },
   detailHeader: {
     flexDirection: 'row',

@@ -18,6 +18,16 @@ export function buildCompetitionMatchPreview(
     return {
       availability: 'matched',
       opponentAlias: opponentAliases[index],
+      opponentBestStreak: 12 - index,
+      opponentCurrentStreak: 4 + index,
+      opponentMonthlyVerifiedDays: target + index * weeklyGoal,
+      opponentStreaks: {
+        daily: 4 + index,
+        monthly: index > 1 ? 1 : 0,
+        weekly: 2 + index,
+        yearly: 0
+      },
+      opponentUserId: `preview-opponent-${index + 1}`,
       opponentVerifiedDateKeys,
       periodIndex: period.index,
       region: 'TORONTO'

@@ -9,31 +9,31 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function SponsorOfferModal() {
   const router = useRouter();
-  const { campaign, economics, enrollment } = useSponsorCampaign();
+  const { campaign, enrollment } = useSponsorCampaign();
   const sponsorConfirmed = campaign.status === 'approved';
   const screenTone = sponsorConfirmed ? 'pink' : 'cyan';
   const sponsorFacts = sponsorConfirmed
     ? [
-        `FUNDS A PROJECTED ${formatCampaignCurrency(economics.prizeDrawAmount)} REGIONAL PRIZE DRAW`,
-        `${Math.round(campaign.economics.prizeDrawWinnerRate * 100)}% OF PLAYERS GET PAID`,
+        'SUPPLIES PHYSICAL PRIZES AND COUPON CODES FOR THE REGIONAL CONTEST',
+        `${Math.round(campaign.economics.rewardWinnerRate * 100)}% OF PLAYERS IS THE PROJECTED REWARD INVENTORY`,
         `REQUIRES ${enrollment.minimumEntrants} REGISTERED PLAYERS ACROSS THE REGION TO LAUNCH`,
         enrollment.maximumEntrants === null
           ? 'THIS REGIONAL CAMPAIGN HAS NO PLAYER CAP'
           : `THIS REGIONAL CAMPAIGN HAS A ${enrollment.maximumEntrants.toLocaleString()}-PLAYER SPONSOR CAP`,
-        `SUPPORTS A PROJECTED ${formatCampaignCurrency(economics.creatorPayoutAmount)} CREATOR PAYOUT`
+        'FEATURES SELECTED LOCAL CREATORS AND THEIR FOLLOW-ALONG WORKOUTS'
       ]
     : [
         'REGIONAL SPONSOR AND PRIZE DETAILS WILL BE PUBLISHED BEFORE THE COMPETITION',
-        `${Math.round(campaign.economics.prizeDrawWinnerRate * 100)}% OF PLAYERS IS THE TARGET PAYOUT RATE`,
+        `${Math.round(campaign.economics.rewardWinnerRate * 100)}% OF PLAYERS IS THE TARGET REWARD RATE`,
         `REQUIRES ${enrollment.minimumEntrants} REGISTERED PLAYERS ACROSS THE REGION TO LAUNCH`,
         enrollment.maximumEntrants === null
           ? 'NO PLAYER CAP IS CURRENTLY CONFIGURED'
           : `CURRENT PLAYER CAP: ${enrollment.maximumEntrants.toLocaleString()}`,
-        'CREATOR PAYOUT DETAILS WILL APPEAR WITH THE SPONSOR ANNOUNCEMENT'
+        'CREATOR FEATURE DETAILS WILL APPEAR WITH THE SPONSOR ANNOUNCEMENT'
       ];
   const closeOffer = () => {
     if (router.canGoBack()) {

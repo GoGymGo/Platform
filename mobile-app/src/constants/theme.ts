@@ -46,6 +46,7 @@ export const colors = {
   panelAlpha70: 'rgba(13, 22, 34, 0.7)',
   panelAlpha84: 'rgba(11, 17, 24, 0.84)',
   blackAlpha25: 'rgba(0, 0, 0, 0.25)',
+  blackAlpha80: 'rgba(0, 0, 0, 0.80)',
   whiteAlpha05: 'rgba(255, 255, 255, 0.05)',
   whiteAlpha06: 'rgba(255, 255, 255, 0.06)',
   whiteAlpha07: 'rgba(255, 255, 255, 0.07)',
@@ -82,7 +83,7 @@ export const colors = {
   borderCyanGlow: 'rgba(52, 229, 232, 0.72)',
   cyanGlow: 'rgba(52, 229, 232, 0.34)',
 
-  // Pink states: prize, multiplier, payout and confirmed sponsor value
+  // Pink states: prize, multiplier, reward and confirmed sponsor value
   surfacePinkGhost: 'rgba(255, 45, 155, 0.035)',
   surfacePinkFaint: 'rgba(255, 45, 155, 0.055)',
   surfacePinkSoft: 'rgba(255, 45, 155, 0.07)',
@@ -155,12 +156,12 @@ export const fontFamilies = {
 } as const;
 
 export const fontSizes = {
-  micro: 10,
-  label: 11,
-  button: 13,
-  body: 14,
-  control: 15,
-  cardTitle: 16,
+  micro: 13,
+  label: 14,
+  button: 15,
+  body: 16,
+  control: 16,
+  cardTitle: 17,
   stat: 18,
   titleSmall: 19,
   title: 21,
@@ -181,11 +182,11 @@ export const fontSizes = {
 } as const;
 
 export const lineHeights = {
-  micro: 14,
-  label: 16,
-  button: 18,
-  body: 20,
-  cardTitle: 22,
+  micro: 18,
+  label: 20,
+  button: 22,
+  body: 24,
+  cardTitle: 24,
   title: 28,
   titleXl: 31,
   title2Xl: 32,
@@ -198,9 +199,9 @@ export const lineHeights = {
 export const letterSpacings = {
   none: 0,
   tight: 0,
-  micro: 1.4,
+  micro: 0.8,
   button: 0,
-  label: 2.2
+  label: 1.4
 } as const;
 
 export const typography = {

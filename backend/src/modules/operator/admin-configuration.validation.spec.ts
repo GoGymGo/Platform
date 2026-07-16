@@ -10,9 +10,6 @@ import {
 const validRules = {
   minHeartRateSamples: 10,
   minSessionMinutes: 30,
-  payoutExponent: 0.8,
-  payoutPoolAmountMinor: 100_000,
-  payoutWinnerCount: 10,
   requireDeviceAttestation: true,
   requireFaceCheck: true,
   requireGymQr: true,

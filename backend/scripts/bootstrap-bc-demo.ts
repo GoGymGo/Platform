@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     const result = await bootstrapBcDemoFoundation(pool, monthKey, reason);
     console.log(JSON.stringify(result, null, 2));
     console.log(
-      'BC non-cash demo registration is available for approved users; prize, winner, payout, and Hyperwallet state remain disabled.',
+      'BC brand-reward registration and its physical-prize marketplace are ready. No payment or banking setup is used.',
     );
   } finally {
     await pool.end();

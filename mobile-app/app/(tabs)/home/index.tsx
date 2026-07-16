@@ -1,8 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
+  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
@@ -13,16 +15,22 @@ import {
   SponsorRail as SponsorBanner
 } from '@/components/sponsor';
 import { ProfileAvatar } from '@/components/profileAvatar';
+import { StreakRewards, UserAlias } from '@/components/streakRewards';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
   useCreatorWorkouts,
-  useCurrentUserPayout
+  useMyRewardAwards,
+  useMyStreaks
 } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
-import { formatPayoutAmount, needsPayoutSetup } from '@/domain/payout';
 import { useProfile } from '@/state/profile';
 import { useAuth } from '@/state/auth';
+import {
+  getPreferenceOwnerId,
+  getVerificationPreference,
+  type VerificationPreference
+} from '@/state/onboardingPreferences';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -35,6 +43,13 @@ type HomeStat = {
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
+  const [showMore, setShowMore] = useState(false);
+  const [verificationPreference, setVerificationPreference] = useState<VerificationPreference>({
+    method: 'heartRate',
+    sourceKey: 'heartRateDevice',
+    sourceLabel: 'HEART-RATE DEVICE'
+  });
   const { profileImageUri, publicName } = useProfile();
   const { enrollment } = useSponsorCampaign();
   const publicInitials = getPublicInitials(publicName);
@@ -64,9 +79,10 @@ export default function HomeScreen() {
     isPending: currentEntrantsPending
   } = useCompetitionEnrollmentCount(competitionRegion, competition.competitionMonthKey);
   const { data: creatorWorkouts = [] } = useCreatorWorkouts();
-  const { data: payoutClaimData } = useCurrentUserPayout(user?.uid);
+  const { data: rewardAwards = [] } = useMyRewardAwards();
+  const { data: streakSummary, isPending: streaksPending } = useMyStreaks();
   const currentEntrants = currentEntrantsData ?? null;
-  const payoutClaim = payoutClaimData ?? null;
+  const unclaimedReward = rewardAwards.find((award) => award.status === 'awarded');
   const featuredCreatorWorkout =
     creatorWorkouts.find((workout) => workout.joined) ?? null;
   const launchConfirmed = currentEntrants !== null && currentEntrants >= enrollment.minimumEntrants;
@@ -89,14 +105,25 @@ export default function HomeScreen() {
       value: currentPeriod
         ? `${Math.min(currentPeriod.opponentVerifiedCount, weeklyGoal)}/${weeklyGoal}`
         : `--/${weeklyGoal}`,
-      label: currentPeriod ? 'MATCH DAYS' : 'MATCH PENDING',
+      label: currentPeriod ? 'PARTNER DAYS' : 'CHALLENGE PENDING',
       tone: 'cyan'
     }
   ];
 
+  useEffect(() => {
+    if (!preferenceOwnerId) {
+      return;
+    }
+
+    void getVerificationPreference(preferenceOwnerId).then(setVerificationPreference);
+  }, [preferenceOwnerId]);
+
+  const workoutStartRoute: Href = verificationPreference.method === 'partnerGymQr'
+    ? '/qr-scanner'
+    : '/workout/check-in';
+
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -107,34 +134,17 @@ export default function HomeScreen() {
             <TerminalText glow tone="cyan" variant="label">
               ACCOUNT READY // {competitionRegion}
             </TerminalText>
-            <TerminalText glow style={styles.username} tone="cyan" variant="title">
-              {publicName}
-            </TerminalText>
+            <UserAlias
+              alias={publicName}
+              glow
+              streaks={streakSummary?.streaks}
+              textStyle={styles.username}
+              tone="cyan"
+              variant="title"
+            />
           </View>
           <ProfileAvatar imageUri={profileImageUri} initials={publicInitials} showStatus size={46} />
         </View>
-
-        {needsPayoutSetup(payoutClaim) && payoutClaim ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/profile/payout')}
-            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-          >
-            <HUDBorderBox glow style={styles.payoutAlert} tone="pink">
-              <View style={styles.payoutAlertCopy}>
-                <TerminalText glow tone="pink" variant="label">
-                  YOU WON {formatPayoutAmount(payoutClaim)}
-                </TerminalText>
-                <TerminalText tone="text" uppercase={false} variant="body">
-                  Set up Hyperwallet to receive your prize.
-                </TerminalText>
-              </View>
-              <TerminalText glow tone="pink" variant="button">
-                -&gt;
-              </TerminalText>
-            </HUDBorderBox>
-          </Pressable>
-        ) : null}
 
         <HUDBorderBox glow style={styles.commitmentCard} tone="cyan">
           <View style={styles.commitmentHeader}>
@@ -162,7 +172,7 @@ export default function HomeScreen() {
                     ? 'Check in and maintain an elevated heart rate for 30 minutes to verify your workout.'
                     : remainingSessions > 0
                       ? `Complete ${remainingSessions} more verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal. Only one workout per calendar day counts.`
-                      : 'Weekly goal hit. Check your Period Match to see whether a 2x or 3x bonus is active.'}
+                      : 'Weekly goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
               </TerminalText>
               {competitionNotStarted ? (
                 <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
@@ -180,7 +190,7 @@ export default function HomeScreen() {
                   : liveMultiplier === 3
                     ? 'ARMED'
                     : liveMultiplier === 2
-                      ? 'MATCH'
+                      ? 'PARTNER'
                       : 'NO BONUS'}
               </TerminalText>
             </View>
@@ -200,8 +210,13 @@ export default function HomeScreen() {
 
           <CyberButtonPrimary
             label={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START VERIFIED WORKOUT ->'}
-            onPress={() => router.push(activeSession ? '/workout/active' : '/workout/check-in')}
+            onPress={() => router.push(activeSession ? '/workout/active' : workoutStartRoute)}
           />
+          {!activeSession ? (
+            <TerminalText style={styles.defaultMethod} tone="muted" uppercase={false} variant="caption">
+              Default check-in: {verificationPreference.sourceLabel}. Change it from Session or Profile.
+            </TerminalText>
+          ) : null}
 
           {competitionNotStarted ? (
             <View style={styles.launchStatus}>
@@ -232,37 +247,28 @@ export default function HomeScreen() {
           ) : null}
         </HUDBorderBox>
 
-        <View style={styles.statsRow}>
-          {stats.map((stat) => (
-            <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
-              <TerminalText
-                glow
-                style={styles.statValue}
-                tone={stat.tone}
-                variant="value"
-              >
-                {stat.value}
-              </TerminalText>
-              <TerminalText style={styles.statLabel} tone="muted" variant="micro">
-                {stat.label}
+        {unclaimedReward ? (
+          <Pressable
+            accessibilityHint="Open My Rewards to claim this award"
+            accessibilityRole="button"
+            onPress={() => router.push('/rewards/awards')}
+            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+          >
+            <HUDBorderBox glow style={styles.rewardAlert} tone="pink">
+              <View style={styles.rewardAlertCopy}>
+                <TerminalText glow tone="pink" variant="label">
+                  REWARD READY // {unclaimedReward.title}
+                </TerminalText>
+                <TerminalText tone="text" uppercase={false} variant="body">
+                  Claim it in My Rewards. No payment setup is required.
+                </TerminalText>
+              </View>
+              <TerminalText glow tone="pink" variant="button">
+                -&gt;
               </TerminalText>
             </HUDBorderBox>
-          ))}
-        </View>
-        <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
-          {prizeDrawEligible
-            ? competitionNotStarted
-              ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
-              : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
-            : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
-        </TerminalText>
-
-        <BrandVideoAdPlaceholder
-          compact
-          onPress={() => router.push('/sponsor-offer')}
-          placement="appOpen"
-          style={styles.videoAd}
-        />
+          </Pressable>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -298,21 +304,35 @@ export default function HomeScreen() {
               </View>
               <View style={styles.pactAvatarMatch}>
                 <TerminalText tone="muted" variant="button">
-                  {getPublicInitials(currentPeriod?.opponentAlias ?? 'MATCH')}
+                  {getPublicInitials(currentPeriod?.opponentAlias ?? 'PARTNER')}
                 </TerminalText>
               </View>
             </View>
             <View style={styles.pactCopy}>
               <TerminalText glow tone="cyan" variant="micro">
-                PERIOD MATCH
+                WEEKLY CHALLENGE
               </TerminalText>
-              <TerminalText style={styles.pactTitle} tone="text" uppercase variant="body">
-                {isBonusDayPhase
-                  ? `BONUS DAYS 29-31 // +${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} EACH`
-                  : competitionNotStarted
-                    ? `MATCHING OPENS ${competitionStartLabel.toUpperCase()}`
-                    : `${currentPeriod?.opponentAlias ?? 'MATCHING IN PROGRESS'} // ${currentPeriod?.opponentVerifiedCount ?? 0}/${weeklyGoal}`}
-              </TerminalText>
+              {isBonusDayPhase || competitionNotStarted || !currentPeriod ? (
+                <TerminalText style={styles.pactTitle} tone="text" uppercase variant="body">
+                  {isBonusDayPhase
+                    ? `BONUS DAYS 29-31 // +${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} EACH`
+                    : competitionNotStarted
+                      ? `CHALLENGES OPEN ${competitionStartLabel.toUpperCase()}`
+                      : 'PAIRING IN PROGRESS'}
+                </TerminalText>
+              ) : (
+                <View style={styles.pactOpponent}>
+                  <UserAlias
+                    alias={currentPeriod.opponentAlias}
+                    streaks={currentPeriod.opponentStreaks}
+                    textStyle={styles.pactTitle}
+                    uppercase
+                  />
+                  <TerminalText tone="cyan" variant="micro">
+                    {currentPeriod.opponentVerifiedCount}/{weeklyGoal} THIS WEEK
+                  </TerminalText>
+                </View>
+              )}
             </View>
             <TerminalText tone="cyan" variant="button">
               -&gt;
@@ -320,41 +340,84 @@ export default function HomeScreen() {
           </HUDBorderBox>
         </Pressable>
 
-        {featuredCreatorWorkout ? <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(`/workouts/${featuredCreatorWorkout.id}`)}
-          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-        >
-          <HUDBorderBox style={styles.workoutCard} tone="cyan">
-            <View style={styles.videoPreview}>
-              <View style={styles.videoBadgeRow}>
-                <View style={styles.creatorBadge}>
-                  <TerminalText glow tone="cyan" variant="micro">
-                    CREATOR WORKOUT
+        <SponsorBanner compact style={styles.inlineSponsor} />
+
+        <CyberButtonOutline
+          label={showMore ? 'HIDE STATS & EXTRAS' : 'SHOW STATS & EXTRAS'}
+          onPress={() => setShowMore((current) => !current)}
+          style={styles.moreButton}
+        />
+
+        {showMore ? (
+          <View style={styles.secondaryContent}>
+            <StreakRewards
+              isLoading={streaksPending}
+              summary={streakSummary}
+            />
+
+            <View style={styles.statsRow}>
+              {stats.map((stat) => (
+                <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
+                  <TerminalText glow style={styles.statValue} tone={stat.tone} variant="value">
+                    {stat.value}
+                  </TerminalText>
+                  <TerminalText style={styles.statLabel} tone="muted" variant="micro">
+                    {stat.label}
+                  </TerminalText>
+                </HUDBorderBox>
+              ))}
+            </View>
+            <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
+              {prizeDrawEligible
+                ? competitionNotStarted
+                  ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
+                  : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
+                : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
+            </TerminalText>
+
+            <BrandVideoAdPlaceholder
+              compact
+              onPress={() => router.push('/sponsor-offer')}
+              placement="appOpen"
+            />
+
+            {featuredCreatorWorkout ? <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push(`/workouts/${featuredCreatorWorkout.id}`)}
+              style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+            >
+              <HUDBorderBox style={styles.workoutCard} tone="cyan">
+                <View style={styles.videoPreview}>
+                  <View style={styles.videoBadgeRow}>
+                    <View style={styles.creatorBadge}>
+                      <TerminalText glow tone="cyan" variant="micro">
+                        CREATOR WORKOUT
+                      </TerminalText>
+                    </View>
+                    <View style={styles.channelBadge}>
+                      <TerminalText glow tone="cyan" variant="micro">
+                        OFFICIAL CHANNEL
+                      </TerminalText>
+                    </View>
+                  </View>
+                  <View style={styles.playCircle}>
+                    <TerminalText glow tone="cyan" variant="micro">
+                      VIEW
+                    </TerminalText>
+                  </View>
+                </View>
+                <View style={styles.workoutCopy}>
+                  <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
+                    {featuredCreatorWorkout.name}
+                  </TerminalText>
+                  <TerminalText tone="muted" uppercase={false} variant="body">
+                    Optional follow-along workout. Session verification still happens in GoGymGo.
                   </TerminalText>
                 </View>
-                <View style={styles.channelBadge}>
-                  <TerminalText glow tone="cyan" variant="micro">
-                    OFFICIAL CHANNEL
-                  </TerminalText>
-                </View>
-              </View>
-              <View style={styles.playCircle}>
-                <TerminalText glow tone="cyan" variant="micro">
-                  VIEW
-                </TerminalText>
-              </View>
-            </View>
-            <View style={styles.workoutCopy}>
-              <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
-                {featuredCreatorWorkout.name}
-              </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="body">
-                Optional follow-along workout. Session verification still happens in GoGymGo.
-              </TerminalText>
-            </View>
-          </HUDBorderBox>
-        </Pressable> : null}
+              </HUDBorderBox>
+            </Pressable> : null}
+          </View>
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -390,16 +453,30 @@ const styles = StyleSheet.create({
   },
   commitmentCard: {
     marginBottom: spacing.lg,
-    padding: spacing.xl
+    padding: spacing.lg
   },
-  payoutAlert: {
+  defaultMethod: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
+  },
+  moreButton: {
+    marginTop: spacing.sm
+  },
+  secondaryContent: {
+    gap: spacing.lg,
+    marginTop: spacing.lg
+  },
+  streakRewards: {
+    marginBottom: spacing.lg
+  },
+  rewardAlert: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     marginBottom: spacing.lg,
-    padding: spacing.lg
+    padding: spacing.md
   },
-  payoutAlertCopy: {
+  rewardAlertCopy: {
     flex: 1,
     gap: spacing.xs
   },
@@ -408,7 +485,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.md,
-    marginBottom: spacing.lg
+    marginBottom: spacing.md
   },
   commitmentTitleBlock: {
     flex: 1
@@ -449,7 +526,7 @@ const styles = StyleSheet.create({
   weekDots: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: spacing.lg
+    marginBottom: spacing.md
   },
   weekDot: {
     flex: 1,
@@ -465,11 +542,13 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: spacing.sm
   },
   statCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 100,
     minHeight: 84,
     alignItems: 'flex-start',
     justifyContent: 'center',
@@ -510,6 +589,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.lg
   },
+  inlineSponsor: {
+    marginHorizontal: 0,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md
+  },
   pactAvatars: {
     flexDirection: 'row'
   },
@@ -538,6 +622,9 @@ const styles = StyleSheet.create({
   },
   pactCopy: {
     flex: 1
+  },
+  pactOpponent: {
+    gap: 2
   },
   pactTitle: {
     marginTop: 2,

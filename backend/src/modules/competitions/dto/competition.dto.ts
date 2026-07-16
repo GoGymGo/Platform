@@ -6,15 +6,16 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsIn,
   Max,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type {
-  CompetitionMode,
   CompetitionStatus,
   EnrollmentStatus,
 } from '../../../database/database.types';
+import { StreakCountsDto } from '../../streaks/dto/streak.dto';
 
 export class CompetitionRulesResponseDto {
   @ApiProperty({ type: Number })
@@ -40,15 +41,6 @@ export class CompetitionRulesResponseDto {
 
   @ApiProperty({ type: Number })
   verifiedSessionPrizeDrawEntries!: number;
-
-  @ApiProperty({ type: Number })
-  payoutPoolAmountMinor!: number;
-
-  @ApiProperty({ type: Number })
-  payoutWinnerCount!: number;
-
-  @ApiProperty({ type: Number })
-  payoutExponent!: number;
 }
 
 export class CompetitionResponseDto {
@@ -72,12 +64,6 @@ export class CompetitionResponseDto {
     ],
   })
   status!: CompetitionStatus;
-
-  @ApiProperty({ enum: ['cash', 'non_cash_demo'], type: String })
-  mode!: CompetitionMode;
-
-  @ApiProperty({ type: String })
-  currency!: string;
 
   @ApiProperty({ type: String })
   regionCode!: string;
@@ -141,9 +127,6 @@ export class EnrollmentResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   competitionId!: string;
 
-  @ApiProperty({ enum: ['cash', 'non_cash_demo'], type: String })
-  competitionMode!: CompetitionMode;
-
   @ApiProperty({ type: Number })
   goalDays!: number;
 
@@ -189,4 +172,92 @@ export class CompetitionMatchResponseDto {
 
   @ApiProperty({ type: String })
   region!: string;
+
+  @ApiPropertyOptional({ format: 'uuid', nullable: true, type: String })
+  opponentUserId!: string | null;
+
+  @ApiProperty({ type: Number })
+  opponentCurrentStreak!: number;
+
+  @ApiProperty({ type: Number })
+  opponentBestStreak!: number;
+
+  @ApiProperty({ type: Number })
+  opponentMonthlyVerifiedDays!: number;
+
+  @ApiProperty({ type: StreakCountsDto })
+  opponentStreaks!: StreakCountsDto;
+}
+
+export class WeeklyChallengePeriodQueryDto extends CompetitionMatchesQueryDto {
+  @ApiProperty({ maximum: 4, minimum: 1, type: Number })
+  @Type(() => Number)
+  @IsInt()
+  @Max(4)
+  @Min(1)
+  period!: 1 | 2 | 3 | 4;
+}
+
+export class EligibleWeeklyChallengePartnerDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  userId!: string;
+
+  @ApiProperty({ type: String })
+  alias!: string;
+
+  @ApiProperty({ maximum: 7, minimum: 1, type: Number })
+  goalDays!: number;
+
+  @ApiProperty({ enum: ['available', 'pending'], type: String })
+  requestStatus!: 'available' | 'pending';
+
+  @ApiProperty({ type: StreakCountsDto })
+  streaks!: StreakCountsDto;
+}
+
+export class CreateWeeklyChallengeRequestDto extends WeeklyChallengePeriodQueryDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  @IsUUID()
+  recipientUserId!: string;
+}
+
+export class WeeklyChallengeRequestDecisionDto {
+  @ApiProperty({ enum: ['accepted', 'declined'], type: String })
+  @IsIn(['accepted', 'declined'])
+  decision!: 'accepted' | 'declined';
+}
+
+export class WeeklyChallengeRequestResponseDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ enum: ['incoming', 'outgoing'], type: String })
+  direction!: 'incoming' | 'outgoing';
+
+  @ApiProperty({ type: String })
+  partnerAlias!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  partnerUserId!: string;
+
+  @ApiProperty({ type: StreakCountsDto })
+  partnerStreaks!: StreakCountsDto;
+
+  @ApiProperty({ maximum: 4, minimum: 1, type: Number })
+  periodIndex!: 1 | 2 | 3 | 4;
+
+  @ApiProperty({ maximum: 7, minimum: 1, type: Number })
+  goalDays!: number;
+
+  @ApiProperty({
+    enum: ['accepted', 'cancelled', 'declined', 'pending'],
+    type: String,
+  })
+  status!: 'accepted' | 'cancelled' | 'declined' | 'pending';
+
+  @ApiProperty({ format: 'date-time', type: String })
+  createdAt!: string;
 }

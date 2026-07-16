@@ -11,13 +11,11 @@ const WORKER_RESULT_KEYS = [
   'competitionsActivated',
   'competitionsCancelled',
   'notificationsSent',
-  'paymentsReconciled',
   'profileMediaCleanupFailed',
   'profileMediaDeleted',
   'privacyExportsDeleted',
   'privacyOperationsCompleted',
   'privacyOperationsFailed',
-  'webhooksProcessed',
 ] as const satisfies readonly (keyof WorkerRunResult)[];
 
 export function safeOperationalErrorCode(error: unknown): string {

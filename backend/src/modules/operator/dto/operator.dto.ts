@@ -250,7 +250,6 @@ export class OperatorWorkQueueItemDto {
   @ApiProperty({
     enum: [
       'partner_application',
-      'payout_claim',
       'privacy_request',
       'profile_media',
       'region_verification',
@@ -260,7 +259,6 @@ export class OperatorWorkQueueItemDto {
   })
   kind!:
     | 'partner_application'
-    | 'payout_claim'
     | 'privacy_request'
     | 'profile_media'
     | 'region_verification'
@@ -290,16 +288,10 @@ export class OperatorQueueDepthsDto {
   notificationsPending!: number;
 
   @ApiProperty({ minimum: 0, type: Number })
-  paymentsUncertain!: number;
-
-  @ApiProperty({ minimum: 0, type: Number })
   privacyOperationsPending!: number;
 
   @ApiProperty({ minimum: 0, type: Number })
   profileMediaCleanupPending!: number;
-
-  @ApiProperty({ minimum: 0, type: Number })
-  webhooksPending!: number;
 }
 
 export class OperatorWorkerHealthDto {

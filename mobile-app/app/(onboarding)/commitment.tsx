@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
+import { AuthStatusNotice } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonPrimary,
@@ -9,8 +10,8 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import {
   calculateWeeklyMatchEntries,
@@ -35,6 +36,7 @@ import {
   getRegistrationTargetCompetitionMonthKey
 } from '@/domain/competitionEnrollment';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useCompetitionRegistration } from '@/hooks/useCompetitionRegistration';
 import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
@@ -51,7 +53,7 @@ type CategoryRank = 0 | 1 | 2 | 3;
 
 export default function CommitmentScreen() {
   const router = useRouter();
-  const { competitionRegion } = useCompetitionRegion();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
   const { campaign, enrollment } = useSponsorCampaign();
   const categoryOptions = [
     { label: 'NONE', value: 0 },
@@ -67,6 +69,16 @@ export default function CommitmentScreen() {
   const upcomingCompetitionMonthKey = getRegistrationTargetCompetitionMonthKey(
     registrationReferenceDateKey
   );
+  const jurisdictionCode = regionVerification?.regionCode
+    ?.split('-')
+    .slice(0, 2)
+    .join('-') || 'GLOBAL';
+  const registration = useCompetitionRegistration({
+    expectedMonthKey: upcomingCompetitionMonthKey,
+    jurisdictionCode,
+    regionLabel: competitionRegion.label,
+    regionVerification
+  });
   const maximumSelectableGoal = getRegistrationGoalLimit(
     upcomingCompetitionMonthKey,
     registrationReferenceDateKey
@@ -84,6 +96,7 @@ export default function CommitmentScreen() {
       ? maximumSelectableGoal
       : Math.min(weeklyGoal, maximumSelectableGoal)
   );
+  const [goalSelected, setGoalSelected] = useState(lateRegistrationActive);
   const [weeklyMatchMultipliers, setWeeklyMatchMultipliers] = useState(
     defaultWeeklyMatchMultipliers
   );
@@ -92,6 +105,10 @@ export default function CommitmentScreen() {
   const [bonusDays, setBonusDays] = useState<RemainderDayCount>(0);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showCalculation, setShowCalculation] = useState(false);
+  const [ageEligibilityAttested, setAgeEligibilityAttested] = useState(false);
+  const [currentLegalAccepted, setCurrentLegalAccepted] = useState(false);
+  const [competitionRulesAccepted, setCompetitionRulesAccepted] = useState(false);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const baseMonthEntries = days * 4;
   const weeklyMatchEntries = calculateWeeklyMatchEntries(days, weeklyMatchMultipliers);
   const matchAdjustedEntries = weeklyMatchEntries.reduce(
@@ -155,14 +172,36 @@ export default function CommitmentScreen() {
     }
   }
 
-  function confirmWeeklyGoal() {
-    setWeeklyGoal(days);
-    router.push('/entry-confirmed');
+  async function confirmWeeklyGoal() {
+    setConfirmationError(null);
+    if (
+      !goalSelected ||
+      !ageEligibilityAttested ||
+      !currentLegalAccepted ||
+      !competitionRulesAccepted
+    ) {
+      setConfirmationError('Review and accept every registration requirement.');
+      return;
+    }
+
+    try {
+      const enrollmentResult = await registration.register(days);
+      setWeeklyGoal(enrollmentResult.goalDays);
+      router.push('/entry-confirmed');
+    } catch (error) {
+      setConfirmationError(
+        error instanceof Error
+          ? error.message
+          : 'Registration could not be completed. Try again.'
+      );
+    }
   }
+
+  const registrationRequirementsAccepted =
+    ageEligibilityAttested && currentLegalAccepted && competitionRulesAccepted;
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -190,7 +229,7 @@ export default function CommitmentScreen() {
               LATE REGISTRATION // DAY {lateRegistrationDay}
             </TerminalText>
             <TerminalText tone="muted" variant="caption">
-              {`ONLY ${maximumSelectableGoal} ${maximumSelectableGoal === 1 ? 'DAY REMAINS' : 'DAYS REMAIN'} IN SCORING WEEK 1, SO YOUR GOAL IS LOCKED TO ${maximumSelectableGoal}. ALL OTHER GOALS ARE UNAVAILABLE. 3X IS AUTOMATIC IF YOUR MATCHED PLAYER MISSES BECAUSE NO EXTRA DAY EXISTS.`}
+              {`ONLY ${maximumSelectableGoal} ${maximumSelectableGoal === 1 ? 'DAY REMAINS' : 'DAYS REMAIN'} IN SCORING WEEK 1, SO YOUR GOAL IS LOCKED TO ${maximumSelectableGoal}. ALL OTHER GOALS ARE UNAVAILABLE. 3X IS AUTOMATIC IF YOUR WEEKLY CHALLENGE PARTNER MISSES BECAUSE NO EXTRA DAY EXISTS.`}
             </TerminalText>
           </View>
         ) : null}
@@ -200,10 +239,10 @@ export default function CommitmentScreen() {
             YOUR COMMITMENT
           </TerminalText>
           <TerminalText glow style={styles.selectedGoalValue} tone="cyan" variant="display">
-            {days}
+            {goalSelected ? days : '--'}
           </TerminalText>
           <TerminalText tone="muted" variant="label">
-            DAYS / WEEK
+            {goalSelected ? 'DAYS / WEEK' : 'SELECT 1-7 DAYS'}
           </TerminalText>
         </View>
 
@@ -215,29 +254,32 @@ export default function CommitmentScreen() {
               <Pressable
               accessibilityRole="radio"
               accessibilityState={{
-                checked: days === day,
+                checked: goalSelected && days === day,
                 disabled: !available
               }}
               disabled={!available}
               key={day}
-              onPress={() => setDays(day)}
+              onPress={() => {
+                setDays(day);
+                setGoalSelected(true);
+              }}
               style={[
                 styles.dayButton,
                 !available
                   ? styles.dayButtonUnavailable
-                  : days === day
+                  : goalSelected && days === day
                     ? styles.dayButtonActive
                     : styles.dayButtonIdle
               ]}
             >
               <TerminalText
-                glow={days === day}
+                glow={goalSelected && days === day}
                 tone={!available
                   ? 'muted'
-                  : days === day
+                  : goalSelected && days === day
                     ? 'cyan'
                     : 'dim'}
-                variant="value"
+                variant="button"
               >
                 {day}
               </TerminalText>
@@ -246,9 +288,62 @@ export default function CommitmentScreen() {
           })}
         </View>
 
+        <HUDBorderBox glow={goalSelected} style={styles.beforeConfirmCard} tone={goalSelected ? 'cyan' : 'amber'}>
+          <TerminalText glow tone={goalSelected ? 'cyan' : 'amber'} variant="label">
+            {goalSelected ? 'BEFORE YOU CONFIRM' : 'CHOOSE A REALISTIC GOAL'}
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            {goalSelected
+              ? `Your ${days}-day goal repeats for four scoring weeks. Only one verified workout per calendar day counts.`
+              : 'Choose the number of days you can repeat every week. Nothing is selected for you automatically.'}
+          </TerminalText>
+          {goalSelected ? (
+            <>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                Hit the full goal to earn that week&apos;s entries. Miss it and that week earns zero.
+              </TerminalText>
+              <CompactTextButton
+                label={showCalculator ? 'SCORING EXPLANATION OPEN BELOW' : 'OPTIONAL // SEE SCORING EXAMPLES ->'}
+                onPress={() => setShowCalculator(true)}
+                tone={showCalculator ? 'muted' : 'cyan'}
+              />
+            </>
+          ) : null}
+        </HUDBorderBox>
+
+        <HUDBorderBox style={styles.registrationConsent} tone="muted">
+          <TerminalText glow tone="cyan" variant="label">
+            REGISTRATION REQUIREMENTS
+          </TerminalText>
+          <LegalDocumentLinks />
+          <LegalConsentCheckbox
+            checked={currentLegalAccepted}
+            label="I ACCEPT THE CURRENT PRIVACY POLICY AND TERMS."
+            onToggle={() => setCurrentLegalAccepted((current) => !current)}
+          />
+          <LegalConsentCheckbox
+            checked={competitionRulesAccepted}
+            label="I ACCEPT THIS COMPETITION'S RULES AND LOCKED WEEKLY GOAL."
+            onToggle={() => setCompetitionRulesAccepted((current) => !current)}
+          />
+          <LegalConsentCheckbox
+            checked={ageEligibilityAttested}
+            label="I CONFIRM I MEET THE MINIMUM AGE FOR MY VERIFIED REGION."
+            onToggle={() => setAgeEligibilityAttested((current) => !current)}
+          />
+          {confirmationError ? (
+            <AuthStatusNotice message={confirmationError} tone="red" />
+          ) : null}
+        </HUDBorderBox>
+
         <CyberButtonPrimary
-          label="CONFIRM WEEKLY GOAL ->"
-          onPress={confirmWeeklyGoal}
+          disabled={
+            !goalSelected ||
+            !registrationRequirementsAccepted ||
+            registration.busy
+          }
+          label={registration.busy ? 'CHECKING REGISTRATION...' : 'CONFIRM + REGISTER ->'}
+          onPress={() => void confirmWeeklyGoal()}
           style={styles.topConfirmButton}
         />
 
@@ -286,7 +381,7 @@ export default function CommitmentScreen() {
             warning="0 ENTRIES"
           />
           <ContestStep
-            detail="A new Period Match appears each scoring week. Other bonuses appear when they become available."
+            detail="A new Weekly Challenge appears each scoring week. Other bonuses appear when they become available."
             label="UNLOCK BONUSES"
             number="03"
           />
@@ -309,7 +404,7 @@ export default function CommitmentScreen() {
             </TerminalText>
           ) : null}
           <TerminalText tone="dim" uppercase={false} variant="caption">
-            Open How Scoring Works to try each week&apos;s Period Match result, your category finish, Bonus Days 29-31 and the final Perfect Month 10x.
+            Open How Scoring Works to try each week&apos;s Weekly Challenge result, your category finish, Bonus Days 29-31 and the final Perfect Month 10x.
           </TerminalText>
           <CompactTextButton
             label={showCalculator ? 'HIDE HOW SCORING WORKS' : 'SEE HOW SCORING WORKS ->'}
@@ -347,7 +442,7 @@ export default function CommitmentScreen() {
             onSelect={selectWeeklyMatchResult}
           />
           <ChoiceControl
-            helper={`Finishing first, second or third in your commitment category multiplies the four-week Period Match subtotal by ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x or ${campaign.economics.categoryPodiumMultipliers[3]}x.`}
+            helper={`Finishing first, second or third in your commitment category multiplies the four-week Weekly Challenge subtotal by ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x or ${campaign.economics.categoryPodiumMultipliers[3]}x.`}
             label="2 // TOP THREE CATEGORY FINISHERS"
             onSelect={(value) => setCategoryRank(value as CategoryRank)}
             options={categoryOptions}
@@ -373,7 +468,7 @@ export default function CommitmentScreen() {
               </TerminalText>
               <TerminalText tone="muted" variant="caption">
                 {perfectMonthAvailable
-                  ? 'Apply the final 10x after Period Match, category and Bonus Day results.'
+                  ? 'Apply the final 10x after Weekly Challenge, category and Bonus Day results.'
                   : 'Miss any Weekly Goal and the Perfect Month 10x is not available.'}
               </TerminalText>
             </View>
@@ -409,14 +504,14 @@ export default function CommitmentScreen() {
                 return (
                   <CalculationRow
                     key={`week-${index + 1}`}
-                    label={`WEEK ${index + 1} // ${multiplier}X MATCH RESULT`}
+                    label={`WEEK ${index + 1} // ${multiplier}X WEEKLY CHALLENGE`}
                     tone={multiplier === 0 ? 'red' : multiplier === 3 ? 'pink' : 'cyan'}
                     value={`${days} X ${multiplier} = ${entries.toLocaleString()}`}
                   />
                 );
               })}
               <CalculationRow
-                label="PERIOD MATCH BONUS SUBTOTAL"
+                label="WEEKLY CHALLENGE BONUS SUBTOTAL"
                 value={`${weeklyMatchEntries.join(' + ')} = ${matchAdjustedEntries.toLocaleString()}`}
               />
               <CalculationRow
@@ -440,19 +535,13 @@ export default function CommitmentScreen() {
           ) : null}
 
           <TerminalText tone="dim" uppercase={false} variant="caption">
-            Match results are added first, followed by category and Bonus Day
+            Weekly Challenge results are added first, followed by category and Bonus Day
             Entries. Perfect Month 10x is applied last. Your Free Entry is added
             once without a multiplier.
           </TerminalText>
         </HUDBorderBox>
         ) : null}
 
-        <View style={styles.actions}>
-          <CyberButtonPrimary
-            label="CONFIRM WEEKLY GOAL ->"
-            onPress={confirmWeeklyGoal}
-          />
-        </View>
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -536,10 +625,10 @@ function WeeklyMatchControl({
   return (
     <View style={styles.controlGroup}>
       <TerminalText glow tone="cyan" variant="label">
-        1 // PERIOD MATCH RESULTS
+        1 // WEEKLY CHALLENGE RESULTS
       </TerminalText>
       <TerminalText tone="dim" uppercase={false} variant="caption">
-        Set each week separately. If you and your matched player both hit the goal,
+        Set each week separately. If you and your Weekly Challenge partner both hit the goal,
         you earn 2x each. If they miss and you complete one extra verified workout,
         you earn 3x. When your goal uses every available day, 3x is automatic if
         they miss. Miss your own goal and that week earns 0 Entries.
@@ -742,6 +831,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: spacing.lg
   },
+  registrationConsent: {
+    gap: spacing.sm,
+    padding: spacing.lg
+  },
   registrationValue: {
     marginVertical: spacing.xs,
     fontFamily: fontFamilies.display,
@@ -770,17 +863,23 @@ const styles = StyleSheet.create({
   },
   dayPicker: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 6,
+    gap: spacing.xs,
     marginTop: spacing.sm,
     marginBottom: spacing.md
+  },
+  beforeConfirmCard: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    padding: spacing.lg
   },
   topConfirmButton: {
     marginBottom: spacing.md
   },
   dayButton: {
-    width: 39,
-    height: 44,
+    width: '23%',
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -949,9 +1048,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.displaySmall,
     lineHeight: 42
-  },
-  actions: {
-    marginTop: spacing.lg,
-    gap: spacing.sm
   }
 });

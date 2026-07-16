@@ -10,7 +10,6 @@ import {
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -31,7 +30,6 @@ export default function ConsentsScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}

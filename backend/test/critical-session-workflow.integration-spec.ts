@@ -63,9 +63,6 @@ const cappedUserPrincipals: readonly [
 const competitionRules = {
   minHeartRateSamples: 2,
   minSessionMinutes: 10,
-  payoutExponent: 0.8,
-  payoutPoolAmountMinor: 10_000,
-  payoutWinnerCount: 3,
   requireDeviceAttestation: true,
   requireFaceCheck: true,
   requireGymQr: true,
@@ -164,6 +161,29 @@ describeWithDatabase('critical session and ledger workflow', () => {
       ),
     ).resolves.toEqual(enrollment);
     await activateCompetition(fixture.competitionId);
+
+    const abandoned = await sessions.create(
+      userPrincipal,
+      'session-workflow-abandoned-create',
+      { competitionId: fixture.competitionId },
+    );
+    const cancelled = await sessions.cancel(
+      userPrincipal,
+      abandoned.id,
+      'session-workflow-abandoned-cancel',
+    );
+    expect(cancelled).toMatchObject({
+      completedAt: expect.any(String),
+      id: abandoned.id,
+      status: 'cancelled',
+    });
+    await expect(
+      sessions.cancel(
+        userPrincipal,
+        abandoned.id,
+        'session-workflow-abandoned-cancel',
+      ),
+    ).resolves.toEqual(cancelled);
 
     const created = await sessions.create(
       userPrincipal,
@@ -652,10 +672,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-          payout_enabled, boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, valid_from)
        VALUES
          ('critical-session-region', 'CA', 'BC', 'Critical Session Region',
-          'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE, TRUE,
+           'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
           'boundary-v1', 'policy-v1', $1)
        RETURNING id`,
       [new Date(now - 24 * 60 * 60_000)],
@@ -676,11 +696,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     const competition = await migrated.pool.query<{ id: string }>(
       `INSERT INTO competitions
-         (region_policy_id, month_key, name, status, currency, rules_version,
+         (region_policy_id, month_key, name, status, rules_version,
           rules, minimum_entrants, registration_opens_at,
           registration_closes_at, starts_at, ends_at)
        VALUES ($1, '2030-01', 'Critical Session Competition', 'registration',
-               'CAD', 'rules-v1', $2::jsonb, 100, $3, $4, $5, $6)
+               'rules-v1', $2::jsonb, 100, $3, $4, $5, $6)
        RETURNING id`,
       [
         region.rows[0].id,
@@ -724,11 +744,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-          payout_enabled, boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, valid_from)
        VALUES
          ('critical-capped-enrollment-region', 'CA', 'BC',
           'Critical Capped Enrollment Region', 'CAD', 'America/Vancouver',
-          ARRAY['en-CA'], 19, TRUE, TRUE, 'boundary-v1', 'policy-v1', $1)
+           ARRAY['en-CA'], 19, TRUE, 'boundary-v1', 'policy-v1', $1)
        RETURNING id`,
       [new Date(now - 24 * 60 * 60_000)],
     );
@@ -765,11 +785,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     }
     const competition = await migrated.pool.query<{ id: string }>(
       `INSERT INTO competitions
-         (region_policy_id, month_key, name, status, currency, rules_version,
+         (region_policy_id, month_key, name, status, rules_version,
           rules, minimum_entrants, entrant_cap, registration_opens_at,
           registration_closes_at, starts_at, ends_at)
        VALUES ($1, '2030-02', 'Critical Capped Enrollment Competition',
-               'registration', 'CAD', 'rules-v1', $2::jsonb, 100, 100,
+               'registration', 'rules-v1', $2::jsonb, 100, 100,
                $3, $4, $5, $6)
        RETURNING id`,
       [

@@ -70,14 +70,6 @@ export function useSponsorCampaign() {
   return context;
 }
 
-export function formatCampaignCurrency(amount: number) {
-  return new Intl.NumberFormat('en-CA', {
-    currency: 'CAD',
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    style: 'currency'
-  }).format(amount);
-}
-
 export function formatCampaignDate(dateKey: string) {
   const [year, month, day] = dateKey.split('-').map(Number);
 

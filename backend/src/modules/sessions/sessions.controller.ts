@@ -90,4 +90,23 @@ export class SessionsController {
       request,
     );
   }
+
+  @Post(':sessionId/cancel')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary:
+      'Cancel an active workout session without submitting it for review',
+  })
+  @ApiOkResponse({ type: SessionResponseDto })
+  cancel(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ): Promise<SessionResponseDto> {
+    return this.sessions.cancel(
+      principal,
+      sessionId,
+      requireIdempotencyKey(idempotencyKey),
+    );
+  }
 }

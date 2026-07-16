@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   getBiometricCameraConsent,
+  getPreferenceOwnerId,
   setBiometricCameraConsent
 } from '@/state/onboardingPreferences';
 import { useAuth } from '@/state/auth';
 
 export function useBiometricCameraConsent() {
   const { loading: authLoading, user } = useAuth();
-  const userId = user?.uid ?? null;
+  const userId = getPreferenceOwnerId(user?.uid);
   const [accepted, setAcceptedState] = useState(false);
   const [ready, setReady] = useState(() => !authLoading && !userId);
 

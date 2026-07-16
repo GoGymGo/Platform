@@ -1,4 +1,4 @@
-export type IdentityMode = 'private' | 'alias' | 'real';
+export type IdentityMode = 'private' | 'alias' | 'real_name';
 
 export type PublicIdentity = {
   callsign: string;
@@ -61,7 +61,7 @@ export function parseStoredPublicIdentity(rawValue: string | null): PublicIdenti
     if (
       typeof callsign !== 'string' ||
       typeof displayName !== 'string' ||
-      (mode !== 'private' && mode !== 'alias' && mode !== 'real')
+      (mode !== 'private' && mode !== 'alias' && mode !== 'real_name')
     ) {
       return null;
     }

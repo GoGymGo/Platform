@@ -11,6 +11,11 @@ const prohibitedContent = [
   /gh[opsu]_[A-Za-z0-9_]{20,}/,
   /sk_(?:live|test)_[A-Za-z0-9]{16,}/,
 ];
+const prohibitedRuntimeContent = [
+  /\bHYPERWALLET_[A-Z0-9_]+\b/,
+  /\/v1\/(?:payouts?|webhooks\/hyperwallet)\b/,
+];
+const prohibitedRuntimePathPrefixes = ['src/modules/payouts/'];
 
 async function listFiles() {
   const { stdout } = await execFileAsync(
@@ -51,12 +56,38 @@ for (const file of files) {
     continue;
   }
 
-  const content = await readFile(file, 'utf8');
+  let content;
+  try {
+    content = await readFile(file, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') continue;
+    throw error;
+  }
+
+  if (
+    prohibitedRuntimePathPrefixes.some((prefix) =>
+      relativePath.startsWith(prefix),
+    )
+  ) {
+    violations.push(`${relativePath}: obsolete payment runtime path`);
+    continue;
+  }
+
   for (const pattern of prohibitedContent) {
     if (pattern.test(content)) {
       violations.push(
         `${relativePath}: content resembles a committed credential`,
       );
+    }
+  }
+
+  if (relativePath.startsWith('src/')) {
+    for (const pattern of prohibitedRuntimeContent) {
+      if (pattern.test(content)) {
+        violations.push(
+          `${relativePath}: obsolete payment-provider runtime reference`,
+        );
+      }
     }
   }
 }
@@ -68,7 +99,16 @@ const dependencies = {
   ...packageJson.dependencies,
   ...packageJson.devDependencies,
 };
-for (const dependency of ['@supabase/supabase-js', 'plaid', 'stripe']) {
+for (const dependency of [
+  '@hyperwallet/sdk',
+  '@paypal/checkout-server-sdk',
+  '@supabase/supabase-js',
+  'braintree',
+  'hyperwallet-rest-sdk',
+  'paypal-rest-sdk',
+  'plaid',
+  'stripe',
+]) {
   if (dependency in dependencies) {
     violations.push(
       `package.json: ${dependency} adds an unapproved financial or data boundary`,

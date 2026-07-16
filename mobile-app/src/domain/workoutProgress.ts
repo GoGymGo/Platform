@@ -13,6 +13,7 @@ export type PersistedActiveWorkoutSession = {
   midSessionCheckPrompted: boolean;
   midSessionCheckPromptedAt: string | null;
   midSessionVerified: boolean;
+  serverManaged: true;
   startedAt: string;
   verificationMethod: WorkoutVerificationMethod;
 };
@@ -74,7 +75,9 @@ export type SessionCompletionStatus =
   | 'heart-rate-target-not-met'
   | 'minimum-not-met'
   | 'missing-mid-session-check'
-  | 'no-active-session';
+  | 'no-active-session'
+  | 'pending-review'
+  | 'rejected';
 
 type SessionCompletionCandidate = {
   averageHeartRateBpm: number;
@@ -152,6 +155,7 @@ function isActiveWorkoutSession(
       Number.isFinite(Date.parse(promptedAt))
     )) &&
     typeof candidate.midSessionVerified === 'boolean' &&
+    candidate.serverManaged === true &&
     Number.isFinite(startedAt) &&
     (candidate.verificationMethod === 'heartRate' ||
       candidate.verificationMethod === 'partnerGymQr')

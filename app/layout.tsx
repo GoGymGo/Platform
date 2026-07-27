@@ -82,11 +82,12 @@ export default function RootLayout({
             </Link>
             <nav aria-label="Primary navigation">
               <Link href="/#how-it-works">HOW IT WORKS</Link>
+              <Link href="/demo">DEMO</Link>
               <Link href="/gym-goers">GYM GOERS</Link>
               <Link href="/brands">FITNESS BRANDS</Link>
             </nav>
-            <Link className="header-cta" href="/gym-goers">
-              PRE-REGISTER <span aria-hidden="true">→</span>
+            <Link className="header-cta" href="/demo">
+              TRY DEMO <span aria-hidden="true">→</span>
             </Link>
           </div>
         </header>
@@ -109,6 +110,7 @@ export default function RootLayout({
             <div>
               <p className="footer-label">THE PRODUCT</p>
               <Link href="/#how-it-works">How GoGymGo works</Link>
+              <Link href="/demo">Join the demo competition</Link>
               <span>Launching region by region</span>
             </div>
           </div>

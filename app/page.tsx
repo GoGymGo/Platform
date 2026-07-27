@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { ProductScreens } from "./components/ProductScreens";
 
 const steps = [
   {
@@ -90,11 +90,11 @@ export default function Home() {
             rewards.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary" href="/gym-goers">
-              PRE-REGISTER <span aria-hidden="true">→</span>
+            <Link className="button button-primary" href="/demo">
+              TRY THE DEMO <span aria-hidden="true">→</span>
             </Link>
-            <Link className="button button-secondary" href="/brands">
-              PARTNER WITH US <span aria-hidden="true">↗</span>
+            <Link className="button button-secondary" href="/gym-goers">
+              PRE-REGISTER <span aria-hidden="true">↗</span>
             </Link>
           </div>
           <p className="hero-note">
@@ -102,36 +102,48 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="hero-visual" aria-label="Preview of the GoGymGo mobile app">
-          <div className="signal-card signal-card-top">
-            <span>WEEKLY GOAL</span>
-            <strong>4 / 4</strong>
-            <small>VERIFIED DAYS</small>
+        <Link
+          className="hero-demo-console"
+          href="/demo"
+          aria-label="Join the interactive GoGymGo demo competition"
+        >
+          <div className="hero-demo-topline">
+            <span>LIVE PRODUCT DEMO</span>
+            <span className="console-live">OPEN</span>
           </div>
-          <div className="phone phone-primary">
-            <Image
-              alt="GoGymGo home screen showing a weekly goal, verified workout button, reward, and Weekly Challenge"
-              fill
-              priority
-              sizes="(max-width: 900px) 60vw, 280px"
-              src="/app/home.png"
-            />
+          <div className="hero-demo-title">
+            <span>JULY // VANCOUVER</span>
+            <strong>4-DAY COMPETITION</strong>
           </div>
-          <div className="phone phone-secondary">
-            <Image
-              alt="GoGymGo Brand Reward marketplace showing sponsor-supplied physical rewards"
-              fill
-              priority
-              sizes="(max-width: 900px) 42vw, 220px"
-              src="/app/rewards.png"
-            />
+          <div className="hero-demo-stats">
+            <div>
+              <span>PLAYERS</span>
+              <strong>128</strong>
+            </div>
+            <div>
+              <span>YOUR DEMO</span>
+              <strong>NOT JOINED</strong>
+            </div>
           </div>
-          <div className="signal-card signal-card-bottom">
-            <span>WORKOUT STATUS</span>
-            <strong>VERIFIED</strong>
-            <small>STREAK UPDATED</small>
+          <div className="hero-demo-rankings" aria-hidden="true">
+            <span>01</span>
+            <strong>CORE_FOUR</strong>
+            <small>CLAIM · PACIFIC MOTION KIT</small>
+            <b>48</b>
+            <span>02</span>
+            <strong>NEON_4</strong>
+            <small>WON · VOLT 25% CODE</small>
+            <b>44</b>
+            <span>03</span>
+            <strong>KODA_FIT</strong>
+            <small>READY · NOVA SHAKER</small>
+            <b>40</b>
           </div>
-        </div>
+          <span className="hero-demo-action">JOIN THE DEMO COMPETITION →</span>
+          <small className="hero-demo-note">
+            Local simulation. No real entry, standing, or reward.
+          </small>
+        </Link>
       </section>
 
       <section className="proof-strip" aria-label="GoGymGo product highlights">
@@ -177,6 +189,8 @@ export default function Home() {
         </div>
       </section>
 
+      <ProductScreens />
+
       <section className="section section-panel">
         <div className="shell">
           <div className="section-heading">
@@ -204,42 +218,37 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section shell app-story">
-        <div className="app-story-visual">
-          <div className="phone phone-story phone-story-one">
-            <Image
-              alt="GoGymGo active workout verification screen"
-              fill
-              sizes="(max-width: 800px) 50vw, 230px"
-              src="/app/active-workout.png"
-            />
-          </div>
-          <div className="phone phone-story phone-story-two">
-            <Image
-              alt="GoGymGo Weekly Challenge screen"
-              fill
-              sizes="(max-width: 800px) 50vw, 230px"
-              src="/app/challenge.png"
-            />
-          </div>
-        </div>
-        <div className="app-story-copy">
-          <p className="eyebrow">PROOF, NOT PERFORMANCE THEATRE</p>
-          <h2>A fairer kind of fitness competition.</h2>
-          <p>
-            Start with a goal that fits your week. GoGymGo verifies eligible
-            sessions, reconciles each result, and only then updates your
-            progress.
+      <section className="section shell demo-promo">
+        <div>
+          <p className="eyebrow">
+            <span className="status-dot" />
+            INTERACTIVE PRODUCT DEMO
           </p>
-          <ul className="check-list">
-            <li>One verified workout can count per regional calendar day.</li>
-            <li>Pending or rejected sessions never appear as approved.</li>
-            <li>Weekly Challenges happen with friends you choose.</li>
-            <li>Rankings compare players in the same Weekly Goal category.</li>
-          </ul>
-          <Link className="text-link" href="/gym-goers">
-            BE FIRST IN YOUR REGION <span aria-hidden="true">→</span>
+          <h2>Don’t just read about it. Enter the competition.</h2>
+          <p>
+            Choose a public Alias and Weekly Goal, run an accelerated verified
+            workout, and watch your sample progress and ranking update.
+          </p>
+          <Link className="button button-primary" href="/demo">
+            JOIN A DEMO COMPETITION <span aria-hidden="true">→</span>
           </Link>
+        </div>
+        <div className="demo-promo-sequence" aria-label="Three steps in the demo">
+          <div>
+            <span>01</span>
+            <strong>JOIN</strong>
+            <small>Pick an Alias + goal</small>
+          </div>
+          <div>
+            <span>02</span>
+            <strong>VERIFY</strong>
+            <small>Run a demo workout</small>
+          </div>
+          <div>
+            <span>03</span>
+            <strong>MOVE UP</strong>
+            <small>See progress + rewards</small>
+          </div>
         </div>
       </section>
 
@@ -300,8 +309,11 @@ export default function Home() {
           <h2>Get in before the first competition starts.</h2>
         </div>
         <div className="final-actions">
-          <Link className="button button-primary" href="/gym-goers">
-            I’M A GYM GOER <span aria-hidden="true">→</span>
+          <Link className="button button-primary" href="/demo">
+            TRY THE DEMO <span aria-hidden="true">→</span>
+          </Link>
+          <Link className="button button-secondary" href="/gym-goers">
+            I’M A GYM GOER <span aria-hidden="true">↗</span>
           </Link>
           <Link className="button button-secondary" href="/brands">
             I REPRESENT A BRAND <span aria-hidden="true">↗</span>

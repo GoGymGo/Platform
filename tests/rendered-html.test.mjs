@@ -5,20 +5,46 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("the landing page contains the finished GoGymGo experience", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+  const [page, layout, productScreens, packageJson] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("app/components/ProductScreens.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
   ]);
 
   assert.match(layout, /GoGymGo — Make consistency count/);
   assert.match(page, /Consistency/);
   assert.match(page, /verified gym attendance/i);
-  assert.match(page, /PRE-REGISTER/);
-  assert.match(page, /PARTNER WITH US/);
+  assert.match(page, /TRY THE DEMO/);
+  assert.match(page, /JOIN A DEMO COMPETITION/);
+  assert.match(layout, /href="\/demo"/);
+  assert.match(productScreens, /<GoalScreen \/>/);
+  assert.match(productScreens, /<TimerScreen \/>/);
+  assert.match(productScreens, /<RewardsLeaderboardScreen \/>/);
+  assert.equal((productScreens.match(/<PhoneShell/g) ?? []).length, 3);
+  assert.match(productScreens, /17 BASE ENTRIES/);
+  assert.match(productScreens, /CLAIM · PACIFIC MOTION KIT/);
+  assert.doesNotMatch(page, /next\/image|\/app\/(?:home|rewards|active-workout|challenge)\.png/);
   assert.equal((layout.match(/wordmark-cyan">GO/g) ?? []).length, 4);
   assert.equal((layout.match(/wordmark-pink">GYM/g) ?? []).length, 2);
   assert.doesNotMatch(page + layout + packageJson, /codex-preview|react-loading-skeleton/i);
+});
+
+test("the demo page supports a truthful local competition flow", async () => {
+  const [demoPage, demoCompetition] = await Promise.all([
+    readFile(new URL("app/demo/page.tsx", root), "utf8"),
+    readFile(new URL("app/components/DemoCompetition.tsx", root), "utf8"),
+  ]);
+
+  assert.match(demoPage, /<DemoCompetition \/>/);
+  assert.match(demoCompetition, /JOIN DEMO COMPETITION/);
+  assert.match(demoCompetition, /gogymgo-demo-competition/);
+  assert.match(demoCompetition, /START DEMO WORKOUT/);
+  assert.match(demoCompetition, /SUBMIT DEMO WORKOUT/);
+  assert.match(
+    demoCompetition,
+    /no real\s+account, Prize Draw Entry, competition standing, or reward/i,
+  );
 });
 
 test("both audience pages expose their intended forms", async () => {

@@ -76,7 +76,9 @@ export default function RootLayout({
         <header className="site-header">
           <div className="shell header-inner">
             <Link aria-label="GoGymGo home" className="wordmark" href="/">
-              GO<span>GYM</span>GO
+              <span className="wordmark-cyan">GO</span>
+              <span className="wordmark-pink">GYM</span>
+              <span className="wordmark-cyan">GO</span>
             </Link>
             <nav aria-label="Primary navigation">
               <Link href="/#how-it-works">HOW IT WORKS</Link>
@@ -93,7 +95,9 @@ export default function RootLayout({
           <div className="shell footer-grid">
             <div>
               <Link aria-label="GoGymGo home" className="wordmark" href="/">
-                GO<span>GYM</span>GO
+                <span className="wordmark-cyan">GO</span>
+                <span className="wordmark-pink">GYM</span>
+                <span className="wordmark-cyan">GO</span>
               </Link>
               <p>Make consistency count.</p>
             </div>

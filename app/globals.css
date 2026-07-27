@@ -132,12 +132,17 @@ a {
   flex: none;
   font-family: "Orbitron", sans-serif;
   font-size: 20px;
-  letter-spacing: -0.04em;
+  letter-spacing: 0.024em;
 }
 
-.wordmark span {
+.wordmark-cyan {
   color: var(--cyan);
   text-shadow: 0 0 14px rgba(52, 229, 232, 0.55);
+}
+
+.wordmark-pink {
+  color: var(--pink);
+  text-shadow: 0 0 14px rgba(255, 45, 155, 0.55);
 }
 
 .site-header nav {

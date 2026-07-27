@@ -16,6 +16,8 @@ test("the landing page contains the finished GoGymGo experience", async () => {
   assert.match(page, /verified gym attendance/i);
   assert.match(page, /PRE-REGISTER/);
   assert.match(page, /PARTNER WITH US/);
+  assert.equal((layout.match(/wordmark-cyan">GO/g) ?? []).length, 4);
+  assert.equal((layout.match(/wordmark-pink">GYM/g) ?? []).length, 2);
   assert.doesNotMatch(page + layout + packageJson, /codex-preview|react-loading-skeleton/i);
 });
 

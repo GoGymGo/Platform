@@ -38,6 +38,8 @@ test("the demo page supports a truthful local competition flow", async () => {
 
   assert.match(demoPage, /<DemoCompetition \/>/);
   assert.match(demoCompetition, /JOIN DEMO COMPETITION/);
+  assert.match(demoCompetition, /Join the <span>competition\.<\/span>/);
+  assert.doesNotMatch(demoCompetition, /Try the loop/i);
   assert.match(demoCompetition, /gogymgo-demo-competition/);
   assert.match(demoCompetition, /START DEMO WORKOUT/);
   assert.match(demoCompetition, /SUBMIT DEMO WORKOUT/);

@@ -139,9 +139,7 @@ export function DemoCompetition() {
             DEMO COMPETITION // OPEN
           </p>
           <h1>
-            Join the competition.
-            <br />
-            <span>Try the loop.</span>
+            Join the <span>competition.</span>
           </h1>
           <p>
             Create a demo Alias, choose the number of verified days you can

@@ -135,6 +135,11 @@ a {
   letter-spacing: 0.024em;
 }
 
+.site-header .wordmark {
+  font-size: 28px;
+  line-height: 1;
+}
+
 .wordmark-cyan {
   color: var(--cyan);
   text-shadow: 0 0 14px rgba(52, 229, 232, 0.55);
@@ -2677,6 +2682,10 @@ h3 {
 
   .wordmark {
     font-size: 17px;
+  }
+
+  .site-header .wordmark {
+    font-size: 22px;
   }
 
   .header-cta span {

@@ -1,5 +1,23 @@
 import Link from "next/link";
 
+function ScreenHeader({
+  label,
+  step,
+}: {
+  label: string;
+  step: string;
+}) {
+  return (
+    <div className="app-screen-header">
+      <span className="app-screen-back" aria-hidden="true">
+        &lt;
+      </span>
+      <span className="app-screen-step">{step}</span>
+      <strong>{label}</strong>
+    </div>
+  );
+}
+
 function PhoneShell({
   children,
   label,
@@ -14,14 +32,8 @@ function PhoneShell({
   return (
     <article className="product-screen-card">
       <div className="product-phone" aria-label={label}>
-        <div className="product-phone-bezel">
-          <div className="product-phone-topbar">
-            <span>9:41</span>
-            <span>● ●●</span>
-          </div>
-          <div className="product-phone-content">{children}</div>
-          <div className="product-phone-homebar" />
-        </div>
+        <div className="product-phone-content">{children}</div>
+        <div className="product-phone-homebar" aria-hidden="true" />
       </div>
       <div className="product-screen-caption">
         <span>{step}</span>
@@ -34,46 +46,42 @@ function PhoneShell({
 function GoalScreen() {
   return (
     <PhoneShell
-      label="GoGymGo Weekly Goal and scoring calculation screen"
+      label="GoGymGo Weekly Goal and four-week entry calculation screen"
       step="01 // COMMIT"
-      title="Pick the week you can repeat"
+      title="Choose a goal you can repeat"
     >
-      <div className="mobile-screen-header">
-        <span>REGISTRATION</span>
-        <strong>WEEKLY GOAL</strong>
+      <ScreenHeader label="WEEKLY GOAL" step="SETUP // 2 OF 2" />
+      <div className="app-screen-progress">
+        <span style={{ width: "100%" }} />
       </div>
-      <p className="mobile-screen-kicker">SELECT 1–7 VERIFIED DAYS</p>
-      <div className="mobile-goal-grid" aria-label="Four days selected">
+      <h4>CHOOSE YOUR WEEKLY GOAL</h4>
+      <p className="app-screen-copy">
+        Choose a realistic number of workout days you can repeat each week.
+      </p>
+      <div className="app-day-picker" aria-label="Four-day Weekly Goal selected">
         {[1, 2, 3, 4, 5, 6, 7].map((day) => (
           <span className={day === 4 ? "is-selected" : ""} key={day}>
-            {day}
+            <strong>{day}</strong>
+            <small>{day === 1 ? "DAY" : "DAYS"}</small>
           </span>
         ))}
       </div>
-      <div className="mobile-selected-goal">
-        <span>YOUR COMMITMENT</span>
-        <strong>4 DAYS / WEEK</strong>
-        <small>4-DAY CATEGORY</small>
-      </div>
-      <div className="mobile-calc-panel">
-        <span className="mobile-panel-label">BASE MONTH CALCULATION</span>
-        <div className="mobile-calc-equation">
+      <div className="app-hud app-goal-summary">
+        <div>
           <strong>4</strong>
-          <span>×</span>
+          <span>DAYS / WEEK</span>
+        </div>
+        <div>
           <strong>4</strong>
-          <span>=</span>
+          <span>ENTRIES / HIT WEEK</span>
+        </div>
+        <div>
           <strong>16</strong>
+          <span>FOUR-WEEK BASE</span>
         </div>
-        <p>WEEKLY GOAL × 4 SCORING WEEKS</p>
-        <div className="mobile-calc-total">
-          <span>+ 1 FREE ENTRY</span>
-          <strong>17 BASE ENTRIES</strong>
-        </div>
+        <p>Earn more through consistency, teamwork and competition.</p>
+        <span className="app-compact-action">VIEW BONUS DETAILS</span>
       </div>
-      <p className="mobile-screen-footnote">
-        Weekly Challenge, category, Bonus Day, and Perfect Month results can
-        increase the final total.
-      </p>
     </PhoneShell>
   );
 }
@@ -81,133 +89,117 @@ function GoalScreen() {
 function TimerScreen() {
   return (
     <PhoneShell
-      label="GoGymGo verified workout timer screen"
+      label="GoGymGo active verified workout timer screen"
       step="02 // VERIFY"
-      title="Prove the session"
+      title="Follow one clear live session"
     >
-      <div className="mobile-screen-header">
-        <span className="mobile-live-label">● SESSION TRACKING</span>
-        <strong>WORKOUT ACTIVE</strong>
+      <div className="app-session-heading">
+        <span>
+          <i />
+          SESSION ACTIVE
+        </span>
+        <strong>HEART RATE</strong>
       </div>
-      <div className="mobile-timer">
-        <span>ELAPSED</span>
-        <strong>18:42</strong>
-        <small>OF 30:00 MINIMUM</small>
-      </div>
-      <div className="mobile-timer-track">
-        <span style={{ width: "62%" }} />
-      </div>
-      <div className="mobile-timer-labels">
-        <span>START</span>
-        <span>CHECK</span>
-        <span>END</span>
-      </div>
-      <div className="mobile-metric-grid">
-        <div>
-          <span>CURRENT BPM</span>
-          <strong>138</strong>
-          <small>ABOVE TARGET</small>
+      <div className="app-hud app-live-panel">
+        <div className="app-live-metrics">
+          <div>
+            <span>ELAPSED TIME</span>
+            <strong>18:42</strong>
+            <small>30:00 MINIMUM</small>
+          </div>
+          <div>
+            <span>LIVE HEART RATE</span>
+            <strong>138</strong>
+            <small>BPM // ON TRACK</small>
+          </div>
         </div>
-        <div>
-          <span>30-MIN AVG</span>
-          <strong>130</strong>
-          <small>100+ REQUIRED</small>
+        <div className="app-workout-progress">
+          <span style={{ width: "62%" }} />
         </div>
-      </div>
-      <div className="mobile-status-stack">
-        <div>
-          <span>EFFORT</span>
-          <strong>HEART RATE ON TRACK</strong>
-        </div>
-        <div>
-          <span>PRESENCE CHECK</span>
-          <strong>READY AT MIDPOINT</strong>
-        </div>
-        <div>
-          <span>SESSION SAVE</span>
-          <strong>AUTO-SAVED</strong>
+        <div className="app-workout-labels">
+          <span>START</span>
+          <span>CHECK</span>
+          <span>END</span>
         </div>
       </div>
-      <div className="mobile-timer-action">FINISH UNLOCKS AT 30:00</div>
+      <div className="app-hud app-verification-card">
+        <div>
+          <span>VERIFICATION</span>
+          <strong>HEART RATE SESSION</strong>
+        </div>
+        <b>IN PROGRESS</b>
+        <p>
+          Your timer and verification progress save automatically. GoGymGo
+          tells you when an action is needed.
+        </p>
+      </div>
+      <div className="app-disabled-action">FINISH UNLOCKS AT 30:00</div>
     </PhoneShell>
   );
 }
 
-function RewardsLeaderboardScreen() {
-  const rows = [
-    {
-      alias: "CORE_FOUR",
-      rank: "01",
-      reward: "CLAIM · PACIFIC MOTION KIT",
-      score: "48",
-      state: "claim",
-    },
-    {
-      alias: "NEON_4",
-      rank: "02",
-      reward: "WON · VOLT 25% CODE",
-      score: "44",
-      state: "won",
-    },
-    {
-      alias: "KODA_FIT",
-      rank: "03",
-      reward: "READY · NOVA SHAKER",
-      score: "40",
-      state: "ready",
-    },
-    {
-      alias: "IVY_RUN",
-      rank: "04",
-      reward: "DRAW ELIGIBLE",
-      score: "36",
-      state: "eligible",
-    },
-  ] as const;
+const rewardRows = [
+  {
+    alias: "CORE_FOUR",
+    rank: "01",
+    reward: "PACIFIC MOTION TRAINING KIT",
+    state: "READY TO CLAIM",
+  },
+  {
+    alias: "NEON_4",
+    rank: "02",
+    reward: "VOLT 25% DIGITAL REWARD",
+    state: "CLAIMED",
+  },
+  {
+    alias: "KODA_FIT",
+    rank: "03",
+    reward: "NOVA SHAKER",
+    state: "READY TO CLAIM",
+  },
+] as const;
 
+function RewardsLeaderboardScreen() {
   return (
     <PhoneShell
-      label="GoGymGo leaderboard with brand rewards beside player aliases"
+      label="GoGymGo competition results with player and brand reward details"
       step="03 // COMPETE"
-      title="See who won—and what is ready"
+      title="See who won and what they can claim"
     >
-      <div className="mobile-screen-header">
+      <div className="app-results-heading">
         <span>SAMPLE RESULTS // VANCOUVER</span>
-        <strong>4-DAY RANKINGS</strong>
+        <h4>WINNERS CIRCLE</h4>
+        <p>JULY COMPETITION</p>
       </div>
-      <div className="mobile-rank-summary">
+      <div className="app-hud app-results-summary">
         <div>
-          <span>YOUR RANK</span>
-          <strong>#04</strong>
+          <strong>3</strong>
+          <span>GOAL-GROUP LEADERS</span>
         </div>
         <div>
-          <span>YOUR SCORE</span>
-          <strong>36</strong>
+          <strong>3</strong>
+          <span>REWARD WINNERS</span>
         </div>
       </div>
-      <div className="mobile-leaderboard-head">
-        <span>PLAYER + BRAND REWARD</span>
-        <span>SCORE</span>
+      <div className="app-results-label">
+        <strong>PLAYER + BRAND REWARD</strong>
+        <span>STATUS</span>
       </div>
-      <div className="mobile-leaderboard">
-        {rows.map((row) => (
-          <div className="mobile-rank-row" key={row.rank}>
-            <span className="mobile-rank-number">{row.rank}</span>
-            <div className="mobile-rank-person">
+      <div className="app-results-list">
+        {rewardRows.map((row) => (
+          <div className="app-result-row" key={row.rank}>
+            <span>{row.rank}</span>
+            <div>
               <strong>{row.alias}</strong>
-              <span className={`reward-state reward-${row.state}`}>
-                {row.reward}
-              </span>
+              <small>{row.reward}</small>
             </div>
-            <strong className="mobile-rank-score">{row.score}</strong>
+            <b>{row.state}</b>
           </div>
         ))}
       </div>
-      <div className="mobile-reward-note">
-        <span>BRAND REWARD STATUS</span>
-        <strong>VISIBLE BESIDE EACH WINNER</strong>
-        <small>Physical prizes + coupon codes. No payment account.</small>
-      </div>
+      <p className="app-results-note">
+        Illustrative demo results. No real reward or claim is created.
+      </p>
     </PhoneShell>
   );
 }
@@ -218,17 +210,17 @@ export function ProductScreens() {
       <div className="shell">
         <div className="section-heading product-showcase-heading">
           <div>
-            <p className="eyebrow">THREE SCREENS. THE COMPLETE LOOP.</p>
-            <h2>Commit. Verify. See what you earned.</h2>
+            <p className="eyebrow">THE CORE APP FLOW</p>
+            <h2>Three screens. One clear reason to keep going.</h2>
           </div>
           <div>
             <p>
-              A cleaner look at the core GoGymGo journey—from choosing a
-              realistic goal to completing a verified session and seeing
-              rankings with brand rewards attached.
+              The website now uses the same interface language as the app:
+              focused panels, one primary action, and clear status at every
+              step.
             </p>
             <Link className="text-link" href="/demo">
-              JOIN A DEMO COMPETITION <span aria-hidden="true">→</span>
+              WALK THROUGH THE REAL FLOW <span aria-hidden="true">→</span>
             </Link>
           </div>
         </div>

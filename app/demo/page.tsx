@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { DemoCompetition } from "../components/DemoCompetition";
 
 export const metadata: Metadata = {
-  title: "Join the demo competition",
+  title: "Interactive app walkthrough",
   description:
-    "Create a local demo Alias, choose a Weekly Goal, and try the GoGymGo verified-workout competition loop.",
+    "Click through the GoGymGo setup, Weekly Goal, verified workout, and competition results flow without creating a real account.",
 };
 
 export default function DemoPage() {

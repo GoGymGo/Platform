@@ -1,21 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+const demoStages = [
+  { id: "welcome", label: "WELCOME" },
+  { id: "region", label: "REGION + AGREEMENTS" },
+  { id: "goal", label: "WEEKLY GOAL" },
+  { id: "home", label: "HOME" },
+  { id: "method", label: "WORKOUT METHOD" },
+  { id: "timer", label: "ACTIVE TIMER" },
+  { id: "complete", label: "COMPLETE" },
+  { id: "results", label: "RESULTS + REWARDS" },
+] as const;
+
+type DemoStage = (typeof demoStages)[number]["id"];
 type VerificationMethod = "heart-rate" | "partner-qr";
-type DemoPhase = "ready" | "running" | "verified";
 
-type DemoProfile = {
+type DemoState = {
+  agreementsAccepted: boolean;
   alias: string;
+  elapsed: number;
   goalDays: number;
-  joinedAt: string;
   method: VerificationMethod;
-  region: string;
+  regionVerified: boolean;
+  stage: DemoStage;
   verifiedDays: number;
 };
 
-const storageKey = "gogymgo-demo-competition";
+const initialState: DemoState = {
+  agreementsAccepted: false,
+  alias: "CAMERON12",
+  elapsed: 1122,
+  goalDays: 4,
+  method: "heart-rate",
+  regionVerified: false,
+  stage: "welcome",
+  verifiedDays: 0,
+};
+
+const storageKey = "gogymgo-app-flow-demo-v2";
 
 function formatTimer(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -23,39 +47,561 @@ function formatTimer(totalSeconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function isDemoProfile(value: unknown): value is DemoProfile {
-  if (!value || typeof value !== "object") return false;
-  const profile = value as Partial<DemoProfile>;
+function isDemoStage(value: unknown): value is DemoStage {
+  return demoStages.some((stage) => stage.id === value);
+}
+
+function restoreDemoState(value: unknown): DemoState | null {
+  if (!value || typeof value !== "object") return null;
+  const saved = value as Partial<DemoState>;
+  if (
+    !isDemoStage(saved.stage) ||
+    typeof saved.alias !== "string" ||
+    typeof saved.goalDays !== "number" ||
+    saved.goalDays < 1 ||
+    saved.goalDays > 7 ||
+    (saved.method !== "heart-rate" && saved.method !== "partner-qr") ||
+    typeof saved.regionVerified !== "boolean" ||
+    typeof saved.agreementsAccepted !== "boolean" ||
+    typeof saved.elapsed !== "number" ||
+    typeof saved.verifiedDays !== "number"
+  ) {
+    return null;
+  }
+  return saved as DemoState;
+}
+
+function AppHeader({
+  label,
+  progress,
+  step,
+}: {
+  label: string;
+  progress: number;
+  step: string;
+}) {
   return (
-    typeof profile.alias === "string" &&
-    typeof profile.goalDays === "number" &&
-    profile.goalDays >= 1 &&
-    profile.goalDays <= 7 &&
-    typeof profile.region === "string" &&
-    (profile.method === "heart-rate" || profile.method === "partner-qr") &&
-    typeof profile.joinedAt === "string" &&
-    typeof profile.verifiedDays === "number"
+    <>
+      <div className="demo-app-header">
+        <span className="demo-app-back" aria-hidden="true">
+          &lt;
+        </span>
+        <span>{step}</span>
+        <strong>{label}</strong>
+      </div>
+      <div className="demo-app-progress">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+    </>
   );
 }
 
-function saveProfile(profile: DemoProfile) {
-  window.localStorage.setItem(storageKey, JSON.stringify(profile));
+function DemoButton({
+  children,
+  disabled = false,
+  onClick,
+  tone = "cyan",
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+  tone?: "cyan" | "green" | "pink";
+}) {
+  return (
+    <button
+      className={`demo-app-button tone-${tone}`}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function DemoWelcome({
+  alias,
+  onAliasChange,
+  onContinue,
+}: {
+  alias: string;
+  onAliasChange: (alias: string) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="demo-screen demo-welcome-screen">
+      <div className="demo-online-label">
+        <i />
+        <span>SYSTEM ONLINE // REGISTRATION OPEN</span>
+      </div>
+      <div className="demo-app-logo" aria-label="GoGymGo">
+        <span>GO</span>
+        <b>GYM</b>
+        <span>GO</span>
+      </div>
+      <p className="demo-welcome-copy">
+        Complete verified workouts, compete in your region and earn chances to
+        win brand rewards.
+      </p>
+      <div className="demo-welcome-steps">
+        <span>
+          <b>01</b>
+          SET GOAL
+        </span>
+        <span>
+          <b>02</b>
+          VERIFY
+        </span>
+        <span>
+          <b>03</b>
+          COMPETE
+        </span>
+      </div>
+      <label className="demo-alias-field">
+        <span>DEMO ALIAS</span>
+        <input
+          aria-label="Demo Alias"
+          maxLength={16}
+          onChange={(event) =>
+            onAliasChange(
+              event.target.value
+                .replace(/[^A-Za-z0-9_]/g, "")
+                .toUpperCase(),
+            )
+          }
+          value={alias}
+        />
+      </label>
+      <p className="demo-sponsor-line">
+        FREE TO PLAY // FUNDED BY SPONSORS
+      </p>
+      <DemoButton onClick={onContinue}>GET STARTED →</DemoButton>
+      <p className="demo-local-note">
+        This walkthrough stays in your browser. It creates no real account,
+        competition standing, Prize Draw Entry, or reward.
+      </p>
+    </div>
+  );
+}
+
+function DemoRegion({
+  agreementsAccepted,
+  onAcceptAgreements,
+  onContinue,
+  onVerifyRegion,
+  regionVerified,
+}: {
+  agreementsAccepted: boolean;
+  onAcceptAgreements: () => void;
+  onContinue: () => void;
+  onVerifyRegion: () => void;
+  regionVerified: boolean;
+}) {
+  return (
+    <div className="demo-screen">
+      <AppHeader label="REGION + AGREEMENTS" progress={50} step="SETUP // 1 OF 2" />
+      <h3>{regionVerified ? "REGION VERIFIED" : "VERIFY YOUR REGION"}</h3>
+      <p className="demo-screen-copy">
+        Confirm your competition region, then review the required agreements
+        in one place.
+      </p>
+      {!regionVerified ? (
+        <>
+          <div className="demo-hud">
+            <span className="demo-label">ONE-TIME LOCATION CHECK</span>
+            <p>
+              The app uses your device location once to match you with the
+              correct regional competition.
+            </p>
+            <small>DEMO ONLY // NO LOCATION IS READ</small>
+          </div>
+          <DemoButton onClick={onVerifyRegion}>USE MY LOCATION →</DemoButton>
+        </>
+      ) : (
+        <>
+          <div className="demo-hud tone-green demo-region-verified">
+            <div>
+              <span>VERIFIED REGION</span>
+              <strong>VANCOUVER</strong>
+            </div>
+            <b>VERIFIED</b>
+          </div>
+          <div className="demo-hud demo-agreements">
+            <span className="demo-label">ACCOUNT AGREEMENTS</span>
+            <p>Review both documents before continuing.</p>
+            <div className="demo-legal-links">
+              <span>PRIVACY POLICY</span>
+              <span>TERMS OF SERVICE</span>
+            </div>
+            <label>
+              <input
+                checked={agreementsAccepted}
+                onChange={onAcceptAgreements}
+                type="checkbox"
+              />
+              <span>I have reviewed and accept the account agreements.</span>
+            </label>
+          </div>
+          <DemoButton disabled={!agreementsAccepted} onClick={onContinue}>
+            CONTINUE TO WEEKLY GOAL →
+          </DemoButton>
+        </>
+      )}
+    </div>
+  );
+}
+
+function GoalSummary({ goalDays }: { goalDays: number }) {
+  return (
+    <div className="demo-hud demo-goal-summary">
+      <div>
+        <strong>{goalDays}</strong>
+        <span>DAYS / WEEK</span>
+      </div>
+      <div>
+        <strong>{goalDays}</strong>
+        <span>ENTRIES / HIT WEEK</span>
+      </div>
+      <div>
+        <strong>{goalDays * 4}</strong>
+        <span>FOUR-WEEK BASE</span>
+      </div>
+      <p>Earn more through consistency, teamwork and competition.</p>
+      <button type="button">VIEW BONUS DETAILS</button>
+    </div>
+  );
+}
+
+function DemoGoal({
+  goalDays,
+  onContinue,
+  onGoalChange,
+}: {
+  goalDays: number;
+  onContinue: () => void;
+  onGoalChange: (goal: number) => void;
+}) {
+  return (
+    <div className="demo-screen">
+      <AppHeader label="WEEKLY GOAL" progress={100} step="SETUP // 2 OF 2" />
+      <h3>CHOOSE YOUR WEEKLY GOAL</h3>
+      <p className="demo-screen-copy">
+        Choose a realistic number of workout days you can repeat each week.
+      </p>
+      <div className="demo-day-picker" role="radiogroup">
+        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+          <button
+            aria-checked={goalDays === day}
+            className={goalDays === day ? "is-selected" : ""}
+            key={day}
+            onClick={() => onGoalChange(day)}
+            role="radio"
+            type="button"
+          >
+            <strong>{day}</strong>
+            <span>{day === 1 ? "DAY" : "DAYS"}</span>
+          </button>
+        ))}
+      </div>
+      <GoalSummary goalDays={goalDays} />
+      <div className="demo-hud demo-confirm-goal">
+        <span className="demo-label">CONFIRM YOUR {goalDays}-DAY GOAL</span>
+        <p>This demo skips the real registration check.</p>
+      </div>
+      <DemoButton onClick={onContinue}>CONFIRM + REGISTER →</DemoButton>
+    </div>
+  );
+}
+
+function DemoHome({
+  alias,
+  goalDays,
+  onContinue,
+}: {
+  alias: string;
+  goalDays: number;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="demo-screen">
+      <div className="demo-home-header">
+        <div>
+          <span>ACCOUNT READY // VANCOUVER</span>
+          <strong>{alias || "CAMERON12"}</strong>
+        </div>
+        <b>{(alias || "CA").slice(0, 2)}</b>
+      </div>
+      <div className="demo-hud tone-green demo-success-notice">
+        <strong>WEEKLY GOAL SET // {goalDays} DAYS</strong>
+        <span>You&apos;re ready. Your next action is shown below.</span>
+      </div>
+      <div className="demo-hud demo-home-action">
+        <span>WEEK 1 // READY</span>
+        <h3>START YOUR FIRST SESSION</h3>
+        <p>
+          Complete {goalDays} verified workouts this week to hit your Weekly
+          Goal.
+        </p>
+        <div className="demo-home-goal">
+          <strong>{goalDays}</strong>
+          <span>DAY GOAL</span>
+        </div>
+        <DemoButton onClick={onContinue}>START WORKOUT →</DemoButton>
+      </div>
+      <div className="demo-mini-cards">
+        <span>WORKOUT CALENDAR →</span>
+        <span>WEEKLY CHALLENGE →</span>
+      </div>
+      <div className="demo-tab-bar" aria-hidden="true">
+        <b>HOME</b>
+        <span>LOG</span>
+        <span>TRAIN</span>
+        <span>COMPETE</span>
+        <span>ME</span>
+      </div>
+    </div>
+  );
+}
+
+function DemoMethod({
+  method,
+  onContinue,
+  onMethodChange,
+}: {
+  method: VerificationMethod;
+  onContinue: () => void;
+  onMethodChange: (method: VerificationMethod) => void;
+}) {
+  return (
+    <div className="demo-screen">
+      <AppHeader label="WORKOUT VERIFICATION" progress={100} step="START WORKOUT" />
+      <h3>CHOOSE HOW TO VERIFY</h3>
+      <p className="demo-screen-copy">
+        Pick the available method you will use for this workout.
+      </p>
+      <div className="demo-method-list">
+        <button
+          className={method === "heart-rate" ? "is-selected" : ""}
+          onClick={() => onMethodChange("heart-rate")}
+          type="button"
+        >
+          <span>
+            <b>HEART-RATE DEVICE</b>
+            <small>Use eligible live heart-rate telemetry.</small>
+          </span>
+          <strong>{method === "heart-rate" ? "SELECTED" : "SELECT"}</strong>
+        </button>
+        <button
+          className={method === "partner-qr" ? "is-selected" : ""}
+          onClick={() => onMethodChange("partner-qr")}
+          type="button"
+        >
+          <span>
+            <b>PARTNER GYM QR</b>
+            <small>Use a verified gym&apos;s entry and exit QR.</small>
+          </span>
+          <strong>{method === "partner-qr" ? "SELECTED" : "SELECT"}</strong>
+        </button>
+      </div>
+      <div className="demo-hud">
+        <p>
+          The real app only shows verification methods that are available for
+          your account and region.
+        </p>
+      </div>
+      <DemoButton onClick={onContinue}>CONTINUE TO CHECK-IN →</DemoButton>
+    </div>
+  );
+}
+
+function DemoTimer({
+  elapsed,
+  method,
+  onContinue,
+}: {
+  elapsed: number;
+  method: VerificationMethod;
+  onContinue: () => void;
+}) {
+  const progress = Math.min(100, Math.round((elapsed / 1800) * 100));
+  return (
+    <div className="demo-screen">
+      <div className="demo-session-title">
+        <span>
+          <i />
+          SESSION ACTIVE
+        </span>
+        <strong>{method === "heart-rate" ? "HEART RATE" : "PARTNER GYM QR"}</strong>
+      </div>
+      <div className="demo-hud demo-live-session">
+        <div className="demo-live-grid">
+          <div>
+            <span>ELAPSED TIME</span>
+            <strong>{formatTimer(elapsed)}</strong>
+            <small>30:00 MINIMUM</small>
+          </div>
+          <div>
+            <span>LIVE HEART RATE</span>
+            <strong>{method === "heart-rate" ? "138" : "--"}</strong>
+            <small>{method === "heart-rate" ? "BPM // ON TRACK" : "QR VERIFIED"}</small>
+          </div>
+        </div>
+        <div className="demo-timer-progress">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+        <div className="demo-progress-labels">
+          <span>START</span>
+          <span>CHECK</span>
+          <span>END</span>
+        </div>
+      </div>
+      <div className="demo-hud demo-session-verification">
+        <div>
+          <span>VERIFICATION</span>
+          <strong>
+            {method === "heart-rate"
+              ? "HEART RATE SESSION"
+              : "PARTNER GYM CHECK-IN"}
+          </strong>
+        </div>
+        <b>IN PROGRESS</b>
+        <p>
+          Your timer and verification progress save automatically. Keep moving;
+          GoGymGo tells you when an action is needed.
+        </p>
+      </div>
+      <DemoButton onClick={onContinue} tone="green">
+        COMPLETE DEMO SESSION →
+      </DemoButton>
+      <p className="demo-local-note">
+        The walkthrough stays roadblock-free; the real app waits for eligible
+        verification evidence before enabling completion.
+      </p>
+    </div>
+  );
+}
+
+function DemoComplete({
+  goalDays,
+  onContinue,
+}: {
+  goalDays: number;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="demo-screen demo-complete-screen">
+      <div className="demo-complete-mark">✓</div>
+      <span className="demo-label">WORKOUT COMPLETE // VERIFIED</span>
+      <h3>YOUR FIRST DAY COUNTS.</h3>
+      <p className="demo-screen-copy">
+        The demo session is approved. Weekly Goal progress and sample
+        competition state are now updated.
+      </p>
+      <div className="demo-result-metrics">
+        <div>
+          <strong>1/{goalDays}</strong>
+          <span>WEEKLY GOAL</span>
+        </div>
+        <div>
+          <strong>1</strong>
+          <span>VERIFIED DAY</span>
+        </div>
+        <div>
+          <strong>1D</strong>
+          <span>STREAK</span>
+        </div>
+      </div>
+      <div className="demo-hud tone-pink demo-entry-result">
+        <span>PRIZE DRAW ENTRIES</span>
+        <strong>WEEK IN PROGRESS</strong>
+        <small>Entries settle after the Weekly Goal result is known.</small>
+      </div>
+      <DemoButton onClick={onContinue}>VIEW REGIONAL COMPETITION →</DemoButton>
+    </div>
+  );
+}
+
+const resultRows = [
+  {
+    alias: "CORE_FOUR",
+    rank: "01",
+    reward: "PACIFIC MOTION TRAINING KIT",
+    state: "READY TO CLAIM",
+  },
+  {
+    alias: "NEON_4",
+    rank: "02",
+    reward: "VOLT 25% DIGITAL REWARD",
+    state: "CLAIMED",
+  },
+  {
+    alias: "KODA_FIT",
+    rank: "03",
+    reward: "NOVA SHAKER",
+    state: "READY TO CLAIM",
+  },
+] as const;
+
+function DemoResults({ alias }: { alias: string }) {
+  return (
+    <div className="demo-screen">
+      <div className="demo-results-title">
+        <span>SAMPLE RESULTS // VANCOUVER</span>
+        <h3>WINNERS CIRCLE</h3>
+        <p>JULY COMPETITION</p>
+      </div>
+      <div className="demo-hud tone-pink demo-winner-summary">
+        <div>
+          <strong>3</strong>
+          <span>GOAL-GROUP LEADERS</span>
+        </div>
+        <div>
+          <strong>3</strong>
+          <span>REWARD WINNERS</span>
+        </div>
+      </div>
+      <div className="demo-results-head">
+        <span>PLAYER + BRAND REWARD</span>
+        <span>STATUS</span>
+      </div>
+      <div className="demo-winner-list">
+        {resultRows.map((row) => (
+          <div key={row.rank}>
+            <span>{row.rank}</span>
+            <p>
+              <strong>{row.alias}</strong>
+              <small>{row.reward}</small>
+            </p>
+            <b>{row.state}</b>
+          </div>
+        ))}
+      </div>
+      <div className="demo-hud demo-your-result">
+        <span>YOUR DEMO RESULT</span>
+        <strong>
+          {alias || "CAMERON12"}
+          {" // WEEK 1 IN PROGRESS"}
+        </strong>
+        <small>Sample results never create a real standing or reward.</small>
+      </div>
+      <Link className="demo-app-link-button" href="/gym-goers">
+        PRE-REGISTER FOR LAUNCH →
+      </Link>
+    </div>
+  );
 }
 
 export function DemoCompetition() {
-  const [profile, setProfile] = useState<DemoProfile | null>(null);
-  const [phase, setPhase] = useState<DemoPhase>("ready");
-  const [elapsed, setElapsed] = useState(0);
-  const [goalDays, setGoalDays] = useState(4);
+  const [state, setState] = useState<DemoState>(initialState);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const restoreDemo = window.setTimeout(() => {
+    const restoreTimer = window.setTimeout(() => {
       try {
         const saved = window.localStorage.getItem(storageKey);
         if (saved) {
-          const parsed = JSON.parse(saved) as unknown;
-          if (isDemoProfile(parsed)) setProfile(parsed);
+          const restored = restoreDemoState(JSON.parse(saved) as unknown);
+          if (restored) setState(restored);
         }
       } catch {
         window.localStorage.removeItem(storageKey);
@@ -64,350 +610,208 @@ export function DemoCompetition() {
       }
     }, 0);
 
-    return () => window.clearTimeout(restoreDemo);
+    return () => window.clearTimeout(restoreTimer);
   }, []);
 
   useEffect(() => {
-    if (phase !== "running") return;
-    const timer = window.setInterval(() => {
-      setElapsed((current) => Math.min(current + 60, 1800));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [phase]);
+    if (!hydrated) return;
+    window.localStorage.setItem(storageKey, JSON.stringify(state));
+  }, [hydrated, state]);
 
-  const projectedBaseEntries = useMemo(
-    () => (profile?.goalDays ?? goalDays) * 4 + 1,
-    [goalDays, profile?.goalDays],
+  useEffect(() => {
+    if (state.stage !== "timer") return;
+    const interval = window.setInterval(() => {
+      setState((current) => ({
+        ...current,
+        elapsed: Math.min(1800, current.elapsed + 60),
+      }));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [state.stage]);
+
+  const stageIndex = demoStages.findIndex((stage) => stage.id === state.stage);
+  const currentStage = demoStages[stageIndex];
+  const completedPercent = Math.round(
+    ((stageIndex + 1) / demoStages.length) * 100,
+  );
+  const nextStage = useMemo(
+    () => demoStages[Math.min(demoStages.length - 1, stageIndex + 1)]?.id,
+    [stageIndex],
   );
 
-  function joinDemo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const nextProfile: DemoProfile = {
-      alias: String(formData.get("alias") ?? "").trim().toUpperCase(),
-      goalDays,
-      joinedAt: new Date().toISOString(),
-      method: String(formData.get("method")) as VerificationMethod,
-      region: String(formData.get("region")),
-      verifiedDays: 0,
-    };
-    saveProfile(nextProfile);
-    setProfile(nextProfile);
-    setPhase("ready");
-    setElapsed(0);
+  function patchState(patch: Partial<DemoState>) {
+    setState((current) => ({ ...current, ...patch }));
   }
 
-  function startWorkout() {
-    setElapsed(0);
-    setPhase("running");
+  function moveTo(stage: DemoStage) {
+    patchState({ stage });
   }
 
-  function verifyWorkout() {
-    if (!profile) return;
-    const nextProfile = {
-      ...profile,
-      verifiedDays: Math.min(profile.verifiedDays + 1, profile.goalDays),
-    };
-    saveProfile(nextProfile);
-    setProfile(nextProfile);
-    setElapsed(1800);
-    setPhase("verified");
+  function moveNext() {
+    if (nextStage) moveTo(nextStage);
   }
 
   function resetDemo() {
     window.localStorage.removeItem(storageKey);
-    setProfile(null);
-    setGoalDays(4);
-    setElapsed(0);
-    setPhase("ready");
+    setState(initialState);
   }
 
   if (!hydrated) {
     return (
       <div className="demo-loading" role="status">
-        LOADING DEMO COMPETITION…
+        LOADING APP WALKTHROUGH…
       </div>
     );
   }
-
-  if (!profile) {
-    return (
-      <section className="demo-join-layout">
-        <div className="demo-join-copy">
-          <p className="eyebrow">
-            <span className="status-dot" />
-            DEMO COMPETITION // OPEN
-          </p>
-          <h1>
-            Join the <span>competition.</span>
-          </h1>
-          <p>
-            Create a demo Alias, choose the number of verified days you can
-            repeat each week, and enter a sample regional competition. Nothing
-            here creates a real account, entry, or reward claim.
-          </p>
-          <div className="demo-facts">
-            <div>
-              <strong>4 WEEKS</strong>
-              <span>Monthly scoring runway</span>
-            </div>
-            <div>
-              <strong>1–7 DAYS</strong>
-              <span>Your commitment category</span>
-            </div>
-            <div>
-              <strong>30:00</strong>
-              <span>Simulated workout minimum</span>
-            </div>
-          </div>
-        </div>
-
-        <form className="demo-join-card" onSubmit={joinDemo}>
-          <div className="demo-card-header">
-            <span>JULY 2026 // SAMPLE REGION</span>
-            <h2>Build your demo player</h2>
-            <p>Your progress stays on this device and can be reset anytime.</p>
-          </div>
-
-          <div className="field">
-            <label htmlFor="demoAlias">PUBLIC ALIAS *</label>
-            <input
-              autoComplete="off"
-              id="demoAlias"
-              maxLength={24}
-              minLength={3}
-              name="alias"
-              pattern="[A-Za-z0-9_]{3,24}"
-              placeholder="e.g. COAST_RUNNER"
-              required
-            />
-            <small>3–24 letters, numbers, or underscores.</small>
-          </div>
-
-          <div className="field">
-            <label htmlFor="demoRegion">DEMO REGION *</label>
-            <select defaultValue="vancouver" id="demoRegion" name="region" required>
-              <option value="VANCOUVER">Vancouver</option>
-              <option value="TORONTO">Toronto</option>
-            </select>
-          </div>
-
-          <fieldset className="demo-fieldset">
-            <legend>WEEKLY GOAL *</legend>
-            <div className="demo-goal-options">
-              {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                <label className={goalDays === day ? "is-selected" : ""} key={day}>
-                  <input
-                    checked={goalDays === day}
-                    name="goalDays"
-                    onChange={() => setGoalDays(day)}
-                    type="radio"
-                    value={day}
-                  />
-                  <strong>{day}</strong>
-                  <span>{day === 1 ? "DAY" : "DAYS"}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="demo-projection">
-            <span>YOUR BASE-MONTH PROJECTION</span>
-            <strong>
-              {goalDays} × 4 + 1 = {projectedBaseEntries} ENTRIES
-            </strong>
-            <small>
-              Four scoring weeks plus the one-time Free Entry. Other published
-              results can change the final total.
-            </small>
-          </div>
-
-          <fieldset className="demo-fieldset">
-            <legend>DEMO VERIFICATION METHOD *</legend>
-            <div className="demo-method-options">
-              <label>
-                <input defaultChecked name="method" type="radio" value="heart-rate" />
-                <span>
-                  <strong>HEART-RATE DEVICE</strong>
-                  <small>Simulate eligible workout telemetry.</small>
-                </span>
-              </label>
-              <label>
-                <input name="method" type="radio" value="partner-qr" />
-                <span>
-                  <strong>PARTNER GYM QR</strong>
-                  <small>Simulate entry and exit verification.</small>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-
-          <label className="consent-row">
-            <input required type="checkbox" />
-            <span>
-              I understand this is a local product demo. It creates no real
-              account, Prize Draw Entry, competition standing, or reward. *
-            </span>
-          </label>
-
-          <button className="submit-button" type="submit">
-            JOIN DEMO COMPETITION →
-          </button>
-        </form>
-      </section>
-    );
-  }
-
-  const progressPercent = Math.round(
-    (Math.min(profile.verifiedDays, profile.goalDays) / profile.goalDays) * 100,
-  );
-  const timerPercent = Math.round((elapsed / 1800) * 100);
 
   return (
-    <section className="demo-dashboard">
-      <div className="demo-dashboard-topline">
+    <section className="demo-experience">
+      <header className="demo-page-heading">
         <div>
-          <span>DEMO COMPETITION // {profile.region}</span>
-          <strong>{profile.alias}</strong>
-        </div>
-        <button onClick={resetDemo} type="button">
-          RESET DEMO
-        </button>
-      </div>
-
-      <div className="demo-dashboard-grid">
-        <aside className="demo-player-card">
-          <div className="demo-avatar">{profile.alias.slice(0, 2)}</div>
-          <span>4-WEEK COMPETITION</span>
-          <h2>{profile.alias}</h2>
-          <p>
-            {profile.goalDays}-DAY CATEGORY //{" "}
-            {profile.method === "heart-rate"
-              ? "HEART-RATE DEVICE"
-              : "PARTNER GYM QR"}
+          <p className="eyebrow">
+            <span className="status-dot" />
+            INTERACTIVE APP WALKTHROUGH
           </p>
-          <div className="demo-player-stats">
-            <div>
-              <span>VERIFIED</span>
-              <strong>{profile.verifiedDays}</strong>
-            </div>
-            <div>
-              <span>WEEKLY GOAL</span>
-              <strong>{profile.goalDays}</strong>
-            </div>
-            <div>
-              <span>BASE ENTRY PROJECTION</span>
-              <strong>{projectedBaseEntries}</strong>
-            </div>
+          <h1>
+            Use the <span>real flow.</span>
+          </h1>
+        </div>
+        <p>
+          Click through the same setup, workout, and competition sequence as the
+          mobile app. The walkthrough is accelerated and local, so there are no
+          account or backend roadblocks.
+        </p>
+      </header>
+
+      <div className="demo-walkthrough">
+        <aside className="demo-route-rail" aria-label="Demo screens">
+          <div className="demo-route-heading">
+            <span>APP FLOW</span>
+            <strong>
+              {String(stageIndex + 1).padStart(2, "0")} /{" "}
+              {String(demoStages.length).padStart(2, "0")}
+            </strong>
           </div>
-          <div className="demo-goal-progress">
-            <div>
-              <span>WEEK 1 PROGRESS</span>
-              <strong>
-                {profile.verifiedDays} / {profile.goalDays}
-              </strong>
-            </div>
-            <div className="demo-progress-track">
-              <span style={{ width: `${progressPercent}%` }} />
-            </div>
+          <div className="demo-route-progress">
+            <span style={{ width: `${completedPercent}%` }} />
           </div>
+          <nav>
+            {demoStages.map((stage, index) => (
+              <button
+                aria-current={state.stage === stage.id ? "step" : undefined}
+                className={
+                  state.stage === stage.id
+                    ? "is-current"
+                    : index < stageIndex
+                      ? "is-complete"
+                      : ""
+                }
+                key={stage.id}
+                onClick={() => moveTo(stage.id)}
+                type="button"
+              >
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{stage.label}</strong>
+                <b>{index < stageIndex ? "✓" : "→"}</b>
+              </button>
+            ))}
+          </nav>
+          <div className="demo-rail-note">
+            <strong>LOCAL DEMO</strong>
+            <span>Jump to any screen. Nothing is sent to GoGymGo.</span>
+          </div>
+          <button className="demo-reset" onClick={resetDemo} type="button">
+            RESET WALKTHROUGH
+          </button>
         </aside>
 
-        <div className="demo-stage-card">
-          {phase === "ready" ? (
-            <div className="demo-ready-state">
-              <p className="eyebrow">NEXT ACTION // VERIFIED WORKOUT</p>
-              <h1>Ready for day {profile.verifiedDays + 1}?</h1>
-              <p>
-                Start a clearly labelled, accelerated simulation of the
-                30-minute workout verification flow. This demo never submits
-                evidence or awards real credit.
-              </p>
-              <div className="demo-ready-checks">
-                <span>✓ DEMO ENROLLMENT ACTIVE</span>
-                <span>✓ WEEKLY GOAL LOCKED</span>
-                <span>✓ VERIFICATION METHOD READY</span>
-              </div>
-              <button className="button button-primary" onClick={startWorkout} type="button">
-                START DEMO WORKOUT →
-              </button>
+        <div className="demo-device-column">
+          <div className="demo-device-label">
+            <span>{currentStage.label}</span>
+            <strong>APP-MATCHED SCREEN</strong>
+          </div>
+          <div className="demo-device">
+            <div className="demo-device-screen">
+              {state.stage === "welcome" ? (
+                <DemoWelcome
+                  alias={state.alias}
+                  onAliasChange={(alias) => patchState({ alias })}
+                  onContinue={moveNext}
+                />
+              ) : null}
+              {state.stage === "region" ? (
+                <DemoRegion
+                  agreementsAccepted={state.agreementsAccepted}
+                  onAcceptAgreements={() =>
+                    patchState({
+                      agreementsAccepted: !state.agreementsAccepted,
+                    })
+                  }
+                  onContinue={moveNext}
+                  onVerifyRegion={() => patchState({ regionVerified: true })}
+                  regionVerified={state.regionVerified}
+                />
+              ) : null}
+              {state.stage === "goal" ? (
+                <DemoGoal
+                  goalDays={state.goalDays}
+                  onContinue={moveNext}
+                  onGoalChange={(goalDays) => patchState({ goalDays })}
+                />
+              ) : null}
+              {state.stage === "home" ? (
+                <DemoHome
+                  alias={state.alias}
+                  goalDays={state.goalDays}
+                  onContinue={moveNext}
+                />
+              ) : null}
+              {state.stage === "method" ? (
+                <DemoMethod
+                  method={state.method}
+                  onContinue={moveNext}
+                  onMethodChange={(method) => patchState({ method })}
+                />
+              ) : null}
+              {state.stage === "timer" ? (
+                <DemoTimer
+                  elapsed={state.elapsed}
+                  method={state.method}
+                  onContinue={() =>
+                    patchState({
+                      elapsed: 1800,
+                      stage: "complete",
+                      verifiedDays: 1,
+                    })
+                  }
+                />
+              ) : null}
+              {state.stage === "complete" ? (
+                <DemoComplete goalDays={state.goalDays} onContinue={moveNext} />
+              ) : null}
+              {state.stage === "results" ? (
+                <DemoResults alias={state.alias} />
+              ) : null}
             </div>
-          ) : null}
-
-          {phase === "running" ? (
-            <div className="demo-workout-state">
-              <div className="demo-workout-status">
-                <span>● DEMO SESSION TRACKING</span>
-                <strong>ACCELERATED</strong>
-              </div>
-              <div className="demo-workout-timer">
-                <span>ELAPSED</span>
-                <strong>{formatTimer(elapsed)}</strong>
-                <small>OF 30:00 DEMO MINIMUM</small>
-              </div>
-              <div className="demo-progress-track demo-timer-track">
-                <span style={{ width: `${timerPercent}%` }} />
-              </div>
-              <div className="demo-live-metrics">
-                <div>
-                  <span>CURRENT BPM</span>
-                  <strong>138</strong>
-                  <small>SIMULATED</small>
-                </div>
-                <div>
-                  <span>PRESENCE</span>
-                  <strong>READY</strong>
-                  <small>LOCAL DEMO</small>
-                </div>
-              </div>
-              <button className="button button-primary" onClick={verifyWorkout} type="button">
-                SUBMIT DEMO WORKOUT →
-              </button>
-              <p>
-                Demo completion skips real evidence review and immediately
-                shows the approved-state experience.
-              </p>
-            </div>
-          ) : null}
-
-          {phase === "verified" ? (
-            <div className="demo-verified-state">
-              <div className="demo-verified-mark">✓</div>
-              <p className="eyebrow">DEMO RESULT // VERIFIED</p>
-              <h1>Your first day counts.</h1>
-              <p>
-                The simulated review approved this workout. Your Week 1
-                progress, streak, and sample standing have now updated.
-              </p>
-              <div className="demo-result-grid">
-                <div>
-                  <span>VERIFIED DAYS</span>
-                  <strong>{profile.verifiedDays}</strong>
-                </div>
-                <div>
-                  <span>DEMO RANK</span>
-                  <strong>#18</strong>
-                </div>
-                <div>
-                  <span>STREAK</span>
-                  <strong>{profile.verifiedDays}D</strong>
-                </div>
-              </div>
-              <div className="demo-sample-reward">
-                <span>SAMPLE BRAND REWARD</span>
-                <strong>PACIFIC MOTION TRAINING KIT</strong>
-                <small>LOCKED // ELIGIBLE AFTER DEMO SETTLEMENT</small>
-              </div>
-              <div className="demo-verified-actions">
-                <button className="button button-secondary" onClick={startWorkout} type="button">
-                  RUN ANOTHER DAY
-                </button>
-                <Link className="button button-primary" href="/gym-goers">
-                  PRE-REGISTER FOR LAUNCH →
-                </Link>
-              </div>
-            </div>
-          ) : null}
+            <div className="demo-device-homebar" aria-hidden="true" />
+          </div>
+          <div className="demo-device-controls">
+            <button
+              disabled={stageIndex === 0}
+              onClick={() => moveTo(demoStages[stageIndex - 1].id)}
+              type="button"
+            >
+              ← PREVIOUS
+            </button>
+            <span>SCREEN {stageIndex + 1} OF {demoStages.length}</span>
+            <button
+              disabled={stageIndex === demoStages.length - 1}
+              onClick={moveNext}
+              type="button"
+            >
+              NEXT →
+            </button>
+          </div>
         </div>
       </div>
     </section>

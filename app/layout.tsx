@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import "./globals.css";
+import "./experience.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -40,9 +41,9 @@ export async function generateMetadata(): Promise<Metadata> {
         ? [
             {
               url: socialImage,
-              width: 1733,
-              height: 907,
-              alt: "GoGymGo — Consistency should count.",
+              width: 1731,
+              height: 909,
+              alt: "GoGymGo — Make consistency count.",
             },
           ]
         : undefined,
@@ -87,7 +88,7 @@ export default function RootLayout({
               <Link href="/brands">FITNESS BRANDS</Link>
             </nav>
             <Link className="header-cta" href="/demo">
-              TRY DEMO <span aria-hidden="true">→</span>
+              APP DEMO <span aria-hidden="true">→</span>
             </Link>
           </div>
         </header>
@@ -110,7 +111,7 @@ export default function RootLayout({
             <div>
               <p className="footer-label">THE PRODUCT</p>
               <Link href="/#how-it-works">How GoGymGo works</Link>
-              <Link href="/demo">Join the demo competition</Link>
+              <Link href="/demo">Interactive app walkthrough</Link>
               <span>Launching region by region</span>
             </div>
           </div>

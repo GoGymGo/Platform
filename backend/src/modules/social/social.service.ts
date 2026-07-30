@@ -1092,7 +1092,7 @@ export class SocialService {
             'region.timezone',
           ])
           .where('challenge.id', '=', challengeId)
-          .forUpdate()
+          .forUpdate('challenge')
           .executeTakeFirst();
         if (
           !challenge ||

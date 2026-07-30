@@ -141,9 +141,10 @@ describeWithDatabase('database migrations', () => {
       );
       const gymApplication = await client.query<{ id: string }>(
         `INSERT INTO partner_applications
-           (application_type, contact_email, payload, region, status)
+           (application_type, contact_email, dedupe_hash, payload, region, status)
          VALUES
            ('gym', 'cleanup-gym@example.invalid',
+            repeat('c', 64),
             '{"gymName":"Iron District","gymAddress":"King St","managerName":"Cleanup"}'::jsonb,
             'Toronto', 'submitted')
          RETURNING id`,

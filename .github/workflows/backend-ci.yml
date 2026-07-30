@@ -56,4 +56,6 @@ jobs:
           RUN_DATABASE_INTEGRATION: "true"
       - run: npm run audit:deps
       - run: docker compose config --quiet
+        env:
+          REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       - run: docker build --tag gogymgo-api:ci .

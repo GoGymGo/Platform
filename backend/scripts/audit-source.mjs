@@ -14,8 +14,20 @@ const prohibitedContent = [
 const prohibitedRuntimeContent = [
   /\bHYPERWALLET_[A-Z0-9_]+\b/,
   /\/v1\/(?:payouts?|webhooks\/hyperwallet)\b/,
+  /\bDEMO_VERIFICATION_[A-Z0-9_]+\b/,
+  /\/v1\/demo-verifications\b/,
+  /\bcanada_demo\b/,
+  /\bCA-BC-DEMO\b/,
+  /\bIRON DISTRICT\b/,
+  /\bVOLT PERFORMANCE CLUB\b/,
+  /\bNORTHLINE FITNESS\b/,
 ];
-const prohibitedRuntimePathPrefixes = ['src/modules/payouts/'];
+const prohibitedRuntimePathPrefixes = [
+  'scripts/bootstrap-bc-demo',
+  'src/foundation/bc-demo',
+  'src/modules/payouts/',
+  'src/modules/verification/demo-',
+];
 
 async function listFiles() {
   const { stdout } = await execFileAsync(
@@ -69,7 +81,7 @@ for (const file of files) {
       relativePath.startsWith(prefix),
     )
   ) {
-    violations.push(`${relativePath}: obsolete payment runtime path`);
+    violations.push(`${relativePath}: prohibited runtime path`);
     continue;
   }
 
@@ -84,9 +96,7 @@ for (const file of files) {
   if (relativePath.startsWith('src/')) {
     for (const pattern of prohibitedRuntimeContent) {
       if (pattern.test(content)) {
-        violations.push(
-          `${relativePath}: obsolete payment-provider runtime reference`,
-        );
+        violations.push(`${relativePath}: prohibited runtime reference`);
       }
     }
   }

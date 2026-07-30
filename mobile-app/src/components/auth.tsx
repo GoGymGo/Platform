@@ -17,7 +17,6 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 
@@ -173,9 +172,6 @@ export function AuthGate({
 }: PropsWithChildren<{ allowUnverified?: boolean }>) {
   const { firebaseConfigured, loading, user } = useAuth();
 
-  if (isLocalPreviewEnabled) {
-    return children;
-  }
   if (loading) {
     return <AuthLoadingScreen />;
   }

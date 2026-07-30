@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -18,8 +18,14 @@ import { useWorkoutProgress } from '@/state/workoutProgress';
 const loopSteps = [
   ['COMMIT', 'Choose 1-7 verified workout days per week.'],
   ['VERIFY', 'Use a heart-rate device or partner-gym QR.'],
-  ['BUILD ODDS', 'Earn prize draw entries through consistency.'],
-  ['CLAIM REWARD', 'If you win, claim the physical prize or coupon code in My Rewards.']
+  [
+    'BUILD ODDS',
+    'Earn prize draw entries through consistency, teamwork and competition'
+  ],
+  [
+    'CLAIM REWARD',
+    'If you win, your physical prize or coupon code appears in My Rewards with brand claim instructions. No bank account is needed.'
+  ]
 ] as const;
 
 export default function HowItWorksScreen() {
@@ -37,10 +43,16 @@ export default function HowItWorksScreen() {
   ] as const;
   const returnLabel =
     from === 'profile'
-      ? 'BACK TO PROFILE ->'
+      ? 'Back to Profile ->'
       : from === 'commitment'
-        ? 'BACK TO COMMITMENT ->'
-        : 'DONE';
+        ? 'Back to Weekly Goal ->'
+        : from === 'leaderboard'
+          ? 'Back to Competition ->'
+          : from === 'challenge'
+            ? 'Back to Weekly Challenge ->'
+            : from === 'home'
+              ? 'Back to Home ->'
+              : 'Done';
 
   function returnToSource() {
     if (from === 'profile') {
@@ -49,6 +61,18 @@ export default function HowItWorksScreen() {
     }
     if (from === 'commitment') {
       router.replace('/commitment');
+      return;
+    }
+    if (from === 'leaderboard') {
+      router.replace('/leaderboard');
+      return;
+    }
+    if (from === 'challenge') {
+      router.replace('/squad');
+      return;
+    }
+    if (from === 'home') {
+      router.replace('/home');
       return;
     }
     goBackOrReplace(router, '/commitment');
@@ -64,16 +88,21 @@ export default function HowItWorksScreen() {
         <OnboardingHeader
           label="REFERENCE"
           onBack={returnToSource}
-          step="HOW SCORING WORKS"
+          step="COMPETITION GUIDE"
         />
 
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          THE LOOP IS SIMPLE
+          HOW THE COMPETITION WORKS
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Choose a weekly goal, verify your workout days and hit the goal before the
-          week closes. Miss the goal and that week earns zero entries.
+          A quick reference for competition scoring, winning odds and brand rewards.
         </TerminalText>
+
+        <HUDBorderBox style={styles.flowSummary} tone="cyan">
+          <TerminalText tone="cyan" uppercase={false} variant="caption">
+            Choose goal → Verify workouts → Earn entries → Improve odds → Claim rewards
+          </TerminalText>
+        </HUDBorderBox>
 
         <View style={styles.loopList}>
           {loopSteps.map(([title, detail]) => (
@@ -85,35 +114,31 @@ export default function HowItWorksScreen() {
                 <TerminalText style={styles.loopDetail} tone="muted" uppercase={false} variant="body">
                   {detail}
                 </TerminalText>
+                {title === 'BUILD ODDS' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showBonusDetails }}
+                    hitSlop={8}
+                    onPress={() => setShowBonusDetails((visible) => !visible)}
+                    style={({ pressed }) => [
+                      styles.bonusDetailsButton,
+                      pressed ? styles.bonusDetailsButtonPressed : null
+                    ]}
+                  >
+                    <TerminalText
+                      style={styles.bonusDetailsButtonLabel}
+                      tone="amber"
+                      uppercase={false}
+                      variant="label"
+                    >
+                      {showBonusDetails ? 'Hide bonus details' : 'View bonus details'}
+                    </TerminalText>
+                  </Pressable>
+                ) : null}
               </View>
             </HUDBorderBox>
           ))}
         </View>
-
-        <HUDBorderBox style={styles.progressiveNote} tone="muted">
-          <TerminalText glow tone="cyan" variant="label">
-            BONUSES ARRIVE WHEN THEY MATTER
-          </TerminalText>
-          <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Your Weekly Challenge appears when each scoring week starts. Category,
-            Bonus Day and Perfect Month results are introduced as they become active.
-          </TerminalText>
-          <CyberButtonPrimary
-            label={showBonusDetails ? 'HIDE BONUS DETAILS' : 'VIEW BONUS DETAILS ->'}
-            onPress={() => setShowBonusDetails((visible) => !visible)}
-          />
-        </HUDBorderBox>
-
-        <HUDBorderBox style={styles.rewardNote} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
-            BRAND REWARDS // NO PAYMENT SETUP
-          </TerminalText>
-          <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            If you win, GoGymGo will add the exact physical prize or coupon code to
-            My Rewards. Claim instructions are provided by the sponsoring brand, and
-            no bank account is connected to GoGymGo.
-          </TerminalText>
-        </HUDBorderBox>
 
         {showBonusDetails ? <HUDBorderBox glow style={styles.bonusPanel} tone="cyan">
           <TerminalText glow style={styles.panelHeading} tone="cyan" variant="label">
@@ -129,10 +154,10 @@ export default function HowItWorksScreen() {
             weekly results.
           </TerminalText>
           <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
-            02 // TOP THREE CATEGORY FINISHERS
+            02 // TOP THREE GOAL-GROUP FINISHERS
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Finishing first, second or third in your commitment category multiplies
+            Finishing first, second or third in your Weekly Goal group multiplies
             the subtotal from your four Weekly Challenge results.
           </TerminalText>
           {categoryMultipliers.map((multiplier, index) => (
@@ -155,14 +180,14 @@ export default function HowItWorksScreen() {
             uppercase={false}
             variant="body"
           >
-            {`When the month has days 29-31, each verified Bonus Day adds your selected ${weeklyGoal}-entry weekly goal value to the category-adjusted subtotal.`}
+            {`When the month has days 29-31, each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}.`}
           </TerminalText>
           <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
             04 // PERFECT MONTH // FINAL 10X
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
             Hit your weekly goal in all four scoring weeks to earn the Perfect Month.
-            Its final 10X multiplies the combined Weekly Challenge subtotal, category-finish
+            Its final 10X multiplies the combined Weekly Challenge subtotal, goal-group
             bonus and any Bonus Day entries.
           </TerminalText>
           <View style={styles.exampleBlock}>
@@ -171,7 +196,7 @@ export default function HowItWorksScreen() {
             </TerminalText>
             <TerminalText style={styles.exampleIntro} tone="muted" uppercase={false} variant="body">
               You hit four verified workout days in all four weeks, you and your Weekly
-              Challenge partner both hit each week, and you finish first in your category.
+              Challenge partner both hit each week, and you finish first in your goal group.
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
               Base month: 4 days x 4 weeks = 16
@@ -180,7 +205,7 @@ export default function HowItWorksScreen() {
               Weekly Challenge bonuses: 16 x 2 = 32
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
-              First in category: 32 x 3 = 96
+              First in goal group: 32 x 3 = 96
             </TerminalText>
             <TerminalText style={styles.exampleResult} tone="cyan" uppercase={false} variant="body">
               Perfect month: 96 x 10 = 960 entries
@@ -192,7 +217,7 @@ export default function HowItWorksScreen() {
         </HUDBorderBox> : null}
 
         <View style={styles.actions}>
-          <CompactTextButton label="VIEW FULL RULES" onPress={() => router.push('/commitment-rules')} />
+          <CompactTextButton label="View full rules" onPress={() => router.push('/commitment-rules')} />
           <CyberButtonPrimary label={returnLabel} onPress={returnToSource} />
         </View>
       </ScreenScrollView>
@@ -227,6 +252,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     gap: spacing.sm
   },
+  flowSummary: {
+    marginTop: spacing.lg,
+    padding: spacing.md
+  },
   loopRow: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg
@@ -245,17 +274,28 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.body,
     lineHeight: 20
   },
+  bonusDetailsButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderWarningGlow,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceWarningActive
+  },
+  bonusDetailsButtonPressed: {
+    opacity: 0.72
+  },
+  bonusDetailsButtonLabel: {
+    color: colors.amber,
+    fontFamily: fontFamilies.bodyStrong,
+    fontSize: fontSizes.label,
+    lineHeight: 16
+  },
   bonusPanel: {
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-    padding: spacing.lg
-  },
-  progressiveNote: {
-    marginTop: spacing.lg,
-    gap: spacing.md,
-    padding: spacing.lg
-  },
-  rewardNote: {
     marginTop: spacing.lg,
     gap: spacing.sm,
     padding: spacing.lg

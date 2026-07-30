@@ -28,28 +28,28 @@ const bonusRules: readonly BonusRule[] = [
     value: '1-7 DAYS',
     label: 'HIT YOUR GOAL BY DAYS PICKED',
     description:
-      'CHOOSE 1 TO 7 VERIFIED WORKOUT DAYS PER WEEK. HIGHER COMMITMENTS CAN EARN MORE ENTRIES WHEN COMPLETED.',
+      'Choose 1 to 7 verified workout days per week. Higher Weekly Goals can earn more entries when completed.',
     tone: 'cyan'
   },
   {
     value: 'x2',
     label: 'YOU + WEEKLY CHALLENGE PARTNER BOTH SUCCEED',
     description:
-      'WHEN YOU AND YOUR WEEKLY CHALLENGE PARTNER BOTH HIT THE SAME WEEKLY GOAL, YOU BOTH RECEIVE THE 2X WEEKLY CHALLENGE BONUS.',
+      'When you and your Weekly Challenge partner both hit the same goal, you both receive the 2x weekly bonus.',
     tone: 'cyan'
   },
   {
     value: 'x3',
     label: 'WEEKLY CHALLENGE PARTNER MISSES + YOU DO EXTRA DAY',
     description:
-      'IF YOUR WEEKLY CHALLENGE PARTNER MISSES, ONE EXTRA VERIFIED WORKOUT ACTIVATES YOUR 3X WEEKLY CHALLENGE BONUS. 3X IS AUTOMATIC WHEN YOUR GOAL ALREADY USES EVERY AVAILABLE DAY.',
+      'If your partner misses, one extra verified workout activates your 3x bonus. The bonus is automatic when your goal already uses every available day.',
     tone: 'pink'
   },
   {
     value: 'x10',
     label: 'PERFECT MONTH',
     description:
-      'THE 10X PERFECT-MONTH BONUS APPLIES TO ALL PRIZE DRAW ENTRIES EARNED ACROSS THE FOUR SCORING WEEKS, INCLUDING WEEKLY CHALLENGE BONUSES, CATEGORY-FINISH BONUSES AND BONUS DAYS 29-31.',
+      'The 10x Perfect Month bonus applies after all four scoring weeks, including Weekly Challenge, goal-group and Bonus Day entries.',
     tone: 'pink'
   }
 ];
@@ -62,15 +62,15 @@ export default function BonusRulesModal() {
     ...bonusRules.slice(0, 3),
     {
       value: `${campaign.economics.categoryPodiumMultipliers[1]}x / ${campaign.economics.categoryPodiumMultipliers[2]}x / ${campaign.economics.categoryPodiumMultipliers[3]}x`,
-      label: 'TOP THREE CATEGORY FINISHERS',
-      description: 'THE TOP THREE FINISHERS IN EACH COMMITMENT CATEGORY MULTIPLY THEIR ACTUAL FOUR-WEEK TOTAL AFTER 1X, 2X OR 3X WEEKLY CHALLENGE RESULTS. BONUS DAYS 29-31 ARE ADDED NEXT, THEN PERFECT-MONTH 10X IS APPLIED LAST.',
+      label: 'TOP THREE GOAL-GROUP FINISHERS',
+      description: 'The top three finishers in each Weekly Goal group multiply their four-week total. Bonus Days are added next, then Perfect Month 10x is applied last.',
       tone: 'pink'
     },
     ...bonusRules.slice(3),
     {
       value: `+${weeklyGoal} / DAY`,
       label: 'BONUS DAYS 29-31',
-      description: `WHEN THE MONTH HAS DAYS 29-31, EACH VERIFIED BONUS DAY ADDS ${weeklyGoal} PRIZE DRAW ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'}, EQUAL TO YOUR SELECTED WEEKLY GOAL, BEFORE THE FINAL PERFECT-MONTH 10X.`,
+      description: `When the month has days 29-31, each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before the final Perfect Month 10x.`,
       tone: 'pink'
     }
   ];
@@ -97,10 +97,9 @@ export default function BonusRulesModal() {
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             HOW ENTRIES{'\n'}MULTIPLY.
           </TerminalText>
-          <TerminalText style={styles.body} tone="muted" variant="body">
-            ENTRIES ARE EARNED THROUGH VERIFIED WORKOUTS. BONUS MULTIPLIERS
-            REWARD STRONGER COMMITMENTS, WEEKLY CHALLENGE ACCOUNTABILITY, AND PERFECT
-            MONTHS.
+          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+            Verified workouts earn entries. Consistency, Weekly Challenge
+            teamwork and a Perfect Month can multiply them.
           </TerminalText>
         </View>
 
@@ -114,10 +113,10 @@ export default function BonusRulesModal() {
           <TerminalText glow style={styles.calloutLabel} tone="cyan" variant="label">
             WEEKLY CHALLENGE BONUS
           </TerminalText>
-          <TerminalText style={styles.calloutCopy} tone="muted" variant="body">
-            BOTH HIT THE GOAL: YOU BOTH EARN 2X. IF YOUR WEEKLY CHALLENGE PARTNER MISSES: COMPLETE
-            ONE EXTRA VERIFIED WORKOUT TO EARN 3X. SEVEN-DAY PLAYERS ACTIVATE
-            3X AUTOMATICALLY WHEN THEIR WEEKLY CHALLENGE PARTNER MISSES.
+          <TerminalText style={styles.calloutCopy} tone="muted" uppercase={false} variant="body">
+            Both hit the goal: 2x each. If your partner misses, complete one
+            extra verified workout for 3x. The 3x bonus is automatic when no
+            extra day is available.
           </TerminalText>
         </HUDBorderBox>
 
@@ -142,7 +141,7 @@ function RuleCard({ rule }: { rule: BonusRule }) {
         <TerminalText glow style={styles.ruleLabel} tone={rule.tone} variant="label">
           {rule.label}
         </TerminalText>
-        <TerminalText style={styles.ruleDescription} tone="muted" variant="body">
+        <TerminalText style={styles.ruleDescription} tone="muted" uppercase={false} variant="body">
           {rule.description}
         </TerminalText>
       </View>

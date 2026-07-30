@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppTourModeBanner } from '@/components/appTour';
 import { colors, cyberGlow, radii, spacing, textGlow, typography } from '@/constants/theme';
 
 export { ScreenScrollView } from './screenScrollView';
@@ -176,6 +177,7 @@ export function ScreenContainer({
   return createElement(
     SafeAreaView,
     { style: cyberStyles.safeArea },
+    createElement(AppTourModeBanner),
     createElement(
       View,
       { style: [cyberStyles.frame, frameStyle] },
@@ -286,7 +288,7 @@ export function CyberButtonPrimary({
       style: ({ pressed }: PressableStateCallbackType) => [
         cyberStyles.buttonShell,
         primaryToneStyles[tone],
-        cyberGlow[tone],
+        disabled ? null : cyberGlow[tone],
         pressed ? cyberStyles.pressed : null,
         disabled ? cyberStyles.disabled : null,
         style
@@ -331,26 +333,51 @@ function ButtonContent({
   label: string;
   tone: CyberButtonTone;
 }) {
+  const hasTrailingArrow = /\s*->$/.test(label);
+  const visibleLabel = hasTrailingArrow ? label.replace(/\s*->$/, '') : label;
+
   return createElement(
     View,
     { style: cyberStyles.buttonContent },
     createElement(
       TerminalText,
-      { glow: true, tone, variant: 'button' },
-      label
-    )
+      {
+        glow: true,
+        style: cyberStyles.buttonLabel,
+        tone,
+        uppercase: false,
+        variant: 'button'
+      },
+      visibleLabel
+    ),
+    hasTrailingArrow
+      ? createElement(
+          TerminalText,
+          {
+            glow: true,
+            style: cyberStyles.buttonArrow,
+            tone,
+            uppercase: false,
+            variant: 'button'
+          },
+          '->'
+        )
+      : null
   );
 }
 
 const cyberStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    width: '100%',
+    overflow: 'hidden',
     backgroundColor: colors.background
   },
   frame: {
     flex: 1,
     width: '100%',
     maxWidth: 430,
+    overflow: 'hidden',
     alignSelf: 'center',
     backgroundColor: colors.background
   },
@@ -406,10 +433,19 @@ const cyberStyles = StyleSheet.create({
     ...webFocusOutline
   },
   buttonContent: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm
+  },
+  buttonLabel: {
+    minWidth: 0,
+    flexShrink: 1,
+    textAlign: 'center'
+  },
+  buttonArrow: {
+    flexShrink: 0
   },
   pressed: {
     opacity: 0.72

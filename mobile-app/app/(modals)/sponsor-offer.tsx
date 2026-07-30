@@ -9,6 +9,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { goBackOrReplace } from '@/navigation/goBack';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function SponsorOfferModal() {
@@ -28,21 +29,12 @@ export default function SponsorOfferModal() {
       ]
     : [
         'REGIONAL SPONSOR AND PRIZE DETAILS WILL BE PUBLISHED BEFORE THE COMPETITION',
-        `${Math.round(campaign.economics.rewardWinnerRate * 100)}% OF PLAYERS IS THE TARGET REWARD RATE`,
-        `REQUIRES ${enrollment.minimumEntrants} REGISTERED PLAYERS ACROSS THE REGION TO LAUNCH`,
-        enrollment.maximumEntrants === null
-          ? 'NO PLAYER CAP IS CURRENTLY CONFIGURED'
-          : `CURRENT PLAYER CAP: ${enrollment.maximumEntrants.toLocaleString()}`,
+        'REWARD INVENTORY HAS NOT BEEN PUBLISHED',
+        'REGISTRATION AND LAUNCH REQUIREMENTS WILL APPEAR WITH THE CAMPAIGN',
+        'NO PLAYER CAP HAS BEEN PUBLISHED',
         'CREATOR FEATURE DETAILS WILL APPEAR WITH THE SPONSOR ANNOUNCEMENT'
       ];
-  const closeOffer = () => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-
-    router.replace('/home');
-  };
+  const closeOffer = () => goBackOrReplace(router, '/home');
 
   return (
     <ScreenContainer contentStyle={styles.sheet}>

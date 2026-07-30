@@ -12,8 +12,8 @@ measurable, month-long activity challenge:
   an optional participant limit. Authenticated users in discovery can join it
   without a friend relationship.
 
-The Expo Squad experience exposes My, Discover, and Create views. It uses the
-same repository contract for API mode and session-only demo mode.
+The Expo Squad experience exposes My, Discover, and Create views. It reads and
+mutates social state only through the authenticated API repository.
 
 ## Trust and privacy rules
 
@@ -137,9 +137,8 @@ The generated `openapi.json` remains the authoritative field-level contract.
   cards, schedules, progress, and responsive controls.
 - `src/domain/social.ts` owns shared types, normalization, and semantic input
   validation.
-- `src/data/socialRepository.ts` and `src/data/socialHooks.ts` map the API and
-  TanStack Query behavior.
-- `src/mocks/social.ts` provides equivalent mutable demo behavior.
+- `src/data/socialRepository.ts` and `src/data/socialHooks.ts` map the API,
+  unavailable-service behavior, and TanStack Query state.
 
 Run the mobile app:
 

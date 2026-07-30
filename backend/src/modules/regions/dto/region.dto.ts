@@ -1,12 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEnum,
   IsLatitude,
   IsLongitude,
   Matches,
-  IsOptional,
-  IsPostalCode,
-  IsString,
   IsUUID,
 } from 'class-validator';
 import type {
@@ -60,7 +57,6 @@ export class RegionPolicyResponseDto {
 
 export enum RegionVerificationMethodDto {
   DEVICE_LOCATION = 'device_location',
-  POSTAL_CODE = 'postal_code',
 }
 
 export class CreateRegionVerificationDto {
@@ -70,27 +66,19 @@ export class CreateRegionVerificationDto {
 
   @ApiProperty({ enum: RegionVerificationMethodDto, type: String })
   @IsEnum(RegionVerificationMethodDto)
-  method!: RegionVerificationMethod;
+  method!: 'device_location';
 
-  @ApiPropertyOptional({ maximum: 90, minimum: -90, type: Number })
-  @IsOptional()
+  @ApiProperty({ maximum: 90, minimum: -90, type: Number })
   @IsLatitude()
-  latitude?: number;
+  latitude!: number;
 
-  @ApiPropertyOptional({ maximum: 180, minimum: -180, type: Number })
-  @IsOptional()
+  @ApiProperty({ maximum: 180, minimum: -180, type: Number })
   @IsLongitude()
-  longitude?: number;
-
-  @ApiPropertyOptional({ type: String })
-  @IsOptional()
-  @IsString()
-  @IsPostalCode('any')
-  postalCode?: string;
+  longitude!: number;
 }
 
 export class CurrentRegionVerificationQueryDto {
-  @ApiProperty({ example: 'CA-BC-DEMO', type: String })
+  @ApiProperty({ example: 'CA-BC', type: String })
   @Matches(/^[A-Z]{2}-[A-Z0-9-]{1,32}$/)
   regionCode!: string;
 }
@@ -122,10 +110,10 @@ export class RegionVerificationResponseDto {
 }
 
 export class CurrentRegionVerificationResponseDto extends RegionVerificationResponseDto {
-  @ApiProperty({ example: 'CA-BC-DEMO', type: String })
+  @ApiProperty({ example: 'CA-BC', type: String })
   regionCode!: string;
 
-  @ApiProperty({ example: 'British Columbia Demo', type: String })
+  @ApiProperty({ example: 'British Columbia', type: String })
   regionName!: string;
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })

@@ -63,8 +63,8 @@ and controller define the OpenAPI contract.
 The feature is already hooked into the home screen:
 
 - `mobile-app/src/domain/streaks.ts` defines the shared client contract.
-- `mobile-app/src/data/appData.ts` fetches `/v1/streaks/me` in API mode and
-  exposes a visual-only fixture in local demo mode.
+- `mobile-app/src/data/appData.ts` fetches `/v1/streaks/me` from the
+  authenticated API and returns no streak record when services are unavailable.
 - `mobile-app/src/data/appDataHooks.tsx` exposes `useMyStreaks()`.
 - `mobile-app/src/components/streakRewards.tsx` renders the responsive badge
   grid using only GoGymGo theme tokens.
@@ -118,5 +118,4 @@ rewrite reward source data or alter API-visible records.
 - Database integration coverage verifies the partial index exists after all
   migrations. Run it with Docker available and
   `$env:RUN_DATABASE_INTEGRATION='true'; npm.cmd run test:integration`.
-- Frontend data-boundary tests cover demo, unavailable, and authenticated API
-  modes.
+- Frontend data-boundary tests cover unavailable and authenticated API modes.

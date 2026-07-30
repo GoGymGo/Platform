@@ -12,9 +12,14 @@ type OnboardingHeaderProps = {
 };
 
 type CompactTextButtonProps = {
+  disabled?: boolean;
   label: string;
   onPress: () => void;
-  tone?: 'cyan' | 'pink' | 'muted';
+  tone?: 'amber' | 'cyan' | 'pink' | 'muted';
+};
+
+type ScreenBackButtonProps = {
+  onPress: () => void;
 };
 
 const webFocusOutline = Platform.select({
@@ -38,16 +43,7 @@ export function OnboardingHeader({
     <View style={style}>
       <View style={styles.headerRow}>
         {onBack ? (
-          <Pressable
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-            onPress={onBack}
-            style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-          >
-            <TerminalText glow tone="cyan" variant="button">
-              {'<'}
-            </TerminalText>
-          </Pressable>
+          <ScreenBackButton onPress={onBack} />
         ) : (
           <View style={styles.backPlaceholder} />
         )}
@@ -67,7 +63,23 @@ export function OnboardingHeader({
   );
 }
 
+export function ScreenBackButton({ onPress }: ScreenBackButtonProps) {
+  return (
+    <Pressable
+      accessibilityLabel="Back"
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
+    >
+      <TerminalText glow tone="cyan" variant="button">
+        {'<'}
+      </TerminalText>
+    </Pressable>
+  );
+}
+
 export function CompactTextButton({
+  disabled = false,
   label,
   onPress,
   tone = 'cyan'
@@ -77,10 +89,21 @@ export function CompactTextButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.textButton, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.textButton,
+        pressed ? styles.pressed : null,
+        disabled ? styles.disabled : null
+      ]}
     >
-      <TerminalText glow={tone !== 'muted'} tone={textTone} variant="button">
+      <TerminalText
+        glow={tone !== 'muted'}
+        tone={textTone}
+        uppercase={false}
+        variant="button"
+      >
         {label}
       </TerminalText>
     </Pressable>
@@ -138,5 +161,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7
+  },
+  disabled: {
+    opacity: 0.45
   }
 });

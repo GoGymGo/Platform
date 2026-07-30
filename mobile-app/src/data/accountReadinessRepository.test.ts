@@ -109,29 +109,20 @@ describe('account readiness repository', () => {
     ]);
   });
 
-  it('completes the same legal, region, and enrollment sequence in demo mode', async () => {
-    const account = createAccountReadinessRepository('demo', null);
+  it('does not fabricate account readiness when the API is unavailable', async () => {
+    const account = createAccountReadinessRepository('unavailable', null);
     const documents = await account.getCurrentLegalDocuments();
-    const receipt = await account.recordLegalReceipt(documents);
     const policies = await account.listRegionPolicies();
-    const verification = await account.createRegionVerification({
-      method: 'postal_code',
-      postalCode: 'V6B 1A1',
-      regionPolicyId: policies[1].id
-    });
     const competition = await account.getCurrentCompetition('2026-08', 'VANCOUVER');
-    assert.ok(competition);
-    const enrollment = await account.enrollInCompetition(competition.id, {
-      ageEligibilityAttested: true,
-      goalDays: 4,
-      legalReceiptBundleId: receipt.receiptBundleId!,
-      regionVerificationId: verification.id,
-      rulesAccepted: true
-    });
 
-    assert.equal(receipt.complete, true);
-    assert.equal(verification.status, 'approved');
-    assert.equal(enrollment.goalDays, 4);
-    assert.deepEqual(await account.getCurrentEnrollment(), enrollment);
+    assert.equal(documents.configured, false);
+    assert.deepEqual(documents.documents, []);
+    assert.deepEqual(policies, []);
+    assert.equal(competition, null);
+    assert.equal(await account.getCurrentEnrollment(), null);
+    await assert.rejects(
+      () => account.recordLegalReceipt(documents),
+      /not configured/i
+    );
   });
 });

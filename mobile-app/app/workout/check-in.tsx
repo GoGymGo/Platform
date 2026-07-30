@@ -1,7 +1,8 @@
-import { useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenLoadingState,
   ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
@@ -9,25 +10,49 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import {
+  RecoverableScreenError,
+  useAccessibilityAnnouncement
+} from '@/components/reliability';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { usePresenceVerification } from '@/hooks/usePresenceVerification';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
+import { goBackOrReplace } from '@/navigation/goBack';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
   const router = useRouter();
+  const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
   const {
     sessionActionError,
     sessionActionPending,
     startWorkoutSession
   } = useWorkoutProgress();
   const {
+    checking: registrationChecking,
+    error: registrationError,
+    ready: registrationReady,
+    retry: retryRegistration,
+    retrying: registrationRetrying,
+    setupActionLabel,
+    setupMessage,
+    setupRoute
+  } = useSessionRegistrationAccess();
+  const {
     accepted: cameraConsentAccepted,
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
-  const { busy, buttonLabel, message, verify } = usePresenceVerification();
+  const { busy, message, verify } = usePresenceVerification();
+  useAccessibilityAnnouncement(
+    deviceSaved === '1'
+      ? 'Default device saved. Next, verify it is you to begin the workout.'
+      : null
+  );
 
   async function confirmPresence() {
     if (!(await verify())) {
@@ -39,6 +64,36 @@ export default function CheckInScreen() {
     }
   }
 
+  if (registrationChecking) {
+    return <ScreenLoadingState body="Checking your competition registration." />;
+  }
+
+  if (registrationError) {
+    return (
+      <RecoverableScreenError
+        body="Your competition setup could not be checked. Retry before starting a verified workout."
+        onRetry={() => void retryRegistration()}
+        retrying={registrationRetrying}
+        title="COULD NOT CHECK SETUP"
+      />
+    );
+  }
+
+  if (!registrationReady) {
+    return (
+      <SessionUnavailable
+        actionLabel={setupActionLabel}
+        body={setupMessage}
+        onAction={() => {
+          if (setupRoute) {
+            router.replace(setupRoute as Href);
+          }
+        }}
+        title="FINISH SETUP"
+      />
+    );
+  }
+
   return (
     <ScreenContainer>
       <ScreenScrollView
@@ -48,14 +103,26 @@ export default function CheckInScreen() {
       >
         <View style={styles.header}>
           <CyberButtonOutline
-            label="HOME"
-            onPress={() => router.push('/home')}
+            label="BACK"
+            onPress={() => goBackOrReplace(router, '/session')}
             style={styles.backButton}
           />
-          <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
-            CHECK-IN // 1 OF 3
+          <TerminalText glow tone="cyan" variant="label">
+            WORKOUT CHECK-IN
           </TerminalText>
         </View>
+        <WorkoutFlowProgress stage="start" style={styles.workoutProgress} />
+
+        {deviceSaved === '1' ? (
+          <HUDBorderBox style={styles.savedDeviceNotice} tone="green">
+            <TerminalText glow live="polite" tone="green" variant="label">
+              DEFAULT DEVICE SAVED
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              Next, verify it&apos;s you to begin the workout.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : null}
 
         <View style={styles.centerContent}>
           <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
@@ -70,8 +137,7 @@ export default function CheckInScreen() {
             {"VERIFY IT'S YOU TO START"}
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Your phone asks for Face ID, Touch ID, fingerprint, or its passcode.
-            GoGymGo receives only the pass or fail result, never biometric data.
+            Use your phone&apos;s secure prompt. GoGymGo receives only pass or fail.
           </TerminalText>
         </View>
 
@@ -90,10 +156,10 @@ export default function CheckInScreen() {
             sessionActionPending
           }
           label={sessionActionPending
-            ? 'STARTING SESSION...'
+              ? 'Starting session...'
             : busy
-              ? 'CHECKING DEVICE...'
-              : buttonLabel}
+              ? 'Checking device...'
+              : 'Verify and start'}
           onPress={() => void confirmPresence()}
         />
         {message || sessionActionError ? (
@@ -126,25 +192,28 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingVertical: spacing.sm
   },
-  stepLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal,
-    textAlign: 'right'
+  workoutProgress: {
+    marginBottom: spacing.sm
+  },
+  savedDeviceNotice: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    padding: spacing.md
   },
   centerContent: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xl
+    paddingVertical: spacing.lg
   },
   scanFrame: {
-    width: 160,
-    height: 160,
+    width: 76,
+    height: 76,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 0,
-    borderRadius: 34,
-    marginBottom: 26,
+    borderRadius: 20,
+    marginBottom: spacing.md,
     ...cyberGlow.cyan
   },
   scanIcon: {
@@ -161,7 +230,7 @@ const styles = StyleSheet.create({
   },
   body: {
     maxWidth: 290,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
   },

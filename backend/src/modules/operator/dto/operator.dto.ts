@@ -270,7 +270,7 @@ export class OperatorWorkQueueItemDto {
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 
-  @ApiPropertyOptional({ example: 'CA-BC-DEMO', type: String })
+  @ApiPropertyOptional({ example: 'CA-BC', type: String })
   regionCode?: string;
 
   @ApiPropertyOptional({

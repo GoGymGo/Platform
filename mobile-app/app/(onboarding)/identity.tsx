@@ -22,7 +22,12 @@ import { useUpdateScreenName } from '@/data/socialHooks';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
 import { normalizeScreenName, validateScreenName } from '@/domain/social';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
+import {
+  clearScreenMemory,
+  useScreenMemory
+} from '@/hooks/useScreenMemory';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useAuth } from '@/state/auth';
 import { useProfile } from '@/state/profile';
 
 export default function IdentityScreen() {
@@ -48,9 +53,12 @@ export default function IdentityScreen() {
 function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | null }) {
   const router = useRouter();
   const { source } = useLocalSearchParams<{ source?: string }>();
+  const { user } = useAuth();
   const { setPublicIdentity } = useProfile();
   const updateAlias = useUpdateScreenName();
-  const [alias, setAlias] = useState(
+  const draftKey = `identity:${user?.uid ?? 'anonymous'}:${source ?? 'setup'}`;
+  const [alias, setAlias] = useScreenMemory(
+    draftKey,
     initialIdentity?.displayName || initialIdentity?.callsign || ''
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -66,7 +74,12 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
   const identityIsValid = alias.length > 0 && !validateScreenName(alias);
   const avatarInitials = getPublicInitials(normalizedAlias || 'GG');
   const isEditing = source === 'profile' || source === 'social';
-  const returnRoute = source === 'social' ? '/squad/social' : '/profile';
+  const returnRoute =
+    source === 'social'
+      ? '/squad/social'
+      : source === 'profile'
+        ? '/profile'
+        : '/home';
 
   const handleContinue = async () => {
     const error = validateScreenName(alias);
@@ -89,12 +102,8 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
       return;
     }
 
-    if (isEditing) {
-      router.replace(returnRoute);
-      return;
-    }
-
-    router.push('/region');
+    clearScreenMemory(draftKey);
+    router.replace(returnRoute);
   };
 
   return (
@@ -107,24 +116,25 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
           bounces={false}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          memoryKey={draftKey}
           showsVerticalScrollIndicator={false}
         >
           <OnboardingHeader
-            label={isEditing ? 'EDIT ALIAS' : 'PUBLIC IDENTITY'}
+            label={isEditing ? 'EDIT ALIAS' : 'OPTIONAL PROFILE'}
             onBack={() => goBackOrReplace(
               router,
-              isEditing ? returnRoute : '/'
+              returnRoute
             )}
-            progress={isEditing ? 100 : 20}
-            step={isEditing ? 'PROFILE' : 'STEP 01 / 05'}
+            progress={100}
+            step="PROFILE"
           />
 
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             HOW SHOULD OTHERS SEE YOU?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            This is shown on leaderboards, Weekly Challenges and community features.
-            Personal details always stay private.
+            Your private player callsign works immediately. Add a custom alias
+            only if you want one shown on rankings and Weekly Challenges.
           </TerminalText>
 
           <AuthTextField
@@ -137,7 +147,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
               setAlias(value);
               setSubmitError(null);
             }}
-            placeholder="GHOST_RUNNER"
+            placeholder="YOUR_ALIAS"
             value={alias}
           />
 
@@ -183,9 +193,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             disabled={!identityIsValid || updateAlias.isPending}
             label={updateAlias.isPending
               ? 'SAVING ALIAS...'
-              : isEditing
-                ? 'SAVE ALIAS ->'
-                : 'CONTINUE ->'}
+              : 'SAVE ALIAS ->'}
             onPress={handleContinue}
             style={styles.primaryButton}
           />

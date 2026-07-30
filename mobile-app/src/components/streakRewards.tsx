@@ -1,8 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps } from 'react';
 import {
   StyleSheet,
   View,
+  type AccessibilityRole,
   type StyleProp,
   type TextStyle,
   type ViewStyle
@@ -191,6 +192,7 @@ export function StreakBadgeStrip({
 }
 
 export function UserAlias({
+  accessibilityRole,
   alias,
   glow = false,
   maximum = 2,
@@ -202,6 +204,7 @@ export function UserAlias({
   uppercase,
   variant = 'body'
 }: {
+  accessibilityRole?: AccessibilityRole;
   alias: string;
   glow?: boolean;
   maximum?: number;
@@ -216,6 +219,7 @@ export function UserAlias({
   return (
     <View style={[styles.userAlias, style]}>
       <TerminalText
+        accessibilityRole={accessibilityRole}
         glow={glow}
         style={[styles.userAliasText, textStyle]}
         tone={tone}

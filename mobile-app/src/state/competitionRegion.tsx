@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import {
+  competitionRegions,
   defaultCompetitionRegion,
   parseCompetitionRegion,
   parseCompetitionRegionVerification,
@@ -17,9 +18,20 @@ import {
   type CompetitionRegionVerificationMethod
 } from '@/config/regions';
 import { createUserStorage } from '@/services/storage/userStorage';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 
 const competitionRegionStorageKey = '@gogymgo/competition-region';
+const appTourRegion = competitionRegions[0];
+const appTourRegionVerification: CompetitionRegionVerification = {
+  method: 'device-location',
+  region: appTourRegion,
+  regionCode: 'CA-ON-TORONTO',
+  regionPolicyId: '10000000-0000-4000-8000-000000000003',
+  status: 'verified',
+  verificationId: '10000000-0000-4000-8000-000000000004',
+  verifiedAt: '2026-01-01T00:00:00.000Z'
+};
 
 type CompetitionRegionContextValue = {
   competitionRegion: CompetitionRegion;
@@ -40,19 +52,30 @@ type CompetitionRegionContextValue = {
 const CompetitionRegionContext = createContext<CompetitionRegionContextValue | null>(null);
 
 export function CompetitionRegionProvider({ children }: PropsWithChildren) {
+  const { active: appTourActive } = useAppTour();
   const { loading: authLoading, user } = useAuth();
   const userId = user?.uid ?? null;
   const userStorage = useMemo(
     () => userId ? createUserStorage(userId) : null,
     [userId]
   );
-  const [competitionRegion, setCompetitionRegionState] = useState(defaultCompetitionRegion);
+  const [competitionRegion, setCompetitionRegionState] = useState(
+    appTourActive ? appTourRegion : defaultCompetitionRegion
+  );
   const [regionVerification, setRegionVerification] =
-    useState<CompetitionRegionVerification | null>(null);
-  const [regionReady, setRegionReady] = useState(false);
+    useState<CompetitionRegionVerification | null>(
+      appTourActive ? appTourRegionVerification : null
+    );
+  const [regionReady, setRegionReady] = useState(appTourActive);
 
   useEffect(() => {
     let mounted = true;
+
+    if (appTourActive) {
+      return () => {
+        mounted = false;
+      };
+    }
 
     if (authLoading) {
       return () => {
@@ -93,7 +116,7 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
     return () => {
       mounted = false;
     };
-  }, [authLoading, userStorage]);
+  }, [appTourActive, authLoading, userStorage]);
 
   const verifyCompetitionRegion = useCallback(async (
     region: CompetitionRegion,
@@ -107,7 +130,7 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
   ) => {
     const status = serverVerification
       ? serverVerification.status === 'approved' ? 'verified' : 'provisional'
-      : method === 'device-location' ? 'verified' : 'provisional';
+      : 'verified';
     const verification = {
       method,
       region,

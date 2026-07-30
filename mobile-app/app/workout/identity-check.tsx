@@ -1,25 +1,31 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
+  ScreenLoadingState,
   ScreenContainer,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import { RecoverableScreenError } from '@/components/reliability';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { isGoGymGoPartnerCode } from '@/domain/partnerGymQr';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { usePresenceVerification } from '@/hooks/usePresenceVerification';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
+import { useAppTour } from '@/state/appTour';
 
 export default function IdentityCheckScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { qrPayload } = useLocalSearchParams<{ qrPayload?: string }>();
   const {
     sessionActionError,
@@ -27,11 +33,21 @@ export default function IdentityCheckScreen() {
     startWorkoutSession
   } = useWorkoutProgress();
   const {
+    checking: registrationChecking,
+    error: registrationError,
+    ready: registrationReady,
+    retry: retryRegistration,
+    retrying: registrationRetrying,
+    setupActionLabel,
+    setupMessage,
+    setupRoute
+  } = useSessionRegistrationAccess();
+  const {
     accepted: cameraConsentAccepted,
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
-  const { busy, buttonLabel, message, verify } = usePresenceVerification();
+  const { busy, message, verify } = usePresenceVerification();
 
   async function confirmPresence() {
     if (
@@ -43,12 +59,48 @@ export default function IdentityCheckScreen() {
     }
   }
 
-  if (!qrPayload || !isGoGymGoPartnerCode(qrPayload, 'entry')) {
+  if (
+    !qrPayload ||
+    (
+      !isGoGymGoPartnerCode(qrPayload, 'entry') &&
+      !(appTourActive && qrPayload === 'gogymgo:gym:entry:app-tour')
+    )
+  ) {
     return (
       <SessionUnavailable
         body="Scan a partner-gym entry QR before the device presence check."
         onAction={() => router.replace('/qr-scanner')}
         title="ENTRY QR REQUIRED"
+      />
+    );
+  }
+
+  if (registrationChecking) {
+    return <ScreenLoadingState body="Checking your competition registration." />;
+  }
+
+  if (registrationError) {
+    return (
+      <RecoverableScreenError
+        body="Your competition setup could not be checked. Retry before confirming the partner-gym entry."
+        onRetry={() => void retryRegistration()}
+        retrying={registrationRetrying}
+        title="COULD NOT CHECK SETUP"
+      />
+    );
+  }
+
+  if (!registrationReady) {
+    return (
+      <SessionUnavailable
+        actionLabel={setupActionLabel}
+        body={setupMessage}
+        onAction={() => {
+          if (setupRoute) {
+            router.replace(setupRoute as Href);
+          }
+        }}
+        title="FINISH SETUP"
       />
     );
   }
@@ -66,10 +118,11 @@ export default function IdentityCheckScreen() {
           onPress={() => goBackOrReplace(router, '/qr-scanner')}
           style={styles.backButton}
         />
-        <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
-          IDENTITY // 2 OF 4
+        <TerminalText glow tone="cyan" variant="label">
+          WORKOUT CHECK-IN
         </TerminalText>
       </View>
+      <WorkoutFlowProgress stage="start" style={styles.workoutProgress} />
 
       <View style={styles.centerContent}>
         <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
@@ -84,8 +137,7 @@ export default function IdentityCheckScreen() {
           CONFIRM IT IS REALLY YOU
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          The gym QR confirms where the session starts. Your phone then uses
-          its own secure authentication prompt to confirm you are present.
+          Confirm your presence with your phone&apos;s secure prompt.
         </TerminalText>
       </View>
 
@@ -104,10 +156,10 @@ export default function IdentityCheckScreen() {
           sessionActionPending
         }
         label={sessionActionPending
-          ? 'STARTING SESSION...'
+          ? 'Starting session...'
           : busy
-            ? 'CHECKING DEVICE...'
-            : buttonLabel}
+            ? 'Checking device...'
+            : 'Verify and start'}
         onPress={() => void confirmPresence()}
       />
       {message || sessionActionError ? (
@@ -140,24 +192,23 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingVertical: spacing.sm
   },
-  stepLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal,
-    textAlign: 'right'
+  workoutProgress: {
+    marginBottom: spacing.sm
   },
   centerContent: {
-    flex: 1,
+    width: '100%',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    paddingVertical: spacing.lg
   },
   scanFrame: {
-    width: 160,
-    height: 160,
+    width: 76,
+    height: 76,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 0,
-    borderRadius: 34,
-    marginBottom: 26,
+    borderRadius: 20,
+    marginBottom: spacing.md,
     ...cyberGlow.cyan
   },
   scanIcon: {
@@ -174,7 +225,7 @@ const styles = StyleSheet.create({
   },
   body: {
     maxWidth: 290,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
   },

@@ -32,7 +32,7 @@ export type PrizeDrawWeightInput = {
 export const goalCategories = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export const categoryRankTieBreakOrder = [
-  'CATEGORY SCORE',
+  'GOAL SCORE',
   'LONGEST VERIFIED WORKOUT STREAK',
   'MOST VERIFIED COMPETITION DAYS',
   'AUDITED EQUAL-CHANCE TIE-BREAK'

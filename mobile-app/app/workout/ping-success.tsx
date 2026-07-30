@@ -8,6 +8,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -33,6 +34,7 @@ export default function PingSuccessScreen() {
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
+      <WorkoutFlowProgress stage="verify" style={styles.workoutProgress} />
       <HUDBorderBox glow style={styles.successMark} tone="green">
         <TerminalText glow style={styles.successMarkText} tone="green" variant="value">
           OK
@@ -65,6 +67,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
     backgroundColor: colors.background
+  },
+  workoutProgress: {
+    marginBottom: spacing.xxl
   },
   successMark: {
     width: 84,

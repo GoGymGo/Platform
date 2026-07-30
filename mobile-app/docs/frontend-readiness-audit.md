@@ -2,10 +2,10 @@
 
 Status: active audit, July 15, 2026
 
-This document is the working map for taking the Expo app from a complete local
-product preview to a backend-connected release candidate. It separates what is
-visually implemented from what is server-authoritative so a polished demo state
-cannot be mistaken for a production integration.
+This document is the working map for taking the Expo app to a
+backend-connected release candidate. It separates implemented UI from
+server-authoritative behavior and requires honest unavailable states wherever a
+production integration is not ready.
 
 ## Current evidence
 
@@ -45,15 +45,16 @@ rule, and updates public identity and friend discovery in one request.
 | Flow | Entry | Primary completion | Current integration |
 | --- | --- | --- | --- |
 | Player account | `/` -> `/join` -> `/sign-up` or `/sign-in` | Firebase account and verified email | Firebase connected; legal receipts are synchronized during registration |
-| Onboarding | `/identity` -> `/region` -> `/consents` -> `/verification` -> `/commitment` | Active competition enrollment | Current legal documents, receipts, region evidence, and enrollment are connected |
-| Verified workout | Home/Start -> method -> check-in -> active -> check-out -> complete | Server-reviewed session | Authoritative create/evidence/complete/cancel adapter connected; pending review never appears verified |
+| Required setup | `/region` (location + account agreements) -> `/commitment` | Active competition enrollment | Current legal documents, receipts, region evidence, and enrollment are connected |
+| Optional profile/workout setup | Profile -> `/identity`; first verified workout -> `/verification` | Custom public Alias and saved workout device | Private callsign is automatic; device-presence consent is requested at first use |
+| Verified workout | Home/Start -> first-use device selection -> check-in -> active -> check-out -> complete | Server-reviewed session | Authoritative create/evidence/complete/cancel adapter connected; pending review never appears verified |
 | Competition | Home/Ranks -> Squad -> Weekly Challenge detail | Goal, partner, progress, and stats | Enrollment and read/partner-request adapters connected |
 | Friends | Profile/Squad -> `/squad/social` | Search, request, accept, invite | API adapter connected |
 | Activity challenge | Friends -> Challenges | Create/join/invite/check in | API adapter connected |
 | Creator planning | Home/Start -> `/workouts` -> detail | Add creator workout to calendar | API adapter connected |
 | Creator submission | Creator catalog/application -> `/creator/submit` | Rights-attested submission | API adapter connected |
 | Results and rewards | Ranks/Home -> Winners Circle/Rewards | View winners and claim award | API adapter connected |
-| Partner intake | Join/Profile -> `/partner` | Creator, sponsor, or gym application | API adapter connected |
+| Partner intake | Join -> `/partner` | Creator, sponsor, or gym application | API adapter connected |
 | Account controls | Profile -> Account Data | Alias, avatar, legal, privacy, reminders | Connected; signed avatar moderation, push registration, and privacy request status have explicit adapters |
 
 ## Code-size and duplication priorities
@@ -105,5 +106,5 @@ The authoritative status matrix and integration order live in
   produces no diff.
 
 The frontend is ready for GitHub handoff only when this evidence exists and all
-remaining P0 connections above are moved from local/demo state to an
-authenticated API adapter or are explicitly removed from the release scope.
+remaining P0 connections above use an authenticated API adapter or are
+explicitly removed from the release scope.

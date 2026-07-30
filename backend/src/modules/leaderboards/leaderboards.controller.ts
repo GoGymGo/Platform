@@ -1,9 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
@@ -16,6 +18,7 @@ import { LeaderboardsService } from './leaderboards.service';
 
 @ApiTags('leaderboards')
 @ApiBearerAuth('firebase')
+@ApiExtraModels(CategoryLeaderboardDto, CompetitionProgressResponseDto)
 @Controller()
 export class LeaderboardsController {
   constructor(private readonly leaderboards: LeaderboardsService) {}
@@ -24,7 +27,12 @@ export class LeaderboardsController {
   @ApiOperation({
     summary: 'Return the current authenticated regional category leaderboard',
   })
-  @ApiOkResponse({ type: CategoryLeaderboardDto })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(CategoryLeaderboardDto) }],
+      nullable: true,
+    },
+  })
   getCurrentLeaderboard(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Query() query: LeaderboardQueryDto,
@@ -37,7 +45,12 @@ export class LeaderboardsController {
     summary:
       'Return authoritative current competition progress from the ledger',
   })
-  @ApiOkResponse({ type: CompetitionProgressResponseDto })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(CompetitionProgressResponseDto) }],
+      nullable: true,
+    },
+  })
   getMyProgress(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<CompetitionProgressResponseDto | null> {

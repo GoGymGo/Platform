@@ -25,15 +25,12 @@ import {
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
-import { shouldPresentWinnersCircleForLogin } from '@/services/winnersCircle';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
-import { useCompetitionRegion } from '@/state/competitionRegion';
 
 export default function SignInScreen() {
   const router = useRouter();
   const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
-  const { social, source: appDataSource } = useAppData();
-  const { competitionRegion } = useCompetitionRegion();
+  const { social } = useAppData();
   const {
     appleSignInAvailable,
     firebaseConfigured,
@@ -59,7 +56,7 @@ export default function SignInScreen() {
       await social.redeemContactInvitation(challengeInvite);
     }
     if (result.isNewUser) {
-      router.replace('/identity');
+      router.replace('/region');
       return;
     }
 
@@ -68,20 +65,7 @@ export default function SignInScreen() {
       return;
     }
 
-    const settledCompetition = await appDataSource
-      .getSettledCompetition()
-      .catch(() => null);
-
-    const showWinnersCircle = await shouldPresentWinnersCircleForLogin(
-      result.user.uid,
-      competitionRegion.timeZone,
-      settledCompetition !== null
-    );
-    router.replace(
-      showWinnersCircle
-        ? { pathname: '/winners-circle', params: { auto: '1' } }
-        : '/home'
-    );
+    router.replace('/home?resume=1');
   };
   const {
     busyProvider,
@@ -91,6 +75,7 @@ export default function SignInScreen() {
   } = useSocialAuthFlow(completeSignIn);
   const busy = submitting || Boolean(busyProvider);
   const hasSocialProviders = appleSignInAvailable || googleSignInAvailable;
+  const emailSignInReady = email.trim().length > 0 && password.length > 0;
 
   async function submitEmailSignIn() {
     const nextErrors = validateSignInForm(email, password);
@@ -139,20 +124,7 @@ export default function SignInScreen() {
         router.replace('/squad/social');
         return;
       }
-      const settledCompetition = await appDataSource
-        .getSettledCompetition()
-        .catch(() => null);
-
-      const showWinnersCircle = await shouldPresentWinnersCircleForLogin(
-        user.uid,
-        competitionRegion.timeZone,
-        settledCompetition !== null
-      );
-      router.replace(
-        showWinnersCircle
-          ? { pathname: '/winners-circle', params: { auto: '1' } }
-          : '/home'
-      );
+      router.replace('/home?resume=1');
     } finally {
       setSubmitting(false);
     }
@@ -160,7 +132,7 @@ export default function SignInScreen() {
 
   return (
     <AuthScreenShell
-      description="Return to your commitment, verified workout history and active prize draw entries."
+      description="Return to your Weekly Goal, verified workouts and prize draw entries."
       eyebrow="SECURE ACCESS"
       onBack={() => router.replace('/join')}
       title="WELCOME BACK"
@@ -200,7 +172,7 @@ export default function SignInScreen() {
               />
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Continuing with Google or Apple creates an account when one does not
-                exist and confirms acceptance of the current Privacy Policy and Terms.
+                exist. New players review the account agreements during setup.
               </TerminalText>
               <LegalDocumentLinks />
 
@@ -221,7 +193,11 @@ export default function SignInScreen() {
               error={errors.email}
               keyboardType="email-address"
               label="EMAIL"
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setErrors((current) => ({ ...current, email: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="you@example.com"
               returnKeyType="next"
               textContentType="emailAddress"
@@ -232,7 +208,11 @@ export default function SignInScreen() {
               autoComplete="current-password"
               error={errors.password}
               label="PASSWORD"
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="Your password"
               secureTextEntry
               textContentType="password"
@@ -240,8 +220,13 @@ export default function SignInScreen() {
             />
             {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
+            {!emailSignInReady ? (
+              <TerminalText tone="dim" uppercase={false} variant="caption">
+                Enter your email and password to continue.
+              </TerminalText>
+            ) : null}
             <CyberButtonPrimary
-              disabled={busy || !firebaseConfigured}
+              disabled={busy || !firebaseConfigured || !emailSignInReady}
               label={submitting ? 'SIGNING IN...' : 'SIGN IN ->'}
               onPress={submitEmailSignIn}
             />
@@ -255,7 +240,7 @@ export default function SignInScreen() {
           <CyberButtonOutline
             disabled={busy}
             label="CREATE A NEW ACCOUNT"
-            onPress={() => router.replace('/')}
+            onPress={() => router.replace('/sign-up')}
           />
         </View>
       )}

@@ -10,13 +10,14 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { ScreenBackButton } from '@/components/onboarding';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
 import { useCreatorWorkoutPlans } from '@/data/appDataHooks';
+import { goBackOrReplace } from '@/navigation/goBack';
 import {
   formatDateKey,
   formatMonthLabel,
-  parseDateKey,
   toDateKey,
   type CalendarDay,
   type WorkoutLog,
@@ -37,8 +38,6 @@ export default function CalendarScreen() {
     currentWeekVerified,
     getLogsForDate,
     logs,
-    totalEntries,
-    verifiedSessionCount,
     weeklyGoal
   } = useWorkoutProgress();
   const [displayMonth, setDisplayMonth] = useState(() => startOfMonth(new Date()));
@@ -58,6 +57,7 @@ export default function CalendarScreen() {
     [displayMonth, logs]
   );
   const selectedDateLabel = formatDateKey(selectedDateKey);
+  const todayDateKey = toDateKey(new Date());
   const selectedPlans = creatorWorkoutPlans.filter(({ plannedDate }) => plannedDate === selectedDateKey);
   const plannedDateKeys = useMemo(
     () => new Set(creatorWorkoutPlans.map(({ plannedDate }) => plannedDate)),
@@ -65,7 +65,9 @@ export default function CalendarScreen() {
   );
   const monthLabel = formatMonthLabel(displayMonth);
   const manualDurationMinutes = Number.parseInt(manualDuration, 10);
-  const selectedDateIsFuture = parseDateKey(selectedDateKey).getTime() > new Date().setHours(23, 59, 59, 999);
+  const selectedDateIsFuture = selectedDateKey > todayDateKey;
+  const selectedDateIsToday = selectedDateKey === todayDateKey;
+  const selectedDateIsPast = selectedDateKey < todayDateKey;
   const manualLogIsValid =
     !selectedDateIsFuture &&
     Number.isFinite(manualDurationMinutes) &&
@@ -105,6 +107,13 @@ export default function CalendarScreen() {
     setShowManualLogForm(false);
   }
 
+  function goToToday() {
+    const today = new Date();
+    setDisplayMonth(startOfMonth(today));
+    setSelectedDateKey(toDateKey(today));
+    setShowManualLogForm(false);
+  }
+
   return (
     <ScreenContainer>
       <ScreenScrollView
@@ -114,25 +123,17 @@ export default function CalendarScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.header, compactCalendar ? styles.headerCompact : null]}>
-          <View style={styles.headerCopy}>
-            <TerminalText glow tone="cyan" variant="label">
-              PERSONAL + VERIFIED HISTORY
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              WORKOUT CALENDAR
-            </TerminalText>
+          <View style={styles.headerLead}>
+            <ScreenBackButton onPress={() => goBackOrReplace(router, '/home')} />
+            <View style={styles.headerCopy}>
+              <TerminalText glow tone="cyan" variant="label">
+                PERSONAL + VERIFIED HISTORY
+              </TerminalText>
+              <TerminalText glow style={styles.title} tone="cyan" variant="title">
+                WORKOUT CALENDAR
+              </TerminalText>
+            </View>
           </View>
-          <HUDBorderBox
-            style={[styles.streakBadge, compactCalendar ? styles.streakBadgeCompact : null]}
-            tone="cyan"
-          >
-            <TerminalText glow style={styles.streakValue} tone="cyan" variant="value">
-              {currentStreak}
-            </TerminalText>
-            <TerminalText tone="muted" variant="micro">
-              PERSONAL STREAK
-            </TerminalText>
-          </HUDBorderBox>
         </View>
 
         {activeSession ? (
@@ -153,8 +154,7 @@ export default function CalendarScreen() {
             tone="cyan"
             value={`${Math.min(currentWeekVerified, weeklyGoal)}/${weeklyGoal}`}
           />
-          <StatCard label="VERIFIED DAYS" tone="green" value={String(verifiedSessionCount)} />
-          <StatCard label="PRIZE DRAW ENTRIES" tone="pink" value={String(totalEntries)} />
+          <StatCard label="PERSONAL STREAK" tone="green" value={String(currentStreak)} />
         </View>
 
         <HUDBorderBox style={styles.calendarCard} tone="cyan">
@@ -184,6 +184,24 @@ export default function CalendarScreen() {
                 </TerminalText>
               </Pressable>
             </View>
+            <Pressable
+              accessibilityLabel="Return to today"
+              accessibilityRole="button"
+              onPress={goToToday}
+              style={({ pressed }) => [
+                styles.todayButton,
+                selectedDateIsToday ? styles.todayButtonSelected : null,
+                pressed ? styles.pressed : null
+              ]}
+            >
+              <TerminalText
+                glow={selectedDateIsToday}
+                tone={selectedDateIsToday ? 'cyan' : 'dim'}
+                variant="micro"
+              >
+                TODAY
+              </TerminalText>
+            </Pressable>
             <TerminalText style={styles.calendarStatus} tone="dim" uppercase={false} variant="micro">
               {competitionNotStarted
                 ? 'Verified sessions build your history until competition scoring opens.'
@@ -193,10 +211,9 @@ export default function CalendarScreen() {
 
           <View style={styles.legend}>
             <CalendarLegend color={colors.green} label="VERIFIED" />
-            <CalendarLegend color={colors.dim} label="MANUAL" />
-            <CalendarLegend color={colors.pink} label="BONUS" />
+            <CalendarLegend color={colors.dim} label="PERSONAL" />
+            <CalendarLegend color={colors.pink} label="BONUS DAY" />
             <CalendarLegend color={colors.amber} label="PLANNED" />
-            <CalendarLegend color={colors.borderMuted} label="OPEN" />
           </View>
 
           <View style={[styles.weekdayRow, compactCalendar ? styles.calendarGridCompact : null]}>
@@ -239,8 +256,12 @@ export default function CalendarScreen() {
                 {selectedDateLabel}
               </TerminalText>
             </View>
-            <TerminalText glow tone={selectedLogs.length > 0 ? 'cyan' : 'dim'} variant="label">
-              {selectedLogs.length > 0 ? 'CHECKED' : 'OPEN'}
+            <TerminalText
+              glow
+              tone={selectedDateIsToday ? 'cyan' : selectedDateIsFuture ? 'amber' : 'dim'}
+              variant="label"
+            >
+              {selectedDateIsToday ? 'TODAY' : selectedDateIsFuture ? 'UPCOMING' : 'PAST'}
             </TerminalText>
           </View>
 
@@ -281,9 +302,16 @@ export default function CalendarScreen() {
           ) : null}
         </HUDBorderBox>
 
+        <TerminalText style={styles.actionHint} tone="dim" uppercase={false} variant="caption">
+          {selectedDateIsFuture
+            ? 'Plan a creator workout for this day. Verified sessions count on the day you complete them.'
+            : selectedDateIsPast
+              ? 'Add a personal log for this day, or return to today to start a verified workout.'
+              : 'Personal logs track your history only. Start a verified workout below for competition credit.'}
+        </TerminalText>
         <CyberButtonOutline
           disabled={selectedDateIsFuture}
-          label={showManualLogForm ? 'CANCEL PERSONAL LOG' : 'ADD PERSONAL WORKOUT LOG ->'}
+          label={showManualLogForm ? 'CANCEL PERSONAL LOG' : 'LOG PERSONAL WORKOUT'}
           onPress={() => setShowManualLogForm((current) => !current)}
           style={styles.manualToggle}
         />
@@ -312,7 +340,7 @@ export default function CalendarScreen() {
             <HUDBorderBox style={styles.manualNotice} tone="muted">
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Manual logs mark this calendar only. They do not verify a workout or
-                change your Weekly Goal, Category Score or Prize Draw Entries.
+                change your Weekly Goal, Goal Score or Prize Draw Entries.
               </TerminalText>
             </HUDBorderBox>
           ) : null}
@@ -373,11 +401,28 @@ export default function CalendarScreen() {
           />
         </HUDBorderBox> : null}
 
-        <CyberButtonOutline
-          label="START VERIFIED SESSION ->"
-          onPress={() => router.push('/session' as Href)}
-          style={styles.sessionButton}
-        />
+        {selectedDateIsFuture ? (
+          <CyberButtonPrimary
+            label="PLAN A CREATOR WORKOUT ->"
+            onPress={() => router.push(
+              `/workouts?source=calendar&plannedDate=${selectedDateKey}` as Href
+            )}
+            style={styles.sessionButton}
+            tone="amber"
+          />
+        ) : selectedDateIsPast ? (
+          <CyberButtonPrimary
+            label="RETURN TO TODAY TO START ->"
+            onPress={goToToday}
+            style={styles.sessionButton}
+          />
+        ) : (
+          <CyberButtonPrimary
+            label="START TODAY'S VERIFIED WORKOUT ->"
+            onPress={() => router.push('/session' as Href)}
+            style={styles.sessionButton}
+          />
+        )}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -533,6 +578,13 @@ const styles = StyleSheet.create({
   headerCopy: {
     flex: 1
   },
+  headerLead: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md
+  },
   headerCompact: {
     alignItems: 'stretch',
     flexDirection: 'column'
@@ -613,6 +665,21 @@ const styles = StyleSheet.create({
   monthLabel: {
     flex: 1,
     textAlign: 'center'
+  },
+  todayButton: {
+    minHeight: 44,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    borderRadius: radii.sm,
+    backgroundColor: colors.panelAlpha45
+  },
+  todayButtonSelected: {
+    borderColor: colors.borderCyanBright,
+    backgroundColor: colors.surfaceCyanActive
   },
   calendarStatus: {
     textAlign: 'center'
@@ -763,6 +830,11 @@ const styles = StyleSheet.create({
   },
   manualToggle: {
     marginBottom: spacing.md
+  },
+  actionHint: {
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    textAlign: 'center'
   },
   manualHeader: {
     flexDirection: 'row',

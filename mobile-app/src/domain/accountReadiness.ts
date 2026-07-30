@@ -67,10 +67,9 @@ export type RegionVerification = {
 };
 
 export type CreateRegionVerificationInput = {
-  latitude?: number;
-  longitude?: number;
-  method: 'device_location' | 'postal_code';
-  postalCode?: string;
+  latitude: number;
+  longitude: number;
+  method: 'device_location';
   regionPolicyId: string;
 };
 

@@ -53,45 +53,6 @@ export function resolveCompetitionRegionFromCoordinates(
     : null;
 }
 
-export function resolveCompetitionRegionFromPostalCode(
-  value: string
-): CompetitionRegion | null {
-  const postalCode = normalizeCanadianPostalCode(value);
-  const regionId = getRegionIdForPostalCode(postalCode);
-
-  return competitionRegions.find((region) => region.id === regionId) ?? null;
-}
-
-export function normalizeCanadianPostalCode(value: string) {
-  const compact = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-  return compact.length > 3 ? `${compact.slice(0, 3)} ${compact.slice(3)}` : compact;
-}
-
-export function isCompleteCanadianPostalCode(value: string) {
-  return /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i.test(
-    value.trim()
-  );
-}
-
-function getRegionIdForPostalCode(postalCode: string) {
-  const fsa = postalCode.replace(' ', '').slice(0, 3);
-
-  if (/^M\d[A-Z]$/.test(fsa)) {
-    return 'toronto';
-  }
-  if (/^H\d[A-Z]$/.test(fsa)) {
-    return 'montreal';
-  }
-  if (/^T(?:1[XYZ]|[23][A-Z])$/.test(fsa)) {
-    return 'calgary';
-  }
-  if (/^V[3-7][A-Z]$/.test(fsa)) {
-    return 'vancouver';
-  }
-
-  return null;
-}
-
 function getDistanceKilometers(first: RegionCoordinates, second: RegionCoordinates) {
   const earthRadiusKilometers = 6371;
   const latitudeDelta = toRadians(second.latitude - first.latitude);

@@ -4,12 +4,12 @@ import { describe, it } from 'node:test';
 import { resolveSponsorCampaign } from './sponsorCampaigns';
 
 describe('regional sponsor campaign resolution', () => {
-  it('returns the approved sponsor for the matching region and month', () => {
+  it('uses neutral campaign metadata until a sponsor is confirmed by the API', () => {
     const campaign = resolveSponsorCampaign('TORONTO', '2026-07');
 
-    assert.equal(campaign.id, 'toronto-2026-07-volt');
-    assert.equal(campaign.sponsor.shortName, 'VOLT');
-    assert.equal(campaign.status, 'approved');
+    assert.equal(campaign.id, 'toronto-2026-07-neutral');
+    assert.equal(campaign.sponsor.shortName, 'GOGYMGO');
+    assert.equal(campaign.status, 'draft');
     assert.equal(campaign.economics.rewardWinnerRate, 0.15);
     assert.equal(campaign.enrollmentPolicy.minimumEntrants, 100);
     assert.equal(campaign.enrollmentPolicy.maximumEntrants, null);

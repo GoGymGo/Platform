@@ -12,6 +12,12 @@ const prohibitedRuntimeContent = [
   /\bHYPERWALLET_[A-Z0-9_]+\b/,
   /\/v1\/(?:payouts?|webhooks\/hyperwallet)\b/,
   /\/(?:payout-winner|leaderboard\/draw|profile\/payout)\b/,
+  /\bEXPO_PUBLIC_ENABLE_ONBOARDING_PREVIEW\b/,
+  /\bcreateAppDataSource\(\s*['"]demo['"]/,
+  /(?:from|import\()\s*['"]@\/mocks\//,
+  /\bIRON DISTRICT\b/,
+  /\bVOLT PERFORMANCE CLUB\b/,
+  /\bNORTHLINE FITNESS\b/
 ];
 const prohibitedRuntimePaths = new Set([
   'app/(tabs)/leaderboard/draw.tsx',
@@ -19,8 +25,9 @@ const prohibitedRuntimePaths = new Set([
   'app/payout-winner.tsx',
   'src/domain/payout.ts',
   'src/mocks/payout.ts',
-  'src/services/payouts.ts',
+  'src/services/payouts.ts'
 ]);
+const prohibitedRuntimePathPrefixes = ['app/(preview)/', 'src/mocks/'];
 
 for (const filePath of sourceFiles) {
   const sourceText = fs.readFileSync(filePath, 'utf8');
@@ -36,10 +43,13 @@ for (const filePath of sourceFiles) {
   if (prohibitedRuntimePaths.has(relativePath)) {
     issues.push(`${relativePath}: obsolete payment runtime path`);
   }
+  if (prohibitedRuntimePathPrefixes.some((prefix) => relativePath.startsWith(prefix))) {
+    issues.push(`${relativePath}: prohibited demo/mock runtime path`);
+  }
 
   for (const pattern of prohibitedRuntimeContent) {
     if (pattern.test(sourceText)) {
-      issues.push(`${relativePath}: obsolete payment-provider runtime reference`);
+      issues.push(`${relativePath}: prohibited runtime reference`);
     }
   }
 
@@ -48,6 +58,20 @@ for (const filePath of sourceFiles) {
     if (colorMatch) {
       issues.push(`${relativePath}: raw color value ${colorMatch[0]}`);
     }
+  }
+
+  if (
+    relativePath !== 'src/navigation/goBack.ts' &&
+    /\brouter\.back\s*\(/.test(sourceText)
+  ) {
+    issues.push(`${relativePath}: raw router.back bypasses the safe fallback helper`);
+  }
+
+  if (
+    relativePath.endsWith('/_layout.tsx') &&
+    /animation:\s*['"]slide_from_(?:right|bottom)['"]/.test(sourceText)
+  ) {
+    issues.push(`${relativePath}: navigation animation ignores reduced-motion preference`);
   }
 
   for (const marker of ['@ts-ignore', '@ts-expect-error', 'eslint-disable']) {
@@ -65,12 +89,14 @@ for (const route of literalRoutes) {
   }
 }
 
-const packageJson = JSON.parse(
-  fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8')
-);
+auditRouteReturnPaths(path.join(projectRoot, 'app'));
+auditAppTourCoverage(path.join(projectRoot, 'app'));
+auditFlowReliability();
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const dependencies = {
   ...packageJson.dependencies,
-  ...packageJson.devDependencies,
+  ...packageJson.devDependencies
 };
 for (const dependency of [
   '@hyperwallet/sdk',
@@ -79,7 +105,7 @@ for (const dependency of [
   'hyperwallet-rest-sdk',
   'paypal-rest-sdk',
   'plaid',
-  'stripe',
+  'stripe'
 ]) {
   if (dependency in dependencies) {
     issues.push(`package.json: obsolete payment dependency ${dependency}`);
@@ -118,11 +144,7 @@ function visit(node, relativePath) {
     reportNode(node, relativePath, `console.${node.expression.name.getText()} call`);
   }
 
-  if (
-    ts.isStringLiteral(node) &&
-    node.text.startsWith('/') &&
-    !node.text.startsWith('/v1/')
-  ) {
+  if (ts.isStringLiteral(node) && node.text.startsWith('/') && !node.text.startsWith('/v1/')) {
     literalRoutes.add(normalizeRoute(node.text));
   }
 
@@ -133,6 +155,220 @@ function reportNode(node, relativePath, message) {
   const sourceFile = node.getSourceFile();
   const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
   issues.push(`${relativePath}:${line + 1}: ${message}`);
+}
+
+function auditRouteReturnPaths(appDirectory) {
+  const entryRouteExemptions = new Set(['app/(onboarding)/welcome.tsx', 'app/index.tsx']);
+  const returnPathPatterns = [
+    /\bgoBackOrReplace\b/,
+    /\brouter\.back\s*\(/,
+    /\bonBack\s*=/,
+    /<Redirect\b[^>]*\bhref\s*=/s,
+    /accessibilityLabel\s*=\s*["']Back["']/i,
+    /(?:LegalDocumentScreen|ConnectedLegalDocumentScreen|CreatorApplicationScreen|creatorApplicationScreen)/,
+    /(?:label|actionLabel)\s*=\s*(?:\{[^}]{0,180})?["'][^"']*(?:BACK|CLOSE|EXIT|HOME|LEAVE|RANKS|COMPETE|COMPETITION|ACCOUNT)/i
+  ];
+
+  for (const filePath of collectSourceFiles(appDirectory)) {
+    const fileName = path.basename(filePath);
+    if (fileName === '_layout.tsx') {
+      continue;
+    }
+
+    const relativePath = path.relative(projectRoot, filePath).replaceAll('\\', '/');
+    const sourceText = fs.readFileSync(filePath, 'utf8');
+    const hasPersistentTabNavigation = relativePath.startsWith('app/(tabs)/');
+    const hasReturnPath = returnPathPatterns.some((pattern) => pattern.test(sourceText));
+
+    if (!entryRouteExemptions.has(relativePath) && !hasPersistentTabNavigation && !hasReturnPath) {
+      issues.push(`${relativePath}: route has no detected in-app return path`);
+    }
+
+    if (relativePath === 'app/(tabs)/calendar.tsx' && !sourceText.includes('ScreenBackButton')) {
+      issues.push(`${relativePath}: calendar requires the shared screen back control`);
+    }
+  }
+}
+
+function auditAppTourCoverage(appDirectory) {
+  const configuredRouteSource = fs.readFileSync(
+    path.join(projectRoot, 'src/testing/appTourRoutes.ts'),
+    'utf8'
+  );
+  const configuredRoutes = new Set(
+    [...configuredRouteSource.matchAll(/\broute:\s*['"]([^'"]+)['"]/g)]
+      .map((match) => normalizeRoute(match[1]))
+  );
+  const routeExemptions = new Set([
+    '/app-tour',
+    '/consents',
+    '/entry-confirmed'
+  ]);
+  const dynamicRouteExamples = new Map([
+    ['/workouts/[workoutId]', '/workouts/app-tour-workout']
+  ]);
+
+  for (const route of collectRouteNames(appDirectory)) {
+    if (routeExemptions.has(route)) {
+      continue;
+    }
+
+    const configuredRoute = dynamicRouteExamples.get(route) ?? route;
+    if (!configuredRoutes.has(configuredRoute)) {
+      issues.push(`${route}: screen is missing from the App Tour route directory`);
+    }
+  }
+}
+
+function auditFlowReliability() {
+  const requirements = new Map([
+    ['app/(auth)/sign-in.tsx', [
+      '/home?resume=1',
+      'emailSignInReady',
+      'Enter your email and password to continue.'
+    ]],
+    ['app/(auth)/sign-up.tsx', [
+      'emailAccountReady',
+      'Complete your email and both password fields to continue.'
+    ]],
+    ['app/(tabs)/_layout.tsx', [
+      "title: 'Calendar'",
+      "tabBarAccessibilityLabel: 'Workout calendar tab'"
+    ]],
+    ['app/(tabs)/home/index.tsx', [
+      'getAppResumeTarget',
+      'RecoverableError',
+      'resume-started',
+      'resume-completed'
+    ]],
+    ['app/(tabs)/leaderboard/index.tsx', [
+      'useScreenMemory',
+      'memoryKey="leaderboard"',
+      'RecoverableError',
+      'Prize Draw Entries set your winning odds.',
+      'Hide ranking details'
+    ]],
+    ['app/(tabs)/calendar.tsx', [
+      'PLAN A CREATOR WORKOUT ->',
+      'RETURN TO TODAY TO START ->',
+      "START TODAY'S VERIFIED WORKOUT ->",
+      'function goToToday()'
+    ]],
+    ['app/(tabs)/workouts/index.tsx', ['plannedDate={plannedDate}']],
+    ['app/(tabs)/workouts/[workoutId].tsx', ['requestedPlannedDate']],
+    ['app/(tabs)/squad/index.tsx', [
+      'ActionFeedback',
+      'memoryKey="squad"',
+      'RecoverableError',
+      'Pairing options'
+    ]],
+    ['app/workout/active.tsx', [
+      'showSessionDetails',
+      'VIEW SESSION DETAILS',
+      'showSessionOptions',
+      'SESSION OPTIONS'
+    ]],
+    ['app/app-tour.tsx', [
+      'SEARCH SCREENS',
+      'appTourRouteGroups',
+      'hydrateAppTourReview',
+      'PREVIOUS',
+      'START TOUR ->',
+      'RESUME LAST SCREEN ->',
+      'RESET REVIEW PROGRESS',
+      'function resetReviewProgress()',
+      'showFlowDiagnostics',
+      'SHOW TEST DIAGNOSTICS'
+    ]],
+    ['src/components/appTour.tsx', [
+      'findAppTourRouteIndex',
+      'Previous App Tour screen',
+      'Next App Tour screen',
+      'recordAppTourVisit'
+    ]],
+    ['app/(onboarding)/commitment.tsx', [
+      'useScreenMemory',
+      'memoryKey={draftKey}',
+      'useReducedMotionPreference',
+      "day === 1 ? 'day' : 'days'} per week"
+    ]],
+    ['app/(onboarding)/how-it-works.tsx', [
+      'A quick reference for competition scoring',
+      'No bank account is needed.'
+    ]],
+    ['app/(onboarding)/identity.tsx', [
+      'useScreenMemory',
+      'memoryKey={draftKey}'
+    ]],
+    ['app/rewards/awards.tsx', [
+      'RecoverableError',
+      'reward-claim-completed',
+      'goBackOrReplace',
+      'READY TO CLAIM'
+    ]],
+    ['src/components/cyber.ts', [
+      'allowFontScaling: true',
+      'minHeight: 54'
+    ]],
+    ['src/components/clarity.tsx', ['GUIDE', 'minWidth: 72']],
+    ['src/components/competitionHubNav.tsx', [
+      'aria-selected={selected}',
+      'accessibilityState={{ selected }}',
+      'if (!selected)'
+    ]],
+    ['src/components/onboarding.tsx', ['minHeight: 44']],
+    ['src/components/socialChallenges.tsx', [
+      'ChallengeBuilderStep',
+      'STEP {builderStepIndex + 1} OF',
+      'CONTINUE TO GOAL ->',
+      'CONTINUE TO INVITE ->',
+      'showExternalInvite'
+    ]],
+    ['src/components/screenScrollView.tsx', ['rememberedOffsets']],
+    ['src/services/flowMetrics.ts', [
+      'getFlowFunnelSummaries',
+      'createUserStorage',
+      'recordFlowMetric'
+    ]]
+  ]);
+
+  for (const [relativePath, markers] of requirements) {
+    const filePath = path.join(projectRoot, relativePath);
+    const sourceText = fs.existsSync(filePath)
+      ? fs.readFileSync(filePath, 'utf8')
+      : '';
+
+    for (const marker of markers) {
+      if (!sourceText.includes(marker)) {
+        issues.push(`${relativePath}: missing flow reliability requirement ${marker}`);
+      }
+    }
+  }
+
+  const forbiddenRequirements = new Map([
+    ['app/(tabs)/leaderboard/index.tsx', [
+      'Goal Score determines rank. Prize Draw Entries determine winning odds.'
+    ]],
+    ['app/(onboarding)/how-it-works.tsx', [
+      'BRAND REWARDS // NO PAYMENT SETUP'
+    ]],
+    ['app/(tabs)/squad/index.tsx', ["'More options'"]],
+    ['app/(tabs)/_layout.tsx', ["title: 'Log'"]],
+    ['src/components/competitionHubNav.tsx', ['disabled={selected}']]
+  ]);
+
+  for (const [relativePath, markers] of forbiddenRequirements) {
+    const filePath = path.join(projectRoot, relativePath);
+    const sourceText = fs.existsSync(filePath)
+      ? fs.readFileSync(filePath, 'utf8')
+      : '';
+
+    for (const marker of markers) {
+      if (sourceText.includes(marker)) {
+        issues.push(`${relativePath}: obsolete clarity copy ${marker}`);
+      }
+    }
+  }
 }
 
 function collectSourceFiles(directory) {
@@ -150,6 +386,17 @@ function collectSourceFiles(directory) {
 }
 
 function collectRoutePatterns(appDirectory) {
+  return collectRouteNames(appDirectory).map((route) => {
+    const expression = route
+      .split('/')
+      .map((segment) => (/^\[.+\]$/.test(segment) ? '[^/]+' : escapeRegExp(segment)))
+      .join('/');
+
+    return new RegExp(`^${expression}$`);
+  });
+}
+
+function collectRouteNames(appDirectory) {
   return collectSourceFiles(appDirectory)
     .filter((filePath) => {
       const fileName = path.basename(filePath);
@@ -164,13 +411,7 @@ function collectRoutePatterns(appDirectory) {
         .split('/')
         .filter((segment) => !/^\(.+\)$/.test(segment))
         .filter((segment) => segment !== 'index');
-      const route = `/${segments.join('/')}`.replace(/\/$/, '') || '/';
-      const expression = route
-        .split('/')
-        .map((segment) => (/^\[.+\]$/.test(segment) ? '[^/]+' : escapeRegExp(segment)))
-        .join('/');
-
-      return new RegExp(`^${expression}$`);
+      return `/${segments.join('/')}`.replace(/\/$/, '') || '/';
     });
 }
 

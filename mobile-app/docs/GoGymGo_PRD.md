@@ -77,11 +77,15 @@ The UI term **Alias** maps to the API field `screenName`. Alias validation is
 
 The required onboarding path is:
 
-1. choose public identity;
-2. verify the supported competition region;
-3. review device, location, health, QR-camera, and presence-check disclosures;
-4. choose the default workout verification method;
-5. choose the Weekly Goal and complete competition registration.
+1. verify the supported competition region and accept the current account
+   agreements on the same screen; and
+2. choose the Weekly Goal, accept the competition rules, confirm age
+   eligibility, and complete competition registration.
+
+Public identity is not a registration blocker. The app generates a private,
+stable player callsign automatically; users may add a public Alias later from
+Profile. Workout-device selection and device-presence consent are requested
+just in time when the player starts their first verified workout.
 
 Registration requirements:
 
@@ -91,16 +95,17 @@ Registration requirements:
   locale, version, and receipt bundle.
 - The user explicitly accepts current legal documents and competition rules and
   attests that they meet the verified region's minimum age.
-- Region evidence can come from one-time device location or a supported postal
-  code. Exact coordinates are not stored as public profile data.
+- Region evidence comes from a one-time device-location check. Exact
+  coordinates are not stored as public profile data.
 - Pending, expired, rejected, or mismatched regional evidence must never appear
   approved.
 - The Weekly Goal is selected from 1-7 verified days and is immutable after
   enrollment because there is no goal-change endpoint in V1.
 - The current competition, legal receipt, approved region verification, age
   attestation, and accepted rules must all agree before enrollment succeeds.
-- Direct navigation to the confirmation screen must not claim registration
-  unless an active server enrollment exists.
+- Successful registration returns directly to Home with a short confirmation
+  banner. The legacy confirmation route redirects to Home and cannot claim
+  registration independently.
 
 Competition timing requirements:
 
@@ -339,7 +344,7 @@ Weekly scoring:
 - Public winner records show permitted Alias, visible streak badges, rank, and
   reward title/type—not coupon codes or private fulfillment details.
 - Results and reward claims use server data and provide retryable error states;
-  a local fixture must not be presented as a production result.
+  unavailable services render explicit empty or error states.
 
 ## 6. Sponsorship and partner model
 
@@ -356,6 +361,44 @@ Weekly scoring:
   claims, and redemptions when the brand supplies that signal.
 - Creator, sponsor, and gym partner applications are available from public and
   Profile entry points and have explicit validation and submission outcomes.
+
+### Sponsor advertising placeholder inventory
+
+- The backend owns a read-only sponsor-placement inventory at
+  `GET /v1/me/sponsor-ad-placements`. The initial contract is explicitly a
+  placeholder: visual delivery, creative URLs, playback, and event tracking are
+  disabled, and the mobile UI must not render these placements yet.
+- The inventory reserves one in-flow banner placement for eligible authenticated
+  member screens and 15-second video placeholders for post-login, verified
+  workout completion, settled Weekly Challenge results, Winners Circle,
+  Brand Rewards, and an explicitly announced Creator workout launch.
+- The post-login video is an automatic 15-second placement after every explicit
+  credential login when the backend confirms an active enrollment in the
+  current or upcoming competition. It occurs only after authentication and
+  enrollment resolution and before the intended signed-in destination.
+- Token refresh, app resume, tab navigation, and deep-link restoration do not
+  count as explicit logins and must not retrigger the post-login placement.
+- No video placement is eligible when enrollment is missing, loading,
+  withdrawn, disqualified, expired, or does not match the relevant competition.
+  Enrollment uncertainty fails closed for video eligibility.
+- Authentication, onboarding, public, active-workout, account-data,
+  legal/privacy, and Creator-submission contexts never contain video ads.
+- Banners may eventually appear once per eligible authenticated member screen,
+  but remain outside authentication, onboarding, public, active-workout,
+  account-data, legal/privacy, and Creator-submission contexts.
+- Future creative delivery must fail open: an unavailable advertisement never
+  delays login completion, workout confirmation, results, reward access, or
+  navigation.
+- Future delivery must clearly identify advertising, provide mute, countdown,
+  accessible close/skip, and inappropriate-ad reporting controls, and enforce
+  frequency on the server.
+- Advertising is contextual to an approved competition, region, and month. It
+  must never target or report using heart rate, health data, workout evidence,
+  streak performance, exact location, legal identity, private social activity,
+  raw contact destinations, or coupon plaintext.
+- Reserved event names include requested, started, viewable, completed,
+  skipped, failed, and clicked. No event is accepted or counted while the
+  placement inventory remains in placeholder status.
 
 Users earn competition credit only through verified GoGymGo workouts, never
 through external views, likes, subscriptions, comments, shares, or watch time.
@@ -394,8 +437,6 @@ decision outside the V1 user application.
 
 ### Mobile data modes
 
-- **Demo:** local, presentation-equivalent product walkthrough; never a
-  production source of truth.
 - **API:** authenticated repository adapters and server-authoritative state.
 - **Unavailable:** safe empty/error behavior when no API is configured.
 
@@ -501,6 +542,8 @@ Included:
 - regional physical/coupon marketplace, encrypted coupon inventory, My Rewards,
   and claims;
 - creator, sponsor, and gym partner applications;
+- a backend-owned, non-delivering sponsor-ad placeholder inventory with
+  enrollment-gated 15-second video eligibility and no mobile presentation;
 - local and push reminders, privacy export/deletion, moderation, operator
   configuration, migrations, OpenAPI, tests, and deployment runbooks.
 
@@ -511,6 +554,8 @@ Deferred:
 - GoGymGo collection of shipping addresses;
 - self-service brand fulfillment and automated third-party fulfillment;
 - creator-owned in-app video hosting and user-generated live video;
+- production sponsor creative delivery, playback, impression/click ingestion,
+  and advertising analytics until the placeholder promotion gate is approved;
 - unsupported combined biometric/device-attestation competition policies until
   real signed evidence integrations are implemented and approved; and
 - global launch before region-by-region legal and operational approval.
@@ -523,16 +568,17 @@ As of July 16, 2026:
 - the primary account, onboarding, registration, QR handoff, creator, rewards,
   friends, privacy, and profile flows have been browser smoke-tested;
 - the mobile check passes typecheck, lint, source audit, and 116 automated tests;
-- the backend check passes formatting, typecheck, lint, 98 unit tests, 24 E2E
-  tests, OpenAPI generation, the 60-operation frontend contract audit, source
+- the backend check passes formatting, typecheck, lint, 101 unit tests, 25 E2E
+  tests, OpenAPI generation, the 61-operation frontend contract audit, source
   audit, and production build;
 - database integration suites remain environment-gated and must run with the
   required PostgreSQL/PostGIS test environment before release; and
 - API adapters exist for legal/region/enrollment, sessions and progress, social
   features, creators, rewards, avatars, privacy, and push devices.
 
-The remaining work is release validation and deployment configuration, not an
-invitation for the client to replace server authority with local fixtures.
+The remaining work is release validation and deployment configuration. The
+client must continue to surface unavailable states instead of replacing server
+authority with locally fabricated records.
 
 ## 12. Release gates
 
@@ -571,4 +617,5 @@ Implementation details and ownership are maintained in:
 - `mobile-app/docs/backend-handoff-architecture.md`;
 - `backend/docs/brand-rewards-marketplace.md`;
 - `backend/docs/social-challenges.md`; and
-- `backend/docs/streak-rewards.md`.
+- `backend/docs/streak-rewards.md`; and
+- `backend/docs/sponsor-ad-placeholders.md`.

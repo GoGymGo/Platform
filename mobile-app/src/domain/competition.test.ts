@@ -4,8 +4,10 @@ import { describe, it } from 'node:test';
 import {
   buildCompetitionCalendar,
   evaluateMonthlyCompetition,
+  getCompetitionRankLabel,
   getCompetitionRegionDateKey,
   getCurrentWeekProgress,
+  getWeeklyChallengeDisplayStatus,
   isCompetitionBonusDay,
   type CompetitionMatch,
   type CompetitionPeriodIndex
@@ -258,6 +260,69 @@ describe('monthly competition scoring', () => {
         ['2026-07-30', 'bonus-day'],
         ['2026-07-31', 'bonus-day']
       ]
+    );
+  });
+});
+
+describe('competition clarity labels', () => {
+  it('shows a precise rank state', () => {
+    assert.equal(
+      getCompetitionRankLabel({
+        competitionNotStarted: true,
+        hasSettledWeek: false
+      }),
+      'PENDING FIRST WEEK'
+    );
+    assert.equal(
+      getCompetitionRankLabel({
+        competitionNotStarted: false,
+        hasSettledWeek: true,
+        rank: 2
+      }),
+      '#2'
+    );
+    assert.equal(
+      getCompetitionRankLabel({
+        competitionNotStarted: false,
+        hasSettledWeek: true
+      }),
+      'UPDATING'
+    );
+  });
+
+  it('prioritizes the next Weekly Challenge action', () => {
+    assert.equal(
+      getWeeklyChallengeDisplayStatus({
+        hasFeaturedPartner: true,
+        hasIncomingRequest: true,
+        isRemainderDayPhase: false
+      }),
+      'INVITE WAITING'
+    );
+    assert.equal(
+      getWeeklyChallengeDisplayStatus({
+        activeAvailability: 'matched',
+        hasFeaturedPartner: true,
+        hasIncomingRequest: true,
+        isRemainderDayPhase: false
+      }),
+      'IN PROGRESS'
+    );
+    assert.equal(
+      getWeeklyChallengeDisplayStatus({
+        hasFeaturedPartner: true,
+        hasIncomingRequest: false,
+        isRemainderDayPhase: false
+      }),
+      'CHOOSE PARTNER'
+    );
+    assert.equal(
+      getWeeklyChallengeDisplayStatus({
+        hasFeaturedPartner: true,
+        hasIncomingRequest: true,
+        isRemainderDayPhase: true
+      }),
+      'COMPLETE'
     );
   });
 });

@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
@@ -9,19 +10,29 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { RecoverableError } from '@/components/reliability';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
-import type { CreatorWorkoutPreview } from '@/data/appData';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
+import type { CreatorWorkout } from '@/domain/creatorWorkouts';
 import { getCreatorWorkoutsReturnTarget } from '@/navigation/creatorWorkouts';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function WorkoutsScreen() {
   const router = useRouter();
-  const { source } = useLocalSearchParams<{ source?: string }>();
+  const { user } = useAuth();
+  const { plannedDate, source } = useLocalSearchParams<{
+    plannedDate?: string;
+    source?: string;
+  }>();
   const { campaign } = useSponsorCampaign();
   const sponsorConfirmed = campaign.status === 'approved';
-  const { data: creatorWorkouts = [], isPending: creatorWorkoutsPending } =
-    useCreatorWorkouts();
+  const creatorWorkoutsQuery = useCreatorWorkouts();
+  const {
+    data: creatorWorkouts = [],
+    isPending: creatorWorkoutsPending
+  } = creatorWorkoutsQuery;
   const returnTarget = getCreatorWorkoutsReturnTarget(source);
 
   return (
@@ -29,6 +40,7 @@ export default function WorkoutsScreen() {
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
+        memoryKey="creator-workouts"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -51,13 +63,25 @@ export default function WorkoutsScreen() {
         </HUDBorderBox>
 
         <View style={styles.workoutList}>
+          {creatorWorkoutsQuery.isError ? (
+            <RecoverableError
+              body="The creator workout catalog could not be loaded. Retry to refresh the list."
+              onRetry={() => {
+                void recordFlowMetric(user?.uid, 'flow-retry', 'workouts');
+                void creatorWorkoutsQuery.refetch();
+              }}
+              retrying={creatorWorkoutsQuery.isFetching}
+              title="COULD NOT LOAD WORKOUTS"
+            />
+          ) : null}
           {creatorWorkouts.map((workout) => (
             <WorkoutCard
               key={workout.id}
+              plannedDate={plannedDate}
               workout={workout}
             />
           ))}
-          {!creatorWorkoutsPending && creatorWorkouts.length === 0 ? (
+          {!creatorWorkoutsQuery.isError && !creatorWorkoutsPending && creatorWorkouts.length === 0 ? (
             <HUDBorderBox style={styles.emptyCard} tone="muted">
               <TerminalText glow tone="amber" variant="label">
                 CREATOR WORKOUTS COMING SOON
@@ -71,7 +95,7 @@ export default function WorkoutsScreen() {
 
         <HUDBorderBox style={styles.sponsorCard} tone="muted">
           <View style={[styles.sponsorCardMark, !sponsorConfirmed && styles.sponsorCardMarkPending]}>
-            <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
+            <TerminalText accessibilityRole="text" glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
               {campaign.sponsor.mark}
             </TerminalText>
           </View>
@@ -117,19 +141,26 @@ export default function WorkoutsScreen() {
 }
 
 function WorkoutCard({
+  plannedDate,
   workout
 }: {
-  workout: CreatorWorkoutPreview;
+  plannedDate?: string;
+  workout: CreatorWorkout;
 }) {
   const router = useRouter();
   const badgeTone = workout.joined ? 'cyan' : 'muted';
 
   return (
     <Pressable
+      accessibilityLabel={`${workout.name} by ${workout.creatorName}. ${workout.durationMinutes} minute ${workout.workoutStyle} workout. ${workout.joined ? 'Open workout' : 'Coming soon'}.`}
       accessibilityRole="button"
       accessibilityState={{ disabled: !workout.joined }}
       disabled={!workout.joined}
-      onPress={() => router.push(`/workouts/${workout.id}`)}
+      onPress={() => router.push(
+        (plannedDate
+          ? `/workouts/${workout.id}?plannedDate=${plannedDate}`
+          : `/workouts/${workout.id}`) as Href
+      )}
       style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
     >
       <HUDBorderBox glow={workout.joined} style={styles.workoutCard} tone={workout.joined ? 'cyan' : 'muted'}>
@@ -150,19 +181,38 @@ function WorkoutCard({
             </HUDBorderBox>
           </View>
           <View style={[styles.playCircle, !workout.joined ? styles.playCircleLocked : null]}>
-            <TerminalText glow={workout.joined} tone={workout.joined ? 'cyan' : 'muted'} variant="micro">
-              {workout.joined ? 'PLAY' : 'LOCKED'}
-            </TerminalText>
+            <Ionicons
+              color={workout.joined ? colors.cyan : colors.muted}
+              name={workout.joined ? 'play' : 'lock-closed'}
+              size={21}
+            />
           </View>
+          <TerminalText
+            glow={workout.joined}
+            style={styles.previewStyle}
+            tone={workout.joined ? 'cyan' : 'muted'}
+            variant="micro"
+          >
+            {workout.workoutStyle}
+          </TerminalText>
         </View>
         <View style={styles.workoutCopy}>
           <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
             {workout.name}
           </TerminalText>
           <View style={styles.metaRow}>
-            <TerminalText style={styles.rewardText} tone="muted" variant="body">
-              {workout.creatorName} · {workout.durationMinutes} MIN · {workout.workoutStyle}
-            </TerminalText>
+            <View style={styles.metaItem}>
+              <Ionicons color={colors.muted} name="person-outline" size={14} />
+              <TerminalText tone="muted" variant="caption">
+                {workout.creatorName}
+              </TerminalText>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons color={colors.muted} name="time-outline" size={14} />
+              <TerminalText tone="muted" variant="caption">
+                {workout.durationMinutes} MIN
+              </TerminalText>
+            </View>
           </View>
           <TerminalText style={styles.catalogDetail} tone="muted" uppercase={false} variant="caption">
             {workout.reward}
@@ -300,6 +350,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelSoft,
     boxShadow: 'none'
   },
+  previewStyle: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.terminal,
+    letterSpacing: 1.2
+  },
   workoutCopy: {
     paddingVertical: 14,
     paddingHorizontal: 15
@@ -314,9 +369,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: 6
   },
-  rewardText: {
-    flexShrink: 1,
-    fontFamily: fontFamilies.terminal
+  metaItem: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    borderRadius: radii.sm,
+    backgroundColor: colors.panelSoft
   },
   timing: {
     marginTop: spacing.sm,

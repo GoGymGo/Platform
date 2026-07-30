@@ -1,7 +1,7 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 
 export type PresenceVerificationResult =
-  | { status: 'verified' | 'simulated' }
+  | { status: 'verified' }
   | { message: string; status: 'cancelled' | 'failed' | 'unavailable' };
 
 export async function verifyLocalPresence(): Promise<PresenceVerificationResult> {

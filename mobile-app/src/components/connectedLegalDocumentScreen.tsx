@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { LegalDocumentScreen } from '@/components/legal';
@@ -13,7 +14,16 @@ export function ConnectedLegalDocumentScreen({
   documentKey: string;
   fallback: LegalDocument;
 }) {
-  const documents = useCurrentLegalDocuments();
+  const params = useLocalSearchParams<{
+    jurisdictionCode?: string;
+    locale?: string;
+  }>();
+  const jurisdictionCode =
+    typeof params.jurisdictionCode === 'string'
+      ? params.jurisdictionCode
+      : 'GLOBAL';
+  const locale = typeof params.locale === 'string' ? params.locale : 'en';
+  const documents = useCurrentLegalDocuments(jurisdictionCode, locale);
   const current = documents.data?.documents.find(
     (document) => document.documentKey === documentKey
   );

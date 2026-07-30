@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
+import { CompetitionHubNav } from '@/components/competitionHubNav';
 import {
   ScreenScrollView,
   CyberButtonPrimary,
@@ -11,11 +12,11 @@ import {
   ScreenLoadingState,
   TerminalText
 } from '@/components/cyber';
+import { CompactTextButton } from '@/components/onboarding';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
-  useAppData,
   useCategoryLeaderboards,
   useRewardWinners,
   useSettledCompetition
@@ -29,25 +30,22 @@ import {
   formatCompetitionMonth,
   getPreviousCompetitionMonthKey
 } from '@/domain/winnersCircle';
-import { getCategoryLeaderboard } from '@/mocks/competitionResults';
-import {
-  rewardWinnersPreview,
-  settledCompetitionPreview
-} from '@/mocks/rewards';
 import { markWinnersCircleSeen } from '@/services/winnersCircle';
 import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function WinnersCircleScreen() {
   const router = useRouter();
   const { auto } = useLocalSearchParams<{ auto?: string }>();
   const { user } = useAuth();
-  const { mode: appDataMode } = useAppData();
   const { competitionRegion } = useCompetitionRegion();
   const { campaign } = useSponsorCampaign();
+  const { weeklyGoal } = useWorkoutProgress();
   const [closing, setClosing] = useState(false);
   const [selectedResults, setSelectedResults] = useState<'categories' | 'rewards'>('categories');
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const isAutomaticLoginView = auto === '1';
   const regionalDateKey = getCompetitionRegionDateKey(
     new Date(),
@@ -79,31 +77,29 @@ export default function WinnersCircleScreen() {
     useRewardWinners();
   const resultsUnavailable =
     settledCompetitionError || categoryResultsError || rewardResultsError;
-  const usingSampleFallback = __DEV__ && appDataMode === 'api' && resultsUnavailable;
-  const settledCompetition = usingSampleFallback
-    ? settledCompetitionPreview
-    : settledCompetitionResult;
-  const categoryLeaderboards = usingSampleFallback
-    ? goalCategories.map((goal) => getCategoryLeaderboard(goal))
-    : categoryLeaderboardResults;
-  const rewardWinners = usingSampleFallback
-    ? rewardWinnersPreview
-    : rewardWinnerResults;
+  const settledCompetition = settledCompetitionResult;
+  const categoryLeaderboards = categoryLeaderboardResults;
+  const rewardWinners = rewardWinnerResults;
   const categoryChampions = [...categoryLeaderboards]
     .reverse()
     .flatMap((leaderboard) => {
       const winner = leaderboard?.rows[0];
       return winner ? [{ goal: leaderboard.goal, winner }] : [];
     });
+  const currentCategoryChampion = categoryChampions.find(({ goal }) => goal === weeklyGoal);
+  const visibleCategoryChampions = showAllCategories
+    ? categoryChampions
+    : currentCategoryChampion
+      ? [currentCategoryChampion]
+      : categoryChampions.slice(0, 1);
 
   async function closeWinnersCircle() {
     setClosing(true);
 
     try {
-      await markWinnersCircleSeen(
-        user?.uid ?? 'local-preview',
-        competitionRegion.timeZone
-      );
+      if (user) {
+        await markWinnersCircleSeen(user.uid, competitionRegion.timeZone);
+      }
     } finally {
       router.replace(isAutomaticLoginView ? '/home' : '/leaderboard');
       setClosing(false);
@@ -118,14 +114,14 @@ export default function WinnersCircleScreen() {
     return (
       <AuthGate>
         <ScreenLoadingState
-          body="Loading audited category and prize-draw results."
+          body="Loading audited Weekly Goal and prize-draw results."
           label="LOADING WINNERS CIRCLE"
         />
       </AuthGate>
     );
   }
 
-  if (resultsUnavailable && !usingSampleFallback) {
+  if (resultsUnavailable) {
     return (
       <AuthGate>
         <ScreenContainer contentStyle={styles.unavailableScreen}>
@@ -163,10 +159,10 @@ export default function WinnersCircleScreen() {
               WINNERS CIRCLE
             </TerminalText>
             <TerminalText style={styles.unavailableCopy} tone="muted" uppercase={false} variant="body">
-              Settled category champions and brand reward winners will appear here after results are audited.
+              Weekly Goal champions and brand reward winners will appear here after results are audited.
             </TerminalText>
             <CyberButtonPrimary
-              label={isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'BACK TO RANKS'}
+              label={isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'VIEW COMPETITION'}
               onPress={() => router.replace(isAutomaticLoginView ? '/home' : '/leaderboard')}
               style={styles.closeButton}
             />
@@ -184,10 +180,13 @@ export default function WinnersCircleScreen() {
           bounces={false}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[0]}
         >
+          <CompetitionHubNav active="winners" style={styles.hubNav} />
+
           <View style={styles.header}>
             <TerminalText glow tone="pink" variant="label">
-              {`${appDataMode === 'demo' || usingSampleFallback ? 'SAMPLE RESULTS' : 'MONTHLY RESULTS'} // ${campaign.region}`}
+              {`MONTHLY RESULTS // ${campaign.region}`}
             </TerminalText>
             <TerminalText glow style={styles.title} tone="pink" variant="title">
               WINNERS CIRCLE
@@ -196,29 +195,18 @@ export default function WinnersCircleScreen() {
               {formatCompetitionMonth(completedMonthKey)}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Celebrate the seven commitment-category champions and the players
+              Celebrate the seven Weekly Goal champions and the players
               selected for physical prizes and coupon codes in the regional draw.
             </TerminalText>
           </View>
 
-          {usingSampleFallback ? (
-            <HUDBorderBox style={styles.sampleNotice} tone="amber">
-              <TerminalText glow tone="amber" variant="micro">
-                LOCAL PREVIEW // RESULTS API OFFLINE
-              </TerminalText>
-              <TerminalText style={styles.sampleNoticeCopy} tone="muted" uppercase={false} variant="caption">
-                Showing clearly labeled sample results so this development preview stays usable. Live builds continue to require audited API results.
-              </TerminalText>
-            </HUDBorderBox>
-          ) : null}
-
           <HUDBorderBox glow style={styles.summaryCard} tone="pink">
             <View style={styles.summaryMetric}>
               <TerminalText glow tone="pink" variant="value">
-                7
+                {categoryChampions.length}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
-                CATEGORY CHAMPIONS
+                GOAL CHAMPIONS
               </TerminalText>
             </View>
             <View style={styles.summaryDivider} />
@@ -234,7 +222,7 @@ export default function WinnersCircleScreen() {
 
           <View accessibilityRole="tablist" style={styles.resultTabs}>
             <ResultTab
-              label="CATEGORY CHAMPIONS"
+              label="GOAL CHAMPIONS"
               onPress={() => setSelectedResults('categories')}
               selected={selectedResults === 'categories'}
             />
@@ -249,20 +237,20 @@ export default function WinnersCircleScreen() {
             <>
               <View style={styles.sectionHeader}>
                 <TerminalText glow tone="cyan" variant="label">
-                  CATEGORY CHAMPIONS
+                  GOAL CHAMPIONS
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
-                  Highest settled category score in each commitment group.
+                  Highest settled score in each Weekly Goal group.
                 </TerminalText>
               </View>
 
               <HUDBorderBox style={styles.resultsPanel} tone="cyan">
-                {categoryChampions.map(({ goal, winner }, index) => (
+                {visibleCategoryChampions.map(({ goal, winner }, index) => (
                   <View
                     key={goal}
                     style={[
                       styles.winnerRow,
-                      index === categoryChampions.length - 1 ? styles.lastRow : null
+                      index === visibleCategoryChampions.length - 1 ? styles.lastRow : null
                     ]}
                   >
                     <View style={styles.goalBadge}>
@@ -280,7 +268,7 @@ export default function WinnersCircleScreen() {
                         textStyle={styles.winnerName}
                       />
                       <TerminalText tone="dim" variant="micro">
-                        CATEGORY CHAMPION
+                        GOAL CHAMPION
                       </TerminalText>
                     </View>
                     <View style={styles.scoreBlock}>
@@ -288,11 +276,16 @@ export default function WinnersCircleScreen() {
                         {winner.categoryEntries}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
-                        CATEGORY SCORE
+                        GOAL SCORE
                       </TerminalText>
                     </View>
                   </View>
                 ))}
+                <CompactTextButton
+                  label={showAllCategories ? 'SHOW MY GOAL GROUP' : 'VIEW ALL 7 GOAL GROUPS'}
+                  onPress={() => setShowAllCategories((current) => !current)}
+                  tone={showAllCategories ? 'muted' : 'cyan'}
+                />
               </HUDBorderBox>
             </>
           ) : (
@@ -351,13 +344,15 @@ export default function WinnersCircleScreen() {
             </>
           )}
 
-          <CyberButtonPrimary
-            disabled={closing}
-            label={closing ? 'SAVING...' : isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'BACK TO RANKS'}
-            onPress={closeWinnersCircle}
-            style={styles.closeButton}
-            tone="cyan"
-          />
+          {isAutomaticLoginView ? (
+            <CyberButtonPrimary
+              disabled={closing}
+              label={closing ? 'SAVING...' : 'ENTER GOGYMGO ->'}
+              onPress={closeWinnersCircle}
+              style={styles.closeButton}
+              tone="cyan"
+            />
+          ) : null}
         </ScreenScrollView>
       </ScreenContainer>
     </AuthGate>
@@ -415,6 +410,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     backgroundColor: colors.background
   },
+  hubNav: {
+    marginBottom: spacing.lg
+  },
   header: {
     gap: spacing.sm,
     marginBottom: spacing.lg
@@ -430,14 +428,6 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     marginBottom: spacing.xl,
     padding: spacing.lg
-  },
-  sampleNotice: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-    padding: spacing.md
-  },
-  sampleNoticeCopy: {
-    fontFamily: fontFamilies.body
   },
   summaryMetric: {
     flex: 1,

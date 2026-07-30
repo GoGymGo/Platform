@@ -33,6 +33,8 @@ import {
   type SocialUserCredential
 } from '@/services/auth/socialAuth';
 import { recordAccountLegalAcceptance } from '@/services/legalAcceptance';
+import { useAppTour } from '@/state/appTour';
+import { appTourUser } from '@/testing/appTourData';
 
 export type AuthenticatedUser = {
   displayName: string | null;
@@ -69,6 +71,44 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const { active: appTourActive } = useAppTour();
+
+  return appTourActive
+    ? <AppTourAuthProvider>{children}</AppTourAuthProvider>
+    : <FirebaseAuthProvider>{children}</FirebaseAuthProvider>;
+}
+
+function AppTourAuthProvider({ children }: PropsWithChildren) {
+  const existingResult = {
+    isNewUser: false,
+    user: appTourUser
+  } satisfies AuthSignInResult;
+  const newResult = {
+    isNewUser: true,
+    user: appTourUser
+  } satisfies AuthSignInResult;
+  const value: AuthContextValue = {
+    appleSignInAvailable: true,
+    createAccount: async () => newResult,
+    firebaseConfigured: true,
+    getIdToken: async () => 'app-tour-token',
+    googleSignInAvailable: true,
+    loading: false,
+    missingConfiguration: [],
+    refreshUser: async () => appTourUser,
+    resendVerificationEmail: async () => undefined,
+    sendPasswordReset: async () => undefined,
+    signInWithApple: async () => existingResult,
+    signInWithEmail: async () => existingResult,
+    signInWithGoogle: async () => existingResult,
+    signOutUser: async () => undefined,
+    user: appTourUser
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function FirebaseAuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
 

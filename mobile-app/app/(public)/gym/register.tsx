@@ -5,7 +5,6 @@ import { StyleSheet, View } from 'react-native';
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
@@ -147,11 +146,6 @@ export default function GymRegistrationScreen() {
             onPress={submitRequest}
           />
         </HUDBorderBox>
-
-        <CyberButtonOutline
-          label="BACK"
-          onPress={() => goBackOrReplace(router, '/join')}
-        />
       </ScreenScrollView>
     </ScreenContainer>
   );

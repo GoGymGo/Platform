@@ -12,6 +12,10 @@ import {
 } from 'react-native';
 
 import { AuthTextField } from '@/components/auth';
+import {
+  ActionFeedback,
+  RecoverableError
+} from '@/components/reliability';
 import { ChallengeHub } from '@/components/socialChallenges';
 import { UserAlias } from '@/components/streakRewards';
 import {
@@ -46,7 +50,6 @@ import {
   type SocialUser,
   type SocialUserSearchResult
 } from '@/domain/social';
-import { goBackOrReplace } from '@/navigation/goBack';
 import {
   colors,
   fontFamilies,
@@ -54,6 +57,10 @@ import {
   radii,
   spacing
 } from '@/constants/theme';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useScreenMemory } from '@/hooks/useScreenMemory';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 type Feedback = {
@@ -65,6 +72,7 @@ type SocialSection = 'friends' | 'requests' | 'challenges';
 
 export default function SocialChallengesScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { mode } = useAppData();
   const { campaign } = useSponsorCampaign();
   const profileQuery = useMySocialProfile();
@@ -80,9 +88,15 @@ export default function SocialChallengesScreen() {
   const joinRegionalChallenge = useJoinRegionalChallenge();
   const challengeCheckIn = useChallengeCheckIn();
   const respondToChallenge = useRespondToChallengeInvitation();
-  const [searchValue, setSearchValue] = useState('');
+  const [searchValue, setSearchValue] = useScreenMemory(
+    'social-challenges:search',
+    ''
+  );
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [activeSection, setActiveSection] = useState<SocialSection>('friends');
+  const [activeSection, setActiveSection] = useScreenMemory<SocialSection>(
+    'social-challenges:section',
+    'friends'
+  );
   const debouncedSearch = useDebouncedValue(searchValue, 300);
   const searchQuery = useSocialUserSearch(debouncedSearch);
   const friends = friendsQuery.data ?? [];
@@ -221,6 +235,7 @@ export default function SocialChallengesScreen() {
           bounces={false}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          memoryKey="social-challenges"
           showsVerticalScrollIndicator={false}
         >
         <Pressable
@@ -246,21 +261,43 @@ export default function SocialChallengesScreen() {
           </TerminalText>
         </View>
 
-        {mode === 'demo' ? (
-          <StatusCard
-            message="Local preview data only. Friend requests and challenges reset when this app session restarts."
-            tone="amber"
-          />
-        ) : null}
         {mode === 'unavailable' ? (
           <StatusCard
             message="The social service is offline. Connect Firebase and the GoGymGo API to use friends and challenges."
             tone="amber"
           />
         ) : null}
-        {feedback ? <StatusCard message={feedback.message} tone={feedback.tone} /> : null}
+        {feedback ? (
+          <ActionFeedback message={feedback.message} tone={feedback.tone} />
+        ) : null}
         {dataError ? (
-          <StatusCard message={getErrorMessage(dataError)} tone="red" />
+          <RecoverableError
+            body={getErrorMessage(dataError)}
+            onRetry={() => {
+              void recordFlowMetric(
+                user?.uid,
+                'flow-retry',
+                'weekly-challenge'
+              );
+              void Promise.all([
+                profileQuery.refetch(),
+                friendsQuery.refetch(),
+                requestsQuery.refetch(),
+                challengesQuery.refetch(),
+                regionalChallengesQuery.refetch(),
+                ...(searchQuery.isError ? [searchQuery.refetch()] : [])
+              ]);
+            }}
+            retrying={[
+              profileQuery,
+              friendsQuery,
+              requestsQuery,
+              challengesQuery,
+              regionalChallengesQuery,
+              searchQuery
+            ].some(({ isFetching }) => isFetching)}
+            title="COULD NOT LOAD SOCIAL DATA"
+          />
         ) : null}
 
         <SocialSectionTabs

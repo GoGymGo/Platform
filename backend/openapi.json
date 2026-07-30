@@ -1385,6 +1385,250 @@
         "tags": ["sessions"]
       }
     },
+    "/v1/legal-documents/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [
+          {
+            "name": "jurisdictionCode",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "GLOBAL", "type": "string" }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "en", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentLegalDocumentsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the current server-authoritative legal document bundle for a jurisdiction and locale",
+        "tags": ["legal-documents"]
+      }
+    },
+    "/v1/me/legal-receipts/status": {
+      "get": {
+        "operationId": "getStatus",
+        "parameters": [
+          {
+            "name": "jurisdictionCode",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "GLOBAL", "type": "string" }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "en", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return this account current legal receipt status",
+        "tags": ["legal-receipts"]
+      }
+    },
+    "/v1/me/legal-receipts": {
+      "post": {
+        "operationId": "record",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLegalReceiptBundleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Atomically record receipts for the exact current legal bundle",
+        "tags": ["legal-receipts"]
+      }
+    },
+    "/v1/operator/configuration/legal-documents": {
+      "post": {
+        "operationId": "publish",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Publish an immutable legal document version",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
+      "post": {
+        "operationId": "withdraw",
+        "parameters": [
+          {
+            "name": "legalDocumentId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Withdraw an immutable legal document version",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/me/verification-consents/device-presence": {
+      "get": {
+        "operationId": "getStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConsentStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the current device-presence and QR-camera consent status",
+        "tags": ["verification-consents"]
+      },
+      "put": {
+        "operationId": "setStatus",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVerificationConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConsentStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Grant or withdraw device-presence and QR-camera consent",
+        "tags": ["verification-consents"]
+      }
+    },
     "/v1/competitions/current": {
       "get": {
         "operationId": "getCurrent",
@@ -1395,7 +1639,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CompetitionResponseDto"
+                  "allOf": [
+                    { "$ref": "#/components/schemas/CompetitionResponseDto" }
+                  ],
+                  "nullable": true
                 }
               }
             }
@@ -1416,7 +1663,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EnrollmentResponseDto" }
+                  ],
+                  "nullable": true
                 }
               }
             }
@@ -1729,193 +1979,6 @@
         "tags": ["competitions"]
       }
     },
-    "/v1/legal-documents/current": {
-      "get": {
-        "operationId": "getCurrent",
-        "parameters": [
-          {
-            "name": "jurisdictionCode",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "GLOBAL", "type": "string" }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "en", "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentLegalDocumentsResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Return the current server-authoritative legal document bundle for a jurisdiction and locale",
-        "tags": ["legal-documents"]
-      }
-    },
-    "/v1/me/legal-receipts/status": {
-      "get": {
-        "operationId": "getStatus",
-        "parameters": [
-          {
-            "name": "jurisdictionCode",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "GLOBAL", "type": "string" }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "en", "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return this account current legal receipt status",
-        "tags": ["legal-receipts"]
-      }
-    },
-    "/v1/me/legal-receipts": {
-      "post": {
-        "operationId": "record",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordLegalReceiptBundleDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Atomically record receipts for the exact current legal bundle",
-        "tags": ["legal-receipts"]
-      }
-    },
-    "/v1/operator/configuration/legal-documents": {
-      "post": {
-        "operationId": "publish",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PublishLegalDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Publish an immutable legal document version",
-        "tags": ["operator-configuration"]
-      }
-    },
-    "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
-      "post": {
-        "operationId": "withdraw",
-        "parameters": [
-          {
-            "name": "legalDocumentId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Withdraw an immutable legal document version",
-        "tags": ["operator-configuration"]
-      }
-    },
     "/v1/me/privacy-requests": {
       "post": {
         "operationId": "create",
@@ -2165,7 +2228,7 @@
             "name": "regionCode",
             "required": true,
             "in": "query",
-            "schema": { "example": "CA-BC-DEMO", "type": "string" }
+            "schema": { "example": "CA-BC", "type": "string" }
           }
         ],
         "responses": {
@@ -2174,7 +2237,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CurrentRegionVerificationResponseDto"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/CurrentRegionVerificationResponseDto"
+                    }
+                  ],
+                  "nullable": true
                 }
               }
             }
@@ -2256,7 +2324,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SettledCompetitionResponseDto"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SettledCompetitionResponseDto"
+                    }
+                  ],
+                  "nullable": true
                 }
               }
             }
@@ -2424,42 +2497,6 @@
         "security": [{ "firebase": [] }],
         "summary": "List my planned creator workouts",
         "tags": ["creator workouts"]
-      }
-    },
-    "/v1/demo-verifications/check-ins": {
-      "post": {
-        "operationId": "createCheckIn",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateDemoCheckInDto" }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoCheckInResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Create a non-eligible Canada demo checkpoint without collecting evidence",
-        "tags": ["demo-verification"]
       }
     },
     "/v1/social/users": {
@@ -2978,6 +3015,27 @@
         "tags": ["streaks"]
       }
     },
+    "/v1/me/sponsor-ad-placements": {
+      "get": {
+        "operationId": "getMyPlacementInventory",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SponsorAdPlacementInventoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return non-delivering sponsor placement placeholders and enrollment eligibility",
+        "tags": ["sponsor ads"]
+      }
+    },
     "/v1/leaderboards/current": {
       "get": {
         "operationId": "getCurrentLeaderboard",
@@ -2995,7 +3053,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CategoryLeaderboardDto"
+                  "allOf": [
+                    { "$ref": "#/components/schemas/CategoryLeaderboardDto" }
+                  ],
+                  "nullable": true
                 }
               }
             }
@@ -3016,7 +3077,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CompetitionProgressResponseDto"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/CompetitionProgressResponseDto"
+                    }
+                  ],
+                  "nullable": true
                 }
               }
             }
@@ -3466,7 +3532,7 @@
           },
           "status": { "type": "string" },
           "createdAt": { "type": "string", "format": "date-time" },
-          "regionCode": { "type": "string", "example": "CA-BC-DEMO" },
+          "regionCode": { "type": "string", "example": "CA-BC" },
           "verificationMethod": {
             "type": "string",
             "enum": ["device_location", "manual_review", "postal_code"]
@@ -3941,6 +4007,8 @@
           "title",
           "description",
           "rewardType",
+          "imageUrl",
+          "termsUrl",
           "inventoryRemaining",
           "inventoryTotal"
         ]
@@ -3971,8 +4039,10 @@
           "rewardType",
           "sponsorName",
           "title",
+          "imageUrl",
           "awardRank",
-          "awardedAt"
+          "awardedAt",
+          "claimedAt"
         ]
       },
       "ClaimRewardResponseDto": {
@@ -4004,8 +4074,13 @@
           "rewardType",
           "sponsorName",
           "title",
+          "imageUrl",
           "awardRank",
-          "awardedAt"
+          "awardedAt",
+          "claimedAt",
+          "couponCode",
+          "claimUrl",
+          "fulfillmentInstructions"
         ]
       },
       "CreateSessionDto": {
@@ -4137,216 +4212,6 @@
           "violations"
         ]
       },
-      "CompetitionRulesResponseDto": {
-        "type": "object",
-        "properties": {
-          "minSessionMinutes": { "type": "number" },
-          "minHeartRateSamples": { "type": "number" },
-          "requireDeviceAttestation": { "type": "boolean" },
-          "requireFaceCheck": { "type": "boolean" },
-          "requireGymQr": { "type": "boolean" },
-          "signupPrizeDrawEntries": { "type": "number" },
-          "verifiedSessionCategoryScore": { "type": "number" },
-          "verifiedSessionPrizeDrawEntries": { "type": "number" }
-        },
-        "required": [
-          "minSessionMinutes",
-          "minHeartRateSamples",
-          "requireDeviceAttestation",
-          "requireFaceCheck",
-          "requireGymQr",
-          "signupPrizeDrawEntries",
-          "verifiedSessionCategoryScore",
-          "verifiedSessionPrizeDrawEntries"
-        ]
-      },
-      "CompetitionResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "monthKey": { "type": "string" },
-          "name": { "type": "string" },
-          "status": {
-            "type": "string",
-            "enum": [
-              "draft",
-              "registration",
-              "active",
-              "settling",
-              "settled",
-              "cancelled"
-            ]
-          },
-          "regionCode": { "type": "string" },
-          "regionName": { "type": "string" },
-          "rulesVersion": { "type": "string" },
-          "rules": {
-            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
-          },
-          "goalDays": { "type": "array", "items": { "type": "number" } },
-          "registrationOpensAt": { "type": "string", "format": "date-time" },
-          "registrationClosesAt": { "type": "string", "format": "date-time" },
-          "startsAt": { "type": "string", "format": "date-time" },
-          "endsAt": { "type": "string", "format": "date-time" }
-        },
-        "required": [
-          "id",
-          "monthKey",
-          "name",
-          "status",
-          "regionCode",
-          "regionName",
-          "rulesVersion",
-          "rules",
-          "goalDays",
-          "registrationOpensAt",
-          "registrationClosesAt",
-          "startsAt",
-          "endsAt"
-        ]
-      },
-      "EnrollmentResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "goalDays": { "type": "number" },
-          "status": {
-            "type": "string",
-            "enum": ["active", "withdrawn", "disqualified"]
-          },
-          "enrolledAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
-      },
-      "CreateEnrollmentDto": {
-        "type": "object",
-        "properties": {
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "regionVerificationId": { "type": "string", "format": "uuid" },
-          "legalReceiptBundleId": { "type": "string", "format": "uuid" },
-          "rulesAccepted": { "type": "boolean", "enum": [true] },
-          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
-        },
-        "required": [
-          "goalDays",
-          "regionVerificationId",
-          "rulesAccepted",
-          "ageEligibilityAttested"
-        ]
-      },
-      "EnrollmentCountResponseDto": {
-        "type": "object",
-        "properties": { "count": { "type": "number" } },
-        "required": ["count"]
-      },
-      "StreakCountsDto": {
-        "type": "object",
-        "properties": {
-          "daily": { "type": "number", "example": 3, "minimum": 0 },
-          "weekly": { "type": "number", "example": 4, "minimum": 0 },
-          "monthly": { "type": "number", "example": 2, "minimum": 0 },
-          "yearly": { "type": "number", "example": 1, "minimum": 0 }
-        },
-        "required": ["daily", "weekly", "monthly", "yearly"]
-      },
-      "CompetitionMatchResponseDto": {
-        "type": "object",
-        "properties": {
-          "availability": {
-            "type": "string",
-            "enum": ["matched", "searching", "solo"]
-          },
-          "opponentAlias": { "type": "string" },
-          "opponentVerifiedDateKeys": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
-          "region": { "type": "string" },
-          "opponentUserId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "opponentCurrentStreak": { "type": "number" },
-          "opponentBestStreak": { "type": "number" },
-          "opponentMonthlyVerifiedDays": { "type": "number" },
-          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" }
-        },
-        "required": [
-          "availability",
-          "opponentAlias",
-          "opponentVerifiedDateKeys",
-          "periodIndex",
-          "region",
-          "opponentCurrentStreak",
-          "opponentBestStreak",
-          "opponentMonthlyVerifiedDays",
-          "opponentStreaks"
-        ]
-      },
-      "EligibleWeeklyChallengePartnerDto": {
-        "type": "object",
-        "properties": {
-          "userId": { "type": "string", "format": "uuid" },
-          "alias": { "type": "string" },
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "requestStatus": {
-            "type": "string",
-            "enum": ["available", "pending"]
-          },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
-        },
-        "required": ["userId", "alias", "goalDays", "requestStatus", "streaks"]
-      },
-      "WeeklyChallengeRequestResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
-          "partnerAlias": { "type": "string" },
-          "partnerUserId": { "type": "string", "format": "uuid" },
-          "partnerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "status": {
-            "type": "string",
-            "enum": ["accepted", "cancelled", "declined", "pending"]
-          },
-          "createdAt": { "type": "string", "format": "date-time" }
-        },
-        "required": [
-          "id",
-          "competitionId",
-          "direction",
-          "partnerAlias",
-          "partnerUserId",
-          "partnerStreaks",
-          "periodIndex",
-          "goalDays",
-          "status",
-          "createdAt"
-        ]
-      },
-      "CreateWeeklyChallengeRequestDto": {
-        "type": "object",
-        "properties": {
-          "region": { "type": "string" },
-          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
-          "period": { "type": "number", "maximum": 4, "minimum": 1 },
-          "recipientUserId": { "type": "string", "format": "uuid" }
-        },
-        "required": ["region", "goal", "period", "recipientUserId"]
-      },
-      "WeeklyChallengeRequestDecisionDto": {
-        "type": "object",
-        "properties": {
-          "decision": { "type": "string", "enum": ["accepted", "declined"] }
-        },
-        "required": ["decision"]
-      },
       "LegalDocumentSectionDto": {
         "type": "object",
         "properties": {
@@ -4463,7 +4328,9 @@
           "documents",
           "jurisdictionCode",
           "locale",
-          "complete"
+          "complete",
+          "receiptBundleId",
+          "acceptedAt"
         ]
       },
       "LegalReceiptItemDto": {
@@ -4555,6 +4422,264 @@
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 }
         },
         "required": ["reason"]
+      },
+      "VerificationConsentStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "accepted": { "type": "boolean" },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "consentKey": {
+            "type": "string",
+            "enum": ["device_presence_qr_camera"],
+            "example": "device_presence_qr_camera"
+          },
+          "consentVersion": { "type": "string", "example": "2026-07-05" },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "accepted",
+          "acceptedAt",
+          "consentKey",
+          "consentVersion",
+          "updatedAt",
+          "withdrawnAt"
+        ]
+      },
+      "SetVerificationConsentDto": {
+        "type": "object",
+        "properties": {
+          "accepted": { "type": "boolean" },
+          "consentVersion": {
+            "type": "string",
+            "example": "2026-07-05",
+            "maxLength": 64
+          }
+        },
+        "required": ["accepted", "consentVersion"]
+      },
+      "CompetitionRulesResponseDto": {
+        "type": "object",
+        "properties": {
+          "minSessionMinutes": { "type": "number" },
+          "minHeartRateSamples": { "type": "number" },
+          "requireDeviceAttestation": { "type": "boolean" },
+          "requireFaceCheck": { "type": "boolean" },
+          "requireGymQr": { "type": "boolean" },
+          "signupPrizeDrawEntries": { "type": "number" },
+          "verifiedSessionCategoryScore": { "type": "number" },
+          "verifiedSessionPrizeDrawEntries": { "type": "number" }
+        },
+        "required": [
+          "minSessionMinutes",
+          "minHeartRateSamples",
+          "requireDeviceAttestation",
+          "requireFaceCheck",
+          "requireGymQr",
+          "signupPrizeDrawEntries",
+          "verifiedSessionCategoryScore",
+          "verifiedSessionPrizeDrawEntries"
+        ]
+      },
+      "CompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "monthKey": { "type": "string" },
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "registration",
+              "active",
+              "settling",
+              "settled",
+              "cancelled"
+            ]
+          },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "rulesVersion": { "type": "string" },
+          "rules": {
+            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
+          },
+          "goalDays": { "type": "array", "items": { "type": "number" } },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "monthKey",
+          "name",
+          "status",
+          "regionCode",
+          "regionName",
+          "rulesVersion",
+          "rules",
+          "goalDays",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "EnrollmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "goalDays": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "withdrawn", "disqualified"]
+          },
+          "enrolledAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
+      },
+      "CreateEnrollmentDto": {
+        "type": "object",
+        "properties": {
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "regionVerificationId": { "type": "string", "format": "uuid" },
+          "legalReceiptBundleId": { "type": "string", "format": "uuid" },
+          "rulesAccepted": { "type": "boolean", "enum": [true] },
+          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
+        },
+        "required": [
+          "goalDays",
+          "regionVerificationId",
+          "legalReceiptBundleId",
+          "rulesAccepted",
+          "ageEligibilityAttested"
+        ]
+      },
+      "EnrollmentCountResponseDto": {
+        "type": "object",
+        "properties": { "count": { "type": "number" } },
+        "required": ["count"]
+      },
+      "StreakCountsDto": {
+        "type": "object",
+        "properties": {
+          "daily": { "type": "number", "example": 3, "minimum": 0 },
+          "weekly": { "type": "number", "example": 4, "minimum": 0 },
+          "monthly": { "type": "number", "example": 2, "minimum": 0 },
+          "yearly": { "type": "number", "example": 1, "minimum": 0 }
+        },
+        "required": ["daily", "weekly", "monthly", "yearly"]
+      },
+      "CompetitionMatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": ["matched", "searching", "solo"]
+          },
+          "opponentAlias": { "type": "string" },
+          "opponentVerifiedDateKeys": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "region": { "type": "string" },
+          "opponentUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "opponentCurrentStreak": { "type": "number" },
+          "opponentBestStreak": { "type": "number" },
+          "opponentMonthlyVerifiedDays": { "type": "number" },
+          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": [
+          "availability",
+          "opponentAlias",
+          "opponentVerifiedDateKeys",
+          "periodIndex",
+          "region",
+          "opponentCurrentStreak",
+          "opponentBestStreak",
+          "opponentMonthlyVerifiedDays",
+          "opponentStreaks"
+        ]
+      },
+      "EligibleWeeklyChallengePartnerDto": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string", "format": "uuid" },
+          "alias": { "type": "string" },
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "requestStatus": {
+            "type": "string",
+            "enum": ["available", "pending"]
+          },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": ["userId", "alias", "goalDays", "requestStatus", "streaks"]
+      },
+      "WeeklyChallengeRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
+          "partnerAlias": { "type": "string" },
+          "partnerUserId": { "type": "string", "format": "uuid" },
+          "partnerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["accepted", "cancelled", "declined", "pending"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "direction",
+          "partnerAlias",
+          "partnerUserId",
+          "partnerStreaks",
+          "periodIndex",
+          "goalDays",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CreateWeeklyChallengeRequestDto": {
+        "type": "object",
+        "properties": {
+          "region": { "type": "string" },
+          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "period": { "type": "number", "maximum": 4, "minimum": 1 },
+          "recipientUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["region", "goal", "period", "recipientUserId"]
+      },
+      "WeeklyChallengeRequestDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["decision"]
       },
       "CreatePrivacyRequestDto": {
         "type": "object",
@@ -4717,6 +4842,47 @@
           "workEmail"
         ]
       },
+      "CurrentRegionVerificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "method": {
+            "type": "string",
+            "enum": ["device_location", "postal_code", "manual_review"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "approved", "rejected", "expired"]
+          },
+          "policyVersion": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "regionCode": { "type": "string", "example": "CA-BC" },
+          "regionName": { "type": "string", "example": "British Columbia" },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "method",
+          "status",
+          "policyVersion",
+          "createdAt",
+          "regionCode",
+          "regionName",
+          "reviewedAt",
+          "expiresAt"
+        ]
+      },
       "RegionPolicyResponseDto": {
         "type": "object",
         "properties": {
@@ -4756,63 +4922,15 @@
           "validTo"
         ]
       },
-      "CurrentRegionVerificationResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "regionPolicyId": { "type": "string", "format": "uuid" },
-          "method": {
-            "type": "string",
-            "enum": ["device_location", "postal_code", "manual_review"]
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "approved", "rejected", "expired"]
-          },
-          "policyVersion": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "regionCode": { "type": "string", "example": "CA-BC-DEMO" },
-          "regionName": {
-            "type": "string",
-            "example": "British Columbia Demo"
-          },
-          "reviewedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "regionPolicyId",
-          "method",
-          "status",
-          "policyVersion",
-          "createdAt",
-          "regionCode",
-          "regionName",
-          "reviewedAt",
-          "expiresAt"
-        ]
-      },
       "CreateRegionVerificationDto": {
         "type": "object",
         "properties": {
           "regionPolicyId": { "type": "string", "format": "uuid" },
-          "method": {
-            "type": "string",
-            "enum": ["device_location", "postal_code"]
-          },
+          "method": { "type": "string", "enum": ["device_location"] },
           "latitude": { "type": "number", "maximum": 90, "minimum": -90 },
-          "longitude": { "type": "number", "maximum": 180, "minimum": -180 },
-          "postalCode": { "type": "string" }
+          "longitude": { "type": "number", "maximum": 180, "minimum": -180 }
         },
-        "required": ["regionPolicyId", "method"]
+        "required": ["regionPolicyId", "method", "latitude", "longitude"]
       },
       "RegionVerificationResponseDto": {
         "type": "object",
@@ -4839,6 +4957,15 @@
           "createdAt"
         ]
       },
+      "SettledCompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "competitionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "rewardCount": { "type": "number", "minimum": 0 }
+        },
+        "required": ["competitionName", "monthKey", "rewardCount"]
+      },
       "RewardWinnerResponseDto": {
         "type": "object",
         "properties": {
@@ -4857,15 +4984,6 @@
           "rewardType",
           "streaks"
         ]
-      },
-      "SettledCompetitionResponseDto": {
-        "type": "object",
-        "properties": {
-          "competitionName": { "type": "string" },
-          "monthKey": { "type": "string" },
-          "rewardCount": { "type": "number", "minimum": 0 }
-        },
-        "required": ["competitionName", "monthKey", "rewardCount"]
       },
       "CreatorWorkoutResponseDto": {
         "type": "object",
@@ -4896,6 +5014,8 @@
           "creatorName",
           "durationMinutes",
           "regionCodes",
+          "sponsorName",
+          "thumbnailUrl",
           "videoUrl",
           "workoutStyle"
         ]
@@ -4984,47 +5104,9 @@
           "workoutName",
           "creatorName",
           "plannedDate",
+          "note",
           "durationMinutes",
           "workoutStyle"
-        ]
-      },
-      "CreateDemoCheckInDto": {
-        "type": "object",
-        "properties": {
-          "regionCode": {
-            "type": "string",
-            "enum": ["CA-BC"],
-            "example": "CA-BC"
-          },
-          "checkpointType": { "type": "string", "enum": ["session_start"] }
-        },
-        "required": ["regionCode", "checkpointType"]
-      },
-      "DemoCheckInResponseDto": {
-        "type": "object",
-        "properties": {
-          "demo": { "type": "boolean" },
-          "expiresAt": { "type": "string", "format": "date-time" },
-          "id": { "type": "string", "format": "uuid" },
-          "issuedAt": { "type": "string", "format": "date-time" },
-          "outcome": { "type": "string", "enum": ["simulated"] },
-          "provider": { "type": "string", "enum": ["canada_demo"] },
-          "regionCode": {
-            "type": "string",
-            "enum": ["CA-BC"],
-            "example": "CA-BC"
-          },
-          "checkpointType": { "type": "string", "enum": ["session_start"] }
-        },
-        "required": [
-          "demo",
-          "expiresAt",
-          "id",
-          "issuedAt",
-          "outcome",
-          "provider",
-          "regionCode",
-          "checkpointType"
         ]
       },
       "UserSearchResultDto": {
@@ -5373,6 +5455,93 @@
           "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
         },
         "required": ["asOfDate", "timezone", "streaks"]
+      },
+      "SponsorAdPlacementResponseDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "creator_workout_launch_video",
+              "member_screen_banner",
+              "post_login_video",
+              "rewards_marketplace_video",
+              "verified_workout_completion_video",
+              "weekly_challenge_result_video",
+              "winners_circle_video"
+            ]
+          },
+          "format": { "type": "string", "enum": ["banner", "video"] },
+          "deliveryMode": {
+            "type": "string",
+            "enum": ["automatic", "inline", "opt_in"]
+          },
+          "durationSeconds": { "type": "number", "nullable": true },
+          "trigger": { "type": "string" },
+          "frequencyPolicy": { "type": "string" },
+          "requiresActiveEnrollment": { "type": "boolean" },
+          "excludedContexts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "account_data",
+                "active_workout",
+                "authentication",
+                "creator_submission",
+                "legal_privacy",
+                "onboarding",
+                "public"
+              ]
+            }
+          },
+          "eligibilitySatisfied": { "type": "boolean" },
+          "status": { "type": "string", "enum": ["placeholder"] },
+          "creativeReady": { "type": "boolean" },
+          "creativeId": { "type": "string", "nullable": true },
+          "mediaUrl": { "type": "string", "format": "uri", "nullable": true },
+          "trackingEnabled": { "type": "boolean" }
+        },
+        "required": [
+          "key",
+          "format",
+          "deliveryMode",
+          "durationSeconds",
+          "trigger",
+          "frequencyPolicy",
+          "requiresActiveEnrollment",
+          "excludedContexts",
+          "eligibilitySatisfied",
+          "status",
+          "creativeReady",
+          "creativeId",
+          "mediaUrl",
+          "trackingEnabled"
+        ]
+      },
+      "SponsorAdPlacementInventoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "implementationStatus": { "type": "string", "enum": ["placeholder"] },
+          "visualDeliveryEnabled": { "type": "boolean" },
+          "competitionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "placements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SponsorAdPlacementResponseDto"
+            }
+          }
+        },
+        "required": [
+          "implementationStatus",
+          "visualDeliveryEnabled",
+          "competitionId",
+          "placements"
+        ]
       },
       "CategoryLeaderboardRowDto": {
         "type": "object",

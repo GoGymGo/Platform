@@ -62,8 +62,7 @@ export type ProfileMediaStatus =
 export type LegalReceiptRequirement = 'accept' | 'acknowledge' | 'none';
 export type LegalDocumentState = 'published' | 'withdrawn';
 export type LegalReceiptAction = 'accept' | 'acknowledge';
-export type DemoVerificationCheckpointType = 'session_start';
-export type DemoVerificationOutcome = 'simulated';
+export type VerificationConsentAction = 'granted' | 'withdrawn';
 export type FriendRequestStatus = 'accepted' | 'declined' | 'pending';
 export type SocialChallengeStatus = 'active' | 'archived';
 export type SocialChallengeType = 'friend' | 'regional';
@@ -355,6 +354,16 @@ export interface AccountLegalReceiptsTable {
   accepted_at: Timestamp;
 }
 
+export interface AccountVerificationConsentEventsTable {
+  id: Generated<string>;
+  user_id: string;
+  consent_key: 'device_presence_qr_camera';
+  consent_version: string;
+  action: VerificationConsentAction;
+  request_id: string;
+  created_at: Timestamp;
+}
+
 export interface CompetitionEnrollmentsTable {
   id: Generated<string>;
   competition_id: string;
@@ -424,19 +433,6 @@ export interface SessionEventsTable {
   occurred_at: Timestamp;
   received_at: Timestamp;
   payload: ColumnType<JsonValue, JsonValue, never>;
-}
-
-export interface DemoVerificationCheckpointsTable {
-  id: Generated<string>;
-  user_id: string;
-  provider: 'canada_demo';
-  region_code: string;
-  checkpoint_type: DemoVerificationCheckpointType;
-  outcome: DemoVerificationOutcome;
-  demo: true;
-  issued_at: Timestamp;
-  expires_at: Timestamp;
-  created_at: Timestamp;
 }
 
 export interface EntryLedgerTable {
@@ -670,6 +666,7 @@ export interface WorkerHeartbeatsTable {
 export interface Database {
   account_legal_receipt_bundles: AccountLegalReceiptBundlesTable;
   account_legal_receipts: AccountLegalReceiptsTable;
+  account_verification_consent_events: AccountVerificationConsentEventsTable;
   competition_draws: CompetitionDrawsTable;
   competition_enrollments: CompetitionEnrollmentsTable;
   competition_goal_brackets: CompetitionGoalBracketsTable;
@@ -679,7 +676,6 @@ export interface Database {
   competition_rule_acceptances: CompetitionRuleAcceptancesTable;
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;
-  demo_verification_checkpoints: DemoVerificationCheckpointsTable;
   entry_ledger: EntryLedgerTable;
   friend_requests: FriendRequestsTable;
   friendships: FriendshipsTable;

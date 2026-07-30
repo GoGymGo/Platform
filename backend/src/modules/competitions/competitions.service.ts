@@ -12,6 +12,7 @@ import { IdempotencyService } from '../../common/idempotency/idempotency.service
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
+import { VerificationConsentsService } from '../legal/verification-consents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import {
   calculateStreaks,
@@ -70,6 +71,7 @@ export class CompetitionsService {
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
     private readonly legalDocuments: LegalDocumentsService,
+    private readonly verificationConsents: VerificationConsentsService,
     private readonly profiles: ProfilesService,
   ) {}
 
@@ -359,13 +361,16 @@ export class CompetitionsService {
           `${verification.country_code}-${verification.subdivision_code}`,
           request.legalReceiptBundleId,
         );
+        await this.verificationConsents.assertActiveDevicePresenceConsent(
+          transaction,
+          user.id,
+        );
 
         const acceptance = await transaction
           .insertInto('competition_rule_acceptances')
           .values({
             accepted_at: now,
-            account_legal_receipt_bundle_id:
-              request.legalReceiptBundleId ?? null,
+            account_legal_receipt_bundle_id: request.legalReceiptBundleId,
             age_eligibility_attested: request.ageEligibilityAttested,
             competition_id: competition.id,
             metadata: {

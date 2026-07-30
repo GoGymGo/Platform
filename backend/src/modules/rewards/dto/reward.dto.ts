@@ -67,10 +67,10 @@ export class RewardCatalogItemResponseDto {
   @ApiProperty({ enum: ['coupon', 'physical'], type: String })
   rewardType!: RewardType;
 
-  @ApiPropertyOptional({ format: 'uri', nullable: true, type: String })
+  @ApiProperty({ format: 'uri', nullable: true, type: String })
   imageUrl!: string | null;
 
-  @ApiPropertyOptional({ format: 'uri', nullable: true, type: String })
+  @ApiProperty({ format: 'uri', nullable: true, type: String })
   termsUrl!: string | null;
 
   @ApiProperty({ minimum: 0, type: Number })
@@ -98,7 +98,7 @@ export class RewardAwardResponseDto {
   @ApiProperty({ type: String })
   title!: string;
 
-  @ApiPropertyOptional({ format: 'uri', nullable: true, type: String })
+  @ApiProperty({ format: 'uri', nullable: true, type: String })
   imageUrl!: string | null;
 
   @ApiProperty({ minimum: 1, type: Number })
@@ -107,18 +107,18 @@ export class RewardAwardResponseDto {
   @ApiProperty({ format: 'date-time', type: String })
   awardedAt!: string;
 
-  @ApiPropertyOptional({ format: 'date-time', nullable: true, type: String })
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
   claimedAt!: string | null;
 }
 
 export class ClaimRewardResponseDto extends RewardAwardResponseDto {
-  @ApiPropertyOptional({ nullable: true, type: String })
+  @ApiProperty({ nullable: true, type: String })
   couponCode!: string | null;
 
-  @ApiPropertyOptional({ format: 'uri', nullable: true, type: String })
+  @ApiProperty({ format: 'uri', nullable: true, type: String })
   claimUrl!: string | null;
 
-  @ApiPropertyOptional({ nullable: true, type: String })
+  @ApiProperty({ nullable: true, type: String })
   fulfillmentInstructions!: string | null;
 }
 

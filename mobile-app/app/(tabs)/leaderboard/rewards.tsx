@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Image, Linking, StyleSheet, View } from 'react-native';
 
@@ -9,6 +9,9 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import { CompetitionHubNav } from '@/components/competitionHubNav';
+import { CompactTextButton } from '@/components/onboarding';
+import { RecoverableError } from '@/components/reliability';
 import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useRewardCatalog } from '@/data/appDataHooks';
@@ -16,18 +19,26 @@ import {
   rewardAvailabilityLabel,
   type RewardCatalogItem
 } from '@/domain/rewards';
-import { goBackOrReplace } from '@/navigation/goBack';
+import { useScreenMemory } from '@/hooks/useScreenMemory';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function RewardMarketplaceScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [showWinnerDetails, setShowWinnerDetails] = useScreenMemory(
+    'reward-marketplace:winner-details',
+    false
+  );
   const { competitionRegion } = useCompetitionRegion();
   const { competition } = useWorkoutProgress();
-  const { data: rewards = [], isPending } = useRewardCatalog(
+  const rewardsQuery = useRewardCatalog(
     competitionRegion.id,
     competition.competitionMonthKey
   );
+  const { data: rewards = [], isPending } = rewardsQuery;
 
   return (
     <ScreenContainer>
@@ -35,18 +46,15 @@ export default function RewardMarketplaceScreen() {
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
+        memoryKey="reward-marketplace"
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
       >
-        <View style={styles.headerRow}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/leaderboard')}
-            style={styles.backButton}
-          />
-          <CyberButtonOutline
-            label="MY REWARDS"
+        <CompetitionHubNav active="rewards" style={styles.hubNav} />
+        <View style={styles.myRewardsRow}>
+          <CompactTextButton
+            label="MY REWARDS ->"
             onPress={() => router.push('/rewards/awards')}
-            style={styles.myRewardsButton}
             tone="pink"
           />
         </View>
@@ -59,13 +67,17 @@ export default function RewardMarketplaceScreen() {
             REWARD MARKETPLACE
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            These physical products and coupon codes are supplied by participating
-            brands for this region&apos;s contest. Prize Draw Entries determine your
-            chance of winning; no payment or bank account is required.
+            Browse the physical prizes and coupon codes available in this region.
+            Prize Draw Entries set your chances; no payment account is required.
           </TerminalText>
+          <CompactTextButton
+            label={showWinnerDetails ? 'HIDE WINNER DETAILS' : 'HOW WINNERS ARE SELECTED'}
+            onPress={() => setShowWinnerDetails((current) => !current)}
+            tone={showWinnerDetails ? 'muted' : 'cyan'}
+          />
         </View>
 
-        <HUDBorderBox style={styles.entryNote} tone="cyan">
+        {showWinnerDetails ? <HUDBorderBox style={styles.entryNote} tone="cyan">
           <TerminalText glow tone="cyan" variant="label">
             HOW WINNERS ARE MATCHED
           </TerminalText>
@@ -74,9 +86,19 @@ export default function RewardMarketplaceScreen() {
             reward unit. Every selected player receives the exact item shown in their
             reward award.
           </TerminalText>
-        </HUDBorderBox>
+        </HUDBorderBox> : null}
 
-        {isPending ? (
+        {rewardsQuery.isError ? (
+          <RecoverableError
+            body="The regional reward catalog could not be loaded. Retry without leaving the marketplace."
+            onRetry={() => {
+              void recordFlowMetric(user?.uid, 'flow-retry', 'reward-marketplace');
+              void rewardsQuery.refetch();
+            }}
+            retrying={rewardsQuery.isFetching}
+            title="COULD NOT LOAD REWARDS"
+          />
+        ) : isPending ? (
           <TerminalText live="polite" style={styles.empty} tone="muted" variant="label">
             LOADING REGIONAL REWARDS...
           </TerminalText>
@@ -176,14 +198,13 @@ const styles = StyleSheet.create({
     paddingBottom: 132,
     backgroundColor: colors.background
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.xl
+  hubNav: {
+    marginBottom: spacing.sm
   },
-  backButton: { width: 96, minHeight: 44 },
-  myRewardsButton: { flex: 1, maxWidth: 180, minHeight: 44 },
+  myRewardsRow: {
+    alignItems: 'flex-end',
+    marginBottom: spacing.lg
+  },
   intro: { gap: spacing.sm, marginBottom: spacing.lg },
   title: { fontFamily: fontFamilies.display },
   entryNote: { gap: spacing.sm, marginBottom: spacing.xl, padding: spacing.lg },

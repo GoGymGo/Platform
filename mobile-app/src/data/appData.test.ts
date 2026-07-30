@@ -5,48 +5,28 @@ import { createAppDataSource } from '@/data/appData';
 import type { ApiClient, ApiRequestOptions } from '@/services/api/client';
 
 describe('app data boundary', () => {
-  it('keeps demo fixtures available only in demo mode', async () => {
-    const demo = createAppDataSource('demo');
+  it('returns honest empty data when services are unavailable', async () => {
+    const unavailable = createAppDataSource('unavailable');
 
-    assert.ok((await demo.getCreatorWorkouts()).length > 0);
-    assert.ok((await demo.getRewardCatalog('toronto', '2026-08')).length > 0);
-    const leaderboard = await demo.getCategoryLeaderboard(4);
-    assert.equal(leaderboard?.rows.length, 10);
-    assert.deepEqual(leaderboard?.rows[0]?.streaks, {
-      daily: 18,
-      monthly: 5,
-      weekly: 9,
-      yearly: 2
-    });
-    assert.equal(await demo.getCompetitionEnrollmentCount('TORONTO', '2026-08'), 84);
-    assert.deepEqual((await demo.getMyStreaks())?.streaks, {
-      daily: 3,
-      monthly: 2,
-      weekly: 4,
-      yearly: 1
-    });
-    assert.notEqual(await demo.getSettledCompetition(), null);
-  });
-
-  it('returns honest empty data when production services are unavailable', async () => {
-    const production = createAppDataSource('unavailable');
-
-    assert.deepEqual(await production.getCreatorWorkouts(), []);
-    assert.deepEqual(await production.getRewardCatalog('toronto'), []);
-    assert.deepEqual(await production.getMyRewardAwards(), []);
-    assert.deepEqual(await production.getRewardWinners(), []);
-    assert.equal(await production.getCategoryLeaderboard(4), null);
-    assert.deepEqual(await production.getCompetitionMatches('2026-08', 4, 'TORONTO'), []);
-    assert.equal(await production.getCompetitionEnrollmentCount('TORONTO', '2026-08'), null);
-    assert.equal(await production.getMyStreaks(), null);
-    assert.equal(production.getSessionTelemetry(60), null);
-    assert.equal(await production.getSettledCompetition(), null);
+    assert.deepEqual(await unavailable.getCreatorWorkouts(), []);
+    assert.deepEqual(await unavailable.getRewardCatalog('toronto'), []);
+    assert.deepEqual(await unavailable.getMyRewardAwards(), []);
+    assert.deepEqual(await unavailable.getRewardWinners(), []);
+    assert.equal(await unavailable.getCategoryLeaderboard(4), null);
+    assert.deepEqual(await unavailable.getCompetitionMatches('2026-08', 4, 'TORONTO'), []);
+    assert.equal(await unavailable.getCompetitionEnrollmentCount('TORONTO', '2026-08'), null);
+    assert.equal(await unavailable.getMyStreaks(), null);
+    assert.equal(await unavailable.getSettledCompetition(), null);
+    await assert.rejects(
+      () => unavailable.planCreatorWorkout('workout-id', '2026-07-16'),
+      /API is not configured/i
+    );
   });
 
   it('requires an authenticated API client for API mode', () => {
     assert.throws(
       () => createAppDataSource('api'),
-      /requires a configured API client/i
+      /API client is unavailable/i
     );
   });
 
@@ -92,21 +72,4 @@ describe('app data boundary', () => {
     assert.equal(streaks?.streaks.weekly, 4);
   });
 
-  it('plans a creator workout and exposes eligible Weekly Challenge partners in demo mode', async () => {
-    const demo = createAppDataSource('demo');
-    const workout = (await demo.getCreatorWorkouts()).find(({ joined }) => joined);
-    assert.ok(workout);
-
-    const plan = await demo.planCreatorWorkout(workout.id, '2026-07-16');
-    assert.equal(plan.workoutId, workout.id);
-    assert.ok((await demo.getCreatorWorkoutPlans()).some(({ id }) => id === plan.id));
-
-    const partners = await demo.getEligibleWeeklyChallengePartners(
-      '2026-07',
-      4,
-      'TORONTO',
-      3
-    );
-    assert.ok(partners.every(({ goalDays }) => goalDays === 4));
-  });
 });

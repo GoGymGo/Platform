@@ -10,13 +10,15 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { colors, goGymGoTheme } from '@/constants/theme';
+import { ScreenLoadingState } from '@/components/cyber';
 import { AppDataProvider } from '@/data/appDataHooks';
 import { AuthProvider, useAuth } from '@/state/auth';
 import { ApiProvider } from '@/state/api';
-import { ProfileProvider } from '@/state/profile';
+import { AppTourProvider, useAppTour } from '@/state/appTour';
+import { ProfileProvider, useProfile } from '@/state/profile';
 import { CompetitionRegionProvider } from '@/state/competitionRegion';
 import { SponsorCampaignProvider } from '@/state/sponsorCampaign';
-import { WorkoutProgressProvider } from '@/state/workoutProgress';
+import { WorkoutProgressProvider, useWorkoutProgress } from '@/state/workoutProgress';
 import { useMidSessionNotificationNavigation } from '@/hooks/useMidSessionNotificationNavigation';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 
@@ -24,7 +26,7 @@ const screenOptions = {
   headerShown: false,
   contentStyle: {
     backgroundColor: colors.background
-  },
+  }
 } as const;
 
 SplashScreen.preventAutoHideAsync();
@@ -47,8 +49,8 @@ export default function RootLayout() {
   if (error) {
     return (
       <View accessibilityLiveRegion="assertive" style={styles.bootScreen}>
-        <Text style={styles.bootErrorLabel}>GOGYMGO COULD NOT START</Text>
-        <Text style={styles.bootErrorBody}>Close and reopen the app. Your account and workout history are safe.</Text>
+        <Text allowFontScaling maxFontSizeMultiplier={2} style={styles.bootErrorLabel}>GOGYMGO COULD NOT START</Text>
+        <Text allowFontScaling maxFontSizeMultiplier={2} style={styles.bootErrorBody}>Close and reopen the app. Your account and workout history are safe.</Text>
       </View>
     );
   }
@@ -57,7 +59,7 @@ export default function RootLayout() {
     return (
       <View accessibilityLiveRegion="polite" style={styles.bootScreen}>
         <ActivityIndicator color={colors.cyan} size="large" />
-        <Text style={styles.bootLabel}>LOADING GOGYMGO</Text>
+        <Text allowFontScaling maxFontSizeMultiplier={2} style={styles.bootLabel}>LOADING GOGYMGO</Text>
       </View>
     );
   }
@@ -66,12 +68,22 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <ThemeProvider value={goGymGoTheme}>
-          <AuthProvider>
-            <AuthenticatedApp reduceMotion={reduceMotion} />
-          </AuthProvider>
+          <AppTourProvider>
+            <AppRuntime reduceMotion={reduceMotion} />
+          </AppTourProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
+  const { active, scenario } = useAppTour();
+
+  return (
+    <AuthProvider key={`${active ? 'tour' : 'app'}-${scenario}`}>
+      <AuthenticatedApp reduceMotion={reduceMotion} />
+    </AuthProvider>
   );
 }
 
@@ -87,29 +99,7 @@ function AuthenticatedApp({ reduceMotion }: { reduceMotion: boolean }) {
           <CompetitionRegionProvider>
             <WorkoutProgressProvider>
               <SponsorCampaignProvider>
-              <StatusBar style="light" />
-              <Stack
-                initialRouteName="index"
-                screenOptions={{
-                  ...screenOptions,
-                  animation: reduceMotion ? 'none' : 'slide_from_right'
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(onboarding)" />
-                <Stack.Screen name="(public)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="winners-circle" />
-                <Stack.Screen name="rewards/awards" />
-                <Stack.Screen name="workout" />
-                <Stack.Screen
-                  name="(modals)"
-                  options={{
-                    presentation: 'modal'
-                  }}
-                />
-              </Stack>
+                <ReadyAppNavigation reduceMotion={reduceMotion} />
               </SponsorCampaignProvider>
             </WorkoutProgressProvider>
           </CompetitionRegionProvider>
@@ -119,9 +109,59 @@ function AuthenticatedApp({ reduceMotion }: { reduceMotion: boolean }) {
   );
 }
 
+function ReadyAppNavigation({ reduceMotion }: { reduceMotion: boolean }) {
+  const { profileReady } = useProfile();
+  const { progressReady } = useWorkoutProgress();
+
+  if (!profileReady || !progressReady) {
+    return <ScreenLoadingState body="Preparing your account and workout history." />;
+  }
+
+  return (
+    <View style={styles.navigationRoot}>
+      <StatusBar style="light" />
+      <View style={styles.stackRoot}>
+        <Stack
+          initialRouteName="index"
+          screenOptions={{
+            ...screenOptions,
+            animation: reduceMotion ? 'none' : 'slide_from_right'
+          }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="app-tour" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(onboarding)" />
+          <Stack.Screen name="(public)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="winners-circle" />
+          <Stack.Screen name="rewards/awards" />
+          <Stack.Screen name="workout" />
+          <Stack.Screen
+            name="(modals)"
+            options={{
+              presentation: 'modal'
+            }}
+          />
+        </Stack>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: colors.background
+  },
+  navigationRoot: {
+    flex: 1,
+    backgroundColor: colors.background
+  },
+  stackRoot: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
     backgroundColor: colors.background
   },
   bootScreen: {

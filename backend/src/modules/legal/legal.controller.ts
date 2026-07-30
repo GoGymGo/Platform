@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -28,9 +29,12 @@ import {
   LegalReceiptStatusResponseDto,
   PublishLegalDocumentDto,
   RecordLegalReceiptBundleDto,
+  SetVerificationConsentDto,
+  VerificationConsentStatusResponseDto,
   WithdrawLegalDocumentDto,
 } from './dto/legal.dto';
 import { LegalDocumentsService } from './legal-documents.service';
+import { VerificationConsentsService } from './verification-consents.service';
 
 @ApiTags('legal-documents')
 @Controller('legal-documents')
@@ -79,6 +83,44 @@ export class LegalReceiptsController {
     @Body() input: RecordLegalReceiptBundleDto,
   ): Promise<LegalReceiptStatusResponseDto> {
     return this.legalDocuments.recordReceiptBundle(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+}
+
+@ApiTags('verification-consents')
+@ApiBearerAuth('firebase')
+@Controller('me/verification-consents')
+export class VerificationConsentsController {
+  constructor(
+    private readonly verificationConsents: VerificationConsentsService,
+  ) {}
+
+  @Get('device-presence')
+  @ApiOperation({
+    summary: 'Return the current device-presence and QR-camera consent status',
+  })
+  @ApiOkResponse({ type: VerificationConsentStatusResponseDto })
+  getStatus(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<VerificationConsentStatusResponseDto> {
+    return this.verificationConsents.getStatus(principal);
+  }
+
+  @Put('device-presence')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Grant or withdraw device-presence and QR-camera consent',
+  })
+  @ApiOkResponse({ type: VerificationConsentStatusResponseDto })
+  setStatus(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: SetVerificationConsentDto,
+  ): Promise<VerificationConsentStatusResponseDto> {
+    return this.verificationConsents.setStatus(
       principal,
       requireIdempotencyKey(idempotencyKey),
       input,

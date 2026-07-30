@@ -45,7 +45,3 @@ export const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.t
 
 export const isGoogleAuthEnabled = process.env.EXPO_PUBLIC_ENABLE_GOOGLE_AUTH === 'true';
 export const isAppleAuthEnabled = process.env.EXPO_PUBLIC_ENABLE_APPLE_AUTH === 'true';
-const developmentMode = typeof __DEV__ !== 'undefined' && __DEV__;
-
-export const isLocalPreviewEnabled =
-  developmentMode && process.env.EXPO_PUBLIC_ENABLE_ONBOARDING_PREVIEW === 'true';

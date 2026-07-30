@@ -65,10 +65,9 @@ flowchart LR
 
 ## Frontend connection readiness
 
-The mobile app has three explicit data modes: `demo` for local product review,
-`api` for authenticated server data, and `unavailable` for a safe offline state.
-Demo data must remain presentation-equivalent to the API response contracts; it
-must never be treated as a production source of truth.
+The mobile app has two explicit data modes: `api` for server data and
+`unavailable` for honest empty/error states when the API is not configured.
+There is no local data source that can imitate production records.
 
 | Product flow | Mobile adapter | Server contract | Current status |
 | --- | --- | --- | --- |

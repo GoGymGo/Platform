@@ -40,12 +40,12 @@ describe('competition regions', () => {
   it('hydrates authoritative region verification identifiers', () => {
     assert.deepEqual(
       parseCompetitionRegionVerification(
-        '{"id":"vancouver","method":"device-location","regionCode":"CA-BC-DEMO","regionPolicyId":"policy-1","status":"verified","verificationId":"verification-1","verifiedAt":"2026-07-12T12:00:00.000Z"}'
+        '{"id":"vancouver","method":"device-location","regionCode":"CA-BC","regionPolicyId":"policy-1","status":"verified","verificationId":"verification-1","verifiedAt":"2026-07-12T12:00:00.000Z"}'
       ),
       {
         method: 'device-location',
         region: competitionRegions.find((region) => region.id === 'vancouver'),
-        regionCode: 'CA-BC-DEMO',
+        regionCode: 'CA-BC',
         regionPolicyId: 'policy-1',
         status: 'verified',
         verificationId: 'verification-1',
@@ -56,6 +56,11 @@ describe('competition regions', () => {
 
   it('rejects incomplete or legacy verification metadata', () => {
     assert.equal(parseCompetitionRegionVerification('{"id":"toronto"}'), null);
-    assert.equal(parseCompetitionRegionVerification('{"id":"unknown","method":"postal-code","status":"provisional","verifiedAt":"today"}'), null);
+    assert.equal(
+      parseCompetitionRegionVerification(
+        '{"id":"vancouver","method":"postal-code","status":"provisional","verifiedAt":"2026-07-12T12:00:00.000Z"}'
+      ),
+      null
+    );
   });
 });

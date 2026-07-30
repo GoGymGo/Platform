@@ -3,7 +3,6 @@ import {
   Equals,
   IsBoolean,
   IsInt,
-  IsOptional,
   IsString,
   IsUUID,
   IsIn,
@@ -104,10 +103,9 @@ export class CreateEnrollmentDto {
   @IsUUID()
   regionVerificationId!: string;
 
-  @ApiPropertyOptional({ format: 'uuid', type: String })
-  @IsOptional()
+  @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
-  legalReceiptBundleId?: string;
+  legalReceiptBundleId!: string;
 
   @ApiProperty({ enum: [true], type: Boolean })
   @Equals(true)

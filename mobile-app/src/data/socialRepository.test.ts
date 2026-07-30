@@ -18,27 +18,17 @@ const friendChallengeInput: CreateSocialChallengeInput = {
 };
 
 describe('social repository', () => {
-  it('runs the consent-based demo friend and challenge workflow', async () => {
-    const social = createSocialRepository('demo', null);
-    const search = await social.searchUsers('NOVA');
+  it('does not fabricate social state when the API is unavailable', async () => {
+    const social = createSocialRepository('unavailable', null);
 
-    assert.equal(search[0].relationship, 'incoming_request');
-    const incoming = (await social.listFriendRequests()).find(
-      ({ direction }) => direction === 'incoming'
+    assert.deepEqual(await social.searchUsers('NOVA'), []);
+    assert.deepEqual(await social.listFriendRequests(), []);
+    assert.deepEqual(await social.listFriends(), []);
+    assert.deepEqual(await social.listChallenges(), []);
+    await assert.rejects(
+      () => social.createChallenge(friendChallengeInput),
+      /not configured/i
     );
-    assert.ok(incoming);
-    await social.respondToFriendRequest(incoming.id, 'accepted');
-    assert.ok((await social.listFriends()).some(({ userId }) => userId === incoming.user.userId));
-
-    const challenge = await social.createChallenge({
-      ...friendChallengeInput,
-      invitedFriendUserIds: [incoming.user.userId]
-    });
-    const updated = (await social.listChallenges()).find(({ id }) => id === challenge.id);
-
-    assert.ok(updated?.members.some(
-      ({ status, userId }) => userId === incoming.user.userId && status === 'pending'
-    ));
   });
 
   it('maps production methods to the authenticated API contract', async () => {
@@ -94,6 +84,13 @@ describe('social repository', () => {
     const api = {
       request: <TResponse>(path: string, options?: { body?: unknown; method?: string }) => {
         requests.push({ body: options?.body, method: options?.method, path });
+        if (path === '/v1/streaks/me') {
+          return Promise.resolve({
+            asOfDate: '2026-07-15',
+            streaks: { daily: 2, monthly: 0, weekly: 1, yearly: 0 },
+            timezone: 'America/Vancouver'
+          }) as Promise<TResponse>;
+        }
         return Promise.resolve({
           id: 'user-1',
           screenName: 'GHOST_RUNNER'
@@ -104,6 +101,7 @@ describe('social repository', () => {
     const profile = await createSocialRepository('api', api).updateScreenName('GHOST_RUNNER');
 
     assert.equal(profile.screenName, 'GHOST_RUNNER');
+    assert.equal(profile.streaks.daily, 2);
     assert.deepEqual(requests, [
       {
         body: {
@@ -113,7 +111,8 @@ describe('social repository', () => {
         },
         method: 'PATCH',
         path: '/v1/me'
-      }
+      },
+      { body: undefined, method: undefined, path: '/v1/streaks/me' }
     ]);
   });
 

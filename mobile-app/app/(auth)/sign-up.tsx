@@ -13,9 +13,8 @@ import {
   HUDBorderBox,
   TerminalText
 } from '@/components/cyber';
-import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
+import { LegalDocumentLinks } from '@/components/legal';
 import { SocialAuthButtons } from '@/components/socialAuthButtons';
-import { accountLegalConsentLabels } from '@/constants/legal';
 import {
   getAuthErrorMessage,
   hasAuthFormErrors,
@@ -42,15 +41,12 @@ export default function SignUpScreen() {
   const [errors, setErrors] = useState<AuthFormErrors>({});
   const [formError, setFormError] = useState<string>();
   const [password, setPassword] = useState('');
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const accountLegalAccepted = privacyAccepted && termsAccepted;
   const completeSocialSignIn = async (result: AuthSignInResult) => {
     if (challengeInvite) {
       await social.redeemContactInvitation(challengeInvite);
     }
-    router.replace(result.isNewUser ? '/identity' : '/home');
+    router.replace(result.isNewUser ? '/region' : '/home');
   };
   const {
     busyProvider,
@@ -60,13 +56,12 @@ export default function SignUpScreen() {
   } = useSocialAuthFlow(completeSocialSignIn);
   const busy = submitting || Boolean(busyProvider);
   const hasSocialProviders = appleSignInAvailable || googleSignInAvailable;
+  const emailAccountReady =
+    email.trim().length > 0 &&
+    password.length > 0 &&
+    confirmPassword.length > 0;
 
   async function submitEmailAccount() {
-    if (!accountLegalAccepted) {
-      setFormError('Accept the Privacy Policy and Terms to create your account.');
-      return;
-    }
-
     const nextErrors = validateSignUpForm(email, password, confirmPassword);
     setErrors(nextErrors);
     setFormError(undefined);
@@ -80,7 +75,7 @@ export default function SignUpScreen() {
       await createAccount(email, password);
       router.replace({
         pathname: '/verify-email',
-        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'identity' }
+        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'region' }
       });
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
@@ -91,7 +86,7 @@ export default function SignUpScreen() {
 
   return (
     <AuthScreenShell
-      description="Create one secure account for your commitment, verified workouts, entries and brand rewards."
+      description="Create one secure account for your Weekly Goal, verified workouts and brand rewards."
       eyebrow="ACCOUNT SETUP"
       onBack={() => router.replace('/join')}
       title="CREATE YOUR ACCOUNT"
@@ -104,7 +99,7 @@ export default function SignUpScreen() {
               <SocialAuthButtons
                 appleAvailable={appleSignInAvailable}
                 busyProvider={busyProvider}
-                disabled={busy || !firebaseConfigured || !accountLegalAccepted}
+                disabled={busy || !firebaseConfigured}
                 googleAvailable={googleSignInAvailable}
                 onApplePress={continueWithApple}
                 onGooglePress={continueWithGoogle}
@@ -127,7 +122,11 @@ export default function SignUpScreen() {
               error={errors.email}
               keyboardType="email-address"
               label="EMAIL"
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setErrors((current) => ({ ...current, email: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="you@example.com"
               returnKeyType="next"
               textContentType="emailAddress"
@@ -138,7 +137,11 @@ export default function SignUpScreen() {
               autoComplete="new-password"
               error={errors.password}
               label="PASSWORD"
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="At least 8 characters"
               secureTextEntry
               textContentType="newPassword"
@@ -149,7 +152,11 @@ export default function SignUpScreen() {
               autoComplete="new-password"
               error={errors.confirmPassword}
               label="CONFIRM PASSWORD"
-              onChangeText={setConfirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                setErrors((current) => ({ ...current, confirmPassword: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="Repeat your password"
               secureTextEntry
               textContentType="newPassword"
@@ -157,24 +164,28 @@ export default function SignUpScreen() {
             />
             {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
-            <View style={styles.legalSection}>
-              <LegalDocumentLinks />
-              <LegalConsentCheckbox
-                checked={privacyAccepted}
-                label={accountLegalConsentLabels.privacy}
-                onToggle={() => setPrivacyAccepted((current) => !current)}
-              />
-              <LegalConsentCheckbox
-                checked={termsAccepted}
-                label={accountLegalConsentLabels.terms}
-                onToggle={() => setTermsAccepted((current) => !current)}
-              />
-            </View>
+            {!emailAccountReady ? (
+              <TerminalText tone="dim" uppercase={false} variant="caption">
+                Complete your email and both password fields to continue.
+              </TerminalText>
+            ) : null}
             <CyberButtonPrimary
-              disabled={busy || !firebaseConfigured || !accountLegalAccepted}
+              disabled={busy || !firebaseConfigured || !emailAccountReady}
               label={submitting ? 'CREATING ACCOUNT...' : 'CREATE SECURE ACCOUNT ->'}
               onPress={submitEmailAccount}
             />
+            <View style={styles.legalSection}>
+              <TerminalText
+                style={styles.legalNotice}
+                tone="dim"
+                uppercase={false}
+                variant="caption"
+              >
+                Privacy and Terms are available now. You will review and accept
+                the current versions during onboarding.
+              </TerminalText>
+              <LegalDocumentLinks compact />
+            </View>
           </HUDBorderBox>
 
         </View>
@@ -191,7 +202,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg
   },
   legalSection: {
-    gap: spacing.sm
+    alignItems: 'center',
+    gap: spacing.xs
+  },
+  legalNotice: {
+    textAlign: 'center'
   },
   divider: {
     flexDirection: 'row',

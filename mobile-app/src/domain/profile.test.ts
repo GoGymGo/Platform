@@ -2,12 +2,22 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  createPrivateIdentity,
   getPublicInitials,
   parseStoredPublicIdentity,
   resolvePublicName
 } from './profile';
 
 describe('public profile identity', () => {
+  it('creates a stable private callsign without exposing account details', () => {
+    assert.deepEqual(createPrivateIdentity('firebase-user-abc123'), {
+      callsign: 'PLAYER_ABC123',
+      displayName: '',
+      mode: 'private'
+    });
+    assert.equal(createPrivateIdentity(null).callsign, 'GOGYMGO_PLAYER');
+  });
+
   it('uses the callsign in private mode', () => {
     assert.equal(
       resolvePublicName({ callsign: 'CameronW12', displayName: 'Cameron', mode: 'private' }),

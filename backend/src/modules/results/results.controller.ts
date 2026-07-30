@@ -1,5 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';
 import {
   RewardWinnerResponseDto,
@@ -9,6 +15,7 @@ import { ResultsService } from './results.service';
 
 @ApiTags('competition results')
 @Public()
+@ApiExtraModels(SettledCompetitionResponseDto)
 @Controller('results')
 export class ResultsController {
   constructor(private readonly results: ResultsService) {}
@@ -22,7 +29,12 @@ export class ResultsController {
 
   @Get('settled-competition')
   @ApiOperation({ summary: 'Return the latest settled reward contest summary' })
-  @ApiOkResponse({ type: SettledCompetitionResponseDto })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(SettledCompetitionResponseDto) }],
+      nullable: true,
+    },
+  })
   getSettledCompetition(): Promise<SettledCompetitionResponseDto | null> {
     return this.results.getSettledCompetition();
   }

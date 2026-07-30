@@ -75,8 +75,8 @@ const commitmentRules: readonly CommitmentRule[] = [
   },
   {
     index: '09',
-    title: 'TOP THREE CATEGORY FINISHERS',
-    body: 'The Top Three Category Finishers multiply their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.',
+    title: 'TOP THREE GOAL-GROUP FINISHERS',
+    body: 'The top three finishers in each Weekly Goal group multiply their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.',
     tone: 'pink'
   },
   {
@@ -88,7 +88,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '11',
     title: 'PERFECT MONTH // FINAL 10X',
-    body: 'The Perfect Month 10x is applied last to the Weekly Challenge-adjusted, category-adjusted total plus all Bonus Day entries.',
+    body: 'The Perfect Month 10x is applied last to the Weekly Challenge-adjusted, goal-group-adjusted total plus all Bonus Day entries.',
     tone: 'pink'
   }
 ];
@@ -96,13 +96,13 @@ const commitmentRules: readonly CommitmentRule[] = [
 export default function CommitmentRulesModal() {
   const router = useRouter();
   const [expandedRuleIndex, setExpandedRuleIndex] = useState<string>('01');
-  const { campaign, economics, enrollment } = useSponsorCampaign();
+  const { campaign, enrollment } = useSponsorCampaign();
   const { weeklyGoal } = useWorkoutProgress();
   const currentRules = commitmentRules.map((rule) =>
     rule.index === '09'
       ? {
           ...rule,
-          body: `The Top Three Category Finishers receive ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x and ${campaign.economics.categoryPodiumMultipliers[3]}x multipliers on their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
+          body: `The top three finishers in each Weekly Goal group receive ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x and ${campaign.economics.categoryPodiumMultipliers[3]}x multipliers on their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
         }
       : rule.index === '10'
         ? {
@@ -116,7 +116,7 @@ export default function CommitmentRulesModal() {
     <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
         <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-          COMMITMENT RULES
+          WEEKLY GOAL RULES
         </TerminalText>
         <CyberButtonOutline
           label="CLOSE"
@@ -142,6 +142,21 @@ export default function CommitmentRulesModal() {
           </TerminalText>
         </View>
 
+        <HUDBorderBox style={styles.atGlanceCard} tone="cyan">
+          <TerminalText glow tone="cyan" variant="label">
+            RULES AT A GLANCE
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            1. Choose a goal of 1-7 verified workout days per week.
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            2. Only one verified workout per calendar day counts.
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            3. Hit all four weekly goals to earn the Perfect Month bonus.
+          </TerminalText>
+        </HUDBorderBox>
+
         <View style={styles.rulesList}>
           {currentRules.map((rule) => (
             <RuleRow
@@ -155,26 +170,21 @@ export default function CommitmentRulesModal() {
 
         <HUDBorderBox glow style={styles.summaryCard} tone="cyan">
           <TerminalText style={styles.summaryLabel} tone="muted" variant="label">
-            CURRENT PRIZE DRAW
+            REGIONAL LAUNCH
           </TerminalText>
           <TerminalText glow style={styles.summaryValue} tone="cyan" variant="title">
-            BRAND REWARDS - {economics.projectedRewardWinners.toLocaleString()} PROJECTED WINNERS
+            {enrollment.minimumEntrants} PLAYERS REQUIRED
           </TerminalText>
           <TerminalText style={styles.summaryCopy} tone="muted" uppercase={false} variant="body">
-            Hit all four Weekly Goals to unlock Prize Draw Entries and apply
-            10x. Late registrants use a reduced goal based on days left in
-            scoring week 1. The Top Three Category Finishers receive an
-            additional month-end multiplier. The regional field requires{' '}
-            {enrollment.minimumEntrants} players to launch and keeps late
-            registration open through day 6
+            Registration remains open through day 6
             {enrollment.maximumEntrants === null
-              ? ' without a cap for this campaign.'
-              : ` unless the ${enrollment.maximumEntrants.toLocaleString()}-player sponsor cap is reached first.`}
+              ? '.'
+              : ` or until the ${enrollment.maximumEntrants.toLocaleString()}-player cap is reached.`}
           </TerminalText>
         </HUDBorderBox>
 
         <CyberButtonPrimary
-          label="BACK TO COMMITMENT ->"
+          label="BACK TO WEEKLY GOAL ->"
           onPress={() => goBackOrReplace(router, '/commitment')}
         />
       </ScreenScrollView>
@@ -270,6 +280,11 @@ const styles = StyleSheet.create({
   rulesList: {
     gap: spacing.md,
     marginBottom: spacing.lg
+  },
+  atGlanceCard: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    padding: spacing.lg
   },
   ruleRow: {
     flexDirection: 'row',

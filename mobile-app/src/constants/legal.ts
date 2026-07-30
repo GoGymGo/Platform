@@ -148,11 +148,6 @@ export const biometricCameraConsent: LegalDocument = {
   ]
 };
 
-export const accountLegalConsentLabels = {
-  privacy: 'I HAVE REVIEWED THE PRIVACY POLICY.',
-  terms: 'I AGREE TO THE TERMS, OFFICIAL PRIZE DRAW RULES AND WORKOUT VERIFICATION RULES.'
-} as const;
-
 export const biometricConsentCopy = {
   title: 'DEVICE PRESENCE NOTICE',
   body:

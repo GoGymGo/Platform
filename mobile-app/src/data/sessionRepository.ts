@@ -30,7 +30,6 @@ export function createWorkoutSessionRepository(
   api: ApiClient | null
 ): WorkoutSessionRepository {
   if (mode === 'api') return createApiRepository(requireApi(api));
-  if (mode === 'demo') return createDemoRepository();
   return createUnavailableRepository();
 }
 
@@ -106,52 +105,6 @@ function createApiRepository(api: ApiClient): WorkoutSessionRepository {
   };
 }
 
-function createDemoRepository(): WorkoutSessionRepository {
-  const sessions = new Map<string, AuthoritativeWorkoutSession>();
-
-  return {
-    appendGymQrScan: async () => undefined,
-    appendHeartRateSample: async () => undefined,
-    cancelSession: async (sessionId) => {
-      const session = requireDemoSession(sessions, sessionId);
-      const cancelled = {
-        ...session,
-        completedAt: new Date().toISOString(),
-        status: 'cancelled' as const
-      };
-      sessions.set(sessionId, cancelled);
-      return cancelled;
-    },
-    completeSession: async (sessionId, clientCompletedAt) => {
-      const session = requireDemoSession(sessions, sessionId);
-      const verified = {
-        ...session,
-        completedAt: clientCompletedAt ?? new Date().toISOString(),
-        eligibleForReview: true,
-        status: 'verified' as const,
-        violations: []
-      };
-      sessions.set(sessionId, verified);
-      return verified;
-    },
-    createSession: async (competitionId) => {
-      const startedAt = new Date().toISOString();
-      const session: AuthoritativeWorkoutSession = {
-        completedAt: null,
-        competitionId,
-        eligibleDate: startedAt.slice(0, 10),
-        id: createUuid(),
-        policyVersion: 'demo-rules-v1',
-        startedAt,
-        status: 'active'
-      };
-      sessions.set(session.id, session);
-      return session;
-    },
-    getCompetitionProgress: async () => null
-  };
-}
-
 function createUnavailableRepository(): WorkoutSessionRepository {
   const unavailable = () => Promise.reject(
     new Error('The workout session service is not configured.')
@@ -164,17 +117,6 @@ function createUnavailableRepository(): WorkoutSessionRepository {
     createSession: unavailable,
     getCompetitionProgress: async () => null
   };
-}
-
-function requireDemoSession(
-  sessions: Map<string, AuthoritativeWorkoutSession>,
-  sessionId: string
-) {
-  const session = sessions.get(sessionId);
-  if (!session || session.status !== 'active') {
-    throw new Error('The active demo workout session was not found.');
-  }
-  return session;
 }
 
 function requireApi(api: ApiClient | null) {

@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
@@ -10,15 +11,55 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import {
+  RecoverableError,
+  useAccessibilityAnnouncement
+} from '@/components/reliability';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useClaimReward, useMyRewardAwards } from '@/data/appDataHooks';
 import type { ClaimedReward, RewardAward } from '@/domain/rewards';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
 
 export default function MyRewardsScreen() {
   const router = useRouter();
-  const { data: awards = [], isPending } = useMyRewardAwards();
+  const { user } = useAuth();
+  const awardsQuery = useMyRewardAwards();
+  const { data: awards = [], isPending } = awardsQuery;
   const claim = useClaimReward();
   const claimedReward = claim.data;
+  const viewedRewardsRef = useRef(false);
+  const completedClaimRef = useRef<string | null>(null);
+  const hasClaimableReward = awards.some(({ status }) => status === 'awarded');
+
+  useEffect(() => {
+    if (!hasClaimableReward || viewedRewardsRef.current) {
+      return;
+    }
+    viewedRewardsRef.current = true;
+    void recordFlowMetric(user?.uid, 'reward-claim-viewed', 'my-rewards');
+  }, [hasClaimableReward, user?.uid]);
+
+  useEffect(() => {
+    if (!claimedReward || completedClaimRef.current === claimedReward.id) {
+      return;
+    }
+    completedClaimRef.current = claimedReward.id;
+    void recordFlowMetric(user?.uid, 'reward-claim-completed', 'my-rewards');
+  }, [claimedReward, user?.uid]);
+
+  const retryClaim = () => {
+    const awardId = claim.variables?.awardId;
+    if (!awardId) {
+      return;
+    }
+    void recordFlowMetric(user?.uid, 'flow-retry', 'my-rewards');
+    claim.mutate({
+      awardId,
+      idempotencyKey: `${awardId}:${Date.now()}`
+    });
+  };
 
   return (
     <AuthGate>
@@ -26,11 +67,12 @@ export default function MyRewardsScreen() {
         <ScreenScrollView
           bounces={false}
           contentContainerStyle={styles.content}
+          memoryKey="my-rewards"
           showsVerticalScrollIndicator={false}
         >
           <CyberButtonOutline
             label="BACK TO MARKETPLACE"
-            onPress={() => router.replace('/leaderboard/rewards')}
+            onPress={() => goBackOrReplace(router, '/leaderboard/rewards')}
             style={styles.backButton}
           />
           <View style={styles.header}>
@@ -48,7 +90,17 @@ export default function MyRewardsScreen() {
 
           {claimedReward ? <ClaimResult reward={claimedReward} /> : null}
 
-          {isPending ? (
+          {awardsQuery.isError ? (
+            <RecoverableError
+              body="Your reward list could not be loaded. Retry to check for awards; no claim data has been lost."
+              onRetry={() => {
+                void recordFlowMetric(user?.uid, 'flow-retry', 'my-rewards');
+                void awardsQuery.refetch();
+              }}
+              retrying={awardsQuery.isFetching}
+              title="COULD NOT LOAD REWARDS"
+            />
+          ) : isPending ? (
             <TerminalText live="polite" style={styles.empty} tone="muted" variant="label">
               LOADING YOUR REWARDS...
             </TerminalText>
@@ -67,6 +119,7 @@ export default function MyRewardsScreen() {
                 <AwardCard
                   award={award}
                   busy={claim.isPending && claim.variables?.awardId === award.id}
+                  disabled={claim.isPending}
                   key={award.id}
                   onClaim={() => claim.mutate({
                     awardId: award.id,
@@ -77,9 +130,12 @@ export default function MyRewardsScreen() {
             </View>
           )}
           {claim.error ? (
-            <TerminalText live="assertive" tone="red" uppercase={false} variant="caption">
-              {claim.error.message}
-            </TerminalText>
+            <RecoverableError
+              body={claim.error.message}
+              onRetry={retryClaim}
+              retrying={claim.isPending}
+              title="CLAIM DID NOT COMPLETE"
+            />
           ) : null}
         </ScreenScrollView>
       </ScreenContainer>
@@ -90,10 +146,12 @@ export default function MyRewardsScreen() {
 function AwardCard({
   award,
   busy,
+  disabled,
   onClaim
 }: {
   award: RewardAward;
   busy: boolean;
+  disabled: boolean;
   onClaim: () => void;
 }) {
   const claimable = award.status === 'awarded' || award.status === 'claimed';
@@ -110,15 +168,15 @@ function AwardCard({
         OFFERED BY {award.sponsorName}
       </TerminalText>
       <TerminalText tone="muted" variant="micro">
-        STATUS {'//'} {award.status.replace('_', ' ')}
+        STATUS {'//'} {getAwardStatusLabel(award.status)}
       </TerminalText>
       {claimable ? (
         <CyberButtonPrimary
           accessibilityHint={award.status === 'claimed'
             ? 'Review the claim details for this reward'
             : 'Reveal the claim instructions for this reward'}
-          disabled={busy}
-          label={busy ? 'CLAIMING...' : award.status === 'claimed' ? 'VIEW CLAIM' : 'CLAIM REWARD'}
+          disabled={disabled}
+          label={busy ? 'Claiming...' : award.status === 'claimed' ? 'View claim' : 'Claim reward'}
           onPress={onClaim}
           style={styles.claimButton}
           tone="pink"
@@ -128,7 +186,24 @@ function AwardCard({
   );
 }
 
+function getAwardStatusLabel(status: RewardAward['status']) {
+  switch (status) {
+    case 'awarded':
+      return 'READY TO CLAIM';
+    case 'claimed':
+      return 'CLAIMED // VIEW DETAILS';
+    case 'fulfilled':
+      return 'FULFILLED';
+    case 'redeemed':
+      return 'REDEEMED';
+    case 'cancelled':
+      return 'UNAVAILABLE';
+  }
+}
+
 function ClaimResult({ reward }: { reward: ClaimedReward }) {
+  useAccessibilityAnnouncement(`${reward.title} reward claimed.`);
+
   return (
     <HUDBorderBox glow style={styles.claimResult} tone="green">
       <TerminalText glow tone="green" variant="label">
@@ -152,7 +227,7 @@ function ClaimResult({ reward }: { reward: ClaimedReward }) {
       ) : null}
       {reward.claimUrl ? (
         <CyberButtonOutline
-          label="OPEN SPONSOR CLAIM PAGE"
+          label="Open sponsor claim page"
           onPress={() => void Linking.openURL(reward.claimUrl!)}
           tone="green"
         />

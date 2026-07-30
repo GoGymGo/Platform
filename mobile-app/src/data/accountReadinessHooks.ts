@@ -123,6 +123,6 @@ function useAccountReadinessContext() {
   return {
     account,
     enabled: authenticatedQueriesEnabled && mode !== 'unavailable',
-    queryKey: ['account-readiness', user?.uid ?? 'preview'] as const
+    queryKey: ['account-readiness', user?.uid ?? 'anonymous'] as const
   };
 }

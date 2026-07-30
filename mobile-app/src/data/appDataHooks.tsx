@@ -16,7 +16,6 @@ import {
 } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import {
   createAppDataSource,
   type AppDataMode,
@@ -42,11 +41,20 @@ import type { GoalCategory } from '@/domain/campaignEconomics';
 import type { CreateCreatorVideoSubmissionInput } from '@/domain/creatorWorkouts';
 import type { RewardAward } from '@/domain/rewards';
 import { useApi } from '@/state/api';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
+import {
+  createAppTourAccountReadinessRepository,
+  createAppTourAccountSettingsRepository,
+  createAppTourDataSource,
+  createAppTourSocialRepository,
+  createAppTourWorkoutSessionRepository
+} from '@/testing/appTourData';
 
 type AppDataContextValue = {
   account: AccountReadinessRepository;
   accountSettings: AccountSettingsRepository;
+  apiQueriesEnabled: boolean;
   authenticatedQueriesEnabled: boolean;
   mode: AppDataMode;
   sessions: WorkoutSessionRepository;
@@ -58,6 +66,7 @@ const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 export function AppDataProvider({ children }: PropsWithChildren) {
   const { api } = useApi();
+  const { active: appTourActive } = useAppTour();
   const { user } = useAuth();
   const [queryClient] = useState(
     () => new QueryClient({
@@ -69,30 +78,44 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       }
     })
   );
-  const mode: AppDataMode = isLocalPreviewEnabled
-    ? 'demo'
-    : api
-      ? 'api'
-      : 'unavailable';
-  const source = useMemo(() => createAppDataSource(mode, api), [api, mode]);
-  const social = useMemo(() => createSocialRepository(mode, api), [api, mode]);
+  const mode: AppDataMode = appTourActive ? 'tour' : api ? 'api' : 'unavailable';
+  const source = useMemo(
+    () => appTourActive
+      ? createAppTourDataSource()
+      : createAppDataSource(mode, api),
+    [api, appTourActive, mode]
+  );
+  const social = useMemo(
+    () => appTourActive
+      ? createAppTourSocialRepository()
+      : createSocialRepository(mode, api),
+    [api, appTourActive, mode]
+  );
   const sessions = useMemo(
-    () => createWorkoutSessionRepository(mode, api),
-    [api, mode]
+    () => appTourActive
+      ? createAppTourWorkoutSessionRepository()
+      : createWorkoutSessionRepository(mode, api),
+    [api, appTourActive, mode]
   );
   const account = useMemo(
-    () => createAccountReadinessRepository(mode, api),
-    [api, mode]
+    () => appTourActive
+      ? createAppTourAccountReadinessRepository()
+      : createAccountReadinessRepository(mode, api),
+    [api, appTourActive, mode]
   );
   const accountSettings = useMemo(
-    () => createAccountSettingsRepository(mode, api),
-    [api, mode]
+    () => appTourActive
+      ? createAppTourAccountSettingsRepository()
+      : createAccountSettingsRepository(mode, api),
+    [api, appTourActive, mode]
   );
-  const authenticatedQueriesEnabled = mode !== 'api' || Boolean(user);
+  const apiQueriesEnabled = mode !== 'unavailable';
+  const authenticatedQueriesEnabled = apiQueriesEnabled && Boolean(user);
   const value = useMemo(
     () => ({
       account,
       accountSettings,
+      apiQueriesEnabled,
       authenticatedQueriesEnabled,
       mode,
       sessions,
@@ -102,6 +125,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
     [
       account,
       accountSettings,
+      apiQueriesEnabled,
       authenticatedQueriesEnabled,
       mode,
       sessions,
@@ -144,7 +168,7 @@ export function useAppData() {
 export function useAuthoritativeCompetitionProgress() {
   const { authenticatedQueriesEnabled, mode, sessions } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled && mode === 'api',
+    enabled: authenticatedQueriesEnabled && mode !== 'unavailable',
     queryFn: () => sessions.getCompetitionProgress(),
     queryKey: ['competition-progress']
   });
@@ -187,18 +211,18 @@ export function useCompetitionEnrollmentCount(
   region: string,
   competitionMonthKey: string
 ) {
-  const { authenticatedQueriesEnabled, source } = useAppData();
+  const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: apiQueriesEnabled,
     queryFn: () => source.getCompetitionEnrollmentCount(region, competitionMonthKey),
     queryKey: ['competition-enrollment-count', region, competitionMonthKey]
   });
 }
 
 export function useCreatorWorkouts() {
-  const { authenticatedQueriesEnabled, source } = useAppData();
+  const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: apiQueriesEnabled,
     queryFn: () => source.getCreatorWorkouts(),
     queryKey: ['creator-workouts']
   });
@@ -210,7 +234,7 @@ export function useCreatorWorkoutPlans() {
   return useQuery({
     enabled: authenticatedQueriesEnabled,
     queryFn: () => source.getCreatorWorkoutPlans(),
-    queryKey: ['creator-workout-plans', user?.uid ?? 'preview']
+    queryKey: ['creator-workout-plans', user?.uid ?? 'anonymous']
   });
 }
 
@@ -318,7 +342,7 @@ export function useMyRewardAwards() {
   return useQuery({
     enabled: authenticatedQueriesEnabled,
     queryFn: () => source.getMyRewardAwards(),
-    queryKey: ['my-reward-awards', user?.uid ?? 'preview']
+    queryKey: ['my-reward-awards', user?.uid ?? 'anonymous']
   });
 }
 
@@ -328,32 +352,32 @@ export function useMyStreaks() {
   return useQuery({
     enabled: authenticatedQueriesEnabled,
     queryFn: () => source.getMyStreaks(),
-    queryKey: ['my-streaks', user?.uid ?? 'preview']
+    queryKey: ['my-streaks', user?.uid ?? 'anonymous']
   });
 }
 
 export function useRewardCatalog(region: string, monthKey?: string) {
-  const { authenticatedQueriesEnabled, source } = useAppData();
+  const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: apiQueriesEnabled,
     queryFn: () => source.getRewardCatalog(region, monthKey),
     queryKey: ['reward-catalog', region, monthKey ?? 'current']
   });
 }
 
 export function useRewardWinners() {
-  const { authenticatedQueriesEnabled, source } = useAppData();
+  const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: apiQueriesEnabled,
     queryFn: () => source.getRewardWinners(),
     queryKey: ['reward-winners']
   });
 }
 
 export function useSettledCompetition() {
-  const { authenticatedQueriesEnabled, source } = useAppData();
+  const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: apiQueriesEnabled,
     queryFn: () => source.getSettledCompetition(),
     queryKey: ['settled-competition']
   });

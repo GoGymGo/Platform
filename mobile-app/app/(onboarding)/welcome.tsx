@@ -9,9 +9,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 type Accent = 'cyan';
 
@@ -42,9 +40,7 @@ const welcomeSteps: readonly WelcomeStep[] = [
 export default function WelcomeScreen() {
   const router = useRouter();
   const { width: viewportWidth } = useWindowDimensions();
-  const { campaign } = useSponsorCampaign();
   const compactLogo = viewportWidth < 360;
-  const sponsorConfirmed = campaign.status === 'approved';
 
   return (
     <ScreenContainer>
@@ -91,6 +87,11 @@ export default function WelcomeScreen() {
             </View>
           </View>
 
+          <TerminalText style={styles.valueProp} tone="text" uppercase={false} variant="body">
+            Complete verified workouts, compete in your region and earn chances
+            to win brand rewards.
+          </TerminalText>
+
           <HUDBorderBox style={styles.stepStrip} tone="cyan">
             {welcomeSteps.map((step) => (
               <WelcomeStepCell key={step.index} step={step} />
@@ -111,55 +112,18 @@ export default function WelcomeScreen() {
               label="SIGN IN"
               onPress={() => router.push('/sign-in')}
             />
-            {isLocalPreviewEnabled ? (
-              <CyberButtonOutline
-                label="PREVIEW APP FLOW"
-                onPress={() => router.push('/identity')}
-              />
-            ) : null}
           </View>
 
           <HUDBorderBox glow style={styles.entryPanel} tone="cyan">
-            <TerminalText style={styles.entryIntro} tone="muted" variant="label">
-              ON SIGNUP YOU RECEIVE A
-            </TerminalText>
             <TerminalText glow style={styles.entryTitle} tone="pink" variant="value">
               FREE ENTRY
             </TerminalText>
-            <TerminalText style={styles.entryActivation} tone="muted" variant="micro">
-              INTO THE MONTHLY PRIZE DRAW
+            <TerminalText style={styles.entryCopy} tone="muted" uppercase={false} variant="body">
+              Create your player account and receive one entry into the monthly
+              regional prize draw.
             </TerminalText>
-            <View style={styles.entryDetailRow}>
-              <View style={[styles.prizeBlock, !sponsorConfirmed && styles.pendingPrizeBlock]}>
-                <TerminalText tone="muted" variant="micro">
-                  PROJECTED DRAW POOL
-                </TerminalText>
-                <TerminalText
-                  glow
-                  style={[styles.prizeValue, !sponsorConfirmed && styles.prizePending]}
-                  tone={sponsorConfirmed ? 'pink' : 'cyan'}
-                  variant="title"
-                >
-                  {sponsorConfirmed ? 'PRIZES\n+ CODES' : 'PUBLISHED\nSOON'}
-                </TerminalText>
-              </View>
-              <View style={[styles.sponsorAd, !sponsorConfirmed && styles.pendingSponsorAd]}>
-                <View style={styles.sponsorAdCopy}>
-                  <TerminalText tone="dim" variant="micro">
-                    MONTH SPONSOR
-                  </TerminalText>
-                  <TerminalText style={styles.sponsorAdTitle} tone="text" variant="body">
-                    {campaign.sponsor.offerTitle}
-                  </TerminalText>
-                </View>
-              </View>
-            </View>
-            <TerminalText
-              style={styles.drawLabel}
-              tone={sponsorConfirmed ? 'pink' : 'cyan'}
-              variant="label"
-            >
-              PHYSICAL PRIZES + COUPON CODES
+            <TerminalText style={styles.drawLabel} tone="cyan" variant="label">
+              SPONSOR-FUNDED PRIZES + COUPON CODES
             </TerminalText>
           </HUDBorderBox>
 
@@ -241,6 +205,14 @@ const styles = StyleSheet.create({
     lineHeight: 48,
     letterSpacing: 0.7
   },
+  valueProp: {
+    maxWidth: 350,
+    paddingHorizontal: spacing.sm,
+    fontFamily: fontFamilies.bodyStrong,
+    fontSize: fontSizes.body,
+    lineHeight: 22,
+    textAlign: 'center'
+  },
   primaryActions: {
     width: '100%',
     gap: spacing.md,
@@ -275,71 +247,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm
   },
-  entryIntro: {
-    textAlign: 'center'
-  },
   entryTitle: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
     fontFamily: fontFamilies.display,
     textAlign: 'center'
   },
-  entryActivation: {
-    marginTop: -4,
-    marginBottom: spacing.sm,
-    fontFamily: fontFamilies.terminal,
+  entryCopy: {
+    maxWidth: 310,
+    alignSelf: 'center',
+    fontFamily: fontFamilies.body,
+    lineHeight: 21,
     textAlign: 'center'
-  },
-  entryDetailRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'stretch'
-  },
-  prizeBlock: {
-    flex: 0.82,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderPinkMuted,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  pendingPrizeBlock: {
-    borderColor: colors.borderCyanSubtle,
-    backgroundColor: colors.surfaceCyanFaint
-  },
-  prizeValue: {
-    marginTop: 2,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.titleLarge,
-    lineHeight: 28,
-    textAlign: 'center'
-  },
-  prizePending: {
-    fontSize: fontSizes.body,
-    lineHeight: 20
-  },
-  sponsorAd: {
-    flex: 1.18,
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderCyanQuiet,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceCyanWhisper
-  },
-  pendingSponsorAd: {
-    borderColor: colors.borderCyanSubtle
-  },
-  sponsorAdCopy: {
-    flex: 1
-  },
-  sponsorAdTitle: {
-    marginTop: 1,
-    fontFamily: fontFamilies.display
   },
   drawLabel: {
     marginTop: spacing.xs,

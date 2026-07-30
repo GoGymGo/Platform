@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { verifyLocalPresence } from '@/services/presenceVerification';
+import { useAppTour } from '@/state/appTour';
 
 export function usePresenceVerification() {
+  const { active: appTourActive } = useAppTour();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -12,13 +13,14 @@ export function usePresenceVerification() {
     setMessage(null);
 
     try {
+      if (appTourActive) {
+        setMessage('Presence confirmed in App Tour.');
+        return true;
+      }
+
       const result = await verifyLocalPresence();
       if (!('message' in result)) {
-        setMessage(
-          result.status === 'simulated'
-            ? 'Demo presence check simulated. The native app uses your device authentication prompt.'
-            : 'Presence confirmed on this device.'
-        );
+        setMessage('Presence confirmed on this device.');
         return true;
       }
 
@@ -30,11 +32,10 @@ export function usePresenceVerification() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [appTourActive]);
 
   return {
     busy,
-    buttonLabel: isLocalPreviewEnabled ? 'SIMULATE PRESENCE CHECK ->' : 'VERIFY PRESENCE ->',
     message,
     verify
   };

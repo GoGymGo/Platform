@@ -92,7 +92,7 @@ describe('workout progress calculations', () => {
     );
   });
 
-  it('derives elapsed session time with an explicit preview scale', () => {
+  it('derives elapsed session time with an explicit time scale', () => {
     const startedAt = new Date(2026, 6, 9, 11, 59, 50).toISOString();
 
     assert.equal(getSessionElapsedSeconds(startedAt, referenceDate), 10);

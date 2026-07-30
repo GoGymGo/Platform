@@ -11,6 +11,7 @@ import {
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
@@ -32,7 +33,7 @@ export default function CheckOutScreen() {
     ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
-  const { busy, buttonLabel, message, verify } = usePresenceVerification();
+  const { busy, message, verify } = usePresenceVerification();
   const elapsedSeconds = activeSession
     ? getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale)
     : 0;
@@ -61,7 +62,7 @@ export default function CheckOutScreen() {
   if (!activeSession || !checkoutReady) {
     return (
       <SessionUnavailable
-        actionLabel={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START A SESSION ->'}
+        actionLabel={activeSession ? 'RETURN TO WORKOUT' : 'START A WORKOUT'}
         body={
           !activeSession
             ? 'Start a verified session before opening check-out.'
@@ -76,7 +77,7 @@ export default function CheckOutScreen() {
             router.replace('/session' as Href);
           }
         }}
-        title="CHECK-OUT LOCKED"
+        title="ACTION NEEDED"
       />
     );
   }
@@ -94,9 +95,7 @@ export default function CheckOutScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
-      <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
-        CHECK-OUT // 3 OF 3
-      </TerminalText>
+      <WorkoutFlowProgress stage="complete" style={styles.workoutProgress} />
 
       <View style={styles.centerContent}>
         <HUDBorderBox glow style={styles.successMark} tone="green">
@@ -108,7 +107,7 @@ export default function CheckOutScreen() {
           30:00 COMPLETE
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          FINAL CHECKPOINT. LOCK THE SESSION.
+          VERIFY + FINISH
         </TerminalText>
 
         <View style={styles.metricRow}>
@@ -134,7 +133,7 @@ export default function CheckOutScreen() {
 
       <CyberButtonPrimary
         disabled={!cameraConsentReady || !cameraConsentAccepted || busy}
-        label={busy ? 'CHECKING DEVICE...' : buttonLabel.replace(' ->', ' & FINISH ->')}
+        label={busy ? 'Checking device...' : 'Verify and finish'}
         onPress={() => void confirmPresence()}
       />
       {message ? (
@@ -161,10 +160,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     backgroundColor: colors.background
   },
-  stepLabel: {
-    marginBottom: 6,
-    fontFamily: fontFamilies.terminal,
-    textAlign: 'center'
+  workoutProgress: {
+    marginBottom: spacing.lg
   },
   centerContent: {
     flex: 1,

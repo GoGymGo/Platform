@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs, useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
 import { TerminalText } from '@/components/cyber';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const tabScreenOptions = {
@@ -12,6 +12,9 @@ const tabScreenOptions = {
   tabBarActiveTintColor: colors.cyan,
   tabBarInactiveTintColor: colors.dim,
   tabBarStyle: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 430 : undefined,
+    alignSelf: 'center',
     height: 78,
     paddingTop: 8,
     paddingBottom: 12,
@@ -20,14 +23,23 @@ const tabScreenOptions = {
     backgroundColor: colors.background
   },
   tabBarLabelStyle: {
+    width: '100%',
     fontFamily: fontFamilies.terminal,
-    fontSize: fontSizes.micro,
-    letterSpacing: 1.1,
+    fontSize: 9,
+    letterSpacing: 0.2,
+    textAlign: 'center',
     textTransform: 'uppercase'
   },
   tabBarItemStyle: Platform.select({
-    web: { outlineColor: colors.cyan } as unknown as ViewStyle,
-    default: {}
+    web: {
+      minWidth: 0,
+      paddingHorizontal: 0,
+      outlineColor: colors.cyan
+    } as unknown as ViewStyle,
+    default: {
+      minWidth: 0,
+      paddingHorizontal: 0
+    }
   })
 } as const;
 
@@ -52,8 +64,8 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="calendar"
             options={{
-              title: 'Log',
-              tabBarAccessibilityLabel: 'Workout history tab',
+              title: 'Calendar',
+              tabBarAccessibilityLabel: 'Workout calendar tab',
               tabBarIcon: ({ color, focused, size }) => (
                 <Ionicons color={color} name={focused ? 'calendar' : 'calendar-outline'} size={size} />
               )
@@ -62,10 +74,10 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="session"
             options={{
-              title: activeSession ? 'Active' : 'Start',
+              title: activeSession ? 'Active' : 'Train',
               tabBarBadge: activeSession ? 'LIVE' : undefined,
               tabBarBadgeStyle: styles.liveBadge,
-              tabBarAccessibilityLabel: 'Start session tab',
+              tabBarAccessibilityLabel: 'Training tab',
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons color={color} name={focused ? 'play-circle' : 'play-circle-outline'} size={30} />
               )
@@ -74,8 +86,8 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="leaderboard"
             options={{
-              title: 'Ranks',
-              tabBarAccessibilityLabel: 'Competition rankings tab',
+              title: 'Compete',
+              tabBarAccessibilityLabel: 'Competition tab',
               tabBarIcon: ({ color, focused, size }) => (
                 <Ionicons color={color} name={focused ? 'trophy' : 'trophy-outline'} size={size} />
               )
@@ -106,27 +118,27 @@ export default function TabsLayout() {
             }}
           />
         </Tabs>
-      {activeSession ? (
-        <Pressable
-          accessibilityHint="Return to the active workout timer"
-          accessibilityRole="button"
-          onPress={() => router.push('/workout/active')}
-          style={({ pressed }) => [styles.activeBanner, pressed ? styles.pressed : null]}
-        >
-          <View style={styles.liveDot} />
-          <View style={styles.activeCopy}>
-            <TerminalText glow tone="green" variant="micro">
-              SESSION ACTIVE
+        {activeSession ? (
+          <Pressable
+            accessibilityHint="Return to the active workout timer"
+            accessibilityRole="button"
+            onPress={() => router.push('/workout/active')}
+            style={({ pressed }) => [styles.activeBanner, pressed ? styles.pressed : null]}
+          >
+            <View style={styles.liveDot} />
+            <View style={styles.activeCopy}>
+              <TerminalText glow tone="green" variant="micro">
+                SESSION ACTIVE
+              </TerminalText>
+              <TerminalText tone="text" uppercase={false} variant="body">
+                Tap to return to your timer and verification status.
+              </TerminalText>
+            </View>
+            <TerminalText glow tone="cyan" variant="button">
+              -&gt;
             </TerminalText>
-            <TerminalText tone="text" uppercase={false} variant="body">
-              Tap to return to your timer and verification status.
-            </TerminalText>
-          </View>
-          <TerminalText glow tone="cyan" variant="button">
-            -&gt;
-          </TerminalText>
-        </Pressable>
-      ) : null}
+          </Pressable>
+        ) : null}
       </View>
     </AuthGate>
   );

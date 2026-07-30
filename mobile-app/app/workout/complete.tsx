@@ -11,6 +11,7 @@ import {
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
 import { BrandVideoAdPlaceholder } from '@/components/sponsor';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { isCompetitionBonusDay } from '@/domain/competition';
 import { shouldShowCreatorInvite } from '@/state/onboardingPreferences';
@@ -89,15 +90,10 @@ export default function WorkoutCompleteScreen() {
   if (!hadActiveSession) {
     return (
       <SessionUnavailable
+        actionLabel="START A WORKOUT"
         body="A session must pass check-in, the 30-minute timer, the mid-session presence check, and check-out before entries can be awarded."
-        onAction={() => {
-          if (completionResult === 'no-active-session') {
-            router.replace('/session' as Href);
-          } else {
-            router.replace('/workout/active');
-          }
-        }}
-        title="SESSION NOT VERIFIED"
+        onAction={() => router.replace('/session' as Href)}
+        title="WORKOUT NOT STARTED"
       />
     );
   }
@@ -110,12 +106,12 @@ export default function WorkoutCompleteScreen() {
   ) {
     return (
       <SessionUnavailable
-        actionLabel="RETURN TO SESSION ->"
+        actionLabel="RETURN TO WORKOUT"
         body={completionResult === 'heart-rate-target-not-met'
           ? 'The heart-rate path did not maintain the required 30-minute average. This session cannot earn competition credit.'
           : 'The session could not be completed because a required timer or presence-check condition did not pass.'}
         onAction={() => router.replace('/session' as Href)}
-        title="VERIFICATION INCOMPLETE"
+        title="ACTION NEEDED"
       />
     );
   }
@@ -123,10 +119,10 @@ export default function WorkoutCompleteScreen() {
   if (completionResult === 'submission-failed') {
     return (
       <SessionUnavailable
-        actionLabel="TRY SUBMISSION AGAIN ->"
+        actionLabel="TRY AGAIN"
         body={sessionActionError ?? 'Your workout remains open on this device. Check your connection and submit it again.'}
         onAction={() => void submitCompletion()}
-        title="SESSION NOT SUBMITTED"
+        title="ACTION NEEDED"
       />
     );
   }
@@ -134,10 +130,10 @@ export default function WorkoutCompleteScreen() {
   if (completionResult === 'pending-review') {
     return (
       <SessionUnavailable
-        actionLabel="BACK TO HOME ->"
+        actionLabel="GO TO HOME"
         body="Your workout and evidence were submitted successfully. Competition credit and entries will appear only after server review approves the session."
         onAction={() => router.replace('/home')}
-        title="SESSION PENDING REVIEW"
+        title="IN REVIEW"
       />
     );
   }
@@ -145,10 +141,10 @@ export default function WorkoutCompleteScreen() {
   if (completionResult === 'rejected') {
     return (
       <SessionUnavailable
-        actionLabel="BACK TO HOME ->"
+        actionLabel="GO TO HOME"
         body="The submitted workout did not meet the competition's server-side duration or evidence requirements, so no credit or entries were awarded."
         onAction={() => router.replace('/home')}
-        title="SESSION NOT ELIGIBLE"
+        title="NOT ELIGIBLE"
       />
     );
   }
@@ -157,7 +153,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <ScreenContainer contentStyle={styles.pendingScreen}>
         <TerminalText glow tone="cyan" variant="label">
-          SUBMITTING SESSION EVIDENCE
+          SUBMITTING WORKOUT
         </TerminalText>
       </ScreenContainer>
     );
@@ -170,6 +166,11 @@ export default function WorkoutCompleteScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
+        <WorkoutFlowProgress
+          complete
+          stage="complete"
+          style={styles.workoutProgress}
+        />
         <HUDBorderBox glow style={styles.badge} tone={entriesAwarded > 0 ? 'pink' : 'green'}>
           <TerminalText glow style={styles.badgeText} tone={entriesAwarded > 0 ? 'pink' : 'green'} variant="display">
             {entriesAwarded > 0 ? `+${entriesAwarded}` : 'OK'}
@@ -177,7 +178,7 @@ export default function WorkoutCompleteScreen() {
         </HUDBorderBox>
 
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
-          SESSION VERIFIED OK
+          COMPLETE
         </TerminalText>
         <TerminalText glow style={styles.title} tone={entriesAwarded > 0 ? 'pink' : 'green'} variant="title">
           {completionResult === 'completed'
@@ -197,13 +198,6 @@ export default function WorkoutCompleteScreen() {
                 : 'Today is checked off. This verified workout counts toward your current scoring week; entries settle when the week closes.'
             : 'Today remains checked off, but a second verified session on the same day does not create another verified day or entry award.'}
         </TerminalText>
-
-        <BrandVideoAdPlaceholder
-          compact
-          onPress={() => router.push('/sponsor-offer')}
-          placement="completion"
-          style={styles.videoAd}
-        />
 
         <HUDBorderBox style={styles.progressCard} tone="cyan">
           <View style={styles.progressHeader}>
@@ -258,9 +252,16 @@ export default function WorkoutCompleteScreen() {
 
         <CyberButtonPrimary
           label={completionResult === 'completed' && wasFirstVerifiedWorkout
-            ? 'CONTINUE ->'
-            : 'BACK TO HOME ->'}
+            ? 'Continue'
+            : 'Go to Home'}
           onPress={continueFromCompletion}
+        />
+
+        <BrandVideoAdPlaceholder
+          compact
+          onPress={() => router.push('/sponsor-offer')}
+          placement="completion"
+          style={styles.videoAd}
         />
       </ScreenScrollView>
     </ScreenContainer>
@@ -281,6 +282,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
     backgroundColor: colors.background
+  },
+  workoutProgress: {
+    marginBottom: spacing.xl
   },
   badge: {
     width: 130,
@@ -313,7 +317,7 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   videoAd: {
-    marginBottom: spacing.lg
+    marginTop: spacing.xl
   },
   progressCard: {
     width: '100%',

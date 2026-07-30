@@ -7,17 +7,24 @@ import {
   LegalDocumentsController,
   LegalReceiptsController,
   OperatorLegalDocumentsController,
+  VerificationConsentsController,
 } from './legal.controller';
 import { LegalDocumentsService } from './legal-documents.service';
+import { VerificationConsentsService } from './verification-consents.service';
 
 @Module({
   controllers: [
     LegalDocumentsController,
     LegalReceiptsController,
     OperatorLegalDocumentsController,
+    VerificationConsentsController,
   ],
-  exports: [LegalDocumentsService],
+  exports: [LegalDocumentsService, VerificationConsentsService],
   imports: [AdminAuthorizationModule, IdempotencyModule, ProfilesModule],
-  providers: [AdminLegalDocumentsService, LegalDocumentsService],
+  providers: [
+    AdminLegalDocumentsService,
+    LegalDocumentsService,
+    VerificationConsentsService,
+  ],
 })
 export class LegalModule {}

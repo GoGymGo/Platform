@@ -2,6 +2,7 @@ import type { AppDataMode } from '@/data/appData';
 import type {
   AvatarState,
   AvatarUploadResult,
+  DevicePresenceConsent,
   PrivacyDownloadAction,
   PrivacyRequest,
   PushDevice
@@ -13,6 +14,7 @@ export type AccountSettingsRepository = {
     requestType: 'delete' | 'export'
   ) => Promise<PrivacyRequest>;
   disablePushDevice: (deviceId: string) => Promise<void>;
+  getDevicePresenceConsent: () => Promise<DevicePresenceConsent>;
   getPrivacyDownload: (
     privacyRequestId: string
   ) => Promise<PrivacyDownloadAction>;
@@ -21,6 +23,10 @@ export type AccountSettingsRepository = {
     platform: 'android' | 'ios',
     pushToken: string
   ) => Promise<PushDevice>;
+  setDevicePresenceConsent: (
+    accepted: boolean,
+    consentVersion: string
+  ) => Promise<DevicePresenceConsent>;
   getAvatar: () => Promise<AvatarState>;
   removeAvatar: () => Promise<void>;
   uploadAvatar: (uri: string) => Promise<AvatarUploadResult>;
@@ -31,7 +37,6 @@ export function createAccountSettingsRepository(
   api: ApiClient | null
 ): AccountSettingsRepository {
   if (mode === 'api') return createApiRepository(requireApi(api));
-  if (mode === 'demo') return createDemoRepository();
   return createUnavailableRepository();
 }
 
@@ -49,6 +54,9 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
       `/v1/me/push-devices/${encodeURIComponent(deviceId)}`,
       { method: 'DELETE' }
     ).then(() => undefined),
+    getDevicePresenceConsent: () => api.request<DevicePresenceConsent>(
+      '/v1/me/verification-consents/device-presence'
+    ),
     getPrivacyDownload: (privacyRequestId) => api.request<PrivacyDownloadAction>(
       `/v1/me/privacy-requests/${encodeURIComponent(privacyRequestId)}/download-action`,
       { method: 'POST' }
@@ -68,55 +76,15 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
       idempotencyKey: createIdempotencyKey('push-device'),
       method: 'POST'
     }),
-    uploadAvatar: (uri) => uploadAvatar(api, uri)
-  };
-}
-
-function createDemoRepository(): AccountSettingsRepository {
-  const privacyRequests: PrivacyRequest[] = [];
-  return {
-    createPrivacyRequest: async (requestType) => {
-      const requestedAt = new Date().toISOString();
-      const request: PrivacyRequest = {
-        completedAt: null,
-        downloadAvailable: false,
-        exportExpiresAt: null,
-        failureCode: null,
-        id: `demo-privacy-${privacyRequests.length + 1}`,
-        requestedAt,
-        requestType,
-        status: 'requested'
-      };
-      privacyRequests.unshift(request);
-      return request;
-    },
-    disablePushDevice: async () => undefined,
-    getPrivacyDownload: async () => {
-      throw new Error('The demo export is not ready for download.');
-    },
-    getAvatar: async () => ({ active: null, latest: null }),
-    listPrivacyRequests: async () => privacyRequests,
-    registerPushDevice: async (platform) => ({
-      enabled: true,
-      id: 'demo-push-device',
-      platform,
-      provider: 'expo'
+    setDevicePresenceConsent: (accepted, consentVersion) => api.request<
+      DevicePresenceConsent,
+      { accepted: boolean; consentVersion: string }
+    >('/v1/me/verification-consents/device-presence', {
+      body: { accepted, consentVersion },
+      idempotencyKey: createIdempotencyKey('verification-consent'),
+      method: 'PUT'
     }),
-    removeAvatar: async () => undefined,
-    uploadAvatar: async (uri) => ({
-      state: {
-        active: {
-          contentType: contentTypeFromUri(uri),
-          createdAt: new Date().toISOString(),
-          id: 'demo-avatar',
-          readUrl: uri,
-          readUrlExpiresAt: null,
-          status: 'approved'
-        },
-        latest: null
-      },
-      status: 'approved'
-    })
+    uploadAvatar: (uri) => uploadAvatar(api, uri)
   };
 }
 
@@ -127,11 +95,13 @@ function createUnavailableRepository(): AccountSettingsRepository {
   return {
     createPrivacyRequest: unavailable,
     disablePushDevice: unavailable,
+    getDevicePresenceConsent: unavailable,
     getPrivacyDownload: unavailable,
     getAvatar: async () => ({ active: null, latest: null }),
     listPrivacyRequests: async () => [],
     registerPushDevice: unavailable,
     removeAvatar: unavailable,
+    setDevicePresenceConsent: unavailable,
     uploadAvatar: unavailable
   };
 }

@@ -11,7 +11,7 @@ import type {
   SocialProfile,
   SocialUserSearchResult
 } from '@/domain/social';
-import { createDemoSocialRepository } from '@/mocks/social';
+import type { StreakSummary } from '@/domain/streaks';
 import type { ApiClient } from '@/services/api/client';
 
 type FriendRequestDecisionResponse = {
@@ -67,9 +67,6 @@ export function createSocialRepository(
   mode: AppDataMode,
   api: ApiClient | null
 ): SocialRepository {
-  if (mode === 'demo') {
-    return createDemoSocialRepository();
-  }
   if (mode === 'api') {
     return createApiSocialRepository(requireApi(api));
   }
@@ -100,7 +97,10 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
     discoverRegionalChallenges: (regionCode) => api.request<readonly SocialChallenge[]>(
       `/v1/social/challenges/discover?regionCode=${encodeURIComponent(regionCode)}`
     ),
-    getMyProfile: () => api.request<MeResponse>('/v1/me').then(toSocialProfile),
+    getMyProfile: () => Promise.all([
+      api.request<MeResponse>('/v1/me'),
+      api.request<StreakSummary>('/v1/streaks/me')
+    ]).then(([profile, streaks]) => toSocialProfile(profile, streaks)),
     inviteFriendToChallenge: (challengeId, friendUserId) =>
       api.request<ChallengeInvitationResponse, { friendUserId: string }>(
         `/v1/social/challenges/${encodeURIComponent(challengeId)}/invitations`,
@@ -167,21 +167,24 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
       idempotencyKey: createIdempotencyKey(),
       method: 'POST'
     }),
-    updateScreenName: (screenName) => api.request<MeResponse, {
-      publicIdentityMode: 'alias';
-      publicName: string;
-      screenName: string;
-    }>(
-      '/v1/me',
-      {
-        body: {
-          publicIdentityMode: 'alias',
-          publicName: screenName,
-          screenName
-        },
-        method: 'PATCH'
-      }
-    ).then(toSocialProfile)
+    updateScreenName: (screenName) => Promise.all([
+      api.request<MeResponse, {
+        publicIdentityMode: 'alias';
+        publicName: string;
+        screenName: string;
+      }>(
+        '/v1/me',
+        {
+          body: {
+            publicIdentityMode: 'alias',
+            publicName: screenName,
+            screenName
+          },
+          method: 'PATCH'
+        }
+      ),
+      api.request<StreakSummary>('/v1/streaks/me')
+    ]).then(([profile, streaks]) => toSocialProfile(profile, streaks))
   };
 }
 
@@ -215,10 +218,13 @@ function requireApi(api: ApiClient | null) {
   return api;
 }
 
-function toSocialProfile(profile: MeResponse): SocialProfile {
+function toSocialProfile(
+  profile: MeResponse,
+  streaks: StreakSummary
+): SocialProfile {
   return {
     screenName: profile.screenName,
-    streaks: { daily: 0, monthly: 0, weekly: 0, yearly: 0 },
+    streaks: streaks.streaks,
     userId: profile.id
   };
 }

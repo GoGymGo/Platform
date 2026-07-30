@@ -10,8 +10,10 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
@@ -47,59 +49,78 @@ type DeviceOption = {
   sub: string;
 };
 
-type GymKey = 'ironDistrict' | 'voltClub' | 'northline';
-
-type GymOption = {
-  key: GymKey;
-  name: string;
-  sub: string;
-};
-
 const deviceCatalog: readonly DeviceOption[] = [
-  { key: 'appleWatch', name: 'APPLE WATCH', sub: 'HEALTHKIT // LIVE HEART RATE' },
-  { key: 'galaxyWatch', name: 'SAMSUNG GALAXY WATCH', sub: 'HEALTH CONNECT // LIVE HEART RATE' },
-  { key: 'pixelWatch', name: 'GOOGLE PIXEL WATCH', sub: 'HEALTH CONNECT // LIVE HEART RATE' },
+  {
+    key: 'appleWatch',
+    name: 'APPLE WATCH',
+    sub: 'HEALTHKIT // LIVE HEART RATE'
+  },
+  {
+    key: 'galaxyWatch',
+    name: 'SAMSUNG GALAXY WATCH',
+    sub: 'HEALTH CONNECT // LIVE HEART RATE'
+  },
+  {
+    key: 'pixelWatch',
+    name: 'GOOGLE PIXEL WATCH',
+    sub: 'HEALTH CONNECT // LIVE HEART RATE'
+  },
   { key: 'garmin', name: 'GARMIN', sub: 'FORERUNNER // FENIX // VENU' },
   { key: 'fitbit', name: 'FITBIT', sub: 'CHARGE // SENSE // VERSA' },
   { key: 'coros', name: 'COROS', sub: 'PACE // APEX // VERTIX' },
   { key: 'suunto', name: 'SUUNTO', sub: 'RACE // VERTICAL' },
   { key: 'amazfit', name: 'AMAZFIT', sub: 'GTR // T-REX // ACTIVE' },
   { key: 'huawei', name: 'HUAWEI WATCH', sub: 'GT // FIT SERIES' },
-  { key: 'withings', name: 'WITHINGS SCANWATCH', sub: 'HYBRID HEART-RATE WATCH' },
+  {
+    key: 'withings',
+    name: 'WITHINGS SCANWATCH',
+    sub: 'HYBRID HEART-RATE WATCH'
+  },
   { key: 'whoop', name: 'WHOOP', sub: 'CONTINUOUS HEART-RATE STRAP' },
   { key: 'ouraRing', name: 'OURA RING', sub: 'WORKOUT HEART RATE' },
   { key: 'polarH10', name: 'POLAR H10', sub: 'CHEST STRAP' },
   { key: 'polarVerity', name: 'POLAR VERITY SENSE', sub: 'OPTICAL ARMBAND' },
   { key: 'wahooTickr', name: 'WAHOO TICKR', sub: 'BLUETOOTH CHEST STRAP' },
-  { key: 'bleStrap', name: 'BLUETOOTH HEART-RATE STRAP', sub: 'STANDARD BLUETOOTH MONITOR' },
+  {
+    key: 'bleStrap',
+    name: 'BLUETOOTH HEART-RATE STRAP',
+    sub: 'STANDARD BLUETOOTH MONITOR'
+  },
   { key: 'antStrap', name: 'ANT+ CHEST STRAP', sub: 'STANDARD ANT+ MONITOR' },
-  { key: 'phonePpg', name: 'PHONE CAMERA BACKUP', sub: 'LOCAL CHECK // NO FRAMES STORED' }
+  {
+    key: 'phonePpg',
+    name: 'PHONE CAMERA BACKUP',
+    sub: 'LOCAL CHECK // NO FRAMES STORED'
+  }
 ];
 
 const primaryDeviceKeys: readonly DeviceKey[] = ['appleWatch', 'galaxyWatch', 'garmin', 'whoop'];
 
-const gymOptions: readonly GymOption[] = [
-  { key: 'ironDistrict', name: 'IRON DISTRICT', sub: 'KING ST // ENTRY + EXIT QR READY' },
-  { key: 'voltClub', name: 'VOLT PERFORMANCE CLUB', sub: 'QUEEN WEST // PARTNER GYM' },
-  { key: 'northline', name: 'NORTHLINE FITNESS', sub: 'LIBERTY VILLAGE // QR READY' }
-];
-
 export default function VerificationScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { user } = useAuth();
   const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const { source } = useLocalSearchParams<{ source?: string }>();
-  const [verificationPath, setVerificationPath] = useState<VerificationPath>('wearable');
+  const [verificationPath, setVerificationPath] =
+    useState<VerificationPath>('wearable');
   const [showAllDevices, setShowAllDevices] = useState(false);
   const [deviceQuery, setDeviceQuery] = useState('');
-  const [selectedDevice, setSelectedDevice] = useState<DeviceKey | null>(null);
-  const [gymQuery, setGymQuery] = useState('');
-  const [selectedGym, setSelectedGym] = useState<GymKey | null>(null);
-  const [preferenceReady, setPreferenceReady] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceKey | null>(
+    appTourActive ? 'appleWatch' : null
+  );
+  const [preferenceReady, setPreferenceReady] = useState(appTourActive);
   const [sourcePickerExpanded, setSourcePickerExpanded] = useState(false);
+  const isProfileSource = source === 'profile';
 
   useEffect(() => {
     let active = true;
+
+    if (appTourActive) {
+      return () => {
+        active = false;
+      };
+    }
 
     if (!preferenceOwnerId) {
       void Promise.resolve().then(() => {
@@ -126,17 +147,15 @@ export default function VerificationScreen() {
         return;
       }
 
-      const savedGym = gymOptions.find((gym) => gym.key === preference.sourceKey);
       setVerificationPath('gymQr');
-      setSelectedGym(savedGym?.key ?? null);
-      setSourcePickerExpanded(!savedGym);
+      setSourcePickerExpanded(true);
       setPreferenceReady(true);
     });
 
     return () => {
       active = false;
     };
-  }, [preferenceOwnerId]);
+  }, [appTourActive, preferenceOwnerId]);
 
   const visibleDevices = useMemo(() => {
     if (!showAllDevices) {
@@ -150,29 +169,26 @@ export default function VerificationScreen() {
       : deviceCatalog;
   }, [deviceQuery, showAllDevices]);
 
-  const visibleGyms = useMemo(() => {
-    const query = gymQuery.trim().toLowerCase();
-    return query
-      ? gymOptions.filter((gym) => `${gym.name} ${gym.sub}`.toLowerCase().includes(query))
-      : gymOptions;
-  }, [gymQuery]);
-
-  const canContinue = verificationPath === 'wearable' ? selectedDevice !== null : selectedGym !== null;
-  const selectedSource = verificationPath === 'wearable'
-    ? deviceCatalog.find((device) => device.key === selectedDevice)
-    : gymOptions.find((gym) => gym.key === selectedGym);
-  const ctaLabel = verificationPath === 'wearable'
-    ? selectedDevice
-      ? 'SAVE DEVICE AS DEFAULT ->'
-      : 'SELECT A DEVICE TO CONTINUE'
-    : selectedGym
-      ? 'CONTINUE WITH GYM QR ->'
-      : 'SELECT A GYM TO CONTINUE';
+  const canContinue = verificationPath === 'wearable' && selectedDevice !== null;
+  const selectedSource =
+    verificationPath === 'wearable'
+      ? deviceCatalog.find((device) => device.key === selectedDevice)
+      : undefined;
+  const ctaLabel =
+    verificationPath === 'wearable'
+      ? selectedDevice
+        ? isProfileSource
+          ? 'Save device'
+          : 'Save and continue'
+        : 'Select a device to continue'
+      : 'Partner Gym QR unavailable';
 
   async function continueWithVerificationMethod() {
-    const selectedSource = verificationPath === 'wearable'
-      ? deviceCatalog.find((device) => device.key === selectedDevice)
-      : gymOptions.find((gym) => gym.key === selectedGym);
+    if (verificationPath !== 'wearable') {
+      return;
+    }
+
+    const selectedSource = deviceCatalog.find((device) => device.key === selectedDevice);
 
     if (!selectedSource) {
       return;
@@ -183,16 +199,20 @@ export default function VerificationScreen() {
     }
 
     await saveVerificationPreference(preferenceOwnerId, {
-      method: verificationPath === 'wearable' ? 'heartRate' : 'partnerGymQr',
+      method: 'heartRate',
       sourceKey: selectedSource.key,
       sourceLabel: selectedSource.name
     });
-    router.replace(source === 'profile' ? '/profile' : '/commitment');
+    router.replace(
+      isProfileSource
+        ? '/profile?deviceSaved=1'
+        : '/workout/check-in?deviceSaved=1'
+    );
   }
 
   function selectVerificationPath(path: VerificationPath) {
     setVerificationPath(path);
-    setSourcePickerExpanded(path === 'wearable' ? selectedDevice === null : selectedGym === null);
+    setSourcePickerExpanded(path === 'wearable' ? selectedDevice === null : true);
   }
 
   return (
@@ -204,21 +224,23 @@ export default function VerificationScreen() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label={source === 'profile' ? 'EDIT VERIFICATION' : 'VERIFICATION'}
+          label={isProfileSource ? 'EDIT WORKOUT DEVICE' : 'FIRST WORKOUT'}
           onBack={() => goBackOrReplace(
             router,
-            source === 'profile' ? '/profile' : '/consents'
+            isProfileSource ? '/profile' : '/home'
           )}
-          progress={source === 'profile' ? 100 : 80}
-          step={source === 'profile' ? 'PROFILE' : 'STEP 04 / 05'}
+          progress={100}
+          step={isProfileSource ? 'PROFILE' : 'WORKOUT SETUP'}
         />
+        {!isProfileSource ? (
+          <WorkoutFlowProgress stage="device" style={styles.workoutProgress} />
+        ) : null}
 
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          HOW WILL YOU VERIFY WORKOUTS?
+          CHOOSE YOUR WORKOUT DEVICE
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Choose your default workout method. Every verified workout also
-          requires the mid-session device presence check.
+          Choose a default now. You can change it later in Profile.
         </TerminalText>
 
         <View accessibilityRole="radiogroup" style={styles.segmentedControl}>
@@ -285,7 +307,10 @@ export default function VerificationScreen() {
             </View>
 
             {!showAllDevices ? (
-              <CompactTextButton label="FIND ANOTHER DEVICE" onPress={() => setShowAllDevices(true)} />
+              <CompactTextButton
+                label="FIND ANOTHER DEVICE"
+                onPress={() => setShowAllDevices(true)}
+              />
             ) : null}
             {showAllDevices && visibleDevices.length === 0 ? (
               <TerminalText style={styles.emptyText} tone="dim" variant="body">
@@ -293,39 +318,21 @@ export default function VerificationScreen() {
               </TerminalText>
             ) : null}
             <TerminalText style={styles.privacyLine} tone="dim" variant="caption">
-              Heart-rate data is used to verify the session. Phone camera frames stay local and are not stored.
+              Heart-rate data is used to verify the session. Phone camera frames stay local and are
+              not stored.
             </TerminalText>
           </View>
         ) : (
           <View style={styles.methodContent}>
-            <SearchField
-              label="SEARCH PARTNER GYMS"
-              onChangeText={setGymQuery}
-              placeholder="GYM OR NEIGHBOURHOOD"
-              value={gymQuery}
-            />
-            <View style={styles.list}>
-              {visibleGyms.map((gym) => (
-                <SelectionRow
-                  active={selectedGym === gym.key}
-                  detail={gym.sub}
-                  key={gym.key}
-                  onPress={() => {
-                    setSelectedGym(gym.key);
-                    setSourcePickerExpanded(false);
-                  }}
-                  title={gym.name}
-                />
-              ))}
-            </View>
-            {visibleGyms.length === 0 ? (
-              <TerminalText style={styles.emptyText} tone="dim" variant="body">
-                NO PARTNER GYMS MATCH YOUR SEARCH.
+            <HUDBorderBox style={styles.unavailableCard} tone="muted">
+              <TerminalText tone="dim" variant="label">
+                NO VERIFIED PARTNER GYMS YET
               </TerminalText>
-            ) : null}
-            <TerminalText style={styles.privacyLine} tone="dim" variant="caption">
-              Scan the entry QR to start and the exit QR to end. QR camera frames are not stored.
-            </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                Partner-gym QR verification will become available after GoGymGo verifies and
+                publishes participating locations. Use a heart-rate device for now.
+              </TerminalText>
+            </HUDBorderBox>
           </View>
         )}
 
@@ -352,6 +359,7 @@ function MethodSegment({
 }) {
   return (
     <Pressable
+      aria-checked={active}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
       onPress={onPress}
@@ -409,6 +417,7 @@ function SelectionRow({
 }) {
   return (
     <Pressable
+      aria-checked={active}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
       onPress={onPress}
@@ -442,6 +451,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
     backgroundColor: colors.background
+  },
+  workoutProgress: {
+    marginBottom: spacing.lg
   },
   title: {
     marginTop: spacing.sm,
@@ -494,7 +506,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md
   },
   searchInput: {
-    minHeight: 38,
+    minHeight: 44,
     color: colors.text,
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.control
@@ -526,6 +538,10 @@ const styles = StyleSheet.create({
   privacyLine: {
     marginTop: spacing.md,
     textAlign: 'center'
+  },
+  unavailableCard: {
+    gap: spacing.sm,
+    padding: spacing.lg
   },
   actions: {
     marginTop: spacing.xl

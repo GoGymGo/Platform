@@ -7,16 +7,28 @@ export type PublicIdentity = {
 };
 
 export const defaultPublicIdentity: PublicIdentity = {
-  callsign: 'GHOST_RUNNER',
+  callsign: '',
   displayName: '',
   mode: 'private'
 };
 
-export function normalizePublicIdentity(identity: PublicIdentity): PublicIdentity {
-  const callsign = identity.callsign.trim() || defaultPublicIdentity.callsign;
+export function createPrivateIdentity(userId: string | null | undefined): PublicIdentity {
+  const suffix = (userId ?? '')
+    .replace(/[^a-z0-9]/gi, '')
+    .slice(-6)
+    .toUpperCase();
+  const callsign = suffix ? `PLAYER_${suffix}` : 'GOGYMGO_PLAYER';
 
   return {
     callsign,
+    displayName: '',
+    mode: 'private'
+  };
+}
+
+export function normalizePublicIdentity(identity: PublicIdentity): PublicIdentity {
+  return {
+    callsign: identity.callsign.trim(),
     displayName: identity.displayName.trim(),
     mode: identity.mode
   };
@@ -29,7 +41,7 @@ export function resolvePublicName(identity: PublicIdentity) {
     return normalized.displayName;
   }
 
-  return normalized.callsign;
+  return normalized.callsign || 'IDENTITY NOT SET';
 }
 
 export function getPublicInitials(publicName: string) {

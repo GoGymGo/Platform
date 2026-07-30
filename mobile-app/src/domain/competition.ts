@@ -7,12 +7,64 @@ export type CurrentWeekProgress = {
 };
 
 export type MatchAvailability = 'matched' | 'searching' | 'solo';
+export type WeeklyChallengeDisplayStatus =
+  | 'CHOOSE PARTNER'
+  | 'COMPLETE'
+  | 'IN PROGRESS'
+  | 'INVITE WAITING'
+  | 'PAIRING PENDING';
 
 export type CompetitionPhase =
   | 'before-month'
   | 'scoring-period'
   | 'bonus-days'
   | 'complete';
+
+export function getCompetitionRankLabel({
+  competitionNotStarted,
+  hasSettledWeek,
+  rank
+}: {
+  competitionNotStarted: boolean;
+  hasSettledWeek: boolean;
+  rank?: number;
+}) {
+  if (competitionNotStarted || !hasSettledWeek) {
+    return 'PENDING FIRST WEEK';
+  }
+
+  return rank ? `#${rank}` : 'UPDATING';
+}
+
+export function getWeeklyChallengeDisplayStatus({
+  activeAvailability,
+  hasFeaturedPartner,
+  hasIncomingRequest,
+  isRemainderDayPhase
+}: {
+  activeAvailability?: MatchAvailability;
+  hasFeaturedPartner: boolean;
+  hasIncomingRequest: boolean;
+  isRemainderDayPhase: boolean;
+}): WeeklyChallengeDisplayStatus {
+  if (isRemainderDayPhase) {
+    return 'COMPLETE';
+  }
+
+  if (activeAvailability === 'matched') {
+    return 'IN PROGRESS';
+  }
+
+  if (hasIncomingRequest) {
+    return 'INVITE WAITING';
+  }
+
+  if (activeAvailability || hasFeaturedPartner) {
+    return 'CHOOSE PARTNER';
+  }
+
+  return 'PAIRING PENDING';
+}
 
 export type CompetitionPeriod = {
   dateKeys: readonly string[];

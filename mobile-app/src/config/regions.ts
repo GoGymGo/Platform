@@ -4,7 +4,7 @@ export type CompetitionRegion = {
   timeZone: string;
 };
 
-export type CompetitionRegionVerificationMethod = 'device-location' | 'postal-code';
+export type CompetitionRegionVerificationMethod = 'device-location';
 export type CompetitionRegionVerificationStatus = 'verified' | 'provisional';
 
 export type CompetitionRegionVerification = {
@@ -24,7 +24,11 @@ export const competitionRegions: readonly CompetitionRegion[] = [
   { id: 'montreal', label: 'MONTREAL', timeZone: 'America/Toronto' }
 ];
 
-export const defaultCompetitionRegion = competitionRegions[0];
+export const defaultCompetitionRegion: CompetitionRegion = {
+  id: 'unverified',
+  label: 'REGION NOT SET',
+  timeZone: 'UTC'
+};
 
 export function parseCompetitionRegion(value: string | null) {
   if (!value) {
@@ -62,7 +66,7 @@ export function parseCompetitionRegionVerification(
 
     if (
       !region ||
-      (method !== 'device-location' && method !== 'postal-code') ||
+      method !== 'device-location' ||
       (parsed.status !== 'verified' && parsed.status !== 'provisional') ||
       typeof parsed.verifiedAt !== 'string' ||
       Number.isNaN(Date.parse(parsed.verifiedAt))

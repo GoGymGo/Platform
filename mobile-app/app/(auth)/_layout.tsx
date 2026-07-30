@@ -1,18 +1,19 @@
 import { Stack } from 'expo-router';
 
 import { colors } from '@/constants/theme';
-
-const authScreenOptions = {
-  animation: 'slide_from_right',
-  contentStyle: {
-    backgroundColor: colors.background
-  },
-  headerShown: false
-} as const;
+import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 
 export default function AuthLayout() {
+  const reduceMotion = useReducedMotionPreference();
+
   return (
-    <Stack screenOptions={authScreenOptions}>
+    <Stack screenOptions={{
+      animation: reduceMotion ? 'none' : 'slide_from_right',
+      contentStyle: {
+        backgroundColor: colors.background
+      },
+      headerShown: false
+    }}>
       <Stack.Screen name="sign-up" />
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="verify-email" />

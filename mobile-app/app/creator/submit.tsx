@@ -13,6 +13,7 @@ import {
 } from '@/components/cyber';
 import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useSubmitCreatorVideo } from '@/data/appDataHooks';
+import { goBackOrReplace } from '@/navigation/goBack';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
 const creatorRightsTerms = [
@@ -132,7 +133,10 @@ export default function CreatorVideoSubmissionScreen() {
         ) : (
           <CyberButtonPrimary disabled={submitCreatorVideo.isPending} label={submitCreatorVideo.isPending ? 'SUBMITTING...' : 'SUBMIT VIDEO FOR REVIEW ->'} onPress={() => void submit()} tone="pink" />
         )}
-        <CyberButtonOutline label="BACK TO CREATOR CATALOG" onPress={() => router.replace('/workouts')} />
+        <CyberButtonOutline
+          label="BACK TO CREATOR CATALOG"
+          onPress={() => goBackOrReplace(router, '/workouts')}
+        />
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -141,6 +145,7 @@ export default function CreatorVideoSubmissionScreen() {
 function ToggleRow({ checked, label, onPress }: { checked: boolean; label: string; onPress: () => void }) {
   return (
     <Pressable
+      aria-checked={checked}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       onPress={onPress}

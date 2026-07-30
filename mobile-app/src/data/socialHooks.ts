@@ -152,7 +152,7 @@ function useSocialContext() {
 
   return {
     enabled: authenticatedQueriesEnabled && mode !== 'unavailable',
-    queryKey: ['social', user?.uid ?? 'preview'] as const,
+    queryKey: ['social', user?.uid ?? 'anonymous'] as const,
     social
   };
 }

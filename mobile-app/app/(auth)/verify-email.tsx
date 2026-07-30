@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import {
@@ -14,7 +14,6 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { getAuthErrorMessage } from '@/domain/auth';
-import { isLocalPreviewEnabled } from '@/config/firebase';
 import { spacing } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 
@@ -32,6 +31,55 @@ export default function VerifyEmailScreen() {
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<'green' | 'amber' | 'red'>('amber');
   const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
+  const polling = useRef(false);
+  const continueAfterVerification = useCallback(() => {
+    router.replace(
+      challengeInvite
+        ? { pathname: '/join', params: { challengeInvite } }
+        : next === 'region'
+          ? '/region'
+          : next === 'identity'
+            ? '/identity'
+            : next === 'profile'
+              ? '/profile'
+              : '/home?resume=1'
+    );
+  }, [challengeInvite, next, router]);
+
+  useEffect(() => {
+    if (!user || user.emailVerified) {
+      return;
+    }
+
+    let active = true;
+    const pollVerification = async () => {
+      if (polling.current) {
+        return;
+      }
+      polling.current = true;
+      try {
+        const refreshedUser = await refreshUser();
+        if (active && refreshedUser?.emailVerified) {
+          continueAfterVerification();
+        }
+      } catch {
+        // The visible manual action reports errors; background checks stay quiet.
+      } finally {
+        polling.current = false;
+      }
+    };
+    const interval = setInterval(() => void pollVerification(), 2500);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [
+    continueAfterVerification,
+    refreshUser,
+    user,
+    user?.emailVerified
+  ]);
 
   async function checkVerification() {
     setBusyAction('check');
@@ -39,15 +87,7 @@ export default function VerifyEmailScreen() {
     try {
       const refreshedUser = await refreshUser();
       if (refreshedUser?.emailVerified) {
-        router.replace(
-          challengeInvite
-            ? { pathname: '/join', params: { challengeInvite } }
-            : next === 'identity'
-              ? '/identity'
-              : next === 'profile'
-                ? '/profile'
-                : '/home'
-        );
+        continueAfterVerification();
         return;
       }
       setMessageTone('amber');
@@ -108,12 +148,13 @@ export default function VerifyEmailScreen() {
             {user.email ?? 'YOUR ACCOUNT EMAIL'}
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Open the Firebase verification email, confirm the address, then return here.
+            Open the Firebase verification email and confirm the address. This
+            screen continues automatically when verification is complete.
           </TerminalText>
           {message ? <AuthStatusNotice message={message} tone={messageTone} /> : null}
           <CyberButtonPrimary
             disabled={Boolean(busyAction)}
-            label={busyAction === 'check' ? 'CHECKING...' : 'I VERIFIED MY EMAIL ->'}
+            label={busyAction === 'check' ? 'CHECKING...' : 'CHECK VERIFICATION ->'}
             onPress={checkVerification}
           />
           <CyberButtonOutline
@@ -121,12 +162,6 @@ export default function VerifyEmailScreen() {
             label={busyAction === 'resend' ? 'SENDING...' : 'RESEND EMAIL'}
             onPress={resendVerification}
           />
-          {isLocalPreviewEnabled ? (
-            <CyberButtonOutline
-              label="PREVIEW APP FLOW"
-              onPress={() => router.push('/identity')}
-            />
-          ) : null}
           <CyberButtonOutline
             disabled={Boolean(busyAction)}
             label={busyAction === 'signout' ? 'SIGNING OUT...' : 'USE ANOTHER ACCOUNT'}

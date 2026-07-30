@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { demoDataCleanupSql } from '../migrations/1784170800000_remove_demo_data';
 import {
   MigratedPostgisTestDatabase,
   startMigratedPostgisTestDatabase,
@@ -40,7 +41,6 @@ describeWithDatabase('database migrations', () => {
         'competition_progress',
         'competitions',
         'draw_entries',
-        'demo_verification_checkpoints',
         'entry_ledger',
         'friend_requests',
         'friendships',
@@ -68,12 +68,125 @@ describeWithDatabase('database migrations', () => {
         'workout_sessions',
       ]),
     );
+    expect(names).not.toContain('demo_verification_checkpoints');
     await expect(pool.query('SELECT PostGIS_Version()')).resolves.toBeDefined();
     await expect(
       pool.query(
         "SELECT extname FROM pg_extension WHERE extname = 'btree_gist'",
       ),
     ).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  it('removes persisted demo records and restores demo-granted roles', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const user = await client.query<{ id: string }>(
+        `INSERT INTO users (firebase_uid, email_verified, roles)
+         VALUES ('cleanup-migration-user', TRUE, ARRAY['operator', 'user'])
+         RETURNING id`,
+      );
+      const userId = user.rows[0].id;
+      await client.query(
+        `INSERT INTO operator_audit_events
+           (actor_user_id, action, entity_type, entity_id, previous_state,
+            next_state, reason, request_id)
+         VALUES
+           ($1, 'user.bc_demo_operator_bootstrapped', 'users', $1,
+            '{"roles":["user"]}'::jsonb,
+            '{"roles":["operator","user"]}'::jsonb,
+            'Integration cleanup migration verification',
+            'cleanup-migration-role')`,
+        [userId],
+      );
+      const region = await client.query<{ id: string }>(
+        `INSERT INTO region_policies
+           (code, country_code, subdivision_code, metro_name, currency,
+            timezone, language_codes, minimum_age, competition_enabled,
+            boundary_version, policy_version, boundary, valid_from)
+         VALUES
+           ('CA-BC-DEMO-CLEANUP', 'CA', 'BC', 'Cleanup Demo Region', 'CAD',
+            'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
+            'cleanup-demo-boundary', 'cleanup-demo-policy',
+            ST_Multi(ST_GeomFromText(
+              'POLYGON((-123.2 49.2,-123.0 49.2,-123.0 49.4,-123.2 49.4,-123.2 49.2))',
+              4326
+            ))::geography,
+            current_timestamp)
+         RETURNING id`,
+      );
+      const competition = await client.query<{ id: string }>(
+        `INSERT INTO competitions
+           (region_policy_id, month_key, name, status, rules_version, rules,
+            minimum_entrants, registration_opens_at, registration_closes_at,
+            starts_at, ends_at)
+         VALUES
+           ($1, '2099-09', 'Cleanup Demo Competition', 'registration',
+            'cleanup-demo-rules', '{}'::jsonb, 100,
+            '2099-08-01T00:00:00Z', '2099-09-01T00:00:00Z',
+            '2099-09-01T00:00:00Z', '2099-10-01T00:00:00Z')
+         RETURNING id`,
+        [region.rows[0].id],
+      );
+      const reward = await client.query<{ id: string }>(
+        `INSERT INTO reward_catalog_items
+           (competition_id, sponsor_name, title, description, reward_type,
+            status, fulfillment_instructions, inventory_total)
+         VALUES
+           ($1, 'Cleanup Sponsor', 'Cleanup Reward',
+            'Migration cleanup verification reward.', 'physical', 'published',
+            'Demo pickup instructions.', 1)
+         RETURNING id`,
+        [competition.rows[0].id],
+      );
+      const gymApplication = await client.query<{ id: string }>(
+        `INSERT INTO partner_applications
+           (application_type, contact_email, payload, region, status)
+         VALUES
+           ('gym', 'cleanup-gym@example.invalid',
+            '{"gymName":"Iron District","gymAddress":"King St","managerName":"Cleanup"}'::jsonb,
+            'Toronto', 'submitted')
+         RETURNING id`,
+      );
+
+      await client.query(demoDataCleanupSql);
+
+      await expect(
+        client.query<{ roles: string[] }>(
+          'SELECT roles FROM users WHERE id = $1',
+          [userId],
+        ),
+      ).resolves.toMatchObject({ rows: [{ roles: ['user'] }] });
+      await expect(
+        client.query(
+          `SELECT id FROM region_policies WHERE id = $1
+           UNION ALL SELECT id FROM competitions WHERE id = $2
+           UNION ALL SELECT id FROM reward_catalog_items WHERE id = $3`,
+          [region.rows[0].id, competition.rows[0].id, reward.rows[0].id],
+        ),
+      ).resolves.toMatchObject({ rowCount: 0 });
+      await expect(
+        client.query('SELECT id FROM partner_applications WHERE id = $1', [
+          gymApplication.rows[0].id,
+        ]),
+      ).resolves.toMatchObject({ rowCount: 0 });
+      await expect(
+        client.query(
+          `SELECT id FROM operator_audit_events
+           WHERE action = 'user.bc_demo_operator_bootstrapped'
+             AND actor_user_id = $1`,
+          [userId],
+        ),
+      ).resolves.toMatchObject({ rowCount: 0 });
+
+      await client.query('DELETE FROM users WHERE id = $1', [userId]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   });
 
   it('installs social identity, consent, and challenge constraints', async () => {
@@ -270,7 +383,6 @@ describeWithDatabase('database migrations', () => {
         'account_legal_receipts_append_only',
         'account_legal_receipts_validate',
         'draw_entries_append_only',
-        'demo_verification_checkpoints_immutable',
         'entry_ledger_append_only',
         'legal_document_events_append_only',
         'legal_documents_append_only',

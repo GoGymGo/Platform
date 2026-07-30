@@ -5,6 +5,8 @@ import { CompetitionsService } from '../src/modules/competitions/competitions.se
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
+import { devicePresenceConsentVersion } from '../src/modules/legal/verification-consent';
+import { VerificationConsentsService } from '../src/modules/legal/verification-consents.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
@@ -87,6 +89,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let operatorUserId: string;
   let profiles: ProfilesService;
   let sessions: SessionsService;
+  let verificationConsents: VerificationConsentsService;
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
@@ -95,14 +98,26 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
+    verificationConsents = new VerificationConsentsService(
+      database,
+      idempotency,
+      profiles,
+    );
     competitions = new CompetitionsService(
       database,
       idempotency,
       ledger,
       legalDocuments,
+      verificationConsents,
       profiles,
     );
-    sessions = new SessionsService(database, idempotency, ledger, profiles);
+    sessions = new SessionsService(
+      database,
+      idempotency,
+      ledger,
+      profiles,
+      verificationConsents,
+    );
     const operator = await profiles.ensureUser(
       operatorPrincipal,
       database.connection,
@@ -134,6 +149,27 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toMatchObject({
       response: { code: 'VERIFIED_EMAIL_REQUIRED' },
     });
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'session-workflow-consent-required',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'DEVICE_PRESENCE_CONSENT_REQUIRED' },
+    });
+    await setVerificationConsent(
+      userPrincipal,
+      true,
+      'session-workflow-consent-granted',
+    );
     const enrollment = await competitions.enroll(
       userPrincipal,
       fixture.competitionId,
@@ -161,6 +197,26 @@ describeWithDatabase('critical session and ledger workflow', () => {
       ),
     ).resolves.toEqual(enrollment);
     await activateCompetition(fixture.competitionId);
+
+    await setVerificationConsent(
+      userPrincipal,
+      false,
+      'session-workflow-consent-withdrawn',
+    );
+    await expect(
+      sessions.create(
+        userPrincipal,
+        'session-workflow-withdrawn-consent-create',
+        { competitionId: fixture.competitionId },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'DEVICE_PRESENCE_CONSENT_REQUIRED' },
+    });
+    await setVerificationConsent(
+      userPrincipal,
+      true,
+      'session-workflow-consent-restored',
+    );
 
     const abandoned = await sessions.create(
       userPrincipal,
@@ -763,6 +819,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
         principal,
         `critical-capped-legal-${principal.firebaseUid}`,
       );
+      await setVerificationConsent(
+        principal,
+        true,
+        `critical-capped-consent-${principal.firebaseUid}`,
+      );
       const verification = await migrated.pool.query<{ id: string }>(
         `INSERT INTO region_verifications
            (user_id, region_policy_id, method, status, evidence_metadata,
@@ -936,6 +997,22 @@ describeWithDatabase('critical session and ledger workflow', () => {
       },
     );
     return status.receiptBundleId!;
+  }
+
+  async function setVerificationConsent(
+    principal: AuthenticatedPrincipal,
+    accepted: boolean,
+    idempotencyKey: string,
+  ): Promise<void> {
+    const status = await verificationConsents.setStatus(
+      principal,
+      idempotencyKey,
+      {
+        accepted,
+        consentVersion: devicePresenceConsentVersion,
+      },
+    );
+    expect(status.accepted).toBe(accepted);
   }
 
   async function activateCompetition(competitionId: string): Promise<void> {

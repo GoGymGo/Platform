@@ -31,6 +31,9 @@ type BiometricCameraConsentBannerProps = {
 };
 
 type LegalDocumentLinksProps = {
+  compact?: boolean;
+  jurisdictionCode?: string;
+  locale?: string;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -66,6 +69,8 @@ export function LegalConsentCheckbox({
 
   return (
     <Pressable
+      aria-checked={checked}
+      aria-label={label}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       onPress={onToggle}
@@ -94,19 +99,64 @@ export function LegalConsentCheckbox({
   );
 }
 
-export function LegalDocumentLinks({ style }: LegalDocumentLinksProps) {
+export function LegalDocumentLinks({
+  compact = false,
+  jurisdictionCode = 'GLOBAL',
+  locale = 'en',
+  style
+}: LegalDocumentLinksProps) {
   const router = useRouter();
+  const openDocument = (
+    pathname: '/privacy-policy' | '/terms-of-service'
+  ) => router.push({
+    pathname,
+    params: { jurisdictionCode, locale }
+  } as Href);
+
+  if (compact) {
+    return (
+      <View style={[styles.compactLinkRow, style]}>
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => openDocument('/privacy-policy')}
+          style={({ pressed }) => [
+            styles.compactLink,
+            pressed ? styles.pressed : null
+          ]}
+        >
+          <TerminalText glow tone="cyan" variant="micro">
+            PRIVACY POLICY
+          </TerminalText>
+        </Pressable>
+        <TerminalText tone="dim" variant="micro">
+          {'//'}
+        </TerminalText>
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => openDocument('/terms-of-service')}
+          style={({ pressed }) => [
+            styles.compactLink,
+            pressed ? styles.pressed : null
+          ]}
+        >
+          <TerminalText glow tone="cyan" variant="micro">
+            TERMS
+          </TerminalText>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.linkRow, style]}>
       <CyberButtonOutline
         label="PRIVACY POLICY"
-        onPress={() => router.push('/privacy-policy' as Href)}
+        onPress={() => openDocument('/privacy-policy')}
         style={styles.linkButton}
       />
       <CyberButtonOutline
         label="TERMS"
-        onPress={() => router.push('/terms-of-service' as Href)}
+        onPress={() => openDocument('/terms-of-service')}
         style={styles.linkButton}
       />
     </View>
@@ -126,28 +176,20 @@ export function BiometricCameraConsentBanner({
 
   if (compact && checked) {
     return (
-      <HUDBorderBox glow style={[styles.cameraBannerAccepted, style]} tone="cyan">
-        <View style={styles.acceptedStatus}>
+      <HUDBorderBox style={[styles.cameraBannerAccepted, style]} tone="muted">
+        <View style={styles.acceptedCopy}>
           <TerminalText glow tone="green" variant="label">
-            CONSENT ON FILE
+            SECURE CHECK READY
           </TerminalText>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/biometric-camera-consent' as Href)}
-            style={({ pressed }) => [styles.policyButton, pressed ? styles.pressed : null]}
-          >
-            <TerminalText glow tone="cyan" variant="micro">
-              VIEW NOTICE
-            </TerminalText>
-          </Pressable>
         </View>
         <Pressable
+          accessibilityLabel="Learn more about device verification"
           accessibilityRole="button"
-          onPress={onToggle}
-          style={({ pressed }) => [styles.withdrawButton, pressed ? styles.pressed : null]}
+          onPress={() => router.push('/biometric-camera-consent' as Href)}
+          style={({ pressed }) => [styles.policyButton, pressed ? styles.pressed : null]}
         >
-          <TerminalText tone="dim" variant="micro">
-            WITHDRAW CONSENT
+          <TerminalText glow tone="cyan" variant="micro">
+            WHY?
           </TerminalText>
         </Pressable>
       </HUDBorderBox>
@@ -294,20 +336,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm
   },
+  compactLinkRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs
+  },
+  compactLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm
+  },
   cameraBanner: {
     gap: spacing.sm,
     padding: spacing.md
   },
   cameraBannerAccepted: {
-    gap: spacing.xs,
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md
   },
-  acceptedStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm
+  acceptedCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2
   },
   bannerHeader: {
     flexDirection: 'row',

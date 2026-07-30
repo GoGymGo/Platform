@@ -11,7 +11,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { OnboardingHeader } from '@/components/onboarding';
+import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   hasCreatorApplicationErrors,
@@ -47,6 +47,7 @@ export default function CreatorApplicationScreen() {
   const [errors, setErrors] = useState<CreatorApplicationErrors>({});
   const [region, setRegion] = useState(competitionRegion.label);
   const [sampleWorkoutUrl, setSampleWorkoutUrl] = useState('');
+  const [showRequirements, setShowRequirements] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionError, setSubmissionError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
@@ -114,24 +115,29 @@ export default function CreatorApplicationScreen() {
           APPLY AS A CREATOR
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Submit a local follow-along workout for review. Selected creators can
-          lead their region and receive featured brand support. Submissions do
-          not add prize draw entries. Approved creators submit videos through
-          the Creator Catalog with a separate, explicit content-rights receipt.
+          Share your region, creator profile and one sample workout. Approved
+          creators receive the complete publishing and content-rights process.
         </TerminalText>
 
-        <View style={styles.requirements}>
-          {requirements.map((requirement, index) => (
-            <View key={requirement} style={styles.requirementRow}>
-              <TerminalText glow tone="cyan" variant="micro">
-                {String(index + 1).padStart(2, '0')}
-              </TerminalText>
-              <TerminalText style={styles.requirementText} tone="text" variant="body">
-                {requirement}
-              </TerminalText>
-            </View>
-          ))}
-        </View>
+        <CompactTextButton
+          label={showRequirements ? 'HIDE CREATOR REQUIREMENTS' : 'VIEW CREATOR REQUIREMENTS'}
+          onPress={() => setShowRequirements((current) => !current)}
+          tone={showRequirements ? 'muted' : 'cyan'}
+        />
+        {showRequirements ? (
+          <View style={styles.requirements}>
+            {requirements.map((requirement, index) => (
+              <View key={requirement} style={styles.requirementRow}>
+                <TerminalText glow tone="cyan" variant="micro">
+                  {String(index + 1).padStart(2, '0')}
+                </TerminalText>
+                <TerminalText style={styles.requirementText} tone="text" variant="body">
+                  {requirement}
+                </TerminalText>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <HUDBorderBox style={styles.form} tone="muted">
           <AuthTextField

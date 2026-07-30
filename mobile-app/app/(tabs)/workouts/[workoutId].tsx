@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
@@ -12,8 +12,11 @@ import {
   ScreenLoadingState,
   TerminalText
 } from '@/components/cyber';
+import { RecoverableScreenError } from '@/components/reliability';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts, usePlanCreatorWorkout } from '@/data/appDataHooks';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
+import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useSponsorCampaign } from '@/state/sponsorCampaign';
 
@@ -33,19 +36,50 @@ const ruleItems: readonly RuleItem[] = [
 export default function WorkoutDetailScreen() {
   const router = useRouter();
   const { campaign } = useSponsorCampaign();
-  const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
+  const { plannedDate: requestedPlannedDate, workoutId } = useLocalSearchParams<{
+    plannedDate?: string;
+    workoutId?: string;
+  }>();
   const { data: creatorWorkouts = [], isError, isPending, refetch } = useCreatorWorkouts();
   const planCreatorWorkout = usePlanCreatorWorkout();
-  const [plannedDate, setPlannedDate] = useState(() => nextDateKey());
+  const [plannedDate, setPlannedDate] = useState(() =>
+    requestedPlannedDate && isFutureDateKey(requestedPlannedDate)
+      ? requestedPlannedDate
+      : nextDateKey()
+  );
   const [planningFeedback, setPlanningFeedback] = useState<string | null>(null);
   const workout = creatorWorkouts.find((item) => item.id === workoutId);
   const sponsorConfirmed = campaign.status === 'approved';
+  const {
+    checking: setupChecking,
+    error: setupError,
+    ready: setupReady,
+    retry: retrySetup,
+    retrying: setupRetrying,
+    setupActionLabel,
+    setupRoute
+  } = useSessionRegistrationAccess();
+  const {
+    ready: verificationPreferenceReady,
+    workoutStartRoute
+  } = useWorkoutVerificationPreference();
 
-  if (isPending) {
+  if (isPending || setupChecking || !verificationPreferenceReady) {
     return (
       <ScreenLoadingState
         body="Loading the creator workout and verification details."
         label="LOADING CREATOR WORKOUT"
+      />
+    );
+  }
+
+  if (setupError) {
+    return (
+      <RecoverableScreenError
+        body="Your competition setup could not be checked. Retry before starting this workout."
+        onRetry={() => void retrySetup()}
+        retrying={setupRetrying}
+        title="COULD NOT CHECK SETUP"
       />
     );
   }
@@ -86,7 +120,7 @@ export default function WorkoutDetailScreen() {
           </TerminalText>
           <CyberButtonPrimary
             label="BACK TO CREATOR WORKOUTS ->"
-            onPress={() => router.replace('/workouts')}
+            onPress={() => goBackOrReplace(router, '/workouts')}
             style={styles.unavailableAction}
           />
         </HUDBorderBox>
@@ -160,8 +194,13 @@ export default function WorkoutDetailScreen() {
         </TerminalText>
 
         <CyberButtonPrimary
-          label="START VERIFIED SESSION ->"
-          onPress={() => router.push('/workout/method')}
+          label={setupReady ? 'START VERIFIED SESSION ->' : setupActionLabel}
+          onPress={() => {
+            const route = setupReady ? workoutStartRoute : setupRoute;
+            if (route) {
+              router.push(route as Href);
+            }
+          }}
           style={styles.startButton}
           tone="cyan"
         />

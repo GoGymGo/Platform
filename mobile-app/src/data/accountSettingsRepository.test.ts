@@ -19,6 +19,8 @@ describe('account settings repository', () => {
     await settings.getPrivacyDownload('privacy-one');
     await settings.registerPushDevice('ios', 'ExponentPushToken[device-one]');
     await settings.disablePushDevice('device-one');
+    await settings.getDevicePresenceConsent();
+    await settings.setDevicePresenceConsent(false, '2026-07-05');
     await settings.getAvatar();
     await settings.removeAvatar();
 
@@ -44,18 +46,33 @@ describe('account settings repository', () => {
         method: 'DELETE',
         path: '/v1/me/push-devices/device-one'
       },
+      {
+        body: undefined,
+        method: undefined,
+        path: '/v1/me/verification-consents/device-presence'
+      },
+      {
+        body: { accepted: false, consentVersion: '2026-07-05' },
+        method: 'PUT',
+        path: '/v1/me/verification-consents/device-presence'
+      },
       { body: undefined, method: undefined, path: '/v1/me/avatar' },
       { body: undefined, method: 'DELETE', path: '/v1/me/avatar' }
     ]);
   });
 
-  it('retains demo privacy requests for a complete UI walkthrough', async () => {
-    const settings = createAccountSettingsRepository('demo', null);
-    await settings.createPrivacyRequest('delete');
-    const requests = await settings.listPrivacyRequests();
+  it('does not fabricate settings state when the API is unavailable', async () => {
+    const settings = createAccountSettingsRepository('unavailable', null);
 
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0].requestType, 'delete');
-    assert.equal(requests[0].status, 'requested');
+    assert.deepEqual(await settings.listPrivacyRequests(), []);
+    assert.deepEqual(await settings.getAvatar(), { active: null, latest: null });
+    await assert.rejects(
+      () => settings.getDevicePresenceConsent(),
+      /not configured/i
+    );
+    await assert.rejects(
+      () => settings.createPrivacyRequest('delete'),
+      /not configured/i
+    );
   });
 });

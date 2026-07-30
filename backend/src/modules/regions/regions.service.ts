@@ -15,7 +15,7 @@ import { buildRegionEvidence } from './region-evidence';
 interface RegionVerificationJson extends JsonObject {
   createdAt: string;
   id: string;
-  method: 'device_location' | 'postal_code';
+  method: 'device_location';
   policyVersion: string;
   regionPolicyId: string;
   status: 'pending';
@@ -127,10 +127,9 @@ export class RegionsService {
     request: CreateRegionVerificationDto,
   ): Promise<RegionVerificationResponseDto> {
     const idempotencyRequest: JsonObject = {
-      latitude: request.latitude ?? null,
-      longitude: request.longitude ?? null,
+      latitude: request.latitude,
+      longitude: request.longitude,
       method: request.method,
-      postalCode: request.postalCode ?? null,
       regionPolicyId: request.regionPolicyId,
     };
     const result = await this.idempotency.execute<RegionVerificationJson>(
@@ -167,10 +166,7 @@ export class RegionsService {
           .insertInto('region_verifications')
           .values({
             created_at: now,
-            evidence_metadata: buildRegionEvidence(
-              request,
-              policy.country_code,
-            ),
+            evidence_metadata: buildRegionEvidence(request),
             method: request.method,
             policy_version: policy.policy_version,
             region_policy_id: policy.id,
@@ -190,7 +186,7 @@ export class RegionsService {
         return {
           createdAt: verification.created_at.toISOString(),
           id: verification.id,
-          method: verification.method as 'device_location' | 'postal_code',
+          method: verification.method as 'device_location',
           policyVersion: verification.policy_version,
           regionPolicyId: verification.region_policy_id,
           status: 'pending',

@@ -59,7 +59,7 @@ export function SponsorRail({
           compact ? styles.sponsorMarkCompact : null
         ]}
       >
-        <TerminalText glow tone={sponsorTone} variant={compact ? 'label' : 'title'}>
+        <TerminalText accessibilityRole="text" glow tone={sponsorTone} variant={compact ? 'label' : 'title'}>
           {resolvedMark}
         </TerminalText>
       </View>
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfacePinkSoft
   },
   sponsorRailCompact: {
-    minHeight: 42,
+    minHeight: 44,
     gap: spacing.sm,
     paddingVertical: 6,
     paddingHorizontal: spacing.md

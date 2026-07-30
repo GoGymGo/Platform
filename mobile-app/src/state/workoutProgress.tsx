@@ -50,6 +50,10 @@ import {
   type WorkoutVerificationMethod
 } from '@/domain/workoutProgress';
 import {
+  hasSessionCompetitionAccess,
+  resolveSessionCompetitionMonthKey
+} from '@/domain/workoutAccess';
+import {
   useAppData,
   useAuthoritativeCompetitionProgress,
   useCompetitionMatches
@@ -65,8 +69,14 @@ import {
   signalMidSessionCheck
 } from '@/services/midSessionCheckReminder';
 import { createUserStorage } from '@/services/storage/userStorage';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
+import {
+  createAppTourActiveSession,
+  createAppTourReadyWorkoutSession
+} from '@/testing/appTourData';
 
 export type { CalendarDay, WorkoutLog } from '@/domain/workoutProgress';
 export { formatDateKey, formatMonthLabel, parseDateKey, toDateKey } from '@/domain/workoutProgress';
@@ -104,6 +114,7 @@ type WorkoutProgressContextValue = {
   markMidSessionVerified: () => boolean;
   midSessionAlertsReady: boolean;
   prizeDrawEligible: boolean;
+  progressReady: boolean;
   recordHeartRateSample: (heartRateBpm: number, elapsedSeconds: number) => void;
   recordGymQrScan: (qrPayload: string) => Promise<boolean>;
   remindersEnabled: boolean;
@@ -125,6 +136,10 @@ type WorkoutProgressContextValue = {
 const WorkoutProgressContext = createContext<WorkoutProgressContextValue | null>(null);
 
 export function WorkoutProgressProvider({ children }: PropsWithChildren) {
+  const {
+    active: appTourActive,
+    scenario: appTourScenario
+  } = useAppTour();
   const { account, accountSettings, mode, sessions } = useAppData();
   const queryClient = useQueryClient();
   const { data: authoritativeProgress = null } =
@@ -136,9 +151,15 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     () => userId ? createUserStorage(userId) : null,
     [userId]
   );
-  const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null);
+  const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(
+    () => appTourActive
+      ? createAppTourActiveSession(appTourScenario)
+      : null
+  );
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
-  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(
+    appTourActive ? userId : null
+  );
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [midSessionAlertsReady, setMidSessionAlertsReady] = useState(false);
   const [sessionActionError, setSessionActionError] = useState<string | null>(null);
@@ -152,9 +173,16 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
   const [weeklyGoal, setWeeklyGoalState] = useState<number>(
     workoutRules.defaultWeeklyGoal
   );
+  const progressReady = !authLoading && (!userId || hydratedUserId === userId);
 
   useEffect(() => {
     let active = true;
+
+    if (appTourActive) {
+      return () => {
+        active = false;
+      };
+    }
 
     if (authLoading || !userId || !userStorage) {
       return () => {
@@ -184,7 +212,11 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
 
         const parsedGoal = storedGoal ? Number.parseInt(storedGoal, 10) : Number.NaN;
         setActiveSession(parseStoredActiveWorkoutSession(storedSession));
-        setLogs(parseStoredWorkoutLogs(storedLogs));
+        setLogs(
+          parseStoredWorkoutLogs(storedLogs).filter(
+            ({ source }) => source === 'manual'
+          )
+        );
         setWeeklyGoalState(
           Number.isFinite(parsedGoal)
             ? Math.min(7, Math.max(1, parsedGoal))
@@ -204,10 +236,10 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, [authLoading, userId, userStorage]);
+  }, [appTourActive, appTourScenario, authLoading, userId, userStorage]);
 
   useEffect(() => {
-    if (!userStorage || hydratedUserId !== userId) {
+    if (appTourActive || !userStorage || hydratedUserId !== userId) {
       return;
     }
 
@@ -221,10 +253,10 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     void persistence.catch(() => {
       // The in-memory session remains active until persistence recovers.
     });
-  }, [activeSession, hydratedUserId, userId, userStorage]);
+  }, [activeSession, appTourActive, hydratedUserId, userId, userStorage]);
 
   useEffect(() => {
-    if (!userStorage || hydratedUserId !== userId) {
+    if (appTourActive || !userStorage || hydratedUserId !== userId) {
       return;
     }
 
@@ -234,7 +266,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     ).catch(() => {
       // The current session remains connected in memory until persistence recovers.
     });
-  }, [hydratedUserId, logs, userId, userStorage]);
+  }, [appTourActive, hydratedUserId, logs, userId, userStorage]);
 
   const authoritativeVerifiedLogs = useMemo(
     () => (authoritativeProgress?.sessions ?? [])
@@ -263,19 +295,21 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     [authoritativeProgress]
   );
   const effectiveLogs = useMemo(
-    () => mode === 'api'
-      ? [
-          ...logs.filter(({ source }) => source === 'manual'),
-          ...authoritativeVerifiedLogs
-        ]
-      : logs,
-    [authoritativeVerifiedLogs, logs, mode]
+    () => [
+      ...logs.filter(({ source }) => source === 'manual'),
+      ...authoritativeVerifiedLogs
+    ],
+    [authoritativeVerifiedLogs, logs]
   );
-  const effectiveWeeklyGoal = mode === 'api' && authoritativeProgress
+  const effectiveWeeklyGoal = mode !== 'unavailable' && authoritativeProgress
     ? authoritativeProgress.goalDays
     : weeklyGoal;
 
   useEffect(() => {
+    if (appTourActive) {
+      return;
+    }
+
     if (!remindersEnabled) {
       return;
     }
@@ -298,7 +332,14 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     void syncCompetitionReminders(reminders).catch(() => {
       // A backend push reminder can recover when local scheduling is unavailable.
     });
-  }, [competitionRegion.timeZone, effectiveLogs, effectiveWeeklyGoal, registrationCompetitionMonthKey, remindersEnabled]);
+  }, [
+    appTourActive,
+    competitionRegion.timeZone,
+    effectiveLogs,
+    effectiveWeeklyGoal,
+    registrationCompetitionMonthKey,
+    remindersEnabled
+  ]);
 
   const reminderSessionId = activeSession?.id;
   const reminderCheckAtSeconds = activeSession?.midSessionCheckAtSeconds;
@@ -308,6 +349,12 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
+
+    if (appTourActive) {
+      return () => {
+        active = false;
+      };
+    }
 
     if (
       !reminderSessionId ||
@@ -349,6 +396,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       active = false;
     };
   }, [
+    appTourActive,
     reminderCheckAtSeconds,
     reminderPrompted,
     reminderSessionId,
@@ -374,12 +422,25 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           now,
           competitionRegion.timeZone
         );
+        const currentMonthKey = getCompetitionMonthKey(dateKey);
+        const sessionMonthKey = resolveSessionCompetitionMonthKey({
+          currentMonthKey
+        });
         const competition = await account.getCurrentCompetition(
-          getCompetitionMonthKey(dateKey),
+          sessionMonthKey,
           competitionRegion.label
         );
         const enrollment = await account.getCurrentEnrollment();
-        if (!competition || !enrollment || enrollment.competitionId !== competition.id) {
+        if (!competition) {
+          throw new Error(
+            'Join the current monthly competition before starting a verified workout.'
+          );
+        }
+        const hasCompetitionAccess = hasSessionCompetitionAccess({
+          competitionId: competition.id,
+          enrollmentCompetitionId: enrollment?.competitionId ?? null
+        });
+        if (!hasCompetitionAccess) {
           throw new Error(
             'Join the current monthly competition before starting a verified workout.'
           );
@@ -429,22 +490,32 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         }
 
         lastHeartRateEvidenceSecond.current = -30;
-        setActiveSession({
-          averageHeartRateBpm: 0,
-          dateKey: serverSession.eligibleDate,
-          heartRateObservedSeconds: 0,
-          heartRateTotalBpmSeconds: 0,
-          id: serverSession.id,
-          lastHeartRateSampleElapsedSeconds: 0,
-          midSessionCheckAtSeconds: getRandomMidSessionCheckSecond(),
-          midSessionCheckPrompted: false,
-          midSessionCheckPromptedAt: null,
-          midSessionVerified: false,
-          serverManaged: true,
-          startedAt: serverSession.startedAt,
-          verificationMethod
-        });
+        const tourSession = mode === 'tour'
+          ? createAppTourReadyWorkoutSession(verificationMethod)
+          : null;
+        setActiveSession(tourSession
+          ? {
+              ...tourSession,
+              dateKey: serverSession.eligibleDate,
+              id: serverSession.id
+            }
+          : {
+              averageHeartRateBpm: 0,
+              dateKey: serverSession.eligibleDate,
+              heartRateObservedSeconds: 0,
+              heartRateTotalBpmSeconds: 0,
+              id: serverSession.id,
+              lastHeartRateSampleElapsedSeconds: 0,
+              midSessionCheckAtSeconds: getRandomMidSessionCheckSecond(),
+              midSessionCheckPrompted: false,
+              midSessionCheckPromptedAt: null,
+              midSessionVerified: false,
+              serverManaged: true,
+              startedAt: serverSession.startedAt,
+              verificationMethod
+            });
         sessionStartAttemptId.current = null;
+        void recordFlowMetric(userId, 'workout-started', 'workout');
         return true;
       } catch (error) {
         setSessionActionError(getSessionActionError(error));
@@ -460,7 +531,8 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       competitionRegion.label,
       competitionRegion.timeZone,
       mode,
-      sessions
+      sessions,
+      userId
     ]
   );
 
@@ -476,6 +548,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       setMidSessionAlertsReady(false);
       sessionStartAttemptId.current = null;
       void cancelMidSessionCheckReminder();
+      void recordFlowMetric(userId, 'workout-cancelled', 'workout');
       return true;
     } catch (error) {
       setSessionActionError(getSessionActionError(error));
@@ -484,7 +557,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       sessionActionInFlight.current = false;
       setSessionActionPending(false);
     }
-  }, [activeSession, queryClient, sessions]);
+  }, [activeSession, queryClient, sessions, userId]);
 
   const markMidSessionVerified = useCallback(() => {
     if (
@@ -660,6 +733,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       setActiveSession(null);
       setMidSessionAlertsReady(false);
       void cancelMidSessionCheckReminder();
+      void recordFlowMetric(userId, 'workout-completed', 'workout');
 
       return completionStatus;
     } catch (error) {
@@ -669,7 +743,14 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       sessionActionInFlight.current = false;
       setSessionActionPending(false);
     }
-  }, [activeSession, effectiveLogs, effectiveWeeklyGoal, queryClient, sessions]);
+  }, [
+    activeSession,
+    effectiveLogs,
+    effectiveWeeklyGoal,
+    queryClient,
+    sessions,
+    userId
+  ]);
 
   const addManualWorkoutLog = useCallback((input: ManualWorkoutInput) => {
     const createdAt = new Date().toISOString();
@@ -692,6 +773,11 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
   }, []);
 
   const setCompetitionRemindersEnabled = useCallback(async (enabled: boolean) => {
+    if (appTourActive) {
+      setRemindersEnabled(enabled);
+      return true;
+    }
+
     if (!enabled) {
       try {
         const pushDeviceId = await userStorage?.getItem(
@@ -755,7 +841,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       setRemindersEnabled(false);
       return false;
     }
-  }, [accountSettings, mode, userStorage]);
+  }, [accountSettings, appTourActive, mode, userStorage]);
 
   const setWeeklyGoal = useCallback((goal: number) => {
     const nextRegistrationDateKey = getCompetitionRegionDateKey(
@@ -867,18 +953,9 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       userVerifiedDateKeys: competitionVerifiedDateKeys,
       weeklyGoal: effectiveWeeklyGoal
     });
-    const localCompetitionEntries = competition.totalCompetitionEntries;
-    const authoritativeTotalEntries = mode === 'api'
-      ? authoritativeProgress?.prizeDrawEntries
-      : undefined;
-    const totalEntries = authoritativeTotalEntries ??
-      workoutRules.signupEntries + localCompetitionEntries;
-    const competitionEntries = authoritativeTotalEntries === undefined
-      ? localCompetitionEntries
-      : Math.max(0, authoritativeTotalEntries - workoutRules.signupEntries);
-    const verifiedSessionCount = mode === 'api' && authoritativeProgress
-      ? authoritativeProgress.verifiedDays
-      : verifiedDateKeys.length;
+    const totalEntries = authoritativeProgress?.prizeDrawEntries ?? 0;
+    const competitionEntries = totalEntries;
+    const verifiedSessionCount = authoritativeProgress?.verifiedDays ?? 0;
     const prizeDrawEligible = hasActivePrizeDrawEntry(totalEntries);
     const calendarWeekProgress = getCurrentWeekProgress(
       referenceDateKey,
@@ -913,7 +990,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       totalEntries,
       verifiedSessionCount
     };
-  }, [authoritativeProgress, competitionMatches, competitionRegion.timeZone, effectiveLogs, effectiveWeeklyGoal, mode, registrationCompetitionMonthKey, registrationDateKey]);
+  }, [authoritativeProgress, competitionMatches, competitionRegion.timeZone, effectiveLogs, effectiveWeeklyGoal, registrationCompetitionMonthKey, registrationDateKey]);
 
   const value = useMemo<WorkoutProgressContextValue>(
     () => ({
@@ -938,6 +1015,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       markMidSessionVerified,
       midSessionAlertsReady,
       prizeDrawEligible: derived.prizeDrawEligible,
+      progressReady,
       recordGymQrScan,
       recordHeartRateSample,
       remindersEnabled,
@@ -945,7 +1023,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       setWeeklyGoal,
       sessionActionError,
       sessionActionPending,
-      signupEntries: workoutRules.signupEntries,
+      signupEntries: 0,
       startWorkoutSession,
       totalEntries: derived.totalEntries,
       triggerMidSessionCheck,
@@ -963,6 +1041,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       effectiveLogs,
       markMidSessionVerified,
       midSessionAlertsReady,
+      progressReady,
       recordHeartRateSample,
       recordGymQrScan,
       remindersEnabled,

@@ -18,6 +18,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { parseCompetitionRules } from '../competitions/competition-rules';
 import { LedgerService } from '../ledger/ledger.service';
+import { VerificationConsentsService } from '../legal/verification-consents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   AppendSessionEventDto,
@@ -75,6 +76,7 @@ export class SessionsService {
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
     private readonly profiles: ProfilesService,
+    private readonly verificationConsents: VerificationConsentsService,
   ) {}
 
   async create(
@@ -128,6 +130,10 @@ export class SessionsService {
               'An active enrollment is required to start a competition session.',
           });
         }
+        await this.verificationConsents.assertActiveDevicePresenceConsent(
+          transaction,
+          user.id,
+        );
         if (
           enrollment.competition_status !== 'active' ||
           now < enrollment.starts_at ||

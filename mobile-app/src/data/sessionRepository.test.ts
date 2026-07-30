@@ -78,16 +78,16 @@ describe('workout session repository', () => {
     );
   });
 
-  it('supports the complete demo lifecycle without awarding before completion', async () => {
-    const sessions = createWorkoutSessionRepository('demo', null);
-    const created = await sessions.createSession(
-      '40000000-0000-4000-8000-000000000001',
-      'demo-attempt'
-    );
-    const completed = await sessions.completeSession(created.id);
+  it('does not fabricate a workout lifecycle when the API is unavailable', async () => {
+    const sessions = createWorkoutSessionRepository('unavailable', null);
 
-    assert.equal(created.status, 'active');
-    assert.equal(completed.status, 'verified');
-    assert.equal(completed.eligibleForReview, true);
+    assert.equal(await sessions.getCompetitionProgress(), null);
+    await assert.rejects(
+      () => sessions.createSession(
+        '40000000-0000-4000-8000-000000000001',
+        'offline-attempt'
+      ),
+      /not configured/i
+    );
   });
 });

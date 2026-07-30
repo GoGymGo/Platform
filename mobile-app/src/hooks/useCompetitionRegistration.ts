@@ -1,12 +1,11 @@
 import {
   useCurrentCompetition,
   useCurrentEnrollment,
-  useCurrentLegalDocuments,
   useEnrollInCompetition,
-  useLegalReceiptStatus,
-  useRecordLegalReceipt
+  useLegalReceiptStatus
 } from '@/data/accountReadinessHooks';
 import type { CompetitionRegionVerification } from '@/config/regions';
+import { useAppTour } from '@/state/appTour';
 
 export function useCompetitionRegistration({
   expectedMonthKey,
@@ -19,16 +18,15 @@ export function useCompetitionRegistration({
   regionLabel: string;
   regionVerification: CompetitionRegionVerification | null;
 }) {
-  const legalDocuments = useCurrentLegalDocuments(jurisdictionCode);
+  const { active: appTourActive } = useAppTour();
   const legalReceipt = useLegalReceiptStatus(jurisdictionCode);
-  const recordLegalReceipt = useRecordLegalReceipt();
   const currentCompetition = useCurrentCompetition(expectedMonthKey, regionLabel);
   const currentEnrollment = useCurrentEnrollment();
   const enrollInCompetition = useEnrollInCompetition();
 
   async function register(goalDays: number) {
     const existingEnrollment = currentEnrollment.data;
-    if (existingEnrollment) {
+    if (existingEnrollment && !appTourActive) {
       if (existingEnrollment.goalDays !== goalDays) {
         throw new Error(
           `You are already enrolled with a ${existingEnrollment.goalDays}-day Weekly Goal. Contact support if that enrollment is incorrect.`
@@ -44,6 +42,18 @@ export function useCompetitionRegistration({
     if (!competition.goalDays.includes(goalDays)) {
       throw new Error('That Weekly Goal is not available in this competition.');
     }
+    if (appTourActive) {
+      return enrollInCompetition.mutateAsync({
+        competitionId: competition.id,
+        input: {
+          ageEligibilityAttested: true,
+          goalDays,
+          legalReceiptBundleId: 'app-tour-legal-receipt',
+          regionVerificationId: 'app-tour-region-verification',
+          rulesAccepted: true
+        }
+      });
+    }
     if (
       regionVerification?.status !== 'verified' ||
       !regionVerification.verificationId
@@ -52,15 +62,11 @@ export function useCompetitionRegistration({
         'An approved region verification is required before registration.'
       );
     }
-    if (!legalDocuments.data?.configured) {
-      throw new Error('Current legal documents are not available. Try again later.');
-    }
-
-    const receipt = legalReceipt.data?.complete && legalReceipt.data.receiptBundleId
-      ? legalReceipt.data
-      : await recordLegalReceipt.mutateAsync(legalDocuments.data);
-    if (!receipt.receiptBundleId) {
-      throw new Error('The legal acceptance receipt could not be confirmed.');
+    const receipt = legalReceipt.data;
+    if (!receipt?.complete || !receipt.receiptBundleId) {
+      throw new Error(
+        'Review and accept Privacy & Permissions before competition registration.'
+      );
     }
 
     return enrollInCompetition.mutateAsync({
@@ -79,9 +85,7 @@ export function useCompetitionRegistration({
     busy:
       currentCompetition.isLoading ||
       currentEnrollment.isLoading ||
-      legalDocuments.isLoading ||
       legalReceipt.isLoading ||
-      recordLegalReceipt.isPending ||
       enrollInCompetition.isPending,
     register
   };

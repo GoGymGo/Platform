@@ -47,10 +47,10 @@ export class CreatorWorkoutResponseDto {
   @ApiProperty({ isArray: true, type: String })
   regionCodes!: string[];
 
-  @ApiPropertyOptional({ nullable: true, type: String })
+  @ApiProperty({ nullable: true, type: String })
   sponsorName!: string | null;
 
-  @ApiPropertyOptional({ format: 'uri', nullable: true, type: String })
+  @ApiProperty({ format: 'uri', nullable: true, type: String })
   thumbnailUrl!: string | null;
 
   @ApiProperty({ format: 'uri', type: String })
@@ -167,7 +167,7 @@ export class CreatorWorkoutPlanResponseDto {
   @ApiProperty({ format: 'date', type: String })
   plannedDate!: string;
 
-  @ApiPropertyOptional({ nullable: true, type: String })
+  @ApiProperty({ nullable: true, type: String })
   note!: string | null;
 
   @ApiProperty({ maximum: 180, minimum: 5, type: Number })

@@ -12,10 +12,12 @@ import {
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
@@ -38,6 +40,7 @@ import {
 } from './dto/competition.dto';
 
 @ApiTags('competitions')
+@ApiExtraModels(CompetitionResponseDto, EnrollmentResponseDto)
 @Controller('competitions')
 export class CompetitionsController {
   constructor(private readonly competitions: CompetitionsService) {}
@@ -47,7 +50,12 @@ export class CompetitionsController {
   @ApiOperation({
     summary: 'Return the authenticated user current regional competition',
   })
-  @ApiOkResponse({ type: CompetitionResponseDto })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(CompetitionResponseDto) }],
+      nullable: true,
+    },
+  })
   getCurrent(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<CompetitionResponseDto | null> {
@@ -59,7 +67,12 @@ export class CompetitionsController {
   @ApiOperation({
     summary: 'Return the authenticated user current active enrollment',
   })
-  @ApiOkResponse({ type: EnrollmentResponseDto })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(EnrollmentResponseDto) }],
+      nullable: true,
+    },
+  })
   getCurrentEnrollment(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<EnrollmentResponseDto | null> {

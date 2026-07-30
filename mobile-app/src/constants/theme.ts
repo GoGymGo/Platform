@@ -27,9 +27,9 @@ export const colors = {
   // Typography / text
   text: '#E9F7F8',
   textOnPrimary: '#04282A',
-  textDisabled: '#8FA0A8',
-  muted: '#7D949B',
-  dim: '#66858D',
+  textDisabled: '#9AAAB0',
+  muted: '#96AAB0',
+  dim: '#78939A',
 
   // Status / feedback
   statusSuccess: '#4DFF88',
@@ -159,7 +159,7 @@ export const fontSizes = {
   micro: 13,
   label: 14,
   button: 15,
-  body: 16,
+  body: 17,
   control: 16,
   cardTitle: 17,
   stat: 18,
@@ -185,7 +185,7 @@ export const lineHeights = {
   micro: 18,
   label: 20,
   button: 22,
-  body: 24,
+  body: 26,
   cardTitle: 24,
   title: 28,
   titleXl: 31,
@@ -236,9 +236,9 @@ export const typography = {
   },
   caption: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.label,
+    fontSize: 15,
     letterSpacing: letterSpacings.none,
-    lineHeight: lineHeights.label
+    lineHeight: 22
   },
   micro: {
     fontFamily: fontFamilies.terminal,

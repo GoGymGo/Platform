@@ -150,6 +150,17 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication before sponsor placement eligibility', () => {
+    return request(app.getHttpServer())
+      .get('/v1/me/sponsor-ad-placements')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
   it('requires an operator token before reward configuration access', () => {
     return request(app.getHttpServer())
       .post('/v1/operator/configuration/rewards')
@@ -196,19 +207,6 @@ describe('platform foundation (e2e)', () => {
         regionVerificationId: '20000000-0000-4000-8000-000000000002',
         rulesAccepted: true,
       })
-      .expect(401)
-      .expect(({ body }) => {
-        expect(body).toEqual({
-          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
-        });
-      });
-  });
-
-  it('requires authentication before creating a demo verification checkpoint', () => {
-    return request(app.getHttpServer())
-      .post('/v1/demo-verifications/check-ins')
-      .set('Idempotency-Key', 'demo-check-in-e2e')
-      .send({ checkpointType: 'session_start', regionCode: 'CA-BC' })
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({

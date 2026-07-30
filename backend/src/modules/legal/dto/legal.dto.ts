@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
+  IsBoolean,
   IsArray,
   IsDateString,
   IsEnum,
@@ -201,11 +202,46 @@ export class LegalReceiptStatusResponseDto extends CurrentLegalDocumentsResponse
   @ApiProperty({ type: Boolean })
   complete!: boolean;
 
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, type: String })
+  @ApiProperty({ format: 'uuid', nullable: true, type: String })
   receiptBundleId!: string | null;
 
-  @ApiPropertyOptional({ format: 'date-time', nullable: true, type: String })
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
   acceptedAt!: string | null;
+}
+
+export class SetVerificationConsentDto {
+  @ApiProperty({ type: Boolean })
+  @IsBoolean()
+  accepted!: boolean;
+
+  @ApiProperty({ example: '2026-07-05', maxLength: 64, type: String })
+  @IsString()
+  @Length(1, 64)
+  consentVersion!: string;
+}
+
+export class VerificationConsentStatusResponseDto {
+  @ApiProperty({ type: Boolean })
+  accepted!: boolean;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  acceptedAt!: string | null;
+
+  @ApiProperty({
+    enum: ['device_presence_qr_camera'],
+    example: 'device_presence_qr_camera',
+    type: String,
+  })
+  consentKey!: 'device_presence_qr_camera';
+
+  @ApiProperty({ example: '2026-07-05', type: String })
+  consentVersion!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  updatedAt!: string | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  withdrawnAt!: string | null;
 }
 
 export class AdminLegalDocumentResponseDto {

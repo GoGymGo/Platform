@@ -1,3 +1,5 @@
+export const devicePresenceConsentVersion = '2026-07-05';
+
 export type PrivacyRequest = {
   completedAt: string | null;
   downloadAvailable: boolean;
@@ -24,6 +26,15 @@ export type PushDevice = {
 export type DevicePushRegistration = {
   platform: 'android' | 'ios';
   pushToken: string;
+};
+
+export type DevicePresenceConsent = {
+  accepted: boolean;
+  acceptedAt: string | null;
+  consentKey: 'device_presence_qr_camera';
+  consentVersion: string;
+  updatedAt: string | null;
+  withdrawnAt: string | null;
 };
 
 export type AvatarMedia = {

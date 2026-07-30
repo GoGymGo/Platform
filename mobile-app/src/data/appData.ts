@@ -7,8 +7,10 @@ import type {
 import type {
   CreateCreatorVideoSubmissionInput,
   CreatorVideoSubmission,
+  CreatorWorkout,
   CreatorWorkoutPlan
 } from '@/domain/creatorWorkouts';
+import type { CategoryLeaderboard } from '@/domain/leaderboard';
 import type {
   ClaimedReward,
   RewardAward,
@@ -17,42 +19,23 @@ import type {
   SettledCompetitionSummary
 } from '@/domain/rewards';
 import type { StreakSummary } from '@/domain/streaks';
-import { buildCompetitionMatchPreview } from '@/mocks/competitionPreview';
-import {
-  getCategoryLeaderboard,
-  type CategoryLeaderboard
-} from '@/mocks/competitionResults';
-import {
-  rewardAwardsPreview,
-  rewardCatalogPreview,
-  rewardWinnersPreview,
-  settledCompetitionPreview
-} from '@/mocks/rewards';
-import {
-  creatorWorkoutPreviews,
-  type CreatorWorkoutPreview
-} from '@/mocks/creatorWorkouts';
-import {
-  getSessionTelemetryPreview,
-  type SessionTelemetryPreview
-} from '@/mocks/sessionTelemetry';
-import { getStreakSummaryPreview } from '@/mocks/streaks';
 import type { ApiClient } from '@/services/api/client';
 
 export type {
   CategoryLeaderboard,
   CategoryLeaderboardRow
-} from '@/mocks/competitionResults';
-export type { CreatorWorkoutPreview } from '@/mocks/creatorWorkouts';
+} from '@/domain/leaderboard';
 
-export type AppDataMode = 'api' | 'demo' | 'unavailable';
+export type AppDataMode = 'api' | 'tour' | 'unavailable';
 
 export type AppDataSource = {
   claimReward: (
     awardId: string,
     idempotencyKey: string
   ) => Promise<ClaimedReward>;
-  getCategoryLeaderboard: (goal: GoalCategory) => Promise<CategoryLeaderboard | null>;
+  getCategoryLeaderboard: (
+    goal: GoalCategory
+  ) => Promise<CategoryLeaderboard | null>;
   getCompetitionMatches: (
     competitionMonthKey: string,
     weeklyGoal: number,
@@ -62,7 +45,7 @@ export type AppDataSource = {
     region: string,
     competitionMonthKey: string
   ) => Promise<number | null>;
-  getCreatorWorkouts: () => Promise<readonly CreatorWorkoutPreview[]>;
+  getCreatorWorkouts: () => Promise<readonly CreatorWorkout[]>;
   getCreatorWorkoutPlans: () => Promise<readonly CreatorWorkoutPlan[]>;
   getEligibleWeeklyChallengePartners: (
     competitionMonthKey: string,
@@ -83,7 +66,6 @@ export type AppDataSource = {
     monthKey?: string
   ) => Promise<readonly RewardCatalogItem[]>;
   getRewardWinners: () => Promise<readonly RewardWinner[]>;
-  getSessionTelemetry: (elapsedSeconds: number) => SessionTelemetryPreview | null;
   getSettledCompetition: () => Promise<SettledCompetitionSummary | null>;
   planCreatorWorkout: (
     workoutId: string,
@@ -111,313 +93,168 @@ export function createAppDataSource(
   mode: AppDataMode,
   api: ApiClient | null = null
 ): AppDataSource {
-  if (mode === 'api' && !api) {
-    throw new Error('The API data source requires a configured API client.');
+  if (mode === 'api') {
+    return createApiDataSource(requireApi(api));
   }
 
+  return createUnavailableDataSource();
+}
+
+function createApiDataSource(api: ApiClient): AppDataSource {
   return {
-    claimReward: (awardId, idempotencyKey) => {
-      if (mode === 'api') {
-        return requireApi(api).request<ClaimedReward>(
-          `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
-          { idempotencyKey, method: 'POST' }
-        );
-      }
-      const award = rewardAwardsPreview.find((item) => item.id === awardId);
-      if (!award) return Promise.reject(new Error('Reward award not found.'));
-      return Promise.resolve({
-        ...award,
-        claimedAt: new Date().toISOString(),
-        claimUrl: null,
-        couponCode: award.rewardType === 'coupon' ? 'DEMO-REWARD-25' : null,
-        fulfillmentInstructions:
-          award.rewardType === 'physical'
-            ? 'The sponsor will contact you with pickup instructions.'
-            : null,
-        status: 'claimed'
-      });
-    },
-    getCategoryLeaderboard: (goal) => {
-      if (mode === 'demo') return Promise.resolve(getCategoryLeaderboard(goal));
-      if (mode === 'api') {
-        return requireApi(api).request<CategoryLeaderboard>(
-          `/v1/leaderboards/current?goal=${goal}`
-        );
-      }
-      return Promise.resolve(null);
-    },
-    getCompetitionMatches: (competitionMonthKey, weeklyGoal, region) => {
-      if (mode === 'demo') {
-        return Promise.resolve(
-          buildCompetitionMatchPreview(competitionMonthKey, weeklyGoal).map((match) => ({
-            ...match,
-            region
-          }))
-        );
-      }
-      if (mode === 'api') {
-        return requireApi(api).request<readonly CompetitionMatch[]>(
-          `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
-          `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}`
-        );
-      }
-      return Promise.resolve([]);
-    },
-    getCompetitionEnrollmentCount: (region, competitionMonthKey) => {
-      if (mode === 'demo') return Promise.resolve(84);
-      if (mode === 'api') {
-        return requireApi(api)
-          .request<{ count: number }>(
-            `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/enrollment-count` +
-            `?region=${encodeURIComponent(region)}`,
-            { authenticated: false }
-          )
-          .then(({ count }) => count);
-      }
-      return Promise.resolve(null);
-    },
-    getCreatorWorkouts: () => {
-      if (mode === 'demo') return Promise.resolve(creatorWorkoutPreviews);
-      if (mode === 'api') {
-        return requireApi(api).request<readonly CreatorWorkoutPreview[]>(
-          '/v1/creator-workouts'
-        );
-      }
-      return Promise.resolve([]);
-    },
-    getCreatorWorkoutPlans: () => {
-      if (mode === 'demo') return Promise.resolve(demoCreatorWorkoutPlans);
-      if (mode === 'api') {
-        return requireApi(api).request<readonly CreatorWorkoutPlan[]>(
-          '/v1/creator-workouts/plans/me'
-        );
-      }
-      return Promise.resolve([]);
-    },
+    claimReward: (awardId, idempotencyKey) => api.request<ClaimedReward>(
+      `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
+      { idempotencyKey, method: 'POST' }
+    ),
+    getCategoryLeaderboard: (goal) => api.request<CategoryLeaderboard>(
+      `/v1/leaderboards/current?goal=${goal}`
+    ),
+    getCompetitionMatches: (competitionMonthKey, weeklyGoal, region) =>
+      api.request<readonly CompetitionMatch[]>(
+        `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
+        `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}`
+      ),
+    getCompetitionEnrollmentCount: (region, competitionMonthKey) =>
+      api.request<{ count: number }>(
+        `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/enrollment-count` +
+        `?region=${encodeURIComponent(region)}`,
+        { authenticated: false }
+      ).then(({ count }) => count),
+    getCreatorWorkouts: () => api.request<readonly CreatorWorkout[]>(
+      '/v1/creator-workouts'
+    ),
+    getCreatorWorkoutPlans: () => api.request<readonly CreatorWorkoutPlan[]>(
+      '/v1/creator-workouts/plans/me'
+    ),
     getEligibleWeeklyChallengePartners: (
       competitionMonthKey,
       weeklyGoal,
       region,
       periodIndex
-    ) => {
-      if (mode === 'demo') return Promise.resolve(demoEligibleWeeklyPartners);
-      if (mode === 'api') {
-        return requireApi(api).request<readonly EligibleWeeklyChallengePartner[]>(
-          `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/eligible-partners` +
-          `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}&period=${periodIndex}`
-        );
-      }
-      return Promise.resolve([]);
-    },
+    ) => api.request<readonly EligibleWeeklyChallengePartner[]>(
+      `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/eligible-partners` +
+      `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}&period=${periodIndex}`
+    ),
     getWeeklyChallengeRequests: (
       competitionMonthKey,
       weeklyGoal,
       region,
       periodIndex
-    ) => {
-      if (mode === 'demo') return Promise.resolve(demoWeeklyChallengeRequests);
-      if (mode === 'api') {
-        return requireApi(api).request<readonly WeeklyChallengeRequest[]>(
-          `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests` +
-          `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}&period=${periodIndex}`
-        );
-      }
-      return Promise.resolve([]);
-    },
-    getMyRewardAwards: () => {
-      if (mode === 'demo') return Promise.resolve(rewardAwardsPreview);
-      if (mode === 'api') {
-        return requireApi(api).request<readonly RewardAward[]>('/v1/rewards/awards/me');
-      }
-      return Promise.resolve([]);
-    },
-    getMyStreaks: () => {
-      if (mode === 'demo') return Promise.resolve(getStreakSummaryPreview());
-      if (mode === 'api') {
-        return requireApi(api).request<StreakSummary>('/v1/streaks/me');
-      }
-      return Promise.resolve(null);
-    },
+    ) => api.request<readonly WeeklyChallengeRequest[]>(
+      `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests` +
+      `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}&period=${periodIndex}`
+    ),
+    getMyRewardAwards: () => api.request<readonly RewardAward[]>(
+      '/v1/rewards/awards/me'
+    ),
+    getMyStreaks: () => api.request<StreakSummary>('/v1/streaks/me'),
     getRewardCatalog: (region, monthKey) => {
-      if (mode === 'demo') return Promise.resolve(rewardCatalogPreview);
-      if (mode === 'api') {
-        const query = new URLSearchParams({ region });
-        if (monthKey) query.set('monthKey', monthKey);
-        return requireApi(api).request<readonly RewardCatalogItem[]>(
-          `/v1/rewards/catalog?${query.toString()}`,
-          { authenticated: false }
-        );
-      }
-      return Promise.resolve([]);
+      const query = new URLSearchParams({ region });
+      if (monthKey) query.set('monthKey', monthKey);
+      return api.request<readonly RewardCatalogItem[]>(
+        `/v1/rewards/catalog?${query.toString()}`,
+        { authenticated: false }
+      );
     },
-    getRewardWinners: () => {
-      if (mode === 'demo') return Promise.resolve(rewardWinnersPreview);
-      if (mode === 'api') {
-        return requireApi(api).request<readonly RewardWinner[]>(
-          '/v1/results/reward-winners',
-          { authenticated: false }
-        );
-      }
-      return Promise.resolve([]);
-    },
-    getSessionTelemetry: (elapsedSeconds) =>
-      mode === 'demo' ? getSessionTelemetryPreview(elapsedSeconds) : null,
-    getSettledCompetition: () => {
-      if (mode === 'demo') return Promise.resolve(settledCompetitionPreview);
-      if (mode === 'api') {
-        return requireApi(api).request<SettledCompetitionSummary | null>(
-          '/v1/results/settled-competition',
-          { authenticated: false }
-        );
-      }
-      return Promise.resolve(null);
-    },
-    planCreatorWorkout: (workoutId, plannedDate, note) => {
-      if (mode === 'demo') {
-        const workout = creatorWorkoutPreviews.find(({ id }) => id === workoutId);
-        if (!workout) return Promise.reject(new Error('Creator workout not found.'));
-        const plan: CreatorWorkoutPlan = {
-          creatorName: workout.creatorName,
-          durationMinutes: workout.durationMinutes,
-          id: `preview-plan-${workoutId}-${plannedDate}`,
-          note: note?.trim() || null,
-          plannedDate,
-          workoutId,
-          workoutName: workout.name,
-          workoutStyle: workout.workoutStyle
-        };
-        const existingIndex = demoCreatorWorkoutPlans.findIndex((item) =>
-          item.workoutId === workoutId && item.plannedDate === plannedDate
-        );
-        if (existingIndex >= 0) demoCreatorWorkoutPlans[existingIndex] = plan;
-        else demoCreatorWorkoutPlans.push(plan);
-        return Promise.resolve(plan);
-      }
-      if (mode === 'api') {
-        return requireApi(api).request<CreatorWorkoutPlan, { note?: string; plannedDate: string }>(
-          `/v1/creator-workouts/${encodeURIComponent(workoutId)}/plans`,
-          {
-            body: { note, plannedDate },
-            idempotencyKey: createIdempotencyKey('creator-plan'),
-            method: 'POST'
-          }
-        );
-      }
-      return Promise.reject(new Error('Creator workout planning is unavailable.'));
-    },
+    getRewardWinners: () => api.request<readonly RewardWinner[]>(
+      '/v1/results/reward-winners',
+      { authenticated: false }
+    ),
+    getSettledCompetition: () =>
+      api.request<SettledCompetitionSummary | null>(
+        '/v1/results/settled-competition',
+        { authenticated: false }
+      ),
+    planCreatorWorkout: (workoutId, plannedDate, note) =>
+      api.request<CreatorWorkoutPlan, { note?: string; plannedDate: string }>(
+        `/v1/creator-workouts/${encodeURIComponent(workoutId)}/plans`,
+        {
+          body: { note, plannedDate },
+          idempotencyKey: createIdempotencyKey('creator-plan'),
+          method: 'POST'
+        }
+      ),
     requestWeeklyChallengePartner: (
       competitionMonthKey,
       weeklyGoal,
       region,
       periodIndex,
       recipientUserId
-    ) => {
-      if (mode === 'demo') {
-        const partner = demoEligibleWeeklyPartners.find(({ userId }) => userId === recipientUserId);
-        if (!partner) return Promise.reject(new Error('That partner is not eligible.'));
-        const request: WeeklyChallengeRequest = {
-          competitionId: 'preview-competition',
-          createdAt: new Date().toISOString(),
-          direction: 'outgoing',
-          goalDays: weeklyGoal,
-          id: `preview-weekly-request-${Date.now()}`,
-          partnerAlias: partner.alias,
-          partnerStreaks: partner.streaks,
-          partnerUserId: partner.userId,
-          periodIndex: periodIndex as 1 | 2 | 3 | 4,
-          status: 'pending'
-        };
-        demoWeeklyChallengeRequests.push(request);
-        partner.requestStatus = 'pending';
-        return Promise.resolve(request);
+    ) => api.request<WeeklyChallengeRequest, {
+      goal: number;
+      period: number;
+      recipientUserId: string;
+      region: string;
+    }>(
+      `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests`,
+      {
+        body: {
+          goal: weeklyGoal,
+          period: periodIndex,
+          recipientUserId,
+          region
+        },
+        idempotencyKey: createIdempotencyKey('weekly-challenge'),
+        method: 'POST'
       }
-      if (mode === 'api') {
-        return requireApi(api).request<WeeklyChallengeRequest, {
-          goal: number;
-          period: number;
-          recipientUserId: string;
-          region: string;
-        }>(
-          `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests`,
-          {
-            body: { goal: weeklyGoal, period: periodIndex, recipientUserId, region },
-            idempotencyKey: createIdempotencyKey('weekly-challenge'),
-            method: 'POST'
-          }
-        );
+    ),
+    respondToWeeklyChallengeRequest: (requestId, decision) =>
+      api.request<WeeklyChallengeRequest, {
+        decision: 'accepted' | 'declined';
+      }>(
+        `/v1/competitions/weekly-challenges/requests/${encodeURIComponent(requestId)}`,
+        {
+          body: { decision },
+          idempotencyKey: createIdempotencyKey(
+            'weekly-challenge-response'
+          ),
+          method: 'PATCH'
+        }
+      ),
+    submitCreatorVideo: (input) => api.request<
+      CreatorVideoSubmission,
+      CreateCreatorVideoSubmissionInput
+    >(
+      '/v1/creator-workouts/submissions',
+      {
+        body: input,
+        idempotencyKey: createIdempotencyKey('creator-submission'),
+        method: 'POST'
       }
-      return Promise.reject(new Error('Weekly Challenge requests are unavailable.'));
-    },
-    respondToWeeklyChallengeRequest: (requestId, decision) => {
-      if (mode === 'demo') {
-        const index = demoWeeklyChallengeRequests.findIndex(({ id }) => id === requestId);
-        const request = demoWeeklyChallengeRequests[index];
-        if (!request) return Promise.reject(new Error('Weekly Challenge request not found.'));
-        const updated = { ...request, status: decision } as WeeklyChallengeRequest;
-        demoWeeklyChallengeRequests.splice(index, 1);
-        return Promise.resolve(updated);
-      }
-      if (mode === 'api') {
-        return requireApi(api).request<WeeklyChallengeRequest, { decision: 'accepted' | 'declined' }>(
-          `/v1/competitions/weekly-challenges/requests/${encodeURIComponent(requestId)}`,
-          {
-            body: { decision },
-            idempotencyKey: createIdempotencyKey('weekly-challenge-response'),
-            method: 'PATCH'
-          }
-        );
-      }
-      return Promise.reject(new Error('Weekly Challenge requests are unavailable.'));
-    },
-    submitCreatorVideo: (input) => {
-      if (mode === 'demo') {
-        return Promise.resolve({
-          createdAt: new Date().toISOString(),
-          id: `preview-submission-${Date.now()}`,
-          rightsAcceptedAt: new Date().toISOString(),
-          rightsVersion: 'creator-video-rights-v1',
-          status: 'submitted',
-          title: input.title,
-          videoUrl: input.videoUrl
-        });
-      }
-      if (mode === 'api') {
-        return requireApi(api).request<CreatorVideoSubmission, CreateCreatorVideoSubmissionInput>(
-          '/v1/creator-workouts/submissions',
-          {
-            body: input,
-            idempotencyKey: createIdempotencyKey('creator-submission'),
-            method: 'POST'
-          }
-        );
-      }
-      return Promise.reject(new Error('Creator video submissions are unavailable.'));
-    },
-    mode
+    ),
+    mode: 'api'
   };
 }
 
-const demoEligibleWeeklyPartners: EligibleWeeklyChallengePartner[] = [
-  {
-    alias: 'NOVA_LIFT',
-    goalDays: 4,
-    requestStatus: 'available',
-    streaks: { daily: 4, monthly: 1, weekly: 3, yearly: 0 },
-    userId: 'preview-nova-lift'
-  },
-  {
-    alias: 'KIRA_PULSE',
-    goalDays: 4,
-    requestStatus: 'available',
-    streaks: { daily: 9, monthly: 3, weekly: 6, yearly: 1 },
-    userId: 'preview-kira-pulse'
-  }
-];
+function createUnavailableDataSource(): AppDataSource {
+  const unavailable = () => Promise.reject(
+    new Error('The GoGymGo API is not configured.')
+  );
 
-const demoWeeklyChallengeRequests: WeeklyChallengeRequest[] = [];
-const demoCreatorWorkoutPlans: CreatorWorkoutPlan[] = [];
+  return {
+    claimReward: unavailable,
+    getCategoryLeaderboard: async () => null,
+    getCompetitionMatches: async () => [],
+    getCompetitionEnrollmentCount: async () => null,
+    getCreatorWorkouts: async () => [],
+    getCreatorWorkoutPlans: async () => [],
+    getEligibleWeeklyChallengePartners: async () => [],
+    getWeeklyChallengeRequests: async () => [],
+    getMyRewardAwards: async () => [],
+    getMyStreaks: async () => null,
+    getRewardCatalog: async () => [],
+    getRewardWinners: async () => [],
+    getSettledCompetition: async () => null,
+    planCreatorWorkout: unavailable,
+    requestWeeklyChallengePartner: unavailable,
+    respondToWeeklyChallengeRequest: unavailable,
+    submitCreatorVideo: unavailable,
+    mode: 'unavailable'
+  };
+}
 
 let appDataIdempotencySequence = 0;
+
 function createIdempotencyKey(scope: string) {
   appDataIdempotencySequence += 1;
   return `${scope}-${Date.now().toString(36)}-${appDataIdempotencySequence.toString(36)}`;

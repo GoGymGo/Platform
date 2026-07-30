@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps } from 'react';
 import {
   Pressable,
@@ -9,13 +9,19 @@ import {
 } from 'react-native';
 
 import { AuthTextField } from '@/components/auth';
-import { CyberButtonPrimary, HUDBorderBox, TerminalText } from '@/components/cyber';
+import {
+  CyberButtonOutline,
+  CyberButtonPrimary,
+  HUDBorderBox,
+  TerminalText
+} from '@/components/cyber';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import {
   buildChallengeMonthWindow,
   challengeActivityLabels,
   socialChallengeActivities,
+  validateChallengeName,
   validateChallengeInput,
   type ChallengeInviteContact,
   type CreateSocialChallengeInput,
@@ -26,6 +32,16 @@ import {
 } from '@/domain/social';
 
 type ChallengeHubSection = 'create' | 'discover' | 'mine';
+type ChallengeBuilderStep = 'basics' | 'goal' | 'invite';
+
+const challengeBuilderSteps: readonly {
+  key: ChallengeBuilderStep;
+  label: string;
+}[] = [
+  { key: 'basics', label: 'BASICS' },
+  { key: 'goal', label: 'GOAL' },
+  { key: 'invite', label: 'INVITE' }
+];
 
 type ChallengeHubProps = {
   busy: boolean;
@@ -229,6 +245,7 @@ function ChallengeBuilder({
   regionCode: string;
 }) {
   const [challengeType, setChallengeType] = useState<'friend' | 'regional'>('friend');
+  const [builderStep, setBuilderStep] = useState<ChallengeBuilderStep>('basics');
   const [activity, setActivity] = useState<SocialChallengeActivity>('gym');
   const [activityLabel, setActivityLabel] = useState('');
   const [description, setDescription] = useState('');
@@ -241,12 +258,30 @@ function ChallengeBuilder({
   const [scheduledDays, setScheduledDays] = useState<number[]>([6]);
   const [scheduledTime, setScheduledTime] = useState('09:00');
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [showExternalInvite, setShowExternalInvite] = useState(friends.length === 0);
   const [targetCount, setTargetCount] = useState(4);
   const [targetPeriod, setTargetPeriod] = useState<'monthly' | 'weekly'>('weekly');
   const [validationError, setValidationError] = useState<string | null>(null);
   const currentMonth = buildChallengeMonthWindow(new Date(), 0);
   const nextMonth = buildChallengeMonthWindow(new Date(), 1);
   const selectedMonth = monthOffset === 0 ? currentMonth : nextMonth;
+  const builderStepIndex = challengeBuilderSteps.findIndex(
+    ({ key }) => key === builderStep
+  );
+
+  const continueFromBasics = () => {
+    const nameError = validateChallengeName(name);
+    const activityError =
+      activity === 'other' &&
+      (activityLabel.trim().length < 2 || activityLabel.trim().length > 60)
+        ? 'Describe the activity in 2-60 characters.'
+        : null;
+    const error = nameError ?? activityError;
+    setValidationError(error);
+    if (!error) {
+      setBuilderStep('goal');
+    }
+  };
 
   const submit = async () => {
     const contacts: ChallengeInviteContact[] = [];
@@ -293,6 +328,8 @@ function ChallengeBuilder({
       setSelectedFriendIds([]);
       setInviteEmail('');
       setInvitePhone('');
+      setBuilderStep('basics');
+      setShowExternalInvite(friends.length === 0);
       onCreated();
     }
   };
@@ -309,6 +346,47 @@ function ChallengeBuilder({
         Set a measurable goal for the month, then challenge a friend or rally people nearby.
       </TerminalText>
 
+      <View
+        accessibilityLabel={`Challenge setup step ${builderStepIndex + 1} of ${challengeBuilderSteps.length}`}
+        style={styles.builderProgress}
+      >
+        {challengeBuilderSteps.map((step, index) => {
+          const active = step.key === builderStep;
+          const complete = index < builderStepIndex;
+          return (
+            <View key={step.key} style={styles.builderProgressStep}>
+              <View
+                style={[
+                  styles.builderProgressMarker,
+                  active ? styles.builderProgressMarkerActive : null,
+                  complete ? styles.builderProgressMarkerComplete : null
+                ]}
+              >
+                <TerminalText
+                  tone={active || complete ? 'cyan' : 'dim'}
+                  variant="micro"
+                >
+                  {complete ? '✓' : index + 1}
+                </TerminalText>
+              </View>
+              <TerminalText
+                tone={active ? 'cyan' : complete ? 'green' : 'dim'}
+                variant="micro"
+              >
+                {step.label}
+              </TerminalText>
+            </View>
+          );
+        })}
+      </View>
+
+      <TerminalText tone="pink" variant="micro">
+        STEP {builderStepIndex + 1} OF {challengeBuilderSteps.length}{' // '}
+        {challengeBuilderSteps[builderStepIndex]?.label}
+      </TerminalText>
+
+      {builderStep === 'basics' ? (
+        <>
       <FieldGroup label="CHALLENGE TYPE">
         <View style={styles.twoColumnControls}>
           <ChoiceCard
@@ -373,7 +451,11 @@ function ChallengeBuilder({
           value={activityLabel}
         />
       ) : null}
+        </>
+      ) : null}
 
+      {builderStep === 'goal' ? (
+        <>
       <FieldGroup label="GOAL">
         <View style={styles.goalRow}>
           <Counter
@@ -419,13 +501,18 @@ function ChallengeBuilder({
           />
         </View>
       </FieldGroup>
+        </>
+      ) : null}
 
+      {builderStep === 'invite' ? (
+        <>
       {challengeType === 'friend' ? (
         <FieldGroup label="CHALLENGE FRIENDS">
           {friends.map((friend) => {
             const selected = selectedFriendIds.includes(friend.userId);
             return (
               <Pressable
+                aria-checked={selected}
                 accessibilityLabel={`${selected ? 'Remove' : 'Select'} @${friend.screenName}`}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
@@ -459,39 +546,48 @@ function ChallengeBuilder({
               No accepted friends yet. Send the challenge by email or phone below.
             </TerminalText>
           ) : null}
-          <View style={styles.contactInvitePanel}>
-            <TerminalText tone="pink" variant="micro">
-              OR INVITE OUTSIDE GOGYMGO
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="caption">
-              We create an expiring invitation link, then open your phone&apos;s email or text composer. GoGymGo does not store the raw address or number.
-            </TerminalText>
-            <AuthTextField
-              autoCapitalize="none"
-              editable={!disabled}
-              keyboardType="email-address"
-              label="EMAIL // OPTIONAL"
-              maxLength={160}
-              onChangeText={(value) => {
-                setInviteEmail(value);
-                setValidationError(null);
-              }}
-              placeholder="friend@example.com"
-              value={inviteEmail}
-            />
-            <AuthTextField
-              editable={!disabled}
-              keyboardType="phone-pad"
-              label="PHONE // OPTIONAL"
-              maxLength={24}
-              onChangeText={(value) => {
-                setInvitePhone(value);
-                setValidationError(null);
-              }}
-              placeholder="+1 250 555 0198"
-              value={invitePhone}
-            />
-          </View>
+          <CyberButtonOutline
+            label={showExternalInvite
+              ? 'HIDE OUTSIDE INVITE'
+              : 'INVITE SOMEONE OUTSIDE GOGYMGO'}
+            onPress={() => setShowExternalInvite((visible) => !visible)}
+            tone="pink"
+          />
+          {showExternalInvite ? (
+            <View style={styles.contactInvitePanel}>
+              <TerminalText tone="pink" variant="micro">
+                OUTSIDE GOGYMGO // OPTIONAL
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="caption">
+                We create an expiring invitation link, then open your phone&apos;s email or text composer. GoGymGo does not store the raw address or number.
+              </TerminalText>
+              <AuthTextField
+                autoCapitalize="none"
+                editable={!disabled}
+                keyboardType="email-address"
+                label="EMAIL // OPTIONAL"
+                maxLength={160}
+                onChangeText={(value) => {
+                  setInviteEmail(value);
+                  setValidationError(null);
+                }}
+                placeholder="friend@example.com"
+                value={inviteEmail}
+              />
+              <AuthTextField
+                editable={!disabled}
+                keyboardType="phone-pad"
+                label="PHONE // OPTIONAL"
+                maxLength={24}
+                onChangeText={(value) => {
+                  setInvitePhone(value);
+                  setValidationError(null);
+                }}
+                placeholder="+1 250 555 0198"
+                value={invitePhone}
+              />
+            </View>
+          ) : null}
         </FieldGroup>
       ) : (
         <>
@@ -524,6 +620,7 @@ function ChallengeBuilder({
                 const selected = scheduledDays.includes(day.value);
                 return (
                   <Pressable
+                    aria-checked={selected}
                     accessibilityLabel={day.label}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: selected }}
@@ -579,6 +676,21 @@ function ChallengeBuilder({
         value={description}
       />
 
+      <HUDBorderBox style={styles.challengeSummary} tone="muted">
+        <TerminalText tone="dim" variant="micro">
+          REVIEW
+        </TerminalText>
+        <TerminalText tone="text" uppercase={false} variant="body">
+          {name.trim() || 'Untitled challenge'}
+        </TerminalText>
+        <TerminalText tone="green" uppercase={false} variant="caption">
+          {targetCount} {targetCount === 1 ? 'session' : 'sessions'} per{' '}
+          {targetPeriod === 'weekly' ? 'week' : 'month'}{' // '}{selectedMonth.label}
+        </TerminalText>
+      </HUDBorderBox>
+        </>
+      ) : null}
+
       {validationError ? (
         <HUDBorderBox style={styles.validationNotice} tone="red">
           <TerminalText live="assertive" tone="red" uppercase={false} variant="body">
@@ -587,16 +699,43 @@ function ChallengeBuilder({
         </HUDBorderBox>
       ) : null}
 
-      <CyberButtonPrimary
-        disabled={disabled || busy}
-        label={busy
-          ? 'CREATING...'
-          : challengeType === 'friend'
-            ? 'CHALLENGE A FRIEND'
-            : 'PUBLISH REGIONAL CHALLENGE'}
-        onPress={submit}
-        tone="pink"
-      />
+      <View style={styles.builderNavigation}>
+        {builderStep !== 'basics' ? (
+          <CyberButtonOutline
+            disabled={busy}
+            label="BACK"
+            onPress={() => {
+              setValidationError(null);
+              setBuilderStep(builderStep === 'invite' ? 'goal' : 'basics');
+            }}
+            style={styles.builderBackButton}
+          />
+        ) : null}
+        <CyberButtonPrimary
+          disabled={disabled || busy}
+          label={builderStep === 'basics'
+            ? 'CONTINUE TO GOAL ->'
+            : builderStep === 'goal'
+              ? 'CONTINUE TO INVITE ->'
+              : busy
+                ? 'CREATING...'
+                : challengeType === 'friend'
+                  ? 'CHALLENGE A FRIEND'
+                  : 'PUBLISH REGIONAL CHALLENGE'}
+          onPress={() => {
+            setValidationError(null);
+            if (builderStep === 'basics') {
+              continueFromBasics();
+            } else if (builderStep === 'goal') {
+              setBuilderStep('invite');
+            } else {
+              void submit();
+            }
+          }}
+          style={styles.builderNextButton}
+          tone="pink"
+        />
+      </View>
     </HUDBorderBox>
   );
 }
@@ -903,6 +1042,7 @@ function ChoiceCard({
 }) {
   return (
     <Pressable
+      aria-checked={selected}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
@@ -936,6 +1076,7 @@ function ActivityChip({
 }) {
   return (
     <Pressable
+      aria-checked={selected}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
@@ -1035,6 +1176,7 @@ function SegmentButton({
 }) {
   return (
     <Pressable
+      aria-checked={selected}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
@@ -1062,6 +1204,7 @@ function MonthButton({
 }) {
   return (
     <Pressable
+      aria-checked={selected}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
@@ -1354,6 +1497,50 @@ const styles = StyleSheet.create({
   builderTitle: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.title
+  },
+  builderProgress: {
+    flexDirection: 'row',
+    gap: spacing.sm
+  },
+  builderProgressStep: {
+    minWidth: 0,
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xs
+  },
+  builderProgressMarker: {
+    width: '100%',
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    borderRadius: radii.sm,
+    backgroundColor: colors.panelAlpha45
+  },
+  builderProgressMarkerActive: {
+    borderColor: colors.borderCyanBright,
+    backgroundColor: colors.surfaceCyanActive
+  },
+  builderProgressMarkerComplete: {
+    borderColor: colors.borderSuccess,
+    backgroundColor: colors.surfaceSuccess
+  },
+  builderNavigation: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm
+  },
+  builderBackButton: {
+    flex: 0.38
+  },
+  builderNextButton: {
+    minWidth: 0,
+    flex: 1
+  },
+  challengeSummary: {
+    gap: spacing.xs,
+    padding: spacing.md
   },
   fieldGroup: {
     gap: spacing.sm

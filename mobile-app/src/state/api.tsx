@@ -7,6 +7,7 @@ import {
 
 import { apiBaseUrl, apiRequestTimeoutMs, isApiConfigured } from '@/config/api';
 import { createApiClient, type ApiClient } from '@/services/api/client';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 
 type ApiContextValue = {
@@ -17,20 +18,21 @@ type ApiContextValue = {
 const ApiContext = createContext<ApiContextValue | null>(null);
 
 export function ApiProvider({ children }: PropsWithChildren) {
+  const { active: appTourActive } = useAppTour();
   const { getIdToken } = useAuth();
   const api = useMemo(
-    () => isApiConfigured
+    () => !appTourActive && isApiConfigured
       ? createApiClient({
           baseUrl: apiBaseUrl,
           getAccessToken: getIdToken,
           timeoutMs: apiRequestTimeoutMs
         })
       : null,
-    [getIdToken]
+    [appTourActive, getIdToken]
   );
   const value = useMemo(
-    () => ({ api, configured: isApiConfigured }),
-    [api]
+    () => ({ api, configured: !appTourActive && isApiConfigured }),
+    [api, appTourActive]
   );
 
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>;

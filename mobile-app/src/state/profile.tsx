@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import {
-  defaultPublicIdentity,
+  createPrivateIdentity,
   normalizePublicIdentity,
   parseStoredPublicIdentity,
   resolvePublicName,
@@ -19,6 +19,7 @@ import {
 import { useAppData } from '@/data/appDataHooks';
 import type { AvatarMedia } from '@/domain/accountSettings';
 import { createUserStorage } from '@/services/storage/userStorage';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 
 type ProfileContextValue = {
@@ -37,10 +38,16 @@ type ProfileContextValue = {
 
 const profileImageStorageKey = '@gogymgo/profile-image';
 const publicIdentityStorageKey = '@gogymgo/public-identity';
+const appTourPublicIdentity: PublicIdentity = {
+  callsign: 'APP_TOUR_PLAYER',
+  displayName: 'APP_TOUR_PLAYER',
+  mode: 'alias'
+};
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: PropsWithChildren) {
   const { accountSettings, mode } = useAppData();
+  const { active: appTourActive } = useAppTour();
   const { loading: authLoading, user } = useAuth();
   const userId = user?.uid ?? null;
   const userStorage = useMemo(
@@ -51,12 +58,20 @@ export function ProfileProvider({ children }: PropsWithChildren) {
   const [profileImageStatus, setProfileImageStatus] = useState<
     AvatarMedia['status'] | 'local' | null
   >(null);
-  const [profileReady, setProfileReady] = useState(false);
-  const [publicIdentity, setPublicIdentityState] = useState<PublicIdentity>(defaultPublicIdentity);
-  const [hasPublicIdentity, setHasPublicIdentity] = useState(false);
+  const [profileReady, setProfileReady] = useState(appTourActive);
+  const [publicIdentity, setPublicIdentityState] = useState<PublicIdentity>(
+    appTourActive ? appTourPublicIdentity : createPrivateIdentity(userId)
+  );
+  const [hasPublicIdentity, setHasPublicIdentity] = useState(appTourActive);
 
   useEffect(() => {
     let active = true;
+
+    if (appTourActive) {
+      return () => {
+        active = false;
+      };
+    }
 
     if (authLoading) {
       return () => {
@@ -115,7 +130,7 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, [accountSettings, authLoading, mode, userStorage]);
+  }, [accountSettings, appTourActive, authLoading, mode, userStorage]);
 
   const setProfileImage = useCallback(async (uri: string) => {
     const previousImage = profileImageUri;

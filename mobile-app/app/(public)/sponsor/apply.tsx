@@ -82,7 +82,7 @@ export default function SponsorApplicationScreen() {
         <View style={styles.valueList}>
           <SponsorValue
             label="TARGETED REACH"
-            value="REGION + COMMITMENT CATEGORY"
+            value="REGION + WEEKLY GOAL GROUP"
           />
           <SponsorValue
             label="CAMPAIGN PLACEMENTS"

@@ -1,0 +1,167 @@
+export type FirebaseClientConfig = {
+  apiKey: string;
+  appId: string;
+  authDomain: string;
+  measurementId?: string;
+  messagingSenderId: string;
+  projectId: string;
+  storageBucket: string;
+};
+
+export type RegionPolicy = {
+  boundaryVersion: string;
+  code: string;
+  competitionEnabled: boolean;
+  countryCode: string;
+  currency: string;
+  id: string;
+  languageCodes: string[];
+  metroName: string;
+  minimumAge: number;
+  policyVersion: string;
+  subdivisionCode: string;
+  timezone: string;
+  validFrom: string;
+  validTo: string | null;
+};
+
+export type GoalBracket = {
+  goalDays: number;
+  label: string;
+};
+
+export type Competition = {
+  endsAt: string;
+  enrollmentCount: number;
+  entrantCap: number | null;
+  goalBrackets: GoalBracket[];
+  id: string;
+  minimumEntrants: number;
+  monthKey: string;
+  name: string;
+  publishedRewardCount: number;
+  regionCode: string;
+  regionName: string;
+  regionPolicyId: string;
+  registrationClosesAt: string;
+  registrationOpensAt: string;
+  rewardCount: number;
+  rules: Record<string, unknown>;
+  rulesVersion: string;
+  startsAt: string;
+  status: string;
+  version: number;
+};
+
+export type Reward = {
+  assignedCouponCodeCount: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  claimUrl: string | null;
+  competitionId: string;
+  competitionName: string;
+  couponCodeCount: number;
+  description: string;
+  displayOrder: number;
+  fulfillmentInstructions: string | null;
+  id: string;
+  imageUrl: string | null;
+  inventoryTotal: number;
+  rewardType: "coupon" | "physical";
+  sponsorName: string;
+  status: string;
+  termsUrl: string | null;
+  title: string;
+  version: number;
+};
+
+export type CreatorWorkout = {
+  creatorName: string;
+  creatorUserId: string | null;
+  durationMinutes: number;
+  id: string;
+  published: boolean;
+  publishedAt: string | null;
+  regionCodes: string[];
+  sponsorName: string | null;
+  thumbnailUrl: string | null;
+  title: string;
+  version: number;
+  videoUrl: string;
+  workoutStyle: string;
+};
+
+export type LegalDocument = {
+  content: Record<string, unknown>;
+  contentSha256: string;
+  documentKey: string;
+  effectiveAt: string;
+  id: string;
+  jurisdictionCode: string;
+  locale: string;
+  receiptRequirement: string;
+  status: "effective" | "scheduled" | "withdrawn";
+  title: string;
+  version: string;
+};
+
+export type AuditEvent = {
+  action: string;
+  actorEmail: string | null;
+  createdAt: string;
+  entityId: string;
+  entityType: string;
+  id: string;
+  reason: string;
+};
+
+export type DashboardSnapshot = {
+  admin: {
+    email: string;
+    id: string;
+    roles: string[];
+  };
+  auditEvents: AuditEvent[];
+  competitions: Competition[];
+  creatorWorkouts: CreatorWorkout[];
+  generatedAt: string;
+  legalDocuments: LegalDocument[];
+  regions: RegionPolicy[];
+  rewards: Reward[];
+};
+
+export type WorkQueueItem = {
+  createdAt: string;
+  id: string;
+  kind: string;
+  regionCode?: string;
+  status: string;
+  verificationMethod?: string;
+};
+
+export type SystemHealth = {
+  checkedAt: string;
+  database: "ok";
+  queues: {
+    competitionStartsDue: number;
+    notificationsPending: number;
+    privacyOperationsPending: number;
+    profileMediaCleanupPending: number;
+  };
+  worker: {
+    heartbeatAgeSeconds: number | null;
+    lastCompletedAt: string | null;
+    lastFailedAt: string | null;
+    lastFailureCode: string | null;
+    status: "degraded" | "healthy" | "stale" | "starting";
+  };
+};
+
+export type AdminSection =
+  | "overview"
+  | "competitions"
+  | "rewards"
+  | "regions"
+  | "content"
+  | "operations"
+  | "audit";

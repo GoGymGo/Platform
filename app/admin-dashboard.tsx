@@ -48,6 +48,8 @@ const navigation: { id: AdminSection; label: string; short: string }[] = [
   { id: "audit", label: "Audit history", short: "AU" },
 ];
 
+const creatorFeaturesEnabled = false;
+
 const defaultCompetitionRules = {
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 10,
@@ -421,6 +423,7 @@ export function AdminDashboard({
           ) : null}
           {section === "content" ? (
             <ContentPanel
+              creatorFeaturesEnabled={creatorFeaturesEnabled}
               documents={snapshot.legalDocuments}
               onCreateDocument={() => setLegalEditor(true)}
               onCreateWorkout={() => setWorkoutEditor("new")}
@@ -1223,6 +1226,7 @@ function RegionsPanel({
 }
 
 function ContentPanel({
+  creatorFeaturesEnabled,
   documents,
   onCreateDocument,
   onCreateWorkout,
@@ -1231,6 +1235,7 @@ function ContentPanel({
   onWorkoutStatus,
   workouts,
 }: {
+  creatorFeaturesEnabled: boolean;
   documents: LegalDocument[];
   onCreateDocument: () => void;
   onCreateWorkout: () => void;
@@ -1250,14 +1255,32 @@ function ContentPanel({
             <p className="eyebrow">CREATOR WORKOUT CATALOG</p>
             <h2>Workout content</h2>
           </div>
-          <button className="primary-button" onClick={onCreateWorkout} type="button">
-            + NEW WORKOUT
+          <button
+            className="primary-button"
+            disabled={!creatorFeaturesEnabled}
+            onClick={onCreateWorkout}
+            type="button"
+          >
+            {creatorFeaturesEnabled ? "+ NEW WORKOUT" : "PROGRAM PAUSED"}
           </button>
         </div>
+        {!creatorFeaturesEnabled ? (
+          <div className="alert warning compact">
+            <span>!</span>
+            <p>
+              Creator features are paused for testing. Existing catalog records stay
+              visible, but creating, editing, publishing and unpublishing workouts is disabled.
+            </p>
+          </div>
+        ) : null}
         {workouts.length === 0 ? (
           <EmptyState
-            body="Add approved creator videos and choose exactly where they may appear."
-            title="No creator workouts"
+            body={
+              creatorFeaturesEnabled
+                ? "Add approved creator videos and choose exactly where they may appear."
+                : "No creator workouts are configured. Catalog controls remain locked while the program is paused."
+            }
+            title={creatorFeaturesEnabled ? "No creator workouts" : "Creator program paused"}
           />
         ) : (
           <div className="compact-list">
@@ -1273,12 +1296,18 @@ function ContentPanel({
                 </div>
                 <div className="inline-actions">
                   {!workout.published ? (
-                    <button className="text-button" onClick={() => onEditWorkout(workout)} type="button">
+                    <button
+                      className="text-button"
+                      disabled={!creatorFeaturesEnabled}
+                      onClick={() => onEditWorkout(workout)}
+                      type="button"
+                    >
                       Edit
                     </button>
                   ) : null}
                   <button
                     className={workout.published ? "text-button danger-text" : "text-button accent"}
+                    disabled={!creatorFeaturesEnabled}
                     onClick={() =>
                       onWorkoutStatus(
                         workout,

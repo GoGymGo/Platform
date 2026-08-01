@@ -19,11 +19,15 @@ import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
 import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { isGoGymGoPartnerCode } from '@/domain/partnerGymQr';
-import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAppTour } from '@/state/appTour';
 import { useWorkoutProgress } from '@/state/workoutProgress';
+import {
+  isAppTourGymQrPayload
+} from '@/testing/appTourData';
+import { AppTourQrSimulator } from '@/testing/AppTourQrSimulator';
 
 export default function QrScannerModal() {
   const router = useRouter();
@@ -50,9 +54,9 @@ export default function QrScannerModal() {
   const scanMode = isExitScan ? 'exit' : 'entry';
   const exitReady = Boolean(
     activeSession?.verificationMethod === 'partnerGymQr' &&
-    activeSession.midSessionVerified &&
+    (!activeSession.presenceCheckRequired || activeSession.midSessionVerified) &&
     getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale) >=
-      workoutRules.minimumSessionSeconds
+      activeSession.minimumSessionSeconds
   );
   const canScan = !isExitScan || exitReady;
 
@@ -70,7 +74,7 @@ export default function QrScannerModal() {
       isGoGymGoPartnerCode(data, scanMode) ||
       (
         appTourActive &&
-        data === `gogymgo:gym:${scanMode}:app-tour`
+        isAppTourGymQrPayload(data, scanMode)
       )
     ) {
       setScannedPayload(data);
@@ -191,25 +195,21 @@ export default function QrScannerModal() {
                 ACTION NEEDED
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
-                Finish 30 minutes and the mid-session presence check first.
+                Finish {activeSession
+                  ? `${activeSession.minimumSessionSeconds / 60} minutes`
+                  : 'the required session time'}
+                {activeSession?.presenceCheckRequired
+                  ? ' and the mid-session presence check'
+                  : ''} first.
               </TerminalText>
             </HUDBorderBox>
           ) : appTourActive ? (
-            <HUDBorderBox style={styles.stateCard} tone="cyan">
-              <TerminalText glow tone="cyan" variant="label">
-                APP TOUR QR SIMULATOR
-              </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="body">
-                Use a local testing code without opening the camera or contacting a gym service.
-              </TerminalText>
-              <CyberButtonPrimary
-                disabled={scanLocked}
-                label={scanLocked ? 'Test QR complete' : 'Confirm test QR'}
-                onPress={() => verifyScannedPayload(
-                  `gogymgo:gym:${scanMode}:app-tour`
-                )}
-              />
-            </HUDBorderBox>
+            <AppTourQrSimulator
+              onConfirm={verifyScannedPayload}
+              scanLocked={scanLocked}
+              scanMode={scanMode}
+              style={styles.stateCard}
+            />
           ) : !permission ? (
             <HUDBorderBox style={styles.stateCard} tone="muted">
               <TerminalText live="polite" tone="muted" variant="label">

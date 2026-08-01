@@ -40,6 +40,10 @@ import {
 import type { GoalCategory } from '@/domain/campaignEconomics';
 import type { CreateCreatorVideoSubmissionInput } from '@/domain/creatorWorkouts';
 import type { RewardAward } from '@/domain/rewards';
+import {
+  creatorFeaturesEnabled,
+  rejectPausedCreatorAction
+} from '@/config/features';
 import { useApi } from '@/state/api';
 import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
@@ -66,7 +70,7 @@ const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 export function AppDataProvider({ children }: PropsWithChildren) {
   const { api } = useApi();
-  const { active: appTourActive } = useAppTour();
+  const { active: appTourActive, scenario: appTourScenario } = useAppTour();
   const { user } = useAuth();
   const [queryClient] = useState(
     () => new QueryClient({
@@ -78,6 +82,11 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       }
     })
   );
+  useEffect(() => {
+    if (appTourActive) {
+      queryClient.clear();
+    }
+  }, [appTourActive, appTourScenario, queryClient]);
   const mode: AppDataMode = appTourActive ? 'tour' : api ? 'api' : 'unavailable';
   const source = useMemo(
     () => appTourActive
@@ -99,9 +108,9 @@ export function AppDataProvider({ children }: PropsWithChildren) {
   );
   const account = useMemo(
     () => appTourActive
-      ? createAppTourAccountReadinessRepository()
+      ? createAppTourAccountReadinessRepository(appTourScenario)
       : createAccountReadinessRepository(mode, api),
-    [api, appTourActive, mode]
+    [api, appTourActive, appTourScenario, mode]
   );
   const accountSettings = useMemo(
     () => appTourActive
@@ -197,34 +206,41 @@ export function useCategoryLeaderboards(goals: readonly GoalCategory[]) {
 export function useCompetitionMatches(
   competitionMonthKey: string,
   weeklyGoal: number,
-  region: string
+  regionCode: string
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
-    queryFn: () => source.getCompetitionMatches(competitionMonthKey, weeklyGoal, region),
-    queryKey: ['competition-matches', competitionMonthKey, weeklyGoal, region]
+    enabled: authenticatedQueriesEnabled && regionCode.length > 0,
+    queryFn: () => source.getCompetitionMatches(
+      competitionMonthKey,
+      weeklyGoal,
+      regionCode
+    ),
+    queryKey: ['competition-matches', competitionMonthKey, weeklyGoal, regionCode]
   });
 }
 
 export function useCompetitionEnrollmentCount(
-  region: string,
+  regionCode: string,
   competitionMonthKey: string
 ) {
   const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: apiQueriesEnabled,
-    queryFn: () => source.getCompetitionEnrollmentCount(region, competitionMonthKey),
-    queryKey: ['competition-enrollment-count', region, competitionMonthKey]
+    enabled: apiQueriesEnabled && regionCode.length > 0,
+    queryFn: () => source.getCompetitionEnrollmentCount(
+      regionCode,
+      competitionMonthKey
+    ),
+    queryKey: ['competition-enrollment-count', regionCode, competitionMonthKey]
   });
 }
 
-export function useCreatorWorkouts() {
+export function useCreatorWorkouts(regionCode: string) {
   const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: apiQueriesEnabled,
-    queryFn: () => source.getCreatorWorkouts(),
-    queryKey: ['creator-workouts']
+    enabled: creatorFeaturesEnabled && apiQueriesEnabled && regionCode.length > 0,
+    queryFn: () => source.getCreatorWorkouts(regionCode),
+    queryKey: ['creator-workouts', regionCode]
   });
 }
 
@@ -232,7 +248,7 @@ export function useCreatorWorkoutPlans() {
   const { authenticatedQueriesEnabled, source } = useAppData();
   const { user } = useAuth();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: creatorFeaturesEnabled && authenticatedQueriesEnabled,
     queryFn: () => source.getCreatorWorkoutPlans(),
     queryKey: ['creator-workout-plans', user?.uid ?? 'anonymous']
   });
@@ -246,7 +262,9 @@ export function usePlanCreatorWorkout() {
       note?: string;
       plannedDate: string;
       workoutId: string;
-    }) => source.planCreatorWorkout(workoutId, plannedDate, note),
+    }) => creatorFeaturesEnabled
+      ? source.planCreatorWorkout(workoutId, plannedDate, note)
+      : rejectPausedCreatorAction(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['creator-workout-plans'] })
   });
 }
@@ -254,45 +272,59 @@ export function usePlanCreatorWorkout() {
 export function useSubmitCreatorVideo() {
   const { source } = useAppData();
   return useMutation({
-    mutationFn: (input: CreateCreatorVideoSubmissionInput) => source.submitCreatorVideo(input)
+    mutationFn: (input: CreateCreatorVideoSubmissionInput) => creatorFeaturesEnabled
+      ? source.submitCreatorVideo(input)
+      : rejectPausedCreatorAction()
   });
 }
 
 export function useEligibleWeeklyChallengePartners(
   competitionMonthKey: string,
   weeklyGoal: number,
-  region: string,
+  regionCode: string,
   periodIndex: number
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: authenticatedQueriesEnabled && regionCode.length > 0,
     queryFn: () => source.getEligibleWeeklyChallengePartners(
       competitionMonthKey,
       weeklyGoal,
-      region,
+      regionCode,
       periodIndex
     ),
-    queryKey: ['weekly-challenge-partners', competitionMonthKey, weeklyGoal, region, periodIndex]
+    queryKey: [
+      'weekly-challenge-partners',
+      competitionMonthKey,
+      weeklyGoal,
+      regionCode,
+      periodIndex
+    ]
   });
 }
 
 export function useWeeklyChallengeRequests(
   competitionMonthKey: string,
   weeklyGoal: number,
-  region: string,
+  regionCode: string,
   periodIndex: number
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled,
+    enabled: authenticatedQueriesEnabled && regionCode.length > 0,
     queryFn: () => source.getWeeklyChallengeRequests(
       competitionMonthKey,
       weeklyGoal,
-      region,
+      regionCode,
       periodIndex
     ),
-    queryKey: ['weekly-challenge-requests', competitionMonthKey, weeklyGoal, region, periodIndex]
+    queryKey: [
+      'weekly-challenge-requests',
+      competitionMonthKey,
+      weeklyGoal,
+      regionCode,
+      periodIndex
+    ]
   });
 }
 
@@ -300,16 +332,16 @@ export function useRequestWeeklyChallengePartner() {
   const { source } = useAppData();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ competitionMonthKey, periodIndex, recipientUserId, region, weeklyGoal }: {
+    mutationFn: ({ competitionMonthKey, periodIndex, recipientUserId, regionCode, weeklyGoal }: {
       competitionMonthKey: string;
       periodIndex: number;
       recipientUserId: string;
-      region: string;
+      regionCode: string;
       weeklyGoal: number;
     }) => source.requestWeeklyChallengePartner(
       competitionMonthKey,
       weeklyGoal,
-      region,
+      regionCode,
       periodIndex,
       recipientUserId
     ),
@@ -356,12 +388,12 @@ export function useMyStreaks() {
   });
 }
 
-export function useRewardCatalog(region: string, monthKey?: string) {
+export function useRewardCatalog(regionCode: string, monthKey?: string) {
   const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: apiQueriesEnabled,
-    queryFn: () => source.getRewardCatalog(region, monthKey),
-    queryKey: ['reward-catalog', region, monthKey ?? 'current']
+    enabled: apiQueriesEnabled && regionCode.length > 0,
+    queryFn: () => source.getRewardCatalog(regionCode, monthKey),
+    queryKey: ['reward-catalog', regionCode, monthKey ?? 'current']
   });
 }
 

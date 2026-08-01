@@ -31,15 +31,15 @@ export class SessionEvidenceFindingsDto {
 
   @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
   @IsEnum(SessionEvidenceFindingDto)
-  faceCheck!: 'approved' | 'not_required' | 'rejected';
-
-  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
-  @IsEnum(SessionEvidenceFindingDto)
   gymQr!: 'approved' | 'not_required' | 'rejected';
 
   @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
   @IsEnum(SessionEvidenceFindingDto)
   heartRate!: 'approved' | 'not_required' | 'rejected';
+
+  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
+  @IsEnum(SessionEvidenceFindingDto)
+  presenceCheck!: 'approved' | 'not_required' | 'rejected';
 }
 
 export class SessionReviewDecisionDto extends OperatorReasonDto {
@@ -76,11 +76,6 @@ export class DeviceAttestationReviewDto extends SessionEvidenceCategoryReviewDto
   uniqueTokenCount!: number;
 }
 
-export class FaceCheckReviewDto extends SessionEvidenceCategoryReviewDto {
-  @ApiProperty({ maximum: 1, minimum: 0, nullable: true, type: Number })
-  maximumConfidence!: number | null;
-}
-
 export class GymQrReviewDto extends SessionEvidenceCategoryReviewDto {
   @ApiProperty({ minimum: 0, type: Number })
   uniquePayloadCount!: number;
@@ -101,14 +96,14 @@ export class SessionEvidenceReviewGroupsDto {
   @ApiProperty({ type: DeviceAttestationReviewDto })
   deviceAttestation!: DeviceAttestationReviewDto;
 
-  @ApiProperty({ type: FaceCheckReviewDto })
-  faceCheck!: FaceCheckReviewDto;
-
   @ApiProperty({ type: GymQrReviewDto })
   gymQr!: GymQrReviewDto;
 
   @ApiProperty({ type: HeartRateReviewDto })
   heartRate!: HeartRateReviewDto;
+
+  @ApiProperty({ type: SessionEvidenceCategoryReviewDto })
+  presenceCheck!: SessionEvidenceCategoryReviewDto;
 }
 
 export class SessionEvidenceReviewResponseDto {

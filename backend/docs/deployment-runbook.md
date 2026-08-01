@@ -2,12 +2,25 @@
 
 The same immutable image supplies three workloads:
 
-1. migration job: `npm run migrate:deploy`;
+1. migration job: `node node_modules/node-pg-migrate/bin/node-pg-migrate.js up
+   --migrations-dir dist/migrations --database-url-var DATABASE_URL`;
 2. operations worker: `node --require ./dist/observability/instrumentation.js dist/worker.js`;
 3. API: `node dist/main.js`.
 
 Run migrations before the worker and before moving traffic to the API revision.
 Never run down migrations in production.
+
+## Preproduction baseline
+
+The migration history was cleaned before the first production deployment. At
+the July 30, 2026 audit, the target Google Cloud project had neither Cloud Run
+nor Cloud SQL APIs enabled, so there was no deployed production database to
+upgrade. A fresh database never creates the retired demo-verification or
+payment schema.
+
+Any local or staging database created from the earlier preproduction migration
+set must be rebuilt from an empty database before using this baseline. Do not
+apply the rewritten baseline over an existing production migration ledger.
 
 ## Required resources and secrets
 
@@ -26,8 +39,8 @@ to Git, Expo variables, Terraform state, container images, or logs.
 
 1. Build and scan `backend/Dockerfile`; record the image digest.
 2. Run Backend CI, Terraform validation, and the PostGIS integration suite.
-3. Confirm a fresh backup. For the rewards decommission migration, also confirm
-   any required legacy financial archive has been exported and approved.
+3. Confirm a fresh backup and validate that the target migration ledger matches
+   the clean release baseline.
 4. Execute the migration job with the new digest and wait for success.
 5. Update the private worker pool with the same digest.
 6. Deploy an API candidate at zero traffic.
@@ -64,8 +77,8 @@ ciphertext and codes not assigned to the user are excluded from privacy exports.
 ## Backup and rollback
 
 - Verify a backup and recovery window before every migration.
-- The brand-rewards decommission migration is intentionally irreversible; use a
-  pre-migration database restore if rollback is required.
+- Never use a down migration as a production rollback; use a verified
+  pre-migration restore or a reviewed forward fix.
 - Roll API/worker traffic back only when the schema remains compatible.
 - Otherwise fix forward while preserving append-only draw, reward, ledger,
   privacy, and operator-audit evidence.

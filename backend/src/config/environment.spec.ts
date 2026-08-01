@@ -1,10 +1,20 @@
 import { validateEnvironment } from './environment';
 
+const productionEnvironment = {
+  CORS_ORIGINS: 'https://app.gogymgo.com',
+  DATABASE_URL: 'postgresql://gogymgo:secret@10.20.0.3:5432/gogymgo',
+  FIREBASE_PROJECT_ID: 'gogymgo-production',
+  NODE_ENV: 'production',
+  OPENAPI_ENABLED: 'false',
+  PRETTY_LOGS_ENABLED: 'false',
+  REWARD_CODE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  TRUST_PROXY: 'true',
+} as const;
+
 describe('environment validation', () => {
   it('normalizes safe local defaults', () => {
     const environment = validateEnvironment({
       NODE_ENV: 'test',
-      AUTH_MODE: 'test',
       REWARD_CODE_ENCRYPTION_KEY: '',
     });
 
@@ -25,7 +35,6 @@ describe('environment validation', () => {
   it('requires an OTLP endpoint and service name when telemetry is enabled', () => {
     expect(() =>
       validateEnvironment({
-        AUTH_MODE: 'test',
         NODE_ENV: 'test',
         OTEL_ENABLED: 'true',
       }),
@@ -33,7 +42,6 @@ describe('environment validation', () => {
 
     expect(
       validateEnvironment({
-        AUTH_MODE: 'test',
         NODE_ENV: 'test',
         OTEL_ENABLED: 'true',
         OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318',
@@ -42,51 +50,94 @@ describe('environment validation', () => {
     ).toBe(true);
   });
 
-  it('rejects test authentication in production', () => {
-    expect(() =>
-      validateEnvironment({
-        NODE_ENV: 'production',
-        AUTH_MODE: 'test',
-        FIREBASE_PROJECT_ID: 'gogymgo-production',
-      }),
-    ).toThrow(/AUTH_MODE must be firebase/i);
+  it('requires a Firebase project in production', () => {
+    expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow(
+      /FIREBASE_PROJECT_ID is required/i,
+    );
   });
 
-  it('requires a Firebase project in production', () => {
+  it('accepts a complete fail-closed production configuration', () => {
+    const environment = validateEnvironment(productionEnvironment);
+
+    expect(environment.NODE_ENV).toBe('production');
+    expect(environment.OPENAPI_ENABLED).toBe(false);
+    expect(environment.PRETTY_LOGS_ENABLED).toBe(false);
+    expect(environment.TRUST_PROXY).toBe(true);
+  });
+
+  it.each([
+    [
+      'loopback database',
+      { DATABASE_URL: 'postgresql://gogymgo:secret@localhost:5432/gogymgo' },
+      /DATABASE_URL must not use a loopback host/i,
+    ],
+    [
+      'insecure CORS origin',
+      { CORS_ORIGINS: 'http://app.gogymgo.com' },
+      /CORS_ORIGINS must contain only exact HTTPS origins/i,
+    ],
+    [
+      'Firebase emulator',
+      { FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' },
+      /FIREBASE_AUTH_EMULATOR_HOST must not be configured/i,
+    ],
+    [
+      'public OpenAPI',
+      { OPENAPI_ENABLED: 'true' },
+      /OPENAPI_ENABLED must be false/i,
+    ],
+    [
+      'pretty logs',
+      { PRETTY_LOGS_ENABLED: 'true' },
+      /PRETTY_LOGS_ENABLED must be false/i,
+    ],
+    ['untrusted proxy', { TRUST_PROXY: 'false' }, /TRUST_PROXY must be true/i],
+    [
+      'missing reward key',
+      { REWARD_CODE_ENCRYPTION_KEY: '' },
+      /REWARD_CODE_ENCRYPTION_KEY is required/i,
+    ],
+    [
+      'insecure push endpoint',
+      { EXPO_PUSH_API_URL: 'http://push.gogymgo.com' },
+      /EXPO_PUSH_API_URL must use HTTPS/i,
+    ],
+    [
+      'insecure telemetry endpoint',
+      {
+        OTEL_ENABLED: 'true',
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'http://telemetry.gogymgo.com',
+        OTEL_SERVICE_NAME: 'gogymgo-api',
+      },
+      /OTEL_EXPORTER_OTLP_ENDPOINT must use HTTPS/i,
+    ],
+  ])('rejects %s in production', (_label, override, message) => {
     expect(() =>
-      validateEnvironment({ NODE_ENV: 'production', AUTH_MODE: 'firebase' }),
-    ).toThrow(/FIREBASE_PROJECT_ID is required/i);
+      validateEnvironment({
+        ...productionEnvironment,
+        ...override,
+      }),
+    ).toThrow(message);
   });
 
   it('requires coupon encryption keys to decode to exactly 32 bytes', () => {
     expect(() =>
       validateEnvironment({
         NODE_ENV: 'test',
-        AUTH_MODE: 'test',
         REWARD_CODE_ENCRYPTION_KEY: Buffer.from('too-short').toString('base64'),
       }),
     ).toThrow(/32-byte key/i);
     expect(
       validateEnvironment({
-        AUTH_MODE: 'test',
         NODE_ENV: 'test',
         REWARD_CODE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       }).REWARD_CODE_ENCRYPTION_KEY,
     ).toBeDefined();
   });
 
-  it('requires Firebase, a private bucket, and a pseudonymization key for privacy execution', () => {
+  it('requires a private bucket and pseudonymization key for privacy execution', () => {
     expect(() =>
       validateEnvironment({
-        AUTH_MODE: 'test',
-        NODE_ENV: 'test',
-        PRIVACY_OPERATIONS_ENABLED: 'true',
-      }),
-    ).toThrow(/AUTH_MODE must be firebase/i);
-
-    expect(() =>
-      validateEnvironment({
-        AUTH_MODE: 'firebase',
         NODE_ENV: 'test',
         PRIVACY_OPERATIONS_ENABLED: 'true',
       }),
@@ -94,7 +145,6 @@ describe('environment validation', () => {
 
     expect(
       validateEnvironment({
-        AUTH_MODE: 'firebase',
         NODE_ENV: 'test',
         PRIVACY_EXPORT_BUCKET: 'private-exports',
         PRIVACY_OPERATIONS_ENABLED: 'true',
@@ -103,7 +153,6 @@ describe('environment validation', () => {
 
     expect(() =>
       validateEnvironment({
-        AUTH_MODE: 'firebase',
         NODE_ENV: 'test',
         PRIVACY_EXPORT_BUCKET: 'private-exports',
         PRIVACY_OPERATIONS_ENABLED: 'true',
@@ -115,7 +164,6 @@ describe('environment validation', () => {
   it('requires a private content bucket when profile media is enabled', () => {
     expect(() =>
       validateEnvironment({
-        AUTH_MODE: 'test',
         NODE_ENV: 'test',
         PROFILE_MEDIA_ENABLED: 'true',
       }),
@@ -123,7 +171,6 @@ describe('environment validation', () => {
 
     expect(
       validateEnvironment({
-        AUTH_MODE: 'test',
         GCP_STORAGE_BUCKET: 'private-content',
         NODE_ENV: 'test',
         PROFILE_MEDIA_ENABLED: 'true',
@@ -134,7 +181,6 @@ describe('environment validation', () => {
   it('requires the Expo access token only in the sending worker', () => {
     expect(
       validateEnvironment({
-        AUTH_MODE: 'test',
         NODE_ENV: 'test',
         PUSH_NOTIFICATIONS_ENABLED: 'true',
       }).PUSH_NOTIFICATIONS_ENABLED,
@@ -142,7 +188,6 @@ describe('environment validation', () => {
 
     expect(() =>
       validateEnvironment({
-        AUTH_MODE: 'test',
         NODE_ENV: 'test',
         PUSH_NOTIFICATIONS_ENABLED: 'true',
         RUNTIME_ROLE: 'worker',

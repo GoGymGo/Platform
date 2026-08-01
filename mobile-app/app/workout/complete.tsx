@@ -10,7 +10,6 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
-import { BrandVideoAdPlaceholder } from '@/components/sponsor';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { isCompetitionBonusDay } from '@/domain/competition';
@@ -20,6 +19,12 @@ import {
   type CompleteWorkoutResult,
   useWorkoutProgress
 } from '@/state/workoutProgress';
+
+function formatClock(totalSeconds: number) {
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
 
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
@@ -39,6 +44,9 @@ export default function WorkoutCompleteScreen() {
   const didCompleteSession = useRef(false);
   const [hadActiveSession] = useState(() => activeSession !== null);
   const [completedDateKey] = useState(() => activeSession?.dateKey ?? null);
+  const [minimumSessionSeconds] = useState(
+    () => activeSession?.minimumSessionSeconds ?? null
+  );
   const [wasFirstVerifiedWorkout] = useState(() => verifiedSessionCount === 0);
   const [completionResult, setCompletionResult] = useState<
     CompleteWorkoutResult | 'pending' | 'submission-failed'
@@ -91,7 +99,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="START A WORKOUT"
-        body="A session must pass check-in, the 30-minute timer, the mid-session presence check, and check-out before entries can be awarded."
+        body="A session must pass the server-set timer and evidence requirements before competition credit can be awarded."
         onAction={() => router.replace('/session' as Href)}
         title="WORKOUT NOT STARTED"
       />
@@ -100,16 +108,18 @@ export default function WorkoutCompleteScreen() {
 
   if (
     completionResult === 'minimum-not-met' ||
-    completionResult === 'heart-rate-target-not-met' ||
+    completionResult === 'heart-rate-evidence-not-met' ||
     completionResult === 'missing-mid-session-check' ||
     completionResult === 'no-active-session'
   ) {
     return (
       <SessionUnavailable
         actionLabel="RETURN TO WORKOUT"
-        body={completionResult === 'heart-rate-target-not-met'
-          ? 'The heart-rate path did not maintain the required 30-minute average. This session cannot earn competition credit.'
-          : 'The session could not be completed because a required timer or presence-check condition did not pass.'}
+        body={
+          completionResult === 'heart-rate-evidence-not-met'
+            ? 'The required heart-rate evidence has not finished uploading. Return to the workout and try again.'
+            : `The session could not be completed because the ${minimumSessionSeconds ? formatClock(minimumSessionSeconds) : 'server-set'} timer or a required presence check did not pass.`
+        }
         onAction={() => router.replace('/session' as Href)}
         title="ACTION NEEDED"
       />
@@ -257,12 +267,6 @@ export default function WorkoutCompleteScreen() {
           onPress={continueFromCompletion}
         />
 
-        <BrandVideoAdPlaceholder
-          compact
-          onPress={() => router.push('/sponsor-offer')}
-          placement="completion"
-          style={styles.videoAd}
-        />
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -315,9 +319,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
-  },
-  videoAd: {
-    marginTop: spacing.xl
   },
   progressCard: {
     width: '100%',

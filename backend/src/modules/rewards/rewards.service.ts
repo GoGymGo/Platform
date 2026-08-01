@@ -35,6 +35,27 @@ export interface RewardAwardSlot {
   rewardCatalogItemId: string;
 }
 
+export function allocateRewardSlots(
+  items: readonly {
+    awardedCount: number;
+    inventoryTotal: number;
+    rewardCatalogItemId: string;
+  }[],
+  maximumSlots: number,
+): RewardAwardSlot[] {
+  const slots: RewardAwardSlot[] = [];
+  const limit = Math.max(0, Math.floor(maximumSlots));
+  for (const item of items) {
+    const available = Math.max(item.inventoryTotal - item.awardedCount, 0);
+    const count = Math.min(available, limit - slots.length);
+    for (let index = 0; index < count; index += 1) {
+      slots.push({ rewardCatalogItemId: item.rewardCatalogItemId });
+    }
+    if (slots.length >= limit) break;
+  }
+  return slots;
+}
+
 @Injectable()
 export class RewardsService {
   constructor(
@@ -259,6 +280,7 @@ export class RewardsService {
     transaction: Transaction<Database>,
     competitionId: string,
     at: Date,
+    maximumSlots: number,
   ): Promise<RewardAwardSlot[]> {
     const items = await transaction
       .selectFrom('reward_catalog_items as item')
@@ -291,16 +313,13 @@ export class RewardsService {
       .forUpdate()
       .execute();
 
-    return items.flatMap((item) =>
-      Array.from(
-        {
-          length: Math.max(
-            item.inventory_total - Number(item.awarded_count),
-            0,
-          ),
-        },
-        () => ({ rewardCatalogItemId: item.id }),
-      ),
+    return allocateRewardSlots(
+      items.map((item) => ({
+        awardedCount: Number(item.awarded_count),
+        inventoryTotal: item.inventory_total,
+        rewardCatalogItemId: item.id,
+      })),
+      maximumSlots,
     );
   }
 

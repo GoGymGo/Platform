@@ -118,7 +118,7 @@ Example regional additions:
 ```json
 {
   "challengeType": "regional",
-  "regionCode": "TORONTO",
+  "regionCode": "toronto-on",
   "locationName": "Waterfront Trail - Music Garden",
   "scheduledDays": [2, 4],
   "scheduledTime": "18:30",

@@ -28,6 +28,13 @@ describe('workout session repository', () => {
           eligibleDate: '2026-07-16',
           id: '60000000-0000-4000-8000-000000000001',
           policyVersion: 'rules-v1',
+          requirements: {
+            minHeartRateSamples: 2,
+            minSessionMinutes: 20,
+            requireDeviceAttestation: false,
+            requireGymQr: false,
+            requirePresenceCheck: true
+          },
           startedAt: '2026-07-16T12:00:00.000Z',
           status: 'active'
         }) as Promise<TResponse>;
@@ -36,10 +43,17 @@ describe('workout session repository', () => {
     const sessions = createWorkoutSessionRepository('api', api);
     const sessionId = '60000000-0000-4000-8000-000000000001';
 
-    await sessions.createSession(
+    const started = await sessions.createSession(
       '40000000-0000-4000-8000-000000000001',
       'attempt-1'
     );
+    assert.deepEqual(started.requirements, {
+      minHeartRateSamples: 2,
+      minSessionMinutes: 20,
+      requireDeviceAttestation: false,
+      requireGymQr: false,
+      requirePresenceCheck: true
+    });
     await sessions.appendHeartRateSample(
       sessionId,
       132,
@@ -48,6 +62,10 @@ describe('workout session repository', () => {
     await sessions.appendGymQrScan(
       sessionId,
       'gogymgo:gym:exit:partner-one'
+    );
+    await sessions.appendPresenceCheck(
+      sessionId,
+      '2026-07-16T12:15:00.000Z'
     );
     await sessions.completeSession(sessionId);
     await sessions.cancelSession(sessionId);
@@ -59,22 +77,23 @@ describe('workout session repository', () => {
         { method: 'POST', path: '/v1/sessions' },
         { method: 'POST', path: `/v1/sessions/${sessionId}/events` },
         { method: 'POST', path: `/v1/sessions/${sessionId}/events` },
+        { method: 'POST', path: `/v1/sessions/${sessionId}/events` },
         { method: 'POST', path: `/v1/sessions/${sessionId}/complete` },
         { method: 'POST', path: `/v1/sessions/${sessionId}/cancel` },
         { method: undefined, path: '/v1/me/progress' }
       ]
     );
     assert.equal(requests[0].idempotencyKey, 'session-create-attempt-1');
-    assert.equal(requests[3].idempotencyKey, `session-complete-${sessionId}`);
-    assert.equal(requests[4].idempotencyKey, `session-cancel-${sessionId}`);
+    assert.equal(requests[4].idempotencyKey, `session-complete-${sessionId}`);
+    assert.equal(requests[5].idempotencyKey, `session-cancel-${sessionId}`);
     assert.deepEqual(requests[0].body, {
       competitionId: '40000000-0000-4000-8000-000000000001'
     });
     assert.deepEqual(
-      requests.slice(1, 3).map(({ body }) =>
+      requests.slice(1, 4).map(({ body }) =>
         (body as { eventType: string }).eventType
       ),
-      ['heart_rate_sample', 'gym_qr_scan']
+      ['heart_rate_sample', 'gym_qr_scan', 'presence_check']
     );
   });
 

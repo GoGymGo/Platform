@@ -5,8 +5,14 @@ export type WeeklyMatchMultiplier = 0 | 1 | 2 | 3;
 export type VerifiedUsersByGoal = Record<GoalCategory, number>;
 
 export type CampaignEconomicsSettings = {
-  categoryPodiumMultipliers: Record<CategoryPodiumRank, number>;
+  categoryPodiumMultipliers: CategoryPodiumMultipliers;
   rewardWinnerRate: number;
+};
+
+export type CategoryPodiumMultipliers = Record<CategoryPodiumRank, number>;
+
+export type PrizeDrawWeightSettings = {
+  categoryPodiumMultipliers: CategoryPodiumMultipliers;
 };
 
 export type CampaignEconomicsResult = {
@@ -67,15 +73,15 @@ export function calculateCampaignEconomics(
 export function calculateFinalPrizeDrawWeight(
   input: PrizeDrawWeightInput,
   categoryRank: number | null,
-  settings: CampaignEconomicsSettings
+  settings: PrizeDrawWeightSettings
 ): PrizeDrawWeightResult {
-  validateSettings(settings);
+  validateCategoryPodiumMultipliers(settings.categoryPodiumMultipliers);
   const periodEntries = sanitizeCount(input.periodEntriesBeforePerfectMonth);
   const bonusDayEntries = sanitizeCount(input.bonusDayEntries);
   const signupEntries = sanitizeCount(input.signupEntries);
   const podiumRank = isCategoryPodiumRank(categoryRank) ? categoryRank : null;
   const multiplier = podiumRank ? settings.categoryPodiumMultipliers[podiumRank] : 1;
-  const categoryAdjustedPeriodEntries = periodEntries * multiplier;
+  const categoryAdjustedPeriodEntries = Math.floor(periodEntries * multiplier);
   const activeEntries =
     (periodEntries + bonusDayEntries) * input.perfectMonthMultiplier + signupEntries;
 
@@ -98,9 +104,15 @@ function validateSettings(settings: CampaignEconomicsSettings) {
   if (settings.rewardWinnerRate <= 0 || settings.rewardWinnerRate > 1) {
     throw new Error('Reward winner rate must be greater than 0 and at most 1.');
   }
-  const first = settings.categoryPodiumMultipliers[1];
-  const second = settings.categoryPodiumMultipliers[2];
-  const third = settings.categoryPodiumMultipliers[3];
+  validateCategoryPodiumMultipliers(settings.categoryPodiumMultipliers);
+}
+
+function validateCategoryPodiumMultipliers(
+  multipliers: CategoryPodiumMultipliers
+) {
+  const first = multipliers[1];
+  const second = multipliers[2];
+  const third = multipliers[3];
   if (
     ![first, second, third].every(Number.isFinite) ||
     first <= second ||

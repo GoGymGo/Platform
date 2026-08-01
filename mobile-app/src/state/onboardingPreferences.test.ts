@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { creatorFeaturesEnabled } from '@/config/features';
 import {
   biometricCameraConsentVersion,
   getClarityTipStorageKey,
   isBiometricCameraConsentCurrent,
   parseVerificationPreference
 } from '@/state/onboardingPreferences';
+
+describe('creator feature availability', () => {
+  it('keeps creator surfaces paused while they remain available for testing', () => {
+    assert.equal(creatorFeaturesEnabled, false);
+  });
+});
 
 describe('verification preference parsing', () => {
   it('keeps the exact selected source', () => {

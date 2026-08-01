@@ -15,6 +15,18 @@ export type AuthoritativeWorkoutSession = {
   status: WorkoutSessionStatus;
 };
 
+export type SessionRequirements = {
+  minHeartRateSamples: number;
+  minSessionMinutes: number;
+  requireDeviceAttestation: boolean;
+  requireGymQr: boolean;
+  requirePresenceCheck: boolean;
+};
+
+export type StartedWorkoutSession = AuthoritativeWorkoutSession & {
+  requirements: SessionRequirements;
+};
+
 export type WorkoutSessionCompletion = AuthoritativeWorkoutSession & {
   eligibleForReview: boolean;
   violations: readonly string[];

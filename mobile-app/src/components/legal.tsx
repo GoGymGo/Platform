@@ -37,6 +37,11 @@ type LegalDocumentLinksProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+type DataCollectionNoticeProps = {
+  message: string;
+  style?: StyleProp<ViewStyle>;
+};
+
 type LegalDocumentScreenProps = {
   document: LegalDocument;
 };
@@ -44,8 +49,9 @@ type LegalDocumentScreenProps = {
 function formatReadableLegalCopy(value: string) {
   return value
     .toLowerCase()
-    .replace(/(^|[.!?]\s+)([a-z])/g, (_match, prefix: string, letter: string) =>
-      `${prefix}${letter.toUpperCase()}`
+    .replace(
+      /(^|[.!?]\s+)([a-z])/g,
+      (_match, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`
     )
     .replace(/\bgogymgo\b/gi, 'GoGymGo')
     .replace(/\bqr\b/gi, 'QR')
@@ -77,7 +83,12 @@ export function LegalConsentCheckbox({
       style={style}
     >
       <HUDBorderBox glow={checked} style={styles.checkboxRow} tone={activeTone}>
-        <View style={[styles.checkboxMark, checked ? styles.checkboxMarkActive : styles.checkboxMarkIdle]}>
+        <View
+          style={[
+            styles.checkboxMark,
+            checked ? styles.checkboxMarkActive : styles.checkboxMarkIdle
+          ]}
+        >
           {checked ? (
             <TerminalText glow tone={tone} variant="micro">
               OK
@@ -106,12 +117,11 @@ export function LegalDocumentLinks({
   style
 }: LegalDocumentLinksProps) {
   const router = useRouter();
-  const openDocument = (
-    pathname: '/privacy-policy' | '/terms-of-service'
-  ) => router.push({
-    pathname,
-    params: { jurisdictionCode, locale }
-  } as Href);
+  const openDocument = (pathname: '/privacy-policy' | '/terms-of-service') =>
+    router.push({
+      pathname,
+      params: { jurisdictionCode, locale }
+    } as Href);
 
   if (compact) {
     return (
@@ -119,10 +129,7 @@ export function LegalDocumentLinks({
         <Pressable
           accessibilityRole="link"
           onPress={() => openDocument('/privacy-policy')}
-          style={({ pressed }) => [
-            styles.compactLink,
-            pressed ? styles.pressed : null
-          ]}
+          style={({ pressed }) => [styles.compactLink, pressed ? styles.pressed : null]}
         >
           <TerminalText glow tone="cyan" variant="micro">
             PRIVACY POLICY
@@ -134,10 +141,7 @@ export function LegalDocumentLinks({
         <Pressable
           accessibilityRole="link"
           onPress={() => openDocument('/terms-of-service')}
-          style={({ pressed }) => [
-            styles.compactLink,
-            pressed ? styles.pressed : null
-          ]}
+          style={({ pressed }) => [styles.compactLink, pressed ? styles.pressed : null]}
         >
           <TerminalText glow tone="cyan" variant="micro">
             TERMS
@@ -160,6 +164,20 @@ export function LegalDocumentLinks({
         style={styles.linkButton}
       />
     </View>
+  );
+}
+
+export function DataCollectionNotice({ message, style }: DataCollectionNoticeProps) {
+  return (
+    <HUDBorderBox style={[styles.dataNotice, style]} tone="muted">
+      <TerminalText glow tone="cyan" variant="micro">
+        HOW WE USE THIS INFORMATION
+      </TerminalText>
+      <TerminalText tone="muted" uppercase={false} variant="caption">
+        {message}
+      </TerminalText>
+      <LegalDocumentLinks compact />
+    </HUDBorderBox>
   );
 }
 
@@ -197,7 +215,11 @@ export function BiometricCameraConsentBanner({
   }
 
   return (
-    <HUDBorderBox glow={checked} style={[styles.cameraBanner, style]} tone={checked ? 'cyan' : 'muted'}>
+    <HUDBorderBox
+      glow={checked}
+      style={[styles.cameraBanner, style]}
+      tone={checked ? 'cyan' : 'muted'}
+    >
       <View style={styles.bannerHeader}>
         <TerminalText glow={checked} tone={checked ? 'cyan' : 'dim'} variant="label">
           {biometricConsentCopy.title}
@@ -277,7 +299,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
                     <View key={bullet} style={styles.bulletRow}>
                       <View style={styles.bulletDot} />
                       <TerminalText style={styles.bulletText} tone="muted" variant="body">
-                      {formatReadableLegalCopy(bullet)}
+                        {formatReadableLegalCopy(bullet)}
                       </TerminalText>
                     </View>
                   ))}
@@ -292,6 +314,10 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
 }
 
 const styles = StyleSheet.create({
+  dataNotice: {
+    gap: spacing.sm,
+    padding: spacing.md
+  },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

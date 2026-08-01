@@ -428,14 +428,10 @@ export class AdminCompetitionConfigurationService {
       });
     }
     const now = new Date();
-    if (
-      competition.registration_closes_at <= now ||
-      competition.starts_at <= now
-    ) {
+    if (competition.ends_at <= now) {
       throw new ConflictException({
         code: 'COMPETITION_PUBLISH_WINDOW_CLOSED',
-        message:
-          'Registration close and competition start must be future times.',
+        message: 'An ended competition cannot be published.',
       });
     }
     const [region, bracket, reward] = await Promise.all([

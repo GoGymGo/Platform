@@ -12,7 +12,6 @@ import {
 import { CompetitionHubNav } from '@/components/competitionHubNav';
 import { CompactTextButton } from '@/components/onboarding';
 import { RecoverableError } from '@/components/reliability';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useRewardCatalog } from '@/data/appDataHooks';
 import {
@@ -32,17 +31,16 @@ export default function RewardMarketplaceScreen() {
     'reward-marketplace:winner-details',
     false
   );
-  const { competitionRegion } = useCompetitionRegion();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
   const { competition } = useWorkoutProgress();
   const rewardsQuery = useRewardCatalog(
-    competitionRegion.id,
+    regionVerification?.regionCode ?? '',
     competition.competitionMonthKey
   );
   const { data: rewards = [], isPending } = rewardsQuery;
 
   return (
     <ScreenContainer>
-      <SponsorBanner compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}

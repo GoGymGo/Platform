@@ -14,7 +14,7 @@ import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
-import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -24,6 +24,12 @@ type CheckoutMetric = {
   label: string;
   value: string;
 };
+
+function formatClock(totalSeconds: number) {
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
 
 export default function CheckOutScreen() {
   const router = useRouter();
@@ -39,23 +45,43 @@ export default function CheckOutScreen() {
     : 0;
   const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
     activeSession &&
-      activeSession.heartRateObservedSeconds >= workoutRules.minimumSessionSeconds &&
-      activeSession.averageHeartRateBpm >= workoutRules.minimumAverageHeartRateBpm
+      activeSession.heartRateSamplesSubmitted >=
+        activeSession.requiredHeartRateSamples
+  );
+  const presenceReady = Boolean(
+    activeSession &&
+      (!activeSession.presenceCheckRequired || activeSession.midSessionVerified)
   );
   const checkoutReady = Boolean(
-    activeSession?.midSessionVerified &&
-      elapsedSeconds >= workoutRules.minimumSessionSeconds &&
+    activeSession &&
+      presenceReady &&
+      elapsedSeconds >= activeSession.minimumSessionSeconds &&
       heartRateReady
   );
   const metrics: readonly CheckoutMetric[] = activeSession?.verificationMethod === 'heartRate'
     ? [
-        { label: 'DURATION', value: '30:00' },
+        {
+          label: 'DURATION',
+          value: formatClock(activeSession.minimumSessionSeconds)
+        },
         { label: 'AVG BPM', value: String(activeSession.averageHeartRateBpm) },
-        { label: 'TARGET', value: `${workoutRules.minimumAverageHeartRateBpm}+` }
+        {
+          label: 'SAMPLES',
+          value:
+            `${activeSession.heartRateSamplesSubmitted}/${activeSession.requiredHeartRateSamples}`
+        }
       ]
     : [
-        { label: 'DURATION', value: '30:00' },
-        { label: 'PRESENCE', value: 'PASS' },
+        {
+          label: 'DURATION',
+          value: activeSession
+            ? formatClock(activeSession.minimumSessionSeconds)
+            : '--:--'
+        },
+        {
+          label: 'PRESENCE',
+          value: activeSession?.presenceCheckRequired ? 'PASS' : 'NOT REQUIRED'
+        },
         { label: 'GYM QR', value: 'READY' }
       ];
 
@@ -67,8 +93,8 @@ export default function CheckOutScreen() {
           !activeSession
             ? 'Start a verified session before opening check-out.'
             : activeSession.verificationMethod === 'heartRate' && !heartRateReady
-              ? `Maintain an average of at least ${workoutRules.minimumAverageHeartRateBpm} BPM across the full 30-minute session.`
-              : 'The 30-minute minimum and automatic presence check must both pass before check-out.'
+              ? 'Wait for the required heart-rate evidence to finish uploading.'
+              : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before check-out.`
         }
         onAction={() => {
           if (activeSession) {
@@ -83,7 +109,7 @@ export default function CheckOutScreen() {
   }
 
   async function confirmPresence() {
-    if (await verify()) {
+    if (!activeSession?.presenceCheckRequired || await verify()) {
       router.push('/workout/complete');
     }
   }
@@ -104,7 +130,7 @@ export default function CheckOutScreen() {
           </TerminalText>
         </HUDBorderBox>
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
-          30:00 COMPLETE
+          {formatClock(activeSession.minimumSessionSeconds)} COMPLETE
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
           VERIFY + FINISH
@@ -124,16 +150,25 @@ export default function CheckOutScreen() {
         </View>
       </View>
 
-      <BiometricCameraConsentBanner
-        checked={cameraConsentAccepted}
-        compact
-        onToggle={toggleCameraConsent}
-        style={styles.cameraConsent}
-      />
+      {activeSession.presenceCheckRequired ? (
+        <BiometricCameraConsentBanner
+          checked={cameraConsentAccepted}
+          compact
+          onToggle={toggleCameraConsent}
+          style={styles.cameraConsent}
+        />
+      ) : null}
 
       <CyberButtonPrimary
-        disabled={!cameraConsentReady || !cameraConsentAccepted || busy}
-        label={busy ? 'Checking device...' : 'Verify and finish'}
+        disabled={
+          activeSession.presenceCheckRequired &&
+          (!cameraConsentReady || !cameraConsentAccepted || busy)
+        }
+        label={
+          activeSession.presenceCheckRequired
+            ? busy ? 'Checking device...' : 'Verify and finish'
+            : 'Finish session'
+        }
         onPress={() => void confirmPresence()}
       />
       {message ? (

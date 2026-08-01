@@ -57,7 +57,6 @@ export function createTestConfig(
   overrides: Record<string, unknown> = {},
 ): ConfigService<Environment, true> {
   const environment = validateEnvironment({
-    AUTH_MODE: 'test',
     DATABASE_POOL_MAX: '5',
     DATABASE_URL: databaseUrl,
     NODE_ENV: 'test',

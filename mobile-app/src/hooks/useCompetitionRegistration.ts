@@ -6,23 +6,26 @@ import {
 } from '@/data/accountReadinessHooks';
 import type { CompetitionRegionVerification } from '@/config/regions';
 import { useAppTour } from '@/state/appTour';
+import { appTourCompetitionRegistrationEvidence } from '@/testing/appTourData';
 
 export function useCompetitionRegistration({
-  expectedMonthKey,
+  defaultMonthKey,
   jurisdictionCode,
-  regionLabel,
+  regionCode,
   regionVerification
 }: {
-  expectedMonthKey: string;
+  defaultMonthKey: string;
   jurisdictionCode: string;
-  regionLabel: string;
+  regionCode: string;
   regionVerification: CompetitionRegionVerification | null;
 }) {
   const { active: appTourActive } = useAppTour();
   const legalReceipt = useLegalReceiptStatus(jurisdictionCode);
-  const currentCompetition = useCurrentCompetition(expectedMonthKey, regionLabel);
+  const publishedCompetition = useCurrentCompetition(null, regionCode);
   const currentEnrollment = useCurrentEnrollment();
   const enrollInCompetition = useEnrollInCompetition();
+  const competition = publishedCompetition.data ?? null;
+  const competitionMonthKey = competition?.monthKey ?? defaultMonthKey;
 
   async function register(goalDays: number) {
     const existingEnrollment = currentEnrollment.data;
@@ -35,9 +38,8 @@ export function useCompetitionRegistration({
       return existingEnrollment;
     }
 
-    const competition = currentCompetition.data;
-    if (!competition || competition.monthKey !== expectedMonthKey) {
-      throw new Error('The regional competition is not open for this month.');
+    if (!competition) {
+      throw new Error('No published regional competition is available to join.');
     }
     if (!competition.goalDays.includes(goalDays)) {
       throw new Error('That Weekly Goal is not available in this competition.');
@@ -48,25 +50,17 @@ export function useCompetitionRegistration({
         input: {
           ageEligibilityAttested: true,
           goalDays,
-          legalReceiptBundleId: 'app-tour-legal-receipt',
-          regionVerificationId: 'app-tour-region-verification',
+          ...appTourCompetitionRegistrationEvidence,
           rulesAccepted: true
         }
       });
     }
-    if (
-      regionVerification?.status !== 'verified' ||
-      !regionVerification.verificationId
-    ) {
-      throw new Error(
-        'An approved region verification is required before registration.'
-      );
+    if (regionVerification?.status !== 'verified' || !regionVerification.verificationId) {
+      throw new Error('An approved region verification is required before registration.');
     }
     const receipt = legalReceipt.data;
     if (!receipt?.complete || !receipt.receiptBundleId) {
-      throw new Error(
-        'Review and accept Privacy & Permissions before competition registration.'
-      );
+      throw new Error('Review and accept Privacy & Permissions before competition registration.');
     }
 
     return enrollInCompetition.mutateAsync({
@@ -83,10 +77,12 @@ export function useCompetitionRegistration({
 
   return {
     busy:
-      currentCompetition.isLoading ||
+      publishedCompetition.isLoading ||
       currentEnrollment.isLoading ||
       legalReceipt.isLoading ||
       enrollInCompetition.isPending,
+    competition,
+    competitionMonthKey,
     register
   };
 }

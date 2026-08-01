@@ -60,7 +60,7 @@ export function useSocialChallenges() {
 
 export function useRegionalChallengeDiscovery(regionCode: string) {
   const context = useSocialContext();
-  const normalizedRegionCode = regionCode.trim().toUpperCase();
+  const normalizedRegionCode = regionCode.trim().toLowerCase();
   return useQuery({
     enabled: context.enabled && normalizedRegionCode.length >= 2,
     queryFn: () => context.social.discoverRegionalChallenges(normalizedRegionCode),

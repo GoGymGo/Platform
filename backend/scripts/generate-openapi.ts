@@ -7,7 +7,6 @@ import { configureApplication } from '../src/bootstrap';
 import { createOpenApiDocument } from '../src/common/openapi/openapi';
 
 process.env.NODE_ENV = 'test';
-process.env.AUTH_MODE = 'test';
 process.env.OPENAPI_ENABLED = 'false';
 
 async function generateOpenApi(): Promise<void> {

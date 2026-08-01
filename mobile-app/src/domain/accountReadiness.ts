@@ -34,64 +34,56 @@ export type LegalReceiptStatus = CurrentLegalDocuments & {
   receiptBundleId: string | null;
 };
 
-export type RegionPolicy = {
-  boundaryVersion: string;
-  code: string;
-  competitionEnabled: boolean;
-  countryCode: string;
-  currency: string;
-  id: string;
-  languageCodes: readonly string[];
-  metroName: string;
-  minimumAge: number;
-  policyVersion: string;
-  subdivisionCode: string;
-  timezone: string;
-  validFrom: string;
-  validTo: string | null;
-};
-
-export type RegionVerificationStatus = 'approved' | 'expired' | 'pending' | 'rejected';
-
 export type RegionVerification = {
   createdAt: string;
-  expiresAt?: string | null;
+  expiresAt: string;
   id: string;
-  method: 'device_location' | 'manual_review' | 'postal_code';
+  jurisdictionCode: string;
+  method: 'device_location';
   policyVersion: string;
-  regionCode?: string;
-  regionName?: string;
+  regionCode: string;
+  regionName: string;
   regionPolicyId: string;
-  reviewedAt?: string | null;
-  status: RegionVerificationStatus;
+  reviewedAt: string;
+  status: 'approved';
+  timezone: string;
 };
 
 export type CreateRegionVerificationInput = {
   latitude: number;
   longitude: number;
   method: 'device_location';
-  regionPolicyId: string;
 };
 
 export type CurrentCompetition = {
   endsAt: string;
+  entrantCap: number | null;
   goalDays: readonly number[];
   id: string;
+  minimumEntrants: number;
   monthKey: string;
   name: string;
   regionCode: string;
   regionName: string;
   registrationClosesAt: string;
   registrationOpensAt: string;
-  rules: {
+  rules?: {
+    categoryPodiumMultipliers: {
+      1: number;
+      2: number;
+      3: number;
+    };
     minHeartRateSamples: number;
     minSessionMinutes: number;
+    perfectMonthMultiplier: number;
     requireDeviceAttestation: boolean;
-    requireFaceCheck: boolean;
+    requirePresenceCheck: boolean;
     requireGymQr: boolean;
     signupPrizeDrawEntries: number;
     verifiedSessionCategoryScore: number;
     verifiedSessionPrizeDrawEntries: number;
+    weeklyChallengeBothHitMultiplier: number;
+    weeklyChallengeRecoveryMultiplier: number;
   };
   rulesVersion: string;
   startsAt: string;

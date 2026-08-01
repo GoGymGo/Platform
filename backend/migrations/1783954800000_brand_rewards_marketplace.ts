@@ -1,51 +1,6 @@
 import type { MigrationBuilder } from 'node-pg-migrate';
 
 export function up(pgm: MigrationBuilder): void {
-  pgm.sql(`
-    DROP TRIGGER IF EXISTS competition_draws_reject_non_cash_demo ON competition_draws;
-    DROP TRIGGER IF EXISTS competition_progress_reject_non_cash_demo ON competition_progress;
-    DROP TRIGGER IF EXISTS entry_ledger_reject_non_cash_demo ON entry_ledger;
-    DROP FUNCTION IF EXISTS gogymgo_reject_demo_financial_state();
-    ALTER TABLE competitions DROP CONSTRAINT IF EXISTS competitions_demo_never_settles;
-    ALTER TABLE competitions DROP CONSTRAINT IF EXISTS competitions_demo_rules_zero_value;
-
-    UPDATE competitions
-    SET rules = (rules - 'payoutPoolAmountMinor' - 'payoutWinnerCount' - 'payoutExponent')
-      || jsonb_build_object(
-        'signupPrizeDrawEntries', GREATEST(COALESCE((rules->>'signupPrizeDrawEntries')::integer, 0), 1),
-        'verifiedSessionCategoryScore', GREATEST(COALESCE((rules->>'verifiedSessionCategoryScore')::integer, 0), 1),
-        'verifiedSessionPrizeDrawEntries', GREATEST(COALESCE((rules->>'verifiedSessionPrizeDrawEntries')::integer, 0), 1)
-      );
-
-    DROP TRIGGER IF EXISTS payout_release_control_delete_guard ON payout_release_control;
-    DROP TRIGGER IF EXISTS payout_release_control_guard ON payout_release_control;
-    DROP FUNCTION IF EXISTS gogymgo_reject_payout_release_control_delete();
-    DROP FUNCTION IF EXISTS gogymgo_enforce_payout_release_control_update();
-    DROP TRIGGER IF EXISTS hyperwallet_users_provider_identity ON hyperwallet_users;
-    DROP FUNCTION IF EXISTS gogymgo_enforce_hyperwallet_user_identity();
-    DROP TRIGGER IF EXISTS payout_payments_financial_identity ON payout_payments;
-    DROP FUNCTION IF EXISTS gogymgo_enforce_payout_payment_identity();
-    DROP TRIGGER IF EXISTS payout_claims_financial_integrity ON payout_claims;
-    DROP FUNCTION IF EXISTS gogymgo_enforce_payout_claim_integrity();
-    DROP TRIGGER IF EXISTS payout_state_events_append_only ON payout_state_events;
-    DROP TRIGGER IF EXISTS draw_winners_append_only ON draw_winners;
-
-    DROP TABLE IF EXISTS payout_release_control;
-    DROP TABLE IF EXISTS payout_state_events;
-    DROP TABLE IF EXISTS payout_payments;
-    DROP TABLE IF EXISTS provider_webhooks;
-    DROP TABLE IF EXISTS hyperwallet_users;
-    DROP TABLE IF EXISTS payout_claims;
-    DROP TABLE IF EXISTS draw_winners;
-    DROP TYPE IF EXISTS provider_webhook_state;
-    DROP TYPE IF EXISTS payout_claim_status;
-
-    ALTER TABLE competitions DROP COLUMN IF EXISTS currency;
-    ALTER TABLE competitions DROP COLUMN IF EXISTS mode;
-    DROP TYPE IF EXISTS competition_mode;
-    ALTER TABLE region_policies DROP COLUMN IF EXISTS payout_enabled;
-  `);
-
   const timestamp = {
     type: 'timestamp with time zone',
     notNull: true,
@@ -228,8 +183,15 @@ export function up(pgm: MigrationBuilder): void {
   `);
 }
 
-export function down(): void {
-  throw new Error(
-    'This decommission migration is intentionally irreversible because it removes payment identity and payout records. Restore a pre-migration backup instead.',
-  );
+export function down(pgm: MigrationBuilder): void {
+  pgm.sql(`
+    DROP TRIGGER IF EXISTS reward_awards_inventory_guard ON reward_awards;
+    DROP FUNCTION IF EXISTS gogymgo_enforce_reward_inventory();
+  `);
+  pgm.dropTable('reward_coupon_codes');
+  pgm.dropTable('reward_awards');
+  pgm.dropTable('reward_catalog_items');
+  pgm.dropType('reward_award_status');
+  pgm.dropType('reward_catalog_status');
+  pgm.dropType('reward_type');
 }

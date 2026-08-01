@@ -178,7 +178,7 @@ export function normalizeChallengeInput(
     invitedFriendUserIds: [...new Set(input.invitedFriendUserIds)],
     locationName: input.locationName?.trim().replace(/\s+/g, ' ') || undefined,
     name: normalizeChallengeName(input.name),
-    regionCode: input.regionCode?.trim().toUpperCase() || undefined,
+    regionCode: input.regionCode?.trim().toLowerCase() || undefined,
     scheduledDays: [...new Set(input.scheduledDays)].sort((left, right) => left - right),
     scheduledTime: input.scheduledTime?.trim() || undefined
   };

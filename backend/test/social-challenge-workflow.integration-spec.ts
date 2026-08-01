@@ -57,9 +57,10 @@ describeWithDatabase('social friend and challenge workflow', () => {
         competition_enabled,
         boundary_version,
         policy_version,
+        boundary,
         valid_from
       ) VALUES (
-        'TORONTO',
+        'toronto-on',
         'CA',
         'ON',
         'Toronto',
@@ -70,6 +71,9 @@ describeWithDatabase('social friend and challenge workflow', () => {
         true,
         'social-test-v1',
         'social-test-v1',
+        ST_GeogFromText(
+          'SRID=4326;MULTIPOLYGON(((-79.8 43.4,-79.0 43.4,-79.0 44.0,-79.8 44.0,-79.8 43.4)))'
+        ),
         now() - interval '1 day'
       )
     `);
@@ -250,7 +254,7 @@ describeWithDatabase('social friend and challenge workflow', () => {
         locationName: 'Waterfront Trail entrance',
         name: 'Waterfront Run Club',
         participantLimit: 3,
-        regionCode: 'TORONTO',
+        regionCode: 'toronto-on',
         scheduledDays: [0, 1, 2, 3, 4, 5, 6],
         scheduledTime: '18:30',
         startDate: challengeDate,
@@ -260,14 +264,14 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
 
     await expect(
-      social.discoverChallenges(charlie, { regionCode: 'TORONTO' }),
+      social.discoverChallenges(charlie, { regionCode: 'toronto-on' }),
     ).resolves.toEqual([
       expect.objectContaining({
         id: challenge.id,
         myRole: null,
         myStatus: 'not_joined',
         participantCount: 1,
-        regionCode: 'TORONTO',
+        regionCode: 'toronto-on',
       }),
     ]);
 

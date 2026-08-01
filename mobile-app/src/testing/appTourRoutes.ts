@@ -104,14 +104,14 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
       { label: 'Creator Submission', route: '/creator/submit' },
       { label: 'Partner Hub', route: '/partner' },
       { label: 'Sponsor Application', route: '/sponsor/apply' },
-      { label: 'Gym Registration', route: '/gym/register' },
-      { label: 'Sponsor Offer', route: '/sponsor-offer' }
+      { label: 'Gym Registration', route: '/gym/register' }
     ]
   },
   {
     title: 'RULES + PRIVACY',
     routes: [
       { label: 'Competition Rules', route: '/commitment-rules' },
+      { label: 'Official Contest Rules', route: '/official-rules' },
       { label: 'Bonus Rules', route: '/bonus-rules' },
       { label: 'Privacy Policy', route: '/privacy-policy' },
       { label: 'Terms of Service', route: '/terms-of-service' },
@@ -131,7 +131,5 @@ export function buildAppTourHref(route: AppTourRoute): Href {
 }
 
 export function findAppTourRouteIndex(pathname: string) {
-  return appTourRoutes.findIndex(
-    ({ route }) => route.split('?', 1)[0] === pathname
-  );
+  return appTourRoutes.findIndex(({ route }) => route.split('?', 1)[0] === pathname);
 }

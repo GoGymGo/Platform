@@ -16,16 +16,28 @@ const prohibitedRuntimeContent = [
   /\/v1\/(?:payouts?|webhooks\/hyperwallet)\b/,
   /\bDEMO_VERIFICATION_[A-Z0-9_]+\b/,
   /\/v1\/demo-verifications\b/,
+  /\/v1\/me\/sponsor-ad-placements\b/,
   /\bcanada_demo\b/,
   /\bCA-BC-DEMO\b/,
+  /\bCA-(?:AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)-[A-Z][A-Z-]*\b/,
   /\bIRON DISTRICT\b/,
   /\bVOLT PERFORMANCE CLUB\b/,
   /\bNORTHLINE FITNESS\b/,
+  /\bAUTH_MODE\b/,
+  /\bTestTokenVerifier\b/,
+  /\bINVALID_TEST_TOKEN\b/,
+  /\bhyperwallet\b/i,
+  /\bpayout_(?:claims|payments|state_events|release_control)\b/,
+  /\bdraw_winners\b/,
+  /\bnon_cash_demo\b/,
+  /\bdemo_verification_checkpoints\b/,
 ];
 const prohibitedRuntimePathPrefixes = [
   'scripts/bootstrap-bc-demo',
   'src/foundation/bc-demo',
   'src/modules/payouts/',
+  'src/modules/sponsor-ads/',
+  'src/modules/auth/test-token-verifier',
   'src/modules/verification/demo-',
 ];
 
@@ -93,7 +105,10 @@ for (const file of files) {
     }
   }
 
-  if (relativePath.startsWith('src/')) {
+  if (
+    relativePath.startsWith('src/') ||
+    relativePath.startsWith('migrations/')
+  ) {
     for (const pattern of prohibitedRuntimeContent) {
       if (pattern.test(content)) {
         violations.push(`${relativePath}: prohibited runtime reference`);
@@ -105,6 +120,218 @@ for (const file of files) {
 const packageJson = JSON.parse(
   await readFile(join(root, 'package.json'), 'utf8'),
 );
+
+const createRegionDto = (
+  await readFile(join(root, 'src/modules/regions/dto/region.dto.ts'), 'utf8')
+).match(/export class CreateRegionVerificationDto \{[\s\S]*?\n\}/)?.[0];
+const regionsService = await readFile(
+  join(root, 'src/modules/regions/regions.service.ts'),
+  'utf8',
+);
+const regionEvidence = await readFile(
+  join(root, 'src/modules/regions/region-evidence.ts'),
+  'utf8',
+);
+const regionMigration = await readFile(
+  join(root, 'migrations/1784181600000_authoritative_region_verification.ts'),
+  'utf8',
+);
+const creatorWorkoutDto = await readFile(
+  join(root, 'src/modules/creator-workouts/dto/creator-workout.dto.ts'),
+  'utf8',
+);
+const socialService = await readFile(
+  join(root, 'src/modules/social/social.service.ts'),
+  'utf8',
+);
+const competitionDto = await readFile(
+  join(root, 'src/modules/competitions/dto/competition.dto.ts'),
+  'utf8',
+);
+const competitionsService = await readFile(
+  join(root, 'src/modules/competitions/competitions.service.ts'),
+  'utf8',
+);
+const sessionDto = await readFile(
+  join(root, 'src/modules/sessions/dto/session.dto.ts'),
+  'utf8',
+);
+const sessionsController = await readFile(
+  join(root, 'src/modules/sessions/sessions.controller.ts'),
+  'utf8',
+);
+const sessionsService = await readFile(
+  join(root, 'src/modules/sessions/sessions.service.ts'),
+  'utf8',
+);
+const dockerfile = await readFile(join(root, 'Dockerfile'), 'utf8');
+const compose = await readFile(join(root, 'compose.yml'), 'utf8');
+const environmentSource = await readFile(
+  join(root, 'src/config/environment.ts'),
+  'utf8',
+);
+const authModule = await readFile(
+  join(root, 'src/modules/auth/auth.module.ts'),
+  'utf8',
+);
+const workloadsTerraform = await readFile(
+  join(root, 'infra/terraform/workloads.tf'),
+  'utf8',
+);
+
+if (!createRegionDto || createRegionDto.includes('regionPolicyId')) {
+  violations.push(
+    'region verification input must not accept a client-selected policy ID',
+  );
+}
+for (const marker of [
+  'ST_Covers(',
+  "status: 'approved'",
+  'buildRegionEvidence(policy.boundary_version)',
+]) {
+  if (!regionsService.includes(marker)) {
+    violations.push(
+      `regions service is missing authoritative marker ${marker}`,
+    );
+  }
+}
+if (/latitude|longitude|postal/i.test(regionEvidence)) {
+  violations.push(
+    'region evidence persistence must not contain location details',
+  );
+}
+for (const marker of [
+  'coordinatesRetained',
+  'region_policies_competition_boundary_required',
+  'region_verifications_evidence_minimized',
+  'region_policies_code_canonical',
+]) {
+  if (!regionMigration.includes(marker)) {
+    violations.push(
+      `region migration is missing privacy/integrity marker ${marker}`,
+    );
+  }
+}
+if (creatorWorkoutDto.includes('joined!:')) {
+  violations.push(
+    'published creator workouts must not expose a false joined state',
+  );
+}
+if (!socialService.includes('regionCode.trim().toLowerCase()')) {
+  violations.push(
+    'social challenges must resolve the canonical lowercase region code',
+  );
+}
+for (const dtoName of [
+  'CurrentCompetitionQueryDto',
+  'EnrollmentCountQueryDto',
+]) {
+  const dto = competitionDto.match(
+    new RegExp(`export class ${dtoName}[\\s\\S]*?\\n\\}`),
+  )?.[0];
+  if (!dto?.includes('@Matches(regionCodePattern)')) {
+    violations.push(
+      `${dtoName} must enforce the canonical backend region code`,
+    );
+  }
+}
+if (
+  /lower\(policy\.metro_name\)|lower\(region\.metro_name\)/.test(
+    competitionsService,
+  )
+) {
+  violations.push(
+    'competition API lookups must use canonical region codes, not display names',
+  );
+}
+for (const marker of [
+  'minHeartRateSamples!: number',
+  'minSessionMinutes!: number',
+  'requireDeviceAttestation!: boolean',
+  'requireGymQr!: boolean',
+  'requirePresenceCheck!: boolean',
+]) {
+  if (!sessionDto.includes(marker)) {
+    violations.push(
+      `started session requirements are missing DTO marker ${marker}`,
+    );
+  }
+}
+if (
+  !sessionsController.includes(
+    '@ApiCreatedResponse({ type: StartedSessionResponseDto })',
+  )
+) {
+  violations.push(
+    'the session start OpenAPI response must expose started-session requirements',
+  );
+}
+for (const marker of [
+  "'competition.rules'",
+  'parseCompetitionRules(enrollment.rules)',
+  'requirements: this.sessionRequirements(',
+]) {
+  if (!sessionsService.includes(marker)) {
+    violations.push(
+      `session creation is missing authoritative requirement marker ${marker}`,
+    );
+  }
+}
+if (
+  dockerfile.includes('rm -f /usr/local/bin/npm') &&
+  (workloadsTerraform.includes('command = ["npm"]') ||
+    /migrate:[\s\S]{0,200}command:\s*\[['"]npm['"]/.test(compose))
+) {
+  violations.push(
+    'the migration workload cannot invoke npm because the runtime image removes it',
+  );
+}
+for (const marker of [
+  'DATABASE_URL must not use a loopback host in production.',
+  'FIREBASE_AUTH_EMULATOR_HOST must not be configured in production.',
+  'OPENAPI_ENABLED must be false in production.',
+  'REWARD_CODE_ENCRYPTION_KEY is required in production.',
+  'TRUST_PROXY must be true in production.',
+]) {
+  if (!environmentSource.includes(marker)) {
+    violations.push(
+      `production environment validation is missing fail-closed marker ${marker}`,
+    );
+  }
+}
+if (
+  authModule.includes('TestTokenVerifier') ||
+  authModule.includes('AUTH_MODE')
+) {
+  violations.push(
+    'the production authentication module must expose only Firebase verification',
+  );
+}
+for (const marker of [
+  'command = ["node"]',
+  'node_modules/node-pg-migrate/bin/node-pg-migrate.js',
+  '"--migrations-dir"',
+  '"dist/migrations"',
+]) {
+  if (!workloadsTerraform.includes(marker)) {
+    violations.push(
+      `the migration workload is missing executable marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  "'node'",
+  "'node_modules/node-pg-migrate/bin/node-pg-migrate.js'",
+  "'--migrations-dir'",
+  "'dist/migrations'",
+]) {
+  if (!compose.includes(marker)) {
+    violations.push(
+      `the local migration container is missing executable marker ${marker}`,
+    );
+  }
+}
+
 const dependencies = {
   ...packageJson.dependencies,
   ...packageJson.devDependencies,

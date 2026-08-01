@@ -22,12 +22,13 @@ import type {
   RewardType,
 } from '../../../database/database.types';
 import { OperatorReasonDto } from '../../operator/dto/operator.dto';
+import { regionCodePattern } from '../../regions/region-code';
 
 export class RewardCatalogQueryDto {
   @ApiProperty({ example: 'victoria-bc', type: String })
   @IsString()
   @Length(2, 64)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  @Matches(regionCodePattern)
   region!: string;
 
   @ApiPropertyOptional({ example: '2026-08', type: String })

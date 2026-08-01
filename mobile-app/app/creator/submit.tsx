@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AuthTextField } from '@/components/auth';
+import { DataCollectionNotice } from '@/components/legal';
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
@@ -11,10 +12,15 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import {
+  creatorFeaturePausedMessage,
+  creatorFeatureStatusLabel,
+  creatorFeaturesEnabled
+} from '@/config/features';
 import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useSubmitCreatorVideo } from '@/data/appDataHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 
 const creatorRightsTerms = [
   'I own or control the video, music, likeness, location and other rights needed to submit this workout.',
@@ -26,7 +32,7 @@ const creatorRightsTerms = [
 
 export default function CreatorVideoSubmissionScreen() {
   const router = useRouter();
-  const { campaign } = useSponsorCampaign();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
   const submitCreatorVideo = useSubmitCreatorVideo();
   const [duration, setDuration] = useState('30');
   const [notes, setNotes] = useState('');
@@ -39,22 +45,62 @@ export default function CreatorVideoSubmissionScreen() {
   const [videoUrl, setVideoUrl] = useState('');
   const [workoutStyle, setWorkoutStyle] = useState('');
 
+  if (!creatorFeaturesEnabled) {
+    return (
+      <ScreenContainer>
+        <ScreenScrollView
+          bounces={false}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <TerminalText glow tone="pink" variant="label">
+              CREATOR STUDIO // {competitionRegion.label}
+            </TerminalText>
+            <TerminalText glow style={styles.title} tone="pink" variant="title">
+              SUBMIT A WORKOUT VIDEO
+            </TerminalText>
+          </View>
+          <HUDBorderBox glow style={styles.notice} tone="amber">
+            <TerminalText glow tone="amber" variant="label">
+              {creatorFeatureStatusLabel}
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              {creatorFeaturePausedMessage}
+            </TerminalText>
+          </HUDBorderBox>
+          <CyberButtonOutline
+            label="BACK TO CREATOR CATALOG"
+            onPress={() => goBackOrReplace(router, '/workouts')}
+          />
+        </ScreenScrollView>
+      </ScreenContainer>
+    );
+  }
+
   const submit = async () => {
     const durationMinutes = Number.parseInt(duration, 10);
     if (title.trim().length < 2) return setValidationError('Enter a workout title.');
-    if (!/^https?:\/\//i.test(videoUrl.trim())) return setValidationError('Enter a hosted HTTPS video URL.');
+    if (!/^https?:\/\//i.test(videoUrl.trim()))
+      return setValidationError('Enter a hosted HTTPS video URL.');
     if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 180) {
       return setValidationError('Choose a duration between 5 and 180 minutes.');
     }
     if (workoutStyle.trim().length < 2) return setValidationError('Enter the workout style.');
-    if (!rightsAccepted) return setValidationError('Review and accept the creator video rights terms.');
+    if (!rightsAccepted)
+      return setValidationError('Review and accept the creator video rights terms.');
+    if (!regionVerification?.regionCode) {
+      return setValidationError(
+        'Verify your competition region before submitting a creator workout.'
+      );
+    }
 
     setValidationError(null);
     try {
       await submitCreatorVideo.mutateAsync({
         durationMinutes,
         notes: notes.trim() || undefined,
-        regionCode: campaign.region.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        regionCode: regionVerification.regionCode,
         rightsAccepted: true,
         sponsorDisclosure: sponsorDisclosure.trim() || undefined,
         syntheticMediaDisclosed,
@@ -64,7 +110,9 @@ export default function CreatorVideoSubmissionScreen() {
       });
       setSubmitted(true);
     } catch {
-      setValidationError('The creator video could not be submitted. Check your connection and try again.');
+      setValidationError(
+        'The creator video could not be submitted. Check your connection and try again.'
+      );
     }
   };
 
@@ -77,40 +125,100 @@ export default function CreatorVideoSubmissionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <TerminalText glow tone="pink" variant="label">CREATOR STUDIO // {campaign.region}</TerminalText>
-          <TerminalText glow style={styles.title} tone="pink" variant="title">SUBMIT A WORKOUT VIDEO</TerminalText>
+          <TerminalText glow tone="pink" variant="label">
+            CREATOR STUDIO // {competitionRegion.label}
+          </TerminalText>
+          <TerminalText glow style={styles.title} tone="pink" variant="title">
+            SUBMIT A WORKOUT VIDEO
+          </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Submit a hosted follow-along video for catalog review. This is a creator-content submission, not a verified workout.
+            Submit a hosted follow-along video for catalog review. This is a creator-content
+            submission, not a verified workout.
           </TerminalText>
         </View>
 
         <HUDBorderBox style={styles.form} tone="muted">
-          <AuthTextField label="WORKOUT TITLE" maxLength={100} onChangeText={setTitle} placeholder="30-MINUTE FULL BODY HIIT" value={title} />
-          <AuthTextField autoCapitalize="none" keyboardType="url" label="HOSTED VIDEO URL" onChangeText={setVideoUrl} placeholder="https://youtube.com/watch?v=..." value={videoUrl} />
+          <AuthTextField
+            label="WORKOUT TITLE"
+            maxLength={100}
+            onChangeText={setTitle}
+            placeholder="30-MINUTE FULL BODY HIIT"
+            value={title}
+          />
+          <AuthTextField
+            autoCapitalize="none"
+            keyboardType="url"
+            label="HOSTED VIDEO URL"
+            onChangeText={setVideoUrl}
+            placeholder="https://youtube.com/watch?v=..."
+            value={videoUrl}
+          />
           <View style={styles.twoColumns}>
             <View style={styles.flexField}>
-              <AuthTextField keyboardType="number-pad" label="MINUTES" maxLength={3} onChangeText={setDuration} value={duration} />
+              <AuthTextField
+                keyboardType="number-pad"
+                label="MINUTES"
+                maxLength={3}
+                onChangeText={setDuration}
+                value={duration}
+              />
             </View>
             <View style={styles.flexField}>
-              <AuthTextField label="WORKOUT STYLE" maxLength={80} onChangeText={setWorkoutStyle} placeholder="HIIT" value={workoutStyle} />
+              <AuthTextField
+                label="WORKOUT STYLE"
+                maxLength={80}
+                onChangeText={setWorkoutStyle}
+                placeholder="HIIT"
+                value={workoutStyle}
+              />
             </View>
           </View>
-          <AuthTextField label="SPONSOR / PRODUCT DISCLOSURE // OPTIONAL" maxLength={500} multiline onChangeText={setSponsorDisclosure} placeholder="List paid placements, gifted products or affiliate relationships." value={sponsorDisclosure} />
-          <AuthTextField label="REVIEW NOTES // OPTIONAL" maxLength={1000} multiline onChangeText={setNotes} placeholder="Equipment, safety modifications, audience and anything reviewers should know." value={notes} />
+          <AuthTextField
+            label="SPONSOR / PRODUCT DISCLOSURE // OPTIONAL"
+            maxLength={500}
+            multiline
+            onChangeText={setSponsorDisclosure}
+            placeholder="List paid placements, gifted products or affiliate relationships."
+            value={sponsorDisclosure}
+          />
+          <AuthTextField
+            label="REVIEW NOTES // OPTIONAL"
+            maxLength={1000}
+            multiline
+            onChangeText={setNotes}
+            placeholder="Equipment, safety modifications, audience and anything reviewers should know."
+            value={notes}
+          />
 
           <ToggleRow
             checked={syntheticMediaDisclosed}
             label="THIS VIDEO INCLUDES AI-GENERATED OR MATERIALLY AI-ALTERED VISUALS / AUDIO"
             onPress={() => setSyntheticMediaDisclosed((value) => !value)}
           />
+          <DataCollectionNotice message="We use the hosted-video link, workout details, disclosures and review notes to moderate the submission, administer the creator catalog and preserve the submitted rights receipt." />
         </HUDBorderBox>
 
-        <HUDBorderBox glow={rightsAccepted} style={styles.rightsCard} tone={rightsAccepted ? 'pink' : 'amber'}>
-          <TerminalText glow tone={rightsAccepted ? 'pink' : 'amber'} variant="label">CREATOR VIDEO RIGHTS + ADAPTATION TERMS</TerminalText>
+        <HUDBorderBox
+          glow={rightsAccepted}
+          style={styles.rightsCard}
+          tone={rightsAccepted ? 'pink' : 'amber'}
+        >
+          <TerminalText glow tone={rightsAccepted ? 'pink' : 'amber'} variant="label">
+            CREATOR VIDEO RIGHTS + ADAPTATION TERMS
+          </TerminalText>
           {creatorRightsTerms.map((term, index) => (
             <View key={term} style={styles.termRow}>
-              <TerminalText tone="cyan" variant="micro">{String(index + 1).padStart(2, '0')}</TerminalText>
-              <TerminalText style={styles.termText} tone="muted" uppercase={false} variant="caption">{term}</TerminalText>
+              <TerminalText tone="cyan" variant="micro">
+                {String(index + 1).padStart(2, '0')}
+              </TerminalText>
+              <TerminalText
+                style={styles.termText}
+                tone="muted"
+                uppercase={false}
+                variant="caption"
+              >
+                {term}
+              </TerminalText>
             </View>
           ))}
           <ToggleRow
@@ -122,16 +230,27 @@ export default function CreatorVideoSubmissionScreen() {
 
         {validationError ? (
           <HUDBorderBox style={styles.notice} tone="red">
-            <TerminalText live="assertive" tone="red" uppercase={false} variant="body">{validationError}</TerminalText>
+            <TerminalText live="assertive" tone="red" uppercase={false} variant="body">
+              {validationError}
+            </TerminalText>
           </HUDBorderBox>
         ) : null}
         {submitted ? (
           <HUDBorderBox style={styles.notice} tone="green">
-            <TerminalText live="polite" glow tone="green" variant="label">VIDEO SUBMITTED FOR REVIEW</TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">Your rights receipt and disclosure were recorded with this submission.</TerminalText>
+            <TerminalText live="polite" glow tone="green" variant="label">
+              VIDEO SUBMITTED FOR REVIEW
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              Your rights receipt and disclosure were recorded with this submission.
+            </TerminalText>
           </HUDBorderBox>
         ) : (
-          <CyberButtonPrimary disabled={submitCreatorVideo.isPending} label={submitCreatorVideo.isPending ? 'SUBMITTING...' : 'SUBMIT VIDEO FOR REVIEW ->'} onPress={() => void submit()} tone="pink" />
+          <CyberButtonPrimary
+            disabled={submitCreatorVideo.isPending}
+            label={submitCreatorVideo.isPending ? 'SUBMITTING...' : 'SUBMIT VIDEO FOR REVIEW ->'}
+            onPress={() => void submit()}
+            tone="pink"
+          />
         )}
         <CyberButtonOutline
           label="BACK TO CREATOR CATALOG"
@@ -142,25 +261,53 @@ export default function CreatorVideoSubmissionScreen() {
   );
 }
 
-function ToggleRow({ checked, label, onPress }: { checked: boolean; label: string; onPress: () => void }) {
+function ToggleRow({
+  checked,
+  label,
+  onPress
+}: {
+  checked: boolean;
+  label: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       aria-checked={checked}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       onPress={onPress}
-      style={({ pressed }) => [styles.toggleRow, checked ? styles.toggleRowChecked : null, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.toggleRow,
+        checked ? styles.toggleRowChecked : null,
+        pressed ? styles.pressed : null
+      ]}
     >
       <View style={[styles.checkbox, checked ? styles.checkboxChecked : null]}>
-        <TerminalText tone={checked ? 'text' : 'dim'} variant="micro">{checked ? 'OK' : ''}</TerminalText>
+        <TerminalText tone={checked ? 'text' : 'dim'} variant="micro">
+          {checked ? 'OK' : ''}
+        </TerminalText>
       </View>
-      <TerminalText style={styles.toggleLabel} tone={checked ? 'text' : 'muted'} uppercase={false} variant="caption">{label}</TerminalText>
+      <TerminalText
+        style={styles.toggleLabel}
+        tone={checked ? 'text' : 'muted'}
+        uppercase={false}
+        variant="caption"
+      >
+        {label}
+      </TerminalText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, gap: spacing.lg, paddingHorizontal: spacing.screenX, paddingTop: spacing.sm, paddingBottom: 132, backgroundColor: colors.background },
+  content: {
+    flexGrow: 1,
+    gap: spacing.lg,
+    paddingHorizontal: spacing.screenX,
+    paddingTop: spacing.sm,
+    paddingBottom: 132,
+    backgroundColor: colors.background
+  },
   header: { gap: spacing.sm },
   title: { fontFamily: fontFamilies.display },
   body: { fontFamily: fontFamilies.body },
@@ -170,10 +317,34 @@ const styles = StyleSheet.create({
   rightsCard: { gap: spacing.md, padding: spacing.lg },
   termRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   termText: { minWidth: 0, flex: 1, fontFamily: fontFamilies.body },
-  toggleRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.borderMuted, borderRadius: radii.sm, backgroundColor: colors.panelAlpha45 },
-  toggleRowChecked: { borderColor: colors.borderPinkGlow, backgroundColor: colors.surfacePinkSoft },
-  checkbox: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderMuted, borderRadius: 5 },
-  checkboxChecked: { borderColor: colors.pink, backgroundColor: colors.surfacePinkActive },
+  toggleRow: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    borderRadius: radii.sm,
+    backgroundColor: colors.panelAlpha45
+  },
+  toggleRowChecked: {
+    borderColor: colors.borderPinkGlow,
+    backgroundColor: colors.surfacePinkSoft
+  },
+  checkbox: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    borderRadius: 5
+  },
+  checkboxChecked: {
+    borderColor: colors.pink,
+    backgroundColor: colors.surfacePinkActive
+  },
   toggleLabel: { minWidth: 0, flex: 1, fontFamily: fontFamilies.body },
   notice: { gap: spacing.sm, padding: spacing.md },
   pressed: { opacity: 0.74 }

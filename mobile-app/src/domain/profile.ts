@@ -6,6 +6,19 @@ export type PublicIdentity = {
   mode: IdentityMode;
 };
 
+export type AccountProfile = {
+  callsign: string;
+  publicIdentityMode: IdentityMode;
+  publicName: string | null;
+  screenName: string;
+};
+
+export type UpdateAccountProfileInput = {
+  publicIdentityMode: IdentityMode;
+  publicName: string | null;
+  screenName?: string;
+};
+
 export const defaultPublicIdentity: PublicIdentity = {
   callsign: '',
   displayName: '',
@@ -42,6 +55,19 @@ export function resolvePublicName(identity: PublicIdentity) {
   }
 
   return normalized.callsign || 'IDENTITY NOT SET';
+}
+
+export function publicIdentityFromAccountProfile(
+  profile: AccountProfile
+): PublicIdentity {
+  return normalizePublicIdentity({
+    callsign: profile.callsign,
+    displayName:
+      profile.publicIdentityMode === 'private'
+        ? ''
+        : profile.publicName ?? profile.screenName,
+    mode: profile.publicIdentityMode
+  });
 }
 
 export function getPublicInitials(publicName: string) {

@@ -11,7 +11,6 @@ describe('platform foundation (e2e)', () => {
 
   beforeEach(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.AUTH_MODE = 'test';
     process.env.OPENAPI_ENABLED = 'false';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -115,7 +114,7 @@ describe('platform foundation (e2e)', () => {
       .get('/v1/social/friend-requests')
       .expect(401);
     await request(app.getHttpServer())
-      .get('/v1/social/challenges/discover?regionCode=TORONTO')
+      .get('/v1/social/challenges/discover?regionCode=toronto-on')
       .expect(401);
     await request(app.getHttpServer())
       .post('/v1/social/challenges')
@@ -142,17 +141,6 @@ describe('platform foundation (e2e)', () => {
   it('requires authentication before reward award access', () => {
     return request(app.getHttpServer())
       .get('/v1/rewards/awards/me')
-      .expect(401)
-      .expect(({ body }) => {
-        expect(body).toEqual({
-          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
-        });
-      });
-  });
-
-  it('requires authentication before sponsor placement eligibility', () => {
-    return request(app.getHttpServer())
-      .get('/v1/me/sponsor-ad-placements')
       .expect(401)
       .expect(({ body }) => {
         expect(body).toEqual({
@@ -326,6 +314,17 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication before the administrative dashboard', () => {
+    return request(app.getHttpServer())
+      .get('/v1/operator/configuration/dashboard')
+      .expect(401)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'AUTH_REQUIRED' }),
+        });
+      });
+  });
+
   it('requires authentication before operational health access', () => {
     return request(app.getHttpServer())
       .get('/v1/operator/system-health')
@@ -337,16 +336,24 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
-  it('validates public creator-workout region filters before database access', () => {
-    return request(app.getHttpServer())
-      .get('/v1/creator-workouts?region=NOT_VALID!')
-      .expect(400)
-      .expect(({ body }) => {
-        expect(body).toEqual({
-          error: expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+  it.each([
+    '/v1/creator-workouts',
+    '/v1/creator-workouts?region=NOT_VALID!',
+    '/v1/competitions/2026-08/enrollment-count',
+    '/v1/competitions/2026-08/enrollment-count?region=VANCOUVER',
+  ])(
+    'validates canonical public region filters before database access: %s',
+    (path) => {
+      return request(app.getHttpServer())
+        .get(path)
+        .expect(400)
+        .expect(({ body }) => {
+          expect(body).toEqual({
+            error: expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+          });
         });
-      });
-  });
+    },
+  );
 
   it('does not expose the removed provider webhook route', () => {
     return request(app.getHttpServer())

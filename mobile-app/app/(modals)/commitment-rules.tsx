@@ -10,9 +10,10 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type RuleTone = 'cyan' | 'pink' | 'amber';
@@ -27,14 +28,14 @@ type CommitmentRule = {
 const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '01',
-    title: 'REGISTRATION WINDOW',
-    body: 'Advance registration opens during the calendar month before the competition. Late registration closes at 11:59 PM on day 6.',
+    title: 'JOIN WHILE PUBLISHED',
+    body: 'Once a regional competition is published, eligible players may join before it starts or at any time while it is active. Enrollment closes when the competition ends, reaches its entrant cap, or is cancelled.',
     tone: 'cyan'
   },
   {
     index: '02',
-    title: '100 PLAYERS TO LAUNCH',
-    body: 'At least 100 players across the region must register by day 1. A campaign may have a sponsor-advised player cap.',
+    title: 'REGIONAL MINIMUM TO LAUNCH',
+    body: 'The regional competition launches only after its published minimum number of eligible players registers.',
     tone: 'cyan'
   },
   {
@@ -96,13 +97,22 @@ const commitmentRules: readonly CommitmentRule[] = [
 export default function CommitmentRulesModal() {
   const router = useRouter();
   const [expandedRuleIndex, setExpandedRuleIndex] = useState<string>('01');
-  const { campaign, enrollment } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
   const { weeklyGoal } = useWorkoutProgress();
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const currentRules = commitmentRules.map((rule) =>
-    rule.index === '09'
+    rule.index === '02' && currentCompetition
       ? {
           ...rule,
-          body: `The top three finishers in each Weekly Goal group receive ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x and ${campaign.economics.categoryPodiumMultipliers[3]}x multipliers on their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
+          body: `At least ${currentCompetition.minimumEntrants.toLocaleString()} eligible players across the region must register before this competition can launch.`,
+          title: `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS TO LAUNCH`
+        }
+      : rule.index === '09'
+      ? {
+          ...rule,
+          body: `The top three finishers in each Weekly Goal group receive ${podiumMultipliers[1]}x, ${podiumMultipliers[2]}x and ${podiumMultipliers[3]}x multipliers on their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
         }
       : rule.index === '10'
         ? {
@@ -135,10 +145,10 @@ export default function CommitmentRulesModal() {
             LOCK YOUR{'\n'}MONTH CLEARLY.
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Your selection carries forward each month. Changes for the upcoming
-            month lock at 11:59:59 PM on the final day before the competition
-            month. Late registration ends at the conclusion of day 6, and
-            scoring starts on the registration day.
+            Choose any published Weekly Goal. If the competition has already
+            started, your eligible scoring begins when enrollment is confirmed.
+            Registration remains available until the competition ends, reaches
+            its entrant cap, or is cancelled.
           </TerminalText>
         </View>
 
@@ -173,13 +183,15 @@ export default function CommitmentRulesModal() {
             REGIONAL LAUNCH
           </TerminalText>
           <TerminalText glow style={styles.summaryValue} tone="cyan" variant="title">
-            {enrollment.minimumEntrants} PLAYERS REQUIRED
+            {currentCompetition
+              ? `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS REQUIRED`
+              : 'REGIONAL MINIMUM PENDING'}
           </TerminalText>
           <TerminalText style={styles.summaryCopy} tone="muted" uppercase={false} variant="body">
-            Registration remains open through day 6
-            {enrollment.maximumEntrants === null
+            Registration remains open until the published competition ends
+            {currentCompetition?.entrantCap == null
               ? '.'
-              : ` or until the ${enrollment.maximumEntrants.toLocaleString()}-player cap is reached.`}
+              : ` or until the ${currentCompetition.entrantCap.toLocaleString()}-player cap is reached.`}
           </TerminalText>
         </HUDBorderBox>
 

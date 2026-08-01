@@ -5,6 +5,7 @@ import {
   createPrivateIdentity,
   getPublicInitials,
   parseStoredPublicIdentity,
+  publicIdentityFromAccountProfile,
   resolvePublicName
 } from './profile';
 
@@ -33,6 +34,22 @@ describe('public profile identity', () => {
     assert.equal(
       resolvePublicName({ callsign: 'GHOST-1234', displayName: 'Cameron Wilson', mode: 'real_name' }),
       'Cameron Wilson'
+    );
+  });
+
+  it('restores the same public identity from the authoritative account profile', () => {
+    assert.deepEqual(
+      publicIdentityFromAccountProfile({
+        callsign: 'GG-ABC123',
+        publicIdentityMode: 'alias',
+        publicName: 'MOVE_MORE',
+        screenName: 'MOVE_MORE'
+      }),
+      {
+        callsign: 'GG-ABC123',
+        displayName: 'MOVE_MORE',
+        mode: 'alias'
+      }
     );
   });
 

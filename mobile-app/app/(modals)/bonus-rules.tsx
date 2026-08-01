@@ -9,9 +9,10 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type RuleTone = 'cyan' | 'pink';
@@ -56,12 +57,15 @@ const bonusRules: readonly BonusRule[] = [
 
 export default function BonusRulesModal() {
   const router = useRouter();
-  const { campaign } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
   const { weeklyGoal } = useWorkoutProgress();
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const rulesWithCategoryWinners: readonly BonusRule[] = [
     ...bonusRules.slice(0, 3),
     {
-      value: `${campaign.economics.categoryPodiumMultipliers[1]}x / ${campaign.economics.categoryPodiumMultipliers[2]}x / ${campaign.economics.categoryPodiumMultipliers[3]}x`,
+      value: `${podiumMultipliers[1]}x / ${podiumMultipliers[2]}x / ${podiumMultipliers[3]}x`,
       label: 'TOP THREE GOAL-GROUP FINISHERS',
       description: 'The top three finishers in each Weekly Goal group multiply their four-week total. Bonus Days are added next, then Perfect Month 10x is applied last.',
       tone: 'pink'

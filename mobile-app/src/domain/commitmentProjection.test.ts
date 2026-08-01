@@ -92,7 +92,7 @@ describe('month-aware commitment projections', () => {
             ) {
               for (const perfectMonthMultiplier of perfectMonthOptions) {
                 const expected =
-                  (matchSubtotal * categoryMultiplier + remainderDays * weeklyGoal) *
+                  (Math.floor(matchSubtotal * categoryMultiplier) + remainderDays * weeklyGoal) *
                   perfectMonthMultiplier;
                 const actual = calculateMonthAwareCommitmentWeight(
                   {

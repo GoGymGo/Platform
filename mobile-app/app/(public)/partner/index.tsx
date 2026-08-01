@@ -1,5 +1,4 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
@@ -11,15 +10,8 @@ import {
 } from '@/components/cyber';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useAuth } from '@/state/auth';
-import { hasSubmittedCreatorApplication } from '@/state/onboardingPreferences';
 
 const partnerOptions = [
-  {
-    body: 'Publish reviewed follow-along workouts for the GoGymGo community.',
-    route: '/creator/apply?source=partner' as Href,
-    title: 'APPLY AS A CREATOR'
-  },
   {
     body: 'Fund a regional campaign and provide physical or digital rewards.',
     route: '/sponsor/apply' as Href,
@@ -34,16 +26,6 @@ const partnerOptions = [
 
 export default function PartnerScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [creatorSubmitted, setCreatorSubmitted] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
-    void hasSubmittedCreatorApplication(user.uid).then(setCreatorSubmitted);
-  }, [user]);
 
   return (
     <ScreenContainer>
@@ -67,40 +49,33 @@ export default function PartnerScreen() {
           PARTNER WITH GOGYMGO
         </TerminalText>
         <TerminalText style={styles.intro} tone="muted" uppercase={false} variant="body">
-          Separate application paths for creators, campaign sponsors, and verified partner gyms.
+          Apply to sponsor a regional campaign or register a verified partner
+          gym location.
         </TerminalText>
 
         <View style={styles.optionList}>
-          {partnerOptions.map((option) => {
-            const submitted = option.title === 'APPLY AS A CREATOR' && creatorSubmitted;
-            return (
+          {partnerOptions.map((option) => (
               <Pressable
                 accessibilityRole="button"
                 key={option.title}
                 onPress={() => router.push(option.route)}
                 style={({ pressed }) => pressed ? styles.pressed : null}
               >
-                <HUDBorderBox glow={submitted} style={styles.optionCard} tone={submitted ? 'green' : 'cyan'}>
+                <HUDBorderBox style={styles.optionCard} tone="cyan">
                   <View style={styles.optionCopy}>
-                    <TerminalText glow tone={submitted ? 'green' : 'cyan'} variant="label">
+                    <TerminalText glow tone="cyan" variant="label">
                       {option.title}
                     </TerminalText>
                     <TerminalText tone="muted" uppercase={false} variant="body">
                       {option.body}
                     </TerminalText>
-                    {submitted ? (
-                      <TerminalText tone="green" variant="micro">
-                        APPLICATION SUBMITTED
-                      </TerminalText>
-                    ) : null}
                   </View>
-                  <TerminalText tone={submitted ? 'green' : 'cyan'} variant="button">
-                    -&gt;
+                  <TerminalText tone="cyan" variant="button">
+                    {'->'}
                   </TerminalText>
                 </HUDBorderBox>
               </Pressable>
-            );
-          })}
+          ))}
         </View>
       </ScreenScrollView>
     </ScreenContainer>

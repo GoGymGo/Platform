@@ -44,7 +44,8 @@ type WeeklyChallengeFeedback = {
 export default function SquadScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { competitionRegion } = useCompetitionRegion();
+  const { regionVerification } = useCompetitionRegion();
+  const competitionRegionCode = regionVerification?.regionCode ?? '';
   const { profileImageUri, publicName } = useProfile();
   const { competition, competitionEntryStartDateKey, weeklyGoal } = useWorkoutProgress();
   const activePeriod = competition.currentPeriod;
@@ -52,13 +53,13 @@ export default function SquadScreen() {
   const eligiblePartnersQuery = useEligibleWeeklyChallengePartners(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegion.label,
+    competitionRegionCode,
     weeklyChallengePeriod
   );
   const requestsQuery = useWeeklyChallengeRequests(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegion.label,
+    competitionRegionCode,
     weeklyChallengePeriod
   );
   const requestPartner = useRequestWeeklyChallengePartner();
@@ -419,7 +420,7 @@ export default function SquadScreen() {
                         competitionMonthKey: competition.competitionMonthKey,
                         periodIndex: weeklyChallengePeriod,
                         recipientUserId: featuredPartner.userId,
-                        region: competitionRegion.label,
+                        regionCode: competitionRegionCode,
                         weeklyGoal
                       })
                       .then(() => setWeeklyChallengeFeedback({

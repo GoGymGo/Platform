@@ -12,9 +12,6 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 - Physical rewards use sponsor-provided claim instructions or secure claim links; GoGymGo does not collect shipping addresses in this version.
 - GoGymGo has no payment-provider, bank-account, tax-form, or cash-payout surface.
 - Account legal documents and receipts are versioned, content-hashed, append-only, and server-timestamped; local device state is never authoritative competition consent.
-- Sponsor-ad placement metadata is a non-delivering placeholder. The backend
-  resolves enrollment eligibility, but returns no creative, media URL, playback,
-  or impression tracking while visual delivery remains disabled.
 
 ## Local foundation
 
@@ -33,6 +30,11 @@ npm.cmd run check
 npm.cmd run start:dev
 ```
 
+The preproduction migration baseline was cleaned before the first Cloud
+deployment. Recreate any older local database volume before running
+`migrate:up`; do not reuse a migration ledger created by the retired
+demo/payment schema.
+
 The verified workout streak schema, API contract, badge integration, migration
 steps, and reward semantics are documented in
 [gym streak rewards](docs/streak-rewards.md).
@@ -44,10 +46,6 @@ migration, API, and Squad UI integration are documented in
 The physical-prize and coupon-code schema, APIs, operator workflow, encryption,
 migration, and mobile marketplace are documented in
 [brand rewards marketplace](docs/brand-rewards-marketplace.md).
-
-The enrollment-gated post-login video slot, banner inventory, exclusions, and
-future activation controls are documented in
-[sponsor advertising placeholders](docs/sponsor-ad-placeholders.md).
 
 The liveness route is `GET http://localhost:3000/v1/health`. In non-production environments, Swagger UI is available at `http://localhost:3000/docs` and the generated contract is committed as `openapi.json`.
 

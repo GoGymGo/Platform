@@ -8,10 +8,7 @@ import type {
 } from '@/domain/accountReadiness';
 import { useAuth } from '@/state/auth';
 
-export function useCurrentLegalDocuments(
-  jurisdictionCode = 'GLOBAL',
-  locale = 'en'
-) {
+export function useCurrentLegalDocuments(jurisdictionCode = 'GLOBAL', locale = 'en') {
   const { account } = useAppData();
   return useQuery({
     queryFn: () => account.getCurrentLegalDocuments(jurisdictionCode, locale),
@@ -19,10 +16,7 @@ export function useCurrentLegalDocuments(
   });
 }
 
-export function useLegalReceiptStatus(
-  jurisdictionCode = 'GLOBAL',
-  locale = 'en'
-) {
+export function useLegalReceiptStatus(jurisdictionCode = 'GLOBAL', locale = 'en') {
   const context = useAccountReadinessContext();
   return useQuery({
     enabled: context.enabled,
@@ -35,28 +29,11 @@ export function useRecordLegalReceipt() {
   const context = useAccountReadinessContext();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (bundle: CurrentLegalDocuments) =>
-      context.account.recordLegalReceipt(bundle),
-    onSuccess: () => queryClient.invalidateQueries({
-      queryKey: [...context.queryKey, 'legal-receipt']
-    })
-  });
-}
-
-export function useRegionPolicies() {
-  const { account } = useAppData();
-  return useQuery({
-    queryFn: () => account.listRegionPolicies(),
-    queryKey: ['account-readiness', 'region-policies']
-  });
-}
-
-export function useCurrentRegionVerification(regionCode: string) {
-  const context = useAccountReadinessContext();
-  return useQuery({
-    enabled: context.enabled && regionCode.length > 0,
-    queryFn: () => context.account.getCurrentRegionVerification(regionCode),
-    queryKey: [...context.queryKey, 'region-verification', regionCode]
+    mutationFn: (bundle: CurrentLegalDocuments) => context.account.recordLegalReceipt(bundle),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: [...context.queryKey, 'legal-receipt']
+      })
   });
 }
 
@@ -66,29 +43,28 @@ export function useCreateRegionVerification() {
   return useMutation({
     mutationFn: (input: CreateRegionVerificationInput) =>
       context.account.createRegionVerification(input),
-    onSuccess: (verification) => queryClient.setQueryData(
-      [...context.queryKey, 'region-verification', verification.regionCode ?? ''],
-      verification
-    )
+    onSuccess: (verification) =>
+      queryClient.setQueryData(
+        [...context.queryKey, 'region-verification', verification.regionCode ?? ''],
+        verification
+      )
   });
 }
 
-export function useCurrentCompetition(
-  expectedMonthKey: string,
-  regionLabel: string
-) {
+export function useCurrentCompetition(expectedMonthKey: string | null, regionCode: string) {
   const context = useAccountReadinessContext();
   return useQuery({
-    enabled: context.enabled,
-    queryFn: () => context.account.getCurrentCompetition(
-      expectedMonthKey,
-      regionLabel
-    ),
+    enabled:
+      context.enabled &&
+      regionCode.length > 0 &&
+      (expectedMonthKey === null || expectedMonthKey.length > 0),
+    queryFn: () =>
+      context.account.getCurrentCompetition(expectedMonthKey ?? undefined, regionCode),
     queryKey: [
       ...context.queryKey,
       'current-competition',
-      expectedMonthKey,
-      regionLabel
+      expectedMonthKey ?? 'published',
+      regionCode
     ]
   });
 }
@@ -106,14 +82,15 @@ export function useEnrollInCompetition() {
   const context = useAccountReadinessContext();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ competitionId, input }: {
+    mutationFn: ({
+      competitionId,
+      input
+    }: {
       competitionId: string;
       input: CreateCompetitionEnrollmentInput;
     }) => context.account.enrollInCompetition(competitionId, input),
-    onSuccess: (enrollment) => queryClient.setQueryData(
-      [...context.queryKey, 'current-enrollment'],
-      enrollment
-    )
+    onSuccess: (enrollment) =>
+      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], enrollment)
   });
 }
 

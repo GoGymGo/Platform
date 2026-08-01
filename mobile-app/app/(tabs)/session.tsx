@@ -8,6 +8,9 @@ import {
   ScreenLoadingState,
   TerminalText
 } from '@/components/cyber';
+import {
+  creatorFeaturesEnabled
+} from '@/config/features';
 import { RecoverableScreenError } from '@/components/reliability';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { getWorkoutAccessMode } from '@/domain/workoutAccess';
@@ -63,7 +66,9 @@ export default function SessionTabRoute() {
         <TerminalText style={styles.helper} tone="muted" uppercase={false} variant="body">
           {activeSession
             ? 'Your verified workout is still running. Return to the timer to continue.'
-            : 'Choose a creator workout or use your own plan. Both use the same verification.'}
+            : creatorFeaturesEnabled
+              ? 'Choose a creator workout or use your own plan. Both use the same verification.'
+              : 'Use your own workout plan and GoGymGo will guide you through verification.'}
         </TerminalText>
       </View>
 
@@ -88,7 +93,7 @@ export default function SessionTabRoute() {
         <HUDBorderBox style={styles.previewNotice} tone="muted">
           <TerminalText glow tone="amber" variant="label">COMPETITION NOT STARTED</TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Browse creator workouts now. Verified sessions unlock when the competition begins.
+            Verified sessions unlock when the competition begins.
           </TerminalText>
         </HUDBorderBox>
       ) : null}
@@ -101,11 +106,13 @@ export default function SessionTabRoute() {
           />
         ) : (
           <>
-            <CyberButtonPrimary
-              label="Choose a creator workout"
-              onPress={() => router.push('/workouts?source=session' as Href)}
-              tone="cyan"
-            />
+            {creatorFeaturesEnabled ? (
+              <CyberButtonPrimary
+                label="Choose a creator workout"
+                onPress={() => router.push('/workouts?source=session' as Href)}
+                tone="cyan"
+              />
+            ) : null}
             <CyberButtonPrimary
               disabled={verifiedWorkoutUnavailable}
               label={verifiedWorkoutUnavailable ? 'Workouts not started' : 'Start my own workout'}

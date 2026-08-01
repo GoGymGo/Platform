@@ -18,7 +18,6 @@ import {
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
-import { useUpdateScreenName } from '@/data/socialHooks';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
 import { normalizeScreenName, validateScreenName } from '@/domain/social';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
@@ -55,12 +54,12 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
   const { source } = useLocalSearchParams<{ source?: string }>();
   const { user } = useAuth();
   const { setPublicIdentity } = useProfile();
-  const updateAlias = useUpdateScreenName();
   const draftKey = `identity:${user?.uid ?? 'anonymous'}:${source ?? 'setup'}`;
   const [alias, setAlias] = useScreenMemory(
     draftKey,
     initialIdentity?.displayName || initialIdentity?.callsign || ''
   );
+  const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     chooseProfileImage,
@@ -86,11 +85,11 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
     setSubmitError(error);
     if (error) return;
 
+    setSaving(true);
     try {
-      const profile = await updateAlias.mutateAsync(normalizedAlias);
       await setPublicIdentity({
-        callsign: profile.screenName,
-        displayName: profile.screenName,
+        callsign: initialIdentity?.callsign ?? '',
+        displayName: normalizedAlias,
         mode: 'alias'
       });
     } catch (mutationError) {
@@ -99,9 +98,11 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
           ? mutationError.message.replace(/screen name/gi, 'alias')
           : 'Your alias could not be saved. Try again.'
       );
+      setSaving(false);
       return;
     }
 
+    setSaving(false);
     clearScreenMemory(draftKey);
     router.replace(returnRoute);
   };
@@ -190,8 +191,8 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
           </View>
 
           <CyberButtonPrimary
-            disabled={!identityIsValid || updateAlias.isPending}
-            label={updateAlias.isPending
+            disabled={!identityIsValid || saving}
+            label={saving
               ? 'SAVING ALIAS...'
               : 'SAVE ALIAS ->'}
             onPress={handleContinue}

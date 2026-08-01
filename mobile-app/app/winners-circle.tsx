@@ -13,7 +13,6 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
@@ -33,7 +32,6 @@ import {
 import { markWinnersCircleSeen } from '@/services/winnersCircle';
 import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function WinnersCircleScreen() {
@@ -41,7 +39,6 @@ export default function WinnersCircleScreen() {
   const { auto } = useLocalSearchParams<{ auto?: string }>();
   const { user } = useAuth();
   const { competitionRegion } = useCompetitionRegion();
-  const { campaign } = useSponsorCampaign();
   const { weeklyGoal } = useWorkoutProgress();
   const [closing, setClosing] = useState(false);
   const [selectedResults, setSelectedResults] = useState<'categories' | 'rewards'>('categories');
@@ -175,7 +172,6 @@ export default function WinnersCircleScreen() {
   return (
     <AuthGate>
       <ScreenContainer>
-        <SponsorBanner />
         <ScreenScrollView
           bounces={false}
           contentContainerStyle={styles.content}
@@ -186,7 +182,7 @@ export default function WinnersCircleScreen() {
 
           <View style={styles.header}>
             <TerminalText glow tone="pink" variant="label">
-              {`MONTHLY RESULTS // ${campaign.region}`}
+              {`MONTHLY RESULTS // ${competitionRegion.label}`}
             </TerminalText>
             <TerminalText glow style={styles.title} tone="pink" variant="title">
               WINNERS CIRCLE

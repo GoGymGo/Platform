@@ -28,6 +28,7 @@ import {
   CompetitionMatchesQueryDto,
   CompetitionMatchResponseDto,
   CompetitionResponseDto,
+  CurrentCompetitionQueryDto,
   CreateEnrollmentDto,
   EnrollmentCountQueryDto,
   EnrollmentCountResponseDto,
@@ -58,8 +59,9 @@ export class CompetitionsController {
   })
   getCurrent(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Query() query: CurrentCompetitionQueryDto,
   ): Promise<CompetitionResponseDto | null> {
-    return this.competitions.getCurrent(principal);
+    return this.competitions.getCurrent(principal, query);
   }
 
   @Get('current/enrollment')

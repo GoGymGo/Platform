@@ -99,28 +99,25 @@ then upload codes using `{ "codes": ["CODE-ONE", "CODE-TWO"], "reason":
 ## Migration and release
 
 Migration `1783954800000_brand_rewards_marketplace.ts` is intentionally
-forward-only. It drops the obsolete payment-provider, payee, payout, payment,
-webhook, and cash-winner tables, removes cash fields from competitions and
-regional policy, normalizes existing competition rules, and creates the reward
-tables. Historical migrations remain unchanged so a fresh database can replay
-its complete schema history.
+focused on the regional reward catalog, awards, and encrypted coupon inventory.
+Because GoGymGo has not deployed a production database, the preproduction
+migration baseline was cleaned before launch: a fresh database never creates
+payment-provider, cash-winner, or demo-verification schema. The integration
+suite asserts those obsolete tables, columns, and types are absent.
 
-1. Confirm no legacy payment data is still required for tax, legal, support, or
-   audit retention. Export it to an approved restricted archive if counsel
-   requires retention.
-2. Verify a recent database backup and point-in-time recovery window. The down
-   migration deliberately throws; rollback is a database restore.
-3. Add `REWARD_CODE_ENCRYPTION_KEY` to Secret Manager and mount it only into the
+1. Verify a recent database backup and point-in-time recovery window before
+   every migration rollout.
+2. Add `REWARD_CODE_ENCRYPTION_KEY` to Secret Manager and mount it only into the
    API workload.
-4. From `backend/`, run `npm.cmd install`, `npm.cmd run check`, then
+3. From `backend/`, run `npm.cmd install`, `npm.cmd run check`, then
    `npm.cmd run migrate:up` locally. Production uses the migration job via
    `npm.cmd run migrate:deploy` before worker and API deployment.
-5. Deploy the same immutable image to migration, worker, and API in that order.
-6. Publish region/month catalog inventory through the operator endpoints, then
+4. Deploy the same immutable image to migration, worker, and API in that order.
+5. Publish region/month catalog inventory through the operator endpoints, then
    publish the competition.
-7. Build the Expo client. The marketplace route is
+6. Build the Expo client. The marketplace route is
    `/(tabs)/leaderboard/rewards`; winner claims use `/rewards/awards`.
-8. In staging, verify physical and coupon catalogs, insufficient-code publish
+7. In staging, verify physical and coupon catalogs, insufficient-code publish
    rejection, draw inventory limits, duplicate claim idempotency, coupon
    secrecy in logs/exports, and the removed legacy routes returning 404.
 

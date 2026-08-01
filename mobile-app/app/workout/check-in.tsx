@@ -17,15 +17,18 @@ import {
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useAppTour } from '@/state/appTour';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
   const {
     sessionActionError,
@@ -53,6 +56,17 @@ export default function CheckInScreen() {
       ? 'Default device saved. Next, verify it is you to begin the workout.'
       : null
   );
+
+  if (!heartRateTelemetryAvailable && !appTourActive) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO TRAIN"
+        body="Heart-rate telemetry is not connected in this build, so a verified session cannot start yet."
+        onAction={() => router.replace('/session')}
+        title="DEVICE CONNECTION REQUIRED"
+      />
+    );
+  }
 
   async function confirmPresence() {
     if (!(await verify())) {

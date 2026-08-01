@@ -11,10 +11,6 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import {
-  BrandVideoAdPlaceholder,
-  SponsorRail as SponsorBanner
-} from '@/components/sponsor';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { CompactTextButton } from '@/components/onboarding';
 import {
@@ -30,7 +26,10 @@ import {
   useMyStreaks,
   useWeeklyChallengeRequests
 } from '@/data/appDataHooks';
-import { getAppResumeTarget } from '@/domain/appResume';
+import {
+  getAppResumeRequestStatus,
+  getAppResumeTarget
+} from '@/domain/appResume';
 import { getPublicInitials } from '@/domain/profile';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -38,8 +37,8 @@ import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useProfile } from '@/state/profile';
-import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type HomeStat = {
@@ -47,6 +46,16 @@ type HomeStat = {
   tone: 'cyan' | 'pink';
   value: string;
 };
+
+function formatCampaignDate(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(year, month - 1, day, 12));
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -56,13 +65,14 @@ export default function HomeScreen() {
     resume?: string;
   }>();
   const { user } = useAuth();
+  const { regionVerification } = useCompetitionRegion();
+  const competitionRegionCode = regionVerification?.regionCode ?? '';
   const [showMore, setShowMore] = useScreenMemory('home:show-more', false);
   const [resumeRetrying, setResumeRetrying] = useState(false);
   const resumeHandledRef = useRef(false);
   const resumeStartedRef = useRef(false);
   const goalMetricRecordedRef = useRef(false);
   const { profileImageUri, profileReady, publicName } = useProfile();
-  const { enrollment } = useSponsorCampaign();
   const publicInitials = getPublicInitials(publicName);
   const {
     activeSession,
@@ -78,6 +88,7 @@ export default function HomeScreen() {
   } = useWorkoutProgress();
   const {
     checking: registrationChecking,
+    currentCompetition,
     error: registrationError,
     ready: registrationReady,
     retry: retryRegistration,
@@ -106,25 +117,33 @@ export default function HomeScreen() {
   const {
     data: currentEntrantsData,
     isPending: currentEntrantsPending
-  } = useCompetitionEnrollmentCount(competitionRegion, competition.competitionMonthKey);
-  const { data: creatorWorkouts = [] } = useCreatorWorkouts();
+  } = useCompetitionEnrollmentCount(
+    competitionRegionCode,
+    competition.competitionMonthKey
+  );
+  const { data: creatorWorkouts = [] } = useCreatorWorkouts(
+    competitionRegionCode
+  );
   const rewardAwardsQuery = useMyRewardAwards();
   const { data: rewardAwards = [] } = rewardAwardsQuery;
   const weeklyChallengeRequestsQuery = useWeeklyChallengeRequests(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegion,
+    competitionRegionCode,
     currentPeriod?.index ?? 1
   );
   const { data: streakSummary, isPending: streaksPending } = useMyStreaks();
   const currentEntrants = currentEntrantsData ?? null;
   const unclaimedReward = rewardAwards.find((award) => award.status === 'awarded');
-  const featuredCreatorWorkout =
-    creatorWorkouts.find((workout) => workout.joined) ?? null;
-  const launchConfirmed = currentEntrants !== null && currentEntrants >= enrollment.minimumEntrants;
-  const entrantsNeeded = currentEntrants === null
+  const featuredCreatorWorkout = creatorWorkouts[0] ?? null;
+  const minimumEntrants = currentCompetition?.minimumEntrants ?? null;
+  const launchConfirmed =
+    currentEntrants !== null &&
+    minimumEntrants !== null &&
+    currentEntrants >= minimumEntrants;
+  const entrantsNeeded = currentEntrants === null || minimumEntrants === null
     ? null
-    : Math.max(0, enrollment.minimumEntrants - currentEntrants);
+    : Math.max(0, minimumEntrants - currentEntrants);
   const liveMultiplier = currentPeriod?.liveMultiplier ?? 0;
   const stats: readonly HomeStat[] = [
     {
@@ -190,10 +209,16 @@ export default function HomeScreen() {
       weeklyChallengeRequestsQuery.isError ||
       rewardAwardsQuery.isError
     );
-  const resumeError = registrationError || secondaryResumeError;
-  const resumeLoading =
-    registrationChecking ||
-    (!registrationError && secondaryResumeLoading);
+  const {
+    error: resumeError,
+    loading: resumeLoading
+  } = getAppResumeRequestStatus({
+    hasImmediateTarget: immediateResumeTarget !== null,
+    registrationError,
+    registrationLoading: registrationChecking,
+    secondaryError: secondaryResumeError,
+    secondaryLoading: secondaryResumeLoading
+  });
 
   useAccessibilityAnnouncement(
     registered === '1'
@@ -467,15 +492,17 @@ export default function HomeScreen() {
                   {currentEntrantsPending
                     ? 'CHECKING REGISTRATION COUNT'
                     : currentEntrants === null
-                      ? 'TOTAL NOT CONNECTED'
-                    : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`}
+                      ? 'REGISTRATION TOTAL UNAVAILABLE'
+                    : minimumEntrants === null
+                      ? `${currentEntrants.toLocaleString()} REGISTERED`
+                      : `${currentEntrants.toLocaleString()} / ${minimumEntrants.toLocaleString()} REGISTERED`}
                 </TerminalText>
               </View>
               <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
                 {launchConfirmed
                   ? 'Competition launch confirmed.'
                   : entrantsNeeded === null
-                    ? 'The live registration total will appear when regional enrollment sync is available.'
+                    ? 'The registration total could not be loaded. Check again later.'
                     : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
               </TerminalText>
             </View>
@@ -610,8 +637,6 @@ export default function HomeScreen() {
               </HUDBorderBox>
             </Pressable>
 
-            <SponsorBanner compact style={styles.inlineSponsor} />
-
             <StreakRewards
               isLoading={streaksPending}
               summary={streakSummary}
@@ -636,12 +661,6 @@ export default function HomeScreen() {
                   : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
                 : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
             </TerminalText>
-
-            <BrandVideoAdPlaceholder
-              compact
-              onPress={() => router.push('/sponsor-offer')}
-              placement="appOpen"
-            />
 
             {featuredCreatorWorkout ? <Pressable
               accessibilityRole="button"
@@ -880,11 +899,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md,
     padding: spacing.lg
-  },
-  inlineSponsor: {
-    marginHorizontal: 0,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md
   },
   pactAvatars: {
     flexDirection: 'row'

@@ -14,6 +14,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { regionCodePattern } from '../../regions/region-code';
 import type {
   FriendRequestStatus,
   SocialChallengeActivity,
@@ -125,14 +126,15 @@ export class CreateSocialChallengeDto {
   endDate!: string;
 
   @ApiProperty({
-    example: 'TORONTO',
-    maxLength: 32,
+    example: 'toronto-on',
+    maxLength: 64,
     required: false,
     type: String,
   })
   @IsOptional()
   @IsString()
-  @Length(2, 32)
+  @Length(2, 64)
+  @Matches(regionCodePattern)
   regionCode?: string;
 
   @ApiProperty({ maxLength: 120, required: false, type: String })
@@ -171,9 +173,10 @@ export class CreateSocialChallengeDto {
 }
 
 export class DiscoverSocialChallengesQueryDto {
-  @ApiProperty({ example: 'TORONTO', maxLength: 32, type: String })
+  @ApiProperty({ example: 'toronto-on', maxLength: 64, type: String })
   @IsString()
-  @Length(2, 32)
+  @Length(2, 64)
+  @Matches(regionCodePattern)
   regionCode!: string;
 }
 

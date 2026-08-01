@@ -39,30 +39,32 @@ export type AppDataSource = {
   getCompetitionMatches: (
     competitionMonthKey: string,
     weeklyGoal: number,
-    region: string
+    regionCode: string
   ) => Promise<readonly CompetitionMatch[]>;
   getCompetitionEnrollmentCount: (
-    region: string,
+    regionCode: string,
     competitionMonthKey: string
   ) => Promise<number | null>;
-  getCreatorWorkouts: () => Promise<readonly CreatorWorkout[]>;
+  getCreatorWorkouts: (
+    regionCode: string
+  ) => Promise<readonly CreatorWorkout[]>;
   getCreatorWorkoutPlans: () => Promise<readonly CreatorWorkoutPlan[]>;
   getEligibleWeeklyChallengePartners: (
     competitionMonthKey: string,
     weeklyGoal: number,
-    region: string,
+    regionCode: string,
     periodIndex: number
   ) => Promise<readonly EligibleWeeklyChallengePartner[]>;
   getWeeklyChallengeRequests: (
     competitionMonthKey: string,
     weeklyGoal: number,
-    region: string,
+    regionCode: string,
     periodIndex: number
   ) => Promise<readonly WeeklyChallengeRequest[]>;
   getMyRewardAwards: () => Promise<readonly RewardAward[]>;
   getMyStreaks: () => Promise<StreakSummary | null>;
   getRewardCatalog: (
-    region: string,
+    regionCode: string,
     monthKey?: string
   ) => Promise<readonly RewardCatalogItem[]>;
   getRewardWinners: () => Promise<readonly RewardWinner[]>;
@@ -75,7 +77,7 @@ export type AppDataSource = {
   requestWeeklyChallengePartner: (
     competitionMonthKey: string,
     weeklyGoal: number,
-    region: string,
+    regionCode: string,
     periodIndex: number,
     recipientUserId: string
   ) => Promise<WeeklyChallengeRequest>;
@@ -109,19 +111,19 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     getCategoryLeaderboard: (goal) => api.request<CategoryLeaderboard>(
       `/v1/leaderboards/current?goal=${goal}`
     ),
-    getCompetitionMatches: (competitionMonthKey, weeklyGoal, region) =>
+    getCompetitionMatches: (competitionMonthKey, weeklyGoal, regionCode) =>
       api.request<readonly CompetitionMatch[]>(
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
-        `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}`
+        `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}`
       ),
-    getCompetitionEnrollmentCount: (region, competitionMonthKey) =>
+    getCompetitionEnrollmentCount: (regionCode, competitionMonthKey) =>
       api.request<{ count: number }>(
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/enrollment-count` +
-        `?region=${encodeURIComponent(region)}`,
+        `?region=${encodeURIComponent(regionCode)}`,
         { authenticated: false }
       ).then(({ count }) => count),
-    getCreatorWorkouts: () => api.request<readonly CreatorWorkout[]>(
-      '/v1/creator-workouts'
+    getCreatorWorkouts: (regionCode) => api.request<readonly CreatorWorkout[]>(
+      `/v1/creator-workouts?region=${encodeURIComponent(regionCode)}`
     ),
     getCreatorWorkoutPlans: () => api.request<readonly CreatorWorkoutPlan[]>(
       '/v1/creator-workouts/plans/me'
@@ -129,27 +131,27 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     getEligibleWeeklyChallengePartners: (
       competitionMonthKey,
       weeklyGoal,
-      region,
+      regionCode,
       periodIndex
     ) => api.request<readonly EligibleWeeklyChallengePartner[]>(
       `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/eligible-partners` +
-      `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}&period=${periodIndex}`
+      `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
     ),
     getWeeklyChallengeRequests: (
       competitionMonthKey,
       weeklyGoal,
-      region,
+      regionCode,
       periodIndex
     ) => api.request<readonly WeeklyChallengeRequest[]>(
       `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests` +
-      `?goal=${weeklyGoal}&region=${encodeURIComponent(region)}&period=${periodIndex}`
+      `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
     ),
     getMyRewardAwards: () => api.request<readonly RewardAward[]>(
       '/v1/rewards/awards/me'
     ),
     getMyStreaks: () => api.request<StreakSummary>('/v1/streaks/me'),
-    getRewardCatalog: (region, monthKey) => {
-      const query = new URLSearchParams({ region });
+    getRewardCatalog: (regionCode, monthKey) => {
+      const query = new URLSearchParams({ region: regionCode });
       if (monthKey) query.set('monthKey', monthKey);
       return api.request<readonly RewardCatalogItem[]>(
         `/v1/rewards/catalog?${query.toString()}`,
@@ -177,7 +179,7 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     requestWeeklyChallengePartner: (
       competitionMonthKey,
       weeklyGoal,
-      region,
+      regionCode,
       periodIndex,
       recipientUserId
     ) => api.request<WeeklyChallengeRequest, {
@@ -192,7 +194,7 @@ function createApiDataSource(api: ApiClient): AppDataSource {
           goal: weeklyGoal,
           period: periodIndex,
           recipientUserId,
-          region
+          region: regionCode
         },
         idempotencyKey: createIdempotencyKey('weekly-challenge'),
         method: 'POST'

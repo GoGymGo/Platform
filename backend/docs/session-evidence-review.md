@@ -2,7 +2,7 @@
 
 ## Trust decision
 
-Workout evidence submitted by the Expo app is an untrusted claim. Heart-rate values and face confidence are client-authored; QR and device tokens are reduced to hashes before storage. A complete submission may enter `pending_review`, but it cannot award competition progress or entries until an authorized operator makes an accountable decision.
+Workout evidence submitted by the Expo app is an untrusted claim. Heart-rate values and the local device-presence result are client-authored; QR and device tokens are reduced to hashes before storage. A complete submission may enter `pending_review`, but it cannot award competition progress or entries until an authorized operator makes an accountable decision.
 
 Manual review is a controlled fallback, not cryptographic verification. Production reward contests remain launch-blocked until required evidence sources have approved server-side verification implementations and real-device/provider UAT.
 
@@ -35,7 +35,7 @@ Before enabling production contest verification, choose and implement the eviden
 - Verify Apple App Attest and Google Play Integrity assertions server-side, including nonce, app identity, timestamp, replay, and device-risk policy.
 - Replace generic gym QR claims with short-lived, partner-signed, server-verifiable credentials and replay controls.
 - Define an approved source and consent model for heart-rate evidence; a client-posted BPM is not a wearable-provider assertion.
-- Define an approved liveness/face-verification vendor and biometric privacy process if face checks remain required.
+- Verify any required local device-presence result through an approved attestation boundary; never transmit biometric identifiers, templates, images, or confidence scores.
 - Retain only the minimum provider result, reference, policy version, and audit evidence approved by security, privacy, and legal review.
 - Exercise success, replay, timeout, provider outage, appeal, and false-positive cases in staging on real iOS and Android devices.
 

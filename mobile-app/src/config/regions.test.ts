@@ -2,50 +2,51 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  competitionRegions,
-  defaultCompetitionRegion,
-  parseCompetitionRegion,
+  createCompetitionRegion,
   parseCompetitionRegionVerification
 } from '@/config/regions';
 
 describe('competition regions', () => {
-  it('hydrates a supported region', () => {
-    assert.deepEqual(parseCompetitionRegion('{"id":"vancouver"}'),
-      competitionRegions.find((region) => region.id === 'vancouver')
-    );
-  });
-
-  it('falls back safely for invalid or unsupported values', () => {
-    assert.deepEqual(parseCompetitionRegion('not-json'), defaultCompetitionRegion);
-    assert.deepEqual(parseCompetitionRegion('{"id":"unknown"}'), defaultCompetitionRegion);
-  });
-
-  it('hydrates verified region metadata', () => {
+  it('creates a region from authoritative server metadata', () => {
     assert.deepEqual(
-      parseCompetitionRegionVerification(
-        '{"id":"calgary","method":"device-location","status":"verified","verifiedAt":"2026-07-12T12:00:00.000Z"}'
-      ),
+      createCompetitionRegion({
+        regionCode: 'vancouver-bc',
+        regionName: 'Vancouver',
+        timezone: 'America/Vancouver'
+      }),
       {
-        method: 'device-location',
-        region: competitionRegions.find((region) => region.id === 'calgary'),
-        regionCode: null,
-        regionPolicyId: null,
-        status: 'verified',
-        verificationId: null,
-        verifiedAt: '2026-07-12T12:00:00.000Z'
+        id: 'vancouver-bc',
+        label: 'VANCOUVER',
+        timeZone: 'America/Vancouver'
       }
     );
   });
 
-  it('hydrates authoritative region verification identifiers', () => {
+  it('hydrates an unexpired authoritative verification', () => {
     assert.deepEqual(
-      parseCompetitionRegionVerification(
-        '{"id":"vancouver","method":"device-location","regionCode":"CA-BC","regionPolicyId":"policy-1","status":"verified","verificationId":"verification-1","verifiedAt":"2026-07-12T12:00:00.000Z"}'
-      ),
-      {
+      parseCompetitionRegionVerification(JSON.stringify({
+        expiresAt: '2099-07-12T12:00:00.000Z',
+        id: 'vancouver-bc',
+        jurisdictionCode: 'CA-BC',
+        label: 'VANCOUVER',
         method: 'device-location',
-        region: competitionRegions.find((region) => region.id === 'vancouver'),
-        regionCode: 'CA-BC',
+        regionCode: 'vancouver-bc',
+        regionPolicyId: 'policy-1',
+        status: 'verified',
+        timeZone: 'America/Vancouver',
+        verificationId: 'verification-1',
+        verifiedAt: '2026-07-12T12:00:00.000Z'
+      })),
+      {
+        expiresAt: '2099-07-12T12:00:00.000Z',
+        jurisdictionCode: 'CA-BC',
+        method: 'device-location',
+        region: {
+          id: 'vancouver-bc',
+          label: 'VANCOUVER',
+          timeZone: 'America/Vancouver'
+        },
+        regionCode: 'vancouver-bc',
         regionPolicyId: 'policy-1',
         status: 'verified',
         verificationId: 'verification-1',
@@ -54,12 +55,20 @@ describe('competition regions', () => {
     );
   });
 
-  it('rejects incomplete or legacy verification metadata', () => {
+  it('rejects expired, incomplete, or legacy verification metadata', () => {
     assert.equal(parseCompetitionRegionVerification('{"id":"toronto"}'), null);
     assert.equal(
-      parseCompetitionRegionVerification(
-        '{"id":"vancouver","method":"postal-code","status":"provisional","verifiedAt":"2026-07-12T12:00:00.000Z"}'
-      ),
+      parseCompetitionRegionVerification(JSON.stringify({
+        expiresAt: '2020-01-01T00:00:00.000Z',
+        id: 'vancouver',
+        jurisdictionCode: 'CA-BC',
+        method: 'device-location',
+        regionCode: 'vancouver-bc',
+        regionPolicyId: 'policy-1',
+        status: 'verified',
+        verificationId: 'verification-1',
+        verifiedAt: '2019-12-01T00:00:00.000Z'
+      })),
       null
     );
   });

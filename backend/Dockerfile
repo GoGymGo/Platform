@@ -17,7 +17,10 @@ ENV PORT=3000
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts \
+  && npm cache clean --force \
+  && rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build --chown=node:node /app/dist ./dist
 
 USER node

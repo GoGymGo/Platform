@@ -40,13 +40,18 @@ describe('workout progress calculations', () => {
       averageHeartRateBpm: 118,
       dateKey: '2026-07-09',
       heartRateObservedSeconds: 120,
+      heartRateSamplesSubmitted: 4,
       heartRateTotalBpmSeconds: 14160,
       id: 'session-1',
       lastHeartRateSampleElapsedSeconds: 120,
+      minimumSessionSeconds: 1800,
       midSessionCheckAtSeconds: 900,
       midSessionCheckPrompted: false,
       midSessionCheckPromptedAt: null,
       midSessionVerified: false,
+      policyVersion: 'rules-v1',
+      presenceCheckRequired: true,
+      requiredHeartRateSamples: 2,
       serverManaged: true,
       startedAt: '2026-07-09T18:00:00.000Z',
       verificationMethod: 'heartRate'
@@ -99,14 +104,15 @@ describe('workout progress calculations', () => {
     assert.equal(getSessionElapsedSeconds(startedAt, referenceDate, 23), 230);
   });
 
-  it('places the automatic face check inside the configured middle window', () => {
-    assert.equal(getRandomMidSessionCheckSecond(0), 600);
-    assert.equal(getRandomMidSessionCheckSecond(0.5), 900);
-    assert.equal(getRandomMidSessionCheckSecond(1), 1200);
-    assert.equal(getRandomMidSessionCheckSecond(Number.NaN), 900);
+  it('places the automatic presence check inside the configured middle window', () => {
+    assert.equal(getRandomMidSessionCheckSecond(1800, 0), 600);
+    assert.equal(getRandomMidSessionCheckSecond(1800, 0.5), 900);
+    assert.equal(getRandomMidSessionCheckSecond(1800, 1), 1200);
+    assert.equal(getRandomMidSessionCheckSecond(600, 0.5), 300);
+    assert.equal(getRandomMidSessionCheckSecond(1800, Number.NaN), 900);
   });
 
-  it('keeps the automatic face-check grace period stable across navigation', () => {
+  it('keeps the automatic presence-check grace period stable across navigation', () => {
     const promptedAt = new Date(2026, 6, 9, 11, 58, 30).toISOString();
 
     assert.equal(getMidSessionGraceSecondsRemaining(promptedAt, referenceDate), 30);
@@ -132,7 +138,11 @@ describe('workout progress calculations', () => {
       averageHeartRateBpm: 128,
       dateKey: '2026-07-09',
       heartRateObservedSeconds: 1800,
+      heartRateSamplesSubmitted: 60,
+      minimumSessionSeconds: 1800,
       midSessionVerified: true,
+      presenceCheckRequired: true,
+      requiredHeartRateSamples: 60,
       startedAt,
       verificationMethod: 'heartRate' as const
     };
@@ -160,27 +170,31 @@ describe('workout progress calculations', () => {
     );
     assert.equal(
       evaluateSessionCompletion(
-        { ...baseSession, averageHeartRateBpm: 99 },
+        { ...baseSession, heartRateSamplesSubmitted: 59 },
         [],
         referenceDate
       ),
-      'heart-rate-target-not-met'
-    );
-    assert.equal(
-      evaluateSessionCompletion(
-        { ...baseSession, heartRateObservedSeconds: 1799 },
-        [],
-        referenceDate
-      ),
-      'heart-rate-target-not-met'
+      'heart-rate-evidence-not-met'
     );
     assert.equal(
       evaluateSessionCompletion(
         {
           ...baseSession,
-          averageHeartRateBpm: 0,
-          heartRateObservedSeconds: 0,
+          heartRateSamplesSubmitted: 0,
+          requiredHeartRateSamples: 0,
           verificationMethod: 'partnerGymQr'
+        },
+        [],
+        referenceDate
+      ),
+      'completed'
+    );
+    assert.equal(
+      evaluateSessionCompletion(
+        {
+          ...baseSession,
+          midSessionVerified: false,
+          presenceCheckRequired: false
         },
         [],
         referenceDate

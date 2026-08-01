@@ -1,47 +1,43 @@
 import * as Location from 'expo-location';
 
-import { resolveCompetitionRegionFromCoordinates } from '@/domain/competitionRegionVerification';
-import type { CompetitionRegion } from '@/config/regions';
+export type RegionCoordinates = {
+  latitude: number;
+  longitude: number;
+};
 
 export type DeviceRegionVerificationResult =
   | {
-      coordinates: { latitude: number; longitude: number };
-      region: CompetitionRegion;
-      status: 'verified';
+      coordinates: RegionCoordinates;
+      status: 'location-read';
     }
   | { status: 'permission-denied' }
-  | { status: 'location-unavailable' }
-  | { status: 'unsupported-region' };
+  | { status: 'location-unavailable' };
 
 export async function verifyCompetitionRegionWithDeviceLocation(): Promise<DeviceRegionVerificationResult> {
-  const servicesEnabled = await Location.hasServicesEnabledAsync();
-
-  if (!servicesEnabled) {
-    return { status: 'location-unavailable' };
-  }
-
-  const permission = await Location.requestForegroundPermissionsAsync();
-
-  if (!permission.granted) {
-    return { status: 'permission-denied' };
-  }
-
   try {
+    const servicesEnabled = await Location.hasServicesEnabledAsync();
+
+    if (!servicesEnabled) {
+      return { status: 'location-unavailable' };
+    }
+
+    const permission = await Location.requestForegroundPermissionsAsync();
+
+    if (!permission.granted) {
+      return { status: 'permission-denied' };
+    }
+
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced
     });
-    const region = resolveCompetitionRegionFromCoordinates(location.coords);
 
-    return region
-      ? {
-          coordinates: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude
-          },
-          region,
-          status: 'verified'
-        }
-      : { status: 'unsupported-region' };
+    return {
+      coordinates: {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      },
+      status: 'location-read'
+    };
   } catch {
     return { status: 'location-unavailable' };
   }

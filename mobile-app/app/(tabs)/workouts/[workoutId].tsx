@@ -13,12 +13,17 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableScreenError } from '@/components/reliability';
+import {
+  creatorFeaturePausedMessage,
+  creatorFeatureStatusLabel,
+  creatorFeaturesEnabled
+} from '@/config/features';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts, usePlanCreatorWorkout } from '@/data/appDataHooks';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 
 type RuleItem = {
   body: string;
@@ -29,18 +34,23 @@ const ruleItems: readonly RuleItem[] = [
   {
     body: 'Creator features are based on GoGymGo selection and verified completions, not YouTube views.'
   },
-  { body: 'Sponsor creative stays outside the YouTube player.' },
+  { body: 'GoGymGo controls stay outside the hosted video player.' },
   { body: 'Users earn entries only after heart-rate or QR verification.' }
 ];
 
 export default function WorkoutDetailScreen() {
   const router = useRouter();
-  const { campaign } = useSponsorCampaign();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
   const { plannedDate: requestedPlannedDate, workoutId } = useLocalSearchParams<{
     plannedDate?: string;
     workoutId?: string;
   }>();
-  const { data: creatorWorkouts = [], isError, isPending, refetch } = useCreatorWorkouts();
+  const {
+    data: creatorWorkouts = [],
+    isError,
+    isPending,
+    refetch
+  } = useCreatorWorkouts(regionVerification?.regionCode ?? '');
   const planCreatorWorkout = usePlanCreatorWorkout();
   const [plannedDate, setPlannedDate] = useState(() =>
     requestedPlannedDate && isFutureDateKey(requestedPlannedDate)
@@ -49,7 +59,6 @@ export default function WorkoutDetailScreen() {
   );
   const [planningFeedback, setPlanningFeedback] = useState<string | null>(null);
   const workout = creatorWorkouts.find((item) => item.id === workoutId);
-  const sponsorConfirmed = campaign.status === 'approved';
   const {
     checking: setupChecking,
     error: setupError,
@@ -59,10 +68,36 @@ export default function WorkoutDetailScreen() {
     setupActionLabel,
     setupRoute
   } = useSessionRegistrationAccess();
-  const {
-    ready: verificationPreferenceReady,
-    workoutStartRoute
-  } = useWorkoutVerificationPreference();
+  const { ready: verificationPreferenceReady, workoutStartRoute } =
+    useWorkoutVerificationPreference();
+
+  if (!creatorFeaturesEnabled) {
+    return (
+      <ScreenContainer contentStyle={styles.unavailableScreen}>
+        <HUDBorderBox glow style={styles.unavailableCard} tone="amber">
+          <TerminalText glow tone="amber" variant="label">
+            {creatorFeatureStatusLabel}
+          </TerminalText>
+          <TerminalText glow style={styles.unavailableTitle} tone="text" variant="title">
+            CREATOR WORKOUTS
+          </TerminalText>
+          <TerminalText
+            style={styles.unavailableBody}
+            tone="muted"
+            uppercase={false}
+            variant="body"
+          >
+            {creatorFeaturePausedMessage}
+          </TerminalText>
+          <CyberButtonPrimary
+            label="BACK TO CREATOR WORKOUTS"
+            onPress={() => goBackOrReplace(router, '/workouts')}
+            style={styles.unavailableAction}
+          />
+        </HUDBorderBox>
+      </ScreenContainer>
+    );
+  }
 
   if (isPending || setupChecking || !verificationPreferenceReady) {
     return (
@@ -91,7 +126,12 @@ export default function WorkoutDetailScreen() {
           <TerminalText live="assertive" glow tone="red" variant="label">
             WORKOUT COULD NOT LOAD
           </TerminalText>
-          <TerminalText style={styles.unavailableBody} tone="muted" uppercase={false} variant="body">
+          <TerminalText
+            style={styles.unavailableBody}
+            tone="muted"
+            uppercase={false}
+            variant="body"
+          >
             Check your connection and try loading this creator workout again.
           </TerminalText>
           <CyberButtonPrimary
@@ -104,7 +144,7 @@ export default function WorkoutDetailScreen() {
     );
   }
 
-  if (!workout?.joined) {
+  if (!workout) {
     return (
       <ScreenContainer contentStyle={styles.unavailableScreen}>
         <HUDBorderBox glow style={styles.unavailableCard} tone="red">
@@ -112,11 +152,16 @@ export default function WorkoutDetailScreen() {
             WORKOUT UNAVAILABLE
           </TerminalText>
           <TerminalText glow style={styles.unavailableTitle} tone="text" variant="title">
-            WORKOUT NOT AVAILABLE YET
+            WORKOUT NOT AVAILABLE
           </TerminalText>
-          <TerminalText style={styles.unavailableBody} tone="muted" uppercase={false} variant="body">
-            This creator slot is still in submission or review. Return to the
-            workout list for the current featured session.
+          <TerminalText
+            style={styles.unavailableBody}
+            tone="muted"
+            uppercase={false}
+            variant="body"
+          >
+            This workout is not in the published catalog for your verified region. Return to the
+            workout list for available sessions.
           </TerminalText>
           <CyberButtonPrimary
             label="BACK TO CREATOR WORKOUTS ->"
@@ -142,7 +187,7 @@ export default function WorkoutDetailScreen() {
             style={styles.backButton}
           />
           <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-            CREATOR WORKOUT // {campaign.region}
+            CREATOR WORKOUT // {competitionRegion.label}
           </TerminalText>
         </View>
 
@@ -153,7 +198,7 @@ export default function WorkoutDetailScreen() {
             </TerminalText>
           </View>
           <View style={styles.creatorCopy}>
-              <TerminalText style={styles.creatorTitle} tone="text" uppercase variant="body">
+            <TerminalText style={styles.creatorTitle} tone="text" uppercase variant="body">
               {workout.name}
             </TerminalText>
             <TerminalText style={styles.metadataBody} tone="muted" variant="body">
@@ -189,8 +234,8 @@ export default function WorkoutDetailScreen() {
         </TerminalText>
 
         <TerminalText style={styles.startHelper} tone="cyan" uppercase={false} variant="body">
-          Start your verified GoGymGo session first, then play the video. The
-          video alone does not count as a verified workout.
+          Start your verified GoGymGo session first, then play the video. The video alone does not
+          count as a verified workout.
         </TerminalText>
 
         <CyberButtonPrimary
@@ -210,7 +255,8 @@ export default function WorkoutDetailScreen() {
             ADD TO WORKOUT CALENDAR
           </TerminalText>
           <TerminalText style={styles.planningCopy} tone="muted" uppercase={false} variant="body">
-            Plan this creator video for a future day. Planning does not verify a workout or award entries.
+            Plan this creator video for a future day. Planning does not verify a workout or award
+            entries.
           </TerminalText>
           <AuthTextField
             autoCapitalize="none"
@@ -226,36 +272,41 @@ export default function WorkoutDetailScreen() {
             value={plannedDate}
           />
           {planningFeedback ? (
-            <TerminalText live="polite" tone={planningFeedback.startsWith('PLANNED') ? 'green' : 'red'} uppercase={false} variant="caption">
+            <TerminalText
+              live="polite"
+              tone={planningFeedback.startsWith('PLANNED') ? 'green' : 'red'}
+              uppercase={false}
+              variant="caption"
+            >
               {planningFeedback}
             </TerminalText>
           ) : null}
           <CyberButtonOutline
             disabled={planCreatorWorkout.isPending || !isFutureDateKey(plannedDate)}
             label={planCreatorWorkout.isPending ? 'ADDING...' : 'ADD TO CALENDAR ->'}
-            onPress={() => void planCreatorWorkout.mutateAsync({
-              plannedDate,
-              workoutId: workout.id
-            })
-              .then(() => setPlanningFeedback(`PLANNED FOR ${plannedDate}. OPEN YOUR WORKOUT CALENDAR TO REVIEW IT.`))
-              .catch(() => setPlanningFeedback('THIS WORKOUT COULD NOT BE ADDED. CHECK THE DATE AND TRY AGAIN.'))}
+            onPress={() =>
+              void planCreatorWorkout
+                .mutateAsync({
+                  plannedDate,
+                  workoutId: workout.id
+                })
+                .then(() =>
+                  setPlanningFeedback(
+                    `PLANNED FOR ${plannedDate}. OPEN YOUR WORKOUT CALENDAR TO REVIEW IT.`
+                  )
+                )
+                .catch(() =>
+                  setPlanningFeedback(
+                    'THIS WORKOUT COULD NOT BE ADDED. CHECK THE DATE AND TRY AGAIN.'
+                  )
+                )
+            }
           />
-        </HUDBorderBox>
-
-        <HUDBorderBox style={styles.selectionCard} tone={sponsorConfirmed ? 'pink' : 'cyan'}>
-          <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="label">
-            {sponsorConfirmed ? `${campaign.sponsor.displayName} CREATOR FEATURE` : 'REGIONAL CREATOR CAMPAIGN'}
-          </TerminalText>
-          <TerminalText style={styles.selectionCopy} tone="muted" variant="body">
-            {sponsorConfirmed
-              ? `SPONSOR FUNDING SUPPORTS THE SELECTED ${campaign.region} WORKOUT LEADER.`
-              : 'CREATOR FEATURE DETAILS ARE PUBLISHED WITH THE REGIONAL CAMPAIGN.'}
-          </TerminalText>
         </HUDBorderBox>
 
         <HUDBorderBox style={styles.rulesCard} tone="muted">
           <TerminalText tone="dim" variant="label">
-            OFFICIAL RULES
+            ENTRY ELIGIBILITY
           </TerminalText>
           <View style={styles.rulesList}>
             {ruleItems.map((rule) => (
@@ -269,8 +320,11 @@ export default function WorkoutDetailScreen() {
               </View>
             ))}
           </View>
+          <CyberButtonOutline
+            label="VIEW OFFICIAL CONTEST RULES"
+            onPress={() => router.push('/official-rules')}
+          />
         </HUDBorderBox>
-
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -294,7 +348,12 @@ function isFutureDateKey(value: string) {
 }
 
 function creatorInitials(value: string) {
-  return value.split(/\s+/).map((word) => word[0]).join('').slice(0, 2).toUpperCase();
+  return value
+    .split(/\s+/)
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 const styles = StyleSheet.create({
@@ -410,40 +469,6 @@ const styles = StyleSheet.create({
   },
   pressableCard: {
     width: '100%'
-  },
-  safeSponsorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg
-  },
-  safeSponsorMark: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  safeSponsorCopy: {
-    flex: 1
-  },
-  safeSponsorTitle: {
-    marginVertical: spacing.xs,
-    fontFamily: fontFamilies.display
-  },
-  selectionCard: {
-    marginTop: spacing.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg
-  },
-  selectionCopy: {
-    marginTop: 7,
-    fontFamily: fontFamilies.body
   },
   verificationCard: {
     marginTop: spacing.md,

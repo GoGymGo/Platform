@@ -12,6 +12,16 @@ describe('session event payloads', () => {
     ).toEqual({ heartRateBpm: 132, trust: 'unverified_client_evidence' });
   });
 
+  it('records only the result type for a local device presence check', () => {
+    expect(
+      buildSessionEventPayload({
+        eventId: crypto.randomUUID(),
+        eventType: 'presence_check',
+        occurredAt: new Date().toISOString(),
+      }),
+    ).toEqual({ trust: 'local_device_authentication_result' });
+  });
+
   it('hashes device evidence tokens instead of persisting the opaque credential', () => {
     const payload = buildSessionEventPayload({
       deviceEvidenceToken: 'opaque-device-token',

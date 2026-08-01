@@ -1369,7 +1369,10 @@ function EmptyState({ body, title }: { body: string; title: string }) {
 }
 
 function formatRegion(regionCode: string) {
-  return regionCode.charAt(0) + regionCode.slice(1).toLowerCase();
+  return regionCode
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
 }
 
 function formatDateRange(startDate: string, endDate: string) {

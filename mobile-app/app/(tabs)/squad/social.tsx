@@ -61,7 +61,7 @@ import { goBackOrReplace } from '@/navigation/goBack';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 
 type Feedback = {
   message: string;
@@ -74,12 +74,13 @@ export default function SocialChallengesScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { mode } = useAppData();
-  const { campaign } = useSponsorCampaign();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
+  const regionCode = regionVerification?.regionCode ?? '';
   const profileQuery = useMySocialProfile();
   const friendsQuery = useFriends();
   const requestsQuery = useFriendRequests();
   const challengesQuery = useSocialChallenges();
-  const regionalChallengesQuery = useRegionalChallengeDiscovery(campaign.region);
+  const regionalChallengesQuery = useRegionalChallengeDiscovery(regionCode);
   const sendFriendRequest = useSendFriendRequest();
   const respondToFriendRequest = useRespondToFriendRequest();
   const createChallenge = useCreateSocialChallenge();
@@ -167,7 +168,7 @@ export default function SocialChallengesScreen() {
       setFeedback({
         message: challenge.challengeType === 'friend'
           ? `${challenge.name} created. ${contacts.length > 0 ? 'Your phone opened the invitation composer.' : 'Your in-app friend invitation is on its way.'}`
-          : `${challenge.name} is now open in ${challenge.regionName ?? campaign.region}.`,
+          : `${challenge.name} is now open in ${challenge.regionName ?? competitionRegion.label}.`,
         tone: 'green'
       });
       return true;
@@ -440,7 +441,7 @@ export default function SocialChallengesScreen() {
               invite(challenge.id, friendUserId, friendScreenName)
             }
             onJoin={joinChallenge}
-            regionCode={campaign.region}
+            regionCode={regionCode}
           />
         ) : null}
         {loading ? (

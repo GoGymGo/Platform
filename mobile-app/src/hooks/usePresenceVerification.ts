@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { verifyLocalPresence } from '@/services/presenceVerification';
 import { useAppTour } from '@/state/appTour';
+import { appTourPresenceConfirmationMessage } from '@/testing/appTourData';
 
 export function usePresenceVerification() {
   const { active: appTourActive } = useAppTour();
@@ -14,7 +15,7 @@ export function usePresenceVerification() {
 
     try {
       if (appTourActive) {
-        setMessage('Presence confirmed in App Tour.');
+        setMessage(appTourPresenceConfirmationMessage);
         return true;
       }
 

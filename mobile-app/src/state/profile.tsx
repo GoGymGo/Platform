@@ -7,11 +7,14 @@ import {
   useState,
   type PropsWithChildren
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { AppState } from 'react-native';
 
 import {
   createPrivateIdentity,
   normalizePublicIdentity,
   parseStoredPublicIdentity,
+  publicIdentityFromAccountProfile,
   resolvePublicName,
   type IdentityMode,
   type PublicIdentity
@@ -21,6 +24,7 @@ import type { AvatarMedia } from '@/domain/accountSettings';
 import { createUserStorage } from '@/services/storage/userStorage';
 import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
+import { appTourPublicIdentity } from '@/testing/appTourData';
 
 type ProfileContextValue = {
   hasPublicIdentity: boolean;
@@ -38,14 +42,10 @@ type ProfileContextValue = {
 
 const profileImageStorageKey = '@gogymgo/profile-image';
 const publicIdentityStorageKey = '@gogymgo/public-identity';
-const appTourPublicIdentity: PublicIdentity = {
-  callsign: 'APP_TOUR_PLAYER',
-  displayName: 'APP_TOUR_PLAYER',
-  mode: 'alias'
-};
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
   const { accountSettings, mode } = useAppData();
   const { active: appTourActive } = useAppTour();
   const { loading: authLoading, user } = useAuth();
@@ -95,9 +95,12 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       userStorage.getItem(publicIdentityStorageKey),
       mode === 'api'
         ? accountSettings.getAvatar().catch(() => null)
+        : Promise.resolve(null),
+      mode === 'api'
+        ? accountSettings.getProfile().catch(() => null)
         : Promise.resolve(null)
     ])
-      .then(([storedImage, storedIdentity, avatarState]) => {
+      .then(([storedImage, storedIdentity, avatarState, accountProfile]) => {
         if (!active) {
           return;
         }
@@ -112,10 +115,22 @@ export function ProfileProvider({ children }: PropsWithChildren) {
           setProfileImageStatus('local');
         }
 
+        const serverIdentity = accountProfile
+          ? publicIdentityFromAccountProfile(accountProfile)
+          : null;
         const parsedIdentity = parseStoredPublicIdentity(storedIdentity);
-        if (parsedIdentity) {
-          setPublicIdentityState(parsedIdentity);
+        const restoredIdentity = serverIdentity ?? parsedIdentity;
+        if (restoredIdentity) {
+          setPublicIdentityState(restoredIdentity);
           setHasPublicIdentity(true);
+          if (serverIdentity) {
+            void userStorage.setItem(
+              publicIdentityStorageKey,
+              JSON.stringify(serverIdentity)
+            ).catch(() => {
+              // The server remains authoritative if the local cache cannot refresh.
+            });
+          }
         }
       })
       .catch(() => {
@@ -131,6 +146,58 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       active = false;
     };
   }, [accountSettings, appTourActive, authLoading, mode, userStorage]);
+
+  useEffect(() => {
+    if (appTourActive || authLoading || mode !== 'api' || !userId) {
+      return undefined;
+    }
+
+    let active = true;
+    const synchronize = () => {
+      void Promise.all([
+        accountSettings.getProfile(),
+        accountSettings.getAvatar().catch(() => null)
+      ])
+        .then(([profile, avatarState]) => {
+          if (!active) return;
+          const identity = publicIdentityFromAccountProfile(profile);
+          setPublicIdentityState(identity);
+          setHasPublicIdentity(true);
+          if (avatarState) {
+            setProfileImageUri(avatarState.active?.readUrl ?? null);
+            setProfileImageStatus(
+              avatarState.latest?.status ??
+              avatarState.active?.status ??
+              null
+            );
+          }
+          void userStorage?.setItem(
+            publicIdentityStorageKey,
+            JSON.stringify(identity)
+          ).catch(() => {
+            // The active server identity remains available in memory.
+          });
+        })
+        .catch(() => {
+          // Keep the last synchronized identity while the API is unreachable.
+        });
+    };
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'active') synchronize();
+    });
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [
+    accountSettings,
+    appTourActive,
+    authLoading,
+    mode,
+    userId,
+    userStorage
+  ]);
 
   const setProfileImage = useCallback(async (uri: string) => {
     const previousImage = profileImageUri;
@@ -171,27 +238,74 @@ export function ProfileProvider({ children }: PropsWithChildren) {
 
   const setPublicIdentity = useCallback(async (identity: PublicIdentity) => {
     const normalized = normalizePublicIdentity(identity);
-    setPublicIdentityState(normalized);
+    const synchronized = mode === 'api'
+      ? publicIdentityFromAccountProfile(
+          await accountSettings.updateProfile({
+            publicIdentityMode: normalized.mode,
+            publicName:
+              normalized.mode === 'private'
+                ? null
+                : normalized.displayName,
+            ...(normalized.mode === 'alias'
+              ? { screenName: normalized.displayName }
+              : {})
+          })
+        )
+      : normalized;
+    setPublicIdentityState(synchronized);
     setHasPublicIdentity(true);
+    void queryClient.invalidateQueries({
+      queryKey: ['social', userId ?? 'anonymous']
+    });
 
     try {
-      await userStorage?.setItem(publicIdentityStorageKey, JSON.stringify(normalized));
+      await userStorage?.setItem(
+        publicIdentityStorageKey,
+        JSON.stringify(synchronized)
+      );
     } catch {
       // Keep the selected identity for the active session if persistence fails.
     }
-  }, [userStorage]);
+  }, [accountSettings, mode, queryClient, userId, userStorage]);
 
-  const setIdentityMode = useCallback(async (mode: IdentityMode) => {
-    const nextIdentity = normalizePublicIdentity({ ...publicIdentity, mode });
-    setPublicIdentityState(nextIdentity);
+  const setIdentityMode = useCallback(async (nextMode: IdentityMode) => {
+    const nextIdentity = normalizePublicIdentity({
+      ...publicIdentity,
+      mode: nextMode
+    });
+    const synchronized = mode === 'api'
+      ? publicIdentityFromAccountProfile(
+          await accountSettings.updateProfile({
+            publicIdentityMode: nextIdentity.mode,
+            publicName:
+              nextIdentity.mode === 'private'
+                ? null
+                : nextIdentity.displayName
+          })
+        )
+      : nextIdentity;
+    setPublicIdentityState(synchronized);
     setHasPublicIdentity(true);
+    void queryClient.invalidateQueries({
+      queryKey: ['social', userId ?? 'anonymous']
+    });
 
     try {
-      await userStorage?.setItem(publicIdentityStorageKey, JSON.stringify(nextIdentity));
+      await userStorage?.setItem(
+        publicIdentityStorageKey,
+        JSON.stringify(synchronized)
+      );
     } catch {
       // Keep the selected mode for the active session if persistence fails.
     }
-  }, [publicIdentity, userStorage]);
+  }, [
+    accountSettings,
+    mode,
+    publicIdentity,
+    queryClient,
+    userId,
+    userStorage
+  ]);
 
   const publicName = resolvePublicName(publicIdentity);
   const value = useMemo<ProfileContextValue>(

@@ -11,6 +11,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { ScreenBackButton } from '@/components/onboarding';
+import { creatorFeaturesEnabled } from '@/config/features';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
 import { useCreatorWorkoutPlans } from '@/data/appDataHooks';
@@ -304,7 +305,9 @@ export default function CalendarScreen() {
 
         <TerminalText style={styles.actionHint} tone="dim" uppercase={false} variant="caption">
           {selectedDateIsFuture
-            ? 'Plan a creator workout for this day. Verified sessions count on the day you complete them.'
+            ? creatorFeaturesEnabled
+              ? 'Plan a creator workout for this day. Verified sessions count on the day you complete them.'
+              : 'Return on this day to start your own verified workout.'
             : selectedDateIsPast
               ? 'Add a personal log for this day, or return to today to start a verified workout.'
               : 'Personal logs track your history only. Start a verified workout below for competition credit.'}
@@ -401,7 +404,7 @@ export default function CalendarScreen() {
           />
         </HUDBorderBox> : null}
 
-        {selectedDateIsFuture ? (
+        {selectedDateIsFuture && creatorFeaturesEnabled ? (
           <CyberButtonPrimary
             label="PLAN A CREATOR WORKOUT ->"
             onPress={() => router.push(
@@ -410,19 +413,19 @@ export default function CalendarScreen() {
             style={styles.sessionButton}
             tone="amber"
           />
-        ) : selectedDateIsPast ? (
+        ) : !selectedDateIsFuture && selectedDateIsPast ? (
           <CyberButtonPrimary
             label="RETURN TO TODAY TO START ->"
             onPress={goToToday}
             style={styles.sessionButton}
           />
-        ) : (
+        ) : !selectedDateIsFuture ? (
           <CyberButtonPrimary
             label="START TODAY'S VERIFIED WORKOUT ->"
             onPress={() => router.push('/session' as Href)}
             style={styles.sessionButton}
           />
-        )}
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );

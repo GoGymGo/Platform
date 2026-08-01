@@ -10,12 +10,23 @@ export default function configureApp({ config }: ConfigContext): ExpoConfig {
   const googleServicesReady =
     existsSync(iosGoogleServicesPath) && existsSync(androidGoogleServicesPath);
   const plugins = [...(config.plugins ?? [])];
+  const releaseBuild =
+    process.env.GOGYMGO_RELEASE_BUILD === 'true' ||
+    process.env.EAS_BUILD_PROFILE === 'production';
 
   if (
     googleServicesReady &&
     !plugins.some((plugin) => getPluginName(plugin) === 'react-native-nitro-google-signin')
   ) {
     plugins.push('react-native-nitro-google-signin');
+  }
+  if (
+    releaseBuild &&
+    !plugins.some(
+      (plugin) => getPluginName(plugin) === './plugins/withReleaseIosPermissions'
+    )
+  ) {
+    plugins.push('./plugins/withReleaseIosPermissions');
   }
 
   return {

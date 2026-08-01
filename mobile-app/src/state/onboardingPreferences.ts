@@ -1,4 +1,5 @@
 import { createUserStorage } from '@/services/storage/userStorage';
+import { creatorFeaturesEnabled } from '@/config/features';
 import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
 import { devicePresenceConsentVersion } from '@/domain/accountSettings';
 
@@ -226,6 +227,10 @@ export async function dismissCreatorInvite(userId: string) {
 }
 
 export async function shouldShowCreatorInvite(userId: string) {
+  if (!creatorFeaturesEnabled) {
+    return false;
+  }
+
   try {
     const storage = createUserStorage(userId);
     const [dismissed, applicationSubmitted] = await Promise.all([

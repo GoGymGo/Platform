@@ -27,7 +27,12 @@ function formatGrace(secondsRemaining: number) {
 
 export default function PingScreen() {
   const router = useRouter();
-  const { activeSession, markMidSessionVerified } = useWorkoutProgress();
+  const {
+    activeSession,
+    markMidSessionVerified,
+    sessionActionError,
+    sessionActionPending
+  } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
     ready: cameraConsentReady,
@@ -60,8 +65,9 @@ export default function PingScreen() {
       return;
     }
 
-    markMidSessionVerified();
-    router.replace('/workout/ping-success');
+    if (await markMidSessionVerified()) {
+      router.replace('/workout/ping-success');
+    }
   }
   if (!activeSession) {
     return (
@@ -130,14 +136,26 @@ export default function PingScreen() {
       )}
 
       <CyberButtonPrimary
-        disabled={!cameraConsentReady || !cameraConsentAccepted || secondsRemaining === 0 || busy}
-        label={busy ? 'Checking device...' : 'Verify now'}
+        disabled={
+          !cameraConsentReady ||
+          !cameraConsentAccepted ||
+          secondsRemaining === 0 ||
+          busy ||
+          sessionActionPending
+        }
+        label={
+          busy
+            ? 'Checking device...'
+            : sessionActionPending
+              ? 'Saving result...'
+              : 'Verify now'
+        }
         onPress={() => void confirmPresence()}
         tone="amber"
       />
-      {message ? (
+      {message || sessionActionError ? (
         <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
-          {message}
+          {sessionActionError ?? message}
         </TerminalText>
       ) : null}
       <CompactTextButton

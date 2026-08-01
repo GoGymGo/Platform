@@ -109,14 +109,14 @@ Registration requirements:
 
 Competition timing requirements:
 
-- Standard registration opens for the complete calendar month before the
-  competition month.
+- Publishing a competition opens enrollment immediately.
+- An eligible player may join before the competition starts or while it is
+  active. Enrollment closes only when the competition ends, reaches its
+  published entrant cap, or is cancelled.
 - The competition requires at least 100 eligible entrants to launch and may
   optionally have a sponsor-approved maximum.
-- Late registration is allowed only through local day 6 of the competition.
-- A late entrant starts on the registration date and receives the only Weekly
-  Goal that remains mathematically possible for the first scoring week.
-- After day 6, new registration targets the next regional competition.
+- A player who joins after scoring begins may select any published Weekly Goal.
+  Only verified results earned after enrollment is confirmed count.
 
 ### 3.3 Workout verification lifecycle
 
@@ -362,44 +362,6 @@ Weekly scoring:
 - Creator, sponsor, and gym partner applications are available from public and
   Profile entry points and have explicit validation and submission outcomes.
 
-### Sponsor advertising placeholder inventory
-
-- The backend owns a read-only sponsor-placement inventory at
-  `GET /v1/me/sponsor-ad-placements`. The initial contract is explicitly a
-  placeholder: visual delivery, creative URLs, playback, and event tracking are
-  disabled, and the mobile UI must not render these placements yet.
-- The inventory reserves one in-flow banner placement for eligible authenticated
-  member screens and 15-second video placeholders for post-login, verified
-  workout completion, settled Weekly Challenge results, Winners Circle,
-  Brand Rewards, and an explicitly announced Creator workout launch.
-- The post-login video is an automatic 15-second placement after every explicit
-  credential login when the backend confirms an active enrollment in the
-  current or upcoming competition. It occurs only after authentication and
-  enrollment resolution and before the intended signed-in destination.
-- Token refresh, app resume, tab navigation, and deep-link restoration do not
-  count as explicit logins and must not retrigger the post-login placement.
-- No video placement is eligible when enrollment is missing, loading,
-  withdrawn, disqualified, expired, or does not match the relevant competition.
-  Enrollment uncertainty fails closed for video eligibility.
-- Authentication, onboarding, public, active-workout, account-data,
-  legal/privacy, and Creator-submission contexts never contain video ads.
-- Banners may eventually appear once per eligible authenticated member screen,
-  but remain outside authentication, onboarding, public, active-workout,
-  account-data, legal/privacy, and Creator-submission contexts.
-- Future creative delivery must fail open: an unavailable advertisement never
-  delays login completion, workout confirmation, results, reward access, or
-  navigation.
-- Future delivery must clearly identify advertising, provide mute, countdown,
-  accessible close/skip, and inappropriate-ad reporting controls, and enforce
-  frequency on the server.
-- Advertising is contextual to an approved competition, region, and month. It
-  must never target or report using heart rate, health data, workout evidence,
-  streak performance, exact location, legal identity, private social activity,
-  raw contact destinations, or coupon plaintext.
-- Reserved event names include requested, started, viewable, completed,
-  skipped, failed, and clicked. No event is accepted or counted while the
-  placement inventory remains in placeholder status.
-
 Users earn competition credit only through verified GoGymGo workouts, never
 through external views, likes, subscriptions, comments, shares, or watch time.
 Creator compensation, if introduced later, is a separate business-accounting
@@ -483,7 +445,7 @@ or claims.
 
 ### Mobile-facing contract
 
-The release contract currently covers 60 required operations across:
+The mobile release contract currently covers 61 required operations across:
 
 - profile, avatar, legal receipt, region, privacy, and push-device APIs;
 - current competition, enrollment, Weekly Challenge, leaderboard, session,
@@ -542,8 +504,6 @@ Included:
 - regional physical/coupon marketplace, encrypted coupon inventory, My Rewards,
   and claims;
 - creator, sponsor, and gym partner applications;
-- a backend-owned, non-delivering sponsor-ad placeholder inventory with
-  enrollment-gated 15-second video eligibility and no mobile presentation;
 - local and push reminders, privacy export/deletion, moderation, operator
   configuration, migrations, OpenAPI, tests, and deployment runbooks.
 
@@ -554,36 +514,45 @@ Deferred:
 - GoGymGo collection of shipping addresses;
 - self-service brand fulfillment and automated third-party fulfillment;
 - creator-owned in-app video hosting and user-generated live video;
-- production sponsor creative delivery, playback, impression/click ingestion,
-  and advertising analytics until the placeholder promotion gate is approved;
+- sponsor creative delivery, playback, impression/click ingestion, and
+  advertising analytics until a production contract and approval gate exist;
 - unsupported combined biometric/device-attestation competition policies until
   real signed evidence integrations are implemented and approved; and
 - global launch before region-by-region legal and operational approval.
 
 ## 11. Current implementation baseline
 
-As of July 16, 2026:
+As of July 30, 2026:
 
 - the Expo Router app contains 49 concrete routes and 47 audited literal links;
 - the primary account, onboarding, registration, QR handoff, creator, rewards,
   friends, privacy, and profile flows have been browser smoke-tested;
-- the mobile check passes typecheck, lint, source audit, and 116 automated tests;
-- the backend check passes formatting, typecheck, lint, 101 unit tests, 25 E2E
-  tests, OpenAPI generation, the 61-operation frontend contract audit, source
-  audit, and production build;
-- database integration suites remain environment-gated and must run with the
-  required PostgreSQL/PostGIS test environment before release; and
+- the mobile check passes typecheck, lint, 127 automated tests, a 64-request-site
+  API audit covering 59 mobile operations, and the source audit;
+- the backend check passes formatting, typecheck, lint, 116 unit tests, 26 E2E
+  tests, 21 clean migrated PostgreSQL/PostGIS integration tests, OpenAPI
+  generation, the 62-operation frontend contract audit, source audit, and
+  production build;
+- production web, iOS, and Android bundles exclude the development App Tour
+  data and UI while development builds retain the dedicated click-through
+  testing area;
+- the production backend image and deployable configuration have zero
+  high/critical Trivy findings, and the Terraform foundation tests pass; and
 - API adapters exist for legal/region/enrollment, sessions and progress, social
   features, creators, rewards, avatars, privacy, and push devices.
 
-The remaining work is release validation and deployment configuration. The
-client must continue to surface unavailable states instead of replacing server
+The remaining work includes release deployment, store identity, legal approval,
+physical-device validation, and connecting a real wearable/heart-rate or
+verified partner-gym evidence provider. The client surfaces those methods as
+unavailable until a genuine provider exists instead of replacing server
 authority with locally fabricated records.
 
 ## 12. Release gates
 
-1. The real PostgreSQL/PostGIS migration suite passes from both a clean database
-   and an upgraded legacy database backup.
+1. The real PostgreSQL/PostGIS migration suite passes from a clean database and
+   a second idempotent migration run. Any database created from the retired
+   preproduction migration set is rebuilt from empty before this baseline is
+   used.
 2. Mobile and backend lint, typecheck, unit, E2E, OpenAPI, contract, source, and
    production builds pass with no generated diff.
 3. A random 32-byte base64 `REWARD_CODE_ENCRYPTION_KEY` is provisioned outside
@@ -617,5 +586,4 @@ Implementation details and ownership are maintained in:
 - `mobile-app/docs/backend-handoff-architecture.md`;
 - `backend/docs/brand-rewards-marketplace.md`;
 - `backend/docs/social-challenges.md`; and
-- `backend/docs/streak-rewards.md`; and
-- `backend/docs/sponsor-ad-placeholders.md`.
+- `backend/docs/streak-rewards.md`.

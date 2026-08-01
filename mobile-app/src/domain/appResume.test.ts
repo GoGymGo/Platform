@@ -1,7 +1,42 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getAppResumeTarget } from './appResume';
+import {
+  getAppResumeRequestStatus,
+  getAppResumeTarget
+} from './appResume';
+
+test('resume uses a known local target even when background checks fail', () => {
+  assert.deepEqual(
+    getAppResumeRequestStatus({
+      hasImmediateTarget: true,
+      registrationError: true,
+      registrationLoading: false,
+      secondaryError: true,
+      secondaryLoading: false
+    }),
+    {
+      error: false,
+      loading: false
+    }
+  );
+});
+
+test('resume reports failed checks when no local target is known', () => {
+  assert.deepEqual(
+    getAppResumeRequestStatus({
+      hasImmediateTarget: false,
+      registrationError: true,
+      registrationLoading: false,
+      secondaryError: false,
+      secondaryLoading: false
+    }),
+    {
+      error: true,
+      loading: false
+    }
+  );
+});
 
 test('resume prioritizes unfinished setup before every other task', () => {
   assert.deepEqual(

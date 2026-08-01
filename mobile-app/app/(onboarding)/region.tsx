@@ -1,26 +1,22 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, Platform, StyleSheet, View } from 'react-native';
 
-import { AuthStatusNotice } from '@/components/auth';
 import { AccountLegalAgreement } from '@/components/accountLegalAgreement';
+import { AuthStatusNotice } from '@/components/auth';
 import {
-  ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import {
-  useCreateRegionVerification,
-  useRegionPolicies
-} from '@/data/accountReadinessHooks';
-import type { CompetitionRegion } from '@/config/regions';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
-import type { RegionCoordinates } from '@/domain/competitionRegionVerification';
+import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { ApiError } from '@/services/api/client';
 import { verifyCompetitionRegionWithDeviceLocation } from '@/services/competitionRegionVerification';
 import { useAppTour } from '@/state/appTour';
 import { useCompetitionRegion } from '@/state/competitionRegion';
@@ -31,7 +27,6 @@ type VerificationState =
   | 'verified'
   | 'permission-denied'
   | 'location-unavailable'
-  | 'review-pending'
   | 'service-error'
   | 'unsupported-region';
 
@@ -44,96 +39,62 @@ export default function RegionScreen() {
     regionVerification,
     verifyCompetitionRegion
   } = useCompetitionRegion();
-  const regionPolicies = useRegionPolicies();
   const createRegionVerification = useCreateRegionVerification();
-  const [candidateRegion, setCandidateRegion] = useState<CompetitionRegion | null>(null);
-  const [verificationState, setVerificationState] = useState<VerificationState>('idle');
-  const [deviceCoordinates, setDeviceCoordinates] =
-    useState<RegionCoordinates | null>(null);
+  const [verificationState, setVerificationState] =
+    useState<VerificationState>('idle');
   const isProfileSource = source === 'profile';
   const isHomeSource = source === 'home';
   const approvedRegionReady =
     regionVerification?.status === 'verified' &&
     Boolean(regionVerification.verificationId);
-  const jurisdictionCode =
-    regionVerification?.regionCode?.split('-').slice(0, 2).join('-') ||
-    'GLOBAL';
-  const visibleRegion =
-    candidateRegion ?? (approvedRegionReady ? competitionRegion : null);
+  const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
+  const permissionDeniedMessage =
+    'LOCATION ACCESS WAS NOT ALLOWED. ENABLE LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
 
   async function checkDeviceLocation() {
-    setCandidateRegion(null);
-    setDeviceCoordinates(null);
     setVerificationState('checking');
 
     if (appTourActive) {
-      setDeviceCoordinates({
-        latitude: 43.6532,
-        longitude: -79.3832
-      });
-      setCandidateRegion(competitionRegion);
-      setVerificationState('verified');
+      try {
+        const serverVerification = await createRegionVerification.mutateAsync({
+          latitude: 43.6532,
+          longitude: -79.3832,
+          method: 'device_location'
+        });
+        await verifyCompetitionRegion(serverVerification);
+        setVerificationState('verified');
+        if (isProfileSource) {
+          router.replace('/profile');
+        }
+      } catch {
+        setVerificationState('service-error');
+      }
       return;
     }
 
     const result = await verifyCompetitionRegionWithDeviceLocation();
-
-    if (result.status === 'verified') {
-      setDeviceCoordinates(result.coordinates);
-      setCandidateRegion(result.region);
-      setVerificationState('verified');
+    if (result.status !== 'location-read') {
+      setVerificationState(result.status);
       return;
     }
 
-    setVerificationState(result.status);
-  }
-
-  async function continueWithVerifiedRegion() {
-    if (!candidateRegion || !deviceCoordinates) {
-      return;
-    }
-
-    await submitRegionVerification(candidateRegion, deviceCoordinates);
-  }
-
-  async function submitRegionVerification(
-    region: CompetitionRegion,
-    coordinates: RegionCoordinates
-  ) {
-    const availablePolicies = regionPolicies.data ?? (await regionPolicies.refetch()).data;
-    const policy = availablePolicies?.find(
-      ({ metroName }) => metroName.toUpperCase() === region.label.toUpperCase()
-    );
-    if (!policy) {
-      setVerificationState('service-error');
-      return;
-    }
-
-    setVerificationState('checking');
     try {
       const serverVerification = await createRegionVerification.mutateAsync({
-        ...coordinates,
-        method: 'device_location',
-        regionPolicyId: policy.id
+        ...result.coordinates,
+        method: 'device_location'
       });
-      await verifyCompetitionRegion(region, 'device-location', {
-        id: serverVerification.id,
-        regionCode: serverVerification.regionCode ?? policy.code,
-        regionPolicyId: serverVerification.regionPolicyId,
-        status: serverVerification.status
-      });
-
-      if (serverVerification.status !== 'approved') {
-        setVerificationState('review-pending');
-        return;
-      }
-
+      await verifyCompetitionRegion(serverVerification);
       setVerificationState('verified');
+
       if (isProfileSource) {
         router.replace('/profile');
       }
-    } catch {
-      setVerificationState('service-error');
+    } catch (error) {
+      setVerificationState(
+        getApiErrorCode(error) === 'LOCATION_OUTSIDE_SUPPORTED_REGION'
+          ? 'unsupported-region'
+          : 'service-error'
+      );
     }
   }
 
@@ -162,7 +123,12 @@ export default function RegionScreen() {
               ? 'REGION VERIFIED'
               : 'VERIFY YOUR REGION'}
         </TerminalText>
-        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+        <TerminalText
+          style={styles.body}
+          tone="muted"
+          uppercase={false}
+          variant="body"
+        >
           {approvedRegionReady && !isProfileSource
             ? `${competitionRegion.label} sets your competition, available rewards and local scoring time.`
             : 'Your verified location sets your regional competition, available rewards and local scoring time.'}
@@ -174,9 +140,9 @@ export default function RegionScreen() {
               ONE-TIME LOCATION CHECK
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-            GoGymGo checks your location only while this screen is open. We save
-            your verified region—not your exact location—and never track you in
-            the background.
+              GoGymGo sends your location once for a secure region check. We
+              save the approved region—not your coordinates—and never track you
+              in the background.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -192,8 +158,8 @@ export default function RegionScreen() {
                   {competitionRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText tone={regionVerification.status === 'verified' ? 'green' : 'amber'} variant="label">
-                {regionVerification.status === 'verified' ? 'VERIFIED' : 'PROVISIONAL'}
+              <TerminalText tone="green" variant="label">
+                VERIFIED
               </TerminalText>
             </View>
           </HUDBorderBox>
@@ -202,7 +168,11 @@ export default function RegionScreen() {
         {!approvedRegionReady || isProfileSource ? (
           <CyberButtonPrimary
             disabled={verificationState === 'checking'}
-            label={verificationState === 'checking' ? 'CHECKING LOCATION...' : 'USE MY LOCATION ->'}
+            label={
+              verificationState === 'checking'
+                ? 'VERIFYING REGION...'
+                : 'USE MY LOCATION ->'
+            }
             onPress={() => void checkDeviceLocation()}
             style={styles.primaryAction}
           />
@@ -210,7 +180,7 @@ export default function RegionScreen() {
 
         {verificationState === 'permission-denied' ? (
           <AuthStatusNotice
-            message="LOCATION ACCESS WAS NOT ALLOWED. ENABLE LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN."
+            message={permissionDeniedMessage}
             tone="amber"
           />
         ) : null}
@@ -226,13 +196,7 @@ export default function RegionScreen() {
             tone="amber"
           />
         ) : null}
-        {verificationState === 'review-pending' ? (
-          <AuthStatusNotice
-            message="YOUR REGION CHECK WAS SUBMITTED FOR REVIEW. RETURN HERE AFTER APPROVAL TO CONTINUE COMPETITION REGISTRATION."
-            tone="amber"
-          />
-        ) : null}
-        {verificationState === 'service-error' || regionPolicies.isError ? (
+        {verificationState === 'service-error' ? (
           <AuthStatusNotice
             message="REGION VERIFICATION COULD NOT BE COMPLETED. CHECK YOUR CONNECTION AND TRY AGAIN."
             tone="red"
@@ -241,12 +205,18 @@ export default function RegionScreen() {
 
         {verificationState === 'permission-denied' ? (
           <CyberButtonOutline
-            label="OPEN DEVICE SETTINGS"
-            onPress={() => void Linking.openSettings()}
+            label={Platform.OS === 'web' ? 'RETRY AFTER ALLOWING' : 'OPEN DEVICE SETTINGS'}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                void checkDeviceLocation();
+                return;
+              }
+              void Linking.openSettings();
+            }}
           />
         ) : null}
 
-        {visibleRegion ? (
+        {approvedRegionReady ? (
           <HUDBorderBox glow style={styles.verifiedCard} tone="green">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
@@ -254,7 +224,7 @@ export default function RegionScreen() {
                   VERIFIED REGION
                 </TerminalText>
                 <TerminalText glow tone="cyan" variant="title">
-                  {visibleRegion.label}
+                  {competitionRegion.label}
                 </TerminalText>
               </View>
               <TerminalText glow tone="green" variant="label">
@@ -262,33 +232,22 @@ export default function RegionScreen() {
               </TerminalText>
             </View>
             <TerminalText tone="muted" uppercase={false} variant="caption">
-              You will compete in {visibleRegion.label} and see rewards available
-              for this region.
+              You will compete in {competitionRegion.label} and see rewards
+              available for this region.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
 
-        {!approvedRegionReady || isProfileSource ? (
-          <CyberButtonPrimary
-            disabled={
-              !candidateRegion ||
-              !deviceCoordinates ||
-              createRegionVerification.isPending ||
-              regionPolicies.isLoading
+        {approvedRegionReady && !isProfileSource ? (
+          <CyberButtonOutline
+            disabled={verificationState === 'checking'}
+            label={
+              verificationState === 'checking'
+                ? 'REVERIFYING REGION...'
+                : 'REVERIFY WITH MY LOCATION ->'
             }
-            label={createRegionVerification.isPending
-              ? 'SAVING REGION...'
-              : isProfileSource
-                ? 'SAVE VERIFIED REGION ->'
-                : 'CONFIRM REGION ->'}
-            onPress={() => void continueWithVerifiedRegion()}
-            style={styles.continueAction}
+            onPress={() => void checkDeviceLocation()}
           />
-        ) : null}
-        {!approvedRegionReady && !candidateRegion && verificationState === 'idle' ? (
-          <TerminalText style={styles.continueHelper} tone="dim" uppercase={false} variant="caption">
-            Confirm Region unlocks after your location is found.
-          </TerminalText>
         ) : null}
 
         {approvedRegionReady && !isProfileSource ? (
@@ -302,6 +261,24 @@ export default function RegionScreen() {
       </ScreenScrollView>
     </ScreenContainer>
   );
+}
+
+function getApiErrorCode(error: unknown) {
+  if (
+    !(error instanceof ApiError) ||
+    !error.body ||
+    typeof error.body !== 'object'
+  ) {
+    return null;
+  }
+  const body = error.body as {
+    code?: unknown;
+    error?: { code?: unknown };
+  };
+  if (typeof body.code === 'string') {
+    return body.code;
+  }
+  return typeof body.error?.code === 'string' ? body.error.code : null;
 }
 
 const styles = StyleSheet.create({
@@ -345,12 +322,5 @@ const styles = StyleSheet.create({
   resultCopy: {
     flex: 1,
     gap: spacing.xs
-  },
-  continueAction: {
-    marginTop: spacing.sm
-  },
-  continueHelper: {
-    paddingHorizontal: spacing.md,
-    textAlign: 'center'
   }
 });

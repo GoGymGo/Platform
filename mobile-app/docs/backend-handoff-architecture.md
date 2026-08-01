@@ -80,7 +80,7 @@ There is no local data source that can imitate production records.
 | Legal documents and receipts | `data/accountReadinessRepository.ts` | `/v1/legal-documents/current`, `/v1/me/legal-receipts*` | Connected; exact current bundle is displayed and receipted during registration |
 | Region eligibility | `data/accountReadinessRepository.ts` plus `state/competitionRegion.tsx` | `/v1/regions`, `/v1/me/region-verifications*` | Connected; pending reviews cannot be presented as approved |
 | Competition enrollment | `hooks/useCompetitionRegistration.ts` | `/v1/competitions/current*`, enrollment command | Connected; confirmation requires legal receipt and approved region evidence |
-| Verified workout session | `data/sessionRepository.ts`, `state/workoutProgress.tsx` | `/v1/sessions*` | Connected for create, throttled heart-rate/QR evidence, completion, pending/rejected review states, and cancellation |
+| Verified workout session | `data/sessionRepository.ts`, `state/workoutProgress.tsx` | `/v1/sessions*` | Connected; create returns the authoritative duration/evidence rule snapshot used by the timer and completion guards, followed by throttled heart-rate/QR evidence, completion, pending/rejected review states, and cancellation |
 | Competition reminders | notification and push-registration services | `/v1/me/push-devices*` | Connected; local schedules and the authenticated Expo push device are enabled/disabled together |
 | Privacy export/deletion | `data/accountSettingsRepository.ts`, `/account-data` | `/v1/me/privacy-requests*` | Connected with request history, guarded deletion, and short-lived export download actions |
 

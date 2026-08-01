@@ -12,8 +12,10 @@ import {
 import { CompactTextButton } from '@/components/onboarding';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
@@ -32,15 +34,15 @@ type VerificationOption = {
 
 const verificationOptions: readonly VerificationOption[] = [
   {
-    available: true,
-    body: 'Use your linked watch, strap, or heart-rate source.',
+    available: heartRateTelemetryAvailable,
+    body: 'Available after an approved heart-rate telemetry provider is connected.',
     method: 'heartRate',
     route: '/workout/check-in',
     title: 'HEART-RATE DEVICE'
   },
   {
     available: verifiedPartnerGymCatalogAvailable,
-    body: 'No verified partner gyms are published yet. Use a heart-rate device for now.',
+    body: 'Available after verified partner gyms and signed QR credentials are published.',
     method: 'partnerGymQr',
     route: '/qr-scanner',
     title: 'PARTNER GYM QR'
@@ -49,6 +51,7 @@ const verificationOptions: readonly VerificationOption[] = [
 
 export default function WorkoutMethodScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { user } = useAuth();
   const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('heartRate');
@@ -104,57 +107,60 @@ export default function WorkoutMethodScreen() {
         </View>
 
         <View style={styles.optionList}>
-          {orderedOptions.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !option.available }}
-              disabled={!option.available}
-              key={option.title}
-              onPress={() => void chooseMethod(option)}
-              style={({ pressed }) => [
-                styles.pressable,
-                !option.available ? styles.unavailable : null,
-                pressed ? styles.pressed : null
-              ]}
-            >
-              <HUDBorderBox
-                glow={option.available}
-                style={styles.optionCard}
-                tone={option.available ? 'cyan' : 'muted'}
+          {orderedOptions.map((option) => {
+            const available = option.available || appTourActive;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !available }}
+                disabled={!available}
+                key={option.title}
+                onPress={() => void chooseMethod({ ...option, available })}
+                style={({ pressed }) => [
+                  styles.pressable,
+                  !available ? styles.unavailable : null,
+                  pressed ? styles.pressed : null
+                ]}
               >
-                <View style={styles.optionCopy}>
-                  {option.method === preferredMethod ? (
-                    <TerminalText glow tone="green" variant="micro">
-                      YOUR DEFAULT // {preferredSourceLabel}
-                    </TerminalText>
-                  ) : null}
-                  <TerminalText
-                    glow={option.available}
-                    style={styles.optionTitle}
-                    tone={option.available ? 'cyan' : 'dim'}
-                    variant="body"
-                  >
-                    {option.title}
-                  </TerminalText>
-                  {!option.available ? (
-                    <TerminalText tone="dim" variant="micro">
-                      NOT AVAILABLE
-                    </TerminalText>
-                  ) : null}
-                  <TerminalText style={styles.optionBody} tone="muted" variant="body">
-                    {option.body}
-                  </TerminalText>
-                </View>
-                <TerminalText
-                  glow={option.available}
-                  tone={option.available ? 'cyan' : 'dim'}
-                  variant="button"
+                <HUDBorderBox
+                  glow={available}
+                  style={styles.optionCard}
+                  tone={available ? 'cyan' : 'muted'}
                 >
-                  {option.available ? '->' : 'Unavailable'}
-                </TerminalText>
-              </HUDBorderBox>
-            </Pressable>
-          ))}
+                  <View style={styles.optionCopy}>
+                    {option.method === preferredMethod ? (
+                      <TerminalText glow tone="green" variant="micro">
+                        {`${available ? 'YOUR DEFAULT' : 'SAVED PREFERENCE'} // ${preferredSourceLabel}`}
+                      </TerminalText>
+                    ) : null}
+                    <TerminalText
+                      glow={available}
+                      style={styles.optionTitle}
+                      tone={available ? 'cyan' : 'dim'}
+                      variant="body"
+                    >
+                      {option.title}
+                    </TerminalText>
+                    {!available ? (
+                      <TerminalText tone="dim" variant="micro">
+                        NOT AVAILABLE
+                      </TerminalText>
+                    ) : null}
+                    <TerminalText style={styles.optionBody} tone="muted" variant="body">
+                      {option.body}
+                    </TerminalText>
+                  </View>
+                  <TerminalText
+                    glow={available}
+                    tone={available ? 'cyan' : 'dim'}
+                    variant="button"
+                  >
+                    {available ? '->' : 'Unavailable'}
+                  </TerminalText>
+                </HUDBorderBox>
+              </Pressable>
+            );
+          })}
         </View>
 
         <CompactTextButton

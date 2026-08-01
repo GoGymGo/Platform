@@ -24,6 +24,7 @@ import {
   SessionCompletionResponseDto,
   SessionEventResponseDto,
   SessionResponseDto,
+  StartedSessionResponseDto,
 } from './dto/session.dto';
 import { SessionsService } from './sessions.service';
 
@@ -38,12 +39,12 @@ export class SessionsController {
   @ApiOperation({
     summary: 'Start an authoritative competition workout session',
   })
-  @ApiCreatedResponse({ type: SessionResponseDto })
+  @ApiCreatedResponse({ type: StartedSessionResponseDto })
   create(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() request: CreateSessionDto,
-  ): Promise<SessionResponseDto> {
+  ): Promise<StartedSessionResponseDto> {
     return this.sessions.create(
       principal,
       requireIdempotencyKey(idempotencyKey),

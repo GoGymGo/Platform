@@ -89,7 +89,6 @@ export function up(pgm: MigrationBuilder): void {
     language_codes: { type: 'text[]', notNull: true },
     minimum_age: { type: 'smallint', notNull: true },
     competition_enabled: { type: 'boolean', notNull: true, default: false },
-    payout_enabled: { type: 'boolean', notNull: true, default: false },
     boundary_version: { type: 'varchar(64)', notNull: true },
     policy_version: { type: 'varchar(64)', notNull: true },
     boundary: { type: 'geography(MultiPolygon,4326)' },

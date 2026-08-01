@@ -11,13 +11,18 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableError } from '@/components/reliability';
+import {
+  creatorFeaturePausedMessage,
+  creatorFeatureStatusLabel,
+  creatorFeaturesEnabled
+} from '@/config/features';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
 import type { CreatorWorkout } from '@/domain/creatorWorkouts';
 import { getCreatorWorkoutsReturnTarget } from '@/navigation/creatorWorkouts';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 
 export default function WorkoutsScreen() {
   const router = useRouter();
@@ -26,14 +31,64 @@ export default function WorkoutsScreen() {
     plannedDate?: string;
     source?: string;
   }>();
-  const { campaign } = useSponsorCampaign();
-  const sponsorConfirmed = campaign.status === 'approved';
-  const creatorWorkoutsQuery = useCreatorWorkouts();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
+  const creatorWorkoutsQuery = useCreatorWorkouts(
+    regionVerification?.regionCode ?? ''
+  );
   const {
     data: creatorWorkouts = [],
     isPending: creatorWorkoutsPending
   } = creatorWorkoutsQuery;
   const returnTarget = getCreatorWorkoutsReturnTarget(source);
+
+  if (!creatorFeaturesEnabled) {
+    return (
+      <ScreenContainer>
+        <ScreenScrollView
+          bounces={false}
+          contentContainerStyle={styles.content}
+          memoryKey="creator-workouts"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <TerminalText glow tone="cyan" variant="label">
+              FOLLOW ALONG // {competitionRegion.label}
+            </TerminalText>
+            <TerminalText glow style={styles.title} tone="cyan" variant="title">
+              CREATOR WORKOUTS
+            </TerminalText>
+          </View>
+          <HUDBorderBox glow style={styles.infoNote} tone="amber">
+            <TerminalText glow style={styles.infoMark} tone="amber" variant="label">
+              {creatorFeatureStatusLabel}
+            </TerminalText>
+            <TerminalText style={styles.infoCopy} tone="muted" uppercase={false} variant="body">
+              {creatorFeaturePausedMessage}
+            </TerminalText>
+          </HUDBorderBox>
+          <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
+            <TerminalText glow tone="pink" variant="label">
+              CREATOR STUDIO
+            </TerminalText>
+            <TerminalText style={styles.creatorSubmitCopy} tone="muted" uppercase={false} variant="body">
+              Creator Studio is not available in this release.
+            </TerminalText>
+            <CyberButtonPrimary
+              disabled
+              label="CREATOR STUDIO UNAVAILABLE"
+              onPress={() => undefined}
+              tone="pink"
+            />
+          </HUDBorderBox>
+          <CyberButtonOutline
+            label={returnTarget.label}
+            onPress={() => router.replace(returnTarget.href)}
+            style={styles.backButton}
+          />
+        </ScreenScrollView>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
@@ -45,7 +100,7 @@ export default function WorkoutsScreen() {
       >
         <View style={styles.header}>
           <TerminalText glow tone="cyan" variant="label">
-            FOLLOW ALONG // {campaign.region}
+            FOLLOW ALONG // {competitionRegion.label}
           </TerminalText>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             CREATOR WORKOUTS
@@ -84,37 +139,14 @@ export default function WorkoutsScreen() {
           {!creatorWorkoutsQuery.isError && !creatorWorkoutsPending && creatorWorkouts.length === 0 ? (
             <HUDBorderBox style={styles.emptyCard} tone="muted">
               <TerminalText glow tone="amber" variant="label">
-                CREATOR WORKOUTS COMING SOON
+                NO WORKOUTS PUBLISHED
               </TerminalText>
               <TerminalText style={styles.emptyCopy} tone="muted" variant="body">
-                FEATURED REGIONAL WORKOUTS WILL APPEAR AFTER THE CREATOR CATALOG IS CONNECTED.
+                NO CREATOR WORKOUTS HAVE BEEN PUBLISHED FOR THIS REGION YET.
               </TerminalText>
             </HUDBorderBox>
           ) : null}
         </View>
-
-        <HUDBorderBox style={styles.sponsorCard} tone="muted">
-          <View style={[styles.sponsorCardMark, !sponsorConfirmed && styles.sponsorCardMarkPending]}>
-            <TerminalText accessibilityRole="text" glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
-              {campaign.sponsor.mark}
-            </TerminalText>
-          </View>
-          <View style={styles.sponsorCardCopy}>
-            <TerminalText tone="dim" variant="micro">
-              CREATOR PROGRAM
-            </TerminalText>
-            <TerminalText style={styles.sponsorCardTitle} tone="text" variant="body">
-              {sponsorConfirmed
-                ? 'SPONSORED CREATOR FEATURE'
-                : 'REGIONAL CREATOR CAMPAIGN'}
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              {sponsorConfirmed
-                ? `Sponsor funding supports the selected ${campaign.region} workout leader.`
-                : 'Creator feature details are published with the regional campaign.'}
-            </TerminalText>
-          </View>
-        </HUDBorderBox>
 
         <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
           <TerminalText glow tone="pink" variant="label">
@@ -148,14 +180,11 @@ function WorkoutCard({
   workout: CreatorWorkout;
 }) {
   const router = useRouter();
-  const badgeTone = workout.joined ? 'cyan' : 'muted';
 
   return (
     <Pressable
-      accessibilityLabel={`${workout.name} by ${workout.creatorName}. ${workout.durationMinutes} minute ${workout.workoutStyle} workout. ${workout.joined ? 'Open workout' : 'Coming soon'}.`}
+      accessibilityLabel={`${workout.name} by ${workout.creatorName}. ${workout.durationMinutes} minute ${workout.workoutStyle} workout. Open workout.`}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !workout.joined }}
-      disabled={!workout.joined}
       onPress={() => router.push(
         (plannedDate
           ? `/workouts/${workout.id}?plannedDate=${plannedDate}`
@@ -163,34 +192,31 @@ function WorkoutCard({
       )}
       style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
     >
-      <HUDBorderBox glow={workout.joined} style={styles.workoutCard} tone={workout.joined ? 'cyan' : 'muted'}>
-        <View style={[
-          styles.workoutPreview,
-          workout.joined ? styles.workoutPreviewActive : styles.workoutPreviewLocked
-        ]}>
+      <HUDBorderBox glow style={styles.workoutCard} tone="cyan">
+        <View style={[styles.workoutPreview, styles.workoutPreviewActive]}>
           <View style={styles.badgeRow}>
             <HUDBorderBox style={styles.creatorBadge} tone="cyan">
               <TerminalText glow tone="cyan" variant="micro">
                 CREATOR
               </TerminalText>
             </HUDBorderBox>
-            <HUDBorderBox style={styles.joinedBadge} tone={badgeTone}>
-              <TerminalText glow={workout.joined} tone={workout.joined ? 'cyan' : 'muted'} variant="micro">
-                {workout.joined ? 'FEATURED' : 'COMING SOON'}
+            <HUDBorderBox style={styles.featuredBadge} tone="cyan">
+              <TerminalText glow tone="cyan" variant="micro">
+                FEATURED
               </TerminalText>
             </HUDBorderBox>
           </View>
-          <View style={[styles.playCircle, !workout.joined ? styles.playCircleLocked : null]}>
+          <View style={styles.playCircle}>
             <Ionicons
-              color={workout.joined ? colors.cyan : colors.muted}
-              name={workout.joined ? 'play' : 'lock-closed'}
+              color={colors.cyan}
+              name="play"
               size={21}
             />
           </View>
           <TerminalText
-            glow={workout.joined}
+            glow
             style={styles.previewStyle}
-            tone={workout.joined ? 'cyan' : 'muted'}
+            tone="cyan"
             variant="micro"
           >
             {workout.workoutStyle}
@@ -256,14 +282,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fontFamilies.body
   },
-  sponsorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 15
-  },
   creatorSubmitCard: {
     gap: spacing.md,
     marginTop: spacing.lg,
@@ -271,27 +289,6 @@ const styles = StyleSheet.create({
   },
   creatorSubmitCopy: {
     fontFamily: fontFamilies.body
-  },
-  sponsorCardMark: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  sponsorCardMarkPending: {
-    borderColor: colors.borderCyanSubtle,
-    backgroundColor: colors.surfaceCyanFaint
-  },
-  sponsorCardCopy: {
-    flex: 1
-  },
-  sponsorCardTitle: {
-    marginVertical: spacing.xs,
-    fontFamily: fontFamilies.display
   },
   workoutList: {
     gap: 13
@@ -312,9 +309,6 @@ const styles = StyleSheet.create({
   workoutPreviewActive: {
     backgroundColor: colors.surfaceCyanSubtle
   },
-  workoutPreviewLocked: {
-    backgroundColor: colors.panelSoft
-  },
   badgeRow: {
     width: '100%',
     flexDirection: 'row',
@@ -328,7 +322,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: 6
   },
-  joinedBadge: {
+  featuredBadge: {
     width: 'auto',
     paddingVertical: spacing.xs,
     paddingHorizontal: 9,
@@ -344,11 +338,6 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     backgroundColor: colors.surfaceCyanProgress,
     ...cyberGlow.cyan
-  },
-  playCircleLocked: {
-    borderColor: colors.borderMuted,
-    backgroundColor: colors.panelSoft,
-    boxShadow: 'none'
   },
   previewStyle: {
     marginTop: spacing.sm,

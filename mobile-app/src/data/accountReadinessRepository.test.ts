@@ -86,8 +86,7 @@ describe('account readiness repository', () => {
     await account.createRegionVerification({
       latitude: 49.2827,
       longitude: -123.1207,
-      method: 'device_location',
-      regionPolicyId: '30000000-0000-4000-8000-000000000001'
+      method: 'device_location'
     });
     await account.enrollInCompetition(
       '40000000-0000-4000-8000-000000000001',
@@ -99,27 +98,54 @@ describe('account readiness repository', () => {
         rulesAccepted: true
       }
     );
+    await account.getCurrentCompetition('2026-08', 'vancouver-bc');
+    await account.getCurrentCompetition(undefined, 'vancouver-bc');
+    await account.getCurrentRegionVerification();
+    await account.getCurrentRegionVerification('vancouver-bc');
 
     assert.deepEqual(requests.map(({ method, path }) => ({ method, path })), [
       { method: 'POST', path: '/v1/me/region-verifications' },
       {
         method: 'POST',
         path: '/v1/competitions/40000000-0000-4000-8000-000000000001/enrollments'
+      },
+      {
+        method: undefined,
+        path: '/v1/competitions/current?monthKey=2026-08&region=vancouver-bc'
+      },
+      {
+        method: undefined,
+        path: '/v1/competitions/current?region=vancouver-bc'
+      },
+      {
+        method: undefined,
+        path: '/v1/me/region-verifications/current'
+      },
+      {
+        method: undefined,
+        path: '/v1/me/region-verifications/current?regionCode=vancouver-bc'
       }
     ]);
+    assert.deepEqual(requests[0].body, {
+      latitude: 49.2827,
+      longitude: -123.1207,
+      method: 'device_location'
+    });
   });
 
   it('does not fabricate account readiness when the API is unavailable', async () => {
     const account = createAccountReadinessRepository('unavailable', null);
     const documents = await account.getCurrentLegalDocuments();
-    const policies = await account.listRegionPolicies();
-    const competition = await account.getCurrentCompetition('2026-08', 'VANCOUVER');
+    const competition = await account.getCurrentCompetition(
+      '2026-08',
+      'vancouver-bc'
+    );
 
     assert.equal(documents.configured, false);
     assert.deepEqual(documents.documents, []);
-    assert.deepEqual(policies, []);
     assert.equal(competition, null);
     assert.equal(await account.getCurrentEnrollment(), null);
+    assert.equal(await account.getCurrentRegionVerification(), null);
     await assert.rejects(
       () => account.recordLegalReceipt(documents),
       /not configured/i

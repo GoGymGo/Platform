@@ -17,9 +17,17 @@ services:
 
   migrate:
     build: .
-    command: ['npm', 'run', 'migrate:deploy']
+    command:
+      [
+        'node',
+        'node_modules/node-pg-migrate/bin/node-pg-migrate.js',
+        'up',
+        '--migrations-dir',
+        'dist/migrations',
+        '--database-url-var',
+        'DATABASE_URL',
+      ]
     environment: &runtime_environment
-      AUTH_MODE: test
       DATABASE_URL: postgresql://gogymgo:gogymgo@database:5432/gogymgo
       PRETTY_LOGS_ENABLED: 'false'
       NODE_ENV: development
@@ -39,7 +47,7 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - '3000:3000'
+      - '${GOGYMGO_API_HOST_PORT:-3000}:3000'
 
   worker:
     build: .

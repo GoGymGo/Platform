@@ -25,7 +25,8 @@ import type { CategoryLeaderboard } from '@/domain/leaderboard';
 import type { RewardAward } from '@/domain/rewards';
 import type {
   AuthoritativeWorkoutSession,
-  CompetitionProgress
+  CompetitionProgress,
+  StartedWorkoutSession
 } from '@/domain/session';
 import type {
   CreateSocialChallengeInput,
@@ -33,6 +34,7 @@ import type {
   SocialChallenge,
   SocialProfile
 } from '@/domain/social';
+import type { AccountProfile, PublicIdentity } from '@/domain/profile';
 import type { PersistedActiveWorkoutSession } from '@/domain/workoutProgress';
 import type { AuthenticatedUser } from '@/state/auth';
 import type { AppTourScenario } from '@/state/appTour';
@@ -43,6 +45,19 @@ const appTourRegionPolicyId = '10000000-0000-4000-8000-000000000003';
 const appTourRegionVerificationId = '10000000-0000-4000-8000-000000000004';
 const appTourLegalBundleId = '10000000-0000-4000-8000-000000000005';
 const appTourUserId = 'app-tour-player';
+export const appTourAuthToken = 'app-tour-token';
+export const appTourCompetitionRegistrationEvidence = {
+  legalReceiptBundleId: 'app-tour-legal-receipt',
+  regionVerificationId: 'app-tour-region-verification'
+} as const;
+export const appTourPresenceConfirmationMessage =
+  'Presence confirmed in the browser preview.';
+export const appTourPublicIdentity: PublicIdentity = {
+  callsign: 'PULSE_RIDER',
+  displayName: 'PULSE_RIDER',
+  mode: 'alias'
+};
+export const appTourSimulatedHeartRateBpm = 118;
 const fixedStreaks = {
   daily: 4,
   monthly: 2,
@@ -51,13 +66,26 @@ const fixedStreaks = {
 } as const;
 
 export const appTourUser: AuthenticatedUser = {
-  displayName: 'App Tour Player',
-  email: 'app-tour@gogymgo.local',
+  displayName: 'Preview Player',
+  email: 'preview.player@example.com',
   emailVerified: true,
   photoUrl: null,
-  providerIds: ['app-tour'],
+  providerIds: ['password'],
   uid: appTourUserId
 };
+
+export type AppTourQrMode = 'entry' | 'exit';
+
+export function createAppTourGymQrPayload(mode: AppTourQrMode) {
+  return `gogymgo:gym:${mode}:app-tour`;
+}
+
+export function isAppTourGymQrPayload(
+  payload: string,
+  mode: AppTourQrMode
+) {
+  return payload === createAppTourGymQrPayload(mode);
+}
 
 export function createAppTourDataSource(): AppDataSource {
   const awards: RewardAward[] = [
@@ -68,7 +96,7 @@ export function createAppTourDataSource(): AppDataSource {
       id: 'app-tour-award',
       imageUrl: null,
       rewardType: 'coupon',
-      sponsorName: 'Tour Partner',
+      sponsorName: 'Northline Wellness',
       status: 'awarded',
       title: 'Recovery Pack'
     }
@@ -81,8 +109,8 @@ export function createAppTourDataSource(): AppDataSource {
         ...award,
         claimedAt: nowIso(),
         claimUrl: null,
-        couponCode: 'APP-TOUR',
-        fulfillmentInstructions: 'Testing mode claim completed.',
+        couponCode: 'RECOVER20',
+        fulfillmentInstructions: 'Use this sample code during the browser preview.',
         status: 'claimed' as const
       };
       awards.splice(0, awards.length, claimed);
@@ -97,11 +125,10 @@ export function createAppTourDataSource(): AppDataSource {
         creatorName: 'GoGymGo Coach',
         durationMinutes: 30,
         id: 'app-tour-workout',
-        joined: true,
         name: 'Full Body Circuit',
-        regionCodes: ['CA-ON-TORONTO'],
+        regionCodes: ['toronto-on'],
         reward: 'Completion badge',
-        sponsorName: 'Tour Partner',
+        sponsorName: 'Northline Wellness',
         thumbnailUrl: null,
         timing: 'ON DEMAND',
         videoUrl: 'https://example.invalid/app-tour-workout',
@@ -134,16 +161,16 @@ export function createAppTourDataSource(): AppDataSource {
       {
         competitionId: appTourCompetitionId,
         competitionName: 'Monthly GoGymGo Competition',
-        description: 'A testing-mode reward used only inside App Tour.',
+        description: 'A recovery-focused coupon reward for active GoGymGo players.',
         id: 'app-tour-reward',
         imageUrl: null,
         inventoryRemaining: 12,
         inventoryTotal: 20,
         monthKey,
-        regionCode: 'CA-ON-TORONTO',
+        regionCode: 'toronto-on',
         regionName: region,
         rewardType: 'coupon',
-        sponsorName: 'Tour Partner',
+        sponsorName: 'Northline Wellness',
         termsUrl: null,
         title: 'Recovery Pack'
       }
@@ -154,7 +181,7 @@ export function createAppTourDataSource(): AppDataSource {
         awardRank: 1,
         rewardTitle: 'Recovery Pack',
         rewardType: 'coupon',
-        sponsorName: 'Tour Partner',
+        sponsorName: 'Northline Wellness',
         streaks: fixedStreaks
       },
       {
@@ -162,7 +189,7 @@ export function createAppTourDataSource(): AppDataSource {
         awardRank: 2,
         rewardTitle: 'Training Credit',
         rewardType: 'coupon',
-        sponsorName: 'Tour Partner',
+        sponsorName: 'Northline Wellness',
         streaks: { ...fixedStreaks, daily: 3 }
       }
     ],
@@ -205,17 +232,26 @@ export function createAppTourDataSource(): AppDataSource {
   };
 }
 
-export function createAppTourAccountReadinessRepository():
+export function createAppTourAccountReadinessRepository(
+  scenario: AppTourScenario = 'ready'
+):
 AccountReadinessRepository {
-  let enrollment: CompetitionEnrollment = {
-    competitionId: appTourCompetitionId,
-    enrolledAt: nowIso(),
-    goalDays: 4,
-    id: appTourEnrollmentId,
-    status: 'active'
-  };
-  let regionVerification = createRegionVerification();
-  let legalReceipt = createLegalReceipt();
+  const newPlayer = scenario === 'new-player';
+  let enrollment: CompetitionEnrollment | null = newPlayer
+    ? null
+    : {
+        competitionId: appTourCompetitionId,
+        enrolledAt: nowIso(),
+        goalDays: 4,
+        id: appTourEnrollmentId,
+        status: 'active'
+      };
+  let legalReceipt = newPlayer
+    ? createUnacceptedLegalReceipt()
+    : createLegalReceipt();
+  let regionVerification: RegionVerification | null = newPlayer
+    ? null
+    : createRegionVerification();
 
   return {
     createRegionVerification: async () => {
@@ -232,35 +268,17 @@ AccountReadinessRepository {
       };
       return enrollment;
     },
-    getCurrentCompetition: async (expectedMonthKey, regionLabel) =>
-      createCurrentCompetition(expectedMonthKey, regionLabel),
+    getCurrentCompetition: async (expectedMonthKey) =>
+      createCurrentCompetition(expectedMonthKey ?? nowIso().slice(0, 7), 'TORONTO'),
     getCurrentEnrollment: async () => enrollment,
+    getCurrentRegionVerification: async () => regionVerification,
     getCurrentLegalDocuments: async (jurisdictionCode = 'GLOBAL', locale = 'en') =>
       createLegalBundle(jurisdictionCode, locale),
-    getCurrentRegionVerification: async () => regionVerification,
     getLegalReceiptStatus: async (jurisdictionCode = 'GLOBAL', locale = 'en') => ({
       ...legalReceipt,
       jurisdictionCode,
       locale
     }),
-    listRegionPolicies: async () => [
-      {
-        boundaryVersion: 'app-tour',
-        code: 'CA-ON-TORONTO',
-        competitionEnabled: true,
-        countryCode: 'CA',
-        currency: 'CAD',
-        id: appTourRegionPolicyId,
-        languageCodes: ['en'],
-        metroName: 'TORONTO',
-        minimumAge: 18,
-        policyVersion: 'app-tour',
-        subdivisionCode: 'ON',
-        timezone: 'America/Toronto',
-        validFrom: '2026-01-01T00:00:00.000Z',
-        validTo: null
-      }
-    ],
     recordLegalReceipt: async (bundle) => {
       legalReceipt = {
         ...bundle,
@@ -277,6 +295,12 @@ export function createAppTourAccountSettingsRepository():
 AccountSettingsRepository {
   let accepted = true;
   let avatar: AvatarMedia | null = null;
+  let accountProfile: AccountProfile = {
+    callsign: appTourPublicIdentity.callsign,
+    publicIdentityMode: appTourPublicIdentity.mode,
+    publicName: appTourPublicIdentity.displayName,
+    screenName: appTourPublicIdentity.displayName
+  };
 
   const consent = (): DevicePresenceConsent => ({
     accepted,
@@ -301,6 +325,7 @@ AccountSettingsRepository {
     disablePushDevice: async () => undefined,
     getAvatar: async () => ({ active: avatar, latest: avatar }),
     getDevicePresenceConsent: async () => consent(),
+    getProfile: async () => accountProfile,
     getPrivacyDownload: async () => ({
       expiresAt: nowIso(),
       url: 'data:text/plain,GoGymGo%20App%20Tour%20export'
@@ -318,6 +343,13 @@ AccountSettingsRepository {
     setDevicePresenceConsent: async (nextAccepted, consentVersion) => {
       accepted = nextAccepted;
       return { ...consent(), consentVersion };
+    },
+    updateProfile: async (input) => {
+      accountProfile = {
+        ...accountProfile,
+        ...input
+      };
+      return accountProfile;
     },
     uploadAvatar: async (uri) => {
       avatar = {
@@ -343,6 +375,7 @@ WorkoutSessionRepository {
   return {
     appendGymQrScan: async () => undefined,
     appendHeartRateSample: async () => undefined,
+    appendPresenceCheck: async () => undefined,
     cancelSession: async (sessionId) => {
       const session = getOrCreateSession(sessions, sessionId);
       const cancelled = { ...session, status: 'cancelled' as const };
@@ -365,7 +398,16 @@ WorkoutSessionRepository {
       const id = `app-tour-session-${sessions.size + 1}`;
       const session = createAuthoritativeSession(id);
       sessions.set(id, session);
-      return session;
+      return {
+        ...session,
+        requirements: {
+          minHeartRateSamples: 0,
+          minSessionMinutes: 30,
+          requireDeviceAttestation: false,
+          requireGymQr: false,
+          requirePresenceCheck: true
+        }
+      } satisfies StartedWorkoutSession;
     },
     getCompetitionProgress: async () => createCompetitionProgress()
   };
@@ -373,7 +415,7 @@ WorkoutSessionRepository {
 
 export function createAppTourSocialRepository(): SocialRepository {
   let profile: SocialProfile = {
-    screenName: 'APP_TOUR_PLAYER',
+    screenName: 'PULSE_RIDER',
     streaks: fixedStreaks,
     userId: appTourUserId
   };
@@ -466,7 +508,7 @@ export function createAppTourActiveSession(
   scenario: AppTourScenario,
   verificationMethod: PersistedActiveWorkoutSession['verificationMethod'] = 'heartRate'
 ): PersistedActiveWorkoutSession | null {
-  if (scenario === 'ready') {
+  if (scenario === 'new-player' || scenario === 'ready') {
     return null;
   }
 
@@ -480,13 +522,18 @@ export function createAppTourActiveSession(
     averageHeartRateBpm,
     dateKey: todayKey(),
     heartRateObservedSeconds,
+    heartRateSamplesSubmitted: completionReady ? 60 : Math.floor(elapsedSeconds / 30),
     heartRateTotalBpmSeconds: averageHeartRateBpm * heartRateObservedSeconds,
     id: 'app-tour-active-session',
     lastHeartRateSampleElapsedSeconds: heartRateObservedSeconds,
+    minimumSessionSeconds: 30 * 60,
     midSessionCheckAtSeconds: 10 * 60,
     midSessionCheckPrompted: presenceCheck,
     midSessionCheckPromptedAt: presenceCheck ? nowIso() : null,
     midSessionVerified: completionReady,
+    policyVersion: 'app-tour',
+    presenceCheckRequired: true,
+    requiredHeartRateSamples: 0,
     serverManaged: true,
     startedAt: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
     verificationMethod
@@ -507,23 +554,29 @@ function createCurrentCompetition(
 
   return {
     endsAt: end,
+    entrantCap: null,
     goalDays: [1, 2, 3, 4, 5, 6, 7],
     id: appTourCompetitionId,
+    minimumEntrants: 100,
     monthKey,
     name: `${regionName} Monthly Competition`,
-    regionCode: 'CA-ON-TORONTO',
+    regionCode: 'toronto-on',
     regionName,
     registrationClosesAt: end,
     registrationOpensAt: start,
     rules: {
+      categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
       minHeartRateSamples: 0,
       minSessionMinutes: 30,
+      perfectMonthMultiplier: 10,
       requireDeviceAttestation: false,
-      requireFaceCheck: false,
+      requirePresenceCheck: true,
       requireGymQr: false,
       signupPrizeDrawEntries: 1,
       verifiedSessionCategoryScore: 1,
-      verifiedSessionPrizeDrawEntries: 1
+      verifiedSessionPrizeDrawEntries: 1,
+      weeklyChallengeBothHitMultiplier: 2,
+      weeklyChallengeRecoveryMultiplier: 3
     },
     rulesVersion: 'app-tour',
     startsAt: start,
@@ -534,15 +587,17 @@ function createCurrentCompetition(
 function createRegionVerification(): RegionVerification {
   return {
     createdAt: nowIso(),
-    expiresAt: null,
+    expiresAt: '2099-01-01T00:00:00.000Z',
     id: appTourRegionVerificationId,
+    jurisdictionCode: 'CA-ON',
     method: 'device_location',
     policyVersion: 'app-tour',
-    regionCode: 'CA-ON-TORONTO',
+    regionCode: 'toronto-on',
     regionName: 'TORONTO',
     regionPolicyId: appTourRegionPolicyId,
     reviewedAt: nowIso(),
-    status: 'approved'
+    status: 'approved',
+    timezone: 'America/Toronto'
   };
 }
 
@@ -556,16 +611,16 @@ function createLegalBundle(
     documents: [
       {
         content: {
-          intro: 'This document is displayed only inside the development App Tour.',
+          intro: 'This sample notice explains how the browser preview behaves.',
           sections: [
             {
-              body: 'No acceptance from App Tour is sent to the GoGymGo backend.',
-              heading: 'Testing mode'
+              body: 'Preview agreements stay in this browser and do not create real competition entries.',
+              heading: 'Browser preview'
             }
           ]
         },
         contentSha256: 'app-tour-privacy',
-        documentKey: 'privacy-policy',
+        documentKey: 'privacy_policy',
         effectiveAt: '2026-01-01T00:00:00.000Z',
         id: 'app-tour-privacy',
         jurisdictionCode,
@@ -576,16 +631,16 @@ function createLegalBundle(
       },
       {
         content: {
-          intro: 'This document is displayed only inside the development App Tour.',
+          intro: 'These sample terms support the browser preview experience.',
           sections: [
             {
-              body: 'Testing-mode actions are local and are not real competition entries.',
-              heading: 'Testing mode'
+              body: 'Preview actions are local and are not real competition entries.',
+              heading: 'Browser preview'
             }
           ]
         },
         contentSha256: 'app-tour-terms',
-        documentKey: 'terms-of-service',
+        documentKey: 'terms_of_service',
         effectiveAt: '2026-01-01T00:00:00.000Z',
         id: 'app-tour-terms',
         jurisdictionCode,
@@ -606,6 +661,15 @@ function createLegalReceipt(): LegalReceiptStatus {
     acceptedAt: nowIso(),
     complete: true,
     receiptBundleId: appTourLegalBundleId
+  };
+}
+
+function createUnacceptedLegalReceipt(): LegalReceiptStatus {
+  return {
+    ...createLegalBundle(),
+    acceptedAt: null,
+    complete: false,
+    receiptBundleId: null
   };
 }
 
@@ -672,7 +736,7 @@ function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
         verifiedDays: 18
       },
       {
-        alias: 'APP_TOUR_PLAYER',
+        alias: 'PULSE_RIDER',
         categoryEntries: 72,
         rank: 2,
         streaks: { ...fixedStreaks, daily: 4 },
@@ -747,7 +811,7 @@ function createSocialChallenge(
     activityLabel: input?.activityLabel ?? 'Gym visits',
     challengeType: input?.challengeType ?? 'friend',
     createdAt: nowIso(),
-    description: input?.description ?? 'A local App Tour challenge.',
+    description: input?.description ?? 'A local four-visit fitness challenge.',
     endDate: input?.endDate ?? month.end.slice(0, 10),
     id: `app-tour-challenge-${Date.now()}`,
     locationName: input?.locationName ?? null,
@@ -760,7 +824,7 @@ function createSocialChallenge(
           targetTotal: targetCount
         },
         role: 'owner',
-        screenName: 'APP_TOUR_PLAYER',
+        screenName: 'PULSE_RIDER',
         status: 'accepted',
         streaks: fixedStreaks,
         userId: appTourUserId
@@ -774,12 +838,12 @@ function createSocialChallenge(
     myRole: 'owner',
     myStatus: 'accepted',
     name: input?.name ?? 'Four Visit Challenge',
-    ownerScreenName: 'APP_TOUR_PLAYER',
+    ownerScreenName: 'PULSE_RIDER',
     ownerStreaks: fixedStreaks,
     ownerUserId: appTourUserId,
     participantCount: 1,
     participantLimit: input?.participantLimit ?? null,
-    regionCode: input?.regionCode ?? 'CA-ON-TORONTO',
+    regionCode: input?.regionCode ?? 'toronto-on',
     regionName: 'TORONTO',
     scheduledDays: input?.scheduledDays ?? [1, 3, 5],
     scheduledTime: input?.scheduledTime ?? '18:00',

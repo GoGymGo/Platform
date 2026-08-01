@@ -29,8 +29,14 @@ export type CompetitionMatchStatus =
 export type WorkoutSessionStatus =
   'active' | 'cancelled' | 'pending_review' | 'rejected' | 'verified';
 export type SessionEventType =
-  'device_attestation' | 'face_check' | 'gym_qr_scan' | 'heart_rate_sample';
+  | 'device_attestation'
+  | 'face_check'
+  | 'gym_qr_scan'
+  | 'heart_rate_sample'
+  | 'presence_check';
 export type LedgerReason =
+  | 'bonus_day'
+  | 'category_placement'
   | 'enrollment'
   | 'operator_adjustment'
   | 'perfect_month'
@@ -562,6 +568,8 @@ export interface NotificationDeliveriesTable {
   status: NotificationDeliveryStatus;
   attempt_count: number;
   last_error: string | null;
+  lease_expires_at: NullableTimestamp;
+  lease_token: string | null;
   scheduled_at: Timestamp;
   sent_at: NullableTimestamp;
   created_at: Timestamp;

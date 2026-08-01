@@ -21,12 +21,13 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { OperatorReasonDto } from './operator.dto';
+import { regionCodePattern } from '../../regions/region-code';
 
 export class CreateRegionPolicyDto extends OperatorReasonDto {
   @ApiProperty({ example: 'victoria-bc', maxLength: 64, type: String })
   @IsString()
   @Length(2, 64)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  @Matches(regionCodePattern)
   code!: string;
 
   @ApiProperty({ example: 'CA', type: String })
@@ -235,7 +236,7 @@ export class CreateCreatorWorkoutDto extends OperatorReasonDto {
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
   @ArrayUnique()
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { each: true })
+  @Matches(regionCodePattern, { each: true })
   regionCodes!: string[];
 }
 

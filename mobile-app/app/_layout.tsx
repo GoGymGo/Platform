@@ -17,10 +17,10 @@ import { ApiProvider } from '@/state/api';
 import { AppTourProvider, useAppTour } from '@/state/appTour';
 import { ProfileProvider, useProfile } from '@/state/profile';
 import { CompetitionRegionProvider } from '@/state/competitionRegion';
-import { SponsorCampaignProvider } from '@/state/sponsorCampaign';
 import { WorkoutProgressProvider, useWorkoutProgress } from '@/state/workoutProgress';
 import { useMidSessionNotificationNavigation } from '@/hooks/useMidSessionNotificationNavigation';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
+import { AppTourModeBanner } from '@/testing/AppTourModeBanner';
 
 const screenOptions = {
   headerShown: false,
@@ -78,10 +78,10 @@ export default function RootLayout() {
 }
 
 function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
-  const { active, scenario } = useAppTour();
+  const { active } = useAppTour();
 
   return (
-    <AuthProvider key={`${active ? 'tour' : 'app'}-${scenario}`}>
+    <AuthProvider key={active ? 'tour' : 'app'}>
       <AuthenticatedApp reduceMotion={reduceMotion} />
     </AuthProvider>
   );
@@ -98,9 +98,7 @@ function AuthenticatedApp({ reduceMotion }: { reduceMotion: boolean }) {
         <ProfileProvider>
           <CompetitionRegionProvider>
             <WorkoutProgressProvider>
-              <SponsorCampaignProvider>
-                <ReadyAppNavigation reduceMotion={reduceMotion} />
-              </SponsorCampaignProvider>
+              <ReadyAppNavigation reduceMotion={reduceMotion} />
             </WorkoutProgressProvider>
           </CompetitionRegionProvider>
         </ProfileProvider>
@@ -120,6 +118,7 @@ function ReadyAppNavigation({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <View style={styles.navigationRoot}>
       <StatusBar style="light" />
+      <AppTourModeBanner />
       <View style={styles.stackRoot}>
         <Stack
           initialRouteName="index"
@@ -130,6 +129,7 @@ function ReadyAppNavigation({ reduceMotion }: { reduceMotion: boolean }) {
         >
           <Stack.Screen name="index" />
           <Stack.Screen name="app-tour" />
+          <Stack.Screen name="test-preview" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(onboarding)" />
           <Stack.Screen name="(public)" />

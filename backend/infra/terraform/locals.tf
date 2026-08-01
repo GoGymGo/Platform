@@ -17,7 +17,6 @@ locals {
 
   common_environment = merge(
     {
-      AUTH_MODE                        = "firebase"
       CORS_ORIGINS                     = join(",", var.cors_origins)
       DATABASE_POOL_MAX                = "10"
       FIREBASE_PROJECT_ID              = var.project_id

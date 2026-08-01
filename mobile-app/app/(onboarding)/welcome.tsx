@@ -9,6 +9,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { GoGymGoWordmark } from '@/components/brandWordmark';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 
 type Accent = 'cyan';
@@ -59,32 +60,7 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.logoShell}>
-            <View style={styles.logoRow}>
-              <TerminalText
-                glow
-                style={[styles.logoWord, compactLogo ? styles.logoWordCompact : null]}
-                tone="cyan"
-                variant="display"
-              >
-                GO
-              </TerminalText>
-              <TerminalText
-                glow
-                style={[styles.logoWord, compactLogo ? styles.logoWordCompact : null]}
-                tone="pink"
-                variant="display"
-              >
-                GYM
-              </TerminalText>
-              <TerminalText
-                glow
-                style={[styles.logoWord, compactLogo ? styles.logoWordCompact : null]}
-                tone="cyan"
-                variant="display"
-              >
-                GO
-              </TerminalText>
-            </View>
+            <GoGymGoWordmark compact={compactLogo} />
           </View>
 
           <TerminalText style={styles.valueProp} tone="text" uppercase={false} variant="body">
@@ -188,22 +164,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.xs,
     marginBottom: spacing.lg
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  logoWord: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.logo,
-    lineHeight: 58,
-    letterSpacing: 1.2
-  },
-  logoWordCompact: {
-    fontSize: 40,
-    lineHeight: 48,
-    letterSpacing: 0.7
   },
   valueProp: {
     maxWidth: 350,

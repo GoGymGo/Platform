@@ -34,7 +34,10 @@ import {
 } from '@/services/auth/socialAuth';
 import { recordAccountLegalAcceptance } from '@/services/legalAcceptance';
 import { useAppTour } from '@/state/appTour';
-import { appTourUser } from '@/testing/appTourData';
+import {
+  appTourAuthToken,
+  appTourUser
+} from '@/testing/appTourData';
 
 export type AuthenticatedUser = {
   displayName: string | null;
@@ -79,30 +82,71 @@ export function AuthProvider({ children }: PropsWithChildren) {
 }
 
 function AppTourAuthProvider({ children }: PropsWithChildren) {
-  const existingResult = {
-    isNewUser: false,
-    user: appTourUser
-  } satisfies AuthSignInResult;
-  const newResult = {
-    isNewUser: true,
-    user: appTourUser
-  } satisfies AuthSignInResult;
+  const { scenario } = useAppTour();
+  const [syncedScenario, setSyncedScenario] = useState(scenario);
+  const [user, setUser] = useState<AuthenticatedUser | null>(
+    scenario === 'new-player' ? null : appTourUser
+  );
+
+  if (syncedScenario !== scenario) {
+    setSyncedScenario(scenario);
+    setUser((currentUser) =>
+      scenario === 'new-player'
+        ? null
+        : currentUser ?? appTourUser
+    );
+  }
+  const createAccount = useCallback(async (email: string) => {
+    const createdUser: AuthenticatedUser = {
+      ...appTourUser,
+      email,
+      emailVerified: false,
+      providerIds: ['password']
+    };
+    setUser(createdUser);
+    return {
+      isNewUser: true,
+      user: createdUser
+    } satisfies AuthSignInResult;
+  }, []);
+  const refreshUser = useCallback(async () => {
+    if (!user) {
+      return null;
+    }
+
+    const verifiedUser = {
+      ...user,
+      emailVerified: true
+    };
+    setUser(verifiedUser);
+    return verifiedUser;
+  }, [user]);
+  const signIn = useCallback(async () => {
+    setUser(appTourUser);
+    return {
+      isNewUser: false,
+      user: appTourUser
+    } satisfies AuthSignInResult;
+  }, []);
+  const signOutUser = useCallback(async () => {
+    setUser(null);
+  }, []);
   const value: AuthContextValue = {
-    appleSignInAvailable: true,
-    createAccount: async () => newResult,
+    appleSignInAvailable: scenario !== 'new-player',
+    createAccount,
     firebaseConfigured: true,
-    getIdToken: async () => 'app-tour-token',
-    googleSignInAvailable: true,
+    getIdToken: async () => appTourAuthToken,
+    googleSignInAvailable: scenario !== 'new-player',
     loading: false,
     missingConfiguration: [],
-    refreshUser: async () => appTourUser,
+    refreshUser,
     resendVerificationEmail: async () => undefined,
     sendPasswordReset: async () => undefined,
-    signInWithApple: async () => existingResult,
-    signInWithEmail: async () => existingResult,
-    signInWithGoogle: async () => existingResult,
-    signOutUser: async () => undefined,
-    user: appTourUser
+    signInWithApple: signIn,
+    signInWithEmail: signIn,
+    signInWithGoogle: signIn,
+    signOutUser,
+    user
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

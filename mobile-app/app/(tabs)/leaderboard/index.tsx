@@ -12,16 +12,18 @@ import { CompetitionHubNav } from '@/components/competitionHubNav';
 import { CompactTextButton } from '@/components/onboarding';
 import { RecoverableError } from '@/components/reliability';
 import { UserAlias } from '@/components/streakRewards';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import type { CategoryLeaderboardRow } from '@/data/appData';
 import { useCategoryLeaderboard, useMyStreaks } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
 import { getCompetitionRankLabel } from '@/domain/competition';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useProfile } from '@/state/profile';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const goalCategories = [1, 2, 3, 4, 5, 6, 7] as const satisfies readonly GoalCategory[];
@@ -31,8 +33,12 @@ export default function LeaderboardScreen() {
   const { width: viewportWidth } = useWindowDimensions();
   const compactRankings = viewportWidth < 360;
   const { user } = useAuth();
+  const { competitionRegion } = useCompetitionRegion();
   const { publicName } = useProfile();
-  const { campaign } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const {
     competition,
     currentWeekVerified,
@@ -92,7 +98,7 @@ export default function LeaderboardScreen() {
         <View style={styles.header}>
           <View style={styles.headerTopLine}>
             <TerminalText glow tone="cyan" variant="label">
-              {campaign.region}{' // MONTHLY COMPETITION'}
+              {competitionRegion.label}{' // MONTHLY COMPETITION'}
             </TerminalText>
             <InlineHelpButton
               label="Open competition guide"
@@ -257,7 +263,7 @@ export default function LeaderboardScreen() {
                 isCurrentUser={row.alias.toLowerCase() === publicName.toLowerCase()}
                 key={row.rank}
                 multiplier={row.rank <= 3
-                  ? campaign.economics.categoryPodiumMultipliers[row.rank as 1 | 2 | 3]
+                  ? podiumMultipliers[row.rank as 1 | 2 | 3]
                   : undefined}
                 row={row}
               />

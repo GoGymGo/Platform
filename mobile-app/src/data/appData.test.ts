@@ -8,13 +8,19 @@ describe('app data boundary', () => {
   it('returns honest empty data when services are unavailable', async () => {
     const unavailable = createAppDataSource('unavailable');
 
-    assert.deepEqual(await unavailable.getCreatorWorkouts(), []);
+    assert.deepEqual(await unavailable.getCreatorWorkouts('vancouver-bc'), []);
     assert.deepEqual(await unavailable.getRewardCatalog('toronto'), []);
     assert.deepEqual(await unavailable.getMyRewardAwards(), []);
     assert.deepEqual(await unavailable.getRewardWinners(), []);
     assert.equal(await unavailable.getCategoryLeaderboard(4), null);
-    assert.deepEqual(await unavailable.getCompetitionMatches('2026-08', 4, 'TORONTO'), []);
-    assert.equal(await unavailable.getCompetitionEnrollmentCount('TORONTO', '2026-08'), null);
+    assert.deepEqual(
+      await unavailable.getCompetitionMatches('2026-08', 4, 'toronto-on'),
+      []
+    );
+    assert.equal(
+      await unavailable.getCompetitionEnrollmentCount('toronto-on', '2026-08'),
+      null
+    );
     assert.equal(await unavailable.getMyStreaks(), null);
     assert.equal(await unavailable.getSettledCompetition(), null);
     await assert.rejects(

@@ -5,14 +5,18 @@ import {
 } from './session-evidence-review';
 
 const rules: CompetitionRules = {
+  categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 2,
   minSessionMinutes: 20,
+  perfectMonthMultiplier: 10,
   requireDeviceAttestation: true,
-  requireFaceCheck: true,
+  requirePresenceCheck: true,
   requireGymQr: true,
   signupPrizeDrawEntries: 1,
   verifiedSessionCategoryScore: 1,
   verifiedSessionPrizeDrawEntries: 1,
+  weeklyChallengeBothHitMultiplier: 2,
+  weeklyChallengeRecoveryMultiplier: 3,
 };
 
 describe('session evidence review', () => {
@@ -34,9 +38,8 @@ describe('session evidence review', () => {
           required: true,
           uniqueTokenCount: 1,
         },
-        faceCheck: {
+        presenceCheck: {
           count: 1,
-          maximumConfidence: 0.92,
           required: true,
         },
         gymQr: { count: 1, required: true, uniquePayloadCount: 1 },
@@ -78,11 +81,11 @@ describe('session evidence review', () => {
     expect(
       unapprovedRequiredEvidence(review, {
         deviceAttestation: 'approved',
-        faceCheck: 'rejected',
         gymQr: 'not_required',
         heartRate: 'approved',
+        presenceCheck: 'rejected',
       }),
-    ).toEqual(['faceCheck', 'gymQr']);
+    ).toEqual(['gymQr', 'presenceCheck']);
   });
 });
 
@@ -100,9 +103,8 @@ function sourceFixture() {
         heartRateBpm: 130,
         trust: 'unverified_client_evidence',
       }),
-      event('3', 'face_check', '2026-07-12T10:12:00Z', {
-        faceMatchConfidence: 0.92,
-        trust: 'unverified_client_evidence',
+      event('3', 'presence_check', '2026-07-12T10:12:00Z', {
+        trust: 'local_device_authentication_result',
       }),
       event('4', 'gym_qr_scan', '2026-07-12T10:13:00Z', {
         qrPayloadHash: 'qr-hash-one',
@@ -124,7 +126,11 @@ function sourceFixture() {
 function event(
   suffix: string,
   eventType:
-    'device_attestation' | 'face_check' | 'gym_qr_scan' | 'heart_rate_sample',
+    | 'device_attestation'
+    | 'face_check'
+    | 'gym_qr_scan'
+    | 'heart_rate_sample'
+    | 'presence_check',
   occurredAt: string,
   payload: Record<string, string | number>,
 ) {

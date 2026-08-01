@@ -22,6 +22,7 @@ import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 import { useAppTour } from '@/state/appTour';
+import { isAppTourGymQrPayload } from '@/testing/appTourData';
 
 export default function IdentityCheckScreen() {
   const router = useRouter();
@@ -63,7 +64,7 @@ export default function IdentityCheckScreen() {
     !qrPayload ||
     (
       !isGoGymGoPartnerCode(qrPayload, 'entry') &&
-      !(appTourActive && qrPayload === 'gogymgo:gym:entry:app-tour')
+      !(appTourActive && isAppTourGymQrPayload(qrPayload, 'entry'))
     )
   ) {
     return (

@@ -1,21 +1,22 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsLatitude,
   IsLongitude,
+  IsOptional,
   Matches,
-  IsUUID,
 } from 'class-validator';
 import type {
   RegionVerificationMethod,
   RegionVerificationStatus,
 } from '../../../database/database.types';
+import { regionCodePattern } from '../region-code';
 
 export class RegionPolicyResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
 
-  @ApiProperty({ example: 'CA-BC-VICTORIA', type: String })
+  @ApiProperty({ example: 'victoria-bc', type: String })
   code!: string;
 
   @ApiProperty({ example: 'CA', type: String })
@@ -60,10 +61,6 @@ export enum RegionVerificationMethodDto {
 }
 
 export class CreateRegionVerificationDto {
-  @ApiProperty({ format: 'uuid', type: String })
-  @IsUUID()
-  regionPolicyId!: string;
-
   @ApiProperty({ enum: RegionVerificationMethodDto, type: String })
   @IsEnum(RegionVerificationMethodDto)
   method!: 'device_location';
@@ -78,9 +75,15 @@ export class CreateRegionVerificationDto {
 }
 
 export class CurrentRegionVerificationQueryDto {
-  @ApiProperty({ example: 'CA-BC', type: String })
-  @Matches(/^[A-Z]{2}-[A-Z0-9-]{1,32}$/)
-  regionCode!: string;
+  @ApiPropertyOptional({
+    description:
+      'When omitted, returns the latest active verification across all regions.',
+    example: 'victoria-bc',
+    type: String,
+  })
+  @IsOptional()
+  @Matches(regionCodePattern)
+  regionCode?: string;
 }
 
 export class RegionVerificationResponseDto {
@@ -91,34 +94,40 @@ export class RegionVerificationResponseDto {
   regionPolicyId!: string;
 
   @ApiProperty({
-    enum: ['device_location', 'postal_code', 'manual_review'],
+    enum: [RegionVerificationMethodDto.DEVICE_LOCATION],
     type: String,
   })
-  method!: RegionVerificationMethod;
+  method!: Extract<RegionVerificationMethod, 'device_location'>;
 
   @ApiProperty({
-    enum: ['pending', 'approved', 'rejected', 'expired'],
+    enum: ['approved'],
     type: String,
   })
-  status!: RegionVerificationStatus;
+  status!: Extract<RegionVerificationStatus, 'approved'>;
 
   @ApiProperty({ type: String })
   policyVersion!: string;
 
-  @ApiProperty({ format: 'date-time', type: String })
-  createdAt!: string;
-}
-
-export class CurrentRegionVerificationResponseDto extends RegionVerificationResponseDto {
-  @ApiProperty({ example: 'CA-BC', type: String })
+  @ApiProperty({ example: 'vancouver-bc', type: String })
   regionCode!: string;
 
-  @ApiProperty({ example: 'British Columbia', type: String })
+  @ApiProperty({ example: 'Vancouver', type: String })
   regionName!: string;
 
-  @ApiProperty({ format: 'date-time', nullable: true, type: String })
-  reviewedAt!: string | null;
+  @ApiProperty({ example: 'CA-BC', type: String })
+  jurisdictionCode!: string;
 
-  @ApiProperty({ format: 'date-time', nullable: true, type: String })
-  expiresAt!: string | null;
+  @ApiProperty({ example: 'America/Vancouver', type: String })
+  timezone!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  createdAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  reviewedAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
 }
+
+export class CurrentRegionVerificationResponseDto extends RegionVerificationResponseDto {}

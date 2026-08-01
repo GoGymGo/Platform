@@ -11,7 +11,13 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import {
+  creatorFeaturePausedMessage,
+  creatorFeatureStatusLabel,
+  creatorFeaturesEnabled
+} from '@/config/features';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { DataCollectionNotice } from '@/components/legal';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   hasCreatorApplicationErrors,
@@ -21,10 +27,7 @@ import {
 } from '@/domain/creatorApplication';
 import { submitCreatorApplication } from '@/services/creatorApplication';
 import { useCompetitionRegion } from '@/state/competitionRegion';
-import {
-  dismissCreatorInvite,
-  recordCreatorApplication
-} from '@/state/onboardingPreferences';
+import { dismissCreatorInvite, recordCreatorApplication } from '@/state/onboardingPreferences';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAuth } from '@/state/auth';
 import { useApi } from '@/state/api';
@@ -54,6 +57,48 @@ export default function CreatorApplicationScreen() {
   const [workoutStyle, setWorkoutStyle] = useState('');
   const openedAfterFirstWorkout = source === 'first-workout';
 
+  if (!creatorFeaturesEnabled) {
+    return (
+      <ScreenContainer>
+        <ScreenScrollView
+          bounces={false}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <OnboardingHeader
+            label="OPTIONAL"
+            onBack={() =>
+              openedAfterFirstWorkout
+                ? router.replace('/home')
+                : goBackOrReplace(router, source === 'profile' ? '/profile' : '/join')
+            }
+            progress={38}
+            step="CREATOR APPLICATION"
+          />
+          <TerminalText glow style={styles.title} tone="cyan" variant="title">
+            APPLY AS A CREATOR
+          </TerminalText>
+          <HUDBorderBox glow style={styles.form} tone="amber">
+            <TerminalText glow tone="amber" variant="label">
+              {creatorFeatureStatusLabel}
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              {creatorFeaturePausedMessage}
+            </TerminalText>
+            <CyberButtonOutline
+              label={openedAfterFirstWorkout ? 'RETURN HOME' : 'BACK TO JOIN OPTIONS'}
+              onPress={() =>
+                openedAfterFirstWorkout
+                  ? router.replace('/home')
+                  : goBackOrReplace(router, source === 'profile' ? '/profile' : '/join')
+              }
+            />
+          </HUDBorderBox>
+        </ScreenScrollView>
+      </ScreenContainer>
+    );
+  }
+
   async function submitApplication() {
     const input = normalizeCreatorApplication({
       channelUrl,
@@ -79,7 +124,9 @@ export default function CreatorApplicationScreen() {
       await recordCreatorApplication(user.uid);
       setSubmitted(true);
     } catch {
-      setSubmissionError('CREATOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+      setSubmissionError(
+        'CREATOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -102,11 +149,11 @@ export default function CreatorApplicationScreen() {
       >
         <OnboardingHeader
           label="OPTIONAL"
-          onBack={() => (
+          onBack={() =>
             openedAfterFirstWorkout
               ? router.replace('/home')
               : goBackOrReplace(router, source === 'profile' ? '/profile' : '/join')
-          )}
+          }
           progress={38}
           step="CREATOR APPLICATION"
         />
@@ -115,8 +162,8 @@ export default function CreatorApplicationScreen() {
           APPLY AS A CREATOR
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Share your region, creator profile and one sample workout. Approved
-          creators receive the complete publishing and content-rights process.
+          Share your region, creator profile and one sample workout. Approved creators receive the
+          complete publishing and content-rights process.
         </TerminalText>
 
         <CompactTextButton
@@ -180,9 +227,16 @@ export default function CreatorApplicationScreen() {
               tone="green"
             />
           ) : null}
+          <DataCollectionNotice message="We use the region, profile and sample-workout links to review this creator request, prevent misuse and contact the signed-in applicant about the review. They are not used to award competition credit." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
-            label={submitted ? 'APPLICATION SUBMITTED' : submitting ? 'SUBMITTING...' : 'APPLY AS A CREATOR ->'}
+            label={
+              submitted
+                ? 'APPLICATION SUBMITTED'
+                : submitting
+                  ? 'SUBMITTING...'
+                  : 'APPLY AS A CREATOR ->'
+            }
             onPress={submitApplication}
             tone="cyan"
           />
@@ -190,7 +244,10 @@ export default function CreatorApplicationScreen() {
 
         <View style={styles.actions}>
           {submitted ? (
-            <CyberButtonOutline label="OPEN CREATOR CATALOG" onPress={() => router.replace('/workouts')} />
+            <CyberButtonOutline
+              label="OPEN CREATOR CATALOG"
+              onPress={() => router.replace('/workouts')}
+            />
           ) : null}
           {openedAfterFirstWorkout && !submitted ? (
             <CyberButtonPrimary label="DON'T SHOW THIS AGAIN" onPress={dismissPrompt} />

@@ -11,6 +11,7 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAppTour } from '@/state/appTour';
@@ -112,6 +113,7 @@ export default function VerificationScreen() {
   const [preferenceReady, setPreferenceReady] = useState(appTourActive);
   const [sourcePickerExpanded, setSourcePickerExpanded] = useState(false);
   const isProfileSource = source === 'profile';
+  const wearableAvailable = heartRateTelemetryAvailable || appTourActive;
 
   useEffect(() => {
     let active = true;
@@ -169,14 +171,19 @@ export default function VerificationScreen() {
       : deviceCatalog;
   }, [deviceQuery, showAllDevices]);
 
-  const canContinue = verificationPath === 'wearable' && selectedDevice !== null;
+  const canContinue =
+    wearableAvailable &&
+    verificationPath === 'wearable' &&
+    selectedDevice !== null;
   const selectedSource =
     verificationPath === 'wearable'
       ? deviceCatalog.find((device) => device.key === selectedDevice)
       : undefined;
   const ctaLabel =
     verificationPath === 'wearable'
-      ? selectedDevice
+      ? !wearableAvailable
+        ? 'Heart-rate connection unavailable'
+        : selectedDevice
         ? isProfileSource
           ? 'Save device'
           : 'Save and continue'
@@ -262,6 +269,18 @@ export default function VerificationScreen() {
               LOADING SAVED VERIFICATION
             </TerminalText>
           </HUDBorderBox>
+        ) : verificationPath === 'wearable' && !wearableAvailable ? (
+          <View style={styles.methodContent}>
+            <HUDBorderBox style={styles.unavailableCard} tone="muted">
+              <TerminalText tone="dim" variant="label">
+                HEART-RATE CONNECTION NOT READY
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                Device selection will unlock after an approved telemetry provider is connected.
+                No wearable is presented as verified until its data can reach the server.
+              </TerminalText>
+            </HUDBorderBox>
+          </View>
         ) : selectedSource && !sourcePickerExpanded ? (
           <HUDBorderBox glow style={styles.selectedSourceCard} tone="cyan">
             <View style={styles.selectionCopy}>
@@ -330,7 +349,7 @@ export default function VerificationScreen() {
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
                 Partner-gym QR verification will become available after GoGymGo verifies and
-                publishes participating locations. Use a heart-rate device for now.
+                publishes participating locations.
               </TerminalText>
             </HUDBorderBox>
           </View>

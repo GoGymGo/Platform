@@ -16,6 +16,36 @@ export type AppResumeState = {
   unclaimedReward: boolean;
 };
 
+export type AppResumeRequestState = {
+  hasImmediateTarget: boolean;
+  registrationError: boolean;
+  registrationLoading: boolean;
+  secondaryError: boolean;
+  secondaryLoading: boolean;
+};
+
+export function getAppResumeRequestStatus({
+  hasImmediateTarget,
+  registrationError,
+  registrationLoading,
+  secondaryError,
+  secondaryLoading
+}: AppResumeRequestState) {
+  if (hasImmediateTarget) {
+    return {
+      error: false,
+      loading: false
+    };
+  }
+
+  return {
+    error: registrationError || secondaryError,
+    loading:
+      registrationLoading ||
+      (!registrationError && secondaryLoading)
+  };
+}
+
 export function getAppResumeTarget({
   activeWorkout,
   pendingChallengeInvite,

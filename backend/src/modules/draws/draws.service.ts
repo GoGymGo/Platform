@@ -8,9 +8,12 @@ import type { Transaction } from 'kysely';
 import type { Database, JsonArray } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { stableJson } from '../../common/idempotency/stable-json';
+import { CompetitionScoringService } from '../competitions/competition-scoring.service';
 import { RewardsService } from '../rewards/rewards.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { buildSeedCommitment, selectWeightedWinners } from './draw-algorithm';
+
+const drawInsertBatchSize = 1_000;
 
 export interface LockDrawInput {
   competitionId: string;
@@ -46,6 +49,7 @@ export class DrawsService {
     private readonly database: DatabaseService,
     private readonly notifications: NotificationsService,
     private readonly rewards: RewardsService,
+    private readonly scoring: CompetitionScoringService,
   ) {}
 
   async lock(input: LockDrawInput): Promise<LockedDrawResult> {
@@ -116,6 +120,12 @@ export class DrawsService {
               'The competition cannot lock a draw while workout sessions remain active or pending review.',
           });
         }
+
+        await this.scoring.finalizeForDraw(
+          transaction,
+          competition.id,
+          new Date(),
+        );
 
         const activeEnrollments = await transaction
           .selectFrom('competition_enrollments as enrollment')
@@ -190,19 +200,26 @@ export class DrawsService {
           })
           .returningAll()
           .executeTakeFirstOrThrow();
-        await transaction
-          .insertInto('draw_entries')
-          .values(
-            progress.map((entry, index) => ({
-              created_at: new Date(),
-              draw_id: draw.id,
-              enrollment_id: entry.enrollment_id,
-              entry_count: entry.prize_draw_entries,
-              snapshot_position: index + 1,
-              user_id: entry.user_id,
-            })),
-          )
-          .execute();
+        for (
+          let offset = 0;
+          offset < progress.length;
+          offset += drawInsertBatchSize
+        ) {
+          const batch = progress.slice(offset, offset + drawInsertBatchSize);
+          await transaction
+            .insertInto('draw_entries')
+            .values(
+              batch.map((entry, batchIndex) => ({
+                created_at: new Date(),
+                draw_id: draw.id,
+                enrollment_id: entry.enrollment_id,
+                entry_count: entry.prize_draw_entries,
+                snapshot_position: offset + batchIndex + 1,
+                user_id: entry.user_id,
+              })),
+            )
+            .execute();
+        }
         await transaction
           .updateTable('competitions')
           .set({ status: 'settling', updated_at: new Date() })
@@ -309,6 +326,7 @@ export class DrawsService {
           transaction,
           draw.competition_id,
           now,
+          entries.length,
         );
         const winnerCount = Math.min(rewardSlots.length, entries.length);
         if (winnerCount === 0) {
@@ -326,24 +344,34 @@ export class DrawsService {
           winnerCount,
           input.seedReveal,
         );
-        const awards = await transaction
-          .insertInto('reward_awards')
-          .values(
-            winners.map((winner, index) => ({
-              award_rank: index + 1,
-              awarded_at: now,
-              claimed_at: null,
-              draw_id: draw.id,
-              fulfilled_at: null,
-              redeemed_at: null,
-              reward_catalog_item_id: rewardSlots[index].rewardCatalogItemId,
-              status: 'awarded' as const,
-              updated_at: now,
-              user_id: winner.userId,
-            })),
-          )
-          .returning(['id', 'user_id'])
-          .execute();
+        const awards: { id: string; user_id: string }[] = [];
+        for (
+          let offset = 0;
+          offset < winners.length;
+          offset += drawInsertBatchSize
+        ) {
+          const batch = winners.slice(offset, offset + drawInsertBatchSize);
+          const inserted = await transaction
+            .insertInto('reward_awards')
+            .values(
+              batch.map((winner, batchIndex) => ({
+                award_rank: offset + batchIndex + 1,
+                awarded_at: now,
+                claimed_at: null,
+                draw_id: draw.id,
+                fulfilled_at: null,
+                redeemed_at: null,
+                reward_catalog_item_id:
+                  rewardSlots[offset + batchIndex].rewardCatalogItemId,
+                status: 'awarded' as const,
+                updated_at: now,
+                user_id: winner.userId,
+              })),
+            )
+            .returning(['id', 'user_id'])
+            .execute();
+          awards.push(...inserted);
+        }
         for (const award of awards) {
           await this.notifications.enqueue(
             transaction,

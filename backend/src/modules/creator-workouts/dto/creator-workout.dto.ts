@@ -12,22 +12,19 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { regionCodePattern } from '../../regions/region-code';
 
 export const CREATOR_VIDEO_RIGHTS_VERSION = 'creator-video-rights-v1';
 
 export class ListCreatorWorkoutsQueryDto {
-  @ApiPropertyOptional({ example: 'victoria-bc', type: String })
-  @IsOptional()
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-  region?: string;
+  @ApiProperty({ example: 'victoria-bc', type: String })
+  @Matches(regionCodePattern)
+  region!: string;
 }
 
 export class CreatorWorkoutResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
-
-  @ApiProperty({ type: Boolean })
-  joined!: boolean;
 
   @ApiProperty({ type: String })
   name!: string;
@@ -89,6 +86,7 @@ export class CreateCreatorVideoSubmissionDto {
   @ApiProperty({ example: 'victoria-bc', maxLength: 64, type: String })
   @IsString()
   @Length(2, 64)
+  @Matches(regionCodePattern)
   regionCode!: string;
 
   @ApiPropertyOptional({ maxLength: 500, type: String })

@@ -18,16 +18,12 @@ import { useAuth } from '@/state/auth';
 
 type JoinOption = {
   category: string;
+  disabled?: boolean;
   label: string;
   route: Href;
 };
 
 const applicationOptions: readonly JoinOption[] = [
-  {
-    category: 'CREATOR',
-    label: 'APPLY AS A CREATOR',
-    route: '/creator/apply?source=join' as Href
-  },
   {
     category: 'SPONSOR',
     label: 'APPLY AS A SPONSOR',
@@ -68,8 +64,8 @@ export default function JoinScreen() {
             HOW DO YOU WANT TO JOIN?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Players can create an account or sign in below. Creator, sponsor and
-            partner-gym tools are available separately.
+            Players can create an account or sign in below. Sponsors and
+            partner-gym teams can use their dedicated application forms.
           </TerminalText>
         </View>
 

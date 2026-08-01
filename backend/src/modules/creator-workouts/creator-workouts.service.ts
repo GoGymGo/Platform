@@ -45,15 +45,14 @@ export class CreatorWorkoutsService {
   ) {}
 
   async listPublished(
-    regionCode?: string,
+    regionCode: string,
   ): Promise<CreatorWorkoutResponseDto[]> {
-    let query = this.database.connection
+    const workouts = await this.database.connection
       .selectFrom('creator_workouts')
       .select([
         'creator_name',
         'duration_minutes',
         'id',
-        'published',
         'published_at',
         'region_codes',
         'sponsor_name',
@@ -64,17 +63,15 @@ export class CreatorWorkoutsService {
       ])
       .where('published', '=', true)
       .where('published_at', 'is not', null)
-      .where('published_at', '<=', new Date());
-    if (regionCode) {
-      query = query.where(sql<boolean>`${regionCode} = ANY(region_codes)`);
-    }
-    const workouts = await query.orderBy('published_at', 'desc').execute();
+      .where('published_at', '<=', new Date())
+      .where(sql<boolean>`${regionCode} = ANY(region_codes)`)
+      .orderBy('published_at', 'desc')
+      .execute();
 
     return workouts.map((workout) => ({
       creatorName: workout.creator_name,
       durationMinutes: workout.duration_minutes,
       id: workout.id,
-      joined: workout.published,
       name: workout.title,
       regionCodes: workout.region_codes,
       reward: `${workout.duration_minutes} MIN ${workout.workout_style} // ENTRIES COME FROM VERIFIED SESSIONS`,

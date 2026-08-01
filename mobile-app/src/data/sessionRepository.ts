@@ -2,6 +2,7 @@ import type { AppDataMode } from '@/data/appData';
 import type {
   AuthoritativeWorkoutSession,
   CompetitionProgress,
+  StartedWorkoutSession,
   WorkoutSessionCompletion
 } from '@/domain/session';
 import type { ApiClient } from '@/services/api/client';
@@ -13,6 +14,10 @@ export type WorkoutSessionRepository = {
     heartRateBpm: number,
     occurredAt?: string
   ) => Promise<void>;
+  appendPresenceCheck: (
+    sessionId: string,
+    occurredAt?: string
+  ) => Promise<void>;
   cancelSession: (sessionId: string) => Promise<AuthoritativeWorkoutSession>;
   completeSession: (
     sessionId: string,
@@ -21,7 +26,7 @@ export type WorkoutSessionRepository = {
   createSession: (
     competitionId: string,
     commandId: string
-  ) => Promise<AuthoritativeWorkoutSession>;
+  ) => Promise<StartedWorkoutSession>;
   getCompetitionProgress: () => Promise<CompetitionProgress | null>;
 };
 
@@ -76,6 +81,22 @@ function createApiRepository(api: ApiClient): WorkoutSessionRepository {
         method: 'POST'
       }).then(() => undefined);
     },
+    appendPresenceCheck: (sessionId, occurredAt) => {
+      const eventId = createUuid();
+      return api.request<unknown, {
+        eventId: string;
+        eventType: 'presence_check';
+        occurredAt: string;
+      }>(`/v1/sessions/${encodeURIComponent(sessionId)}/events`, {
+        body: {
+          eventId,
+          eventType: 'presence_check',
+          occurredAt: occurredAt ?? new Date().toISOString()
+        },
+        idempotencyKey: `session-event-${eventId}`,
+        method: 'POST'
+      }).then(() => undefined);
+    },
     cancelSession: (sessionId) => api.request<AuthoritativeWorkoutSession>(
       `/v1/sessions/${encodeURIComponent(sessionId)}/cancel`,
       {
@@ -93,7 +114,7 @@ function createApiRepository(api: ApiClient): WorkoutSessionRepository {
         }
       ),
     createSession: (competitionId, commandId) =>
-      api.request<AuthoritativeWorkoutSession, { competitionId: string }>(
+      api.request<StartedWorkoutSession, { competitionId: string }>(
         '/v1/sessions', {
         body: { competitionId },
         idempotencyKey: `session-create-${commandId}`,
@@ -112,6 +133,7 @@ function createUnavailableRepository(): WorkoutSessionRepository {
   return {
     appendGymQrScan: unavailable,
     appendHeartRateSample: unavailable,
+    appendPresenceCheck: unavailable,
     cancelSession: unavailable,
     completeSession: unavailable,
     createSession: unavailable,

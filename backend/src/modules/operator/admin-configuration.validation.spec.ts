@@ -8,14 +8,18 @@ import {
 } from './admin-configuration.validation';
 
 const validRules = {
+  categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 10,
   minSessionMinutes: 30,
+  perfectMonthMultiplier: 10,
   requireDeviceAttestation: true,
-  requireFaceCheck: true,
+  requirePresenceCheck: true,
   requireGymQr: true,
   signupPrizeDrawEntries: 1,
   verifiedSessionCategoryScore: 10,
   verifiedSessionPrizeDrawEntries: 2,
+  weeklyChallengeBothHitMultiplier: 2,
+  weeklyChallengeRecoveryMultiplier: 3,
 };
 
 describe('admin configuration validation', () => {

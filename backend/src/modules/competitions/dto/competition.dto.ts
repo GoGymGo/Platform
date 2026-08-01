@@ -3,9 +3,10 @@ import {
   Equals,
   IsBoolean,
   IsInt,
-  IsString,
   IsUUID,
   IsIn,
+  IsOptional,
+  Matches,
   Max,
   Min,
 } from 'class-validator';
@@ -14,7 +15,19 @@ import type {
   CompetitionStatus,
   EnrollmentStatus,
 } from '../../../database/database.types';
+import { regionCodePattern } from '../../regions/region-code';
 import { StreakCountsDto } from '../../streaks/dto/streak.dto';
+
+export class CategoryPodiumMultipliersResponseDto {
+  @ApiProperty({ type: Number })
+  '1'!: number;
+
+  @ApiProperty({ type: Number })
+  '2'!: number;
+
+  @ApiProperty({ type: Number })
+  '3'!: number;
+}
 
 export class CompetitionRulesResponseDto {
   @ApiProperty({ type: Number })
@@ -27,10 +40,16 @@ export class CompetitionRulesResponseDto {
   requireDeviceAttestation!: boolean;
 
   @ApiProperty({ type: Boolean })
-  requireFaceCheck!: boolean;
+  requirePresenceCheck!: boolean;
 
   @ApiProperty({ type: Boolean })
   requireGymQr!: boolean;
+
+  @ApiProperty({ type: CategoryPodiumMultipliersResponseDto })
+  categoryPodiumMultipliers!: CategoryPodiumMultipliersResponseDto;
+
+  @ApiProperty({ type: Number })
+  perfectMonthMultiplier!: number;
 
   @ApiProperty({ type: Number })
   signupPrizeDrawEntries!: number;
@@ -40,6 +59,12 @@ export class CompetitionRulesResponseDto {
 
   @ApiProperty({ type: Number })
   verifiedSessionPrizeDrawEntries!: number;
+
+  @ApiProperty({ type: Number })
+  weeklyChallengeBothHitMultiplier!: number;
+
+  @ApiProperty({ type: Number })
+  weeklyChallengeRecoveryMultiplier!: number;
 }
 
 export class CompetitionResponseDto {
@@ -79,6 +104,12 @@ export class CompetitionResponseDto {
   @ApiProperty({ isArray: true, type: Number })
   goalDays!: number[];
 
+  @ApiProperty({ minimum: 100, type: Number })
+  minimumEntrants!: number;
+
+  @ApiProperty({ minimum: 100, nullable: true, type: Number })
+  entrantCap!: number | null;
+
   @ApiProperty({ format: 'date-time', type: String })
   registrationOpensAt!: string;
 
@@ -90,6 +121,18 @@ export class CompetitionResponseDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   endsAt!: string;
+}
+
+export class CurrentCompetitionQueryDto {
+  @ApiPropertyOptional({ example: '2026-08', type: String })
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+  monthKey?: string;
+
+  @ApiPropertyOptional({ example: 'vancouver-bc', type: String })
+  @IsOptional()
+  @Matches(regionCodePattern)
+  region?: string;
 }
 
 export class CreateEnrollmentDto {
@@ -136,8 +179,8 @@ export class EnrollmentResponseDto {
 }
 
 export class EnrollmentCountQueryDto {
-  @ApiProperty({ type: String })
-  @IsString()
+  @ApiProperty({ example: 'vancouver-bc', type: String })
+  @Matches(regionCodePattern)
   region!: string;
 }
 

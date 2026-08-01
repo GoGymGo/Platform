@@ -9,20 +9,22 @@ export default function ModalLayout() {
   const segments = useSegments();
   const activeRoute = segments[segments.length - 1];
   const stack = (
-    <Stack screenOptions={{
-      headerShown: false,
-      contentStyle: {
-        backgroundColor: colors.background
-      },
-      animation: reduceMotion ? 'none' : 'slide_from_bottom'
-    }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {
+          backgroundColor: colors.background
+        },
+        animation: reduceMotion ? 'none' : 'slide_from_bottom'
+      }}
+    >
       <Stack.Screen name="bonus-rules" />
       <Stack.Screen name="biometric-camera-consent" />
       <Stack.Screen name="commitment-rules" />
       <Stack.Screen name="consent-settings" />
+      <Stack.Screen name="official-rules" />
       <Stack.Screen name="privacy-policy" />
       <Stack.Screen name="qr-scanner" />
-      <Stack.Screen name="sponsor-offer" />
       <Stack.Screen name="terms-of-service" />
     </Stack>
   );

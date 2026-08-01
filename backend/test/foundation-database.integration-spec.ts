@@ -1,5 +1,4 @@
 import { Pool } from 'pg';
-import { demoDataCleanupSql } from '../migrations/1784170800000_remove_demo_data';
 import {
   MigratedPostgisTestDatabase,
   startMigratedPostgisTestDatabase,
@@ -47,6 +46,7 @@ describeWithDatabase('database migrations', () => {
         'idempotency_keys',
         'legal_document_events',
         'legal_documents',
+        'notification_deliveries',
         'operator_audit_events',
         'partner_applications',
         'profile_media',
@@ -77,117 +77,48 @@ describeWithDatabase('database migrations', () => {
     ).resolves.toMatchObject({ rowCount: 1 });
   });
 
-  it('removes persisted demo records and restores demo-granted roles', async () => {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const user = await client.query<{ id: string }>(
-        `INSERT INTO users (firebase_uid, email_verified, roles)
-         VALUES ('cleanup-migration-user', TRUE, ARRAY['operator', 'user'])
-         RETURNING id`,
-      );
-      const userId = user.rows[0].id;
-      await client.query(
-        `INSERT INTO operator_audit_events
-           (actor_user_id, action, entity_type, entity_id, previous_state,
-            next_state, reason, request_id)
-         VALUES
-           ($1, 'user.bc_demo_operator_bootstrapped', 'users', $1,
-            '{"roles":["user"]}'::jsonb,
-            '{"roles":["operator","user"]}'::jsonb,
-            'Integration cleanup migration verification',
-            'cleanup-migration-role')`,
-        [userId],
-      );
-      const region = await client.query<{ id: string }>(
-        `INSERT INTO region_policies
-           (code, country_code, subdivision_code, metro_name, currency,
-            timezone, language_codes, minimum_age, competition_enabled,
-            boundary_version, policy_version, boundary, valid_from)
-         VALUES
-           ('CA-BC-DEMO-CLEANUP', 'CA', 'BC', 'Cleanup Demo Region', 'CAD',
-            'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
-            'cleanup-demo-boundary', 'cleanup-demo-policy',
-            ST_Multi(ST_GeomFromText(
-              'POLYGON((-123.2 49.2,-123.0 49.2,-123.0 49.4,-123.2 49.4,-123.2 49.2))',
-              4326
-            ))::geography,
-            current_timestamp)
-         RETURNING id`,
-      );
-      const competition = await client.query<{ id: string }>(
-        `INSERT INTO competitions
-           (region_policy_id, month_key, name, status, rules_version, rules,
-            minimum_entrants, registration_opens_at, registration_closes_at,
-            starts_at, ends_at)
-         VALUES
-           ($1, '2099-09', 'Cleanup Demo Competition', 'registration',
-            'cleanup-demo-rules', '{}'::jsonb, 100,
-            '2099-08-01T00:00:00Z', '2099-09-01T00:00:00Z',
-            '2099-09-01T00:00:00Z', '2099-10-01T00:00:00Z')
-         RETURNING id`,
-        [region.rows[0].id],
-      );
-      const reward = await client.query<{ id: string }>(
-        `INSERT INTO reward_catalog_items
-           (competition_id, sponsor_name, title, description, reward_type,
-            status, fulfillment_instructions, inventory_total)
-         VALUES
-           ($1, 'Cleanup Sponsor', 'Cleanup Reward',
-            'Migration cleanup verification reward.', 'physical', 'published',
-            'Demo pickup instructions.', 1)
-         RETURNING id`,
-        [competition.rows[0].id],
-      );
-      const gymApplication = await client.query<{ id: string }>(
-        `INSERT INTO partner_applications
-           (application_type, contact_email, dedupe_hash, payload, region, status)
-         VALUES
-           ('gym', 'cleanup-gym@example.invalid',
-            repeat('c', 64),
-            '{"gymName":"Iron District","gymAddress":"King St","managerName":"Cleanup"}'::jsonb,
-            'Toronto', 'submitted')
-         RETURNING id`,
-      );
+  it('keeps obsolete demo and payment schema out of the release baseline', async () => {
+    const obsoleteTables = await pool.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public'
+         AND table_name = ANY($1::text[])`,
+      [
+        [
+          'demo_verification_checkpoints',
+          'draw_winners',
+          'hyperwallet_users',
+          'payout_claims',
+          'payout_payments',
+          'payout_release_control',
+          'payout_state_events',
+          'provider_webhooks',
+        ],
+      ],
+    );
+    const obsoleteColumns = await pool.query<{
+      column_name: string;
+      table_name: string;
+    }>(
+      `SELECT table_name, column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND (
+           (table_name = 'competitions' AND column_name IN ('currency', 'mode'))
+           OR
+           (table_name = 'region_policies' AND column_name = 'payout_enabled')
+         )`,
+    );
+    const obsoleteTypes = await pool.query<{ typname: string }>(
+      `SELECT typname
+       FROM pg_type
+       WHERE typname = ANY($1::text[])`,
+      [['competition_mode', 'payout_claim_status', 'provider_webhook_state']],
+    );
 
-      await client.query(demoDataCleanupSql);
-
-      await expect(
-        client.query<{ roles: string[] }>(
-          'SELECT roles FROM users WHERE id = $1',
-          [userId],
-        ),
-      ).resolves.toMatchObject({ rows: [{ roles: ['user'] }] });
-      await expect(
-        client.query(
-          `SELECT id FROM region_policies WHERE id = $1
-           UNION ALL SELECT id FROM competitions WHERE id = $2
-           UNION ALL SELECT id FROM reward_catalog_items WHERE id = $3`,
-          [region.rows[0].id, competition.rows[0].id, reward.rows[0].id],
-        ),
-      ).resolves.toMatchObject({ rowCount: 0 });
-      await expect(
-        client.query('SELECT id FROM partner_applications WHERE id = $1', [
-          gymApplication.rows[0].id,
-        ]),
-      ).resolves.toMatchObject({ rowCount: 0 });
-      await expect(
-        client.query(
-          `SELECT id FROM operator_audit_events
-           WHERE action = 'user.bc_demo_operator_bootstrapped'
-             AND actor_user_id = $1`,
-          [userId],
-        ),
-      ).resolves.toMatchObject({ rowCount: 0 });
-
-      await client.query('DELETE FROM users WHERE id = $1', [userId]);
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    expect(obsoleteTables.rows).toEqual([]);
+    expect(obsoleteColumns.rows).toEqual([]);
+    expect(obsoleteTypes.rows).toEqual([]);
   });
 
   it('installs social identity, consent, and challenge constraints', async () => {
@@ -207,6 +138,7 @@ describeWithDatabase('database migrations', () => {
        WHERE schemaname = 'public'
          AND indexname IN (
            'profiles_screen_name_unique',
+           'profiles_screen_name_trgm_idx',
            'friend_requests_one_pending_pair'
          )`,
     );
@@ -229,6 +161,7 @@ describeWithDatabase('database migrations', () => {
     expect(indexes.rows.map((row) => row.indexname)).toEqual(
       expect.arrayContaining([
         'friend_requests_one_pending_pair',
+        'profiles_screen_name_trgm_idx',
         'profiles_screen_name_unique',
       ]),
     );
@@ -255,6 +188,67 @@ describeWithDatabase('database migrations', () => {
     expect(index.rows).toHaveLength(1);
     expect(index.rows[0].indexdef).toMatch(
       /\(user_id, eligible_date DESC\).*WHERE \(status = 'verified'/i,
+    );
+  });
+
+  it('installs the notification-delivery lease contract', async () => {
+    const columns = await pool.query<{
+      column_name: string;
+      data_type: string;
+    }>(
+      `SELECT column_name, data_type
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'notification_deliveries'
+         AND column_name IN ('lease_expires_at', 'lease_token')
+       ORDER BY column_name`,
+    );
+    const constraint = await pool.query<{ conname: string }>(
+      `SELECT conname
+       FROM pg_constraint
+       WHERE conname = 'notification_deliveries_lease_pair'`,
+    );
+    const index = await pool.query<{ indexdef: string }>(
+      `SELECT indexdef
+       FROM pg_indexes
+       WHERE schemaname = 'public'
+         AND indexname = 'notification_deliveries_claimable_idx'`,
+    );
+
+    expect(columns.rows).toEqual([
+      {
+        column_name: 'lease_expires_at',
+        data_type: 'timestamp with time zone',
+      },
+      { column_name: 'lease_token', data_type: 'uuid' },
+    ]);
+    expect(constraint.rows).toEqual([
+      { conname: 'notification_deliveries_lease_pair' },
+    ]);
+    expect(index.rows).toHaveLength(1);
+    expect(index.rows[0].indexdef).toMatch(
+      /\(status, scheduled_at, lease_expires_at\).*WHERE.*attempt_count < 5/i,
+    );
+  });
+
+  it('installs partial indexes for bounded worker queue scans', async () => {
+    const indexes = await pool.query<{ indexname: string }>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE schemaname = 'public'
+         AND indexname IN (
+           'profile_media_cleanup_queue_idx',
+           'workout_sessions_competition_date_unresolved_idx',
+           'workout_sessions_competition_date_verified_idx'
+         )`,
+    );
+
+    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+      expect.arrayContaining([
+        'profile_media_cleanup_queue_idx',
+        'workout_sessions_competition_date_unresolved_idx',
+        'workout_sessions_competition_date_verified_idx',
+      ]),
     );
   });
 
@@ -324,11 +318,15 @@ describeWithDatabase('database migrations', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-           boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, boundary, valid_from)
        VALUES
          ('version-region', 'US', 'WA', 'Version Region', 'USD',
            'America/Los_Angeles', ARRAY['en-US'], 18, TRUE,
-          'boundary-v1', 'policy-v1', '2026-01-01T00:00:00.000Z')
+          'boundary-v1', 'policy-v1',
+          ST_GeogFromText(
+            'SRID=4326;MULTIPOLYGON(((-122.6 47.4,-122.0 47.4,-122.0 47.9,-122.6 47.9,-122.6 47.4)))'
+          ),
+          '2026-01-01T00:00:00.000Z')
        RETURNING id`,
     );
     const competition = await pool.query<{

@@ -75,7 +75,7 @@ describe('social input rules', () => {
       invitedFriendUserIds: [],
       locationName: 'Waterfront Trail',
       name: 'Waterfront Run Series',
-      regionCode: 'TORONTO',
+      regionCode: 'toronto-on',
       scheduledDays: [] as number[],
       scheduledTime: '18:30',
       startDate: '2026-07-01',

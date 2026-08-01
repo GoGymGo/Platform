@@ -202,6 +202,27 @@
         "tags": ["profiles"]
       }
     },
+    "/v1/operator/configuration/dashboard": {
+      "get": {
+        "operationId": "getDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDashboardSnapshotDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the administrator configuration dashboard and recent audit history",
+        "tags": ["operator-configuration"]
+      }
+    },
     "/v1/operator/configuration/region-policies": {
       "post": {
         "operationId": "createRegionPolicy",
@@ -927,6 +948,613 @@
         "tags": ["operator"]
       }
     },
+    "/v1/competitions/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": false,
+            "in": "query",
+            "schema": { "example": "2026-08", "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": false,
+            "in": "query",
+            "schema": { "example": "vancouver-bc", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/CompetitionResponseDto" }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the authenticated user current regional competition",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/current/enrollment": {
+      "get": {
+        "operationId": "getCurrentEnrollment",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EnrollmentResponseDto" }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the authenticated user current active enrollment",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{competitionId}/enrollments": {
+      "post": {
+        "operationId": "enroll",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateEnrollmentDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Enroll the authenticated eligible user in a goal bracket",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/enrollment-count": {
+      "get": {
+        "operationId": "getEnrollmentCount",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "example": "vancouver-bc", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentCountResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the active enrollment count for a regional competition",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/matches": {
+      "get": {
+        "operationId": "getMatches",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "example": "vancouver-bc", "type": "string" }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CompetitionMatchResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the authenticated entrant weekly competition matches",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/weekly-challenges/eligible-partners": {
+      "get": {
+        "operationId": "listEligibleWeeklyChallengePartners",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "example": "vancouver-bc", "type": "string" }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 4, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleWeeklyChallengePartnerDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List accepted friends eligible for the same weekly commitment",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{monthKey}/weekly-challenges/requests": {
+      "get": {
+        "operationId": "listWeeklyChallengeRequests",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "region",
+            "required": true,
+            "in": "query",
+            "schema": { "example": "vancouver-bc", "type": "string" }
+          },
+          {
+            "name": "goal",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 4, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List my incoming and outgoing Weekly Challenge requests",
+        "tags": ["competitions"]
+      },
+      "post": {
+        "operationId": "createWeeklyChallengeRequest",
+        "parameters": [
+          {
+            "name": "monthKey",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWeeklyChallengeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Request a known eligible friend as a Weekly Challenge partner",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/weekly-challenges/requests/{requestId}": {
+      "patch": {
+        "operationId": "respondToWeeklyChallengeRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklyChallengeRequestDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Accept or decline an incoming Weekly Challenge request",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/legal-documents/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [
+          {
+            "name": "jurisdictionCode",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "GLOBAL", "type": "string" }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "en", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentLegalDocumentsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Return the current server-authoritative legal document bundle for a jurisdiction and locale",
+        "tags": ["legal-documents"]
+      }
+    },
+    "/v1/me/legal-receipts/status": {
+      "get": {
+        "operationId": "getStatus",
+        "parameters": [
+          {
+            "name": "jurisdictionCode",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "GLOBAL", "type": "string" }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "en", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return this account current legal receipt status",
+        "tags": ["legal-receipts"]
+      }
+    },
+    "/v1/me/legal-receipts": {
+      "post": {
+        "operationId": "record",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLegalReceiptBundleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Atomically record receipts for the exact current legal bundle",
+        "tags": ["legal-receipts"]
+      }
+    },
+    "/v1/operator/configuration/legal-documents": {
+      "post": {
+        "operationId": "publish",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Publish an immutable legal document version",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
+      "post": {
+        "operationId": "withdraw",
+        "parameters": [
+          {
+            "name": "legalDocumentId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Withdraw an immutable legal document version",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/me/verification-consents/device-presence": {
+      "get": {
+        "operationId": "getStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConsentStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the current device-presence and QR-camera consent status",
+        "tags": ["verification-consents"]
+      },
+      "put": {
+        "operationId": "setStatus",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVerificationConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationConsentStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Grant or withdraw device-presence and QR-camera consent",
+        "tags": ["verification-consents"]
+      }
+    },
     "/v1/operator/reward-awards/{awardId}/status-action": {
       "post": {
         "operationId": "changeStatus",
@@ -1259,7 +1887,9 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/SessionResponseDto" }
+                "schema": {
+                  "$ref": "#/components/schemas/StartedSessionResponseDto"
+                }
               }
             }
           }
@@ -1383,600 +2013,6 @@
         "security": [{ "firebase": [] }],
         "summary": "Cancel an active workout session without submitting it for review",
         "tags": ["sessions"]
-      }
-    },
-    "/v1/legal-documents/current": {
-      "get": {
-        "operationId": "getCurrent",
-        "parameters": [
-          {
-            "name": "jurisdictionCode",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "GLOBAL", "type": "string" }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "en", "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CurrentLegalDocumentsResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Return the current server-authoritative legal document bundle for a jurisdiction and locale",
-        "tags": ["legal-documents"]
-      }
-    },
-    "/v1/me/legal-receipts/status": {
-      "get": {
-        "operationId": "getStatus",
-        "parameters": [
-          {
-            "name": "jurisdictionCode",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "GLOBAL", "type": "string" }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "en", "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return this account current legal receipt status",
-        "tags": ["legal-receipts"]
-      }
-    },
-    "/v1/me/legal-receipts": {
-      "post": {
-        "operationId": "record",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordLegalReceiptBundleDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LegalReceiptStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Atomically record receipts for the exact current legal bundle",
-        "tags": ["legal-receipts"]
-      }
-    },
-    "/v1/operator/configuration/legal-documents": {
-      "post": {
-        "operationId": "publish",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PublishLegalDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Publish an immutable legal document version",
-        "tags": ["operator-configuration"]
-      }
-    },
-    "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
-      "post": {
-        "operationId": "withdraw",
-        "parameters": [
-          {
-            "name": "legalDocumentId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminLegalDocumentResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Withdraw an immutable legal document version",
-        "tags": ["operator-configuration"]
-      }
-    },
-    "/v1/me/verification-consents/device-presence": {
-      "get": {
-        "operationId": "getStatus",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VerificationConsentStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return the current device-presence and QR-camera consent status",
-        "tags": ["verification-consents"]
-      },
-      "put": {
-        "operationId": "setStatus",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetVerificationConsentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VerificationConsentStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Grant or withdraw device-presence and QR-camera consent",
-        "tags": ["verification-consents"]
-      }
-    },
-    "/v1/competitions/current": {
-      "get": {
-        "operationId": "getCurrent",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/CompetitionResponseDto" }
-                  ],
-                  "nullable": true
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return the authenticated user current regional competition",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/current/enrollment": {
-      "get": {
-        "operationId": "getCurrentEnrollment",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/EnrollmentResponseDto" }
-                  ],
-                  "nullable": true
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return the authenticated user current active enrollment",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{competitionId}/enrollments": {
-      "post": {
-        "operationId": "enroll",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateEnrollmentDto" }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnrollmentResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Enroll the authenticated eligible user in a goal bracket",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{monthKey}/enrollment-count": {
-      "get": {
-        "operationId": "getEnrollmentCount",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "region",
-            "required": true,
-            "in": "query",
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnrollmentCountResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Return the active enrollment count for a regional competition",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{monthKey}/matches": {
-      "get": {
-        "operationId": "getMatches",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "region",
-            "required": true,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "goal",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CompetitionMatchResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return the authenticated entrant weekly competition matches",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{monthKey}/weekly-challenges/eligible-partners": {
-      "get": {
-        "operationId": "listEligibleWeeklyChallengePartners",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "region",
-            "required": true,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "goal",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
-          },
-          {
-            "name": "period",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 1, "maximum": 4, "type": "number" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EligibleWeeklyChallengePartnerDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "List accepted friends eligible for the same weekly commitment",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/{monthKey}/weekly-challenges/requests": {
-      "get": {
-        "operationId": "listWeeklyChallengeRequests",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "region",
-            "required": true,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "goal",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 1, "maximum": 7, "type": "number" }
-          },
-          {
-            "name": "period",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 1, "maximum": 4, "type": "number" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "List my incoming and outgoing Weekly Challenge requests",
-        "tags": ["competitions"]
-      },
-      "post": {
-        "operationId": "createWeeklyChallengeRequest",
-        "parameters": [
-          {
-            "name": "monthKey",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateWeeklyChallengeRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Request a known eligible friend as a Weekly Challenge partner",
-        "tags": ["competitions"]
-      }
-    },
-    "/v1/competitions/weekly-challenges/requests/{requestId}": {
-      "patch": {
-        "operationId": "respondToWeeklyChallengeRequest",
-        "parameters": [
-          {
-            "name": "requestId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WeeklyChallengeRequestDecisionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Accept or decline an incoming Weekly Challenge request",
-        "tags": ["competitions"]
       }
     },
     "/v1/me/privacy-requests": {
@@ -2226,9 +2262,10 @@
         "parameters": [
           {
             "name": "regionCode",
-            "required": true,
+            "required": false,
             "in": "query",
-            "schema": { "example": "CA-BC", "type": "string" }
+            "description": "When omitted, returns the latest active verification across all regions.",
+            "schema": { "example": "victoria-bc", "type": "string" }
           }
         ],
         "responses": {
@@ -2345,7 +2382,7 @@
         "parameters": [
           {
             "name": "region",
-            "required": false,
+            "required": true,
             "in": "query",
             "schema": { "example": "victoria-bc", "type": "string" }
           }
@@ -2730,8 +2767,8 @@
             "required": true,
             "in": "query",
             "schema": {
-              "maxLength": 32,
-              "example": "TORONTO",
+              "maxLength": 64,
+              "example": "toronto-on",
               "type": "string"
             }
           }
@@ -3015,27 +3052,6 @@
         "tags": ["streaks"]
       }
     },
-    "/v1/me/sponsor-ad-placements": {
-      "get": {
-        "operationId": "getMyPlacementInventory",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SponsorAdPlacementInventoryResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Return non-delivering sponsor placement placeholders and enrollment eligibility",
-        "tags": ["sponsor ads"]
-      }
-    },
     "/v1/leaderboards/current": {
       "get": {
         "operationId": "getCurrentLeaderboard",
@@ -3305,6 +3321,318 @@
             "$ref": "#/components/schemas/UpdatePrivacySettingsDto"
           }
         }
+      },
+      "AdminDashboardIdentityDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "roles": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "email", "roles"]
+      },
+      "AdminDashboardRegionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "countryCode": { "type": "string" },
+          "subdivisionCode": { "type": "string" },
+          "metroName": { "type": "string" },
+          "currency": { "type": "string" },
+          "timezone": { "type": "string" },
+          "languageCodes": { "type": "array", "items": { "type": "string" } },
+          "minimumAge": { "type": "number" },
+          "competitionEnabled": { "type": "boolean" },
+          "boundaryVersion": { "type": "string" },
+          "policyVersion": { "type": "string" },
+          "validFrom": { "type": "string", "format": "date-time" },
+          "validTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "countryCode",
+          "subdivisionCode",
+          "metroName",
+          "currency",
+          "timezone",
+          "languageCodes",
+          "minimumAge",
+          "competitionEnabled",
+          "boundaryVersion",
+          "policyVersion",
+          "validFrom",
+          "validTo"
+        ]
+      },
+      "AdminDashboardGoalBracketDto": {
+        "type": "object",
+        "properties": {
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "label": { "type": "string" }
+        },
+        "required": ["goalDays", "label"]
+      },
+      "AdminDashboardCompetitionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 },
+          "rulesVersion": { "type": "string" },
+          "rules": { "type": "object" },
+          "minimumEntrants": { "type": "number" },
+          "entrantCap": { "type": "number", "nullable": true },
+          "enrollmentCount": { "type": "number" },
+          "rewardCount": { "type": "number" },
+          "publishedRewardCount": { "type": "number" },
+          "goalBrackets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardGoalBracketDto"
+            }
+          },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "regionCode",
+          "regionName",
+          "monthKey",
+          "name",
+          "status",
+          "version",
+          "rulesVersion",
+          "rules",
+          "minimumEntrants",
+          "entrantCap",
+          "enrollmentCount",
+          "rewardCount",
+          "publishedRewardCount",
+          "goalBrackets",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "AdminDashboardRewardDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "rewardType": { "type": "string" },
+          "status": { "type": "string" },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "termsUrl": { "type": "string", "format": "uri", "nullable": true },
+          "claimUrl": { "type": "string", "format": "uri", "nullable": true },
+          "fulfillmentInstructions": { "type": "string", "nullable": true },
+          "inventoryTotal": { "type": "number" },
+          "couponCodeCount": { "type": "number" },
+          "assignedCouponCodeCount": { "type": "number" },
+          "displayOrder": { "type": "number" },
+          "availableFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "availableUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "competitionName",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "status",
+          "imageUrl",
+          "termsUrl",
+          "claimUrl",
+          "fulfillmentInstructions",
+          "inventoryTotal",
+          "couponCodeCount",
+          "assignedCouponCodeCount",
+          "displayOrder",
+          "availableFrom",
+          "availableUntil",
+          "version"
+        ]
+      },
+      "AdminDashboardCreatorWorkoutDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "creatorUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "title": { "type": "string" },
+          "creatorName": { "type": "string" },
+          "videoUrl": { "type": "string", "format": "uri" },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "durationMinutes": { "type": "number" },
+          "workoutStyle": { "type": "string" },
+          "sponsorName": { "type": "string", "nullable": true },
+          "regionCodes": { "type": "array", "items": { "type": "string" } },
+          "published": { "type": "boolean" },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "id",
+          "creatorUserId",
+          "title",
+          "creatorName",
+          "videoUrl",
+          "thumbnailUrl",
+          "durationMinutes",
+          "workoutStyle",
+          "sponsorName",
+          "regionCodes",
+          "published",
+          "publishedAt",
+          "version"
+        ]
+      },
+      "AdminDashboardLegalDocumentDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "documentKey": { "type": "string" },
+          "jurisdictionCode": { "type": "string" },
+          "locale": { "type": "string" },
+          "version": { "type": "string" },
+          "title": { "type": "string" },
+          "content": { "type": "object" },
+          "contentSha256": { "type": "string" },
+          "receiptRequirement": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["effective", "scheduled", "withdrawn"]
+          },
+          "effectiveAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "documentKey",
+          "jurisdictionCode",
+          "locale",
+          "version",
+          "title",
+          "content",
+          "contentSha256",
+          "receiptRequirement",
+          "status",
+          "effectiveAt"
+        ]
+      },
+      "AdminDashboardAuditEventDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "actorEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "action": { "type": "string" },
+          "entityType": { "type": "string" },
+          "entityId": { "type": "string", "format": "uuid" },
+          "reason": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "id",
+          "actorEmail",
+          "action",
+          "entityType",
+          "entityId",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "AdminDashboardSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "admin": { "$ref": "#/components/schemas/AdminDashboardIdentityDto" },
+          "regions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminDashboardRegionDto" }
+          },
+          "competitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardCompetitionDto"
+            }
+          },
+          "rewards": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminDashboardRewardDto" }
+          },
+          "creatorWorkouts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardCreatorWorkoutDto"
+            }
+          },
+          "legalDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardLegalDocumentDto"
+            }
+          },
+          "auditEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardAuditEventDto"
+            }
+          },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "admin",
+          "regions",
+          "competitions",
+          "rewards",
+          "creatorWorkouts",
+          "legalDocuments",
+          "auditEvents",
+          "generatedAt"
+        ]
       },
       "CreateRegionPolicyDto": {
         "type": "object",
@@ -3604,28 +3932,6 @@
           "uniqueTokenCount"
         ]
       },
-      "FaceCheckReviewDto": {
-        "type": "object",
-        "properties": {
-          "count": { "type": "number", "minimum": 0 },
-          "minimumRequiredCount": { "type": "number", "minimum": 0 },
-          "required": { "type": "boolean" },
-          "trustStates": { "type": "array", "items": { "type": "string" } },
-          "maximumConfidence": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0,
-            "nullable": true
-          }
-        },
-        "required": [
-          "count",
-          "minimumRequiredCount",
-          "required",
-          "trustStates",
-          "maximumConfidence"
-        ]
-      },
       "GymQrReviewDto": {
         "type": "object",
         "properties": {
@@ -3664,17 +3970,29 @@
           "minimumBpm"
         ]
       },
+      "SessionEvidenceCategoryReviewDto": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "number", "minimum": 0 },
+          "minimumRequiredCount": { "type": "number", "minimum": 0 },
+          "required": { "type": "boolean" },
+          "trustStates": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["count", "minimumRequiredCount", "required", "trustStates"]
+      },
       "SessionEvidenceReviewGroupsDto": {
         "type": "object",
         "properties": {
           "deviceAttestation": {
             "$ref": "#/components/schemas/DeviceAttestationReviewDto"
           },
-          "faceCheck": { "$ref": "#/components/schemas/FaceCheckReviewDto" },
           "gymQr": { "$ref": "#/components/schemas/GymQrReviewDto" },
-          "heartRate": { "$ref": "#/components/schemas/HeartRateReviewDto" }
+          "heartRate": { "$ref": "#/components/schemas/HeartRateReviewDto" },
+          "presenceCheck": {
+            "$ref": "#/components/schemas/SessionEvidenceCategoryReviewDto"
+          }
         },
-        "required": ["deviceAttestation", "faceCheck", "gymQr", "heartRate"]
+        "required": ["deviceAttestation", "gymQr", "heartRate", "presenceCheck"]
       },
       "SessionEvidenceReviewResponseDto": {
         "type": "object",
@@ -3720,10 +4038,6 @@
             "type": "string",
             "enum": ["approved", "not_required", "rejected"]
           },
-          "faceCheck": {
-            "type": "string",
-            "enum": ["approved", "not_required", "rejected"]
-          },
           "gymQr": {
             "type": "string",
             "enum": ["approved", "not_required", "rejected"]
@@ -3731,9 +4045,13 @@
           "heartRate": {
             "type": "string",
             "enum": ["approved", "not_required", "rejected"]
+          },
+          "presenceCheck": {
+            "type": "string",
+            "enum": ["approved", "not_required", "rejected"]
           }
         },
-        "required": ["deviceAttestation", "faceCheck", "gymQr", "heartRate"]
+        "required": ["deviceAttestation", "gymQr", "heartRate", "presenceCheck"]
       },
       "RejectSessionDto": {
         "type": "object",
@@ -3849,368 +4167,239 @@
         },
         "required": ["reason", "decision"]
       },
-      "RewardAwardStatusActionDto": {
+      "CategoryPodiumMultipliersResponseDto": {
         "type": "object",
         "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "action": {
-            "type": "string",
-            "enum": ["cancel", "fulfill", "redeem"]
-          }
+          "1": { "type": "number" },
+          "2": { "type": "number" },
+          "3": { "type": "number" }
         },
-        "required": ["reason", "action"]
+        "required": ["1", "2", "3"]
       },
-      "AdminRewardAwardResponseDto": {
+      "CompetitionRulesResponseDto": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "status": {
-            "type": "string",
-            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
-          }
-        },
-        "required": ["id", "status"]
-      },
-      "CreateRewardCatalogItemDto": {
-        "type": "object",
-        "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "sponsorName": { "type": "string", "maxLength": 120 },
-          "title": { "type": "string", "maxLength": 160 },
-          "description": { "type": "string", "maxLength": 2000 },
-          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
-          "imageUrl": { "type": "string", "format": "uri" },
-          "termsUrl": { "type": "string", "format": "uri" },
-          "claimUrl": { "type": "string", "format": "uri" },
-          "fulfillmentInstructions": { "type": "string", "maxLength": 2000 },
-          "inventoryTotal": {
-            "type": "number",
-            "maximum": 100000,
-            "minimum": 1
+          "minSessionMinutes": { "type": "number" },
+          "minHeartRateSamples": { "type": "number" },
+          "requireDeviceAttestation": { "type": "boolean" },
+          "requirePresenceCheck": { "type": "boolean" },
+          "requireGymQr": { "type": "boolean" },
+          "categoryPodiumMultipliers": {
+            "$ref": "#/components/schemas/CategoryPodiumMultipliersResponseDto"
           },
-          "displayOrder": { "type": "number", "default": 0, "minimum": 0 },
-          "availableFrom": { "type": "string", "format": "date-time" },
-          "availableUntil": { "type": "string", "format": "date-time" }
+          "perfectMonthMultiplier": { "type": "number" },
+          "signupPrizeDrawEntries": { "type": "number" },
+          "verifiedSessionCategoryScore": { "type": "number" },
+          "verifiedSessionPrizeDrawEntries": { "type": "number" },
+          "weeklyChallengeBothHitMultiplier": { "type": "number" },
+          "weeklyChallengeRecoveryMultiplier": { "type": "number" }
         },
         "required": [
-          "reason",
-          "competitionId",
-          "sponsorName",
-          "title",
-          "description",
-          "rewardType",
-          "inventoryTotal"
+          "minSessionMinutes",
+          "minHeartRateSamples",
+          "requireDeviceAttestation",
+          "requirePresenceCheck",
+          "requireGymQr",
+          "categoryPodiumMultipliers",
+          "perfectMonthMultiplier",
+          "signupPrizeDrawEntries",
+          "verifiedSessionCategoryScore",
+          "verifiedSessionPrizeDrawEntries",
+          "weeklyChallengeBothHitMultiplier",
+          "weeklyChallengeRecoveryMultiplier"
         ]
       },
-      "AdminRewardResponseDto": {
+      "CompetitionResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "status": {
-            "type": "string",
-            "enum": ["archived", "draft", "published"]
-          },
-          "version": { "type": "number", "minimum": 1 }
-        },
-        "required": ["id", "status", "version"]
-      },
-      "UpdateRewardCatalogItemDto": {
-        "type": "object",
-        "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "sponsorName": { "type": "string", "maxLength": 120 },
-          "title": { "type": "string", "maxLength": 160 },
-          "description": { "type": "string", "maxLength": 2000 },
-          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
-          "imageUrl": { "type": "string", "format": "uri" },
-          "termsUrl": { "type": "string", "format": "uri" },
-          "claimUrl": { "type": "string", "format": "uri" },
-          "fulfillmentInstructions": { "type": "string", "maxLength": 2000 },
-          "inventoryTotal": {
-            "type": "number",
-            "maximum": 100000,
-            "minimum": 1
-          },
-          "displayOrder": { "type": "number", "default": 0, "minimum": 0 },
-          "availableFrom": { "type": "string", "format": "date-time" },
-          "availableUntil": { "type": "string", "format": "date-time" },
-          "expectedVersion": { "type": "number", "minimum": 1 }
-        },
-        "required": [
-          "reason",
-          "competitionId",
-          "sponsorName",
-          "title",
-          "description",
-          "rewardType",
-          "inventoryTotal",
-          "expectedVersion"
-        ]
-      },
-      "RewardCatalogStatusActionDto": {
-        "type": "object",
-        "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "action": { "type": "string", "enum": ["archive", "publish"] },
-          "expectedVersion": { "type": "number", "minimum": 1 }
-        },
-        "required": ["reason", "action", "expectedVersion"]
-      },
-      "AddRewardCouponCodesDto": {
-        "type": "object",
-        "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "codes": {
-            "maxItems": 10000,
-            "type": "array",
-            "items": { "type": "string" }
-          }
-        },
-        "required": ["reason", "codes"]
-      },
-      "AddedCouponCodesResponseDto": {
-        "type": "object",
-        "properties": {
-          "added": { "type": "number", "minimum": 1 },
-          "rewardId": { "type": "string", "format": "uuid" }
-        },
-        "required": ["added", "rewardId"]
-      },
-      "RewardCatalogItemResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "competitionName": { "type": "string" },
           "monthKey": { "type": "string" },
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "registration",
+              "active",
+              "settling",
+              "settled",
+              "cancelled"
+            ]
+          },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
-          "sponsorName": { "type": "string" },
-          "title": { "type": "string" },
-          "description": { "type": "string" },
-          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
-          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
-          "termsUrl": { "type": "string", "format": "uri", "nullable": true },
-          "inventoryRemaining": { "type": "number", "minimum": 0 },
-          "inventoryTotal": { "type": "number", "minimum": 1 }
+          "rulesVersion": { "type": "string" },
+          "rules": {
+            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
+          },
+          "goalDays": { "type": "array", "items": { "type": "number" } },
+          "minimumEntrants": { "type": "number", "minimum": 100 },
+          "entrantCap": { "type": "number", "minimum": 100, "nullable": true },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
-          "competitionId",
-          "competitionName",
           "monthKey",
+          "name",
+          "status",
           "regionCode",
           "regionName",
-          "sponsorName",
-          "title",
-          "description",
-          "rewardType",
-          "imageUrl",
-          "termsUrl",
-          "inventoryRemaining",
-          "inventoryTotal"
+          "rulesVersion",
+          "rules",
+          "goalDays",
+          "minimumEntrants",
+          "entrantCap",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt"
         ]
       },
-      "RewardAwardResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "status": {
-            "type": "string",
-            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
-          },
-          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
-          "sponsorName": { "type": "string" },
-          "title": { "type": "string" },
-          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
-          "awardRank": { "type": "number", "minimum": 1 },
-          "awardedAt": { "type": "string", "format": "date-time" },
-          "claimedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "status",
-          "rewardType",
-          "sponsorName",
-          "title",
-          "imageUrl",
-          "awardRank",
-          "awardedAt",
-          "claimedAt"
-        ]
-      },
-      "ClaimRewardResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "status": {
-            "type": "string",
-            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
-          },
-          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
-          "sponsorName": { "type": "string" },
-          "title": { "type": "string" },
-          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
-          "awardRank": { "type": "number", "minimum": 1 },
-          "awardedAt": { "type": "string", "format": "date-time" },
-          "claimedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "couponCode": { "type": "string", "nullable": true },
-          "claimUrl": { "type": "string", "format": "uri", "nullable": true },
-          "fulfillmentInstructions": { "type": "string", "nullable": true }
-        },
-        "required": [
-          "id",
-          "status",
-          "rewardType",
-          "sponsorName",
-          "title",
-          "imageUrl",
-          "awardRank",
-          "awardedAt",
-          "claimedAt",
-          "couponCode",
-          "claimUrl",
-          "fulfillmentInstructions"
-        ]
-      },
-      "CreateSessionDto": {
-        "type": "object",
-        "properties": {
-          "competitionId": { "type": "string", "format": "uuid" },
-          "clientStartedAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["competitionId"]
-      },
-      "SessionResponseDto": {
+      "EnrollmentResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "competitionId": { "type": "string", "format": "uuid" },
-          "eligibleDate": { "type": "string" },
+          "goalDays": { "type": "number" },
           "status": {
             "type": "string",
-            "enum": [
-              "active",
-              "pending_review",
-              "verified",
-              "rejected",
-              "cancelled"
-            ]
+            "enum": ["active", "withdrawn", "disqualified"]
           },
-          "policyVersion": { "type": "string" },
-          "startedAt": { "type": "string", "format": "date-time" },
-          "completedAt": {
+          "enrolledAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
+      },
+      "CreateEnrollmentDto": {
+        "type": "object",
+        "properties": {
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "regionVerificationId": { "type": "string", "format": "uuid" },
+          "legalReceiptBundleId": { "type": "string", "format": "uuid" },
+          "rulesAccepted": { "type": "boolean", "enum": [true] },
+          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
+        },
+        "required": [
+          "goalDays",
+          "regionVerificationId",
+          "legalReceiptBundleId",
+          "rulesAccepted",
+          "ageEligibilityAttested"
+        ]
+      },
+      "EnrollmentCountResponseDto": {
+        "type": "object",
+        "properties": { "count": { "type": "number" } },
+        "required": ["count"]
+      },
+      "StreakCountsDto": {
+        "type": "object",
+        "properties": {
+          "daily": { "type": "number", "example": 3, "minimum": 0 },
+          "weekly": { "type": "number", "example": 4, "minimum": 0 },
+          "monthly": { "type": "number", "example": 2, "minimum": 0 },
+          "yearly": { "type": "number", "example": 1, "minimum": 0 }
+        },
+        "required": ["daily", "weekly", "monthly", "yearly"]
+      },
+      "CompetitionMatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "availability": {
             "type": "string",
-            "format": "date-time",
+            "enum": ["matched", "searching", "solo"]
+          },
+          "opponentAlias": { "type": "string" },
+          "opponentVerifiedDateKeys": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "region": { "type": "string" },
+          "opponentUserId": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
-          }
+          },
+          "opponentCurrentStreak": { "type": "number" },
+          "opponentBestStreak": { "type": "number" },
+          "opponentMonthlyVerifiedDays": { "type": "number" },
+          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": [
+          "availability",
+          "opponentAlias",
+          "opponentVerifiedDateKeys",
+          "periodIndex",
+          "region",
+          "opponentCurrentStreak",
+          "opponentBestStreak",
+          "opponentMonthlyVerifiedDays",
+          "opponentStreaks"
+        ]
+      },
+      "EligibleWeeklyChallengePartnerDto": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string", "format": "uuid" },
+          "alias": { "type": "string" },
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "requestStatus": {
+            "type": "string",
+            "enum": ["available", "pending"]
+          },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": ["userId", "alias", "goalDays", "requestStatus", "streaks"]
+      },
+      "WeeklyChallengeRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
+          "partnerAlias": { "type": "string" },
+          "partnerUserId": { "type": "string", "format": "uuid" },
+          "partnerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
+          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["accepted", "cancelled", "declined", "pending"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
           "competitionId",
-          "eligibleDate",
+          "direction",
+          "partnerAlias",
+          "partnerUserId",
+          "partnerStreaks",
+          "periodIndex",
+          "goalDays",
           "status",
-          "policyVersion",
-          "startedAt",
-          "completedAt"
+          "createdAt"
         ]
       },
-      "AppendSessionEventDto": {
+      "CreateWeeklyChallengeRequestDto": {
         "type": "object",
         "properties": {
-          "eventId": { "type": "string", "format": "uuid" },
-          "eventType": {
-            "type": "string",
-            "enum": [
-              "device_attestation",
-              "face_check",
-              "gym_qr_scan",
-              "heart_rate_sample"
-            ]
-          },
-          "occurredAt": { "type": "string", "format": "date-time" },
-          "heartRateBpm": { "type": "number", "maximum": 240, "minimum": 30 },
-          "faceMatchConfidence": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0
-          },
-          "qrPayload": { "type": "string", "maxLength": 2048 },
-          "deviceEvidenceToken": { "type": "string", "maxLength": 4096 }
+          "region": { "type": "string", "example": "vancouver-bc" },
+          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "period": { "type": "number", "maximum": 4, "minimum": 1 },
+          "recipientUserId": { "type": "string", "format": "uuid" }
         },
-        "required": ["eventId", "eventType", "occurredAt"]
+        "required": ["region", "goal", "period", "recipientUserId"]
       },
-      "SessionEventResponseDto": {
+      "WeeklyChallengeRequestDecisionDto": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "eventId": { "type": "string", "format": "uuid" },
-          "eventType": {
-            "type": "string",
-            "enum": [
-              "device_attestation",
-              "face_check",
-              "gym_qr_scan",
-              "heart_rate_sample"
-            ]
-          },
-          "receivedAt": { "type": "string", "format": "date-time" }
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
         },
-        "required": ["id", "eventId", "eventType", "receivedAt"]
-      },
-      "CompleteSessionDto": {
-        "type": "object",
-        "properties": {
-          "clientCompletedAt": { "type": "string", "format": "date-time" }
-        }
-      },
-      "SessionCompletionResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "eligibleDate": { "type": "string" },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "pending_review",
-              "verified",
-              "rejected",
-              "cancelled"
-            ]
-          },
-          "policyVersion": { "type": "string" },
-          "startedAt": { "type": "string", "format": "date-time" },
-          "completedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "eligibleForReview": { "type": "boolean" },
-          "violations": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": [
-          "id",
-          "competitionId",
-          "eligibleDate",
-          "status",
-          "policyVersion",
-          "startedAt",
-          "completedAt",
-          "eligibleForReview",
-          "violations"
-        ]
+        "required": ["decision"]
       },
       "LegalDocumentSectionDto": {
         "type": "object",
@@ -4470,216 +4659,418 @@
         },
         "required": ["accepted", "consentVersion"]
       },
-      "CompetitionRulesResponseDto": {
+      "RewardAwardStatusActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": {
+            "type": "string",
+            "enum": ["cancel", "fulfill", "redeem"]
+          }
+        },
+        "required": ["reason", "action"]
+      },
+      "AdminRewardAwardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          }
+        },
+        "required": ["id", "status"]
+      },
+      "CreateRewardCatalogItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "sponsorName": { "type": "string", "maxLength": 120 },
+          "title": { "type": "string", "maxLength": 160 },
+          "description": { "type": "string", "maxLength": 2000 },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "imageUrl": { "type": "string", "format": "uri" },
+          "termsUrl": { "type": "string", "format": "uri" },
+          "claimUrl": { "type": "string", "format": "uri" },
+          "fulfillmentInstructions": { "type": "string", "maxLength": 2000 },
+          "inventoryTotal": {
+            "type": "number",
+            "maximum": 100000,
+            "minimum": 1
+          },
+          "displayOrder": { "type": "number", "default": 0, "minimum": 0 },
+          "availableFrom": { "type": "string", "format": "date-time" },
+          "availableUntil": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "reason",
+          "competitionId",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "inventoryTotal"
+        ]
+      },
+      "AdminRewardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["archived", "draft", "published"]
+          },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": ["id", "status", "version"]
+      },
+      "UpdateRewardCatalogItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "sponsorName": { "type": "string", "maxLength": 120 },
+          "title": { "type": "string", "maxLength": 160 },
+          "description": { "type": "string", "maxLength": 2000 },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "imageUrl": { "type": "string", "format": "uri" },
+          "termsUrl": { "type": "string", "format": "uri" },
+          "claimUrl": { "type": "string", "format": "uri" },
+          "fulfillmentInstructions": { "type": "string", "maxLength": 2000 },
+          "inventoryTotal": {
+            "type": "number",
+            "maximum": 100000,
+            "minimum": 1
+          },
+          "displayOrder": { "type": "number", "default": 0, "minimum": 0 },
+          "availableFrom": { "type": "string", "format": "date-time" },
+          "availableUntil": { "type": "string", "format": "date-time" },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "reason",
+          "competitionId",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "inventoryTotal",
+          "expectedVersion"
+        ]
+      },
+      "RewardCatalogStatusActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": { "type": "string", "enum": ["archive", "publish"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "action", "expectedVersion"]
+      },
+      "AddRewardCouponCodesDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "codes": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["reason", "codes"]
+      },
+      "AddedCouponCodesResponseDto": {
+        "type": "object",
+        "properties": {
+          "added": { "type": "number", "minimum": 1 },
+          "rewardId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["added", "rewardId"]
+      },
+      "RewardCatalogItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "termsUrl": { "type": "string", "format": "uri", "nullable": true },
+          "inventoryRemaining": { "type": "number", "minimum": 0 },
+          "inventoryTotal": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "competitionName",
+          "monthKey",
+          "regionCode",
+          "regionName",
+          "sponsorName",
+          "title",
+          "description",
+          "rewardType",
+          "imageUrl",
+          "termsUrl",
+          "inventoryRemaining",
+          "inventoryTotal"
+        ]
+      },
+      "RewardAwardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "awardRank": { "type": "number", "minimum": 1 },
+          "awardedAt": { "type": "string", "format": "date-time" },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "rewardType",
+          "sponsorName",
+          "title",
+          "imageUrl",
+          "awardRank",
+          "awardedAt",
+          "claimedAt"
+        ]
+      },
+      "ClaimRewardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          },
+          "rewardType": { "type": "string", "enum": ["coupon", "physical"] },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
+          "awardRank": { "type": "number", "minimum": 1 },
+          "awardedAt": { "type": "string", "format": "date-time" },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "couponCode": { "type": "string", "nullable": true },
+          "claimUrl": { "type": "string", "format": "uri", "nullable": true },
+          "fulfillmentInstructions": { "type": "string", "nullable": true }
+        },
+        "required": [
+          "id",
+          "status",
+          "rewardType",
+          "sponsorName",
+          "title",
+          "imageUrl",
+          "awardRank",
+          "awardedAt",
+          "claimedAt",
+          "couponCode",
+          "claimUrl",
+          "fulfillmentInstructions"
+        ]
+      },
+      "CreateSessionDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": { "type": "string", "format": "uuid" },
+          "clientStartedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["competitionId"]
+      },
+      "SessionRequirementsResponseDto": {
         "type": "object",
         "properties": {
           "minSessionMinutes": { "type": "number" },
           "minHeartRateSamples": { "type": "number" },
           "requireDeviceAttestation": { "type": "boolean" },
-          "requireFaceCheck": { "type": "boolean" },
-          "requireGymQr": { "type": "boolean" },
-          "signupPrizeDrawEntries": { "type": "number" },
-          "verifiedSessionCategoryScore": { "type": "number" },
-          "verifiedSessionPrizeDrawEntries": { "type": "number" }
+          "requirePresenceCheck": { "type": "boolean" },
+          "requireGymQr": { "type": "boolean" }
         },
         "required": [
           "minSessionMinutes",
           "minHeartRateSamples",
           "requireDeviceAttestation",
-          "requireFaceCheck",
-          "requireGymQr",
-          "signupPrizeDrawEntries",
-          "verifiedSessionCategoryScore",
-          "verifiedSessionPrizeDrawEntries"
+          "requirePresenceCheck",
+          "requireGymQr"
         ]
       },
-      "CompetitionResponseDto": {
+      "StartedSessionResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "monthKey": { "type": "string" },
-          "name": { "type": "string" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string" },
           "status": {
             "type": "string",
             "enum": [
-              "draft",
-              "registration",
               "active",
-              "settling",
-              "settled",
+              "pending_review",
+              "verified",
+              "rejected",
               "cancelled"
             ]
           },
-          "regionCode": { "type": "string" },
-          "regionName": { "type": "string" },
-          "rulesVersion": { "type": "string" },
-          "rules": {
-            "$ref": "#/components/schemas/CompetitionRulesResponseDto"
-          },
-          "goalDays": { "type": "array", "items": { "type": "number" } },
-          "registrationOpensAt": { "type": "string", "format": "date-time" },
-          "registrationClosesAt": { "type": "string", "format": "date-time" },
-          "startsAt": { "type": "string", "format": "date-time" },
-          "endsAt": { "type": "string", "format": "date-time" }
-        },
-        "required": [
-          "id",
-          "monthKey",
-          "name",
-          "status",
-          "regionCode",
-          "regionName",
-          "rulesVersion",
-          "rules",
-          "goalDays",
-          "registrationOpensAt",
-          "registrationClosesAt",
-          "startsAt",
-          "endsAt"
-        ]
-      },
-      "EnrollmentResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "goalDays": { "type": "number" },
-          "status": {
+          "policyVersion": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
             "type": "string",
-            "enum": ["active", "withdrawn", "disqualified"]
-          },
-          "enrolledAt": { "type": "string", "format": "date-time" }
-        },
-        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
-      },
-      "CreateEnrollmentDto": {
-        "type": "object",
-        "properties": {
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "regionVerificationId": { "type": "string", "format": "uuid" },
-          "legalReceiptBundleId": { "type": "string", "format": "uuid" },
-          "rulesAccepted": { "type": "boolean", "enum": [true] },
-          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
-        },
-        "required": [
-          "goalDays",
-          "regionVerificationId",
-          "legalReceiptBundleId",
-          "rulesAccepted",
-          "ageEligibilityAttested"
-        ]
-      },
-      "EnrollmentCountResponseDto": {
-        "type": "object",
-        "properties": { "count": { "type": "number" } },
-        "required": ["count"]
-      },
-      "StreakCountsDto": {
-        "type": "object",
-        "properties": {
-          "daily": { "type": "number", "example": 3, "minimum": 0 },
-          "weekly": { "type": "number", "example": 4, "minimum": 0 },
-          "monthly": { "type": "number", "example": 2, "minimum": 0 },
-          "yearly": { "type": "number", "example": 1, "minimum": 0 }
-        },
-        "required": ["daily", "weekly", "monthly", "yearly"]
-      },
-      "CompetitionMatchResponseDto": {
-        "type": "object",
-        "properties": {
-          "availability": {
-            "type": "string",
-            "enum": ["matched", "searching", "solo"]
-          },
-          "opponentAlias": { "type": "string" },
-          "opponentVerifiedDateKeys": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
-          "region": { "type": "string" },
-          "opponentUserId": {
-            "type": "string",
-            "format": "uuid",
+            "format": "date-time",
             "nullable": true
           },
-          "opponentCurrentStreak": { "type": "number" },
-          "opponentBestStreak": { "type": "number" },
-          "opponentMonthlyVerifiedDays": { "type": "number" },
-          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" }
-        },
-        "required": [
-          "availability",
-          "opponentAlias",
-          "opponentVerifiedDateKeys",
-          "periodIndex",
-          "region",
-          "opponentCurrentStreak",
-          "opponentBestStreak",
-          "opponentMonthlyVerifiedDays",
-          "opponentStreaks"
-        ]
-      },
-      "EligibleWeeklyChallengePartnerDto": {
-        "type": "object",
-        "properties": {
-          "userId": { "type": "string", "format": "uuid" },
-          "alias": { "type": "string" },
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "requestStatus": {
-            "type": "string",
-            "enum": ["available", "pending"]
-          },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
-        },
-        "required": ["userId", "alias", "goalDays", "requestStatus", "streaks"]
-      },
-      "WeeklyChallengeRequestResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
-          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
-          "partnerAlias": { "type": "string" },
-          "partnerUserId": { "type": "string", "format": "uuid" },
-          "partnerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
-          "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
-          "status": {
-            "type": "string",
-            "enum": ["accepted", "cancelled", "declined", "pending"]
-          },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "requirements": {
+            "$ref": "#/components/schemas/SessionRequirementsResponseDto"
+          }
         },
         "required": [
           "id",
           "competitionId",
-          "direction",
-          "partnerAlias",
-          "partnerUserId",
-          "partnerStreaks",
-          "periodIndex",
-          "goalDays",
+          "eligibleDate",
           "status",
-          "createdAt"
+          "policyVersion",
+          "startedAt",
+          "completedAt",
+          "requirements"
         ]
       },
-      "CreateWeeklyChallengeRequestDto": {
+      "AppendSessionEventDto": {
         "type": "object",
         "properties": {
-          "region": { "type": "string" },
-          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
-          "period": { "type": "number", "maximum": 4, "minimum": 1 },
-          "recipientUserId": { "type": "string", "format": "uuid" }
+          "eventId": { "type": "string", "format": "uuid" },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "device_attestation",
+              "gym_qr_scan",
+              "heart_rate_sample",
+              "presence_check"
+            ]
+          },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "heartRateBpm": { "type": "number", "maximum": 240, "minimum": 30 },
+          "qrPayload": { "type": "string", "maxLength": 2048 },
+          "deviceEvidenceToken": { "type": "string", "maxLength": 4096 }
         },
-        "required": ["region", "goal", "period", "recipientUserId"]
+        "required": ["eventId", "eventType", "occurredAt"]
       },
-      "WeeklyChallengeRequestDecisionDto": {
+      "SessionEventResponseDto": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+          "id": { "type": "string", "format": "uuid" },
+          "eventId": { "type": "string", "format": "uuid" },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "device_attestation",
+              "gym_qr_scan",
+              "heart_rate_sample",
+              "presence_check"
+            ]
+          },
+          "receivedAt": { "type": "string", "format": "date-time" }
         },
-        "required": ["decision"]
+        "required": ["id", "eventId", "eventType", "receivedAt"]
+      },
+      "CompleteSessionDto": {
+        "type": "object",
+        "properties": {
+          "clientCompletedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SessionCompletionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_review",
+              "verified",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "policyVersion": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "eligibleForReview": { "type": "boolean" },
+          "violations": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "eligibleDate",
+          "status",
+          "policyVersion",
+          "startedAt",
+          "completedAt",
+          "eligibleForReview",
+          "violations"
+        ]
+      },
+      "SessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_review",
+              "verified",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "policyVersion": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "competitionId",
+          "eligibleDate",
+          "status",
+          "policyVersion",
+          "startedAt",
+          "completedAt"
+        ]
       },
       "CreatePrivacyRequestDto": {
         "type": "object",
@@ -4847,28 +5238,16 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "regionPolicyId": { "type": "string", "format": "uuid" },
-          "method": {
-            "type": "string",
-            "enum": ["device_location", "postal_code", "manual_review"]
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "approved", "rejected", "expired"]
-          },
+          "method": { "type": "string", "enum": ["device_location"] },
+          "status": { "type": "string", "enum": ["approved"] },
           "policyVersion": { "type": "string" },
+          "regionCode": { "type": "string", "example": "vancouver-bc" },
+          "regionName": { "type": "string", "example": "Vancouver" },
+          "jurisdictionCode": { "type": "string", "example": "CA-BC" },
+          "timezone": { "type": "string", "example": "America/Vancouver" },
           "createdAt": { "type": "string", "format": "date-time" },
-          "regionCode": { "type": "string", "example": "CA-BC" },
-          "regionName": { "type": "string", "example": "British Columbia" },
-          "reviewedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
+          "reviewedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
@@ -4876,9 +5255,11 @@
           "method",
           "status",
           "policyVersion",
-          "createdAt",
           "regionCode",
           "regionName",
+          "jurisdictionCode",
+          "timezone",
+          "createdAt",
           "reviewedAt",
           "expiresAt"
         ]
@@ -4887,7 +5268,7 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "code": { "type": "string", "example": "CA-BC-VICTORIA" },
+          "code": { "type": "string", "example": "victoria-bc" },
           "countryCode": { "type": "string", "example": "CA" },
           "subdivisionCode": { "type": "string", "example": "BC" },
           "metroName": { "type": "string", "example": "Victoria" },
@@ -4925,28 +5306,27 @@
       "CreateRegionVerificationDto": {
         "type": "object",
         "properties": {
-          "regionPolicyId": { "type": "string", "format": "uuid" },
           "method": { "type": "string", "enum": ["device_location"] },
           "latitude": { "type": "number", "maximum": 90, "minimum": -90 },
           "longitude": { "type": "number", "maximum": 180, "minimum": -180 }
         },
-        "required": ["regionPolicyId", "method", "latitude", "longitude"]
+        "required": ["method", "latitude", "longitude"]
       },
       "RegionVerificationResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "regionPolicyId": { "type": "string", "format": "uuid" },
-          "method": {
-            "type": "string",
-            "enum": ["device_location", "postal_code", "manual_review"]
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "approved", "rejected", "expired"]
-          },
+          "method": { "type": "string", "enum": ["device_location"] },
+          "status": { "type": "string", "enum": ["approved"] },
           "policyVersion": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "regionCode": { "type": "string", "example": "vancouver-bc" },
+          "regionName": { "type": "string", "example": "Vancouver" },
+          "jurisdictionCode": { "type": "string", "example": "CA-BC" },
+          "timezone": { "type": "string", "example": "America/Vancouver" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "reviewedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
@@ -4954,7 +5334,13 @@
           "method",
           "status",
           "policyVersion",
-          "createdAt"
+          "regionCode",
+          "regionName",
+          "jurisdictionCode",
+          "timezone",
+          "createdAt",
+          "reviewedAt",
+          "expiresAt"
         ]
       },
       "SettledCompetitionResponseDto": {
@@ -4989,7 +5375,6 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "joined": { "type": "boolean" },
           "name": { "type": "string" },
           "reward": { "type": "string" },
           "timing": { "type": "string" },
@@ -5007,7 +5392,6 @@
         },
         "required": [
           "id",
-          "joined",
           "name",
           "reward",
           "timing",
@@ -5338,8 +5722,8 @@
           },
           "regionCode": {
             "type": "string",
-            "example": "TORONTO",
-            "maxLength": 32
+            "example": "toronto-on",
+            "maxLength": 64
           },
           "locationName": { "type": "string", "maxLength": 120 },
           "scheduledDays": {
@@ -5455,93 +5839,6 @@
           "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
         },
         "required": ["asOfDate", "timezone", "streaks"]
-      },
-      "SponsorAdPlacementResponseDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "enum": [
-              "creator_workout_launch_video",
-              "member_screen_banner",
-              "post_login_video",
-              "rewards_marketplace_video",
-              "verified_workout_completion_video",
-              "weekly_challenge_result_video",
-              "winners_circle_video"
-            ]
-          },
-          "format": { "type": "string", "enum": ["banner", "video"] },
-          "deliveryMode": {
-            "type": "string",
-            "enum": ["automatic", "inline", "opt_in"]
-          },
-          "durationSeconds": { "type": "number", "nullable": true },
-          "trigger": { "type": "string" },
-          "frequencyPolicy": { "type": "string" },
-          "requiresActiveEnrollment": { "type": "boolean" },
-          "excludedContexts": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "account_data",
-                "active_workout",
-                "authentication",
-                "creator_submission",
-                "legal_privacy",
-                "onboarding",
-                "public"
-              ]
-            }
-          },
-          "eligibilitySatisfied": { "type": "boolean" },
-          "status": { "type": "string", "enum": ["placeholder"] },
-          "creativeReady": { "type": "boolean" },
-          "creativeId": { "type": "string", "nullable": true },
-          "mediaUrl": { "type": "string", "format": "uri", "nullable": true },
-          "trackingEnabled": { "type": "boolean" }
-        },
-        "required": [
-          "key",
-          "format",
-          "deliveryMode",
-          "durationSeconds",
-          "trigger",
-          "frequencyPolicy",
-          "requiresActiveEnrollment",
-          "excludedContexts",
-          "eligibilitySatisfied",
-          "status",
-          "creativeReady",
-          "creativeId",
-          "mediaUrl",
-          "trackingEnabled"
-        ]
-      },
-      "SponsorAdPlacementInventoryResponseDto": {
-        "type": "object",
-        "properties": {
-          "implementationStatus": { "type": "string", "enum": ["placeholder"] },
-          "visualDeliveryEnabled": { "type": "boolean" },
-          "competitionId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "placements": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SponsorAdPlacementResponseDto"
-            }
-          }
-        },
-        "required": [
-          "implementationStatus",
-          "visualDeliveryEnabled",
-          "competitionId",
-          "placements"
-        ]
       },
       "CategoryLeaderboardRowDto": {
         "type": "object",

@@ -46,7 +46,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthScreenShell
-      description="Enter your account email and Firebase will send a secure password-reset link."
+      description="Enter your account email and we will send a secure password-reset link."
       eyebrow="ACCOUNT RECOVERY"
       footer={(
         <CyberButtonOutline

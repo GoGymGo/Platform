@@ -2,15 +2,8 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
-import {
-  CyberButtonPrimary,
-  HUDBorderBox,
-  TerminalText
-} from '@/components/cyber';
-import {
-  LegalConsentCheckbox,
-  LegalDocumentLinks
-} from '@/components/legal';
+import { CyberButtonPrimary, HUDBorderBox, TerminalText } from '@/components/cyber';
+import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
 import { spacing } from '@/constants/theme';
 import {
   useCurrentLegalDocuments,
@@ -32,23 +25,13 @@ export function AccountLegalAgreement({
   const [submissionError, setSubmissionError] = useState<string>();
   const legalReceiptCurrent = legalReceipt.data?.complete === true;
   const legalBundleReady =
-    legalDocuments.data?.configured === true &&
-    legalDocuments.data.documents.length > 0;
+    legalDocuments.data?.configured === true && legalDocuments.data.documents.length > 0;
   const legalBundleSha256 = legalDocuments.data?.bundleSha256;
   const accountLegalAccepted =
     legalReceiptCurrent ||
-    (
-      Boolean(legalBundleSha256) &&
-      acceptedBundleSha256 === legalBundleSha256
-    );
-  const busy =
-    legalDocuments.isLoading ||
-    legalReceipt.isLoading ||
-    recordLegalReceipt.isPending;
-  const canContinue =
-    legalBundleReady &&
-    accountLegalAccepted &&
-    !busy;
+    (Boolean(legalBundleSha256) && acceptedBundleSha256 === legalBundleSha256);
+  const busy = legalDocuments.isLoading || legalReceipt.isLoading || recordLegalReceipt.isPending;
+  const canContinue = legalBundleReady && accountLegalAccepted && !busy;
 
   async function saveAndContinue() {
     setSubmissionError(undefined);
@@ -60,9 +43,7 @@ export function AccountLegalAgreement({
       return;
     }
     if (!accountLegalAccepted) {
-      setSubmissionError(
-        'Accept the Terms and acknowledge the Privacy Policy to continue.'
-      );
+      setSubmissionError('Accept the Terms and acknowledge the Privacy Policy to continue.');
       return;
     }
 
@@ -76,9 +57,7 @@ export function AccountLegalAgreement({
       onComplete();
     } catch (error) {
       setSubmissionError(
-        error instanceof Error
-          ? error.message
-          : 'Your agreements could not be recorded. Try again.'
+        error instanceof Error ? error.message : 'Your agreements could not be recorded. Try again.'
       );
     }
   }
@@ -90,8 +69,8 @@ export function AccountLegalAgreement({
           ACCOUNT AGREEMENTS
         </TerminalText>
         <TerminalText tone="muted" uppercase={false} variant="body">
-          Review these once for your verified region. We will ask again only
-          when a required document changes.
+          Review these once for your verified region. We will ask again only when a required
+          document changes.
         </TerminalText>
       </View>
 
@@ -110,19 +89,16 @@ export function AccountLegalAgreement({
             </TerminalText>
           ) : null}
         </View>
-        <LegalDocumentLinks
-          compact={legalReceiptCurrent}
-          jurisdictionCode={jurisdictionCode}
-        />
+        <LegalDocumentLinks compact={legalReceiptCurrent} jurisdictionCode={jurisdictionCode} />
         {!legalReceiptCurrent ? (
           <LegalConsentCheckbox
             checked={accountLegalAccepted}
             label="I accept the Terms and acknowledge the Privacy Policy."
-            onToggle={() => setAcceptedBundleSha256(
-              accountLegalAccepted
-                ? undefined
-                : legalDocuments.data?.bundleSha256
-            )}
+            onToggle={() =>
+              setAcceptedBundleSha256(
+                accountLegalAccepted ? undefined : legalDocuments.data?.bundleSha256
+              )
+            }
           />
         ) : null}
         {busy ? (
@@ -132,15 +108,13 @@ export function AccountLegalAgreement({
         ) : null}
         {!busy && !legalBundleReady ? (
           <AuthStatusNotice
-            message="CURRENT LEGAL DOCUMENTS ARE UNAVAILABLE. CHECK YOUR CONNECTION AND TRY AGAIN."
-            tone="red"
+            message="LEGAL DOCUMENTS HAVE NOT BEEN CONFIGURED FOR THIS REGION YET."
+            tone="amber"
           />
         ) : null}
       </HUDBorderBox>
 
-      {submissionError ? (
-        <AuthStatusNotice message={submissionError} tone="red" />
-      ) : null}
+      {submissionError ? <AuthStatusNotice message={submissionError} tone="red" /> : null}
 
       <CyberButtonPrimary
         disabled={!canContinue}

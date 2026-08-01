@@ -1,6 +1,6 @@
 # GoGymGo frontend readiness audit
 
-Status: active audit, July 15, 2026
+Status: code audit complete; external release configuration pending, July 30, 2026
 
 This document is the working map for taking the Expo app to a
 backend-connected release candidate. It separates implemented UI from
@@ -9,15 +9,24 @@ production integration is not ready.
 
 ## Current evidence
 
-- The Expo Router tree contains 48 concrete routes and 46 literal navigation
+- The Expo Router tree contains 49 concrete routes and 47 literal navigation
   targets. `npm run audit:source` currently finds no broken literal target.
-- A 390 x 844 browser boot sweep loaded every concrete route (using a catalog
-  workout for the dynamic route) without an uncaught render error or console
-  error. Guarded routes still require stateful, action-by-action validation.
-- Mobile typecheck, lint, and 112 domain/data tests pass.
-- Backend typecheck, lint, 98 unit tests, OpenAPI generation, and formatting pass.
+- A browser boot sweep loaded all 46 App Tour catalog screens at default and
+  390 x 844 dimensions without an uncaught render error, console error, or
+  horizontal overflow.
+- Mobile typecheck, lint, 127 domain/data tests, API route audit, and source
+  audit pass.
+- Backend formatting, typecheck, lint, build, 116 unit tests, 26 E2E tests,
+  21 clean PostgreSQL/PostGIS integration tests, OpenAPI generation, contract
+  audit, and source audit pass. The source audit inspected 270 files, and the
+  compiled production audit found all 21 prohibited markers absent across 165
+  generated files.
 - The frontend contract gate now requires all 59 mobile-facing server
   operations, rather than the original 20-route subset.
+- Production web, iOS, and Android bundles were scanned for 23 App Tour
+  fixture/UI markers across 69 generated files. None are packaged. Development
+  builds retain the dedicated click-through App Tour through production-aware
+  Metro aliases.
 
 ## Product-language dictionary
 
@@ -79,15 +88,20 @@ Do not split components solely to reduce a number. A split is complete only
 when the new module has one product responsibility, a narrow typed interface,
 and equivalent tests/render behavior.
 
-## Remaining release-blocking connections
+## Remaining release-blocking inputs and connections
 
 The authoritative status matrix and integration order live in
-`backend-handoff-architecture.md`. The current P0 order is:
+`backend-handoff-architecture.md`. Code checks are green. Store release remains
+blocked until the release owner supplies or approves:
 
-1. physical-device verification for QR camera, device presence, push token,
-   notification permission, and signed avatar upload states;
-2. decomposition of the large Commitment, social challenge, and workout state
-   files after their data boundaries are stable.
+1. final iOS bundle ID and Android package ID;
+2. the EAS owner and initialized EAS project ID;
+3. a public HTTPS production API deployment;
+4. public privacy-policy and account-deletion URLs with approved wording;
+5. at least one genuine workout evidence provider (wearable/heart-rate or
+   verified partner-gym QR); and
+6. physical-device validation for QR camera, device presence, push token,
+   notification permission, and signed avatar upload states.
 
 ## Required verification for completion
 
@@ -105,6 +119,5 @@ The authoritative status matrix and integration order live in
 - Run `npm run check` in both workspaces and confirm the regenerated OpenAPI file
   produces no diff.
 
-The frontend is ready for GitHub handoff only when this evidence exists and all
-remaining P0 connections above use an authenticated API adapter or are
-explicitly removed from the release scope.
+The codebase is ready for GitHub handoff. Store submission remains gated on the
+external release inputs and physical-device evidence listed above.

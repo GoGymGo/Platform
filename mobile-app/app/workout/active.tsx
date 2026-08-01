@@ -22,9 +22,10 @@ import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
-import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { useAppTour } from '@/state/appTour';
+import { appTourSimulatedHeartRateBpm } from '@/testing/appTourData';
 import { formatDateKey, useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatClock(totalSeconds: number) {
@@ -52,6 +53,8 @@ export default function ActiveWorkoutScreen() {
   const [showSessionOptions, setShowSessionOptions] = useState(false);
   const cancelDialogRef = useRef<View>(null);
   const activeSessionStartedAt = activeSession?.startedAt;
+  const activeSessionMinimumSeconds =
+    activeSession?.minimumSessionSeconds ?? 1;
 
   useEffect(() => {
     if (!activeSessionStartedAt) {
@@ -66,7 +69,7 @@ export default function ActiveWorkoutScreen() {
             new Date(),
             sessionTimeScale
           ),
-          workoutRules.minimumSessionSeconds
+          activeSessionMinimumSeconds
         )
       );
     };
@@ -77,46 +80,61 @@ export default function ActiveWorkoutScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activeSessionStartedAt]);
+  }, [activeSessionMinimumSeconds, activeSessionStartedAt]);
 
   const session = useMemo(() => {
     const progressPercent = Math.min(
       100,
-      Math.round((elapsedSeconds / workoutRules.minimumSessionSeconds) * 100)
+      Math.round((elapsedSeconds / activeSessionMinimumSeconds) * 100)
     );
-    const minimumReached = elapsedSeconds >= workoutRules.minimumSessionSeconds;
-    const midSessionVerified = activeSession?.midSessionVerified ?? false;
+    const minimumReached = elapsedSeconds >= activeSessionMinimumSeconds;
+    const presenceReady = Boolean(
+      activeSession &&
+        (!activeSession.presenceCheckRequired || activeSession.midSessionVerified)
+    );
     const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
       activeSession &&
-        activeSession.heartRateObservedSeconds >= workoutRules.minimumSessionSeconds &&
-        activeSession.averageHeartRateBpm >= workoutRules.minimumAverageHeartRateBpm
+        activeSession.heartRateSamplesSubmitted >=
+          activeSession.requiredHeartRateSamples
     );
+    const missingHeartRateSamples = activeSession?.verificationMethod === 'heartRate'
+      ? Math.max(
+          0,
+          activeSession.requiredHeartRateSamples -
+            activeSession.heartRateSamplesSubmitted
+        )
+      : 0;
 
     return {
       averageHeartRate: activeSession?.averageHeartRateBpm ?? 0,
       clock: formatClock(elapsedSeconds),
       finishCta:
-        minimumReached && midSessionVerified && heartRateReady
+        minimumReached && presenceReady && heartRateReady
           ? 'Verify and finish'
           : minimumReached
-            ? !midSessionVerified
+            ? !presenceReady
               ? 'Presence check required'
-              : `Reach ${workoutRules.minimumAverageHeartRateBpm} BPM to continue`
-            : 'Available at 30:00',
+              : `${missingHeartRateSamples} heart-rate samples remaining`
+            : `Available at ${formatClock(activeSessionMinimumSeconds)}`,
       heartRate: appTourActive
-        ? activeSession?.averageHeartRateBpm ?? 118
+        ? activeSession?.averageHeartRateBpm ?? appTourSimulatedHeartRateBpm
         : 0,
-      currentHeartRateElevated: appTourActive,
       telemetryAvailable: appTourActive,
       heartRateReady,
       progressPercent,
-      ready: minimumReached && midSessionVerified && heartRateReady
+      ready: minimumReached && presenceReady && heartRateReady
     };
-  }, [activeSession, appTourActive, elapsedSeconds]);
+  }, [
+    activeSession,
+    activeSessionMinimumSeconds,
+    appTourActive,
+    elapsedSeconds
+  ]);
 
   useEffect(() => {
     if (
       activeSession &&
+      activeSession.presenceCheckRequired &&
       !activeSession.midSessionCheckPrompted &&
       !activeSession.midSessionVerified &&
       elapsedSeconds >= activeSession.midSessionCheckAtSeconds
@@ -138,30 +156,38 @@ export default function ActiveWorkoutScreen() {
   }
 
   const isHeartRateVerification = activeSession.verificationMethod === 'heartRate';
-  const heartRateTone: 'green' | 'amber' = session.telemetryAvailable && session.currentHeartRateElevated
+  const heartRateTone: 'green' | 'amber' = session.telemetryAvailable
     ? 'green'
     : 'amber';
   const heartRateStatus = !session.telemetryAvailable
     ? 'NO DEVICE CONNECTED'
-    : session.currentHeartRateElevated
-      ? 'ABOVE TARGET'
-      : 'BELOW TARGET';
-  const presenceTone: 'cyan' | 'green' | 'amber' = activeSession.midSessionVerified
+    : 'LIVE SIGNAL';
+  const presenceTone: 'cyan' | 'green' | 'amber' =
+    !activeSession.presenceCheckRequired
+      ? 'green'
+      : activeSession.midSessionVerified
     ? 'green'
     : activeSession.midSessionCheckPrompted
       ? 'amber'
       : 'cyan';
-  const presenceValue = activeSession.midSessionVerified
+  const presenceValue = !activeSession.presenceCheckRequired
+    ? 'NOT REQUIRED'
+    : activeSession.midSessionVerified
     ? 'COMPLETE'
     : activeSession.midSessionCheckPrompted
       ? 'ACTION NEEDED'
       : 'IN PROGRESS';
-  const alertTone: 'cyan' | 'green' | 'amber' = activeSession.midSessionVerified
+  const alertTone: 'cyan' | 'green' | 'amber' =
+    !activeSession.presenceCheckRequired
+      ? 'green'
+      : activeSession.midSessionVerified
     ? 'green'
     : activeSession.midSessionCheckPrompted
       ? 'amber'
       : 'cyan';
-  const alertValue = activeSession.midSessionVerified
+  const alertValue = !activeSession.presenceCheckRequired
+    ? 'NOT REQUIRED'
+    : activeSession.midSessionVerified
     ? 'COMPLETE'
     : activeSession.midSessionCheckPrompted
       ? 'ACTION NEEDED'
@@ -199,7 +225,7 @@ export default function ActiveWorkoutScreen() {
               {session.clock}
             </TerminalText>
             <TerminalText style={styles.minimumLabel} tone="muted" variant="micro">
-              30:00 MINIMUM
+              {formatClock(activeSession.minimumSessionSeconds)} MINIMUM
             </TerminalText>
           </View>
 
@@ -289,16 +315,16 @@ export default function ActiveWorkoutScreen() {
               {isHeartRateVerification ? (
                 <>
                   <SessionStatusCell
-                    label="30-MIN AVG"
+                    label="AVG BPM"
                     tone={session.heartRateReady ? 'green' : 'cyan'}
                     value={activeSession.heartRateObservedSeconds > 0
                       ? `${session.averageHeartRate} BPM`
                       : '-- BPM'}
                   />
                   <SessionStatusCell
-                    label="TARGET"
+                    label="SAMPLES"
                     tone={session.heartRateReady ? 'green' : 'amber'}
-                    value={`${workoutRules.minimumAverageHeartRateBpm}+ BPM`}
+                    value={`${activeSession.heartRateSamplesSubmitted}/${activeSession.requiredHeartRateSamples}`}
                   />
                 </>
               ) : (

@@ -1,5 +1,6 @@
 .expo/
 .expo-shared/
+.firebase/
 node_modules/
 dist/
 web-build/

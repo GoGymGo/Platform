@@ -63,14 +63,18 @@ const cappedUserPrincipals: readonly [
 ];
 
 const competitionRules = {
+  categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 2,
   minSessionMinutes: 10,
+  perfectMonthMultiplier: 10,
   requireDeviceAttestation: true,
-  requireFaceCheck: true,
+  requirePresenceCheck: true,
   requireGymQr: true,
   signupPrizeDrawEntries: 5,
   verifiedSessionCategoryScore: 7,
   verifiedSessionPrizeDrawEntries: 3,
+  weeklyChallengeBothHitMultiplier: 2,
+  weeklyChallengeRecoveryMultiplier: 3,
 };
 
 interface CompetitionFixture {
@@ -246,6 +250,13 @@ describeWithDatabase('critical session and ledger workflow', () => {
       'session-workflow-create',
       { competitionId: fixture.competitionId },
     );
+    expect(created.requirements).toEqual({
+      minHeartRateSamples: competitionRules.minHeartRateSamples,
+      minSessionMinutes: competitionRules.minSessionMinutes,
+      requireDeviceAttestation: competitionRules.requireDeviceAttestation,
+      requireGymQr: competitionRules.requireGymQr,
+      requirePresenceCheck: competitionRules.requirePresenceCheck,
+    });
     await expect(
       sessions.create(userPrincipal, 'session-workflow-create', {
         competitionId: fixture.competitionId,
@@ -279,11 +290,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await sessions.appendEvent(
       userPrincipal,
       created.id,
-      'session-face-check',
+      'session-presence-check',
       {
         eventId: '10000000-0000-4000-8000-000000000003',
-        eventType: 'face_check',
-        faceMatchConfidence: 0.94,
+        eventType: 'presence_check',
         occurredAt: evidenceTimes[2],
       },
     );
@@ -393,9 +403,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
     expect(evidenceReview).toMatchObject({
       evidence: {
         deviceAttestation: { count: 1, required: true },
-        faceCheck: { count: 1, required: true },
         gymQr: { count: 1, required: true, uniquePayloadCount: 1 },
         heartRate: { count: 2, required: true },
+        presenceCheck: { count: 1, required: true },
       },
       status: 'pending_review',
     });
@@ -412,9 +422,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
         evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
         findings: {
           deviceAttestation: 'approved',
-          faceCheck: 'rejected',
           gymQr: 'approved',
           heartRate: 'approved',
+          presenceCheck: 'rejected',
         },
         operatorUserId,
         reason: 'required evidence rejection integration test',
@@ -498,9 +508,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
         evidenceSnapshotSha256: duplicateReview.evidenceSnapshotSha256,
         findings: {
           deviceAttestation: 'not_required',
-          faceCheck: 'not_required',
           gymQr: 'not_required',
           heartRate: 'not_required',
+          presenceCheck: 'not_required',
         },
         operatorUserId,
         reason: 'rejection requires a failed evidence finding',
@@ -676,9 +686,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
       evidenceSnapshotSha256: resolvedSnapshotSha256,
       findings: {
         deviceAttestation: 'approved',
-        faceCheck: 'approved',
         gymQr: 'approved',
         heartRate: 'approved',
+        presenceCheck: 'approved',
       },
       operatorUserId,
       reason: 'trusted evidence reviewed in integration test',
@@ -696,9 +706,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
       evidenceSnapshotSha256,
       findings: {
         deviceAttestation: 'not_required',
-        faceCheck: 'rejected',
         gymQr: 'not_required',
         heartRate: 'not_required',
+        presenceCheck: 'rejected',
       },
       operatorUserId,
       reason: 'evidence failed operator review in integration test',
@@ -728,11 +738,15 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-           boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, boundary, valid_from)
        VALUES
          ('critical-session-region', 'CA', 'BC', 'Critical Session Region',
            'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
-          'boundary-v1', 'policy-v1', $1)
+          'boundary-v1', 'policy-v1',
+          ST_GeogFromText(
+            'SRID=4326;MULTIPOLYGON(((-123.5 49.0,-122.8 49.0,-122.8 49.6,-123.5 49.6,-123.5 49.0)))'
+          ),
+          $1)
        RETURNING id`,
       [new Date(now - 24 * 60 * 60_000)],
     );
@@ -800,11 +814,15 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-           boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, boundary, valid_from)
        VALUES
          ('critical-capped-enrollment-region', 'CA', 'BC',
           'Critical Capped Enrollment Region', 'CAD', 'America/Vancouver',
-           ARRAY['en-CA'], 19, TRUE, 'boundary-v1', 'policy-v1', $1)
+           ARRAY['en-CA'], 19, TRUE, 'boundary-v1', 'policy-v1',
+           ST_GeogFromText(
+             'SRID=4326;MULTIPOLYGON(((-123.5 49.0,-122.8 49.0,-122.8 49.6,-123.5 49.6,-123.5 49.0)))'
+           ),
+           $1)
        RETURNING id`,
       [new Date(now - 24 * 60 * 60_000)],
     );

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   Param,
   ParseUUIDPipe,
@@ -19,8 +20,10 @@ import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key'
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import { AdminCompetitionConfigurationService } from './admin-competition-configuration.service';
+import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminRegionConfigurationService } from './admin-region-configuration.service';
 import { AdminWorkoutConfigurationService } from './admin-workout-configuration.service';
+import { AdminDashboardSnapshotDto } from './dto/admin-dashboard.dto';
 import {
   AdminEntityResponseDto,
   AdminRegionPolicyResponseDto,
@@ -39,9 +42,22 @@ import {
 export class AdminConfigurationController {
   constructor(
     private readonly competitions: AdminCompetitionConfigurationService,
+    private readonly dashboard: AdminDashboardService,
     private readonly regions: AdminRegionConfigurationService,
     private readonly workouts: AdminWorkoutConfigurationService,
   ) {}
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary:
+      'Return the administrator configuration dashboard and recent audit history',
+  })
+  @ApiOkResponse({ type: AdminDashboardSnapshotDto })
+  getDashboard(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<AdminDashboardSnapshotDto> {
+    return this.dashboard.getSnapshot(principal);
+  }
 
   @Post('region-policies')
   @ApiHeader({ name: 'Idempotency-Key', required: true })

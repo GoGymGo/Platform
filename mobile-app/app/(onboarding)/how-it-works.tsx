@@ -10,9 +10,10 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const loopSteps = [
@@ -31,15 +32,18 @@ const loopSteps = [
 export default function HowItWorksScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
-  const { campaign } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
   const { weeklyGoal } = useWorkoutProgress();
   const [showBonusDetails, setShowBonusDetails] = useState(
     from === 'profile' || from === 'commitment'
   );
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const categoryMultipliers = [
-    campaign.economics.categoryPodiumMultipliers[1],
-    campaign.economics.categoryPodiumMultipliers[2],
-    campaign.economics.categoryPodiumMultipliers[3]
+    podiumMultipliers[1],
+    podiumMultipliers[2],
+    podiumMultipliers[3]
   ] as const;
   const returnLabel =
     from === 'profile'

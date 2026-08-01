@@ -178,6 +178,28 @@ interface ChallengeCheckInJson extends JsonObject {
   source: 'manual' | 'verified_workout';
 }
 
+export function socialChallengeDateWindow(
+  challenges: readonly {
+    end_date: Date | string;
+    start_date: Date | string;
+  }[],
+): { endDate: string; startDate: string } | null {
+  if (challenges.length === 0) return null;
+
+  const startDates = challenges.map(({ start_date }) =>
+    normalizeDateKey(start_date),
+  );
+  const endDates = challenges.map(({ end_date }) => normalizeDateKey(end_date));
+  return {
+    endDate: endDates.reduce((latest, value) =>
+      value > latest ? value : latest,
+    ),
+    startDate: startDates.reduce((earliest, value) =>
+      value < earliest ? value : earliest,
+    ),
+  };
+}
+
 @Injectable()
 export class SocialService {
   constructor(
@@ -212,10 +234,11 @@ export class SocialService {
         if (candidates.length === 0) {
           return [];
         }
+        const candidateIds = candidates.map((candidate) => candidate.user_id);
 
         const streaksByUser = await loadPublicStreaks(
           transaction,
-          candidates.map((candidate) => candidate.user_id),
+          candidateIds,
         );
 
         const friendships = await transaction
@@ -223,8 +246,14 @@ export class SocialService {
           .select(['user_a_id', 'user_b_id'])
           .where((expression) =>
             expression.or([
-              expression('user_a_id', '=', user.id),
-              expression('user_b_id', '=', user.id),
+              expression.and([
+                expression('user_a_id', '=', user.id),
+                expression('user_b_id', 'in', candidateIds),
+              ]),
+              expression.and([
+                expression('user_b_id', '=', user.id),
+                expression('user_a_id', 'in', candidateIds),
+              ]),
             ]),
           )
           .execute();
@@ -241,8 +270,14 @@ export class SocialService {
           .where('status', '=', 'pending')
           .where((expression) =>
             expression.or([
-              expression('requester_user_id', '=', user.id),
-              expression('recipient_user_id', '=', user.id),
+              expression.and([
+                expression('requester_user_id', '=', user.id),
+                expression('recipient_user_id', 'in', candidateIds),
+              ]),
+              expression.and([
+                expression('recipient_user_id', '=', user.id),
+                expression('requester_user_id', 'in', candidateIds),
+              ]),
             ]),
           )
           .execute();
@@ -1472,6 +1507,11 @@ export class SocialService {
       .orderBy('challenge.start_date')
       .orderBy('challenge.created_at', 'desc')
       .execute();
+    const activityWindow = socialChallengeDateWindow(challenges);
+    if (!activityWindow) {
+      return [];
+    }
+    const activeChallengeIds = challenges.map(({ id }) => id);
     const members = await executor
       .selectFrom('social_challenge_members')
       .innerJoin(
@@ -1486,14 +1526,14 @@ export class SocialService {
         'social_challenge_members.user_id',
         'profiles.screen_name',
       ])
-      .where('social_challenge_members.challenge_id', 'in', challengeIds)
+      .where('social_challenge_members.challenge_id', 'in', activeChallengeIds)
       .where('social_challenge_members.status', '!=', 'declined')
       .orderBy('social_challenge_members.created_at', 'asc')
       .execute();
     const checkIns = await executor
       .selectFrom('social_challenge_checkins')
       .select(['challenge_id', 'eligible_date', 'user_id'])
-      .where('challenge_id', 'in', challengeIds)
+      .where('challenge_id', 'in', activeChallengeIds)
       .execute();
     const memberUserIds = [...new Set(members.map(({ user_id }) => user_id))];
     const verifiedWorkouts =
@@ -1505,6 +1545,8 @@ export class SocialService {
             .distinct()
             .where('user_id', 'in', memberUserIds)
             .where('status', '=', 'verified')
+            .where('eligible_date', '>=', activityWindow.startDate)
+            .where('eligible_date', '<=', activityWindow.endDate)
             .execute();
     const streaksByUser = await loadPublicStreaks(executor, memberUserIds);
     const checkInDates = new Map<string, Set<string>>();
@@ -1624,7 +1666,7 @@ export class SocialService {
     const region = await executor
       .selectFrom('region_policies')
       .select(['code', 'id', 'metro_name', 'timezone'])
-      .where('code', '=', regionCode.trim().toUpperCase())
+      .where('code', '=', regionCode.trim().toLowerCase())
       .where('valid_from', '<=', now)
       .where((expression) =>
         expression.or([

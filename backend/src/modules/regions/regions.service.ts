@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { sql } from 'kysely';
 import type { JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -14,12 +19,20 @@ import { buildRegionEvidence } from './region-evidence';
 
 interface RegionVerificationJson extends JsonObject {
   createdAt: string;
+  expiresAt: string;
   id: string;
+  jurisdictionCode: string;
   method: 'device_location';
   policyVersion: string;
+  regionCode: string;
+  regionName: string;
   regionPolicyId: string;
-  status: 'pending';
+  reviewedAt: string;
+  status: 'approved';
+  timezone: string;
 }
+
+const regionVerificationValidityMilliseconds = 30 * 24 * 60 * 60 * 1_000;
 
 @Injectable()
 export class RegionsService {
@@ -66,13 +79,13 @@ export class RegionsService {
 
   async getCurrentVerification(
     principal: AuthenticatedPrincipal,
-    regionCode: string,
+    regionCode?: string,
   ): Promise<CurrentRegionVerificationResponseDto | null> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        const verification = await transaction
+        let query = transaction
           .selectFrom('region_verifications as verification')
           .innerJoin(
             'region_policies as region',
@@ -89,34 +102,41 @@ export class RegionsService {
             'verification.status',
             'verification.verified_at',
             'region.code as region_code',
+            'region.country_code',
             'region.metro_name as region_name',
+            'region.subdivision_code',
+            'region.timezone',
           ])
           .where('verification.user_id', '=', user.id)
-          .where('region.code', '=', regionCode)
+          .where('verification.method', '=', 'device_location')
+          .where('verification.status', '=', 'approved')
+          .where('verification.expires_at', '>', new Date());
+
+        if (regionCode) {
+          query = query.where('region.code', '=', regionCode);
+        }
+
+        const verification = await query
           .orderBy('verification.created_at', 'desc')
           .executeTakeFirst();
 
         if (!verification) {
           return null;
         }
-        const status =
-          verification.status === 'approved' &&
-          verification.expires_at !== null &&
-          verification.expires_at <= new Date()
-            ? 'expired'
-            : verification.status;
 
         return {
           createdAt: verification.created_at.toISOString(),
-          expiresAt: verification.expires_at?.toISOString() ?? null,
+          expiresAt: verification.expires_at!.toISOString(),
           id: verification.id,
-          method: verification.method,
+          jurisdictionCode: `${verification.country_code}-${verification.subdivision_code}`,
+          method: 'device_location',
           policyVersion: verification.policy_version,
           regionCode: verification.region_code,
           regionName: verification.region_name,
           regionPolicyId: verification.region_policy_id,
-          reviewedAt: verification.verified_at?.toISOString() ?? null,
-          status,
+          reviewedAt: verification.verified_at!.toISOString(),
+          status: 'approved',
+          timezone: verification.timezone,
         };
       });
   }
@@ -130,7 +150,6 @@ export class RegionsService {
       latitude: request.latitude,
       longitude: request.longitude,
       method: request.method,
-      regionPolicyId: request.regionPolicyId,
     };
     const result = await this.idempotency.execute<RegionVerificationJson>(
       {
@@ -143,64 +162,111 @@ export class RegionsService {
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
         const now = new Date();
-        const policy = await transaction
-          .selectFrom('region_policies')
-          .selectAll()
-          .where('id', '=', request.regionPolicyId)
-          .where('valid_from', '<=', now)
+        const policies = await transaction
+          .selectFrom('region_policies as policy')
+          .select([
+            'policy.boundary_version',
+            'policy.code',
+            'policy.country_code',
+            'policy.id',
+            'policy.metro_name',
+            'policy.policy_version',
+            'policy.subdivision_code',
+            'policy.timezone',
+          ])
+          .where('policy.competition_enabled', '=', true)
+          .where('policy.valid_from', '<=', now)
           .where((expression) =>
             expression.or([
-              expression('valid_to', 'is', null),
-              expression('valid_to', '>', now),
+              expression('policy.valid_to', 'is', null),
+              expression('policy.valid_to', '>', now),
             ]),
           )
-          .executeTakeFirst();
-        if (!policy) {
-          throw new NotFoundException({
-            code: 'REGION_POLICY_NOT_FOUND',
-            message: 'The requested active region policy was not found.',
+          .where(
+            sql<boolean>`ST_Covers(
+              ${sql.ref('policy.boundary')}::geometry,
+              ST_SetSRID(
+                ST_MakePoint(${request.longitude}, ${request.latitude}),
+                4326
+              )
+            )`,
+          )
+          .limit(2)
+          .execute();
+        if (policies.length === 0) {
+          throw new BadRequestException({
+            code: 'LOCATION_OUTSIDE_SUPPORTED_REGION',
+            message:
+              'Your current location is outside an active GoGymGo competition region.',
           });
         }
+        if (policies.length > 1) {
+          throw new ConflictException({
+            code: 'REGION_BOUNDARY_CONFIGURATION_CONFLICT',
+            message:
+              'This location matches more than one active competition region.',
+          });
+        }
+        const policy = policies[0];
+        const expiresAt = new Date(
+          now.getTime() + regionVerificationValidityMilliseconds,
+        );
 
         const verification = await transaction
           .insertInto('region_verifications')
           .values({
             created_at: now,
-            evidence_metadata: buildRegionEvidence(request),
+            evidence_metadata: buildRegionEvidence(policy.boundary_version),
+            expires_at: expiresAt,
             method: request.method,
             policy_version: policy.policy_version,
             region_policy_id: policy.id,
-            status: 'pending',
+            status: 'approved',
             user_id: user.id,
+            verified_at: now,
           })
           .returning([
             'created_at',
+            'expires_at',
             'id',
             'method',
             'policy_version',
             'region_policy_id',
             'status',
+            'verified_at',
           ])
           .executeTakeFirstOrThrow();
 
         return {
           createdAt: verification.created_at.toISOString(),
+          expiresAt: verification.expires_at?.toISOString() ?? '',
           id: verification.id,
+          jurisdictionCode: `${policy.country_code}-${policy.subdivision_code}`,
           method: verification.method as 'device_location',
           policyVersion: verification.policy_version,
+          regionCode: policy.code,
+          regionName: policy.metro_name,
           regionPolicyId: verification.region_policy_id,
-          status: 'pending',
+          reviewedAt: verification.verified_at?.toISOString() ?? '',
+          status: 'approved',
+          timezone: policy.timezone,
         };
       },
     );
 
     return {
       createdAt: result.createdAt,
+      expiresAt: result.expiresAt,
       id: result.id,
+      jurisdictionCode: result.jurisdictionCode,
       method: result.method,
       policyVersion: result.policyVersion,
+      regionCode: result.regionCode,
+      regionName: result.regionName,
       regionPolicyId: result.regionPolicyId,
+      reviewedAt: result.reviewedAt,
       status: result.status,
+      timezone: result.timezone,
     };
   }
 }

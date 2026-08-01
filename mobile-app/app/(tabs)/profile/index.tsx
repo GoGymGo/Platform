@@ -3,7 +3,13 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
-import { ScreenScrollView, CyberButtonOutline, HUDBorderBox, ScreenContainer, TerminalText } from '@/components/cyber';
+import {
+  ScreenScrollView,
+  CyberButtonOutline,
+  HUDBorderBox,
+  ScreenContainer,
+  TerminalText
+} from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { UserAlias } from '@/components/streakRewards';
@@ -65,9 +71,15 @@ function getSettingsRows(
       },
       {
         title: 'TERMS OF SERVICE',
-        subtitle: 'PRIZE DRAW RULES // VERIFICATION TERMS',
+        subtitle: 'ACCOUNT // VERIFICATION // SERVICE TERMS',
         tone: 'muted',
         route: '/terms-of-service' as Href
+      },
+      {
+        title: 'OFFICIAL CONTEST RULES',
+        subtitle: 'ELIGIBILITY // ENTRIES // DRAW // PRIZES',
+        tone: 'muted',
+        route: '/official-rules' as Href
       },
       {
         title: 'DEVICE PRESENCE / QR CAMERA CONSENT',
@@ -93,12 +105,15 @@ export default function ProfileScreen() {
   const { data: streakSummary } = useMyStreaks();
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const publicInitials = getPublicInitials(publicName);
-  const { currentStreak, remindersEnabled, setCompetitionRemindersEnabled, totalEntries, verifiedSessionCount } =
-    useWorkoutProgress();
   const {
-    preference: verificationPreference,
-    saved: verificationPreferenceSaved
-  } = useWorkoutVerificationPreference();
+    currentStreak,
+    remindersEnabled,
+    setCompetitionRemindersEnabled,
+    totalEntries,
+    verifiedSessionCount
+  } = useWorkoutProgress();
+  const { preference: verificationPreference, saved: verificationPreferenceSaved } =
+    useWorkoutVerificationPreference();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string>();
   const [showProfileEditor, setShowProfileEditor] = useState(false);
@@ -124,9 +139,7 @@ export default function ProfileScreen() {
     }
   ];
   const settingsGroups = getSettingsRows(
-    verificationPreferenceSaved
-      ? verificationPreference.sourceLabel
-      : 'CHOOSE AT FIRST WORKOUT',
+    verificationPreferenceSaved ? verificationPreference.sourceLabel : 'CHOOSE AT FIRST WORKOUT',
     verificationPreferenceSaved
   );
   const providerLabel = formatProviderLabel(user?.providerIds ?? []);
@@ -164,7 +177,11 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer>
-      <ScreenScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.profileHeader}>
           <ProfileAvatar
             imageUri={profileImageUri}
@@ -194,7 +211,13 @@ export default function ProfileScreen() {
               <View style={styles.profileImageActions}>
                 <CyberButtonOutline
                   disabled={isPickingImage}
-                  label={isPickingImage ? 'PREPARING...' : profileImageUri ? 'CHANGE PICTURE' : 'ADD PICTURE'}
+                  label={
+                    isPickingImage
+                      ? 'PREPARING...'
+                      : profileImageUri
+                        ? 'CHANGE PICTURE'
+                        : 'ADD PICTURE'
+                  }
                   onPress={chooseProfileImage}
                   style={styles.profileImageButton}
                 />
@@ -210,12 +233,22 @@ export default function ProfileScreen() {
             </View>
           ) : null}
           {showProfileEditor && profileImageMessage ? (
-            <TerminalText live="polite" style={styles.profileImageMessage} tone="muted" variant="caption">
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="muted"
+              variant="caption"
+            >
               {profileImageMessage}
             </TerminalText>
           ) : null}
           {showProfileEditor && profileImageStatus === 'pending_review' ? (
-            <TerminalText live="polite" style={styles.profileImageMessage} tone="amber" variant="caption">
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="amber"
+              variant="caption"
+            >
               PICTURE PENDING MODERATION
             </TerminalText>
           ) : null}
@@ -299,7 +332,10 @@ export default function ProfileScreen() {
                 <TerminalText glow tone="cyan" variant="body">
                   {competitionRegion.label}
                 </TerminalText>
-                <TerminalText tone={regionVerification?.status === 'verified' ? 'green' : 'amber'} variant="caption">
+                <TerminalText
+                  tone={regionVerification?.status === 'verified' ? 'green' : 'amber'}
+                  variant="caption"
+                >
                   {regionVerification
                     ? regionVerification.status === 'verified'
                       ? 'VERIFIED BY DEVICE LOCATION'
@@ -343,7 +379,11 @@ export default function ProfileScreen() {
                 tone={remindersEnabled ? 'cyan' : 'muted'}
               >
                 <View style={styles.notificationCopy}>
-                  <TerminalText glow={remindersEnabled} tone={remindersEnabled ? 'cyan' : 'text'} variant="body">
+                  <TerminalText
+                    glow={remindersEnabled}
+                    tone={remindersEnabled ? 'cyan' : 'text'}
+                    variant="body"
+                  >
                     COMPETITION REMINDERS
                   </TerminalText>
                   <TerminalText tone="muted" variant="caption">

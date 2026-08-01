@@ -7,6 +7,10 @@ import type {
   PrivacyRequest,
   PushDevice
 } from '@/domain/accountSettings';
+import type {
+  AccountProfile,
+  UpdateAccountProfileInput
+} from '@/domain/profile';
 import type { ApiClient } from '@/services/api/client';
 
 export type AccountSettingsRepository = {
@@ -15,6 +19,7 @@ export type AccountSettingsRepository = {
   ) => Promise<PrivacyRequest>;
   disablePushDevice: (deviceId: string) => Promise<void>;
   getDevicePresenceConsent: () => Promise<DevicePresenceConsent>;
+  getProfile: () => Promise<AccountProfile>;
   getPrivacyDownload: (
     privacyRequestId: string
   ) => Promise<PrivacyDownloadAction>;
@@ -27,6 +32,9 @@ export type AccountSettingsRepository = {
     accepted: boolean,
     consentVersion: string
   ) => Promise<DevicePresenceConsent>;
+  updateProfile: (
+    input: UpdateAccountProfileInput
+  ) => Promise<AccountProfile>;
   getAvatar: () => Promise<AvatarState>;
   removeAvatar: () => Promise<void>;
   uploadAvatar: (uri: string) => Promise<AvatarUploadResult>;
@@ -57,6 +65,7 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
     getDevicePresenceConsent: () => api.request<DevicePresenceConsent>(
       '/v1/me/verification-consents/device-presence'
     ),
+    getProfile: () => api.request<AccountProfile>('/v1/me'),
     getPrivacyDownload: (privacyRequestId) => api.request<PrivacyDownloadAction>(
       `/v1/me/privacy-requests/${encodeURIComponent(privacyRequestId)}/download-action`,
       { method: 'POST' }
@@ -84,6 +93,13 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
       idempotencyKey: createIdempotencyKey('verification-consent'),
       method: 'PUT'
     }),
+    updateProfile: (input) => api.request<
+      AccountProfile,
+      UpdateAccountProfileInput
+    >('/v1/me', {
+      body: input,
+      method: 'PATCH'
+    }),
     uploadAvatar: (uri) => uploadAvatar(api, uri)
   };
 }
@@ -96,12 +112,14 @@ function createUnavailableRepository(): AccountSettingsRepository {
     createPrivacyRequest: unavailable,
     disablePushDevice: unavailable,
     getDevicePresenceConsent: unavailable,
+    getProfile: unavailable,
     getPrivacyDownload: unavailable,
     getAvatar: async () => ({ active: null, latest: null }),
     listPrivacyRequests: async () => [],
     registerPushDevice: unavailable,
     removeAvatar: unavailable,
     setDevicePresenceConsent: unavailable,
+    updateProfile: unavailable,
     uploadAvatar: unavailable
   };
 }

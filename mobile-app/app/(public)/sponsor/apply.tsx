@@ -11,6 +11,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
+import { DataCollectionNotice } from '@/components/legal';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -36,7 +37,11 @@ export default function SponsorApplicationScreen() {
   const [targetRegion, setTargetRegion] = useState(competitionRegion.label);
 
   async function submitApplication() {
-    const input = normalizeSponsorApplication({ companyName, contactEmail, targetRegion });
+    const input = normalizeSponsorApplication({
+      companyName,
+      contactEmail,
+      targetRegion
+    });
     const nextErrors = validateSponsorApplication(input);
     setErrors(nextErrors);
 
@@ -50,7 +55,9 @@ export default function SponsorApplicationScreen() {
       await recordSponsorApplication(api, input);
       setSubmitted(true);
     } catch {
-      setSubmissionError('SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+      setSubmissionError(
+        'SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -75,23 +82,16 @@ export default function SponsorApplicationScreen() {
           SPONSOR A REGION
         </TerminalText>
         <TerminalText tone="muted" uppercase={false} variant="body">
-          Reach verified GoGymGo members in a chosen region through sponsor
-          placements that appear throughout the monthly competition.
+          Support a regional GoGymGo competition through approved prizes and participant rewards.
         </TerminalText>
 
         <View style={styles.valueList}>
+          <SponsorValue label="TARGETED REACH" value="REGION + COMPETITION COMMUNITY" />
           <SponsorValue
-            label="TARGETED REACH"
-            value="REGION + WEEKLY GOAL GROUP"
+            label="PARTNERSHIP OPTIONS"
+            value="COMPETITION REWARDS"
           />
-          <SponsorValue
-            label="CAMPAIGN PLACEMENTS"
-            value="APP OPEN, CHECK-IN, COMPLETION + RANKS"
-          />
-          <SponsorValue
-            label="REWARD FORMAT"
-            value="PHYSICAL PRIZES + COUPON CODES"
-          />
+          <SponsorValue label="REWARD FORMAT" value="PHYSICAL PRIZES + COUPON CODES" />
         </View>
 
         <HUDBorderBox style={styles.form} tone="cyan">
@@ -123,13 +123,20 @@ export default function SponsorApplicationScreen() {
             <AuthStatusNotice message={submissionError} tone="red" />
           ) : submitted ? (
             <AuthStatusNotice
-              message="SPONSOR INTEREST RECORDED. GOGYMGO WILL CONNECT THIS FORM TO THE CAMPAIGN BACKEND BEFORE LAUNCH."
+              message="APPLICATION SUBMITTED. THE GOGYMGO TEAM WILL REVIEW IT AND FOLLOW UP BY EMAIL."
               tone="green"
             />
           ) : null}
+          <DataCollectionNotice message="We use these business contact details to review this sponsor request, prevent misuse and contact you about the requested partnership. They are not added to a marketing list through this form." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
-            label={submitted ? 'INTEREST RECORDED' : submitting ? 'RECORDING...' : 'APPLY AS A SPONSOR ->'}
+            label={
+              submitted
+                ? 'INTEREST RECORDED'
+                : submitting
+                  ? 'RECORDING...'
+                  : 'APPLY AS A SPONSOR ->'
+            }
             onPress={submitApplication}
           />
         </HUDBorderBox>

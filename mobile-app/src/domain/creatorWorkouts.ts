@@ -2,7 +2,6 @@ export type CreatorWorkout = {
   creatorName: string;
   durationMinutes: number;
   id: string;
-  joined: boolean;
   name: string;
   regionCodes: readonly string[];
   reward: string;

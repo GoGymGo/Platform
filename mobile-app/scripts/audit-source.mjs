@@ -15,6 +15,15 @@ const prohibitedRuntimeContent = [
   /\bEXPO_PUBLIC_ENABLE_ONBOARDING_PREVIEW\b/,
   /\bcreateAppDataSource\(\s*['"]demo['"]/,
   /(?:from|import\()\s*['"]@\/mocks\//,
+  /(?:from|import\()\s*['"]@\/(?:components\/sponsor|config\/sponsorCampaigns|state\/sponsorCampaign)['"]/,
+  /\/sponsor-offer\b/,
+  /\bTOTAL NOT CONNECTED\b/,
+  /regionVerification\?\.regionCode\?\.split\(/,
+  /region:\s*competitionRegion\.label/,
+  /(?:getCurrentCompetition|useCompetitionMatches|useCompetitionEnrollmentCount|useEligibleWeeklyChallengePartners|useWeeklyChallengeRequests|useRewardCatalog)\([\s\S]{0,180}competitionRegion\.label/,
+  /workoutRules\.minimumSessionSeconds/,
+  /minimumAverageHeartRateBpm/,
+  /minSessionMinutes\s*>\s*30/,
   /\bIRON DISTRICT\b/,
   /\bVOLT PERFORMANCE CLUB\b/,
   /\bNORTHLINE FITNESS\b/
@@ -23,9 +32,14 @@ const prohibitedRuntimePaths = new Set([
   'app/(tabs)/leaderboard/draw.tsx',
   'app/(tabs)/profile/payout.tsx',
   'app/payout-winner.tsx',
+  'app/(modals)/sponsor-offer.tsx',
+  'src/components/sponsor.tsx',
+  'src/config/sponsorCampaigns.ts',
   'src/domain/payout.ts',
+  'src/domain/competitionRegionVerification.ts',
   'src/mocks/payout.ts',
-  'src/services/payouts.ts'
+  'src/services/payouts.ts',
+  'src/state/sponsorCampaign.tsx'
 ]);
 const prohibitedRuntimePathPrefixes = ['app/(preview)/', 'src/mocks/'];
 
@@ -91,7 +105,10 @@ for (const route of literalRoutes) {
 
 auditRouteReturnPaths(path.join(projectRoot, 'app'));
 auditAppTourCoverage(path.join(projectRoot, 'app'));
+auditAppTourProductionBoundary();
 auditFlowReliability();
+auditAuthoritativeRegionBoundary();
+auditAuthoritativeSessionRulesBoundary();
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const dependencies = {
@@ -202,7 +219,8 @@ function auditAppTourCoverage(appDirectory) {
   const routeExemptions = new Set([
     '/app-tour',
     '/consents',
-    '/entry-confirmed'
+    '/entry-confirmed',
+    '/test-preview'
   ]);
   const dynamicRouteExamples = new Map([
     ['/workouts/[workoutId]', '/workouts/app-tour-workout']
@@ -249,13 +267,21 @@ function auditFlowReliability() {
       'Hide ranking details'
     ]],
     ['app/(tabs)/calendar.tsx', [
-      'PLAN A CREATOR WORKOUT ->',
+      'Return on this day to start your own verified workout.',
       'RETURN TO TODAY TO START ->',
       "START TODAY'S VERIFIED WORKOUT ->",
       'function goToToday()'
     ]],
-    ['app/(tabs)/workouts/index.tsx', ['plannedDate={plannedDate}']],
-    ['app/(tabs)/workouts/[workoutId].tsx', ['requestedPlannedDate']],
+    ['app/(tabs)/workouts/index.tsx', [
+      'plannedDate={plannedDate}',
+      'CREATOR STUDIO UNAVAILABLE',
+      'creatorFeaturesEnabled'
+    ]],
+    ['app/(tabs)/workouts/[workoutId].tsx', [
+      'requestedPlannedDate',
+      'creatorFeaturePausedMessage',
+      'creatorFeaturesEnabled'
+    ]],
     ['app/(tabs)/squad/index.tsx', [
       'ActionFeedback',
       'memoryKey="squad"',
@@ -268,7 +294,7 @@ function auditFlowReliability() {
       'showSessionOptions',
       'SESSION OPTIONS'
     ]],
-    ['app/app-tour.tsx', [
+    ['src/testing/AppTourScreen.tsx', [
       'SEARCH SCREENS',
       'appTourRouteGroups',
       'hydrateAppTourReview',
@@ -280,7 +306,7 @@ function auditFlowReliability() {
       'showFlowDiagnostics',
       'SHOW TEST DIAGNOSTICS'
     ]],
-    ['src/components/appTour.tsx', [
+    ['src/testing/AppTourModeBanner.tsx', [
       'findAppTourRouteIndex',
       'Previous App Tour screen',
       'Next App Tour screen',
@@ -368,6 +394,250 @@ function auditFlowReliability() {
         issues.push(`${relativePath}: obsolete clarity copy ${marker}`);
       }
     }
+  }
+}
+
+function auditAppTourProductionBoundary() {
+  const stateSource = fs.readFileSync(
+    path.join(projectRoot, 'src/state/appTour.tsx'),
+    'utf8'
+  );
+  const routeSource = fs.readFileSync(
+    path.join(projectRoot, 'app/app-tour.tsx'),
+    'utf8'
+  );
+  const browserPreviewRouteSource = fs.readFileSync(
+    path.join(projectRoot, 'app/test-preview.tsx'),
+    'utf8'
+  );
+  const browserPreviewConfigSource = fs.readFileSync(
+    path.join(projectRoot, 'src/config/browserTestPreview.ts'),
+    'utf8'
+  );
+  const browserPreviewBannerSource = fs.readFileSync(
+    path.join(projectRoot, 'src/testing/AppTourModeBanner.tsx'),
+    'utf8'
+  );
+  const rootLayoutSource = fs.readFileSync(
+    path.join(projectRoot, 'app/_layout.tsx'),
+    'utf8'
+  );
+  const metroSource = fs.readFileSync(
+    path.join(projectRoot, 'metro.config.js'),
+    'utf8'
+  );
+  const requiredProductionAliases = [
+    '@/state/appTour',
+    '@/testing/appTourData',
+    '@/testing/appTourRegion',
+    '@/testing/appTourRoutes',
+    '@/testing/appTourReview',
+    '@/testing/AppTourScreen',
+    '@/testing/AppTourModeBanner',
+    '@/testing/AppTourQrSimulator'
+  ];
+  const developmentFixtureMarkers = [
+    'PULSE_RIDER',
+    'Northline Wellness',
+    'app-tour-legal-receipt',
+    'app-tour-region-verification',
+    'app-tour-token',
+    'gogymgo:gym:entry:app-tour'
+  ];
+
+  if (!stateSource.includes('browserTestPreviewEnabled &&')) {
+    issues.push('src/state/appTour.tsx: test preview activation must use the shared availability guard');
+  }
+  if (!stateSource.includes('if (!browserTestPreviewEnabled)')) {
+    issues.push('src/state/appTour.tsx: enterTour must reject unavailable preview activation');
+  }
+  if (!routeSource.includes('if (!__DEV__)')) {
+    issues.push('app/app-tour.tsx: production builds must redirect away from the App Tour');
+  }
+  if (!routeSource.includes("@/testing/AppTourScreen")) {
+    issues.push('app/app-tour.tsx: development App Tour UI must remain isolated from the route entry');
+  }
+  if (
+    !browserPreviewConfigSource.includes('__DEV__ || browserTestPreviewBuildEnabled') ||
+    !browserPreviewConfigSource.includes("Platform.OS === 'web'") ||
+    !browserPreviewConfigSource.includes('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW')
+  ) {
+    issues.push('src/config/browserTestPreview.ts: hosted preview must be explicit and web-only');
+  }
+  if (
+    !browserPreviewRouteSource.includes('browserTestPreviewEnabled') ||
+    !browserPreviewRouteSource.includes("@/testing/AppTourScreen")
+  ) {
+    issues.push('app/test-preview.tsx: hosted preview route must use the guarded testing UI');
+  }
+  if (
+    !browserPreviewBannerSource.includes('browserTestPreviewBuildEnabled') ||
+    !browserPreviewBannerSource.includes("'/test-preview?appTour=1'")
+  ) {
+    issues.push('src/testing/AppTourModeBanner.tsx: hosted preview navigation must open the production-safe screen directory');
+  }
+  if (!rootLayoutSource.includes("<AuthProvider key={active ? 'tour' : 'app'}>")) {
+    issues.push('app/_layout.tsx: App Tour scenario changes must not remount the router');
+  }
+  if (!metroSource.includes('context.dev')) {
+    issues.push('metro.config.js: production module aliases must be selected from the Metro development flag');
+  }
+  if (
+    !metroSource.includes("platform === 'web'") ||
+    !metroSource.includes('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW') ||
+    !metroSource.includes("src/testing/browserPreviewLegal.ts")
+  ) {
+    issues.push('metro.config.js: hosted preview fixtures and sample legal copy must be retained only for explicit web exports');
+  }
+  for (const moduleName of requiredProductionAliases) {
+    if (!metroSource.includes(moduleName)) {
+      issues.push(`metro.config.js: missing production App Tour alias ${moduleName}`);
+    }
+  }
+  for (const filePath of sourceFiles) {
+    const relativePath = path.relative(projectRoot, filePath).replaceAll('\\', '/');
+    if (relativePath.startsWith('src/testing/')) {
+      continue;
+    }
+    const sourceText = fs.readFileSync(filePath, 'utf8');
+    for (const marker of developmentFixtureMarkers) {
+      if (sourceText.includes(marker)) {
+        issues.push(`${relativePath}: development fixture escaped src/testing (${marker})`);
+      }
+    }
+  }
+}
+
+function auditAuthoritativeRegionBoundary() {
+  const regionScreen = fs.readFileSync(
+    path.join(projectRoot, 'app/(onboarding)/region.tsx'),
+    'utf8'
+  );
+  const regionLocation = fs.readFileSync(
+    path.join(projectRoot, 'src/services/competitionRegionVerification.ts'),
+    'utf8'
+  );
+  const regionConfig = fs.readFileSync(
+    path.join(projectRoot, 'src/config/regions.ts'),
+    'utf8'
+  );
+  const regionState = fs.readFileSync(
+    path.join(projectRoot, 'src/state/competitionRegion.tsx'),
+    'utf8'
+  );
+  const appData = fs.readFileSync(
+    path.join(projectRoot, 'src/data/appData.ts'),
+    'utf8'
+  );
+  const socialDomain = fs.readFileSync(
+    path.join(projectRoot, 'src/domain/social.ts'),
+    'utf8'
+  );
+  const homeScreen = fs.readFileSync(
+    path.join(projectRoot, 'app/(tabs)/home/index.tsx'),
+    'utf8'
+  );
+  const registrationAccess = fs.readFileSync(
+    path.join(projectRoot, 'src/hooks/useSessionRegistrationAccess.ts'),
+    'utf8'
+  );
+
+  for (const marker of [
+    'verifyCompetitionRegion(serverVerification)',
+    "method: 'device_location'",
+    'LOCATION_OUTSIDE_SUPPORTED_REGION'
+  ]) {
+    if (!regionScreen.includes(marker)) {
+      issues.push(`app/(onboarding)/region.tsx: missing authoritative region marker ${marker}`);
+    }
+  }
+  if (regionScreen.includes('regionPolicyId:')) {
+    issues.push(
+      'app/(onboarding)/region.tsx: the client must not select a server region policy'
+    );
+  }
+  if (/radiusKilometers|resolveCompetitionRegionFromCoordinates/.test(regionLocation)) {
+    issues.push(
+      'src/services/competitionRegionVerification.ts: client-side region boundaries are forbidden'
+    );
+  }
+  if (/competitionRegions|America\/(?:Toronto|Vancouver|Edmonton)/.test(regionConfig)) {
+    issues.push(
+      'src/config/regions.ts: production region catalogs must come from server verification'
+    );
+  }
+  if (
+    !regionState.includes('parseCompetitionRegionVerification(storedRegion)') ||
+    !regionState.includes('userStorage.removeItem(competitionRegionStorageKey)')
+  ) {
+    issues.push(
+      'src/state/competitionRegion.tsx: invalid or expired server verification must clear the stored region'
+    );
+  }
+  if (!appData.includes('/v1/creator-workouts?region=')) {
+    issues.push('src/data/appData.ts: creator workouts must be scoped to the verified region');
+  }
+  if (!homeScreen.includes('useCompetitionEnrollmentCount(\n    competitionRegionCode,')) {
+    issues.push(
+      'app/(tabs)/home/index.tsx: regional competition queries must use the verified region code'
+    );
+  }
+  if (!registrationAccess.includes('regionVerification?.jurisdictionCode')) {
+    issues.push(
+      'src/hooks/useSessionRegistrationAccess.ts: legal requests must use the server jurisdiction code'
+    );
+  }
+  if (socialDomain.includes('regionCode?.trim().toUpperCase()')) {
+    issues.push('src/domain/social.ts: region codes must use the canonical lowercase slug');
+  }
+}
+
+function auditAuthoritativeSessionRulesBoundary() {
+  const progressState = fs.readFileSync(
+    path.join(projectRoot, 'src/state/workoutProgress.tsx'),
+    'utf8'
+  );
+  const activeWorkout = fs.readFileSync(
+    path.join(projectRoot, 'app/workout/active.tsx'),
+    'utf8'
+  );
+  const checkout = fs.readFileSync(
+    path.join(projectRoot, 'app/workout/check-out.tsx'),
+    'utf8'
+  );
+  const qrScanner = fs.readFileSync(
+    path.join(projectRoot, 'app/(modals)/qr-scanner.tsx'),
+    'utf8'
+  );
+
+  for (const marker of [
+    'serverSession.requirements.minSessionMinutes',
+    'serverSession.requirements.minHeartRateSamples',
+    'serverSession.requirements.requirePresenceCheck'
+  ]) {
+    if (!progressState.includes(marker)) {
+      issues.push(
+        `src/state/workoutProgress.tsx: active sessions must persist server requirement ${marker}`
+      );
+    }
+  }
+  if (
+    !activeWorkout.includes('activeSession.minimumSessionSeconds') ||
+    !activeWorkout.includes('activeSession.requiredHeartRateSamples')
+  ) {
+    issues.push(
+      'app/workout/active.tsx: the timer and evidence state must use the started session requirements'
+    );
+  }
+  if (!checkout.includes('activeSession.minimumSessionSeconds')) {
+    issues.push(
+      'app/workout/check-out.tsx: check-out must use the started session duration'
+    );
+  }
+  if (!qrScanner.includes('activeSession.minimumSessionSeconds')) {
+    issues.push(
+      'app/(modals)/qr-scanner.tsx: partner-gym exit must use the started session duration'
+    );
   }
 }
 

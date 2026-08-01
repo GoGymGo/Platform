@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppTourModeBanner } from '@/components/appTour';
 import { colors, cyberGlow, radii, spacing, textGlow, typography } from '@/constants/theme';
 
 export { ScreenScrollView } from './screenScrollView';
@@ -177,7 +176,6 @@ export function ScreenContainer({
   return createElement(
     SafeAreaView,
     { style: cyberStyles.safeArea },
-    createElement(AppTourModeBanner),
     createElement(
       View,
       { style: [cyberStyles.frame, frameStyle] },

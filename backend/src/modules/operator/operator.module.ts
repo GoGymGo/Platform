@@ -6,6 +6,7 @@ import { SessionsModule } from '../sessions/sessions.module';
 import { AdminAuthorizationModule } from './admin-authorization.module';
 import { AdminCompetitionConfigurationService } from './admin-competition-configuration.service';
 import { AdminConfigurationController } from './admin-configuration.controller';
+import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminRegionConfigurationService } from './admin-region-configuration.service';
 import { AdminWorkoutConfigurationService } from './admin-workout-configuration.service';
 import { OperatorController } from './operator.controller';
@@ -22,6 +23,7 @@ import { OperatorService } from './operator.service';
   ],
   providers: [
     AdminCompetitionConfigurationService,
+    AdminDashboardService,
     AdminRegionConfigurationService,
     AdminWorkoutConfigurationService,
     OperatorService,

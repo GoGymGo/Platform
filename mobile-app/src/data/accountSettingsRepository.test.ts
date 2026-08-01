@@ -21,6 +21,12 @@ describe('account settings repository', () => {
     await settings.disablePushDevice('device-one');
     await settings.getDevicePresenceConsent();
     await settings.setDevicePresenceConsent(false, '2026-07-05');
+    await settings.getProfile();
+    await settings.updateProfile({
+      publicIdentityMode: 'alias',
+      publicName: 'MOVE_MORE',
+      screenName: 'MOVE_MORE'
+    });
     await settings.getAvatar();
     await settings.removeAvatar();
 
@@ -56,6 +62,16 @@ describe('account settings repository', () => {
         method: 'PUT',
         path: '/v1/me/verification-consents/device-presence'
       },
+      { body: undefined, method: undefined, path: '/v1/me' },
+      {
+        body: {
+          publicIdentityMode: 'alias',
+          publicName: 'MOVE_MORE',
+          screenName: 'MOVE_MORE'
+        },
+        method: 'PATCH',
+        path: '/v1/me'
+      },
       { body: undefined, method: undefined, path: '/v1/me/avatar' },
       { body: undefined, method: 'DELETE', path: '/v1/me/avatar' }
     ]);
@@ -72,6 +88,10 @@ describe('account settings repository', () => {
     );
     await assert.rejects(
       () => settings.createPrivacyRequest('delete'),
+      /not configured/i
+    );
+    await assert.rejects(
+      () => settings.getProfile(),
       /not configured/i
     );
   });

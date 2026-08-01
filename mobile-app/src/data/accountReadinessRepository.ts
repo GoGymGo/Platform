@@ -6,7 +6,6 @@ import type {
   CurrentCompetition,
   CurrentLegalDocuments,
   LegalReceiptStatus,
-  RegionPolicy,
   RegionVerification
 } from '@/domain/accountReadiness';
 import type { ApiClient } from '@/services/api/client';
@@ -20,22 +19,21 @@ export type AccountReadinessRepository = {
     input: CreateCompetitionEnrollmentInput
   ) => Promise<CompetitionEnrollment>;
   getCurrentCompetition: (
-    expectedMonthKey: string,
-    regionLabel: string
+    expectedMonthKey: string | undefined,
+    regionCode: string
   ) => Promise<CurrentCompetition | null>;
   getCurrentEnrollment: () => Promise<CompetitionEnrollment | null>;
+  getCurrentRegionVerification: (
+    regionCode?: string
+  ) => Promise<RegionVerification | null>;
   getCurrentLegalDocuments: (
     jurisdictionCode?: string,
     locale?: string
   ) => Promise<CurrentLegalDocuments>;
-  getCurrentRegionVerification: (
-    regionCode: string
-  ) => Promise<RegionVerification | null>;
   getLegalReceiptStatus: (
     jurisdictionCode?: string,
     locale?: string
   ) => Promise<LegalReceiptStatus>;
-  listRegionPolicies: () => Promise<readonly RegionPolicy[]>;
   recordLegalReceipt: (
     bundle: CurrentLegalDocuments
   ) => Promise<LegalReceiptStatus>;
@@ -67,30 +65,39 @@ function createApiRepository(api: ApiClient): AccountReadinessRepository {
       idempotencyKey: createIdempotencyKey('competition-enrollment'),
       method: 'POST'
     }),
-    getCurrentCompetition: () => api.request<CurrentCompetition | null>(
-      '/v1/competitions/current'
-    ),
+    getCurrentCompetition: (expectedMonthKey, regionCode) => {
+      const query = [
+        expectedMonthKey
+          ? `monthKey=${encodeURIComponent(expectedMonthKey)}`
+          : null,
+        `region=${encodeURIComponent(regionCode)}`
+      ].filter((value): value is string => value !== null);
+
+      return api.request<CurrentCompetition | null>(
+        `/v1/competitions/current?${query.join('&')}`
+      );
+    },
     getCurrentEnrollment: () => api.request<CompetitionEnrollment | null>(
       '/v1/competitions/current/enrollment'
     ),
+    getCurrentRegionVerification: (regionCode) => regionCode
+      ? api.request<RegionVerification | null>(
+          `/v1/me/region-verifications/current?regionCode=${encodeURIComponent(regionCode)}`
+        )
+      : api.request<RegionVerification | null>(
+          '/v1/me/region-verifications/current'
+        ),
     getCurrentLegalDocuments: (jurisdictionCode = 'GLOBAL', locale = 'en') =>
       api.request<CurrentLegalDocuments>(
         `/v1/legal-documents/current?jurisdictionCode=${encodeURIComponent(jurisdictionCode)}` +
         `&locale=${encodeURIComponent(locale)}`,
         { authenticated: false }
       ),
-    getCurrentRegionVerification: (regionCode) => api.request<RegionVerification | null>(
-      `/v1/me/region-verifications/current?regionCode=${encodeURIComponent(regionCode)}`
-    ),
     getLegalReceiptStatus: (jurisdictionCode = 'GLOBAL', locale = 'en') =>
       api.request<LegalReceiptStatus>(
         `/v1/me/legal-receipts/status?jurisdictionCode=${encodeURIComponent(jurisdictionCode)}` +
         `&locale=${encodeURIComponent(locale)}`
       ),
-    listRegionPolicies: () => api.request<readonly RegionPolicy[]>(
-      '/v1/regions',
-      { authenticated: false }
-    ),
     recordLegalReceipt: (bundle) => api.request<LegalReceiptStatus, {
       bundleSha256: string;
       documents: readonly {
@@ -130,10 +137,9 @@ function createUnavailableRepository(): AccountReadinessRepository {
     enrollInCompetition: unavailable,
     getCurrentCompetition: async () => null,
     getCurrentEnrollment: async () => null,
-    getCurrentLegalDocuments: async () => emptyLegalBundle,
     getCurrentRegionVerification: async () => null,
+    getCurrentLegalDocuments: async () => emptyLegalBundle,
     getLegalReceiptStatus: async () => emptyLegalReceipt,
-    listRegionPolicies: async () => [],
     recordLegalReceipt: unavailable
   };
 }

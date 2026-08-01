@@ -27,7 +27,6 @@ import { ResultsModule } from './modules/results/results.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { SocialModule } from './modules/social/social.module';
 import { StreaksModule } from './modules/streaks/streaks.module';
-import { SponsorAdsModule } from './modules/sponsor-ads/sponsor-ads.module';
 import { activeTraceLogFields } from './observability/log-correlation';
 import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.service';
 
@@ -121,7 +120,6 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
     SessionsModule,
     SocialModule,
     StreaksModule,
-    SponsorAdsModule,
     LeaderboardsModule,
     LegalModule,
     RewardsModule,

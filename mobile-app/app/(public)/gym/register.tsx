@@ -11,6 +11,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
+import { DataCollectionNotice } from '@/components/legal';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -56,7 +57,9 @@ export default function GymRegistrationScreen() {
       await recordGymRegistrationRequest(api, input);
       setSubmitted(true);
     } catch {
-      setSubmissionError('GYM REGISTRATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+      setSubmissionError(
+        'GYM REGISTRATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -82,8 +85,8 @@ export default function GymRegistrationScreen() {
             REGISTER A GYM
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Request a GoGymGo entry and exit QR-code set for one gym location.
-            We review the location and manager details before activation.
+            Request a GoGymGo entry and exit QR-code set for one gym location. We review the
+            location and manager details before activation.
           </TerminalText>
         </View>
 
@@ -140,9 +143,16 @@ export default function GymRegistrationScreen() {
               tone="green"
             />
           ) : null}
+          <DataCollectionNotice message="We use the manager contact and gym-location details to review this QR request, verify the location, prevent misuse and contact the applicant. They are not added to a marketing list through this form." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
-            label={submitted ? 'REQUEST RECORDED' : submitting ? 'RECORDING...' : 'REQUEST GYM QR CODES ->'}
+            label={
+              submitted
+                ? 'REQUEST RECORDED'
+                : submitting
+                  ? 'RECORDING...'
+                  : 'REQUEST GYM QR CODES ->'
+            }
             onPress={submitRequest}
           />
         </HUDBorderBox>

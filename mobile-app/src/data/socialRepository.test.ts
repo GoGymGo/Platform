@@ -126,14 +126,14 @@ describe('social repository', () => {
     };
     const social = createSocialRepository('api', api);
 
-    await social.discoverRegionalChallenges('TORONTO');
+    await social.discoverRegionalChallenges('toronto-on');
     await social.joinRegionalChallenge('challenge-1');
     await social.checkInToChallenge('challenge-1');
 
     assert.deepEqual(requests, [
       {
         method: undefined,
-        path: '/v1/social/challenges/discover?regionCode=TORONTO'
+        path: '/v1/social/challenges/discover?regionCode=toronto-on'
       },
       {
         method: 'POST',

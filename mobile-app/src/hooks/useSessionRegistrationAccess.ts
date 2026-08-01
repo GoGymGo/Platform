@@ -13,7 +13,7 @@ import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export function useSessionRegistrationAccess() {
-  const { competition, competitionRegion, progressReady } = useWorkoutProgress();
+  const { competition, progressReady } = useWorkoutProgress();
   const {
     regionReady,
     regionVerification
@@ -22,12 +22,13 @@ export function useSessionRegistrationAccess() {
     regionVerification?.status === 'verified' &&
     Boolean(regionVerification.verificationId);
   const jurisdictionCode =
-    regionVerification?.regionCode?.split('-').slice(0, 2).join('-') ||
+    regionVerification?.jurisdictionCode ||
     'GLOBAL';
+  const regionCode = regionVerification?.regionCode ?? '';
   const legalReceipt = useLegalReceiptStatus(jurisdictionCode);
   const currentCompetition = useCurrentCompetition(
     competition.competitionMonthKey,
-    competitionRegion
+    regionCode
   );
   const currentEnrollment = useCurrentEnrollment();
   const competitionId = currentCompetition.data?.id ?? null;
@@ -59,6 +60,7 @@ export function useSessionRegistrationAccess() {
       currentCompetition.isError ||
       currentEnrollment.isError ||
       (regionVerified && legalReceipt.isError),
+    currentCompetition: currentCompetition.data ?? null,
     ready: setupStep === 'complete',
     retry,
     retrying:

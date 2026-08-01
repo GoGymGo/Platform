@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { sql, type Transaction } from 'kysely';
+import type { Transaction } from 'kysely';
 import type { Database, JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { normalizeDateKey } from '../../database/date-key';
@@ -24,11 +24,16 @@ import {
   buildCompetitionPeriods,
   dateKeyInTimezone,
 } from './competition-calendar';
+import {
+  availableRegistrationGoalDays,
+  isPublishedCompetitionJoinable,
+} from './competition-registration';
 import { parseCompetitionRules } from './competition-rules';
 import type {
   CompetitionMatchResponseDto,
   CompetitionResponseDto,
   CreateEnrollmentDto,
+  CurrentCompetitionQueryDto,
   CreateWeeklyChallengeRequestDto,
   EligibleWeeklyChallengePartnerDto,
   EnrollmentResponseDto,
@@ -77,13 +82,14 @@ export class CompetitionsService {
 
   async getCurrent(
     principal: AuthenticatedPrincipal,
+    query: CurrentCompetitionQueryDto = {},
   ): Promise<CompetitionResponseDto | null> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
         const now = new Date();
-        const competition = await transaction
+        let competitionQuery = transaction
           .selectFrom('region_verifications as verification')
           .innerJoin(
             'competitions as competition',
@@ -97,7 +103,9 @@ export class CompetitionsService {
           )
           .select([
             'competition.ends_at',
+            'competition.entrant_cap',
             'competition.id',
+            'competition.minimum_entrants',
             'competition.month_key',
             'competition.name',
             'competition.registration_closes_at',
@@ -119,8 +127,23 @@ export class CompetitionsService {
           )
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.ends_at', '>', now)
-          .orderBy('competition.starts_at')
-          .executeTakeFirst();
+          .orderBy('competition.starts_at');
+        if (query.monthKey) {
+          assertMonthKey(query.monthKey);
+          competitionQuery = competitionQuery.where(
+            'competition.month_key',
+            '=',
+            query.monthKey,
+          );
+        }
+        if (query.region) {
+          competitionQuery = competitionQuery.where(
+            'region.code',
+            '=',
+            query.region,
+          );
+        }
+        const competition = await competitionQuery.executeTakeFirst();
         if (!competition) {
           return null;
         }
@@ -134,8 +157,12 @@ export class CompetitionsService {
 
         return {
           endsAt: competition.ends_at.toISOString(),
-          goalDays: brackets.map((bracket) => bracket.goal_days),
+          entrantCap: competition.entrant_cap,
+          goalDays: availableRegistrationGoalDays({
+            configuredGoalDays: brackets.map((bracket) => bracket.goal_days),
+          }),
           id: competition.id,
+          minimumEntrants: competition.minimum_entrants,
           monthKey: competition.month_key,
           name: competition.name,
           regionCode: competition.region_code,
@@ -217,9 +244,9 @@ export class CompetitionsService {
         this.profiles.requireVerifiedEmail(user);
         const now = new Date();
         const competition = await transaction
-          .selectFrom('competitions')
-          .selectAll()
-          .where('id', '=', competitionId)
+          .selectFrom('competitions as competition')
+          .selectAll('competition')
+          .where('competition.id', '=', competitionId)
           .forUpdate()
           .executeTakeFirst();
         if (!competition) {
@@ -229,13 +256,15 @@ export class CompetitionsService {
           });
         }
         if (
-          !['registration', 'active'].includes(competition.status) ||
-          now < competition.registration_opens_at ||
-          now > competition.registration_closes_at
+          !isPublishedCompetitionJoinable({
+            endsAt: competition.ends_at,
+            now,
+            status: competition.status,
+          })
         ) {
           throw new ConflictException({
             code: 'COMPETITION_REGISTRATION_CLOSED',
-            message: 'Registration is not open for this competition.',
+            message: 'This competition is no longer available to join.',
           });
         }
         if (!request.legalReceiptBundleId) {
@@ -337,6 +366,15 @@ export class CompetitionsService {
           throw new UnprocessableEntityException({
             code: 'GOAL_BRACKET_UNAVAILABLE',
             message: 'The selected goal bracket is not available.',
+          });
+        }
+        const availableGoalDays = availableRegistrationGoalDays({
+          configuredGoalDays: [bracket.goal_days],
+        });
+        if (!availableGoalDays.includes(request.goalDays)) {
+          throw new UnprocessableEntityException({
+            code: 'GOAL_UNAVAILABLE_FOR_REGISTRATION',
+            message: 'That Weekly Goal is not available in this competition.',
           });
         }
         if (!verification) {
@@ -452,9 +490,7 @@ export class CompetitionsService {
       .where('user.email', 'is not', null)
       .where('user.email_verified', '=', true)
       .where('user.status', '=', 'active')
-      .where(
-        sql<boolean>`(lower(policy.code) = lower(${region}) OR lower(policy.metro_name) = lower(${region}))`,
-      )
+      .where('policy.code', '=', region)
       .executeTakeFirstOrThrow();
     return Number(row.count);
   }
@@ -484,9 +520,7 @@ export class CompetitionsService {
             'policy.timezone',
           ])
           .where('competition.month_key', '=', monthKey)
-          .where(
-            sql<boolean>`(lower(policy.code) = lower(${region}) OR lower(policy.metro_name) = lower(${region}))`,
-          )
+          .where('policy.code', '=', region)
           .executeTakeFirst();
         if (!competition) {
           return [];
@@ -1046,9 +1080,7 @@ export class CompetitionsService {
       )
       .select(['competition.id'])
       .where('competition.month_key', '=', monthKey)
-      .where(
-        sql<boolean>`(lower(policy.code) = lower(${region}) OR lower(policy.metro_name) = lower(${region}))`,
-      )
+      .where('policy.code', '=', region)
       .executeTakeFirst();
     if (!competition) {
       throw new NotFoundException({

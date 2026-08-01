@@ -69,7 +69,6 @@ export const environmentSchema = z
     OTEL_ENABLED: booleanString.default(false),
     OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
     OTEL_SERVICE_NAME: optionalTrimmedString,
-    AUTH_MODE: z.enum(['firebase', 'test']).default('firebase'),
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
     DATABASE_URL: z
@@ -129,17 +128,6 @@ export const environmentSchema = z
   .superRefine((environment, context) => {
     if (
       environment.NODE_ENV === 'production' &&
-      environment.AUTH_MODE !== 'firebase'
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'AUTH_MODE must be firebase in production.',
-        path: ['AUTH_MODE'],
-      });
-    }
-
-    if (
-      environment.NODE_ENV === 'production' &&
       !environment.FIREBASE_PROJECT_ID
     ) {
       context.addIssue({
@@ -147,6 +135,93 @@ export const environmentSchema = z
         message: 'FIREBASE_PROJECT_ID is required in production.',
         path: ['FIREBASE_PROJECT_ID'],
       });
+    }
+
+    if (environment.NODE_ENV === 'production') {
+      const databaseHost = new URL(environment.DATABASE_URL).hostname
+        .trim()
+        .toLowerCase();
+      if (
+        databaseHost === 'localhost' ||
+        databaseHost === '127.0.0.1' ||
+        databaseHost === '::1'
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'DATABASE_URL must not use a loopback host in production.',
+          path: ['DATABASE_URL'],
+        });
+      }
+
+      const corsOrigins = environment.CORS_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+      if (
+        corsOrigins.some(
+          (origin) => !/^https:\/\/[^/?#]+(?::\d+)?$/i.test(origin),
+        )
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'CORS_ORIGINS must contain only exact HTTPS origins in production.',
+          path: ['CORS_ORIGINS'],
+        });
+      }
+
+      if (environment.FIREBASE_AUTH_EMULATOR_HOST) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'FIREBASE_AUTH_EMULATOR_HOST must not be configured in production.',
+          path: ['FIREBASE_AUTH_EMULATOR_HOST'],
+        });
+      }
+      if (environment.OPENAPI_ENABLED) {
+        context.addIssue({
+          code: 'custom',
+          message: 'OPENAPI_ENABLED must be false in production.',
+          path: ['OPENAPI_ENABLED'],
+        });
+      }
+      if (environment.PRETTY_LOGS_ENABLED) {
+        context.addIssue({
+          code: 'custom',
+          message: 'PRETTY_LOGS_ENABLED must be false in production.',
+          path: ['PRETTY_LOGS_ENABLED'],
+        });
+      }
+      if (!environment.TRUST_PROXY) {
+        context.addIssue({
+          code: 'custom',
+          message: 'TRUST_PROXY must be true in production.',
+          path: ['TRUST_PROXY'],
+        });
+      }
+      if (!environment.REWARD_CODE_ENCRYPTION_KEY) {
+        context.addIssue({
+          code: 'custom',
+          message: 'REWARD_CODE_ENCRYPTION_KEY is required in production.',
+          path: ['REWARD_CODE_ENCRYPTION_KEY'],
+        });
+      }
+      if (!environment.EXPO_PUSH_API_URL.startsWith('https://')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'EXPO_PUSH_API_URL must use HTTPS in production.',
+          path: ['EXPO_PUSH_API_URL'],
+        });
+      }
+      if (
+        environment.OTEL_EXPORTER_OTLP_ENDPOINT &&
+        !environment.OTEL_EXPORTER_OTLP_ENDPOINT.startsWith('https://')
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'OTEL_EXPORTER_OTLP_ENDPOINT must use HTTPS in production.',
+          path: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+        });
+      }
     }
 
     if (environment.REWARD_CODE_ENCRYPTION_KEY) {
@@ -177,14 +252,6 @@ export const environmentSchema = z
     }
 
     if (environment.PRIVACY_OPERATIONS_ENABLED) {
-      if (environment.AUTH_MODE !== 'firebase') {
-        context.addIssue({
-          code: 'custom',
-          message:
-            'AUTH_MODE must be firebase when PRIVACY_OPERATIONS_ENABLED is true.',
-          path: ['AUTH_MODE'],
-        });
-      }
       for (const key of ['PRIVACY_EXPORT_BUCKET'] as const) {
         if (!environment[key]) {
           context.addIssue({

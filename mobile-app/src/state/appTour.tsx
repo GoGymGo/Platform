@@ -8,7 +8,13 @@ import {
 } from 'react';
 import { useGlobalSearchParams, usePathname } from 'expo-router';
 
+import {
+  browserTestPreviewBuildEnabled,
+  browserTestPreviewEnabled
+} from '@/config/browserTestPreview';
+
 export type AppTourScenario =
+  | 'new-player'
   | 'ready'
   | 'active-workout'
   | 'presence-check'
@@ -30,21 +36,25 @@ export function AppTourProvider({ children }: PropsWithChildren) {
     tourScenario?: string | string[];
   }>();
   const requestedScenario = parseScenario(firstParam(params.tourScenario));
+  const browserPreviewLanding =
+    browserTestPreviewBuildEnabled && pathname === '/';
   const tourRequested =
-    __DEV__ &&
+    browserTestPreviewEnabled &&
     (
       pathname === '/app-tour' ||
+      pathname === '/test-preview' ||
+      browserPreviewLanding ||
       firstParam(params.appTour) === '1'
     );
   const [active, setActive] = useState(tourRequested);
   const [scenario, setScenario] = useState<AppTourScenario>(
-    requestedScenario ?? 'ready'
+    requestedScenario ?? (browserPreviewLanding ? 'new-player' : 'ready')
   );
   const effectiveActive = active || tourRequested;
   const effectiveScenario = requestedScenario ?? scenario;
 
   const enterTour = useCallback((nextScenario: AppTourScenario = 'ready') => {
-    if (!__DEV__) {
+    if (!browserTestPreviewEnabled) {
       return;
     }
 
@@ -90,6 +100,7 @@ function firstParam(value: string | string[] | undefined) {
 
 function parseScenario(value: string | undefined): AppTourScenario | null {
   if (
+    value === 'new-player' ||
     value === 'ready' ||
     value === 'active-workout' ||
     value === 'presence-check' ||

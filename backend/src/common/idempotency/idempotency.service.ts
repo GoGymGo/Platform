@@ -14,6 +14,8 @@ interface IdempotencyOptions {
   storeResponseBody?: boolean;
 }
 
+const redactedResponseBody: JsonObject = { redacted: true };
+
 @Injectable()
 export class IdempotencyService {
   constructor(private readonly database: DatabaseService) {}
@@ -75,15 +77,15 @@ export class IdempotencyService {
           }
 
           if (existing.state === 'completed') {
+            if (options.storeResponseBody === false) {
+              return handler(transaction);
+            }
             if (
               existing.response_body &&
               typeof existing.response_body === 'object' &&
               !Array.isArray(existing.response_body)
             ) {
               return { ...existing.response_body } as T;
-            }
-            if (options.storeResponseBody === false) {
-              return handler(transaction);
             }
           }
 
@@ -99,7 +101,10 @@ export class IdempotencyService {
           .updateTable('idempotency_keys')
           .set({
             completed_at: new Date(),
-            response_body: options.storeResponseBody === false ? null : result,
+            response_body:
+              options.storeResponseBody === false
+                ? redactedResponseBody
+                : result,
             response_code: options.responseCode ?? 200,
             state: 'completed',
           })

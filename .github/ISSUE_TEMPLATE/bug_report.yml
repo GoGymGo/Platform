@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible GoGymGo platform defect.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Member app
+        - Admin
+        - Landing
+        - API / worker
+        - Infrastructure / deployment
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What happened?
+      description: Include expected and actual behaviour without personal data or secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: List the smallest reliable steps.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe evidence
+      description: Add sanitized logs or screenshots only.

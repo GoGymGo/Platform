@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 92" role="img" aria-labelledby="wordmark-title">
+  <title id="wordmark-title">GoGymGo</title>
+  <style>
+    text { font-family: Orbitron, sans-serif; font-size: 72px; font-weight: 700; letter-spacing: 2px; }
+  </style>
+  <text x="4" y="70" fill="#34E5E8">GO</text>
+  <text x="162" y="70" fill="#FF2D9B">GYM</text>
+  <text x="392" y="70" fill="#34E5E8">GO</text>
+</svg>

@@ -1,0 +1,51 @@
+name: Platform Integration
+
+on:
+  pull_request:
+    paths:
+      - "packages/**"
+      - "services/api/openapi.json"
+      - "apps/member-app/src/services/api/**"
+      - "infrastructure/local/**"
+      - "tooling/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "services/api/openapi.json"
+      - "apps/member-app/src/services/api/**"
+      - "infrastructure/local/**"
+      - "tooling/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts-and-local-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          cache: npm
+          cache-dependency-path: package-lock.json
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm run check --workspace @gogymgo/brand
+      - run: npm run contracts:check
+      - run: npm run audit:contract --workspace @gogymgo/api
+      - run: npm run audit:api-routes --workspace @gogymgo/member-app
+      - run: docker compose -f infrastructure/local/compose.yml config --quiet
+        env:
+          REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

@@ -7,7 +7,7 @@ import {
   View
 } from 'react-native';
 
-import { AuthStatusNotice } from '@/components/auth';
+import { AuthTextField } from '@/components/auth';
 import {
   ScreenScrollView,
   CyberButtonOutline,
@@ -15,14 +15,18 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { FormTextInput } from '@/components/formTextInput';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
+import { normalizeScreenName, validateScreenName } from '@/domain/social';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
+import {
+  clearScreenMemory,
+  useScreenMemory
+} from '@/hooks/useScreenMemory';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { useAuth } from '@/state/auth';
 import { useProfile } from '@/state/profile';
 
 export default function IdentityScreen() {
@@ -32,7 +36,7 @@ export default function IdentityScreen() {
     return (
       <ScreenContainer>
         <View style={styles.loading}>
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText glow live="polite" tone="cyan" variant="label">
             LOADING PUBLIC IDENTITY
           </TerminalText>
         </View>
@@ -48,12 +52,15 @@ export default function IdentityScreen() {
 function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | null }) {
   const router = useRouter();
   const { source } = useLocalSearchParams<{ source?: string }>();
+  const { user } = useAuth();
   const { setPublicIdentity } = useProfile();
-  const [alias, setAlias] = useState(
+  const draftKey = `identity:${user?.uid ?? 'anonymous'}:${source ?? 'setup'}`;
+  const [alias, setAlias] = useScreenMemory(
+    draftKey,
     initialIdentity?.displayName || initialIdentity?.callsign || ''
   );
-  const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     chooseProfileImage,
     clearProfileImage,
@@ -61,31 +68,43 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
     profileImageMessage,
     profileImageUri
   } = useProfileImagePicker();
-  const identityIsValid = alias.trim().length >= 2;
-  const avatarInitials = getPublicInitials(alias.trim() || 'GG');
+  const normalizedAlias = normalizeScreenName(alias);
+  const validationError = alias.length > 0 ? validateScreenName(alias) : null;
+  const identityIsValid = alias.length > 0 && !validateScreenName(alias);
+  const avatarInitials = getPublicInitials(normalizedAlias || 'GG');
+  const isEditing = source === 'profile' || source === 'social';
+  const returnRoute =
+    source === 'social'
+      ? '/squad/social'
+      : source === 'profile'
+        ? '/profile'
+        : '/home';
 
   const handleContinue = async () => {
-    const normalizedAlias = alias.trim();
-    setSaveError('');
+    const error = validateScreenName(alias);
+    setSubmitError(error);
+    if (error) return;
+
     setSaving(true);
     try {
       await setPublicIdentity({
-        callsign: normalizedAlias,
+        callsign: initialIdentity?.callsign ?? '',
         displayName: normalizedAlias,
         mode: 'alias'
       });
-
-      if (source === 'profile') {
-        router.replace('/profile');
-        return;
-      }
-
-      router.push('/region');
-    } catch {
-      setSaveError('YOUR ALIAS COULD NOT BE SAVED. CHECK THE API AND TRY AGAIN.');
-    } finally {
+    } catch (mutationError) {
+      setSubmitError(
+        mutationError instanceof Error
+          ? mutationError.message.replace(/screen name/gi, 'alias')
+          : 'Your alias could not be saved. Try again.'
+      );
       setSaving(false);
+      return;
     }
+
+    setSaving(false);
+    clearScreenMemory(draftKey);
+    router.replace(returnRoute);
   };
 
   return (
@@ -94,45 +113,44 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <SponsorBanner compact />
         <ScreenScrollView
           bounces={false}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          memoryKey={draftKey}
           showsVerticalScrollIndicator={false}
         >
           <OnboardingHeader
-            label={source === 'profile' ? 'EDIT ALIAS' : 'PUBLIC IDENTITY'}
+            label={isEditing ? 'EDIT ALIAS' : 'OPTIONAL PROFILE'}
             onBack={() => goBackOrReplace(
               router,
-              source === 'profile' ? '/profile' : '/'
+              returnRoute
             )}
-            progress={source === 'profile' ? 100 : 20}
-            step={source === 'profile' ? 'PROFILE' : 'STEP 01 / 05'}
+            progress={100}
+            step="PROFILE"
           />
 
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             HOW SHOULD OTHERS SEE YOU?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            This is shown on leaderboards, Period Matches and community features.
-            Personal details always stay private.
+            Your private player callsign works immediately. Add a custom alias
+            only if you want one shown on rankings and Weekly Challenges.
           </TerminalText>
 
-          <View style={styles.fieldGroup}>
-            <TerminalText tone="dim" variant="micro">
-              ALIAS
-            </TerminalText>
-            <FormTextInput
-              accessibilityLabel="Alias"
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={24}
-              onChangeText={setAlias}
-              placeholder="Enter your alias"
-              value={alias}
-            />
-          </View>
+          <AuthTextField
+            autoCapitalize="characters"
+            autoCorrect={false}
+            error={submitError ?? validationError ?? undefined}
+            label="ALIAS"
+            maxLength={24}
+            onChangeText={(value) => {
+              setAlias(value);
+              setSubmitError(null);
+            }}
+            placeholder="YOUR_ALIAS"
+            value={alias}
+          />
 
           <View style={styles.pictureSection}>
             <ProfileAvatar
@@ -172,17 +190,11 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             ) : null}
           </View>
 
-          {saveError ? (
-            <AuthStatusNotice message={saveError} tone="amber" />
-          ) : null}
-
           <CyberButtonPrimary
             disabled={!identityIsValid || saving}
             label={saving
               ? 'SAVING ALIAS...'
-              : source === 'profile'
-                ? 'SAVE ALIAS ->'
-                : 'CONTINUE ->'}
+              : 'SAVE ALIAS ->'}
             onPress={handleContinue}
             style={styles.primaryButton}
           />
@@ -219,10 +231,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
-  },
-  fieldGroup: {
-    gap: spacing.xs,
-    marginTop: spacing.sm
   },
   pictureSection: {
     alignItems: 'center',

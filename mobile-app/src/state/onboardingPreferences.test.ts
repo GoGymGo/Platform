@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { creatorFeaturesEnabled } from '@/config/features';
 import {
   biometricCameraConsentVersion,
+  getClarityTipStorageKey,
   isBiometricCameraConsentCurrent,
   parseVerificationPreference
 } from '@/state/onboardingPreferences';
+
+describe('creator feature availability', () => {
+  it('keeps creator surfaces paused while they remain available for testing', () => {
+    assert.equal(creatorFeaturesEnabled, false);
+  });
+});
 
 describe('verification preference parsing', () => {
   it('keeps the exact selected source', () => {
@@ -28,5 +36,18 @@ describe('biometric camera consent versioning', () => {
     assert.equal(isBiometricCameraConsentCurrent(biometricCameraConsentVersion), true);
     assert.equal(isBiometricCameraConsentCurrent('2025-01-01'), false);
     assert.equal(isBiometricCameraConsentCurrent(null), false);
+  });
+});
+
+describe('contextual clarity preferences', () => {
+  it('creates a stable user-scoped key for each tip', () => {
+    assert.equal(
+      getClarityTipStorageKey('competition-overview'),
+      'gogymgo:clarity:competition-overview:dismissed'
+    );
+    assert.equal(
+      getClarityTipStorageKey('weekly-challenge'),
+      'gogymgo:clarity:weekly-challenge:dismissed'
+    );
   });
 });

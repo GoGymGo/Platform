@@ -2,12 +2,23 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  createPrivateIdentity,
   getPublicInitials,
   parseStoredPublicIdentity,
+  publicIdentityFromAccountProfile,
   resolvePublicName
 } from './profile';
 
 describe('public profile identity', () => {
+  it('creates a stable private callsign without exposing account details', () => {
+    assert.deepEqual(createPrivateIdentity('firebase-user-abc123'), {
+      callsign: 'PLAYER_ABC123',
+      displayName: '',
+      mode: 'private'
+    });
+    assert.equal(createPrivateIdentity(null).callsign, 'GOGYMGO_PLAYER');
+  });
+
   it('uses the callsign in private mode', () => {
     assert.equal(
       resolvePublicName({ callsign: 'CameronW12', displayName: 'Cameron', mode: 'private' }),
@@ -21,8 +32,24 @@ describe('public profile identity', () => {
       '@camtrains'
     );
     assert.equal(
-      resolvePublicName({ callsign: 'GHOST-1234', displayName: 'Cameron Wilson', mode: 'real' }),
+      resolvePublicName({ callsign: 'GHOST-1234', displayName: 'Cameron Wilson', mode: 'real_name' }),
       'Cameron Wilson'
+    );
+  });
+
+  it('restores the same public identity from the authoritative account profile', () => {
+    assert.deepEqual(
+      publicIdentityFromAccountProfile({
+        callsign: 'GG-ABC123',
+        publicIdentityMode: 'alias',
+        publicName: 'MOVE_MORE',
+        screenName: 'MOVE_MORE'
+      }),
+      {
+        callsign: 'GG-ABC123',
+        displayName: 'MOVE_MORE',
+        mode: 'alias'
+      }
     );
   });
 

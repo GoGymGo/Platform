@@ -31,15 +31,15 @@ export class SessionEvidenceFindingsDto {
 
   @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
   @IsEnum(SessionEvidenceFindingDto)
-  faceCheck!: 'approved' | 'not_required' | 'rejected';
-
-  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
-  @IsEnum(SessionEvidenceFindingDto)
   gymQr!: 'approved' | 'not_required' | 'rejected';
 
   @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
   @IsEnum(SessionEvidenceFindingDto)
   heartRate!: 'approved' | 'not_required' | 'rejected';
+
+  @ApiProperty({ enum: SessionEvidenceFindingDto, type: String })
+  @IsEnum(SessionEvidenceFindingDto)
+  presenceCheck!: 'approved' | 'not_required' | 'rejected';
 }
 
 export class SessionReviewDecisionDto extends OperatorReasonDto {
@@ -76,11 +76,6 @@ export class DeviceAttestationReviewDto extends SessionEvidenceCategoryReviewDto
   uniqueTokenCount!: number;
 }
 
-export class FaceCheckReviewDto extends SessionEvidenceCategoryReviewDto {
-  @ApiProperty({ maximum: 1, minimum: 0, nullable: true, type: Number })
-  maximumConfidence!: number | null;
-}
-
 export class GymQrReviewDto extends SessionEvidenceCategoryReviewDto {
   @ApiProperty({ minimum: 0, type: Number })
   uniquePayloadCount!: number;
@@ -101,14 +96,14 @@ export class SessionEvidenceReviewGroupsDto {
   @ApiProperty({ type: DeviceAttestationReviewDto })
   deviceAttestation!: DeviceAttestationReviewDto;
 
-  @ApiProperty({ type: FaceCheckReviewDto })
-  faceCheck!: FaceCheckReviewDto;
-
   @ApiProperty({ type: GymQrReviewDto })
   gymQr!: GymQrReviewDto;
 
   @ApiProperty({ type: HeartRateReviewDto })
   heartRate!: HeartRateReviewDto;
+
+  @ApiProperty({ type: SessionEvidenceCategoryReviewDto })
+  presenceCheck!: SessionEvidenceCategoryReviewDto;
 }
 
 export class SessionEvidenceReviewResponseDto {
@@ -250,7 +245,6 @@ export class OperatorWorkQueueItemDto {
   @ApiProperty({
     enum: [
       'partner_application',
-      'payout_claim',
       'privacy_request',
       'profile_media',
       'region_verification',
@@ -260,7 +254,6 @@ export class OperatorWorkQueueItemDto {
   })
   kind!:
     | 'partner_application'
-    | 'payout_claim'
     | 'privacy_request'
     | 'profile_media'
     | 'region_verification'
@@ -272,7 +265,7 @@ export class OperatorWorkQueueItemDto {
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 
-  @ApiPropertyOptional({ example: 'CA-BC-DEMO', type: String })
+  @ApiPropertyOptional({ example: 'CA-BC', type: String })
   regionCode?: string;
 
   @ApiPropertyOptional({
@@ -290,16 +283,10 @@ export class OperatorQueueDepthsDto {
   notificationsPending!: number;
 
   @ApiProperty({ minimum: 0, type: Number })
-  paymentsUncertain!: number;
-
-  @ApiProperty({ minimum: 0, type: Number })
   privacyOperationsPending!: number;
 
   @ApiProperty({ minimum: 0, type: Number })
   profileMediaCleanupPending!: number;
-
-  @ApiProperty({ minimum: 0, type: Number })
-  webhooksPending!: number;
 }
 
 export class OperatorWorkerHealthDto {

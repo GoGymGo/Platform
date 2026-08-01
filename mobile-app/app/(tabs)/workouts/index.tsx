@@ -1,40 +1,106 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
   CyberButtonOutline,
+  CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, componentSizes, cyberGlow, fontFamilies, interactionStates, radii, spacing } from '@/constants/theme';
-import type { CreatorWorkout } from '@/data/appData';
+import { RecoverableError } from '@/components/reliability';
+import {
+  creatorFeaturePausedMessage,
+  creatorFeatureStatusLabel,
+  creatorFeaturesEnabled
+} from '@/config/features';
+import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
+import type { CreatorWorkout } from '@/domain/creatorWorkouts';
 import { getCreatorWorkoutsReturnTarget } from '@/navigation/creatorWorkouts';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 
 export default function WorkoutsScreen() {
   const router = useRouter();
-  const { source } = useLocalSearchParams<{ source?: string }>();
-  const { campaign, economics } = useSponsorCampaign();
-  const sponsorConfirmed = campaign.status === 'approved';
-  const { data: creatorWorkouts = [], isPending: creatorWorkoutsPending } =
-    useCreatorWorkouts();
+  const { user } = useAuth();
+  const { plannedDate, source } = useLocalSearchParams<{
+    plannedDate?: string;
+    source?: string;
+  }>();
+  const { competitionRegion, regionVerification } = useCompetitionRegion();
+  const creatorWorkoutsQuery = useCreatorWorkouts(
+    regionVerification?.regionCode ?? ''
+  );
+  const {
+    data: creatorWorkouts = [],
+    isPending: creatorWorkoutsPending
+  } = creatorWorkoutsQuery;
   const returnTarget = getCreatorWorkoutsReturnTarget(source);
+
+  if (!creatorFeaturesEnabled) {
+    return (
+      <ScreenContainer>
+        <ScreenScrollView
+          bounces={false}
+          contentContainerStyle={styles.content}
+          memoryKey="creator-workouts"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <TerminalText glow tone="cyan" variant="label">
+              FOLLOW ALONG // {competitionRegion.label}
+            </TerminalText>
+            <TerminalText glow style={styles.title} tone="cyan" variant="title">
+              CREATOR WORKOUTS
+            </TerminalText>
+          </View>
+          <HUDBorderBox glow style={styles.infoNote} tone="amber">
+            <TerminalText glow style={styles.infoMark} tone="amber" variant="label">
+              {creatorFeatureStatusLabel}
+            </TerminalText>
+            <TerminalText style={styles.infoCopy} tone="muted" uppercase={false} variant="body">
+              {creatorFeaturePausedMessage}
+            </TerminalText>
+          </HUDBorderBox>
+          <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
+            <TerminalText glow tone="pink" variant="label">
+              CREATOR STUDIO
+            </TerminalText>
+            <TerminalText style={styles.creatorSubmitCopy} tone="muted" uppercase={false} variant="body">
+              Creator Studio is not available in this release.
+            </TerminalText>
+            <CyberButtonPrimary
+              disabled
+              label="CREATOR STUDIO UNAVAILABLE"
+              onPress={() => undefined}
+              tone="pink"
+            />
+          </HUDBorderBox>
+          <CyberButtonOutline
+            label={returnTarget.label}
+            onPress={() => router.replace(returnTarget.href)}
+            style={styles.backButton}
+          />
+        </ScreenScrollView>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
+        memoryKey="creator-workouts"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <TerminalText glow tone="cyan" variant="label">
-            FOLLOW ALONG // {campaign.region}
+            FOLLOW ALONG // {competitionRegion.label}
           </TerminalText>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             CREATOR WORKOUTS
@@ -52,45 +118,48 @@ export default function WorkoutsScreen() {
         </HUDBorderBox>
 
         <View style={styles.workoutList}>
+          {creatorWorkoutsQuery.isError ? (
+            <RecoverableError
+              body="The creator workout catalog could not be loaded. Retry to refresh the list."
+              onRetry={() => {
+                void recordFlowMetric(user?.uid, 'flow-retry', 'workouts');
+                void creatorWorkoutsQuery.refetch();
+              }}
+              retrying={creatorWorkoutsQuery.isFetching}
+              title="COULD NOT LOAD WORKOUTS"
+            />
+          ) : null}
           {creatorWorkouts.map((workout) => (
             <WorkoutCard
               key={workout.id}
+              plannedDate={plannedDate}
               workout={workout}
             />
           ))}
-          {!creatorWorkoutsPending && creatorWorkouts.length === 0 ? (
+          {!creatorWorkoutsQuery.isError && !creatorWorkoutsPending && creatorWorkouts.length === 0 ? (
             <HUDBorderBox style={styles.emptyCard} tone="muted">
               <TerminalText glow tone="amber" variant="label">
-                CREATOR WORKOUTS COMING SOON
+                NO WORKOUTS PUBLISHED
               </TerminalText>
               <TerminalText style={styles.emptyCopy} tone="muted" variant="body">
-                FEATURED REGIONAL WORKOUTS WILL APPEAR AFTER THE CREATOR CATALOG IS CONNECTED.
+                NO CREATOR WORKOUTS HAVE BEEN PUBLISHED FOR THIS REGION YET.
               </TerminalText>
             </HUDBorderBox>
           ) : null}
         </View>
 
-        <HUDBorderBox style={styles.sponsorCard} tone="muted">
-          <View style={[styles.sponsorCardMark, !sponsorConfirmed && styles.sponsorCardMarkPending]}>
-            <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'amber'} variant="title">
-              {campaign.sponsor.mark}
-            </TerminalText>
-          </View>
-          <View style={styles.sponsorCardCopy}>
-            <TerminalText tone="dim" variant="micro">
-              CREATOR PROGRAM
-            </TerminalText>
-            <TerminalText style={styles.sponsorCardTitle} tone="text" variant="body">
-              {sponsorConfirmed
-                ? `CREATOR PAYOUT POOL: ${formatCampaignCurrency(economics.creatorPayoutAmount)}`
-                : 'REGIONAL CREATOR CAMPAIGN'}
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              {sponsorConfirmed
-                ? `Sponsor funding supports the selected ${campaign.region} workout leader.`
-                : 'Creator payout details are published with the regional campaign.'}
-            </TerminalText>
-          </View>
+        <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
+          <TerminalText glow tone="pink" variant="label">
+            CREATOR STUDIO
+          </TerminalText>
+          <TerminalText style={styles.creatorSubmitCopy} tone="muted" uppercase={false} variant="body">
+            Approved creators can submit hosted workout videos for review, including brand and AI-assisted adaptation permissions.
+          </TerminalText>
+          <CyberButtonPrimary
+            label="SUBMIT A CREATOR VIDEO ->"
+            onPress={() => router.push('/creator/submit')}
+            tone="pink"
+          />
         </HUDBorderBox>
 
         <CyberButtonOutline
@@ -104,53 +173,76 @@ export default function WorkoutsScreen() {
 }
 
 function WorkoutCard({
+  plannedDate,
   workout
 }: {
+  plannedDate?: string;
   workout: CreatorWorkout;
 }) {
   const router = useRouter();
-  const badgeTone = workout.joined ? 'cyan' : 'muted';
 
   return (
     <Pressable
+      accessibilityLabel={`${workout.name} by ${workout.creatorName}. ${workout.durationMinutes} minute ${workout.workoutStyle} workout. Open workout.`}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !workout.joined }}
-      disabled={!workout.joined}
-      onPress={() => router.push(`/workouts/${workout.id}`)}
+      onPress={() => router.push(
+        (plannedDate
+          ? `/workouts/${workout.id}?plannedDate=${plannedDate}`
+          : `/workouts/${workout.id}`) as Href
+      )}
       style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
     >
-      <HUDBorderBox glow={workout.joined} style={styles.workoutCard} tone={workout.joined ? 'cyan' : 'muted'}>
-        <View style={[
-          styles.workoutPreview,
-          workout.joined ? styles.workoutPreviewActive : styles.workoutPreviewLocked
-        ]}>
+      <HUDBorderBox glow style={styles.workoutCard} tone="cyan">
+        <View style={[styles.workoutPreview, styles.workoutPreviewActive]}>
           <View style={styles.badgeRow}>
             <HUDBorderBox style={styles.creatorBadge} tone="cyan">
               <TerminalText glow tone="cyan" variant="micro">
                 CREATOR
               </TerminalText>
             </HUDBorderBox>
-            <HUDBorderBox style={styles.joinedBadge} tone={badgeTone}>
-              <TerminalText glow={workout.joined} tone={workout.joined ? 'cyan' : 'muted'} variant="micro">
-                {workout.joined ? 'FEATURED' : 'COMING SOON'}
+            <HUDBorderBox style={styles.featuredBadge} tone="cyan">
+              <TerminalText glow tone="cyan" variant="micro">
+                FEATURED
               </TerminalText>
             </HUDBorderBox>
           </View>
-          <View style={[styles.playCircle, !workout.joined ? styles.playCircleLocked : null]}>
-            <TerminalText glow={workout.joined} tone={workout.joined ? 'cyan' : 'muted'} variant="micro">
-              {workout.joined ? 'PLAY' : 'LOCKED'}
-            </TerminalText>
+          <View style={styles.playCircle}>
+            <Ionicons
+              color={colors.cyan}
+              name="play"
+              size={21}
+            />
           </View>
+          <TerminalText
+            glow
+            style={styles.previewStyle}
+            tone="cyan"
+            variant="micro"
+          >
+            {workout.workoutStyle}
+          </TerminalText>
         </View>
         <View style={styles.workoutCopy}>
           <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
             {workout.name}
           </TerminalText>
           <View style={styles.metaRow}>
-            <TerminalText style={styles.rewardText} tone="muted" variant="body">
-              {workout.reward}
-            </TerminalText>
+            <View style={styles.metaItem}>
+              <Ionicons color={colors.muted} name="person-outline" size={14} />
+              <TerminalText tone="muted" variant="caption">
+                {workout.creatorName}
+              </TerminalText>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons color={colors.muted} name="time-outline" size={14} />
+              <TerminalText tone="muted" variant="caption">
+                {workout.durationMinutes} MIN
+              </TerminalText>
+            </View>
           </View>
+          <TerminalText style={styles.catalogDetail} tone="muted" uppercase={false} variant="caption">
+            {workout.reward}
+          </TerminalText>
           <TerminalText style={styles.timing} tone="dim" variant="micro">
             {workout.timing}
           </TerminalText>
@@ -165,7 +257,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
@@ -190,41 +282,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fontFamilies.body
   },
-  sponsorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  creatorSubmitCard: {
     gap: spacing.md,
     marginTop: spacing.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 15
+    padding: spacing.lg
   },
-  sponsorCardMark: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  sponsorCardMarkPending: {
-    borderColor: colors.borderWarning,
-    backgroundColor: colors.surfaceWarning
-  },
-  sponsorCardCopy: {
-    flex: 1
-  },
-  sponsorCardTitle: {
-    marginVertical: spacing.xs,
-    fontFamily: fontFamilies.display
+  creatorSubmitCopy: {
+    fontFamily: fontFamilies.body
   },
   workoutList: {
     gap: 13
   },
   pressableCard: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   workoutCard: {
     overflow: 'hidden',
@@ -239,9 +309,6 @@ const styles = StyleSheet.create({
   workoutPreviewActive: {
     backgroundColor: colors.surfaceCyanSubtle
   },
-  workoutPreviewLocked: {
-    backgroundColor: colors.panelSoft
-  },
   badgeRow: {
     width: '100%',
     flexDirection: 'row',
@@ -255,7 +322,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: 6
   },
-  joinedBadge: {
+  featuredBadge: {
     width: 'auto',
     paddingVertical: spacing.xs,
     paddingHorizontal: 9,
@@ -272,10 +339,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCyanProgress,
     ...cyberGlow.cyan
   },
-  playCircleLocked: {
-    borderColor: colors.borderMuted,
-    backgroundColor: colors.panelSoft,
-    shadowOpacity: 0
+  previewStyle: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.terminal,
+    letterSpacing: 1.2
   },
   workoutCopy: {
     paddingVertical: 14,
@@ -291,13 +358,25 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: 6
   },
-  rewardText: {
-    flexShrink: 1,
-    fontFamily: fontFamilies.terminal
+  metaItem: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    borderRadius: radii.sm,
+    backgroundColor: colors.panelSoft
   },
   timing: {
     marginTop: spacing.sm,
     fontFamily: fontFamilies.terminal
+  },
+  catalogDetail: {
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.body
   },
   backButton: {
     marginTop: spacing.lg
@@ -310,6 +389,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

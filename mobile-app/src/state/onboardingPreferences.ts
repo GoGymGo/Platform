@@ -1,4 +1,9 @@
 import { createUserStorage } from '@/services/storage/userStorage';
+import { creatorFeaturesEnabled } from '@/config/features';
+import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
+import { devicePresenceConsentVersion } from '@/domain/accountSettings';
+
+export { devicePresenceConsentVersion as biometricCameraConsentVersion } from '@/domain/accountSettings';
 
 const preferenceKeys = {
   biometricCameraConsent: 'gogymgo:legal:biometric-camera-consent',
@@ -8,9 +13,11 @@ const preferenceKeys = {
   verificationPreference: 'gogymgo:workout:verification-preference'
 } as const;
 
-export const biometricCameraConsentVersion = '2026-07-05';
-
 export type PreferredVerificationMethod = 'heartRate' | 'partnerGymQr';
+
+export type ClarityTipKey =
+  | 'competition-overview'
+  | 'weekly-challenge';
 
 export type VerificationPreference = {
   method: PreferredVerificationMethod;
@@ -18,14 +25,26 @@ export type VerificationPreference = {
   sourceLabel: string;
 };
 
+export function getPreferenceOwnerId(userId: string | null | undefined) {
+  return userId ?? null;
+}
+
 const defaultVerificationPreference: VerificationPreference = {
   method: 'heartRate',
   sourceKey: 'heartRateDevice',
   sourceLabel: 'HEART-RATE DEVICE'
 };
 
+function getSupportedVerificationPreference(
+  preference: VerificationPreference
+): VerificationPreference {
+  return preference.method === 'partnerGymQr' && !verifiedPartnerGymCatalogAvailable
+    ? defaultVerificationPreference
+    : preference;
+}
+
 export function isBiometricCameraConsentCurrent(value: string | null) {
-  return value === biometricCameraConsentVersion;
+  return value === devicePresenceConsentVersion;
 }
 
 export async function getBiometricCameraConsent(userId: string) {
@@ -43,10 +62,7 @@ export async function setBiometricCameraConsent(userId: string, accepted: boolea
   try {
     const storage = createUserStorage(userId);
     if (accepted) {
-      await storage.setItem(
-        preferenceKeys.biometricCameraConsent,
-        biometricCameraConsentVersion
-      );
+      await storage.setItem(preferenceKeys.biometricCameraConsent, devicePresenceConsentVersion);
       return;
     }
 
@@ -85,18 +101,17 @@ export async function saveVerificationPreference(
 ) {
   try {
     const storage = createUserStorage(userId);
+    const supportedPreference = getSupportedVerificationPreference(preference);
     await Promise.all([
-      storage.setItem(preferenceKeys.verificationPreference, JSON.stringify(preference)),
-      storage.setItem(preferenceKeys.preferredVerificationMethod, preference.method)
+      storage.setItem(preferenceKeys.verificationPreference, JSON.stringify(supportedPreference)),
+      storage.setItem(preferenceKeys.preferredVerificationMethod, supportedPreference.method)
     ]);
   } catch {
-    // Workout check-in still offers both methods when persistence is unavailable.
+    // Active workout verification remains available when persistence is unavailable.
   }
 }
 
-export async function getVerificationPreference(
-  userId: string
-): Promise<VerificationPreference> {
+export async function getVerificationPreference(userId: string): Promise<VerificationPreference> {
   try {
     const storage = createUserStorage(userId);
     const [savedPreference, savedMethod] = await Promise.all([
@@ -106,18 +121,54 @@ export async function getVerificationPreference(
     const parsedPreference = parseVerificationPreference(savedPreference);
 
     if (parsedPreference) {
-      return parsedPreference;
+      const supportedPreference = getSupportedVerificationPreference(parsedPreference);
+      if (supportedPreference !== parsedPreference) {
+        await Promise.all([
+          storage.setItem(
+            preferenceKeys.verificationPreference,
+            JSON.stringify(supportedPreference)
+          ),
+          storage.setItem(preferenceKeys.preferredVerificationMethod, supportedPreference.method)
+        ]);
+      }
+      return supportedPreference;
     }
 
-    return savedMethod === 'partnerGymQr'
-      ? {
+    if (savedMethod === 'partnerGymQr') {
+      if (verifiedPartnerGymCatalogAvailable) {
+        return {
           method: 'partnerGymQr',
           sourceKey: 'partnerGymQr',
           sourceLabel: 'PARTNER GYM QR'
-        }
-      : defaultVerificationPreference;
+        };
+      }
+
+      await Promise.all([
+        storage.setItem(
+          preferenceKeys.verificationPreference,
+          JSON.stringify(defaultVerificationPreference)
+        ),
+        storage.setItem(
+          preferenceKeys.preferredVerificationMethod,
+          defaultVerificationPreference.method
+        )
+      ]);
+    }
+
+    return defaultVerificationPreference;
   } catch {
     return defaultVerificationPreference;
+  }
+}
+
+export async function hasSavedVerificationPreference(userId: string) {
+  try {
+    const savedPreference = await createUserStorage(userId).getItem(
+      preferenceKeys.verificationPreference
+    );
+    return parseVerificationPreference(savedPreference) !== null;
+  } catch {
+    return false;
   }
 }
 
@@ -125,14 +176,16 @@ export async function savePreferredVerificationMethod(
   userId: string,
   method: PreferredVerificationMethod
 ) {
+  const supportedMethod =
+    method === 'partnerGymQr' && !verifiedPartnerGymCatalogAvailable ? 'heartRate' : method;
   const currentPreference = await getVerificationPreference(userId);
   await saveVerificationPreference(
     userId,
-    currentPreference.method === method
+    currentPreference.method === supportedMethod
       ? currentPreference
-      : method === 'partnerGymQr'
+      : supportedMethod === 'partnerGymQr'
         ? {
-            method,
+            method: supportedMethod,
             sourceKey: 'partnerGymQr',
             sourceLabel: 'PARTNER GYM QR'
           }
@@ -148,10 +201,7 @@ export async function getPreferredVerificationMethod(
 
 export async function recordCreatorApplication(userId: string) {
   try {
-    await createUserStorage(userId).setItem(
-      preferenceKeys.creatorApplicationSubmitted,
-      'true'
-    );
+    await createUserStorage(userId).setItem(preferenceKeys.creatorApplicationSubmitted, 'true');
   } catch {
     // Backend creator status remains authoritative if local storage is unavailable.
   }
@@ -160,8 +210,9 @@ export async function recordCreatorApplication(userId: string) {
 export async function hasSubmittedCreatorApplication(userId: string) {
   try {
     return (
-      await createUserStorage(userId).getItem(preferenceKeys.creatorApplicationSubmitted)
-    ) === 'true';
+      (await createUserStorage(userId).getItem(preferenceKeys.creatorApplicationSubmitted)) ===
+      'true'
+    );
   } catch {
     return false;
   }
@@ -176,6 +227,10 @@ export async function dismissCreatorInvite(userId: string) {
 }
 
 export async function shouldShowCreatorInvite(userId: string) {
+  if (!creatorFeaturesEnabled) {
+    return false;
+  }
+
   try {
     const storage = createUserStorage(userId);
     const [dismissed, applicationSubmitted] = await Promise.all([
@@ -187,4 +242,35 @@ export async function shouldShowCreatorInvite(userId: string) {
   } catch {
     return true;
   }
+}
+
+export async function isClarityTipDismissed(
+  userId: string,
+  tip: ClarityTipKey
+) {
+  try {
+    return (
+      await createUserStorage(userId).getItem(getClarityTipStorageKey(tip))
+    ) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function dismissClarityTip(
+  userId: string,
+  tip: ClarityTipKey
+) {
+  try {
+    await createUserStorage(userId).setItem(
+      getClarityTipStorageKey(tip),
+      'true'
+    );
+  } catch {
+    // Contextual guidance remains visible if its local preference cannot be saved.
+  }
+}
+
+export function getClarityTipStorageKey(tip: ClarityTipKey) {
+  return `gogymgo:clarity:${tip}:dismissed`;
 }

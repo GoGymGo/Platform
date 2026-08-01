@@ -36,8 +36,9 @@ export function assessSessionSubmission(
   if (rules.requireDeviceAttestation && count('device_attestation') === 0) {
     violations.push('device_attestation_missing');
   }
-  if (rules.requireFaceCheck && count('face_check') === 0) {
-    violations.push('face_check_missing');
+  const presenceCheckCount = count('presence_check') + count('face_check');
+  if (rules.requirePresenceCheck && presenceCheckCount === 0) {
+    violations.push('presence_check_missing');
   }
   if (rules.requireGymQr && count('gym_qr_scan') === 0) {
     violations.push('gym_qr_missing');

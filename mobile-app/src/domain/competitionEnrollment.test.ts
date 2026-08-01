@@ -6,51 +6,48 @@ import {
   evaluateCompetitionEnrollment,
   getCompetitionDateRange,
   getCompetitionEntryStartDateKey,
+  getNextCompetitionMonthKey,
   getRegistrationGoalLimit,
-  getRegistrationGoalOptions,
-  getRegistrationTargetCompetitionMonthKey,
-  isLateCompetitionRegistration,
-  getNextCompetitionMonthKey
+  getRegistrationGoalOptions
 } from './competitionEnrollment';
 
 const enrollmentPolicy = { maximumEntrants: null, minimumEntrants: 100 } as const;
 
 describe('competition enrollment', () => {
-  it('opens registration for the complete calendar month before competition', () => {
+  it('builds the complete competition window', () => {
     const july = buildCompetitionEnrollmentSummary('2026-07', enrollmentPolicy);
-    const january = buildCompetitionEnrollmentSummary('2027-01', enrollmentPolicy);
+    const february = buildCompetitionEnrollmentSummary('2028-02', enrollmentPolicy);
 
-    assert.equal(july.registrationStartDateKey, '2026-06-01');
-    assert.equal(july.registrationEndDateKey, '2026-06-30');
-    assert.equal(july.lateRegistrationEndDateKey, '2026-07-06');
-    assert.equal(january.registrationStartDateKey, '2026-12-01');
-    assert.equal(january.registrationEndDateKey, '2026-12-31');
+    assert.equal(july.competitionStartDateKey, '2026-07-01');
+    assert.equal(july.competitionEndDateKey, '2026-07-31');
+    assert.equal(february.competitionStartDateKey, '2028-02-01');
+    assert.equal(february.competitionEndDateKey, '2028-02-29');
   });
 
-  it('does not launch below 100 entrants and confirms launch at 100', () => {
+  it('keeps a published competition joinable before and throughout its active month', () => {
     const summary = buildCompetitionEnrollmentSummary('2026-07', enrollmentPolicy);
 
+    for (const dateKey of ['2026-05-01', '2026-06-30', '2026-07-01', '2026-07-31']) {
+      assert.equal(
+        evaluateCompetitionEnrollment(summary, 99, dateKey).registrationOpen,
+        true,
+        `Expected registration to remain open on ${dateKey}`
+      );
+    }
+
     assert.equal(
-      evaluateCompetitionEnrollment(summary, 99, '2026-07-01').phase,
-      'cancelled'
-    );
-    assert.equal(
-      evaluateCompetitionEnrollment(summary, 100, '2026-07-01').phase,
-      'competition-active'
+      evaluateCompetitionEnrollment(summary, 99, '2026-08-01').registrationOpen,
+      false
     );
   });
 
-  it('keeps late registration open only through the conclusion of day 6', () => {
+  it('confirms launch at 100 entrants without closing enrollment', () => {
     const summary = buildCompetitionEnrollmentSummary('2026-07', enrollmentPolicy);
-    const openStatus = evaluateCompetitionEnrollment(summary, 100, '2026-07-06');
-    const closedStatus = evaluateCompetitionEnrollment(summary, 100, '2026-07-07');
+    const status = evaluateCompetitionEnrollment(summary, 100, '2026-07-20');
 
-    assert.equal(openStatus.phase, 'competition-active');
-    assert.equal(openStatus.lateRegistration, true);
-    assert.equal(openStatus.registrationOpen, true);
-    assert.equal(closedStatus.phase, 'competition-active');
-    assert.equal(closedStatus.lateRegistration, false);
-    assert.equal(closedStatus.registrationOpen, false);
+    assert.equal(status.launchConfirmed, true);
+    assert.equal(status.phase, 'competition-active');
+    assert.equal(status.registrationOpen, true);
   });
 
   it('supports an optional sponsor-advised entrant cap', () => {
@@ -58,7 +55,7 @@ describe('competition enrollment', () => {
       maximumEntrants: 2_500,
       minimumEntrants: 100
     });
-    const status = evaluateCompetitionEnrollment(summary, 2_500, '2026-07-04');
+    const status = evaluateCompetitionEnrollment(summary, 2_500, '2026-07-20');
 
     assert.equal(status.phase, 'full');
     assert.equal(status.atCapacity, true);
@@ -66,7 +63,7 @@ describe('competition enrollment', () => {
     assert.equal(status.spotsRemaining, 0);
   });
 
-  it('starts eligible late entrants on their registration date', () => {
+  it('starts entrants on the competition start or their enrollment date', () => {
     assert.equal(
       getCompetitionEntryStartDateKey('2026-07', '2026-06-30'),
       '2026-07-01'
@@ -76,44 +73,25 @@ describe('competition enrollment', () => {
       '2026-07-01'
     );
     assert.equal(
-      getCompetitionEntryStartDateKey('2026-07', '2026-07-02'),
-      '2026-07-02'
-    );
-    assert.equal(
-      getCompetitionEntryStartDateKey('2026-07', '2026-07-06'),
-      '2026-07-06'
-    );
-    assert.equal(
       getCompetitionEntryStartDateKey('2026-07', '2026-07-07'),
-      '2026-08-01'
+      '2026-07-07'
+    );
+    assert.equal(
+      getCompetitionEntryStartDateKey('2026-07', '2026-07-31'),
+      '2026-07-31'
     );
   });
 
-  it('returns the only late-registration goal from days left in scoring week 1', () => {
-    assert.equal(getRegistrationGoalLimit('2026-07', '2026-06-30'), 7);
-    assert.equal(getRegistrationGoalLimit('2026-07', '2026-07-01'), 7);
-    assert.equal(getRegistrationGoalLimit('2026-07', '2026-07-02'), 6);
-    assert.equal(getRegistrationGoalLimit('2026-07', '2026-07-03'), 5);
-    assert.equal(getRegistrationGoalLimit('2026-07', '2026-07-06'), 2);
-    assert.equal(getRegistrationGoalLimit('2026-07', '2026-07-07'), 0);
-    assert.equal(isLateCompetitionRegistration('2026-07', '2026-07-01'), true);
-    assert.equal(isLateCompetitionRegistration('2026-07', '2026-07-06'), true);
-    assert.equal(isLateCompetitionRegistration('2026-07', '2026-07-07'), false);
-    assert.deepEqual(
-      getRegistrationGoalOptions('2026-07', '2026-06-30'),
-      [1, 2, 3, 4, 5, 6, 7]
-    );
-    assert.deepEqual(getRegistrationGoalOptions('2026-07', '2026-07-02'), [6]);
-    assert.deepEqual(getRegistrationGoalOptions('2026-07', '2026-07-03'), [5]);
-    assert.deepEqual(getRegistrationGoalOptions('2026-07', '2026-07-06'), [2]);
-    assert.deepEqual(getRegistrationGoalOptions('2026-07', '2026-07-07'), []);
-  });
-
-  it('targets the active month through day 6 and the next month afterward', () => {
-    assert.equal(getRegistrationTargetCompetitionMonthKey('2026-07-01'), '2026-07');
-    assert.equal(getRegistrationTargetCompetitionMonthKey('2026-07-06'), '2026-07');
-    assert.equal(getRegistrationTargetCompetitionMonthKey('2026-07-07'), '2026-08');
-    assert.equal(getRegistrationTargetCompetitionMonthKey('2026-12-31'), '2027-01');
+  it('offers every configured goal throughout a published competition', () => {
+    for (const dateKey of ['2026-06-01', '2026-07-01', '2026-07-20', '2026-07-31']) {
+      assert.equal(getRegistrationGoalLimit('2026-07', dateKey), 7);
+      assert.deepEqual(
+        getRegistrationGoalOptions('2026-07', dateKey),
+        [1, 2, 3, 4, 5, 6, 7]
+      );
+    }
+    assert.equal(getRegistrationGoalLimit('2026-07', '2026-08-01'), 0);
+    assert.deepEqual(getRegistrationGoalOptions('2026-07', '2026-08-01'), []);
   });
 
   it('builds the next competition month and complete date range', () => {
@@ -128,10 +106,10 @@ describe('competition enrollment', () => {
   it('rejects a launch minimum below 100 entrants', () => {
     assert.throws(
       () =>
-        buildCompetitionEnrollmentSummary(
-          '2026-07',
-          { maximumEntrants: null, minimumEntrants: 99 }
-        ),
+        buildCompetitionEnrollmentSummary('2026-07', {
+          maximumEntrants: null,
+          minimumEntrants: 99
+        }),
       /at least 100/i
     );
   });

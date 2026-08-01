@@ -135,7 +135,7 @@ describe('PrivacyOperationsService', () => {
       exportObjectKeys: ['privacy-exports/me/old.json'],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
-      hasOpenPayout: false,
+      hasOpenRewardClaim: false,
       userId: deletionJob.userId,
       userStatus: 'active',
     });
@@ -168,7 +168,7 @@ describe('PrivacyOperationsService', () => {
     );
   });
 
-  it('does not remove access while a payout still requires the winner', async () => {
+  it('does not remove access while a reward still requires the winner', async () => {
     const deletionJob = { ...exportJob, requestType: 'delete' as const };
     const { calls, repository, service } = setup({ job: deletionJob });
     repository.getDeletionContext.mockResolvedValue({
@@ -177,7 +177,7 @@ describe('PrivacyOperationsService', () => {
       exportObjectKeys: [],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
-      hasOpenPayout: true,
+      hasOpenRewardClaim: true,
       userId: deletionJob.userId,
       userStatus: 'active',
     });
@@ -190,7 +190,7 @@ describe('PrivacyOperationsService', () => {
     expect(calls.deleteAccount).not.toHaveBeenCalled();
     expect(calls.recordFailure).toHaveBeenCalledWith(
       deletionJob,
-      'OPEN_PAYOUT_REQUIRES_REVIEW',
+      'OPEN_REWARD_CLAIM_REQUIRES_REVIEW',
     );
   });
 
@@ -206,7 +206,7 @@ describe('PrivacyOperationsService', () => {
       exportObjectKeys: [],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
-      hasOpenPayout: false,
+      hasOpenRewardClaim: false,
       userId: deletionJob.userId,
       userStatus: 'active',
     });

@@ -8,13 +8,12 @@ import type { Transaction } from 'kysely';
 import type { Database, JsonArray } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { stableJson } from '../../common/idempotency/stable-json';
-import { parseCompetitionRules } from '../competitions/competition-rules';
-import { PayoutsService } from '../payouts/payouts.service';
-import {
-  buildPayoutLadder,
-  buildSeedCommitment,
-  selectWeightedWinners,
-} from './draw-algorithm';
+import { CompetitionScoringService } from '../competitions/competition-scoring.service';
+import { RewardsService } from '../rewards/rewards.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { buildSeedCommitment, selectWeightedWinners } from './draw-algorithm';
+
+const drawInsertBatchSize = 1_000;
 
 export interface LockDrawInput {
   competitionId: string;
@@ -41,7 +40,6 @@ export interface SettleDrawInput {
 
 export interface SettledDrawResult {
   drawId: string;
-  payoutPoolAmountMinor: number;
   winnerCount: number;
 }
 
@@ -49,7 +47,9 @@ export interface SettledDrawResult {
 export class DrawsService {
   constructor(
     private readonly database: DatabaseService,
-    private readonly payouts: PayoutsService,
+    private readonly notifications: NotificationsService,
+    private readonly rewards: RewardsService,
+    private readonly scoring: CompetitionScoringService,
   ) {}
 
   async lock(input: LockDrawInput): Promise<LockedDrawResult> {
@@ -76,14 +76,6 @@ export class DrawsService {
             message: 'The competition was not found.',
           });
         }
-        if (competition.mode === 'non_cash_demo') {
-          throw new ConflictException({
-            code: 'DEMO_COMPETITION_DRAWS_DISABLED',
-            message:
-              'Draw creation is disabled for non-cash demo competitions.',
-          });
-        }
-
         const existing = await transaction
           .selectFrom('competition_draws')
           .selectAll()
@@ -128,6 +120,12 @@ export class DrawsService {
               'The competition cannot lock a draw while workout sessions remain active or pending review.',
           });
         }
+
+        await this.scoring.finalizeForDraw(
+          transaction,
+          competition.id,
+          new Date(),
+        );
 
         const activeEnrollments = await transaction
           .selectFrom('competition_enrollments as enrollment')
@@ -202,19 +200,26 @@ export class DrawsService {
           })
           .returningAll()
           .executeTakeFirstOrThrow();
-        await transaction
-          .insertInto('draw_entries')
-          .values(
-            progress.map((entry, index) => ({
-              created_at: new Date(),
-              draw_id: draw.id,
-              enrollment_id: entry.enrollment_id,
-              entry_count: entry.prize_draw_entries,
-              snapshot_position: index + 1,
-              user_id: entry.user_id,
-            })),
-          )
-          .execute();
+        for (
+          let offset = 0;
+          offset < progress.length;
+          offset += drawInsertBatchSize
+        ) {
+          const batch = progress.slice(offset, offset + drawInsertBatchSize);
+          await transaction
+            .insertInto('draw_entries')
+            .values(
+              batch.map((entry, batchIndex) => ({
+                created_at: new Date(),
+                draw_id: draw.id,
+                enrollment_id: entry.enrollment_id,
+                entry_count: entry.prize_draw_entries,
+                snapshot_position: offset + batchIndex + 1,
+                user_id: entry.user_id,
+              })),
+            )
+            .execute();
+        }
         await transaction
           .updateTable('competitions')
           .set({ status: 'settling', updated_at: new Date() })
@@ -256,8 +261,6 @@ export class DrawsService {
             'draw.competition_id',
           )
           .select([
-            'competition.currency',
-            'competition.rules',
             'competition.status as competition_status',
             'draw.competition_id',
             'draw.id',
@@ -283,16 +286,14 @@ export class DrawsService {
             });
           }
           const count = await transaction
-            .selectFrom('draw_winners')
+            .selectFrom('reward_awards')
             .select((expression) =>
               expression.fn.countAll<number>().as('count'),
             )
             .where('draw_id', '=', draw.id)
             .executeTakeFirstOrThrow();
-          const rules = parseCompetitionRules(draw.rules);
           return {
             drawId: draw.id,
-            payoutPoolAmountMinor: rules.payoutPoolAmountMinor,
             winnerCount: Number(count.count),
           };
         }
@@ -320,8 +321,21 @@ export class DrawsService {
           .where('draw_id', '=', draw.id)
           .orderBy('snapshot_position')
           .execute();
-        const rules = parseCompetitionRules(draw.rules);
-        const winnerCount = Math.min(rules.payoutWinnerCount, entries.length);
+        const now = new Date();
+        const rewardSlots = await this.rewards.listAvailableAwardSlots(
+          transaction,
+          draw.competition_id,
+          now,
+          entries.length,
+        );
+        const winnerCount = Math.min(rewardSlots.length, entries.length);
+        if (winnerCount === 0) {
+          throw new ConflictException({
+            code: 'DRAW_REWARD_INVENTORY_REQUIRED',
+            message:
+              'Publish at least one in-stock reward before settling the draw.',
+          });
+        }
         const winners = selectWeightedWinners(
           entries.map((entry) => ({
             entryCount: entry.entry_count,
@@ -330,35 +344,42 @@ export class DrawsService {
           winnerCount,
           input.seedReveal,
         );
-        const ladder = buildPayoutLadder(
-          rules.payoutPoolAmountMinor,
-          winnerCount,
-          rules.payoutExponent,
-        );
-        const now = new Date();
-        const insertedWinners = await transaction
-          .insertInto('draw_winners')
-          .values(
-            winners.map((winner, index) => ({
-              amount_minor: ladder[index].amountMinor,
-              created_at: now,
-              currency: draw.currency,
-              draw_id: draw.id,
-              payout_rank: index + 1,
-              user_id: winner.userId,
-            })),
-          )
-          .returning(['amount_minor', 'currency', 'id', 'user_id'])
-          .execute();
-        await this.payouts.createClaimsForWinners(
-          transaction,
-          insertedWinners.map((winner) => ({
-            amountMinor: winner.amount_minor,
-            currency: winner.currency,
-            id: winner.id,
-            userId: winner.user_id,
-          })),
-        );
+        const awards: { id: string; user_id: string }[] = [];
+        for (
+          let offset = 0;
+          offset < winners.length;
+          offset += drawInsertBatchSize
+        ) {
+          const batch = winners.slice(offset, offset + drawInsertBatchSize);
+          const inserted = await transaction
+            .insertInto('reward_awards')
+            .values(
+              batch.map((winner, batchIndex) => ({
+                award_rank: offset + batchIndex + 1,
+                awarded_at: now,
+                claimed_at: null,
+                draw_id: draw.id,
+                fulfilled_at: null,
+                redeemed_at: null,
+                reward_catalog_item_id:
+                  rewardSlots[offset + batchIndex].rewardCatalogItemId,
+                status: 'awarded' as const,
+                updated_at: now,
+                user_id: winner.userId,
+              })),
+            )
+            .returning(['id', 'user_id'])
+            .execute();
+          awards.push(...inserted);
+        }
+        for (const award of awards) {
+          await this.notifications.enqueue(
+            transaction,
+            award.user_id,
+            'reward_awarded',
+            { awardId: award.id },
+          );
+        }
         await transaction
           .updateTable('competition_draws')
           .set({
@@ -387,7 +408,6 @@ export class DrawsService {
 
         return {
           drawId: draw.id,
-          payoutPoolAmountMinor: rules.payoutPoolAmountMinor,
           winnerCount,
         };
       });

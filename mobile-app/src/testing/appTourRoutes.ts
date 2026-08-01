@@ -1,0 +1,135 @@
+import type { Href } from 'expo-router';
+
+import type { AppTourScenario } from '@/state/appTour';
+
+export type AppTourRoute = {
+  label: string;
+  route: string;
+  scenario?: AppTourScenario;
+};
+
+export type AppTourRouteGroup = {
+  routes: readonly AppTourRoute[];
+  title: string;
+};
+
+export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
+  {
+    title: 'START + ACCOUNT',
+    routes: [
+      { label: 'App Entry', route: '/' },
+      { label: 'Welcome', route: '/welcome' },
+      { label: 'Choose How to Join', route: '/join' },
+      { label: 'Sign Up', route: '/sign-up' },
+      { label: 'Sign In', route: '/sign-in' },
+      { label: 'Verify Email', route: '/verify-email?next=region' },
+      { label: 'Forgot Password', route: '/forgot-password' }
+    ]
+  },
+  {
+    title: 'REQUIRED SETUP',
+    routes: [
+      { label: 'Region + Agreements', route: '/region' },
+      { label: 'Weekly Goal', route: '/commitment' }
+    ]
+  },
+  {
+    title: 'OPTIONAL SETUP',
+    routes: [
+      { label: 'Public Alias', route: '/identity' },
+      { label: 'Workout Device', route: '/verification?source=workout' },
+      { label: 'Competition Guide', route: '/how-it-works' }
+    ]
+  },
+  {
+    title: 'MAIN APP',
+    routes: [
+      { label: 'Home', route: '/home' },
+      { label: 'Workout Calendar', route: '/calendar' },
+      { label: 'Train', route: '/session' },
+      { label: 'Leaderboard', route: '/leaderboard' },
+      { label: 'Winners Circle', route: '/winners-circle' },
+      { label: 'Rewards', route: '/leaderboard/rewards' },
+      { label: 'My Awards', route: '/rewards/awards' },
+      { label: 'Weekly Challenge', route: '/squad' },
+      { label: 'Social Challenges', route: '/squad/social' },
+      { label: 'Challenge Gym', route: '/squad/gym' },
+      { label: 'Profile', route: '/profile' },
+      { label: 'Account Data', route: '/account-data' }
+    ]
+  },
+  {
+    title: 'WORKOUT FLOW',
+    routes: [
+      { label: 'Choose Method', route: '/workout/method' },
+      { label: 'Heart-Rate Check-In', route: '/workout/check-in' },
+      { label: 'Partner Gym QR', route: '/qr-scanner' },
+      {
+        label: 'Partner Gym Presence',
+        route: '/workout/identity-check?qrPayload=gogymgo:gym:entry:app-tour'
+      },
+      {
+        label: 'Active Timer',
+        route: '/workout/active',
+        scenario: 'active-workout'
+      },
+      {
+        label: 'Presence Check',
+        route: '/workout/ping',
+        scenario: 'presence-check'
+      },
+      {
+        label: 'Presence Confirmed',
+        route: '/workout/ping-success',
+        scenario: 'workout-complete'
+      },
+      {
+        label: 'Check-Out',
+        route: '/workout/check-out',
+        scenario: 'workout-complete'
+      },
+      {
+        label: 'Workout Complete',
+        route: '/workout/complete',
+        scenario: 'workout-complete'
+      }
+    ]
+  },
+  {
+    title: 'CREATORS + PARTNERS',
+    routes: [
+      { label: 'Creator Workouts', route: '/workouts' },
+      { label: 'Workout Detail', route: '/workouts/app-tour-workout' },
+      { label: 'Creator Application', route: '/creator/apply' },
+      { label: 'Creator Submission', route: '/creator/submit' },
+      { label: 'Partner Hub', route: '/partner' },
+      { label: 'Sponsor Application', route: '/sponsor/apply' },
+      { label: 'Gym Registration', route: '/gym/register' }
+    ]
+  },
+  {
+    title: 'RULES + PRIVACY',
+    routes: [
+      { label: 'Competition Rules', route: '/commitment-rules' },
+      { label: 'Official Contest Rules', route: '/official-rules' },
+      { label: 'Bonus Rules', route: '/bonus-rules' },
+      { label: 'Privacy Policy', route: '/privacy-policy' },
+      { label: 'Terms of Service', route: '/terms-of-service' },
+      { label: 'Consent Settings', route: '/consent-settings' },
+      { label: 'Presence Notice', route: '/biometric-camera-consent' }
+    ]
+  }
+];
+
+export const appTourRoutes = appTourRouteGroups.flatMap(({ routes }) => routes);
+
+export function buildAppTourHref(route: AppTourRoute): Href {
+  const scenario = route.scenario ?? 'ready';
+  const join = route.route.includes('?') ? '&' : '?';
+
+  return `${route.route}${join}appTour=1&tourScenario=${scenario}` as Href;
+}
+
+export function findAppTourRouteIndex(pathname: string) {
+  return appTourRoutes.findIndex(({ route }) => route.split('?', 1)[0] === pathname);
+}

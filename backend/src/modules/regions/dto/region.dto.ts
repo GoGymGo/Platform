@@ -3,22 +3,20 @@ import {
   IsEnum,
   IsLatitude,
   IsLongitude,
-  Matches,
   IsOptional,
-  IsPostalCode,
-  IsString,
-  IsUUID,
+  Matches,
 } from 'class-validator';
 import type {
   RegionVerificationMethod,
   RegionVerificationStatus,
 } from '../../../database/database.types';
+import { regionCodePattern } from '../region-code';
 
 export class RegionPolicyResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
 
-  @ApiProperty({ example: 'CA-BC-VICTORIA', type: String })
+  @ApiProperty({ example: 'victoria-bc', type: String })
   code!: string;
 
   @ApiProperty({ example: 'CA', type: String })
@@ -45,9 +43,6 @@ export class RegionPolicyResponseDto {
   @ApiProperty({ type: Boolean })
   competitionEnabled!: boolean;
 
-  @ApiProperty({ type: Boolean })
-  payoutEnabled!: boolean;
-
   @ApiProperty({ type: String })
   policyVersion!: string;
 
@@ -63,39 +58,32 @@ export class RegionPolicyResponseDto {
 
 export enum RegionVerificationMethodDto {
   DEVICE_LOCATION = 'device_location',
-  POSTAL_CODE = 'postal_code',
 }
 
 export class CreateRegionVerificationDto {
-  @ApiProperty({ format: 'uuid', type: String })
-  @IsUUID()
-  regionPolicyId!: string;
-
   @ApiProperty({ enum: RegionVerificationMethodDto, type: String })
   @IsEnum(RegionVerificationMethodDto)
-  method!: RegionVerificationMethod;
+  method!: 'device_location';
 
-  @ApiPropertyOptional({ maximum: 90, minimum: -90, type: Number })
-  @IsOptional()
+  @ApiProperty({ maximum: 90, minimum: -90, type: Number })
   @IsLatitude()
-  latitude?: number;
+  latitude!: number;
 
-  @ApiPropertyOptional({ maximum: 180, minimum: -180, type: Number })
-  @IsOptional()
+  @ApiProperty({ maximum: 180, minimum: -180, type: Number })
   @IsLongitude()
-  longitude?: number;
-
-  @ApiPropertyOptional({ type: String })
-  @IsOptional()
-  @IsString()
-  @IsPostalCode('any')
-  postalCode?: string;
+  longitude!: number;
 }
 
 export class CurrentRegionVerificationQueryDto {
-  @ApiProperty({ example: 'CA-BC-DEMO', type: String })
-  @Matches(/^[A-Z]{2}-[A-Z0-9-]{1,32}$/)
-  regionCode!: string;
+  @ApiPropertyOptional({
+    description:
+      'When omitted, returns the latest active verification across all regions.',
+    example: 'victoria-bc',
+    type: String,
+  })
+  @IsOptional()
+  @Matches(regionCodePattern)
+  regionCode?: string;
 }
 
 export class RegionVerificationResponseDto {
@@ -106,34 +94,40 @@ export class RegionVerificationResponseDto {
   regionPolicyId!: string;
 
   @ApiProperty({
-    enum: ['device_location', 'postal_code', 'manual_review'],
+    enum: [RegionVerificationMethodDto.DEVICE_LOCATION],
     type: String,
   })
-  method!: RegionVerificationMethod;
+  method!: Extract<RegionVerificationMethod, 'device_location'>;
 
   @ApiProperty({
-    enum: ['pending', 'approved', 'rejected', 'expired'],
+    enum: ['approved'],
     type: String,
   })
-  status!: RegionVerificationStatus;
+  status!: Extract<RegionVerificationStatus, 'approved'>;
 
   @ApiProperty({ type: String })
   policyVersion!: string;
 
-  @ApiProperty({ format: 'date-time', type: String })
-  createdAt!: string;
-}
-
-export class CurrentRegionVerificationResponseDto extends RegionVerificationResponseDto {
-  @ApiProperty({ example: 'CA-BC-DEMO', type: String })
+  @ApiProperty({ example: 'vancouver-bc', type: String })
   regionCode!: string;
 
-  @ApiProperty({ example: 'British Columbia Demo', type: String })
+  @ApiProperty({ example: 'Vancouver', type: String })
   regionName!: string;
 
-  @ApiProperty({ format: 'date-time', nullable: true, type: String })
-  reviewedAt!: string | null;
+  @ApiProperty({ example: 'CA-BC', type: String })
+  jurisdictionCode!: string;
 
-  @ApiProperty({ format: 'date-time', nullable: true, type: String })
-  expiresAt!: string | null;
+  @ApiProperty({ example: 'America/Vancouver', type: String })
+  timezone!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  createdAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  reviewedAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
 }
+
+export class CurrentRegionVerificationResponseDto extends RegionVerificationResponseDto {}

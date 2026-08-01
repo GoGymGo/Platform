@@ -5,6 +5,8 @@ import { CompetitionsService } from '../src/modules/competitions/competitions.se
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
+import { devicePresenceConsentVersion } from '../src/modules/legal/verification-consent';
+import { VerificationConsentsService } from '../src/modules/legal/verification-consents.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
@@ -61,17 +63,18 @@ const cappedUserPrincipals: readonly [
 ];
 
 const competitionRules = {
+  categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 2,
   minSessionMinutes: 10,
-  payoutExponent: 0.8,
-  payoutPoolAmountMinor: 10_000,
-  payoutWinnerCount: 3,
+  perfectMonthMultiplier: 10,
   requireDeviceAttestation: true,
-  requireFaceCheck: true,
+  requirePresenceCheck: true,
   requireGymQr: true,
   signupPrizeDrawEntries: 5,
   verifiedSessionCategoryScore: 7,
   verifiedSessionPrizeDrawEntries: 3,
+  weeklyChallengeBothHitMultiplier: 2,
+  weeklyChallengeRecoveryMultiplier: 3,
 };
 
 interface CompetitionFixture {
@@ -90,6 +93,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let operatorUserId: string;
   let profiles: ProfilesService;
   let sessions: SessionsService;
+  let verificationConsents: VerificationConsentsService;
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
@@ -98,14 +102,26 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
+    verificationConsents = new VerificationConsentsService(
+      database,
+      idempotency,
+      profiles,
+    );
     competitions = new CompetitionsService(
       database,
       idempotency,
       ledger,
       legalDocuments,
+      verificationConsents,
       profiles,
     );
-    sessions = new SessionsService(database, idempotency, ledger, profiles);
+    sessions = new SessionsService(
+      database,
+      idempotency,
+      ledger,
+      profiles,
+      verificationConsents,
+    );
     const operator = await profiles.ensureUser(
       operatorPrincipal,
       database.connection,
@@ -137,6 +153,27 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toMatchObject({
       response: { code: 'VERIFIED_EMAIL_REQUIRED' },
     });
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'session-workflow-consent-required',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'DEVICE_PRESENCE_CONSENT_REQUIRED' },
+    });
+    await setVerificationConsent(
+      userPrincipal,
+      true,
+      'session-workflow-consent-granted',
+    );
     const enrollment = await competitions.enroll(
       userPrincipal,
       fixture.competitionId,
@@ -165,11 +202,61 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).resolves.toEqual(enrollment);
     await activateCompetition(fixture.competitionId);
 
+    await setVerificationConsent(
+      userPrincipal,
+      false,
+      'session-workflow-consent-withdrawn',
+    );
+    await expect(
+      sessions.create(
+        userPrincipal,
+        'session-workflow-withdrawn-consent-create',
+        { competitionId: fixture.competitionId },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'DEVICE_PRESENCE_CONSENT_REQUIRED' },
+    });
+    await setVerificationConsent(
+      userPrincipal,
+      true,
+      'session-workflow-consent-restored',
+    );
+
+    const abandoned = await sessions.create(
+      userPrincipal,
+      'session-workflow-abandoned-create',
+      { competitionId: fixture.competitionId },
+    );
+    const cancelled = await sessions.cancel(
+      userPrincipal,
+      abandoned.id,
+      'session-workflow-abandoned-cancel',
+    );
+    expect(cancelled).toMatchObject({
+      completedAt: expect.any(String),
+      id: abandoned.id,
+      status: 'cancelled',
+    });
+    await expect(
+      sessions.cancel(
+        userPrincipal,
+        abandoned.id,
+        'session-workflow-abandoned-cancel',
+      ),
+    ).resolves.toEqual(cancelled);
+
     const created = await sessions.create(
       userPrincipal,
       'session-workflow-create',
       { competitionId: fixture.competitionId },
     );
+    expect(created.requirements).toEqual({
+      minHeartRateSamples: competitionRules.minHeartRateSamples,
+      minSessionMinutes: competitionRules.minSessionMinutes,
+      requireDeviceAttestation: competitionRules.requireDeviceAttestation,
+      requireGymQr: competitionRules.requireGymQr,
+      requirePresenceCheck: competitionRules.requirePresenceCheck,
+    });
     await expect(
       sessions.create(userPrincipal, 'session-workflow-create', {
         competitionId: fixture.competitionId,
@@ -203,11 +290,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await sessions.appendEvent(
       userPrincipal,
       created.id,
-      'session-face-check',
+      'session-presence-check',
       {
         eventId: '10000000-0000-4000-8000-000000000003',
-        eventType: 'face_check',
-        faceMatchConfidence: 0.94,
+        eventType: 'presence_check',
         occurredAt: evidenceTimes[2],
       },
     );
@@ -317,9 +403,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
     expect(evidenceReview).toMatchObject({
       evidence: {
         deviceAttestation: { count: 1, required: true },
-        faceCheck: { count: 1, required: true },
         gymQr: { count: 1, required: true, uniquePayloadCount: 1 },
         heartRate: { count: 2, required: true },
+        presenceCheck: { count: 1, required: true },
       },
       status: 'pending_review',
     });
@@ -336,9 +422,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
         evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
         findings: {
           deviceAttestation: 'approved',
-          faceCheck: 'rejected',
           gymQr: 'approved',
           heartRate: 'approved',
+          presenceCheck: 'rejected',
         },
         operatorUserId,
         reason: 'required evidence rejection integration test',
@@ -422,9 +508,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
         evidenceSnapshotSha256: duplicateReview.evidenceSnapshotSha256,
         findings: {
           deviceAttestation: 'not_required',
-          faceCheck: 'not_required',
           gymQr: 'not_required',
           heartRate: 'not_required',
+          presenceCheck: 'not_required',
         },
         operatorUserId,
         reason: 'rejection requires a failed evidence finding',
@@ -600,9 +686,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
       evidenceSnapshotSha256: resolvedSnapshotSha256,
       findings: {
         deviceAttestation: 'approved',
-        faceCheck: 'approved',
         gymQr: 'approved',
         heartRate: 'approved',
+        presenceCheck: 'approved',
       },
       operatorUserId,
       reason: 'trusted evidence reviewed in integration test',
@@ -620,9 +706,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
       evidenceSnapshotSha256,
       findings: {
         deviceAttestation: 'not_required',
-        faceCheck: 'rejected',
         gymQr: 'not_required',
         heartRate: 'not_required',
+        presenceCheck: 'rejected',
       },
       operatorUserId,
       reason: 'evidence failed operator review in integration test',
@@ -652,11 +738,15 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-          payout_enabled, boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, boundary, valid_from)
        VALUES
          ('critical-session-region', 'CA', 'BC', 'Critical Session Region',
-          'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE, TRUE,
-          'boundary-v1', 'policy-v1', $1)
+           'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
+          'boundary-v1', 'policy-v1',
+          ST_GeogFromText(
+            'SRID=4326;MULTIPOLYGON(((-123.5 49.0,-122.8 49.0,-122.8 49.6,-123.5 49.6,-123.5 49.0)))'
+          ),
+          $1)
        RETURNING id`,
       [new Date(now - 24 * 60 * 60_000)],
     );
@@ -676,11 +766,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     const competition = await migrated.pool.query<{ id: string }>(
       `INSERT INTO competitions
-         (region_policy_id, month_key, name, status, currency, rules_version,
+         (region_policy_id, month_key, name, status, rules_version,
           rules, minimum_entrants, registration_opens_at,
           registration_closes_at, starts_at, ends_at)
        VALUES ($1, '2030-01', 'Critical Session Competition', 'registration',
-               'CAD', 'rules-v1', $2::jsonb, 100, $3, $4, $5, $6)
+               'rules-v1', $2::jsonb, 100, $3, $4, $5, $6)
        RETURNING id`,
       [
         region.rows[0].id,
@@ -724,11 +814,15 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_policies
          (code, country_code, subdivision_code, metro_name, currency,
           timezone, language_codes, minimum_age, competition_enabled,
-          payout_enabled, boundary_version, policy_version, valid_from)
+           boundary_version, policy_version, boundary, valid_from)
        VALUES
          ('critical-capped-enrollment-region', 'CA', 'BC',
           'Critical Capped Enrollment Region', 'CAD', 'America/Vancouver',
-          ARRAY['en-CA'], 19, TRUE, TRUE, 'boundary-v1', 'policy-v1', $1)
+           ARRAY['en-CA'], 19, TRUE, 'boundary-v1', 'policy-v1',
+           ST_GeogFromText(
+             'SRID=4326;MULTIPOLYGON(((-123.5 49.0,-122.8 49.0,-122.8 49.6,-123.5 49.6,-123.5 49.0)))'
+           ),
+           $1)
        RETURNING id`,
       [new Date(now - 24 * 60 * 60_000)],
     );
@@ -742,6 +836,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
       const legalReceiptBundleId = await acceptCurrentLegalBundle(
         principal,
         `critical-capped-legal-${principal.firebaseUid}`,
+      );
+      await setVerificationConsent(
+        principal,
+        true,
+        `critical-capped-consent-${principal.firebaseUid}`,
       );
       const verification = await migrated.pool.query<{ id: string }>(
         `INSERT INTO region_verifications
@@ -765,11 +864,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     }
     const competition = await migrated.pool.query<{ id: string }>(
       `INSERT INTO competitions
-         (region_policy_id, month_key, name, status, currency, rules_version,
+         (region_policy_id, month_key, name, status, rules_version,
           rules, minimum_entrants, entrant_cap, registration_opens_at,
           registration_closes_at, starts_at, ends_at)
        VALUES ($1, '2030-02', 'Critical Capped Enrollment Competition',
-               'registration', 'CAD', 'rules-v1', $2::jsonb, 100, 100,
+               'registration', 'rules-v1', $2::jsonb, 100, 100,
                $3, $4, $5, $6)
        RETURNING id`,
       [
@@ -916,6 +1015,22 @@ describeWithDatabase('critical session and ledger workflow', () => {
       },
     );
     return status.receiptBundleId!;
+  }
+
+  async function setVerificationConsent(
+    principal: AuthenticatedPrincipal,
+    accepted: boolean,
+    idempotencyKey: string,
+  ): Promise<void> {
+    const status = await verificationConsents.setStatus(
+      principal,
+      idempotencyKey,
+      {
+        accepted,
+        consentVersion: devicePresenceConsentVersion,
+      },
+    );
+    expect(status.accepted).toBe(accepted);
   }
 
   async function activateCompetition(competitionId: string): Promise<void> {

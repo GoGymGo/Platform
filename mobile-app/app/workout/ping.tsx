@@ -3,17 +3,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { CompactTextButton } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { getMidSessionGraceSecondsRemaining } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatGrace(secondsRemaining: number) {
@@ -24,11 +27,18 @@ function formatGrace(secondsRemaining: number) {
 
 export default function PingScreen() {
   const router = useRouter();
-  const { activeSession } = useWorkoutProgress();
+  const {
+    activeSession,
+    markMidSessionVerified,
+    sessionActionError,
+    sessionActionPending
+  } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const { busy, message, verify } = usePresenceVerification();
   const [secondsRemaining, setSecondsRemaining] = useState(() =>
     getMidSessionGraceSecondsRemaining(activeSession?.midSessionCheckPromptedAt ?? null)
   );
@@ -49,10 +59,20 @@ export default function PingScreen() {
     () => formatGrace(secondsRemaining),
     [secondsRemaining]
   );
+
+  async function confirmPresence() {
+    if (!(await verify())) {
+      return;
+    }
+
+    if (await markMidSessionVerified()) {
+      router.replace('/workout/ping-success');
+    }
+  }
   if (!activeSession) {
     return (
       <SessionUnavailable
-        body="START A VERIFIED SESSION BEFORE OPENING A MID-SESSION CHECK."
+        body="Start a verified session before opening a mid-session presence check."
         onAction={() => router.replace('/session' as Href)}
       />
     );
@@ -61,20 +81,26 @@ export default function PingScreen() {
   if (!activeSession.midSessionCheckPrompted && !activeSession.midSessionVerified) {
     return (
       <SessionUnavailable
-        actionLabel="RETURN TO ACTIVE SESSION ->"
-        body="THE RANDOM FACE CHECK HAS NOT BEEN TRIGGERED YET. KEEP THE ACTIVE SESSION OPEN AND GOGYMGO WILL PROMPT YOU AUTOMATICALLY."
+        actionLabel="RETURN TO WORKOUT"
+        body="The random presence check has not been triggered yet. GoGymGo will send a local alert when it is ready."
         onAction={() => router.replace('/workout/active')}
-        title="FACE CHECK ARMED"
+        title="CHECK NOT STARTED"
       />
     );
   }
 
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+      <WorkoutFlowProgress stage="verify" style={styles.workoutProgress} />
       <HUDBorderBox glow style={styles.pingPill} tone="amber">
         <View style={styles.pingDot} />
         <TerminalText glow tone="amber" variant="micro">
-          AUTOMATIC FACE CHECK // ACTION REQUIRED
+          ACTION NEEDED // PRESENCE CHECK
         </TerminalText>
       </HUDBorderBox>
 
@@ -92,45 +118,68 @@ export default function PingScreen() {
       <TerminalText glow style={styles.title} tone="amber" variant="title">
         VERIFY NOW TO KEEP IT VALID
       </TerminalText>
-      <TerminalText style={styles.body} tone="muted" variant="body">
-        YOUR RANDOM MID-WORKOUT CHECK IS READY. MISS THIS CHECKPOINT AND THIS
-        WORKOUT CANNOT COUNT. USE THE LOCAL BIOMETRIC PROMPT, THEN BACK TO IT.
+      <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+        Complete your phone&apos;s secure prompt before the timer ends.
       </TerminalText>
 
-      <BiometricCameraConsentBanner
-        checked={cameraConsentAccepted}
-        compact
-        onToggle={toggleCameraConsent}
-        style={styles.cameraConsent}
-      />
+      {cameraConsentAccepted ? (
+        <TerminalText style={styles.verificationReady} tone="green" uppercase={false} variant="caption">
+          Device verification is ready.
+        </TerminalText>
+      ) : (
+        <BiometricCameraConsentBanner
+          checked={cameraConsentAccepted}
+          compact
+          onToggle={toggleCameraConsent}
+          style={styles.cameraConsent}
+        />
+      )}
 
       <CyberButtonPrimary
-        disabled
-        label="IDENTITY PROVIDER REQUIRED"
-        onPress={() => undefined}
+        disabled={
+          !cameraConsentReady ||
+          !cameraConsentAccepted ||
+          secondsRemaining === 0 ||
+          busy ||
+          sessionActionPending
+        }
+        label={
+          busy
+            ? 'Checking device...'
+            : sessionActionPending
+              ? 'Saving result...'
+              : 'Verify now'
+        }
+        onPress={() => void confirmPresence()}
         tone="amber"
       />
-      <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
-        THIS CHECKPOINT CANNOT PASS UNTIL VERIFIED PROVIDER EVIDENCE IS RETURNED.
-      </TerminalText>
-
-      <CyberButtonOutline
-        label="BACK TO SESSION"
+      {message || sessionActionError ? (
+        <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+          {sessionActionError ?? message}
+        </TerminalText>
+      ) : null}
+      <CompactTextButton
+        label="Back to timer"
         onPress={() => router.replace('/workout/active')}
-        style={styles.backButton}
+        tone="muted"
       />
+
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
     backgroundColor: colors.background
+  },
+  workoutProgress: {
+    marginBottom: spacing.xl
   },
   pingPill: {
     width: 'auto',
@@ -190,9 +239,12 @@ const styles = StyleSheet.create({
   cameraConsent: {
     marginBottom: spacing.md
   },
-  integrationNote: {
+  verificationReady: {
+    marginBottom: spacing.md,
+    textAlign: 'center'
+  },
+  statusMessage: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
     textAlign: 'center'
   }
 });

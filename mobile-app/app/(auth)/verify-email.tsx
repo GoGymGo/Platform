@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import {
@@ -15,10 +15,12 @@ import {
 } from '@/components/cyber';
 import { getAuthErrorMessage } from '@/domain/auth';
 import { spacing } from '@/constants/theme';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { next } = useLocalSearchParams<{ next?: string }>();
   const {
     firebaseConfigured,
@@ -30,7 +32,57 @@ export default function VerifyEmailScreen() {
   const [busyAction, setBusyAction] = useState<'check' | 'resend' | 'signout' | null>(null);
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<'green' | 'amber' | 'red'>('amber');
-  const nextRoute = next === 'identity' ? '/identity' : next === 'profile' ? '/profile' : '/home';
+  const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
+  const polling = useRef(false);
+  const continueAfterVerification = useCallback(() => {
+    router.replace(
+      challengeInvite
+        ? { pathname: '/join', params: { challengeInvite } }
+        : next === 'region'
+          ? '/region'
+          : next === 'identity'
+            ? '/identity'
+            : next === 'profile'
+              ? '/profile'
+              : '/home?resume=1'
+    );
+  }, [challengeInvite, next, router]);
+
+  useEffect(() => {
+    if (appTourActive || !user || user.emailVerified) {
+      return;
+    }
+
+    let active = true;
+    const pollVerification = async () => {
+      if (polling.current) {
+        return;
+      }
+      polling.current = true;
+      try {
+        const refreshedUser = await refreshUser();
+        if (active && refreshedUser?.emailVerified) {
+          continueAfterVerification();
+        }
+      } catch {
+        // The visible manual action reports errors; background checks stay quiet.
+      } finally {
+        polling.current = false;
+      }
+    };
+    const interval = setInterval(() => void pollVerification(), 2500);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [
+    appTourActive,
+    continueAfterVerification,
+    refreshUser,
+    user,
+    user?.emailVerified
+  ]);
 
   async function checkVerification() {
     setBusyAction('check');
@@ -38,7 +90,7 @@ export default function VerifyEmailScreen() {
     try {
       const refreshedUser = await refreshUser();
       if (refreshedUser?.emailVerified) {
-        router.replace(nextRoute);
+        continueAfterVerification();
         return;
       }
       setMessageTone('amber');
@@ -78,7 +130,9 @@ export default function VerifyEmailScreen() {
 
   return (
     <AuthScreenShell
-      description="Verify the email attached to your GoGymGo account before entering competition flows."
+      description={appTourActive
+        ? 'This preview simulates the email-verification step without sending a message.'
+        : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
       eyebrow="ACCOUNT SECURITY"
       title="CHECK YOUR EMAIL"
     >
@@ -99,19 +153,27 @@ export default function VerifyEmailScreen() {
             {user.email ?? 'YOUR ACCOUNT EMAIL'}
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Open the Firebase verification email, confirm the address, then return here.
+            {appTourActive
+              ? 'Choose Continue Demo to confirm the sample account and proceed to region setup.'
+              : 'Open the verification email and confirm the address. This screen continues automatically when verification is complete.'}
           </TerminalText>
           {message ? <AuthStatusNotice message={message} tone={messageTone} /> : null}
           <CyberButtonPrimary
             disabled={Boolean(busyAction)}
-            label={busyAction === 'check' ? 'CHECKING...' : 'I VERIFIED MY EMAIL ->'}
+            label={busyAction === 'check'
+              ? 'CHECKING...'
+              : appTourActive
+                ? 'CONTINUE DEMO ->'
+                : 'CHECK VERIFICATION ->'}
             onPress={checkVerification}
           />
-          <CyberButtonOutline
-            disabled={Boolean(busyAction)}
-            label={busyAction === 'resend' ? 'SENDING...' : 'RESEND EMAIL'}
-            onPress={resendVerification}
-          />
+          {!appTourActive ? (
+            <CyberButtonOutline
+              disabled={Boolean(busyAction)}
+              label={busyAction === 'resend' ? 'SENDING...' : 'RESEND EMAIL'}
+              onPress={resendVerification}
+            />
+          ) : null}
           <CyberButtonOutline
             disabled={Boolean(busyAction)}
             label={busyAction === 'signout' ? 'SIGNING OUT...' : 'USE ANOTHER ACCOUNT'}

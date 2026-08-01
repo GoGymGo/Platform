@@ -7,25 +7,24 @@ import {
   useState,
   type PropsWithChildren
 } from 'react';
+import { AppState } from 'react-native';
 
 import {
+  createCompetitionRegion,
   defaultCompetitionRegion,
-  parseCompetitionRegion,
   parseCompetitionRegionVerification,
   type CompetitionRegion,
   type CompetitionRegionVerification
 } from '@/config/regions';
-import type {
-  BcRegionEvidence,
-  CurrentRegionVerificationResponse
-} from '@/services/regionFoundation';
-import {
-  getCurrentBcRegionVerification,
-  submitBcRegionVerification
-} from '@/services/regionFoundation';
+import type { RegionVerification } from '@/domain/accountReadiness';
+import { useAppData } from '@/data/appDataHooks';
 import { createUserStorage } from '@/services/storage/userStorage';
-import { useApi } from '@/state/api';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
+import {
+  appTourRegion,
+  appTourRegionVerification
+} from '@/testing/appTourRegion';
 
 const competitionRegionStorageKey = '@gogymgo/competition-region';
 
@@ -33,30 +32,57 @@ type CompetitionRegionContextValue = {
   competitionRegion: CompetitionRegion;
   regionVerification: CompetitionRegionVerification | null;
   regionReady: boolean;
-  refreshCompetitionRegionVerification: () => Promise<CompetitionRegionVerification | null>;
   verifyCompetitionRegion: (
-    region: CompetitionRegion,
-    evidence: BcRegionEvidence
+    serverVerification: RegionVerification
   ) => Promise<void>;
 };
 
 const CompetitionRegionContext = createContext<CompetitionRegionContextValue | null>(null);
 
 export function CompetitionRegionProvider({ children }: PropsWithChildren) {
-  const { api } = useApi();
+  const { account, mode } = useAppData();
+  const { active: appTourActive, scenario: appTourScenario } = useAppTour();
   const { loading: authLoading, user } = useAuth();
   const userId = user?.uid ?? null;
   const userStorage = useMemo(
     () => userId ? createUserStorage(userId) : null,
     [userId]
   );
-  const [competitionRegion, setCompetitionRegionState] = useState(defaultCompetitionRegion);
+  const [competitionRegion, setCompetitionRegionState] = useState(
+    appTourActive && appTourScenario !== 'new-player'
+      ? appTourRegion
+      : defaultCompetitionRegion
+  );
   const [regionVerification, setRegionVerification] =
-    useState<CompetitionRegionVerification | null>(null);
-  const [regionReady, setRegionReady] = useState(false);
+    useState<CompetitionRegionVerification | null>(
+      appTourActive && appTourScenario !== 'new-player'
+        ? appTourRegionVerification
+        : null
+    );
+  const [regionReady, setRegionReady] = useState(appTourActive);
+  const [syncedAppTourScenario, setSyncedAppTourScenario] =
+    useState(appTourScenario);
+
+  if (appTourActive && syncedAppTourScenario !== appTourScenario) {
+    const setupComplete = appTourScenario !== 'new-player';
+    setSyncedAppTourScenario(appTourScenario);
+    setCompetitionRegionState(
+      setupComplete ? appTourRegion : defaultCompetitionRegion
+    );
+    setRegionVerification(
+      setupComplete ? appTourRegionVerification : null
+    );
+    setRegionReady(true);
+  }
 
   useEffect(() => {
     let mounted = true;
+
+    if (appTourActive) {
+      return () => {
+        mounted = false;
+      };
+    }
 
     if (authLoading) {
       return () => {
@@ -67,6 +93,8 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
     if (!userStorage) {
       void Promise.resolve().then(() => {
         if (mounted) {
+          setCompetitionRegionState(defaultCompetitionRegion);
+          setRegionVerification(null);
           setRegionReady(true);
         }
       });
@@ -75,101 +103,124 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
       };
     }
 
-    void (async () => {
-      const storedRegion = await userStorage.getItem(competitionRegionStorageKey);
-      if (!mounted) {
-        return;
-      }
-      const storedVerification = parseCompetitionRegionVerification(storedRegion);
-      const region = storedVerification?.region ?? parseCompetitionRegion(storedRegion);
-      setCompetitionRegionState(region);
-      setRegionVerification(api ? null : storedVerification);
+    void userStorage.getItem(competitionRegionStorageKey)
+      .then(async (storedRegion) => {
+        const storedVerification =
+          parseCompetitionRegionVerification(storedRegion);
+        const serverVerification = mode === 'api'
+          ? await account.getCurrentRegionVerification().catch(() => undefined)
+          : undefined;
+        const synchronizedVerification = serverVerification
+          ? toCompetitionRegionVerification(serverVerification)
+          : serverVerification === null
+            ? null
+            : storedVerification;
 
-      if (api) {
-        try {
-          const current = await getCurrentBcRegionVerification(api);
-          if (!mounted) {
-            return;
-          }
-          const verification = current
-            ? mapBackendVerification(current, region)
-            : null;
-          setRegionVerification(verification);
-          if (verification) {
-            await persistVerification(userStorage, verification);
+        if (mounted) {
+          if (synchronizedVerification) {
+            setCompetitionRegionState(synchronizedVerification.region);
+            setRegionVerification(synchronizedVerification);
+            if (serverVerification) {
+              void userStorage.setItem(
+                competitionRegionStorageKey,
+                serializeCompetitionRegionVerification(
+                  synchronizedVerification
+                )
+              ).catch(() => {
+                // The backend remains authoritative if the local cache cannot refresh.
+              });
+            }
           } else {
-            await persistRegion(userStorage, region);
+            setCompetitionRegionState(defaultCompetitionRegion);
+            setRegionVerification(null);
+            if (storedRegion) {
+              try {
+                await userStorage.removeItem(competitionRegionStorageKey);
+              } catch {
+                // The invalid value is ignored even if local cleanup must retry later.
+              }
+            }
           }
-        } catch {
-          // Stored status remains available while the backend is unreachable.
         }
-      }
-    })().finally(() => {
-      if (mounted) {
-        setRegionReady(true);
-      }
-    });
+      })
+      .finally(() => {
+        if (mounted) {
+          setRegionReady(true);
+        }
+      });
 
     return () => {
       mounted = false;
     };
-  }, [api, authLoading, userStorage]);
-
-  const refreshCompetitionRegionVerification = useCallback(async () => {
-    const current = await getCurrentBcRegionVerification(api);
-    const verification = current
-      ? mapBackendVerification(current, defaultCompetitionRegion)
-      : null;
-    setCompetitionRegionState(defaultCompetitionRegion);
-    setRegionVerification(verification);
-    if (verification) {
-      await persistVerification(userStorage, verification);
-    } else {
-      await persistRegion(userStorage, defaultCompetitionRegion);
-    }
-    return verification;
-  }, [api, userStorage]);
+  }, [account, appTourActive, authLoading, mode, userStorage]);
 
   const verifyCompetitionRegion = useCallback(async (
-    region: CompetitionRegion,
-    evidence: BcRegionEvidence
+    serverVerification: RegionVerification
   ) => {
-    const response = await submitBcRegionVerification(api, evidence);
-    const verification = {
-      backendVerificationId: response.id,
-      expiresAt: null,
-      method: evidence.method,
-      policyVersion: response.policyVersion,
-      region,
-      reviewedAt: null,
-      status: response.status,
-      submittedAt: response.createdAt
-    } satisfies CompetitionRegionVerification;
+    const verification = toCompetitionRegionVerification(serverVerification);
+    const { region } = verification;
 
     setCompetitionRegionState(region);
     setRegionVerification(verification);
     try {
-      await persistVerification(userStorage, verification);
+      await userStorage?.setItem(
+        competitionRegionStorageKey,
+        serializeCompetitionRegionVerification(verification)
+      );
     } catch {
       // The verified region remains active in memory until persistence recovers.
     }
-  }, [api, userStorage]);
+  }, [userStorage]);
+
+  useEffect(() => {
+    if (appTourActive || authLoading || mode !== 'api' || !userId) {
+      return undefined;
+    }
+
+    let mounted = true;
+    const synchronize = () => {
+      void account.getCurrentRegionVerification()
+        .then(async (serverVerification) => {
+          if (!mounted) return;
+          if (serverVerification) {
+            await verifyCompetitionRegion(serverVerification);
+            return;
+          }
+
+          setCompetitionRegionState(defaultCompetitionRegion);
+          setRegionVerification(null);
+          await userStorage?.removeItem(competitionRegionStorageKey);
+        })
+        .catch(() => {
+          // Keep the last verified region while the API is unreachable.
+        });
+    };
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'active') synchronize();
+    });
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [
+    account,
+    appTourActive,
+    authLoading,
+    mode,
+    userId,
+    userStorage,
+    verifyCompetitionRegion
+  ]);
 
   const value = useMemo(
     () => ({
       competitionRegion,
-      refreshCompetitionRegionVerification,
       regionReady,
       regionVerification,
       verifyCompetitionRegion
     }),
-    [
-      competitionRegion,
-      refreshCompetitionRegionVerification,
-      regionReady,
-      regionVerification,
-      verifyCompetitionRegion
-    ]
+    [competitionRegion, regionReady, regionVerification, verifyCompetitionRegion]
   );
 
   return (
@@ -179,49 +230,39 @@ export function CompetitionRegionProvider({ children }: PropsWithChildren) {
   );
 }
 
-function mapBackendVerification(
-  response: CurrentRegionVerificationResponse,
-  region: CompetitionRegion
+function toCompetitionRegionVerification(
+  serverVerification: RegionVerification
 ): CompetitionRegionVerification {
+  const region = createCompetitionRegion(serverVerification);
   return {
-    backendVerificationId: response.id,
-    expiresAt: response.expiresAt,
-    method: response.method === 'device_location' ? 'device-location' : 'postal-code',
-    policyVersion: response.policyVersion,
+    expiresAt: serverVerification.expiresAt,
+    jurisdictionCode: serverVerification.jurisdictionCode,
+    method: 'device-location',
     region,
-    reviewedAt: response.reviewedAt,
-    status: response.status,
-    submittedAt: response.createdAt
+    regionCode: serverVerification.regionCode,
+    regionPolicyId: serverVerification.regionPolicyId,
+    status: 'verified',
+    verificationId: serverVerification.id,
+    verifiedAt: serverVerification.reviewedAt
   };
 }
 
-async function persistVerification(
-  storage: ReturnType<typeof createUserStorage> | null,
+function serializeCompetitionRegionVerification(
   verification: CompetitionRegionVerification
 ) {
-  await storage?.setItem(
-    competitionRegionStorageKey,
-    JSON.stringify({
-      backendVerificationId: verification.backendVerificationId,
-      expiresAt: verification.expiresAt,
-      id: verification.region.id,
-      method: verification.method,
-      policyVersion: verification.policyVersion,
-      reviewedAt: verification.reviewedAt,
-      status: verification.status,
-      submittedAt: verification.submittedAt
-    })
-  );
-}
-
-async function persistRegion(
-  storage: ReturnType<typeof createUserStorage> | null,
-  region: CompetitionRegion
-) {
-  await storage?.setItem(
-    competitionRegionStorageKey,
-    JSON.stringify({ id: region.id })
-  );
+  return JSON.stringify({
+    expiresAt: verification.expiresAt,
+    id: verification.region.id,
+    jurisdictionCode: verification.jurisdictionCode,
+    label: verification.region.label,
+    method: verification.method,
+    regionCode: verification.regionCode,
+    regionPolicyId: verification.regionPolicyId,
+    status: verification.status,
+    timeZone: verification.region.timeZone,
+    verificationId: verification.verificationId,
+    verifiedAt: verification.verifiedAt
+  });
 }
 
 export function useCompetitionRegion() {

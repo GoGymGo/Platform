@@ -14,7 +14,7 @@ All routes use the `/v1/operator/configuration` prefix:
 - `PUT /creator-workouts/:id` replaces an unpublished workout when `expectedVersion` matches.
 - `POST /creator-workouts/:id/status-action` publishes or unpublishes a workout when `expectedVersion` matches.
 
-Competition publication requires a future registration close and start, a region policy covering the full lifecycle, enabled competition and payout operations, currency agreement, and at least one goal bracket. Creator workout publication requires absolute HTTPS media URLs and currently enabled target regions.
+Competition publication requires a future registration close and start, a region policy covering the full lifecycle, enabled competition operations, at least one goal bracket, and at least one published catalog reward. Creator workout publication requires absolute HTTPS media URLs and currently enabled target regions.
 
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, it instead cancels the competition, withdraws active enrollments, queues a neutral cancellation notification, and records an append-only audit event.
 

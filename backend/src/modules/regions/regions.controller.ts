@@ -2,10 +2,12 @@ import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
@@ -21,6 +23,7 @@ import {
 import { RegionsService } from './regions.service';
 
 @ApiTags('regions')
+@ApiExtraModels(CurrentRegionVerificationResponseDto)
 @Controller()
 export class RegionsController {
   constructor(private readonly regions: RegionsService) {}
@@ -39,7 +42,12 @@ export class RegionsController {
     summary:
       'Read the latest regional eligibility review for the signed-in user',
   })
-  @ApiOkResponse({ type: CurrentRegionVerificationResponseDto })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(CurrentRegionVerificationResponseDto) }],
+      nullable: true,
+    },
+  })
   getCurrentVerification(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Query() query: CurrentRegionVerificationQueryDto,

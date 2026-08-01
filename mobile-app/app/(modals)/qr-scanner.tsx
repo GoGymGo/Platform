@@ -1,108 +1,286 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Linking, StyleSheet, View } from 'react-native';
 
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenLoadingState,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import { BiometricCameraConsentBanner } from '@/components/legal';
-import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { RecoverableScreenError } from '@/components/reliability';
+import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
+import { sessionTimeScale } from '@/config/runtime';
+import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { isGoGymGoPartnerCode } from '@/domain/partnerGymQr';
+import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { useAppTour } from '@/state/appTour';
+import { useWorkoutProgress } from '@/state/workoutProgress';
+import {
+  isAppTourGymQrPayload
+} from '@/testing/appTourData';
+import { AppTourQrSimulator } from '@/testing/AppTourQrSimulator';
 
 export default function QrScannerModal() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const params = useLocalSearchParams<{ mode?: string }>();
-  const isExitScan = params.mode === 'exit';
+  const { activeSession, recordGymQrScan, sessionActionError, sessionActionPending } =
+    useWorkoutProgress();
   const {
-    accepted: cameraConsentAccepted,
-    toggle: toggleCameraConsent
-  } = useBiometricCameraConsent();
+    checking: registrationChecking,
+    error: registrationError,
+    ready: registrationReady,
+    retry: retryRegistration,
+    retrying: registrationRetrying,
+    setupActionLabel,
+    setupMessage,
+    setupRoute
+  } = useSessionRegistrationAccess();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanLocked, setScanLocked] = useState(false);
+  const [scanVerified, setScanVerified] = useState(false);
+  const [scannedPayload, setScannedPayload] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const isExitScan = params.mode === 'exit';
+  const scanMode = isExitScan ? 'exit' : 'entry';
+  const exitReady = Boolean(
+    activeSession?.verificationMethod === 'partnerGymQr' &&
+    (!activeSession.presenceCheckRequired || activeSession.midSessionVerified) &&
+    getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale) >=
+      activeSession.minimumSessionSeconds
+  );
+  const canScan = !isExitScan || exitReady;
 
-  const ctaLabel = isExitScan
-    ? 'EXIT QR PROVIDER REQUIRED'
-    : 'QR SCANNER CONNECTION REQUIRED';
-  const title = isExitScan ? 'SCAN EXIT QR' : 'SCAN GYM QR';
-  const subtitle = isExitScan
-    ? 'THE EXIT CODE ENDS THE VERIFIED PARTNER-GYM SESSION.'
-    : 'THE ENTRY CODE STARTS THE PARTNER-GYM SESSION BEFORE FACE ID.';
-  const stepLabel = isExitScan ? 'EXIT QR // 4 OF 4' : 'ENTRY QR // 1 OF 4';
+  function handleBarcodeScanned(result: BarcodeScanningResult) {
+    verifyScannedPayload(result.data);
+  }
+
+  function verifyScannedPayload(data: string) {
+    if (scanLocked || !canScan) {
+      return;
+    }
+
+    setScanLocked(true);
+    if (
+      isGoGymGoPartnerCode(data, scanMode) ||
+      (
+        appTourActive &&
+        isAppTourGymQrPayload(data, scanMode)
+      )
+    ) {
+      setScannedPayload(data);
+      setScanVerified(true);
+      setStatusMessage(`${isExitScan ? 'Exit' : 'Entry'} QR confirmed for this partner gym.`);
+      return;
+    }
+
+    setStatusMessage('That is not a valid GoGymGo partner-gym code. Check the sign and try again.');
+  }
+
+  async function continueAfterScan() {
+    if (!scanVerified || !scannedPayload) {
+      return;
+    }
+
+    if (isExitScan) {
+      if (await recordGymQrScan(scannedPayload)) {
+        router.replace('/workout/complete');
+      }
+      return;
+    }
+
+    router.replace({
+      pathname: '/workout/identity-check',
+      params: { qrPayload: scannedPayload }
+    });
+  }
+
+  function retryScan() {
+    setScanLocked(false);
+    setScanVerified(false);
+    setScannedPayload(null);
+    setStatusMessage(null);
+  }
+
+  if (!verifiedPartnerGymCatalogAvailable && !appTourActive) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO METHODS"
+        body="Partner-gym QR verification will be enabled after participating gyms are verified and published."
+        onAction={() => router.replace('/workout/method')}
+        title="NO VERIFIED PARTNER GYMS"
+      />
+    );
+  }
+
+  if (!isExitScan && !activeSession && registrationChecking) {
+    return <ScreenLoadingState body="Checking your competition registration." />;
+  }
+
+  if (!isExitScan && !activeSession && registrationError) {
+    return (
+      <RecoverableScreenError
+        body="Your competition setup could not be checked. Retry before scanning an entry code."
+        onRetry={() => void retryRegistration()}
+        retrying={registrationRetrying}
+        title="COULD NOT CHECK SETUP"
+      />
+    );
+  }
+
+  if (!isExitScan && !activeSession && !registrationReady) {
+    return (
+      <SessionUnavailable
+        actionLabel={setupActionLabel}
+        body={setupMessage}
+        onAction={() => {
+          if (setupRoute) {
+            router.replace(setupRoute as Href);
+          }
+        }}
+        title="FINISH SETUP"
+      />
+    );
+  }
 
   return (
-    <ScreenContainer contentStyle={styles.screen} surface="modal">
-      <View style={styles.header}>
-        <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-          {stepLabel}
-        </TerminalText>
-        <CyberButtonOutline
-          label="CLOSE"
-          onPress={() => goBackOrReplace(
-            router,
-            isExitScan ? '/workout/active' : '/workout/method'
-          )}
-          style={styles.closeButton}
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
+            {isExitScan ? 'WORKOUT CHECK-OUT' : 'WORKOUT CHECK-IN'}
+          </TerminalText>
+          <CyberButtonOutline
+            label="CLOSE"
+            onPress={() =>
+              goBackOrReplace(router, isExitScan ? '/workout/active' : '/workout/method')
+            }
+            style={styles.closeButton}
+          />
+        </View>
+        <WorkoutFlowProgress
+          stage={isExitScan ? 'complete' : 'start'}
+          style={styles.workoutProgress}
         />
-      </View>
 
-      <View style={styles.centerContent}>
-        <TerminalText glow tone="cyan" variant="label">
-          PARTNER GYM QR
+        <View style={styles.centerContent}>
+          <TerminalText glow tone="cyan" variant="label">
+            PARTNER GYM QR
+          </TerminalText>
+          <TerminalText glow style={styles.title} tone="cyan" variant="title">
+            {isExitScan ? 'SCAN EXIT QR' : 'SCAN ENTRY QR'}
+          </TerminalText>
+          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+            {isExitScan
+              ? 'The exit code closes the verified partner-gym session.'
+              : 'The entry code confirms your gym before the secure device presence check.'}
+          </TerminalText>
+
+          {!canScan ? (
+            <HUDBorderBox style={styles.stateCard} tone="amber">
+              <TerminalText glow tone="amber" variant="label">
+                ACTION NEEDED
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                Finish {activeSession
+                  ? `${activeSession.minimumSessionSeconds / 60} minutes`
+                  : 'the required session time'}
+                {activeSession?.presenceCheckRequired
+                  ? ' and the mid-session presence check'
+                  : ''} first.
+              </TerminalText>
+            </HUDBorderBox>
+          ) : appTourActive ? (
+            <AppTourQrSimulator
+              onConfirm={verifyScannedPayload}
+              scanLocked={scanLocked}
+              scanMode={scanMode}
+              style={styles.stateCard}
+            />
+          ) : !permission ? (
+            <HUDBorderBox style={styles.stateCard} tone="muted">
+              <TerminalText live="polite" tone="muted" variant="label">
+                CHECKING CAMERA PERMISSION
+              </TerminalText>
+            </HUDBorderBox>
+          ) : !permission.granted ? (
+            <HUDBorderBox style={styles.stateCard} tone="amber">
+              <TerminalText glow tone="amber" variant="label">
+                CAMERA ACCESS REQUIRED
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                GoGymGo needs camera access only while you scan the partner gym code. Frames are
+                processed locally and are not stored.
+              </TerminalText>
+              <CyberButtonPrimary
+                label={permission.canAskAgain ? 'Allow camera' : 'Open settings'}
+                onPress={() =>
+                  void (permission.canAskAgain ? requestPermission() : Linking.openSettings())
+                }
+                tone="amber"
+              />
+            </HUDBorderBox>
+          ) : (
+            <View style={styles.cameraShell}>
+              <CameraView
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={scanLocked ? undefined : handleBarcodeScanned}
+                style={styles.camera}
+              />
+              <View pointerEvents="none" style={styles.scanGuide} />
+            </View>
+          )}
+
+          {statusMessage || sessionActionError ? (
+            <TerminalText
+              live={scanVerified ? 'polite' : 'assertive'}
+              style={styles.statusMessage}
+              tone={sessionActionError ? 'amber' : scanVerified ? 'green' : 'amber'}
+              uppercase={false}
+              variant="body"
+            >
+              {sessionActionError ?? statusMessage}
+            </TerminalText>
+          ) : null}
+        </View>
+
+        {scanVerified ? (
+          <CyberButtonPrimary
+            disabled={sessionActionPending}
+            label={isExitScan ? 'Verify and finish' : 'Continue to secure check'}
+            onPress={() => void continueAfterScan()}
+          />
+        ) : scanLocked ? (
+          <CyberButtonOutline label="SCAN AGAIN" onPress={retryScan} />
+        ) : null}
+        <TerminalText style={styles.note} tone="dim" uppercase={false} variant="caption">
+          Entry and exit scans are both required for partner-gym verification.
         </TerminalText>
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          {title}
-        </TerminalText>
-        <TerminalText style={styles.body} tone="muted" variant="body">
-          {subtitle}
-        </TerminalText>
-
-        <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
-          <View style={styles.qrGrid}>
-            <View style={styles.qrBlockLarge} />
-            <View style={styles.qrBlockSmall} />
-            <View style={styles.qrBlockSmall} />
-            <View style={styles.qrBlockLarge} />
-            <View style={styles.qrBlockSmall} />
-            <View style={styles.qrBlockLarge} />
-            <View style={styles.qrBlockLarge} />
-            <View style={styles.qrBlockSmall} />
-            <View style={styles.qrBlockLarge} />
-          </View>
-        </HUDBorderBox>
-
-        <TerminalText style={styles.note} tone="dim" variant="caption">
-          ENTRY AND EXIT SCANS ARE BOTH REQUIRED TO VERIFY THIS SESSION.
-        </TerminalText>
-      </View>
-
-      <BiometricCameraConsentBanner
-        checked={cameraConsentAccepted}
-        compact
-        onToggle={toggleCameraConsent}
-        style={styles.cameraConsent}
-      />
-
-      <CyberButtonPrimary
-        disabled
-        label={ctaLabel}
-        onPress={() => undefined}
-      />
-      <TerminalText style={styles.exitHelp} tone="amber" variant="caption">
-        SCANNING WILL UNLOCK WHEN SIGNED PARTNER-GYM QR VALIDATION IS CONNECTED.
-      </TerminalText>
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',
@@ -110,6 +288,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     marginBottom: spacing.lg
+  },
+  workoutProgress: {
+    marginBottom: spacing.md
   },
   headerLabel: {
     flex: 1,
@@ -131,53 +312,48 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   body: {
-    maxWidth: 290,
+    maxWidth: 320,
     marginTop: spacing.md,
     marginBottom: spacing.xl,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
-  scanFrame: {
-    width: 180,
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 0,
-    borderRadius: 22,
-    marginBottom: spacing.lg,
+  cameraShell: {
+    width: '100%',
+    maxWidth: 340,
+    aspectRatio: 1,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderCyanStrong,
+    borderRadius: radii.md,
     ...cyberGlow.cyan
   },
-  qrGrid: {
-    width: 118,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8
+  camera: {
+    flex: 1
   },
-  qrBlockLarge: {
-    width: 34,
-    height: 34,
-    borderRadius: 5,
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
-  },
-  qrBlockSmall: {
-    width: 34,
-    height: 34,
+  scanGuide: {
+    position: 'absolute',
+    top: '18%',
+    right: '18%',
+    bottom: '18%',
+    left: '18%',
     borderWidth: 2,
     borderColor: colors.cyan,
-    borderRadius: 5,
-    backgroundColor: colors.surfaceCyanSoft
+    borderRadius: radii.sm
+  },
+  stateCard: {
+    width: '100%',
+    maxWidth: 420,
+    gap: spacing.md,
+    padding: spacing.lg
+  },
+  statusMessage: {
+    maxWidth: 360,
+    marginTop: spacing.lg,
+    textAlign: 'center'
   },
   note: {
     marginTop: spacing.md,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
-  },
-  cameraConsent: {
-    marginBottom: spacing.md
-  },
-  exitHelp: {
-    marginTop: spacing.sm,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
   }

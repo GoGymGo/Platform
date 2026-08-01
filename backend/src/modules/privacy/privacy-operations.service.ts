@@ -145,8 +145,8 @@ export class PrivacyOperationsService {
 
   private async processDeletion(job: ClaimedPrivacyJob): Promise<void> {
     const context = await this.repository.getDeletionContext(job);
-    if (context.hasOpenPayout) {
-      throw new PrivacyOperationError('OPEN_PAYOUT_REQUIRES_REVIEW');
+    if (context.hasOpenRewardClaim) {
+      throw new PrivacyOperationError('OPEN_REWARD_CLAIM_REQUIRES_REVIEW');
     }
     if (context.hasOpenCompetition) {
       throw new PrivacyOperationError('OPEN_COMPETITION_REQUIRES_REVIEW');

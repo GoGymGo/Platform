@@ -2,17 +2,18 @@ import type { CompetitionRules } from '../competitions/competition-rules';
 import { assessSessionSubmission } from './session-assessment';
 
 const rules: CompetitionRules = {
+  categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 2,
   minSessionMinutes: 20,
-  payoutExponent: 0.5,
-  payoutPoolAmountMinor: 1_000_000,
-  payoutWinnerCount: 100,
+  perfectMonthMultiplier: 10,
   requireDeviceAttestation: false,
-  requireFaceCheck: true,
+  requirePresenceCheck: true,
   requireGymQr: false,
   signupPrizeDrawEntries: 1,
   verifiedSessionCategoryScore: 1,
   verifiedSessionPrizeDrawEntries: 1,
+  weeklyChallengeBothHitMultiplier: 2,
+  weeklyChallengeRecoveryMultiplier: 3,
 };
 
 describe('session submission assessment', () => {
@@ -30,7 +31,7 @@ describe('session submission assessment', () => {
           occurredAt: new Date('2026-07-12T10:15:00Z'),
         },
         {
-          eventType: 'face_check',
+          eventType: 'presence_check',
           occurredAt: new Date('2026-07-12T10:12:00Z'),
         },
       ],
@@ -57,7 +58,7 @@ describe('session submission assessment', () => {
     expect(assessment.violations).toEqual([
       'minimum_duration_not_met',
       'insufficient_heart_rate_samples',
-      'face_check_missing',
+      'presence_check_missing',
     ]);
   });
 
@@ -75,7 +76,7 @@ describe('session submission assessment', () => {
           occurredAt: new Date('2026-07-12T10:15:00Z'),
         },
         {
-          eventType: 'face_check',
+          eventType: 'presence_check',
           occurredAt: new Date('2026-07-12T10:12:00Z'),
         },
       ],

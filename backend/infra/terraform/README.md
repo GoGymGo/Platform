@@ -4,7 +4,7 @@ This root codifies one isolated environment of the GoGymGo backend. Use a separa
 
 - private PostgreSQL 17 Cloud SQL with point-in-time recovery and PostGIS enabled by the application migration;
 - Firebase enabled in the same isolated project so token verification and account-erasure IAM cannot drift across projects;
-- a public Cloud Run API protected at the application layer by Firebase bearer tokens and dedicated Hyperwallet webhook authentication;
+- a public Cloud Run API protected at the application layer by Firebase bearer tokens;
 - a private, continuously running Cloud Run worker pool;
 - a one-shot Cloud Run migration job;
 - private content and seven-day privacy-export buckets, with optional exact-size avatar upload permissions restricted to the `avatars/` prefix;
@@ -49,11 +49,11 @@ Before the first workload deployment:
 
 1. Create a least-privilege PostgreSQL login outside Terraform and grant it only the application database privileges required by migrations/runtime.
 2. Build `DATABASE_URL` with the Cloud SQL private IP from `terraform output cloud_sql_private_ip`, require TLS, and add it as the first version of the output secret ID `DATABASE_URL`.
-3. Add at least 32 random characters to the pseudonymization-key secret before enabling privacy operations.
-4. Add Hyperwallet and Expo credentials only in their environment-specific projects. Never copy UAT credentials into production or vice versa.
+3. Add a random 32-byte base64 value to `REWARD_CODE_ENCRYPTION_KEY`; mount it only into the API workload.
+4. Add at least 32 random characters to the pseudonymization-key secret before enabling privacy operations, and add Expo credentials only when notifications are enabled.
 5. Grant the release identity Cloud Run developer, job executor, Artifact Registry reader, and service-account user permissions only on this environment's resources. The API and worker use separate runtime roles and receive different secret mounts; do not merge their service accounts for convenience.
 
-Enabling `hyperwallet_enabled`, `privacy_operations_enabled`, `profile_media_enabled`, or `push_notifications_enabled` adds the corresponding secret mounts or access grants. Keep each flag false until the feature's staging/UAT checklist passes. Profile media grants the API conditional object-create and object-read roles only under the `avatars/` prefix; cleanup remains worker-only.
+Enabling `privacy_operations_enabled`, `profile_media_enabled`, or `push_notifications_enabled` adds the corresponding secret mounts or access grants. Keep each flag false until the feature's staging/UAT checklist passes. Profile media grants the API conditional object-create and object-read roles only under the `avatars/` prefix; cleanup remains worker-only.
 
 ## Release ownership
 

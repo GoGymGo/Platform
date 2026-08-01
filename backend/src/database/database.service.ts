@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
@@ -8,6 +8,7 @@ import type { Database } from './database.types';
 @Injectable()
 export class DatabaseService implements OnApplicationShutdown {
   readonly connection: Kysely<Database>;
+  private readonly logger = new Logger(DatabaseService.name);
 
   constructor(config: ConfigService<Environment, true>) {
     const pool = new Pool({
@@ -16,6 +17,12 @@ export class DatabaseService implements OnApplicationShutdown {
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 30_000,
       max: config.get('DATABASE_POOL_MAX', { infer: true }),
+    });
+    pool.on('error', (error) => {
+      this.logger.error({
+        errorType: error.name.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 120),
+        event: 'database.pool.idle_client_failed',
+      });
     });
 
     this.connection = new Kysely<Database>({

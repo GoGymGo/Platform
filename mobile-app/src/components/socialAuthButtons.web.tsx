@@ -1,4 +1,4 @@
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { CyberButtonOutline } from '@/components/cyber';
 import { spacing } from '@/constants/theme';
@@ -25,14 +25,22 @@ export function SocialAuthButtons({
       {googleAvailable ? (
         <CyberButtonOutline
           disabled={disabled}
-          label={busyProvider === 'google' ? 'CONNECTING GOOGLE...' : 'CONTINUE WITH GOOGLE'}
+          label={
+            busyProvider === 'google'
+              ? 'CONNECTING TO GOOGLE...'
+              : 'CONTINUE WITH GOOGLE'
+          }
           onPress={onGooglePress}
         />
       ) : null}
       {appleAvailable ? (
         <CyberButtonOutline
           disabled={disabled}
-          label={busyProvider === 'apple' ? 'CONNECTING APPLE...' : 'CONTINUE WITH APPLE'}
+          label={
+            busyProvider === 'apple'
+              ? 'CONNECTING TO APPLE...'
+              : 'CONTINUE WITH APPLE'
+          }
           onPress={onApplePress}
         />
       ) : null}

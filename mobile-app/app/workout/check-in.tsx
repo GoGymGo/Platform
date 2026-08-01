@@ -1,8 +1,8 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
+  ScreenLoadingState,
   ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
@@ -10,50 +10,102 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import {
+  RecoverableScreenError,
+  useAccessibilityAnnouncement
+} from '@/components/reliability';
 import { BiometricCameraConsentBanner } from '@/components/legal';
-import { SponsorRail } from '@/components/sponsor';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
+import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
-import { createDemoCheckIn } from '@/services/demoVerification';
-import { useApi } from '@/state/api';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useAppTour } from '@/state/appTour';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
   const router = useRouter();
-  const { api } = useApi();
-  const [checkpointRecorded, setCheckpointRecorded] = useState(false);
-  const [submissionError, setSubmissionError] = useState<string>();
-  const [submitting, setSubmitting] = useState(false);
-  const { accepted: cameraConsentAccepted, toggle: toggleCameraConsent } =
-    useBiometricCameraConsent();
-  const demoAvailable = isDemoVerificationEnabled;
-  const buttonLabel = !isDemoVerificationEnabled
-    ? 'IDENTITY PROVIDER REQUIRED'
-    : !api
-        ? 'API REQUIRED'
-        : checkpointRecorded
-          ? 'DEMO CHECK-IN RECORDED'
-          : !cameraConsentAccepted
-            ? 'ACCEPT NOTICE TO CONTINUE'
-            : submitting
-              ? 'VERIFYING DEMO CHECK-IN...'
-              : 'RUN DEMO CHECK-IN ->';
+  const { active: appTourActive } = useAppTour();
+  const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
+  const {
+    sessionActionError,
+    sessionActionPending,
+    startWorkoutSession
+  } = useWorkoutProgress();
+  const {
+    checking: registrationChecking,
+    error: registrationError,
+    ready: registrationReady,
+    retry: retryRegistration,
+    retrying: registrationRetrying,
+    setupActionLabel,
+    setupMessage,
+    setupRoute
+  } = useSessionRegistrationAccess();
+  const {
+    accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
+    toggle: toggleCameraConsent
+  } = useBiometricCameraConsent();
+  const { busy, message, verify } = usePresenceVerification();
+  useAccessibilityAnnouncement(
+    deviceSaved === '1'
+      ? 'Default device saved. Next, verify it is you to begin the workout.'
+      : null
+  );
 
-  async function verifyDemoCheckIn() {
-    if (!cameraConsentAccepted || !demoAvailable || !api) {
+  if (!heartRateTelemetryAvailable && !appTourActive) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO TRAIN"
+        body="Heart-rate telemetry is not connected in this build, so a verified session cannot start yet."
+        onAction={() => router.replace('/session')}
+        title="DEVICE CONNECTION REQUIRED"
+      />
+    );
+  }
+
+  async function confirmPresence() {
+    if (!(await verify())) {
       return;
     }
 
-    setSubmitting(true);
-    setSubmissionError(undefined);
-    try {
-      await createDemoCheckIn(api);
-      setCheckpointRecorded(true);
-    } catch {
-      setSubmissionError('DEMO CHECK-IN COULD NOT BE VERIFIED. CHECK THE LOCAL API AND TRY AGAIN.');
-    } finally {
-      setSubmitting(false);
+    if (await startWorkoutSession('heartRate')) {
+      router.push('/workout/active');
     }
+  }
+
+  if (registrationChecking) {
+    return <ScreenLoadingState body="Checking your competition registration." />;
+  }
+
+  if (registrationError) {
+    return (
+      <RecoverableScreenError
+        body="Your competition setup could not be checked. Retry before starting a verified workout."
+        onRetry={() => void retryRegistration()}
+        retrying={registrationRetrying}
+        title="COULD NOT CHECK SETUP"
+      />
+    );
+  }
+
+  if (!registrationReady) {
+    return (
+      <SessionUnavailable
+        actionLabel={setupActionLabel}
+        body={setupMessage}
+        onAction={() => {
+          if (setupRoute) {
+            router.replace(setupRoute as Href);
+          }
+        }}
+        title="FINISH SETUP"
+      />
+    );
   }
 
   return (
@@ -65,16 +117,26 @@ export default function CheckInScreen() {
       >
         <View style={styles.header}>
           <CyberButtonOutline
-            label="HOME"
-            onPress={() => router.push('/home')}
+            label="BACK"
+            onPress={() => goBackOrReplace(router, '/session')}
             style={styles.backButton}
           />
-          <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
-            CHECK-IN // 1 OF 3
+          <TerminalText glow tone="cyan" variant="label">
+            WORKOUT CHECK-IN
           </TerminalText>
         </View>
+        <WorkoutFlowProgress stage="start" style={styles.workoutProgress} />
 
-        <SponsorRail compact />
+        {deviceSaved === '1' ? (
+          <HUDBorderBox style={styles.savedDeviceNotice} tone="green">
+            <TerminalText glow live="polite" tone="green" variant="label">
+              DEFAULT DEVICE SAVED
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              Next, verify it&apos;s you to begin the workout.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : null}
 
         <View style={styles.centerContent}>
           <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
@@ -83,14 +145,13 @@ export default function CheckInScreen() {
             </TerminalText>
           </HUDBorderBox>
           <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
-            NATIVE BIOMETRIC CHECK
+            LOCAL PRESENCE CHECK
           </TerminalText>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             {"VERIFY IT'S YOU TO START"}
           </TerminalText>
-          <TerminalText style={styles.body} tone="muted" variant="body">
-            THE DEVICE CONFIRMS PRESENCE ONLY. GOGYMGO STORES THE CHECKPOINT RESULT, NOT FACE DATA
-            OR BIOMETRIC DATA.
+          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+            Use your phone&apos;s secure prompt. GoGymGo receives only pass or fail.
           </TerminalText>
         </View>
 
@@ -103,23 +164,23 @@ export default function CheckInScreen() {
 
         <CyberButtonPrimary
           disabled={
-            !cameraConsentAccepted || !demoAvailable || !api || checkpointRecorded || submitting
+            !cameraConsentReady ||
+            !cameraConsentAccepted ||
+            busy ||
+            sessionActionPending
           }
-          label={buttonLabel}
-          onPress={() => void verifyDemoCheckIn()}
+          label={sessionActionPending
+              ? 'Starting session...'
+            : busy
+              ? 'Checking device...'
+              : 'Verify and start'}
+          onPress={() => void confirmPresence()}
         />
-        <TerminalText
-          style={styles.integrationNote}
-          tone={submissionError ? 'red' : checkpointRecorded ? 'green' : 'amber'}
-          variant="caption"
-        >
-          {submissionError ??
-            (checkpointRecorded
-              ? 'SIMULATED CHECKPOINT RECORDED. NO WORKOUT SESSION, COMPETITION CREDIT, PRIZE ELIGIBILITY OR PAYOUT STATE WAS CREATED.'
-              : demoAvailable
-                ? 'BRITISH COLUMBIA, CANADA DEMO ONLY. THIS SIMULATES A SHORT-LIVED, NON-ELIGIBLE CHECKPOINT WITHOUT CAMERA, BIOMETRIC, HEALTH OR PAYMENT DATA.'
-                : 'CHECK-IN WILL UNLOCK WHEN THE BACKEND IDENTITY AND HEART-RATE PROVIDERS ARE CONNECTED.')}
-        </TerminalText>
+        {message || sessionActionError ? (
+          <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+            {sessionActionError ?? message}
+          </TerminalText>
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -145,25 +206,28 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingVertical: spacing.sm
   },
-  stepLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal,
-    textAlign: 'right'
+  workoutProgress: {
+    marginBottom: spacing.sm
+  },
+  savedDeviceNotice: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    padding: spacing.md
   },
   centerContent: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xl
+    paddingVertical: spacing.lg
   },
   scanFrame: {
-    width: 160,
-    height: 160,
+    width: 76,
+    height: 76,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 0,
-    borderRadius: 34,
-    marginBottom: 26,
+    borderRadius: 20,
+    marginBottom: spacing.md,
     ...cyberGlow.cyan
   },
   scanIcon: {
@@ -180,16 +244,15 @@ const styles = StyleSheet.create({
   },
   body: {
     maxWidth: 290,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
   cameraConsent: {
     marginBottom: spacing.md
   },
-  integrationNote: {
+  statusMessage: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
     textAlign: 'center'
   }
 });

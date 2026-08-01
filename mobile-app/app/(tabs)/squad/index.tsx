@@ -1,61 +1,295 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
+  CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { FirstVisitTip, InlineHelpButton } from '@/components/clarity';
+import { CompetitionHubNav } from '@/components/competitionHubNav';
+import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, componentSizes, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import {
+  ActionFeedback,
+  RecoverableError
+} from '@/components/reliability';
+import { UserAlias } from '@/components/streakRewards';
+import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { getWeeklyChallengeDisplayStatus } from '@/domain/competition';
 import { getPublicInitials } from '@/domain/profile';
+import type { StreakCounts } from '@/domain/streaks';
+import {
+  useEligibleWeeklyChallengePartners,
+  useRequestWeeklyChallengePartner,
+  useRespondToWeeklyChallengeRequest,
+  useWeeklyChallengeRequests
+} from '@/data/appDataHooks';
+import { useScreenMemory } from '@/hooks/useScreenMemory';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 import { formatDateKey, useWorkoutProgress } from '@/state/workoutProgress';
 import { useProfile } from '@/state/profile';
 
 type PlayerTone = 'cyan' | 'muted';
+type WeeklyChallengeFeedback = {
+  message: string;
+  tone: 'cyan' | 'green' | 'red';
+};
 
 export default function SquadScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { regionVerification } = useCompetitionRegion();
+  const competitionRegionCode = regionVerification?.regionCode ?? '';
   const { profileImageUri, publicName } = useProfile();
   const { competition, competitionEntryStartDateKey, weeklyGoal } = useWorkoutProgress();
   const activePeriod = competition.currentPeriod;
+  const weeklyChallengePeriod = activePeriod?.index ?? 1;
+  const eligiblePartnersQuery = useEligibleWeeklyChallengePartners(
+    competition.competitionMonthKey,
+    weeklyGoal,
+    competitionRegionCode,
+    weeklyChallengePeriod
+  );
+  const requestsQuery = useWeeklyChallengeRequests(
+    competition.competitionMonthKey,
+    weeklyGoal,
+    competitionRegionCode,
+    weeklyChallengePeriod
+  );
+  const requestPartner = useRequestWeeklyChallengePartner();
+  const respondToRequest = useRespondToWeeklyChallengeRequest();
+  const [showBonusDetails, setShowBonusDetails] = useScreenMemory(
+    'squad:bonus-details',
+    false
+  );
+  const [showPairingOptions, setShowPairingOptions] = useScreenMemory(
+    'squad:pairing-options',
+    false
+  );
+  const [showPairingRules, setShowPairingRules] = useScreenMemory(
+    'squad:pairing-rules',
+    false
+  );
+  const [handledRequestIds, setHandledRequestIds] = useScreenMemory<
+    readonly string[]
+  >(
+    `squad:${competition.competitionMonthKey}:${weeklyChallengePeriod}:handled-request-ids`,
+    []
+  );
+  const [acceptedPartnerAlias, setAcceptedPartnerAlias] = useScreenMemory<
+    string | null
+  >(
+    `squad:${competition.competitionMonthKey}:${weeklyChallengePeriod}:accepted-partner`,
+    null
+  );
+  const [weeklyChallengeFeedback, setWeeklyChallengeFeedback] =
+    useState<WeeklyChallengeFeedback | null>(null);
+  const viewedInviteRef = useRef<string | null>(null);
   const isRemainderDayPhase =
     competition.phase === 'bonus-days' && competition.bonusDateKeys.length > 0;
-  const matchInitials = activePeriod
-    ? getInitials(activePeriod.opponentAlias)
-    : '--';
+  const matchInitials = activePeriod ? getInitials(activePeriod.opponentAlias) : '--';
   const bonusStatus = activePeriod
     ? getBonusStatus(activePeriod, weeklyGoal)
-    : 'AVAILABLE WHEN YOUR PERIOD MATCH STARTS';
+    : 'NOT STARTED';
   const bonusEndDay = Number(competition.bonusDateKeys.at(-1)?.slice(-2) ?? 28);
+  const incomingRequest = (requestsQuery.data ?? []).find(
+    ({ direction, id }) =>
+      direction === 'incoming' && !handledRequestIds.includes(id)
+  );
+  const featuredPartner = (eligiblePartnersQuery.data ?? []).find(
+    ({ requestStatus }) => requestStatus !== 'pending'
+  ) ?? (eligiblePartnersQuery.data ?? [])[0];
+  const pairingRequired =
+    !isRemainderDayPhase && activePeriod?.availability !== 'matched';
+  const pairingActionRequired = pairingRequired && !acceptedPartnerAlias;
+  const challengeState = acceptedPartnerAlias
+    ? 'PARTNER CONFIRMED'
+    : getWeeklyChallengeDisplayStatus({
+        activeAvailability: activePeriod?.availability,
+        hasFeaturedPartner: Boolean(featuredPartner),
+        hasIncomingRequest: Boolean(incomingRequest),
+        isRemainderDayPhase
+      });
+  const pairingDataError =
+    pairingActionRequired &&
+    (eligiblePartnersQuery.isError || requestsQuery.isError);
+  const pairingDataLoading =
+    pairingActionRequired &&
+    (eligiblePartnersQuery.isLoading || requestsQuery.isLoading);
+
+  useEffect(() => {
+    if (!incomingRequest || viewedInviteRef.current === incomingRequest.id) {
+      return;
+    }
+
+    viewedInviteRef.current = incomingRequest.id;
+    void recordFlowMetric(
+      user?.uid,
+      'challenge-invite-viewed',
+      'weekly-challenge'
+    );
+  }, [incomingRequest, user?.uid]);
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
+        memoryKey="squad"
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
       >
         <View style={styles.header}>
-          <TerminalText glow tone="cyan" variant="label">
-            {activePeriod
-              ? 'YOUR WEEKLY OPPONENT'
-              : isRemainderDayPhase
-                ? 'BONUS DAYS 29-31'
-                : 'MATCH PENDING'}
-          </TerminalText>
+          <View style={styles.headerTopLine}>
+            <TerminalText glow tone="cyan" variant="label">
+              {challengeState}
+            </TerminalText>
+            <InlineHelpButton
+              label="Open competition guide"
+              onPress={() => router.push('/how-it-works?from=challenge')}
+            />
+          </View>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            {activePeriod
-              ? `WEEK ${activePeriod.index} PERIOD MATCH`
-              : isRemainderDayPhase
-                ? 'BONUS DAYS. EXTRA ENTRIES.'
-                : 'YOUR FIRST MATCH STARTS SOON'}
+            {activePeriod ? `WEEK ${activePeriod.index} CHALLENGE` : 'WEEKLY CHALLENGE'}
           </TerminalText>
         </View>
+
+        <CompetitionHubNav active="challenge" style={styles.hubNav} />
+
+        {pairingDataError ? (
+          <RecoverableError
+            body="Partner invitations could not be loaded. Retry without leaving this screen."
+            onRetry={() => {
+              void recordFlowMetric(
+                user?.uid,
+                'flow-retry',
+                'weekly-challenge'
+              );
+              void Promise.all([
+                eligiblePartnersQuery.refetch(),
+                requestsQuery.refetch()
+              ]);
+            }}
+            retrying={
+              eligiblePartnersQuery.isFetching ||
+              requestsQuery.isFetching
+            }
+            style={styles.queryState}
+            title="COULD NOT LOAD INVITES"
+          />
+        ) : pairingDataLoading ? (
+          <TerminalText live="polite" style={styles.queryState} tone="muted" variant="label">
+            CHECKING PARTNER INVITES...
+          </TerminalText>
+        ) : null}
+
+        {weeklyChallengeFeedback ? (
+          <ActionFeedback
+            message={weeklyChallengeFeedback.message}
+            style={styles.queryState}
+            tone={weeklyChallengeFeedback.tone}
+          />
+        ) : null}
+
+        {!pairingDataError && !pairingDataLoading && incomingRequest && pairingActionRequired ? (
+          <HUDBorderBox glow style={styles.partnerRequestCard} tone="amber">
+            <TerminalText glow tone="amber" variant="label">
+              RESPOND TO INVITE
+            </TerminalText>
+            <View style={styles.partnerIdentity}>
+              <UserAlias
+                alias={incomingRequest.partnerAlias}
+                prefix="@"
+                streaks={incomingRequest.partnerStreaks}
+              />
+              <TerminalText tone="dim" variant="micro">
+                SAME {weeklyGoal}-DAY WEEKLY GOAL
+              </TerminalText>
+            </View>
+            <CyberButtonPrimary
+              disabled={respondToRequest.isPending}
+              label={respondToRequest.isPending ? 'Responding...' : 'Accept invite'}
+              onPress={() =>
+                void respondToRequest
+                  .mutateAsync({
+                    decision: 'accepted',
+                    requestId: incomingRequest.id
+                  })
+                  .then(() => {
+                    setHandledRequestIds((current) => [
+                      ...new Set([...current, incomingRequest.id])
+                    ]);
+                    setWeeklyChallengeFeedback(
+                      {
+                        message: `@${incomingRequest.partnerAlias} is now your Weekly Challenge partner.`,
+                        tone: 'green'
+                      }
+                    );
+                    setAcceptedPartnerAlias(incomingRequest.partnerAlias);
+                    void recordFlowMetric(
+                      user?.uid,
+                      'challenge-invite-responded',
+                      'weekly-challenge'
+                    );
+                  })
+                  .catch(() => setWeeklyChallengeFeedback({
+                    message: 'That invite could not be accepted. Try again.',
+                    tone: 'red'
+                  }))
+              }
+            />
+            <CompactTextButton
+              disabled={respondToRequest.isPending}
+              label={respondToRequest.isPending ? 'Responding...' : 'Decline invite'}
+              onPress={() =>
+                void respondToRequest
+                  .mutateAsync({
+                    decision: 'declined',
+                    requestId: incomingRequest.id
+                  })
+                  .then(() => {
+                    setHandledRequestIds((current) => [
+                      ...new Set([...current, incomingRequest.id])
+                    ]);
+                    setWeeklyChallengeFeedback({
+                      message: 'Weekly Challenge invite declined.',
+                      tone: 'cyan'
+                    });
+                    void recordFlowMetric(
+                      user?.uid,
+                      'challenge-invite-responded',
+                      'weekly-challenge'
+                    );
+                  })
+                  .catch(() => setWeeklyChallengeFeedback({
+                    message: 'That invite could not be declined. Try again.',
+                    tone: 'red'
+                  }))
+              }
+              tone="muted"
+            />
+            <PairingMoreOptions
+              onManageFriends={() => router.push('/squad/social')}
+              onToggleOptions={() => setShowPairingOptions((current) => !current)}
+              onToggleRules={() => setShowPairingRules((current) => !current)}
+              showOptions={showPairingOptions}
+              showRules={showPairingRules}
+            />
+          </HUDBorderBox>
+        ) : null}
+
+        <FirstVisitTip
+          body="Hit your Weekly Goal with a partner for 2x. If they miss, one extra workout can unlock 3x."
+          onOpenGuide={() => router.push('/how-it-works?from=challenge')}
+          style={styles.firstVisitTip}
+          tip="weekly-challenge"
+        />
 
         {activePeriod ? (
           <HUDBorderBox glow style={styles.pactCard} tone="cyan">
@@ -74,6 +308,7 @@ export default function SquadScreen() {
                 initials={matchInitials}
                 label={activePeriod.opponentAlias}
                 progress={`${Math.min(activePeriod.opponentVerifiedCount, weeklyGoal)} / ${weeklyGoal}`}
+                streaks={activePeriod.opponentStreaks}
                 tone="muted"
               />
             </View>
@@ -87,77 +322,185 @@ export default function SquadScreen() {
               />
               <DailyProgressRow
                 dateKeys={activePeriod.period.dateKeys}
-                label="MATCH"
+                label="THEM"
                 tone="muted"
                 verifiedDateKeys={activePeriod.opponentVerifiedDateKeys}
               />
             </View>
 
-            <HUDBorderBox style={styles.matchNote} tone="cyan">
-              <TerminalText style={styles.matchNoteText} tone="cyan" uppercase={false} variant="body">
+            <View style={styles.matchNote}>
+              <TerminalText
+                style={styles.matchNoteText}
+                tone="cyan"
+                uppercase={false}
+                variant="body"
+              >
                 {getMatchNote(activePeriod, weeklyGoal)}
               </TerminalText>
-            </HUDBorderBox>
+            </View>
           </HUDBorderBox>
         ) : isRemainderDayPhase ? (
           <HUDBorderBox glow style={styles.pactCard} tone="cyan">
             <TerminalText glow tone="cyan" variant="label">
               DAYS 29-{bonusEndDay}
             </TerminalText>
-            <TerminalText style={styles.matchNoteText} tone="muted" variant="body">
-              PERIOD MATCHES ARE COMPLETE. EACH VERIFIED WORKOUT ON A BONUS
-              CALENDAR DAY ADDS {weeklyGoal} PRIZE DRAW {weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} BEFORE PERFECT-MONTH 10X.
+            <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
+              Weekly Challenges are complete. Each verified Bonus Day adds {weeklyGoal}{' '}
+              prize draw {weeklyGoal === 1 ? 'entry' : 'entries'} before the Perfect Month 10x.
             </TerminalText>
           </HUDBorderBox>
         ) : (
           <HUDBorderBox glow style={styles.pactCard} tone="cyan">
             <TerminalText glow tone="cyan" variant="label">
-              FIRST ELIGIBLE WEEK
+              {acceptedPartnerAlias ? 'PARTNER READY' : 'FIRST ELIGIBLE WEEK'}
             </TerminalText>
             <TerminalText style={styles.pendingDate} tone="text" variant="title">
               {formatDateKey(competitionEntryStartDateKey)}
             </TerminalText>
-            <TerminalText style={styles.matchNoteText} tone="muted" variant="body">
-              YOUR RANDOM PERIOD MATCH OPENS WHEN YOUR FIRST ELIGIBLE SCORING WEEK
-              STARTS. WORKOUTS BEFORE THIS DATE CAN STILL APPEAR IN YOUR
-              CALENDAR, BUT THEY DO NOT COUNT TOWARD THIS COMPETITION.
+            <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
+              {acceptedPartnerAlias
+                ? `@${acceptedPartnerAlias} is confirmed. Your first Weekly Challenge begins on this date.`
+                : 'Choose an eligible friend or wait for automatic pairing when scoring starts.'}
             </TerminalText>
           </HUDBorderBox>
         )}
 
         {activePeriod ? (
-          <HUDBorderBox glow style={styles.forfeitCard} tone="pink">
-            <View style={styles.forfeitHeader}>
-              <TerminalText glow tone="pink" variant="micro">
-                BONUS
-              </TerminalText>
-              <TerminalText glow tone="pink" variant="label">
-                MAKE-UP BONUS
-              </TerminalText>
+          <HUDBorderBox style={styles.forfeitCard} tone="pink">
+            <View style={styles.bonusSummary}>
+              <View style={styles.bonusSummaryCopy}>
+                <TerminalText tone="dim" variant="micro">
+                  WEEKLY BONUS STATUS
+                </TerminalText>
+                <TerminalText glow tone="pink" variant="body">
+                  {bonusStatus}
+                </TerminalText>
+              </View>
+              <CompactTextButton
+                label={showBonusDetails ? 'Hide details' : 'View details'}
+                onPress={() => setShowBonusDetails((current) => !current)}
+                tone={showBonusDetails ? 'muted' : 'pink'}
+              />
             </View>
-            <TerminalText style={styles.forfeitCopy} tone="text" uppercase={false} variant="body">
-              If you both hit the Weekly Goal, you each earn 2x. If your matched
-              player misses, one extra verified workout upgrades your week to 3x.
-              The 3x upgrade is automatic when your goal already uses every available day.
-            </TerminalText>
-            <View style={styles.claimRow}>
-              <TerminalText tone="muted" variant="micro">
-                STATUS
+            {showBonusDetails ? (
+              <TerminalText style={styles.forfeitCopy} tone="muted" uppercase={false} variant="body">
+                Both players hit the goal: 2x each. If your partner misses, one
+                extra verified workout upgrades your week to 3x. The upgrade is
+                automatic when no extra workout day is available.
               </TerminalText>
-              <TerminalText glow style={styles.claimValue} tone="pink" variant="body">
-                {bonusStatus}
-              </TerminalText>
-            </View>
+            ) : null}
           </HUDBorderBox>
         ) : null}
 
-        <CyberButtonOutline
-          label="VIEW GYM COMPETITION ->"
-          onPress={() => router.push('/squad/gym')}
-          style={styles.gymButton}
-        />
+        {pairingActionRequired && !pairingDataError && !pairingDataLoading && !incomingRequest ? (
+          <HUDBorderBox style={styles.partnerRequestCard} tone="cyan">
+            {featuredPartner ? (
+              <>
+                <TerminalText glow tone="cyan" variant="label">
+                  INVITE A PARTNER
+                </TerminalText>
+                <View style={styles.partnerRow}>
+                  <View style={styles.partnerIdentity}>
+                    <UserAlias
+                      alias={featuredPartner.alias}
+                      prefix="@"
+                      streaks={featuredPartner.streaks}
+                    />
+                    <TerminalText tone="dim" variant="micro">
+                      SAME {featuredPartner.goalDays}-DAY WEEKLY GOAL
+                    </TerminalText>
+                  </View>
+                </View>
+                <CyberButtonPrimary
+                  disabled={requestPartner.isPending || featuredPartner.requestStatus === 'pending'}
+                  label={featuredPartner.requestStatus === 'pending' ? 'Invite sent' : 'Send invite'}
+                  onPress={() =>
+                    void requestPartner
+                      .mutateAsync({
+                        competitionMonthKey: competition.competitionMonthKey,
+                        periodIndex: weeklyChallengePeriod,
+                        recipientUserId: featuredPartner.userId,
+                        regionCode: competitionRegionCode,
+                        weeklyGoal
+                      })
+                      .then(() => setWeeklyChallengeFeedback({
+                        message: `Invite sent to @${featuredPartner.alias}.`,
+                        tone: 'green'
+                      }))
+                      .catch(() => setWeeklyChallengeFeedback({
+                        message: 'That invite could not be sent. Try again.',
+                        tone: 'red'
+                      }))
+                  }
+                />
+              </>
+            ) : (
+              <>
+                <TerminalText glow tone="cyan" variant="label">
+                  PAIRING NOT STARTED
+                </TerminalText>
+                <TerminalText tone="muted" uppercase={false} variant="body">
+                  We&apos;ll look for an eligible partner when pairing opens.
+                </TerminalText>
+              </>
+            )}
+
+            <PairingMoreOptions
+              onManageFriends={() => router.push('/squad/social')}
+              onToggleOptions={() => setShowPairingOptions((current) => !current)}
+              onToggleRules={() => setShowPairingRules((current) => !current)}
+              showOptions={showPairingOptions}
+              showRules={showPairingRules}
+            />
+
+          </HUDBorderBox>
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
+  );
+}
+
+function PairingMoreOptions({
+  onManageFriends,
+  onToggleOptions,
+  onToggleRules,
+  showOptions,
+  showRules
+}: {
+  onManageFriends: () => void;
+  onToggleOptions: () => void;
+  onToggleRules: () => void;
+  showOptions: boolean;
+  showRules: boolean;
+}) {
+  return (
+    <View style={styles.moreOptions}>
+      <CompactTextButton
+        label={showOptions ? 'Hide pairing options' : 'Pairing options'}
+        onPress={onToggleOptions}
+        tone="muted"
+      />
+      {showOptions ? (
+        <View style={styles.moreOptionsContent}>
+          <CompactTextButton
+            label={showRules ? 'Hide pairing rules' : 'Pairing rules'}
+            onPress={onToggleRules}
+            tone={showRules ? 'muted' : 'cyan'}
+          />
+          {showRules ? (
+            <TerminalText style={styles.partnerRequestCopy} tone="muted" uppercase={false} variant="caption">
+              Partners must be in the same regional competition with the same Weekly Goal.
+              An invite becomes active only after it is accepted.
+            </TerminalText>
+          ) : null}
+          <CompactTextButton
+            label="Manage friends"
+            onPress={onManageFriends}
+            tone="muted"
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -212,28 +555,28 @@ function getMatchNote(
   weeklyGoal: number
 ) {
   if (period.availability === 'solo') {
-    return `NO COMPATIBLE MATCHED PLAYER WAS AVAILABLE. HIT ${weeklyGoal} VERIFIED WORKOUT DAYS FOR THE STANDARD 1X RESULT.`;
+    return `No compatible partner was available. Hit ${weeklyGoal} verified workout days for the standard 1x result.`;
   }
 
   if (period.userGoalMet && period.opponentGoalMet) {
-    return `BOTH PLAYERS HIT ${weeklyGoal}. THE 2X RESULT IS SECURED WHEN THIS WEEK CLOSES.`;
+    return `Both players hit ${weeklyGoal}. The 2x result is secured when this week closes.`;
   }
 
   if (period.userGoalMet && period.bonusWorkoutCompleted) {
     return weeklyGoal === 7
-      ? 'YOUR SEVEN-DAY GOAL IS COMPLETE. 3X ACTIVATES AUTOMATICALLY IF YOUR MATCHED PLAYER MISSES.'
-      : 'YOUR EXTRA VERIFIED WORKOUT IS COMPLETE. 3X IS ARMED IF YOUR MATCHED PLAYER MISSES.';
+      ? 'Your seven-day goal is complete. 3x activates automatically if your partner misses.'
+      : 'Your extra verified workout is complete. 3x is ready if your partner misses.';
   }
 
   if (period.userGoalMet) {
-    return `YOUR ${weeklyGoal}-DAY GOAL IS COMPLETE. ADD ONE MORE VERIFIED WORKOUT TO ARM 3X IF YOUR MATCHED PLAYER MISSES.`;
+    return `Your ${weeklyGoal}-day goal is complete. Add one more verified workout to unlock 3x if your partner misses.`;
   }
 
   const remaining = weeklyGoal - period.userVerifiedCount;
   const deadline = formatDateKey(period.period.dateKeys.at(-1) ?? period.period.dateKeys[0]);
   const opponentProgress = Math.min(period.opponentVerifiedCount, weeklyGoal);
 
-  return `Complete ${remaining} more verified ${remaining === 1 ? 'workout' : 'workouts'} by ${deadline}. Your matched player is at ${opponentProgress}/${weeklyGoal}. ${period.opponentGoalMet ? 'Hit your goal to secure 2x with them.' : 'The 2x bonus remains available if you both hit the goal.'}`;
+  return `Complete ${remaining} more verified ${remaining === 1 ? 'workout' : 'workouts'} by ${deadline}. Your Weekly Challenge partner is at ${opponentProgress}/${weeklyGoal}. ${period.opponentGoalMet ? 'Hit your goal to secure 2x with them.' : 'The 2x bonus remains available if you both hit the goal.'}`;
 }
 
 function getBonusStatus(
@@ -245,11 +588,11 @@ function getBonusStatus(
   }
 
   if (period.userGoalMet && period.bonusWorkoutCompleted) {
-    return weeklyGoal === 7 ? '3X AUTO-ARMED' : '3X ARMED';
+    return '3X BONUS READY';
   }
 
   if (period.userGoalMet) {
-    return weeklyGoal === 7 ? 'WAITING ON MATCH' : 'EXTRA WORKOUT AVAILABLE';
+    return weeklyGoal === 7 ? 'WAITING ON PARTNER' : 'EXTRA WORKOUT AVAILABLE';
   }
 
   return `${weeklyGoal - period.userVerifiedCount} TO GO`;
@@ -269,12 +612,14 @@ function PlayerBlock({
   initials,
   label,
   progress,
+  streaks,
   tone
 }: {
   imageUri?: string | null;
   initials: string;
   label: string;
   progress: string;
+  streaks?: StreakCounts;
   tone: PlayerTone;
 }) {
   const isMuted = tone === 'muted';
@@ -284,15 +629,27 @@ function PlayerBlock({
       {imageUri ? (
         <ProfileAvatar imageUri={imageUri} initials={initials} size={50} />
       ) : (
-        <View style={[styles.playerAvatar, isMuted ? styles.playerAvatarMuted : styles.playerAvatarCyan]}>
-          <TerminalText style={isMuted ? styles.playerInitialsLight : styles.playerInitialsDark} tone="text" variant="button">
+        <View
+          style={[
+            styles.playerAvatar,
+            isMuted ? styles.playerAvatarMuted : styles.playerAvatarCyan
+          ]}
+        >
+          <TerminalText
+            style={isMuted ? styles.playerInitialsLight : styles.playerInitialsDark}
+            tone="text"
+            variant="button"
+          >
             {initials}
           </TerminalText>
         </View>
       )}
-      <TerminalText style={styles.playerLabel} tone="text" variant="body">
-        {label}
-      </TerminalText>
+      <UserAlias
+        alias={label}
+        streaks={streaks}
+        style={styles.playerAlias}
+        textStyle={styles.playerLabel}
+      />
       <TerminalText glow style={styles.playerProgress} tone={tone} variant="micro">
         {progress}
       </TerminalText>
@@ -305,10 +662,26 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
+    marginBottom: spacing.lg
+  },
+  headerTopLine: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md
+  },
+  hubNav: {
+    marginBottom: spacing.lg
+  },
+  queryState: {
+    marginBottom: spacing.lg
+  },
+  firstVisitTip: {
     marginBottom: spacing.lg
   },
   title: {
@@ -360,8 +733,11 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   playerLabel: {
-    marginTop: spacing.sm,
     fontFamily: fontFamilies.terminal
+  },
+  playerAlias: {
+    justifyContent: 'center',
+    marginTop: spacing.sm
   },
   playerProgress: {
     marginTop: 2,
@@ -372,8 +748,10 @@ const styles = StyleSheet.create({
   },
   matchNote: {
     marginTop: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: 14
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderCyanSubtle
   },
   matchNoteText: {
     fontFamily: fontFamilies.body,
@@ -384,7 +762,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.divider
+    borderTopColor: colors.borderCyanSubtle
   },
   dailyRow: {
     flexDirection: 'row',
@@ -411,7 +789,7 @@ const styles = StyleSheet.create({
   },
   dailyCellOpen: {
     borderColor: colors.borderMuted,
-    backgroundColor: colors.surfaceBase
+    backgroundColor: colors.panelAlpha45
   },
   dailyCellCyan: {
     borderColor: colors.borderCyanBright,
@@ -424,6 +802,16 @@ const styles = StyleSheet.create({
   forfeitCard: {
     marginBottom: spacing.lg,
     padding: spacing.lg
+  },
+  bonusSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md
+  },
+  bonusSummaryCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2
   },
   forfeitHeader: {
     flexDirection: 'row',
@@ -445,7 +833,42 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display,
     textAlign: 'right'
   },
-  gymButton: {
-    marginTop: spacing.lg
+  gymUnavailableCard: {
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    padding: spacing.lg
   },
+  partnerRequestCard: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.lg
+  },
+  partnerRequestCopy: {
+    fontFamily: fontFamilies.body
+  },
+  moreOptions: {
+    borderTopWidth: 1,
+    borderTopColor: colors.borderMuted
+  },
+  moreOptionsContent: {
+    gap: spacing.xs,
+    paddingBottom: spacing.xs
+  },
+  partnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan,
+    backgroundColor: colors.panelAlpha45
+  },
+  partnerIdentity: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2
+  },
+  confirmedPartner: {
+    gap: spacing.xs
+  }
 });

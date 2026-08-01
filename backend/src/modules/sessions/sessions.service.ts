@@ -18,6 +18,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { parseCompetitionRules } from '../competitions/competition-rules';
 import { LedgerService } from '../ledger/ledger.service';
+import { VerificationConsentsService } from '../legal/verification-consents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   AppendSessionEventDto,
@@ -25,7 +26,9 @@ import type {
   CreateSessionDto,
   SessionCompletionResponseDto,
   SessionEventResponseDto,
+  SessionRequirementsResponseDto,
   SessionResponseDto,
+  StartedSessionResponseDto,
 } from './dto/session.dto';
 import { assessSessionSubmission } from './session-assessment';
 import {
@@ -43,13 +46,21 @@ interface SessionJson extends JsonObject {
   id: string;
   policyVersion: string;
   startedAt: string;
-  status: 'active' | 'pending_review' | 'rejected';
+  status: 'active' | 'cancelled' | 'pending_review' | 'rejected' | 'verified';
+}
+
+interface StartedSessionJson extends SessionJson {
+  requirements: SessionRequirementsResponseDto & JsonObject;
 }
 
 interface SessionEventJson extends JsonObject {
   eventId: string;
   eventType:
-    'device_attestation' | 'face_check' | 'gym_qr_scan' | 'heart_rate_sample';
+    | 'device_attestation'
+    | 'face_check'
+    | 'gym_qr_scan'
+    | 'heart_rate_sample'
+    | 'presence_check';
   id: string;
   receivedAt: string;
 }
@@ -75,14 +86,15 @@ export class SessionsService {
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
     private readonly profiles: ProfilesService,
+    private readonly verificationConsents: VerificationConsentsService,
   ) {}
 
   async create(
     principal: AuthenticatedPrincipal,
     idempotencyKey: string,
     request: CreateSessionDto,
-  ): Promise<SessionResponseDto> {
-    return this.idempotency.execute<SessionJson>(
+  ): Promise<StartedSessionResponseDto> {
+    return this.idempotency.execute<StartedSessionJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
@@ -111,7 +123,7 @@ export class SessionsService {
           )
           .select([
             'competition.ends_at',
-            'competition.mode',
+            'competition.rules',
             'competition.rules_version',
             'competition.starts_at',
             'competition.status as competition_status',
@@ -129,13 +141,10 @@ export class SessionsService {
               'An active enrollment is required to start a competition session.',
           });
         }
-        if (enrollment.mode === 'non_cash_demo') {
-          throw new ConflictException({
-            code: 'DEMO_COMPETITION_SESSIONS_DISABLED',
-            message:
-              'Competition workout sessions are disabled for the non-cash demo.',
-          });
-        }
+        await this.verificationConsents.assertActiveDevicePresenceConsent(
+          transaction,
+          user.id,
+        );
         if (
           enrollment.competition_status !== 'active' ||
           now < enrollment.starts_at ||
@@ -181,7 +190,12 @@ export class SessionsService {
           .returningAll()
           .executeTakeFirstOrThrow();
 
-        return this.sessionJson(session);
+        return {
+          ...this.sessionJson(session),
+          requirements: this.sessionRequirements(
+            parseCompetitionRules(enrollment.rules),
+          ),
+        };
       },
     );
   }
@@ -383,6 +397,62 @@ export class SessionsService {
           status: assessment.status,
           violations: assessment.violations,
         };
+      },
+    );
+  }
+
+  async cancel(
+    principal: AuthenticatedPrincipal,
+    sessionId: string,
+    idempotencyKey: string,
+  ): Promise<SessionResponseDto> {
+    return this.idempotency.execute<SessionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { sessionId },
+        scope: 'sessions:cancel',
+      },
+      async (transaction) => {
+        const user = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(user);
+        const session = await transaction
+          .selectFrom('workout_sessions')
+          .selectAll()
+          .where('id', '=', sessionId)
+          .where('user_id', '=', user.id)
+          .executeTakeFirst();
+        if (!session) {
+          throw new NotFoundException({
+            code: 'SESSION_NOT_FOUND',
+            message: 'The workout session was not found.',
+          });
+        }
+        if (session.status !== 'active') {
+          throw new ConflictException({
+            code: 'SESSION_NOT_ACTIVE',
+            message: 'Only an active workout session can be cancelled.',
+          });
+        }
+
+        const cancelledAt = new Date();
+        const cancelled = await transaction
+          .updateTable('workout_sessions')
+          .set({
+            completed_at: cancelledAt,
+            status: 'cancelled',
+            updated_at: cancelledAt,
+            verification_summary: {
+              cancelledAt: cancelledAt.toISOString(),
+              evidenceTrust: 'not_submitted',
+            },
+          })
+          .where('id', '=', session.id)
+          .where('status', '=', 'active')
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        return this.sessionJson(cancelled);
       },
     );
   }
@@ -770,7 +840,15 @@ export class SessionsService {
     started_at: Date;
     status: 'active' | 'cancelled' | 'pending_review' | 'rejected' | 'verified';
   }): SessionJson {
-    if (!['active', 'pending_review', 'rejected'].includes(session.status)) {
+    if (
+      ![
+        'active',
+        'cancelled',
+        'pending_review',
+        'rejected',
+        'verified',
+      ].includes(session.status)
+    ) {
       throw new Error('Unexpected session state in client session response.');
     }
     return {
@@ -780,7 +858,19 @@ export class SessionsService {
       id: session.id,
       policyVersion: session.policy_version,
       startedAt: session.started_at.toISOString(),
-      status: session.status as SessionJson['status'],
+      status: session.status,
+    };
+  }
+
+  private sessionRequirements(
+    rules: ReturnType<typeof parseCompetitionRules>,
+  ): SessionRequirementsResponseDto & JsonObject {
+    return {
+      minHeartRateSamples: rules.minHeartRateSamples,
+      minSessionMinutes: rules.minSessionMinutes,
+      requireDeviceAttestation: rules.requireDeviceAttestation,
+      requireGymQr: rules.requireGymQr,
+      requirePresenceCheck: rules.requirePresenceCheck,
     };
   }
 }

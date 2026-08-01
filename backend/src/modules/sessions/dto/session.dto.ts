@@ -3,7 +3,6 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -29,9 +28,9 @@ export class CreateSessionDto {
 
 export enum SessionEventTypeDto {
   DEVICE_ATTESTATION = 'device_attestation',
-  FACE_CHECK = 'face_check',
   GYM_QR_SCAN = 'gym_qr_scan',
   HEART_RATE_SAMPLE = 'heart_rate_sample',
+  PRESENCE_CHECK = 'presence_check',
 }
 
 export class AppendSessionEventDto {
@@ -53,13 +52,6 @@ export class AppendSessionEventDto {
   @Max(240)
   @Min(30)
   heartRateBpm?: number;
-
-  @ApiPropertyOptional({ maximum: 1, minimum: 0, type: Number })
-  @IsOptional()
-  @IsNumber()
-  @Max(1)
-  @Min(0)
-  faceMatchConfidence?: number;
 
   @ApiPropertyOptional({ maxLength: 2048, type: String })
   @IsOptional()
@@ -104,6 +96,28 @@ export class SessionResponseDto {
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   completedAt!: string | null;
+}
+
+export class SessionRequirementsResponseDto {
+  @ApiProperty({ type: Number })
+  minSessionMinutes!: number;
+
+  @ApiProperty({ type: Number })
+  minHeartRateSamples!: number;
+
+  @ApiProperty({ type: Boolean })
+  requireDeviceAttestation!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  requirePresenceCheck!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  requireGymQr!: boolean;
+}
+
+export class StartedSessionResponseDto extends SessionResponseDto {
+  @ApiProperty({ type: SessionRequirementsResponseDto })
+  requirements!: SessionRequirementsResponseDto;
 }
 
 export class SessionEventResponseDto {

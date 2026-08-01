@@ -1,20 +1,16 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
+  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { SponsorRail } from '@/components/sponsor';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
+import { GoGymGoWordmark } from '@/components/brandWordmark';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
-import {
-  formatCampaignCurrency,
-  useSponsorCampaign
-} from '@/state/sponsorCampaign';
 
 type Accent = 'cyan';
 
@@ -44,8 +40,8 @@ const welcomeSteps: readonly WelcomeStep[] = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { campaign, economics } = useSponsorCampaign();
-  const sponsorConfirmed = campaign.status === 'approved';
+  const { width: viewportWidth } = useWindowDimensions();
+  const compactLogo = viewportWidth < 360;
 
   return (
     <ScreenContainer>
@@ -54,7 +50,6 @@ export default function WelcomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <SponsorRail style={styles.sponsorBanner} />
 
         <View style={styles.introStack}>
           <View style={styles.statusRail}>
@@ -65,18 +60,13 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.logoShell}>
-            <View style={styles.logoRow}>
-              <TerminalText glow style={styles.logoWord} tone="cyan" variant="display">
-                GO
-              </TerminalText>
-              <TerminalText glow style={styles.logoWord} tone="pink" variant="display">
-                GYM
-              </TerminalText>
-              <TerminalText glow style={styles.logoWord} tone="cyan" variant="display">
-                GO
-              </TerminalText>
-            </View>
+            <GoGymGoWordmark compact={compactLogo} />
           </View>
+
+          <TerminalText style={styles.valueProp} tone="text" uppercase={false} variant="body">
+            Complete verified workouts, compete in your region and earn chances
+            to win brand rewards.
+          </TerminalText>
 
           <HUDBorderBox style={styles.stepStrip} tone="cyan">
             {welcomeSteps.map((step) => (
@@ -88,62 +78,31 @@ export default function WelcomeScreen() {
             FREE TO PLAY // FUNDED BY SPONSORS
           </TerminalText>
 
+          <View style={styles.primaryActions}>
+            <CyberButtonPrimary
+              label="GET STARTED ->"
+              onPress={() => router.push('/join')}
+            />
+            <CyberButtonOutline
+              accessibilityHint="Open the returning player sign-in screen"
+              label="SIGN IN"
+              onPress={() => router.push('/sign-in')}
+            />
+          </View>
+
           <HUDBorderBox glow style={styles.entryPanel} tone="cyan">
-            <TerminalText style={styles.entryIntro} tone="muted" variant="label">
-              {isDemoVerificationEnabled ? 'BRITISH COLUMBIA DEMO' : 'ON SIGNUP YOU RECEIVE A'}
-            </TerminalText>
             <TerminalText glow style={styles.entryTitle} tone="pink" variant="value">
-              {isDemoVerificationEnabled ? 'NO ENTRY CREATED' : 'FREE ENTRY'}
+              FREE ENTRY
             </TerminalText>
-            <TerminalText style={styles.entryActivation} tone="muted" variant="micro">
-              {isDemoVerificationEnabled ? 'DRAFT FOUNDATION ONLY' : 'INTO THE MONTHLY PRIZE DRAW'}
+            <TerminalText style={styles.entryCopy} tone="muted" uppercase={false} variant="body">
+              Create your player account and receive one entry into the monthly
+              regional prize draw.
             </TerminalText>
-            <View style={styles.entryDetailRow}>
-              <View style={[styles.prizeBlock, !sponsorConfirmed && styles.pendingPrizeBlock]}>
-                <TerminalText tone="muted" variant="micro">
-                  {isDemoVerificationEnabled ? 'PAYOUT STATUS' : 'PROJECTED DRAW POOL'}
-                </TerminalText>
-                <TerminalText
-                  glow
-                  style={[styles.prizeValue, !sponsorConfirmed && styles.prizePending]}
-                  tone={sponsorConfirmed ? 'pink' : 'amber'}
-                  variant="title"
-                >
-                  {isDemoVerificationEnabled
-                    ? 'DISABLED'
-                    : sponsorConfirmed
-                    ? formatCampaignCurrency(economics.prizeDrawAmount)
-                    : 'PUBLISHED\nSOON'}
-                </TerminalText>
-              </View>
-              <View style={[styles.sponsorAd, !sponsorConfirmed && styles.pendingSponsorAd]}>
-                <View style={styles.sponsorAdCopy}>
-                  <TerminalText tone="dim" variant="micro">
-                    MONTH SPONSOR
-                  </TerminalText>
-                  <TerminalText style={styles.sponsorAdTitle} tone="text" variant="body">
-                    {campaign.sponsor.offerTitle}
-                  </TerminalText>
-                </View>
-              </View>
-            </View>
-            <TerminalText
-              style={styles.drawLabel}
-              tone={sponsorConfirmed ? 'pink' : 'amber'}
-              variant="label"
-            >
-              {isDemoVerificationEnabled
-                ? 'NO ENROLLMENT // NO WINNERS // NO PAYOUTS'
-                : '15% OF PLAYERS GET PAID'}
+            <TerminalText style={styles.drawLabel} tone="cyan" variant="label">
+              SPONSOR-FUNDED PRIZES + COUPON CODES
             </TerminalText>
           </HUDBorderBox>
 
-          <View style={styles.primaryActions}>
-            <CyberButtonPrimary
-              label="CREATE ACCOUNT ->"
-              onPress={() => router.push('/join')}
-            />
-          </View>
         </View>
       </ScreenScrollView>
     </ScreenContainer>
@@ -206,17 +165,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.lg
   },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap'
-  },
-  logoWord: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.logo,
-    lineHeight: 58,
-    letterSpacing: 1.2
+  valueProp: {
+    maxWidth: 350,
+    paddingHorizontal: spacing.sm,
+    fontFamily: fontFamilies.bodyStrong,
+    fontSize: fontSizes.body,
+    lineHeight: 22,
+    textAlign: 'center'
   },
   primaryActions: {
     width: '100%',
@@ -252,72 +207,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm
   },
-  entryIntro: {
-    textAlign: 'center'
-  },
   entryTitle: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
     fontFamily: fontFamilies.display,
     textAlign: 'center'
   },
-  entryActivation: {
-    marginTop: -4,
-    marginBottom: spacing.sm,
-    fontFamily: fontFamilies.terminal,
+  entryCopy: {
+    maxWidth: 310,
+    alignSelf: 'center',
+    fontFamily: fontFamilies.body,
+    lineHeight: 21,
     textAlign: 'center'
-  },
-  entryDetailRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'stretch'
-  },
-  prizeBlock: {
-    flex: 0.82,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderPinkMuted,
-    borderRadius: 8,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  pendingPrizeBlock: {
-    borderColor: colors.borderWarning,
-    backgroundColor: colors.surfaceWarning
-  },
-  prizeValue: {
-    marginTop: 2,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.titleLarge,
-    lineHeight: 28,
-    textAlign: 'center'
-  },
-  prizePending: {
-    fontSize: fontSizes.body,
-    lineHeight: 20
-  },
-  sponsorAd: {
-    flex: 1.18,
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderCyanQuiet,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceCyanWhisper
-  },
-  pendingSponsorAd: {
-    borderColor: colors.borderWarning,
-    backgroundColor: colors.surfaceWarning
-  },
-  sponsorAdCopy: {
-    flex: 1
-  },
-  sponsorAdTitle: {
-    marginTop: 1,
-    fontFamily: fontFamilies.display
   },
   drawLabel: {
     marginTop: spacing.xs,

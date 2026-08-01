@@ -4,7 +4,12 @@ import { pickProfileImage } from '@/services/profileImage';
 import { useProfile } from '@/state/profile';
 
 export function useProfileImagePicker() {
-  const { profileImageUri, removeProfileImage, setProfileImage } = useProfile();
+  const {
+    profileImageStatus,
+    profileImageUri,
+    removeProfileImage,
+    setProfileImage
+  } = useProfile();
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [profileImageMessage, setProfileImageMessage] = useState<string | null>(null);
 
@@ -12,23 +17,39 @@ export function useProfileImagePicker() {
     setIsPickingImage(true);
     setProfileImageMessage(null);
 
-    const result = await pickProfileImage();
+    try {
+      const result = await pickProfileImage();
 
-    if (result.status === 'selected') {
-      await setProfileImage(result.uri);
-      setProfileImageMessage('PROFILE PICTURE SAVED.');
-    } else if (result.status === 'denied') {
-      setProfileImageMessage('PHOTO ACCESS IS REQUIRED TO CHOOSE A PICTURE.');
-    } else if (result.status === 'error') {
-      setProfileImageMessage('PICTURE COULD NOT BE PREPARED. TRY ANOTHER PHOTO.');
+      if (result.status === 'selected') {
+        await setProfileImage(result.uri);
+        setProfileImageMessage('PROFILE PICTURE SUBMITTED. MODERATION STATUS WILL UPDATE HERE.');
+      } else if (result.status === 'denied') {
+        setProfileImageMessage('PHOTO ACCESS IS REQUIRED TO CHOOSE A PICTURE.');
+      } else if (result.status === 'error') {
+        setProfileImageMessage('PICTURE COULD NOT BE PREPARED. TRY ANOTHER PHOTO.');
+      }
+    } catch (error) {
+      setProfileImageMessage(
+        error instanceof Error
+          ? error.message.toUpperCase()
+          : 'PROFILE PICTURE COULD NOT BE UPLOADED. TRY AGAIN.'
+      );
+    } finally {
+      setIsPickingImage(false);
     }
-
-    setIsPickingImage(false);
   }, [setProfileImage]);
 
   const clearProfileImage = useCallback(async () => {
-    await removeProfileImage();
-    setProfileImageMessage('INITIALS AVATAR RESTORED.');
+    try {
+      await removeProfileImage();
+      setProfileImageMessage('INITIALS AVATAR RESTORED.');
+    } catch (error) {
+      setProfileImageMessage(
+        error instanceof Error
+          ? error.message.toUpperCase()
+          : 'PROFILE PICTURE COULD NOT BE REMOVED. TRY AGAIN.'
+      );
+    }
   }, [removeProfileImage]);
 
   return {
@@ -36,6 +57,7 @@ export function useProfileImagePicker() {
     clearProfileImage,
     isPickingImage,
     profileImageMessage,
+    profileImageStatus,
     profileImageUri
   };
 }

@@ -11,7 +11,10 @@ interface IdempotencyOptions {
   request: JsonObject;
   responseCode?: number;
   scope: string;
+  storeResponseBody?: boolean;
 }
+
+const redactedResponseBody: JsonObject = { redacted: true };
 
 @Injectable()
 export class IdempotencyService {
@@ -73,13 +76,17 @@ export class IdempotencyService {
             });
           }
 
-          if (
-            existing.state === 'completed' &&
-            existing.response_body &&
-            typeof existing.response_body === 'object' &&
-            !Array.isArray(existing.response_body)
-          ) {
-            return { ...existing.response_body } as T;
+          if (existing.state === 'completed') {
+            if (options.storeResponseBody === false) {
+              return handler(transaction);
+            }
+            if (
+              existing.response_body &&
+              typeof existing.response_body === 'object' &&
+              !Array.isArray(existing.response_body)
+            ) {
+              return { ...existing.response_body } as T;
+            }
           }
 
           throw new ConflictException({
@@ -94,7 +101,10 @@ export class IdempotencyService {
           .updateTable('idempotency_keys')
           .set({
             completed_at: new Date(),
-            response_body: result,
+            response_body:
+              options.storeResponseBody === false
+                ? redactedResponseBody
+                : result,
             response_code: options.responseCode ?? 200,
             state: 'completed',
           })

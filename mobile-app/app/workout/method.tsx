@@ -9,15 +9,23 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, interactionStates, spacing, fontSizes } from '@/constants/theme';
+import { CompactTextButton } from '@/components/onboarding';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
+import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { goBackOrReplace } from '@/navigation/goBack';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
+  getPreferenceOwnerId,
   savePreferredVerificationMethod,
   type PreferredVerificationMethod
 } from '@/state/onboardingPreferences';
 
 type VerificationOption = {
+  available: boolean;
   body: string;
   method: PreferredVerificationMethod;
   route: Href;
@@ -26,13 +34,15 @@ type VerificationOption = {
 
 const verificationOptions: readonly VerificationOption[] = [
   {
-    body: 'USE YOUR LINKED WATCH, STRAP OR HEART-RATE SOURCE.',
+    available: heartRateTelemetryAvailable,
+    body: 'Available after an approved heart-rate telemetry provider is connected.',
     method: 'heartRate',
     route: '/workout/check-in',
     title: 'HEART-RATE DEVICE'
   },
   {
-    body: 'SCAN IN AND OUT AT A PARTICIPATING PARTNER GYM.',
+    available: verifiedPartnerGymCatalogAvailable,
+    body: 'Available after verified partner gyms and signed QR credentials are published.',
     method: 'partnerGymQr',
     route: '/qr-scanner',
     title: 'PARTNER GYM QR'
@@ -41,32 +51,40 @@ const verificationOptions: readonly VerificationOption[] = [
 
 export default function WorkoutMethodScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { user } = useAuth();
+  const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('heartRate');
   const [preferredSourceLabel, setPreferredSourceLabel] = useState('HEART-RATE DEVICE');
+  const [showVerificationRules, setShowVerificationRules] = useState(false);
   const orderedOptions = useMemo(
-    () => [...verificationOptions].sort(
-      (left, right) =>
-        Number(right.method === preferredMethod) - Number(left.method === preferredMethod)
-    ),
+    () =>
+      [...verificationOptions].sort(
+        (left, right) =>
+          Number(right.method === preferredMethod) - Number(left.method === preferredMethod)
+      ),
     [preferredMethod]
   );
 
   useEffect(() => {
-    if (!user) {
+    if (!preferenceOwnerId) {
       return;
     }
 
-    void getVerificationPreference(user.uid).then((preference) => {
+    void getVerificationPreference(preferenceOwnerId).then((preference) => {
       setPreferredMethod(preference.method);
       setPreferredSourceLabel(preference.sourceLabel);
     });
-  }, [user]);
+  }, [preferenceOwnerId]);
 
   async function chooseMethod(option: VerificationOption) {
+    if (!option.available) {
+      return;
+    }
+
     setPreferredMethod(option.method);
-    if (user) {
-      await savePreferredVerificationMethod(user.uid, option.method);
+    if (preferenceOwnerId) {
+      await savePreferredVerificationMethod(preferenceOwnerId, option.method);
     }
     router.push(option.route);
   }
@@ -78,6 +96,7 @@ export default function WorkoutMethodScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <WorkoutFlowProgress stage="device" style={styles.workoutProgress} />
         <View style={styles.header}>
           <TerminalText glow tone="cyan" variant="label">
             WORKOUT VERIFICATION
@@ -88,48 +107,78 @@ export default function WorkoutMethodScreen() {
         </View>
 
         <View style={styles.optionList}>
-          {orderedOptions.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              key={option.title}
-              onPress={() => void chooseMethod(option)}
-              style={({ pressed }) => [styles.pressable, pressed ? styles.pressed : null]}
-            >
-              <HUDBorderBox glow style={styles.optionCard} tone="cyan">
-                <View style={styles.optionCopy}>
-                  {option.method === preferredMethod ? (
-                    <TerminalText glow tone="green" variant="micro">
-                      YOUR DEFAULT // {preferredSourceLabel}
+          {orderedOptions.map((option) => {
+            const available = option.available || appTourActive;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !available }}
+                disabled={!available}
+                key={option.title}
+                onPress={() => void chooseMethod({ ...option, available })}
+                style={({ pressed }) => [
+                  styles.pressable,
+                  !available ? styles.unavailable : null,
+                  pressed ? styles.pressed : null
+                ]}
+              >
+                <HUDBorderBox
+                  glow={available}
+                  style={styles.optionCard}
+                  tone={available ? 'cyan' : 'muted'}
+                >
+                  <View style={styles.optionCopy}>
+                    {option.method === preferredMethod ? (
+                      <TerminalText glow tone="green" variant="micro">
+                        {`${available ? 'YOUR DEFAULT' : 'SAVED PREFERENCE'} // ${preferredSourceLabel}`}
+                      </TerminalText>
+                    ) : null}
+                    <TerminalText
+                      glow={available}
+                      style={styles.optionTitle}
+                      tone={available ? 'cyan' : 'dim'}
+                      variant="body"
+                    >
+                      {option.title}
                     </TerminalText>
-                  ) : null}
-                  <TerminalText glow style={styles.optionTitle} tone="cyan" variant="body">
-                    {option.title}
+                    {!available ? (
+                      <TerminalText tone="dim" variant="micro">
+                        NOT AVAILABLE
+                      </TerminalText>
+                    ) : null}
+                    <TerminalText style={styles.optionBody} tone="muted" variant="body">
+                      {option.body}
+                    </TerminalText>
+                  </View>
+                  <TerminalText
+                    glow={available}
+                    tone={available ? 'cyan' : 'dim'}
+                    variant="button"
+                  >
+                    {available ? '->' : 'Unavailable'}
                   </TerminalText>
-                  <TerminalText style={styles.optionBody} tone="muted" variant="body">
-                    {option.body}
-                  </TerminalText>
-                </View>
-                <TerminalText glow tone="cyan" variant="button">
-                  -&gt;
-                </TerminalText>
-              </HUDBorderBox>
-            </Pressable>
-          ))}
+                </HUDBorderBox>
+              </Pressable>
+            );
+          })}
         </View>
 
-        <HUDBorderBox style={styles.noteCard} tone="muted">
-          <TerminalText glow tone="cyan" variant="label">
-            VERIFICATION RULE
-          </TerminalText>
-          <TerminalText style={styles.noteCopy} tone="muted" variant="body">
-            YOUR DEFAULT METHOD APPEARS FIRST. BOTH METHODS REQUIRE CHECK-IN,
-            A MID-SESSION IDENTITY CHECK AND CHECK-OUT BEFORE THE WORKOUT COUNTS.
-          </TerminalText>
-        </HUDBorderBox>
+        <CompactTextButton
+          label={showVerificationRules ? 'Hide check-in details' : 'Why is this required?'}
+          onPress={() => setShowVerificationRules((current) => !current)}
+          tone={showVerificationRules ? 'muted' : 'cyan'}
+        />
+        {showVerificationRules ? (
+          <HUDBorderBox style={styles.noteCard} tone="muted">
+            <TerminalText style={styles.noteCopy} tone="muted" uppercase={false} variant="body">
+              Every workout includes a start check, mid-workout verification and completion check.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : null}
 
         <CyberButtonOutline
-          label="BACK TO SESSION"
-          onPress={() => router.replace('/session' as Href)}
+          label="BACK"
+          onPress={() => goBackOrReplace(router, '/session' as Href)}
           style={styles.backButton}
         />
       </ScreenScrollView>
@@ -149,6 +198,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl
   },
+  workoutProgress: {
+    marginBottom: spacing.xl
+  },
   title: {
     marginTop: spacing.sm,
     fontFamily: fontFamilies.display,
@@ -160,8 +212,7 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   pressable: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   optionCard: {
     flexDirection: 'row',
@@ -181,8 +232,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   noteCard: {
-    gap: spacing.xs,
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
     padding: spacing.lg
   },
   noteCopy: {
@@ -192,6 +242,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
+  },
+  unavailable: {
+    opacity: 0.7
   }
 });

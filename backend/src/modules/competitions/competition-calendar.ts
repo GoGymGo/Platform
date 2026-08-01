@@ -30,6 +30,13 @@ export function buildCompetitionPeriods(monthKey: string): CompetitionPeriod[] {
   });
 }
 
+export function competitionMonthEndDateKey(monthKey: string): string {
+  assertMonthKey(monthKey);
+  const [year, month] = monthKey.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return dateKey(year, month, lastDay);
+}
+
 export function dateKeyInTimezone(value: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     day: '2-digit',

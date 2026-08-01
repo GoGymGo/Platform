@@ -4,43 +4,25 @@ export type CompetitionRegion = {
   timeZone: string;
 };
 
-export type CompetitionRegionVerificationMethod = 'device-location' | 'postal-code';
-export type CompetitionRegionVerificationStatus =
-  | 'approved'
-  | 'expired'
-  | 'pending'
-  | 'rejected';
+export type CompetitionRegionVerificationMethod = 'device-location';
 
 export type CompetitionRegionVerification = {
-  backendVerificationId: string;
-  expiresAt: string | null;
+  expiresAt: string;
+  jurisdictionCode: string;
   method: CompetitionRegionVerificationMethod;
-  policyVersion: string;
   region: CompetitionRegion;
-  reviewedAt: string | null;
-  status: CompetitionRegionVerificationStatus;
-  submittedAt: string;
+  regionCode: string;
+  regionPolicyId: string;
+  status: 'verified';
+  verificationId: string;
+  verifiedAt: string;
 };
 
-export const competitionRegions: readonly CompetitionRegion[] = [
-  { id: 'bc', label: 'BRITISH COLUMBIA', timeZone: 'America/Vancouver' }
-];
-
-export const defaultCompetitionRegion = competitionRegions[0];
-
-export function parseCompetitionRegion(value: string | null) {
-  if (!value) {
-    return defaultCompetitionRegion;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as { id?: unknown };
-    return competitionRegions.find((region) => region.id === parsed.id)
-      ?? defaultCompetitionRegion;
-  } catch {
-    return defaultCompetitionRegion;
-  }
-}
+export const defaultCompetitionRegion: CompetitionRegion = {
+  id: 'unverified',
+  label: 'REGION NOT SET',
+  timeZone: 'UTC'
+};
 
 export function parseCompetitionRegionVerification(
   value: string | null
@@ -51,45 +33,114 @@ export function parseCompetitionRegionVerification(
 
   try {
     const parsed = JSON.parse(value) as {
-      backendVerificationId?: unknown;
-      expiresAt?: unknown;
       id?: unknown;
+      expiresAt?: unknown;
+      jurisdictionCode?: unknown;
+      label?: unknown;
       method?: unknown;
-      policyVersion?: unknown;
-      reviewedAt?: unknown;
+      regionCode?: unknown;
+      regionPolicyId?: unknown;
       status?: unknown;
-      submittedAt?: unknown;
+      timeZone?: unknown;
+      verificationId?: unknown;
+      verifiedAt?: unknown;
     };
-    const region = competitionRegions.find((candidate) => candidate.id === parsed.id);
+    const region = parseStoredRegion(parsed);
     const method = parsed.method;
 
     if (
       !region ||
-      (method !== 'device-location' && method !== 'postal-code') ||
-      !['approved', 'expired', 'pending', 'rejected'].includes(
-        parsed.status as string
-      ) ||
-      typeof parsed.backendVerificationId !== 'string' ||
-      typeof parsed.policyVersion !== 'string' ||
-      !(parsed.expiresAt === null || typeof parsed.expiresAt === 'string') ||
-      !(parsed.reviewedAt === null || typeof parsed.reviewedAt === 'string') ||
-      typeof parsed.submittedAt !== 'string' ||
-      Number.isNaN(Date.parse(parsed.submittedAt))
+      method !== 'device-location' ||
+      parsed.status !== 'verified' ||
+      typeof parsed.expiresAt !== 'string' ||
+      Number.isNaN(Date.parse(parsed.expiresAt)) ||
+      Date.parse(parsed.expiresAt) <= Date.now() ||
+      typeof parsed.jurisdictionCode !== 'string' ||
+      !/^[A-Z]{2}-[A-Z0-9-]{1,8}$/.test(parsed.jurisdictionCode) ||
+      typeof parsed.regionCode !== 'string' ||
+      typeof parsed.regionPolicyId !== 'string' ||
+      typeof parsed.verificationId !== 'string' ||
+      typeof parsed.verifiedAt !== 'string' ||
+      Number.isNaN(Date.parse(parsed.verifiedAt))
     ) {
       return null;
     }
 
     return {
-      backendVerificationId: parsed.backendVerificationId,
       expiresAt: parsed.expiresAt,
+      jurisdictionCode: parsed.jurisdictionCode,
       method,
-      policyVersion: parsed.policyVersion,
       region,
-      reviewedAt: parsed.reviewedAt,
-      status: parsed.status as CompetitionRegionVerificationStatus,
-      submittedAt: parsed.submittedAt
+      regionCode: parsed.regionCode,
+      regionPolicyId: parsed.regionPolicyId,
+      status: 'verified',
+      verificationId: parsed.verificationId,
+      verifiedAt: parsed.verifiedAt
     };
   } catch {
     return null;
+  }
+}
+
+export function createCompetitionRegion({
+  regionCode,
+  regionName,
+  timezone
+}: {
+  regionCode: string;
+  regionName: string;
+  timezone: string;
+}): CompetitionRegion {
+  const normalizedCode = regionCode.trim();
+  const normalizedName = regionName.trim();
+  const normalizedTimezone = timezone.trim();
+
+  if (
+    !normalizedCode ||
+    !normalizedName ||
+    !isValidTimeZone(normalizedTimezone)
+  ) {
+    throw new Error('The server returned invalid competition-region metadata.');
+  }
+
+  return {
+    id: normalizedCode,
+    label: normalizedName.toUpperCase(),
+    timeZone: normalizedTimezone
+  };
+}
+
+function parseStoredRegion(value: unknown): CompetitionRegion | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const stored = value as {
+    id?: unknown;
+    label?: unknown;
+    timeZone?: unknown;
+  };
+  if (
+    typeof stored.id !== 'string' ||
+    typeof stored.label !== 'string' ||
+    typeof stored.timeZone !== 'string' ||
+    !stored.id.trim() ||
+    !stored.label.trim() ||
+    !isValidTimeZone(stored.timeZone)
+  ) {
+    return null;
+  }
+  return {
+    id: stored.id,
+    label: stored.label,
+    timeZone: stored.timeZone
+  };
+}
+
+function isValidTimeZone(value: string) {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
   }
 }

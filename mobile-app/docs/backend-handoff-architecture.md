@@ -1,197 +1,141 @@
-# GoGymGo Backend Handoff Architecture
+# GoGymGo backend handoff architecture
 
-Status: frontend decision record, July 2026
+Status: current frontend decision record, July 2026
 
 ## Decision
 
-Build the first production backend as a TypeScript modular monolith. Keep the Expo app as an untrusted client, Firebase Authentication as the identity provider, PostgreSQL/PostGIS as the system of record and durable work queue, a separately deployed worker for asynchronous operations, and Hyperwallet Pay Portal as the hosted payout experience. Add Redis only after measured load shows that PostgreSQL-backed reads or jobs are the bottleneck.
-
-This is the lowest-risk initial shape because it has one API boundary, one authoritative relational datastore, explicit financial ledgers, and no bank, tax, or identity-document collection in the mobile app. Do not split into microservices until real load or team ownership requires it.
+Use a NestJS modular monolith, Firebase Authentication, PostgreSQL/PostGIS, a
+database-backed operations worker, and Cloud Storage. The Expo app is an
+untrusted client. Regional contests award sponsor-funded physical products and
+coupon codes through a server-authoritative rewards marketplace.
 
 ```mermaid
 flowchart LR
-    A[Expo React Native app] -->|Firebase ID token| B[NestJS API on Cloud Run]
-    B --> C[(PostgreSQL + PostGIS)]
-    B --> F[Cloud object storage]
-    B -->|server credentials only| G[Hyperwallet API]
-    E[Private Cloud Run worker] --> C
-    E --> F
-    E --> G
-    G -->|idempotent webhooks| B
-    E --> H[Expo push service / FCM / APNs]
-    I[Admin operations] --> B
+  App[Expo app] -->|Firebase ID token| API[NestJS API]
+  API --> DB[(PostgreSQL and PostGIS)]
+  API --> Storage[Private object storage]
+  Worker[Operations worker] --> DB
+  Worker --> Push[Expo push service]
+  Admin[Operator tools] --> API
 ```
 
-## Non-negotiable trust boundaries
+## Trust boundaries
 
-- The app may display progress, but only the API can create verified sessions, competition entries, winners, or payouts.
-- Firebase UID is the account identity. The API verifies every Firebase ID token and derives the user from the token; it never trusts a user ID supplied by the client.
-- A current Firebase-verified email is required before competition enrollment and remains a server-side precondition through evidence awards, operator actions, draw eligibility, and Hyperwallet onboarding. The app must handle `VERIFIED_EMAIL_REQUIRED` by sending the user through Firebase verification and refreshing their ID token.
-- Every write that can award money uses an idempotency key and an append-only audit event.
-- Workout evidence is uploaded as events. Server policy decides whether it is valid and records the policy version used.
-- Hyperwallet API credentials, user tokens, payment tokens, webhook processing, and payout decisions remain server-side.
-- GoGymGo never receives or stores a winner's bank-account number, tax form, or identity document. The winner enters that data in Hyperwallet's hosted Pay Portal.
-- AsyncStorage is only a convenience cache. It is unencrypted and cannot be a source of truth for money, consent, eligibility, or verification.
+- The API derives the account from a verified Firebase token and never trusts a
+  client-supplied user ID.
+- Only the server creates verified sessions, entries, draw snapshots, winners,
+  reward awards, or coupon assignments.
+- Retried value-bearing writes require idempotency keys and operator mutations
+  require append-only audit events.
+- Coupon plaintext is encrypted at the API boundary, redacted from logs, and
+  revealed only to the authenticated award owner after claim.
+- Physical fulfillment uses a sponsor HTTPS claim URL or instructions. The app
+  does not collect a shipping address.
+- AsyncStorage is only a convenience cache and never the source of truth for
+  consent, eligibility, verification, inventory, or claims.
+- The product has no cash, bank-account, payee, or payment-provider workflow.
 
-## Recommended production stack
+## Stack
 
-| Layer | Choice | Why |
+| Layer | Choice | Purpose |
 | --- | --- | --- |
-| Mobile | Expo SDK 57, React Native, Expo Router, TypeScript | Already implemented and validated across native/web bundles. |
-| Identity | Firebase Authentication | Already integrated; supports email, Google, and Apple without a second auth migration. |
-| API | NestJS modular monolith on Cloud Run | TypeScript end to end, clear modules, OpenAPI support, managed scaling. |
-| Data | Cloud SQL PostgreSQL + PostGIS | Transactions, constraints, auditability, geographic eligibility, and financial ledgers. |
-| SQL access | Kysely + `pg`; `node-pg-migrate` for migrations | Typed queries with explicit SQL and reviewable migrations, including PostGIS and ledger constraints. |
-| Jobs/cache | PostgreSQL leases + private worker | Durable webhook, payout, notification, and privacy retries without another stateful dependency. Add Redis only for measured non-authoritative cache/queue pressure. |
-| Media | Cloud Storage signed uploads | The app uploads directly with a short-lived signed URL; the database stores metadata and moderation state. |
-| Payouts | Hyperwallet Pay Portal + REST API + webhooks | Provider-hosted payee setup and transfer methods keep sensitive financial onboarding out of GoGymGo. |
-| Contracts | OpenAPI generated by NestJS | One versioned contract for the mobile client, backend implementation, tests, and admin tooling. |
-| Observability | OpenTelemetry, Pino, managed error reporting/Sentry SDK | Correlated request, job, webhook, and payout audit trails. Never log tokens or sensitive payout data. |
+| Mobile | Expo, React Native, Expo Router, TypeScript | Shared iOS, Android, and preview UI |
+| Identity | Firebase Authentication | Email, Apple, and Google identity |
+| API | NestJS on Cloud Run | Modules, guards, validation, OpenAPI |
+| Data | PostgreSQL/PostGIS through Kysely | Transactions, constraints, regional policy |
+| Migrations | node-pg-migrate | Reviewable forward schema history |
+| Jobs | PostgreSQL leases | Retryable lifecycle, push, media, and privacy work |
+| Media | Private Cloud Storage | Signed avatar/media operations |
+| Rewards | PostgreSQL plus AES-256-GCM | Regional catalog, inventory, awards, coupon secrecy |
 
-The existing Supabase CLI scaffold is removed by this decision. A direct Supabase mobile client would create a second identity/data policy surface and is not appropriate for authoritative prize or payout writes. Supabase-hosted PostgreSQL could still be reconsidered as infrastructure, but only behind the same API boundary.
-
-## Open-source packages to adopt deliberately
-
-### Frontend next
-
-| Package | Purpose | Timing |
-| --- | --- | --- |
-| `@tanstack/react-query` | Async server state, retries, invalidation, loading/error states, React Native lifecycle support | Implemented as the repository/query boundary; connect and refine policies with the first OpenAPI endpoints. |
-| `zod` | Runtime validation of API and deep-link payloads | Add with generated API contracts. |
-| `react-hook-form` + `@hookform/resolvers` | Consistent forms and server error mapping | Add while connecting onboarding/application forms. |
-| `@react-native-community/netinfo` | Online/offline query behavior | Add with React Query. |
-| `expo-secure-store` | Small secrets or device-bound opaque tokens only; not general app data | Add only if the backend issues a value Firebase cannot manage. |
-| `expo-camera` | Real signed partner-gym QR scanning | Add when the backend defines signed QR payloads and replay rules. |
-| `expo-local-authentication` | Device-owner confirmation before sensitive local actions | Add for step-up UX; never treat it as proof that a workout occurred. |
-| Maestro | Device-level onboarding, account-switching, workout, and payout E2E tests | Add before beta. |
-| MSW | Contract-level API mocks for component and failure-state tests | Add with the query layer. |
-
-Expo documents AsyncStorage as unencrypted storage, SecureStore as encrypted small-value storage, LocalAuthentication as a device biometric prompt, Camera as a camera/barcode interface, and Notifications as the native push interface. Use those narrow capabilities rather than custom native code where possible:
-
-- <https://docs.expo.dev/versions/latest/sdk/async-storage/>
-- <https://docs.expo.dev/versions/latest/sdk/securestore/>
-- <https://docs.expo.dev/versions/latest/sdk/local-authentication/>
-- <https://docs.expo.dev/versions/latest/sdk/camera/>
-- <https://docs.expo.dev/versions/latest/sdk/notifications/>
-- <https://tanstack.com/query/v5/docs/framework/react/react-native>
-
-### Backend next
-
-| Package | Purpose |
-| --- | --- |
-| `@nestjs/*` | API modules, guards, validation, OpenAPI, and testing. |
-| `firebase-admin` | Firebase ID-token verification and account administration. |
-| `kysely`, `pg`, `node-pg-migrate` | Typed SQL, transactions, and explicit migrations. |
-| `@google-cloud/storage` | Private JSON exports, object deletion, and short-lived V4 download actions. |
-| `pino` | Structured logs with mandatory redaction. |
-| `@opentelemetry/*` | Trace API, SQL, queues, and external-provider calls. |
-| `testcontainers` | Integration tests against real PostgreSQL/PostGIS containers. |
-
-NestJS documents rate limiting at <https://docs.nestjs.com/security/rate-limiting>.
-
-## Hyperwallet: lowest-risk implementation
-
-Use the Pay Portal payout experience, not a custom bank-account form.
-
-1. A server-side draw process settles a winner and creates a pending `PayoutClaim` in one transaction.
-2. Operations/fraud review approves the claim. No payout is created from a client action.
-3. The backend idempotently creates or retrieves the Hyperwallet user using the internal user ID as `clientUserId`.
-4. The app receives only claim status and a provider-approved hosted activation/portal action. The exact portal-session mechanism must be finalized with the assigned Hyperwallet implementation specialist.
-5. Hyperwallet collects identity, tax, and transfer-method data. Bank details never pass through GoGymGo.
-6. Hyperwallet webhooks update the claim/payment state. Store each webhook token before processing so duplicate delivery is harmless, then reconcile against the Hyperwallet API.
-7. The worker sends a push notification for `action_required`, `processing`, `paid`, or `failed`; operations handles exceptions in an admin queue.
-
-Hyperwallet's official documentation confirms that Pay Portal can collect payee details during activation, transfer methods are configured by program and geography, API calls require server credentials, and webhook tokens should be stored for deduplication:
-
-- <https://docs.hyperwallet.com/content/api/v4/resources/users/create>
-- <https://docs.hyperwallet.com/content/pay-portal-payout-experience/v1/create-transfer-method>
-- <https://docs.hyperwallet.com/content/api/v3/overview/accessing-the-api>
-- <https://docs.hyperwallet.com/content/webhooks/v1/integration>
-
-Do not add Plaid, Stripe Financial Connections, or another bank-linking SDK for payouts. Hyperwallet is the bank/transfer-method boundary; a second connector adds cost, consent, support, and data-liability surfaces without improving this payout flow.
-
-## Backend modules and ownership
+## Module ownership
 
 | Module | Owns |
 | --- | --- |
-| Auth | Firebase token guard, user bootstrap, roles, account status. |
-| Profiles | Public identity, avatar metadata, privacy settings. |
-| Legal | Immutable jurisdiction- and locale-aware document publication, content hashes, account receipt bundles, and withdrawal events. |
-| Regions | Versioned service areas, residency evidence, country/currency/time-zone policy. |
-| Competitions | Competition definitions, goal brackets, enrollment, rules version. |
-| Sessions | Check-in/out evidence, signed QR events, device evidence, review status. |
-| Ledger | Append-only entry awards/reversals with reason and source event. |
-| Leaderboards | Indexed PostgreSQL truth; optional non-authoritative cache only after profiling. |
-| Draws | Locked entrant snapshot, audited randomness input/output, winner settlement. |
-| Payouts | Claims, Hyperwallet mapping, payments, webhooks, reconciliation. |
-| Partnerships | Sponsor, creator, and gym intake/review workflows. |
-| Notifications | Push tokens, preferences, templates, delivery attempts. |
-| Privacy | Operator-approved exports/deletions, private storage actions, pseudonymization, and append-only request events. |
-| Moderation/Admin | Review queues, sanctions, overrides, immutable operator audit. |
+| Auth and profiles | Firebase guard, account status, public identity |
+| Regions | Versioned service areas and eligibility evidence |
+| Competitions | Definitions, brackets, enrollment, rules versions, Weekly Challenge partner requests |
+| Sessions and ledger | Evidence, review snapshots, append-only entries |
+| Leaderboards and draws | Read models, locked entrant snapshot, selection |
+| Rewards | Catalog, inventory, awards, claims, encrypted coupon codes |
+| Social | Screen-name search, friend requests, challenges, hashed contact invitations |
+| Creator workouts | Public catalog, rights-attested submissions, calendar plans |
+| Notifications | Preferences, templates, delivery attempts |
+| Operator/privacy | Configuration, audit, export, erasure, support queues |
 
-## Minimum API contract
+## Frontend connection readiness
 
-All routes are versioned under `/v1`. Mutations accept `Idempotency-Key` where a retry could duplicate value.
-Payout responses use integer `amountMinor` or `payoutPoolAmountMinor` fields plus ISO currency; the frontend repository converts those values to display units at its boundary.
+The mobile app has two explicit data modes: `api` for server data and
+`unavailable` for honest empty/error states when the API is not configured.
+There is no local data source that can imitate production records.
 
-- `GET /me`, `PATCH /me`, `POST /me/avatar-upload`, `POST /me/avatar-upload/{mediaId}/complete`, `GET /me/avatar`, `DELETE /me/avatar`
-- `GET /legal-documents/current`, `GET /me/legal-receipts/status`, `POST /me/legal-receipts`
-- `GET /regions`, `POST /me/region-verifications`
-- `GET /competitions/current`, `POST /competitions/:id/enrollments`
-- `GET /competitions/:monthKey/matches?goal=&region=`
-- `GET /competitions/:monthKey/enrollment-count?region=`
-- `POST /sessions`, `POST /sessions/:id/events`, `POST /sessions/:id/complete`
-- `GET /operator/sessions/:id/review`, `POST /operator/sessions/:id/verify`, `POST /operator/sessions/:id/reject` (operator-only; every decision is bound to the returned evidence snapshot)
-- `GET /me/progress`, `GET /leaderboards/current?goal=`
-- `GET /creator-workouts`
-- `GET /results/settled-competition`, `GET /results/payout-winners`
-- `GET /payout-claims/me`
-- `POST /payout-claims/:id/portal-action`
-- `POST /partner-applications/creators`, `/sponsors`, `/gyms`
-- `POST /devices/push-tokens`, `DELETE /devices/push-tokens/:id`
-- `POST /me/privacy-requests`, `GET /me/privacy-requests`
-- `POST /me/privacy-requests/:id/download-action`
-- `POST /webhooks/hyperwallet` (provider-only ingress, separate controls)
+| Product flow | Mobile adapter | Server contract | Current status |
+| --- | --- | --- | --- |
+| Firebase account access | `state/auth.tsx` | Firebase ID token guard | Connected |
+| Alias and friend discovery | `data/socialRepository.ts` | `GET/PATCH /v1/me`, social routes | Connected; UI term is **alias**, API field remains `screenName` |
+| Friends and social challenges | `data/socialRepository.ts` | `/v1/social/*` | Connected |
+| Leaderboards, results, streaks, and rewards | `data/appData.ts` | leaderboards, results, streaks, rewards | Connected |
+| Creator catalog, planning, and submission | `data/appData.ts` | `/v1/creator-workouts/*` | Connected |
+| Profile image | `data/accountSettingsRepository.ts`, `state/profile.tsx` | `/v1/me/avatar*` | Connected through exact-size signed upload, moderation state, private read URL, and removal |
+| Legal documents and receipts | `data/accountReadinessRepository.ts` | `/v1/legal-documents/current`, `/v1/me/legal-receipts*` | Connected; exact current bundle is displayed and receipted during registration |
+| Region eligibility | `data/accountReadinessRepository.ts` plus `state/competitionRegion.tsx` | `/v1/regions`, `/v1/me/region-verifications*` | Connected; pending reviews cannot be presented as approved |
+| Competition enrollment | `hooks/useCompetitionRegistration.ts` | `/v1/competitions/current*`, enrollment command | Connected; confirmation requires legal receipt and approved region evidence |
+| Verified workout session | `data/sessionRepository.ts`, `state/workoutProgress.tsx` | `/v1/sessions*` | Connected; create returns the authoritative duration/evidence rule snapshot used by the timer and completion guards, followed by throttled heart-rate/QR evidence, completion, pending/rejected review states, and cancellation |
+| Competition reminders | notification and push-registration services | `/v1/me/push-devices*` | Connected; local schedules and the authenticated Expo push device are enabled/disabled together |
+| Privacy export/deletion | `data/accountSettingsRepository.ts`, `/account-data` | `/v1/me/privacy-requests*` | Connected with request history, guarded deletion, and short-lived export download actions |
 
-The frontend now has a bearer-token API client boundary configured by `EXPO_PUBLIC_API_URL` plus account-resetting TanStack Query repositories. It supplies the Firebase ID token, a timeout, JSON handling, and idempotency headers. Preview data remains explicitly non-authoritative until these endpoints are built.
+### Integration order
 
-## Core database invariants
+1. Run the generated OpenAPI audit and real-device loading, empty, error, retry,
+   permission-denied, and expired-session scenarios before enabling API mode.
+2. Configure GCS upload CORS for the signed avatar headers and set the EAS
+   project ID used to mint Expo push tokens in release builds.
+3. Confirm the session-review worker refresh cadence against the mobile
+   `/v1/me/progress` query and notification expectations.
 
-- Monetary amounts are integer minor units plus ISO currency; never floating point.
-- Entry ledger rows are append-only. Corrections are compensating rows, not updates/deletes.
-- One enrollment per user/competition; competition-row locking serializes entrant caps, inactive enrollments cannot be recreated by the user, and one award exists per unique source event/policy. Every new enrollment references a complete current server-side account legal receipt bundle for the competition jurisdiction.
-- Legal documents, publication/withdrawal events, receipt bundles, and receipts are append-only. Receipt actions and content hashes must match the immutable document, and current resolution falls from subdivision to country to global scope without changing locale.
-- Draw settlement locks an immutable entrant snapshot and rule version.
-- One internal user maps to at most one Hyperwallet user per program.
-- Provider webhook token and payment token are unique.
-- Payout state transitions are validated and audited; `paid` cannot be set by an app request.
-- Geographic eligibility stores boundary/policy version and evidence metadata, not only a mutable region label.
-- Every administrative decision stores operator, reason, previous state, next state, and timestamp.
-- One active privacy request per user; worker claims use expiring lease tokens and every transition has an append-only event.
+`backend/scripts/audit-frontend-contract.mjs` is the release gate for every
+mobile-facing operation, including adapters that are staged but not yet wired.
+Adding or removing a product flow requires updating both this matrix and that
+contract gate.
 
-## North America rollout
+## Core reward contract
 
-Do not hard-code "North America" as one ruleset. Store country, subdivision, currency, language, tax/payout availability, age threshold, and competition eligibility as versioned configuration. Launch region by region only after legal review and Hyperwallet program coverage are confirmed. The current four Canadian metro previews are UI fixtures, not a production eligibility map.
+- `GET /v1/rewards/catalog?region=&monthKey=`
+- `GET /v1/rewards/awards/me`
+- `POST /v1/rewards/awards/{awardId}/claim`
+- `POST /v1/operator/configuration/rewards`
+- `PUT /v1/operator/configuration/rewards/{rewardId}`
+- `POST /v1/operator/configuration/rewards/{rewardId}/coupon-codes`
+- `POST /v1/operator/configuration/rewards/{rewardId}/status-action`
 
-## Backend handoff sequence
+The catalog is public and contains presentation-safe inventory only. Award and
+claim routes are authenticated. Operator mutations require a database role,
+reason, idempotency key, and optimistic version where applicable.
 
-1. Provision Firebase production apps, Cloud Run, Cloud SQL/PostGIS, secrets, private object storage, and separate development/staging/production environments.
-2. Establish the OpenAPI contract and generated mobile types before wiring screens.
-3. Implement Auth, Profiles, Regions, Competitions, Sessions, and Ledger first.
-4. Replace preview reads with React Query hooks and render explicit loading, empty, offline, and error states.
-5. Integrate the server-defined evidence contract, then add partner-signed QR, Apple App Attest/Google Play Integrity, and approved wearable/liveness verification with replay and provider-outage rules. Manual operator review is implemented but does not make client evidence cryptographically trusted.
-6. Complete Hyperwallet UAT onboarding, webhook reconciliation, operations runbooks, and sandbox payout E2E tests.
-7. Replace `src/services/legalAcceptance.ts` as the authority: fetch and render the server bundle, submit the exact receipt actions, refresh status after sign-in/account switching, and pass `receiptBundleId` during competition enrollment. AsyncStorage may cache UI state only.
-8. Complete the remaining admin configuration tooling, observability, infrastructure automation, device-level E2E coverage, and alerting. Privacy export/deletion, account legal receipts, competition-rules acceptance, rate limits, and the backend HTTP/migration test foundations are implemented.
-9. Run legal review and publish approved document versions for each launch jurisdiction and locale before enabling cash competition enrollment.
+## Invariants
 
-## Definition of backend-ready frontend
+- One enrollment per user and competition; one ledger award per source event.
+- Draw settlement locks an immutable eligible snapshot and rules version.
+- Published reward inventory is positive and region-scoped by competition.
+- One winner and one rank per draw; awards cannot exceed catalog inventory.
+- Coupon fingerprints are globally unique and coupon plaintext is absent from
+  logs, public catalog data, privacy exports, and other users' responses.
+- Every administrative decision stores actor, reason, state, and timestamp.
 
-- The branch is reviewed, committed, and reproducibly installable from a fresh clone.
-- Store bundle identifiers, EAS configuration, Firebase native service files/secrets, icons, and signing are configured.
-- OpenAPI endpoints and error envelopes are agreed.
-- Preview data is replaced screen by screen with asynchronous query/mutation states.
-- No account-owned key is device-global; no sensitive intake payload is persisted in AsyncStorage.
-- Two-account device E2E proves that profiles, regions, goals, logs, consent, and payout notices do not cross accounts.
-- Winner UI opens only a backend-issued Hyperwallet action and never accepts bank details.
-- Backend tests prove idempotent session awards, draw settlement, webhook handling, and payouts.
+## Handoff sequence
+
+1. Provision isolated Firebase/GCP environments, Cloud SQL/PostGIS, workload
+   identity, secret manager, buckets, backups, and monitoring.
+2. Populate `DATABASE_URL` and a random 32-byte base64
+   `REWARD_CODE_ENCRYPTION_KEY` outside Terraform state.
+3. Run the committed OpenAPI and mobile contract checks.
+4. Execute the forward-only brand-rewards migration before worker/API rollout.
+5. Configure sponsor inventory in draft, load coupon codes where applicable,
+   publish rewards, then publish the regional competition.
+6. Validate loading, empty, error, physical-claim, coupon-claim, duplicate retry,
+   and out-of-stock behavior on real devices.
+7. Complete regional contest, privacy, sponsor-terms, fulfillment, fraud, and
+   incident approval before enabling registration.
+
+Detailed endpoints and migration instructions are in
+`backend/docs/brand-rewards-marketplace.md`.

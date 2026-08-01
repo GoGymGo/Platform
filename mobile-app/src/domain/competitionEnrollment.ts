@@ -1,5 +1,4 @@
 export const competitionEnrollmentRules = {
-  lateRegistrationEndDay: 6,
   maximumWeeklyGoal: 7,
   minimumEntrants: 100
 } as const;
@@ -10,10 +9,9 @@ export type CompetitionEnrollmentPolicy = {
 };
 
 export type CompetitionEnrollmentSummary = CompetitionEnrollmentPolicy & {
+  competitionEndDateKey: string;
   competitionMonthKey: string;
-  lateRegistrationEndDateKey: string;
-  registrationEndDateKey: string;
-  registrationStartDateKey: string;
+  competitionStartDateKey: string;
 };
 
 export type CompetitionEnrollmentPhase =
@@ -28,7 +26,6 @@ export type CompetitionEnrollmentPhase =
 export type CompetitionEnrollmentStatus = CompetitionEnrollmentSummary & {
   atCapacity: boolean;
   currentEntrants: number;
-  lateRegistration: boolean;
   launchConfirmed: boolean;
   phase: CompetitionEnrollmentPhase;
   registrationOpen: boolean;
@@ -42,17 +39,13 @@ export function buildCompetitionEnrollmentSummary(
   const { month, year } = parseMonthKey(competitionMonthKey);
   validatePolicy(policy);
 
-  const registrationMonth = new Date(year, month - 2, 1);
-  const registrationYear = registrationMonth.getFullYear();
-  const registrationMonthNumber = registrationMonth.getMonth() + 1;
-  const registrationMonthKey = `${registrationYear}-${String(registrationMonthNumber).padStart(2, '0')}`;
-  const registrationDays = new Date(registrationYear, registrationMonthNumber, 0).getDate();
   return {
     ...policy,
+    competitionEndDateKey: `${competitionMonthKey}-${String(
+      new Date(year, month, 0).getDate()
+    ).padStart(2, '0')}`,
     competitionMonthKey,
-    lateRegistrationEndDateKey: `${competitionMonthKey}-${String(competitionEnrollmentRules.lateRegistrationEndDay).padStart(2, '0')}`,
-    registrationEndDateKey: `${registrationMonthKey}-${String(registrationDays).padStart(2, '0')}`,
-    registrationStartDateKey: `${registrationMonthKey}-01`
+    competitionStartDateKey: `${competitionMonthKey}-01`
   };
 }
 
@@ -62,45 +55,29 @@ export function evaluateCompetitionEnrollment(
   referenceDateKey: string
 ): CompetitionEnrollmentStatus {
   const entrants = sanitizeCount(currentEntrants);
-  const competitionEndDateKey = getCompetitionEndDateKey(summary.competitionMonthKey);
-  const lateRegistrationWindowOpen =
-    referenceDateKey > summary.registrationEndDateKey &&
-    referenceDateKey <= summary.lateRegistrationEndDateKey;
   const atCapacity = summary.maximumEntrants !== null && entrants >= summary.maximumEntrants;
   const launchConfirmed = entrants >= summary.minimumEntrants;
+  const competitionEnded = referenceDateKey > summary.competitionEndDateKey;
 
   let phase: CompetitionEnrollmentPhase;
 
-  if (referenceDateKey < summary.registrationStartDateKey) {
-    phase = 'before-registration';
-  } else if (referenceDateKey <= summary.registrationEndDateKey) {
-    phase = atCapacity
-      ? 'full'
-      : launchConfirmed
-        ? 'registration-ready'
-        : 'registration-open';
-  } else if (referenceDateKey <= competitionEndDateKey) {
-    phase = launchConfirmed
-      ? atCapacity
-        ? 'full'
-        : 'competition-active'
-      : 'cancelled';
-  } else {
+  if (competitionEnded) {
     phase = launchConfirmed ? 'competition-complete' : 'cancelled';
+  } else if (atCapacity) {
+    phase = 'full';
+  } else if (referenceDateKey < summary.competitionStartDateKey) {
+    phase = launchConfirmed ? 'registration-ready' : 'registration-open';
+  } else {
+    phase = 'competition-active';
   }
 
   return {
     ...summary,
     atCapacity,
     currentEntrants: entrants,
-    lateRegistration:
-      lateRegistrationWindowOpen,
     launchConfirmed,
     phase,
-    registrationOpen:
-      phase === 'registration-open' ||
-      phase === 'registration-ready' ||
-      (phase === 'competition-active' && lateRegistrationWindowOpen),
+    registrationOpen: !competitionEnded && !atCapacity,
     spotsRemaining: summary.maximumEntrants === null
       ? null
       : Math.max(0, summary.maximumEntrants - entrants)
@@ -121,23 +98,11 @@ export function getCompetitionEntryStartDateKey(
     return getNextMonthStartDateKey(competitionMonthKey);
   }
 
-  const registrationDay = Number(registrationDateKey.slice(-2));
-
-  if (registrationDay <= competitionEnrollmentRules.lateRegistrationEndDay) {
+  if (registrationDateKey.startsWith(`${competitionMonthKey}-`)) {
     return registrationDateKey;
   }
 
   return getNextMonthStartDateKey(competitionMonthKey);
-}
-
-export function getRegistrationTargetCompetitionMonthKey(referenceDateKey: string) {
-  validateDateKey(referenceDateKey);
-  const currentMonthKey = referenceDateKey.slice(0, 7);
-  const currentDay = Number(referenceDateKey.slice(-2));
-
-  return currentDay <= competitionEnrollmentRules.lateRegistrationEndDay
-    ? currentMonthKey
-    : getNextCompetitionMonthKey(currentMonthKey);
 }
 
 export function getRegistrationGoalLimit(
@@ -151,17 +116,9 @@ export function getRegistrationGoalLimit(
     return competitionEnrollmentRules.maximumWeeklyGoal;
   }
 
-  if (!registrationDateKey.startsWith(`${competitionMonthKey}-`)) {
-    return 0;
-  }
-
-  const registrationDay = Number(registrationDateKey.slice(-2));
-
-  if (registrationDay > competitionEnrollmentRules.lateRegistrationEndDay) {
-    return 0;
-  }
-
-  return competitionEnrollmentRules.maximumWeeklyGoal - registrationDay + 1;
+  return registrationDateKey.startsWith(`${competitionMonthKey}-`)
+    ? competitionEnrollmentRules.maximumWeeklyGoal
+    : 0;
 }
 
 export function getRegistrationGoalOptions(
@@ -177,24 +134,9 @@ export function getRegistrationGoalOptions(
     return [];
   }
 
-  if (isLateCompetitionRegistration(competitionMonthKey, registrationDateKey)) {
-    return [goalLimit];
-  }
-
   return Array.from(
     { length: competitionEnrollmentRules.maximumWeeklyGoal },
     (_, index) => index + 1
-  );
-}
-
-export function isLateCompetitionRegistration(
-  competitionMonthKey: string,
-  registrationDateKey: string
-) {
-  return (
-    registrationDateKey >= `${competitionMonthKey}-01` &&
-    registrationDateKey <=
-      `${competitionMonthKey}-${String(competitionEnrollmentRules.lateRegistrationEndDay).padStart(2, '0')}`
   );
 }
 

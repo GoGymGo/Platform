@@ -37,6 +37,7 @@ export class PrivacyExportBuilder {
             'user.created_at',
             'user.updated_at',
             'profile.callsign',
+            'profile.screen_name',
             'profile.public_identity_mode',
             'profile.public_name',
             'profile.privacy_settings',
@@ -106,7 +107,6 @@ export class PrivacyExportBuilder {
             'competition.id as competition_id',
             'competition.name as competition_name',
             'competition.month_key',
-            'competition.currency',
             'competition.rules_version',
             'competition.starts_at',
             'competition.ends_at',
@@ -199,23 +199,6 @@ export class PrivacyExportBuilder {
           .orderBy('event.received_at')
           .execute();
 
-        const demoVerificationCheckpoints = await transaction
-          .selectFrom('demo_verification_checkpoints')
-          .select([
-            'id',
-            'provider',
-            'region_code',
-            'checkpoint_type',
-            'outcome',
-            'demo',
-            'issued_at',
-            'expires_at',
-            'created_at',
-          ])
-          .where('user_id', '=', job.userId)
-          .orderBy('issued_at')
-          .execute();
-
         const progress = await transaction
           .selectFrom('competition_progress')
           .select([
@@ -288,54 +271,30 @@ export class PrivacyExportBuilder {
           .orderBy('entry.created_at')
           .execute();
 
-        const winnings = await transaction
-          .selectFrom('draw_winners as winner')
-          .innerJoin('competition_draws as draw', 'draw.id', 'winner.draw_id')
-          .select([
-            'winner.id',
-            'winner.draw_id',
-            'winner.payout_rank',
-            'winner.amount_minor',
-            'winner.currency',
-            'winner.created_at',
-            'draw.competition_id',
-          ])
-          .where('winner.user_id', '=', job.userId)
-          .orderBy('winner.created_at')
-          .execute();
-
-        const payoutClaims = await transaction
-          .selectFrom('payout_claims as claim')
-          .leftJoin(
-            'payout_payments as payment',
-            'payment.payout_claim_id',
-            'claim.id',
+        const rewardAwards = await transaction
+          .selectFrom('reward_awards as award')
+          .innerJoin('competition_draws as draw', 'draw.id', 'award.draw_id')
+          .innerJoin(
+            'reward_catalog_items as reward',
+            'reward.id',
+            'award.reward_catalog_item_id',
           )
           .select([
-            'claim.id',
-            'claim.draw_winner_id',
-            'claim.status',
-            'claim.provider',
-            'claim.amount_minor',
-            'claim.currency',
-            'claim.approved_at',
-            'claim.paid_at',
-            'claim.failure_code',
-            'claim.created_at',
-            'claim.updated_at',
-            'payment.provider_status as payment_status',
-            'payment.created_at as payment_created_at',
-            'payment.updated_at as payment_updated_at',
+            'award.id',
+            'award.draw_id',
+            'award.award_rank',
+            'award.status',
+            'award.awarded_at',
+            'award.claimed_at',
+            'award.fulfilled_at',
+            'award.redeemed_at',
+            'draw.competition_id',
+            'reward.sponsor_name',
+            'reward.title',
+            'reward.reward_type',
           ])
-          .where('claim.user_id', '=', job.userId)
-          .orderBy('claim.created_at')
-          .execute();
-
-        const payoutProfiles = await transaction
-          .selectFrom('hyperwallet_users')
-          .select(['provider_status', 'created_at', 'updated_at'])
-          .where('user_id', '=', job.userId)
-          .orderBy('created_at')
+          .where('award.user_id', '=', job.userId)
+          .orderBy('award.awarded_at')
           .execute();
 
         const partnerApplications = await transaction
@@ -425,11 +384,175 @@ export class PrivacyExportBuilder {
           .orderBy('created_at')
           .execute();
 
+        const creatorVideoSubmissions = await transaction
+          .selectFrom('creator_video_submissions')
+          .select([
+            'id',
+            'title',
+            'video_url',
+            'thumbnail_url',
+            'duration_minutes',
+            'workout_style',
+            'region_code',
+            'sponsor_disclosure',
+            'synthetic_media_disclosed',
+            'rights_version',
+            'rights_accepted_at',
+            'notes',
+            'status',
+            'created_at',
+            'updated_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('created_at')
+          .execute();
+        const creatorWorkoutPlans = await transaction
+          .selectFrom('creator_workout_plans as plan')
+          .innerJoin(
+            'creator_workouts as workout',
+            'workout.id',
+            'plan.creator_workout_id',
+          )
+          .select([
+            'plan.id',
+            'plan.planned_date',
+            'plan.note',
+            'plan.created_at',
+            'plan.updated_at',
+            'workout.title as workout_title',
+            'workout.creator_name',
+          ])
+          .where('plan.user_id', '=', job.userId)
+          .orderBy('plan.planned_date')
+          .execute();
+
+        const friendRequests = await transaction
+          .selectFrom('friend_requests')
+          .select([
+            'id',
+            'requester_user_id',
+            'status',
+            'responded_at',
+            'created_at',
+            'updated_at',
+          ])
+          .where((expression) =>
+            expression.or([
+              expression('requester_user_id', '=', job.userId),
+              expression('recipient_user_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
+        const friendships = await transaction
+          .selectFrom('friendships')
+          .select('created_at')
+          .where((expression) =>
+            expression.or([
+              expression('user_a_id', '=', job.userId),
+              expression('user_b_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
+        const challengeMemberships = await transaction
+          .selectFrom('social_challenge_members as membership')
+          .innerJoin(
+            'social_challenges as challenge',
+            'challenge.id',
+            'membership.challenge_id',
+          )
+          .leftJoin(
+            'region_policies as challenge_region',
+            'challenge_region.id',
+            'challenge.region_policy_id',
+          )
+          .select([
+            'challenge.id',
+            'challenge.name',
+            'challenge.challenge_type',
+            'challenge.activity',
+            'challenge.activity_label',
+            'challenge.description',
+            'challenge.target_count',
+            'challenge.target_period',
+            'challenge.start_date',
+            'challenge.end_date',
+            'challenge.location_name',
+            'challenge.scheduled_days',
+            'challenge.scheduled_time_local',
+            'challenge.participant_limit',
+            'challenge_region.code as region_code',
+            'challenge.status as challenge_status',
+            'challenge.owner_user_id',
+            'challenge.created_at as challenge_created_at',
+            'membership.role',
+            'membership.status as membership_status',
+            'membership.responded_at',
+            'membership.created_at as membership_created_at',
+          ])
+          .where('membership.user_id', '=', job.userId)
+          .orderBy('membership.created_at')
+          .execute();
+        const challengeCheckIns = await transaction
+          .selectFrom('social_challenge_checkins')
+          .select([
+            'id',
+            'challenge_id',
+            'eligible_date',
+            'source',
+            'workout_session_id',
+            'created_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('eligible_date')
+          .orderBy('created_at')
+          .execute();
+        const challengeContactInvitations = await transaction
+          .selectFrom('challenge_contact_invitations')
+          .select([
+            'id',
+            'challenge_id',
+            'channel',
+            'destination_hint',
+            'status',
+            'expires_at',
+            'claimed_at',
+            'created_at',
+          ])
+          .where((expression) =>
+            expression.or([
+              expression('inviter_user_id', '=', job.userId),
+              expression('claimed_by_user_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
+        const weeklyChallengeRequests = await transaction
+          .selectFrom('weekly_challenge_requests')
+          .select([
+            'id',
+            'competition_id',
+            'period_index',
+            'goal_days',
+            'status',
+            'created_at',
+            'responded_at',
+            'requester_user_id',
+          ])
+          .where((expression) =>
+            expression.or([
+              expression('requester_user_id', '=', job.userId),
+              expression('recipient_user_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
+
         return {
           account,
           accountLegalReceipts,
           competitionData: {
-            demoVerificationCheckpoints,
             drawEntries,
             enrollments,
             entryLedger,
@@ -445,14 +568,20 @@ export class PrivacyExportBuilder {
               ...session,
               eligible_date: normalizeDateKey(session.eligible_date),
             })),
-            winnings,
+            rewardAwards,
+          },
+          creatorContent: {
+            creatorVideoSubmissions,
+            creatorWorkoutPlans: creatorWorkoutPlans.map((plan) => ({
+              ...plan,
+              planned_date: normalizeDateKey(plan.planned_date),
+            })),
           },
           creatorWorkouts,
           deliveryPreferences: { pushDevices },
           generatedAt: new Date().toISOString(),
           notificationHistory,
           partnerApplications,
-          payoutData: { payoutClaims, payoutProfiles },
           privacyRequests,
           profileMedia,
           regionVerifications,
@@ -460,14 +589,44 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 3,
+          schemaVersion: 7,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',
-            'Hyperwallet user, payment, program, and webhook tokens',
+            'Encrypted coupon inventory and unassigned coupon codes',
             "Other users' identifiers and internal operator case material",
             'Raw device-attestation and reusable QR credentials',
           ],
+          socialData: {
+            challengeCheckIns: challengeCheckIns.map((checkIn) => ({
+              ...checkIn,
+              eligible_date: normalizeDateKey(checkIn.eligible_date),
+            })),
+            challengeContactInvitations,
+            challengeMemberships: challengeMemberships.map(
+              ({ owner_user_id: ownerUserId, ...membership }) => ({
+                ...membership,
+                end_date: normalizeDateKey(membership.end_date),
+                ownedByAccount: ownerUserId === job.userId,
+                start_date: normalizeDateKey(membership.start_date),
+              }),
+            ),
+            friendRequests: friendRequests.map(
+              ({ requester_user_id: requesterUserId, ...request }) => ({
+                ...request,
+                direction:
+                  requesterUserId === job.userId ? 'outgoing' : 'incoming',
+              }),
+            ),
+            friendships,
+            weeklyChallengeRequests: weeklyChallengeRequests.map(
+              ({ requester_user_id: requesterUserId, ...weeklyRequest }) => ({
+                ...weeklyRequest,
+                direction:
+                  requesterUserId === job.userId ? 'outgoing' : 'incoming',
+              }),
+            ),
+          },
         };
       });
   }

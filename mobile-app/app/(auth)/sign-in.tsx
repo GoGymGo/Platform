@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -25,15 +25,12 @@ import {
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
-import { shouldPresentWinnersCircleForLogin } from '@/services/winnersCircle';
-import { shouldPresentPayoutWinnerNotice } from '@/services/payouts';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
-import { useCompetitionRegion } from '@/state/competitionRegion';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { source: appDataSource } = useAppData();
-  const { competitionRegion } = useCompetitionRegion();
+  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { social } = useAppData();
   const {
     appleSignInAvailable,
     firebaseConfigured,
@@ -49,37 +46,26 @@ export default function SignInScreen() {
   const [submitting, setSubmitting] = useState(false);
   const completeSignIn = async (result: AuthSignInResult) => {
     if (!result.user.emailVerified) {
-      router.replace({ pathname: '/verify-email', params: { next: 'home' } });
+      router.replace({
+        pathname: '/verify-email',
+        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+      });
       return;
+    }
+    if (challengeInvite) {
+      await social.redeemContactInvitation(challengeInvite);
     }
     if (result.isNewUser) {
-      router.replace('/identity');
+      router.replace('/region');
       return;
     }
 
-    const [payoutClaim, settledCompetition] = await Promise.all([
-      appDataSource.getCurrentUserPayout(result.user.uid).catch(() => null),
-      appDataSource.getSettledCompetition().catch(() => null)
-    ]);
-    const showPayoutWinner = await shouldPresentPayoutWinnerNotice(
-      result.user.uid,
-      payoutClaim
-    );
-    if (showPayoutWinner) {
-      router.replace('/payout-winner');
+    if (challengeInvite) {
+      router.replace('/squad/social');
       return;
     }
 
-    const showWinnersCircle = await shouldPresentWinnersCircleForLogin(
-      result.user.uid,
-      competitionRegion.timeZone,
-      settledCompetition !== null
-    );
-    router.replace(
-      showWinnersCircle
-        ? { pathname: '/winners-circle', params: { auto: '1' } }
-        : '/home'
-    );
+    router.replace('/home?resume=1');
   };
   const {
     busyProvider,
@@ -89,6 +75,7 @@ export default function SignInScreen() {
   } = useSocialAuthFlow(completeSignIn);
   const busy = submitting || Boolean(busyProvider);
   const hasSocialProviders = appleSignInAvailable || googleSignInAvailable;
+  const emailSignInReady = email.trim().length > 0 && password.length > 0;
 
   async function submitEmailSignIn() {
     const nextErrors = validateSignInForm(email, password);
@@ -123,35 +110,21 @@ export default function SignInScreen() {
       return;
     }
     if (!user.emailVerified) {
-      router.replace('/verify-email');
+      router.replace({
+        pathname: '/verify-email',
+        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+      });
       return;
     }
 
     setSubmitting(true);
     try {
-      const [payoutClaim, settledCompetition] = await Promise.all([
-        appDataSource.getCurrentUserPayout(user.uid).catch(() => null),
-        appDataSource.getSettledCompetition().catch(() => null)
-      ]);
-      const showPayoutWinner = await shouldPresentPayoutWinnerNotice(
-        user.uid,
-        payoutClaim
-      );
-      if (showPayoutWinner) {
-        router.replace('/payout-winner');
+      if (challengeInvite) {
+        await social.redeemContactInvitation(challengeInvite);
+        router.replace('/squad/social');
         return;
       }
-
-      const showWinnersCircle = await shouldPresentWinnersCircleForLogin(
-        user.uid,
-        competitionRegion.timeZone,
-        settledCompetition !== null
-      );
-      router.replace(
-        showWinnersCircle
-          ? { pathname: '/winners-circle', params: { auto: '1' } }
-          : '/home'
-      );
+      router.replace('/home?resume=1');
     } finally {
       setSubmitting(false);
     }
@@ -159,7 +132,7 @@ export default function SignInScreen() {
 
   return (
     <AuthScreenShell
-      description="Return to your commitment, verified workout history and active prize draw entries."
+      description="Return to your Weekly Goal, verified workouts and prize draw entries."
       eyebrow="SECURE ACCESS"
       onBack={() => router.replace('/join')}
       title="WELCOME BACK"
@@ -199,7 +172,7 @@ export default function SignInScreen() {
               />
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Continuing with Google or Apple creates an account when one does not
-                exist and confirms acceptance of the current Privacy Policy and Terms.
+                exist. New players review the account agreements during setup.
               </TerminalText>
               <LegalDocumentLinks />
 
@@ -220,7 +193,11 @@ export default function SignInScreen() {
               error={errors.email}
               keyboardType="email-address"
               label="EMAIL"
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setErrors((current) => ({ ...current, email: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="you@example.com"
               returnKeyType="next"
               textContentType="emailAddress"
@@ -231,7 +208,11 @@ export default function SignInScreen() {
               autoComplete="current-password"
               error={errors.password}
               label="PASSWORD"
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: undefined }));
+                setFormError(undefined);
+              }}
               placeholder="Your password"
               secureTextEntry
               textContentType="password"
@@ -239,8 +220,13 @@ export default function SignInScreen() {
             />
             {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
+            {!emailSignInReady ? (
+              <TerminalText tone="dim" uppercase={false} variant="caption">
+                Enter your email and password to continue.
+              </TerminalText>
+            ) : null}
             <CyberButtonPrimary
-              disabled={busy || !firebaseConfigured}
+              disabled={busy || !firebaseConfigured || !emailSignInReady}
               label={submitting ? 'SIGNING IN...' : 'SIGN IN ->'}
               onPress={submitEmailSignIn}
             />
@@ -254,7 +240,7 @@ export default function SignInScreen() {
           <CyberButtonOutline
             disabled={busy}
             label="CREATE A NEW ACCOUNT"
-            onPress={() => router.replace('/')}
+            onPress={() => router.replace('/sign-up')}
           />
         </View>
       )}

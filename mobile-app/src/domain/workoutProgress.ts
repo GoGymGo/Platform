@@ -6,13 +6,19 @@ export type PersistedActiveWorkoutSession = {
   averageHeartRateBpm: number;
   dateKey: string;
   heartRateObservedSeconds: number;
+  heartRateSamplesSubmitted: number;
   heartRateTotalBpmSeconds: number;
   id: string;
   lastHeartRateSampleElapsedSeconds: number;
+  minimumSessionSeconds: number;
   midSessionCheckAtSeconds: number;
   midSessionCheckPrompted: boolean;
   midSessionCheckPromptedAt: string | null;
   midSessionVerified: boolean;
+  policyVersion: string;
+  presenceCheckRequired: boolean;
+  requiredHeartRateSamples: number;
+  serverManaged: true;
   startedAt: string;
   verificationMethod: WorkoutVerificationMethod;
 };
@@ -71,16 +77,20 @@ export type CalendarDay = {
 export type SessionCompletionStatus =
   | 'already-verified'
   | 'completed'
-  | 'heart-rate-target-not-met'
+  | 'heart-rate-evidence-not-met'
   | 'minimum-not-met'
   | 'missing-mid-session-check'
-  | 'no-active-session';
+  | 'no-active-session'
+  | 'pending-review'
+  | 'rejected';
 
 type SessionCompletionCandidate = {
-  averageHeartRateBpm: number;
   dateKey: string;
-  heartRateObservedSeconds: number;
+  heartRateSamplesSubmitted: number;
+  minimumSessionSeconds: number;
   midSessionVerified: boolean;
+  presenceCheckRequired: boolean;
+  requiredHeartRateSamples: number;
   startedAt: string;
   verificationMethod: WorkoutVerificationMethod;
 };
@@ -89,10 +99,6 @@ export const workoutRules = {
   defaultWeeklyGoal: 4,
   maximumManualDurationMinutes: 1440,
   midSessionCheckGraceSeconds: 120,
-  midSessionCheckEarliestSeconds: 600,
-  midSessionCheckLatestSeconds: 1200,
-  minimumAverageHeartRateBpm: 100,
-  minimumSessionSeconds: 1800,
   signupEntries: 1
 } as const;
 
@@ -138,12 +144,19 @@ function isActiveWorkoutSession(
     /^\d{4}-\d{2}-\d{2}$/.test(candidate.dateKey) &&
     typeof candidate.heartRateObservedSeconds === 'number' &&
     Number.isFinite(candidate.heartRateObservedSeconds) &&
+    typeof candidate.heartRateSamplesSubmitted === 'number' &&
+    Number.isInteger(candidate.heartRateSamplesSubmitted) &&
+    candidate.heartRateSamplesSubmitted >= 0 &&
     typeof candidate.heartRateTotalBpmSeconds === 'number' &&
     Number.isFinite(candidate.heartRateTotalBpmSeconds) &&
     typeof candidate.id === 'string' &&
     candidate.id.length > 0 &&
     typeof candidate.lastHeartRateSampleElapsedSeconds === 'number' &&
     Number.isFinite(candidate.lastHeartRateSampleElapsedSeconds) &&
+    typeof candidate.minimumSessionSeconds === 'number' &&
+    Number.isInteger(candidate.minimumSessionSeconds) &&
+    candidate.minimumSessionSeconds >= 600 &&
+    candidate.minimumSessionSeconds <= 14_400 &&
     typeof candidate.midSessionCheckAtSeconds === 'number' &&
     Number.isFinite(candidate.midSessionCheckAtSeconds) &&
     typeof candidate.midSessionCheckPrompted === 'boolean' &&
@@ -152,6 +165,14 @@ function isActiveWorkoutSession(
       Number.isFinite(Date.parse(promptedAt))
     )) &&
     typeof candidate.midSessionVerified === 'boolean' &&
+    typeof candidate.policyVersion === 'string' &&
+    candidate.policyVersion.length > 0 &&
+    typeof candidate.presenceCheckRequired === 'boolean' &&
+    typeof candidate.requiredHeartRateSamples === 'number' &&
+    Number.isInteger(candidate.requiredHeartRateSamples) &&
+    candidate.requiredHeartRateSamples >= 0 &&
+    candidate.requiredHeartRateSamples <= 10_000 &&
+    candidate.serverManaged === true &&
     Number.isFinite(startedAt) &&
     (candidate.verificationMethod === 'heartRate' ||
       candidate.verificationMethod === 'partnerGymQr')
@@ -174,16 +195,21 @@ export function getMidSessionGraceSecondsRemaining(
   return Math.max(0, workoutRules.midSessionCheckGraceSeconds - elapsedSeconds);
 }
 
-export function getRandomMidSessionCheckSecond(randomValue = Math.random()) {
+export function getRandomMidSessionCheckSecond(
+  minimumSessionSeconds: number,
+  randomValue = Math.random()
+) {
+  const safeMinimum = Number.isFinite(minimumSessionSeconds)
+    ? Math.max(600, Math.min(14_400, Math.round(minimumSessionSeconds)))
+    : 1800;
   const normalizedRandom = Number.isFinite(randomValue)
     ? Math.min(1, Math.max(0, randomValue))
     : 0.5;
-  const windowSeconds =
-    workoutRules.midSessionCheckLatestSeconds -
-    workoutRules.midSessionCheckEarliestSeconds;
+  const earliestSeconds = Math.floor(safeMinimum / 3);
+  const latestSeconds = Math.floor((safeMinimum * 2) / 3);
+  const windowSeconds = latestSeconds - earliestSeconds;
 
-  return workoutRules.midSessionCheckEarliestSeconds +
-    Math.round(windowSeconds * normalizedRandom);
+  return earliestSeconds + Math.round(windowSeconds * normalizedRandom);
 }
 
 export function getAverageHeartRateBpm(totalBpmSeconds: number, observedSeconds: number) {
@@ -288,42 +314,43 @@ export function calculateBestStreak(dateKeys: readonly string[]) {
 
 export function getSessionElapsedSeconds(
   startedAt: string,
-  referenceDate = new Date()
+  referenceDate = new Date(),
+  timeScale = 1
 ) {
   const elapsedMilliseconds = Math.max(
     0,
     referenceDate.getTime() - new Date(startedAt).getTime()
   );
 
-  return Math.floor(elapsedMilliseconds / 1000);
+  return Math.floor((elapsedMilliseconds / 1000) * Math.max(1, timeScale));
 }
 
 export function evaluateSessionCompletion(
   session: SessionCompletionCandidate | null,
   logs: readonly WorkoutLog[],
-  referenceDate = new Date()
+  referenceDate = new Date(),
+  timeScale = 1
 ): SessionCompletionStatus {
   if (!session) {
     return 'no-active-session';
   }
 
-  if (!session.midSessionVerified) {
+  if (session.presenceCheckRequired && !session.midSessionVerified) {
     return 'missing-mid-session-check';
   }
 
   if (
-    getSessionElapsedSeconds(session.startedAt, referenceDate) <
-    workoutRules.minimumSessionSeconds
+    getSessionElapsedSeconds(session.startedAt, referenceDate, timeScale) <
+    session.minimumSessionSeconds
   ) {
     return 'minimum-not-met';
   }
 
   if (
     session.verificationMethod === 'heartRate' &&
-    (session.heartRateObservedSeconds < workoutRules.minimumSessionSeconds ||
-      session.averageHeartRateBpm < workoutRules.minimumAverageHeartRateBpm)
+    session.heartRateSamplesSubmitted < session.requiredHeartRateSamples
   ) {
-    return 'heart-rate-target-not-met';
+    return 'heart-rate-evidence-not-met';
   }
 
   const alreadyVerifiedToday = logs.some(

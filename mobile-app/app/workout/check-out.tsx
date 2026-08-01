@@ -6,15 +6,18 @@ import {
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
 import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
-import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
+import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
+import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type CheckoutMetric = {
@@ -22,50 +25,76 @@ type CheckoutMetric = {
   value: string;
 };
 
+function formatClock(totalSeconds: number) {
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
 export default function CheckOutScreen() {
   const router = useRouter();
-  const { campaign } = useSponsorCampaign();
-  const sponsorConfirmed = campaign.status === 'approved';
   const { activeSession } = useWorkoutProgress();
   const {
     accepted: cameraConsentAccepted,
+    ready: cameraConsentReady,
     toggle: toggleCameraConsent
   } = useBiometricCameraConsent();
+  const { busy, message, verify } = usePresenceVerification();
   const elapsedSeconds = activeSession
-    ? getSessionElapsedSeconds(activeSession.startedAt, new Date())
+    ? getSessionElapsedSeconds(activeSession.startedAt, new Date(), sessionTimeScale)
     : 0;
   const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
     activeSession &&
-      activeSession.heartRateObservedSeconds >= workoutRules.minimumSessionSeconds &&
-      activeSession.averageHeartRateBpm >= workoutRules.minimumAverageHeartRateBpm
+      activeSession.heartRateSamplesSubmitted >=
+        activeSession.requiredHeartRateSamples
+  );
+  const presenceReady = Boolean(
+    activeSession &&
+      (!activeSession.presenceCheckRequired || activeSession.midSessionVerified)
   );
   const checkoutReady = Boolean(
-    activeSession?.midSessionVerified &&
-      elapsedSeconds >= workoutRules.minimumSessionSeconds &&
+    activeSession &&
+      presenceReady &&
+      elapsedSeconds >= activeSession.minimumSessionSeconds &&
       heartRateReady
   );
   const metrics: readonly CheckoutMetric[] = activeSession?.verificationMethod === 'heartRate'
     ? [
-        { label: 'DURATION', value: '30:00' },
+        {
+          label: 'DURATION',
+          value: formatClock(activeSession.minimumSessionSeconds)
+        },
         { label: 'AVG BPM', value: String(activeSession.averageHeartRateBpm) },
-        { label: 'TARGET', value: `${workoutRules.minimumAverageHeartRateBpm}+` }
+        {
+          label: 'SAMPLES',
+          value:
+            `${activeSession.heartRateSamplesSubmitted}/${activeSession.requiredHeartRateSamples}`
+        }
       ]
     : [
-        { label: 'DURATION', value: '30:00' },
-        { label: 'FACE CHECK', value: 'PASS' },
+        {
+          label: 'DURATION',
+          value: activeSession
+            ? formatClock(activeSession.minimumSessionSeconds)
+            : '--:--'
+        },
+        {
+          label: 'PRESENCE',
+          value: activeSession?.presenceCheckRequired ? 'PASS' : 'NOT REQUIRED'
+        },
         { label: 'GYM QR', value: 'READY' }
       ];
 
   if (!activeSession || !checkoutReady) {
     return (
       <SessionUnavailable
-        actionLabel={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START A SESSION ->'}
+        actionLabel={activeSession ? 'RETURN TO WORKOUT' : 'START A WORKOUT'}
         body={
           !activeSession
-            ? 'START A VERIFIED SESSION BEFORE OPENING CHECK-OUT.'
+            ? 'Start a verified session before opening check-out.'
             : activeSession.verificationMethod === 'heartRate' && !heartRateReady
-              ? `MAINTAIN AN AVERAGE OF AT LEAST ${workoutRules.minimumAverageHeartRateBpm} BPM ACROSS THE FULL 30-MINUTE SESSION.`
-              : 'THE 30-MINUTE MINIMUM AND AUTOMATIC FACE CHECK MUST BOTH PASS BEFORE CHECK-OUT.'
+              ? 'Wait for the required heart-rate evidence to finish uploading.'
+              : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before check-out.`
         }
         onAction={() => {
           if (activeSession) {
@@ -74,32 +103,25 @@ export default function CheckOutScreen() {
             router.replace('/session' as Href);
           }
         }}
-        title="CHECK-OUT LOCKED"
+        title="ACTION NEEDED"
       />
     );
   }
 
-  return (
-    <ScreenContainer contentStyle={styles.screen}>
-      <TerminalText glow style={styles.stepLabel} tone="cyan" variant="label">
-        CHECK-OUT // 3 OF 3
-      </TerminalText>
+  async function confirmPresence() {
+    if (!activeSession?.presenceCheckRequired || await verify()) {
+      router.push('/workout/complete');
+    }
+  }
 
-      <HUDBorderBox style={styles.sponsorCard} tone="muted">
-        <View style={[styles.sponsorMark, !sponsorConfirmed ? styles.sponsorMarkPending : null]}>
-          <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="title">
-            {campaign.sponsor.mark}
-          </TerminalText>
-        </View>
-        <View style={styles.sponsorCopy}>
-          <TerminalText tone="dim" variant="micro">
-            SESSION SPONSOR
-          </TerminalText>
-          <TerminalText style={styles.sponsorText} tone="text" variant="body">
-            {campaign.sponsor.shortName} FUNDS THIS REGIONAL CAMPAIGN.
-          </TerminalText>
-        </View>
-      </HUDBorderBox>
+  return (
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+      <WorkoutFlowProgress stage="complete" style={styles.workoutProgress} />
 
       <View style={styles.centerContent}>
         <HUDBorderBox glow style={styles.successMark} tone="green">
@@ -108,10 +130,10 @@ export default function CheckOutScreen() {
           </TerminalText>
         </HUDBorderBox>
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
-          30:00 COMPLETE
+          {formatClock(activeSession.minimumSessionSeconds)} COMPLETE
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          FINAL CHECKPOINT. LOCK THE SESSION.
+          VERIFY + FINISH
         </TerminalText>
 
         <View style={styles.metricRow}>
@@ -128,73 +150,53 @@ export default function CheckOutScreen() {
         </View>
       </View>
 
-      <BiometricCameraConsentBanner
-        checked={cameraConsentAccepted}
-        compact
-        onToggle={toggleCameraConsent}
-        style={styles.cameraConsent}
-      />
+      {activeSession.presenceCheckRequired ? (
+        <BiometricCameraConsentBanner
+          checked={cameraConsentAccepted}
+          compact
+          onToggle={toggleCameraConsent}
+          style={styles.cameraConsent}
+        />
+      ) : null}
 
       <CyberButtonPrimary
-        disabled
-        label="FINAL IDENTITY CHECK REQUIRED"
-        onPress={() => undefined}
+        disabled={
+          activeSession.presenceCheckRequired &&
+          (!cameraConsentReady || !cameraConsentAccepted || busy)
+        }
+        label={
+          activeSession.presenceCheckRequired
+            ? busy ? 'Checking device...' : 'Verify and finish'
+            : 'Finish session'
+        }
+        onPress={() => void confirmPresence()}
       />
-      <TerminalText style={styles.integrationNote} tone="amber" variant="caption">
-        COMPLETION WILL UNLOCK ONLY AFTER THE BACKEND ACCEPTS FINAL VERIFICATION EVIDENCE.
-      </TerminalText>
+      {message ? (
+        <TerminalText live="assertive" style={styles.statusMessage} tone="amber" uppercase={false} variant="caption">
+          {message}
+        </TerminalText>
+      ) : null}
 
       <CyberButtonOutline
         label="BACK"
         onPress={() => goBackOrReplace(router, '/workout/active')}
         style={styles.backButton}
       />
+      </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
     backgroundColor: colors.background
   },
-  stepLabel: {
-    marginBottom: 6,
-    fontFamily: fontFamilies.terminal,
-    textAlign: 'center'
-  },
-  sponsorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    marginTop: 14,
-    marginBottom: 20,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: 14
-  },
-  sponsorMark: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.sponsorBorder,
-    borderRadius: 9,
-    backgroundColor: colors.surfacePinkSoft
-  },
-  sponsorMarkPending: {
-    borderColor: colors.borderCyanSoft,
-    backgroundColor: colors.surfaceCyanGhost
-  },
-  sponsorCopy: {
-    flex: 1
-  },
-  sponsorText: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.terminal
+  workoutProgress: {
+    marginBottom: spacing.lg
   },
   centerContent: {
     flex: 1,
@@ -251,9 +253,8 @@ const styles = StyleSheet.create({
   cameraConsent: {
     marginBottom: spacing.md
   },
-  integrationNote: {
+  statusMessage: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
     textAlign: 'center'
-  },
+  }
 });

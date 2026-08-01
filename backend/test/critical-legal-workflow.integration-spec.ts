@@ -281,7 +281,12 @@ describeWithDatabase('critical account legal receipt workflow', () => {
             receipt_action: 'acknowledge',
           }),
         ]),
-        schemaVersion: 3,
+        schemaVersion: 7,
+        socialData: expect.objectContaining({
+          challengeMemberships: [],
+          friendRequests: [],
+          friendships: [],
+        }),
       }),
     );
   });

@@ -1,6 +1,11 @@
-import { LegalDocumentScreen } from '@/components/legal';
+import { ConnectedLegalDocumentScreen } from '@/components/connectedLegalDocumentScreen';
 import { termsOfService } from '@/constants/legal';
 
 export default function TermsOfServiceModal() {
-  return <LegalDocumentScreen document={termsOfService} />;
+  return (
+    <ConnectedLegalDocumentScreen
+      documentKey="terms_of_service"
+      fallback={termsOfService}
+    />
+  );
 }

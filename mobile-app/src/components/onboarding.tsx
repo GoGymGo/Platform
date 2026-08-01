@@ -1,16 +1,7 @@
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { TerminalText } from '@/components/cyber';
-import {
-  borders,
-  colors,
-  componentSizes,
-  cyberGlow,
-  fontFamilies,
-  interactionStates,
-  radii,
-  spacing
-} from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 
 type OnboardingHeaderProps = {
   label: string;
@@ -21,10 +12,20 @@ type OnboardingHeaderProps = {
 };
 
 type CompactTextButtonProps = {
+  disabled?: boolean;
   label: string;
   onPress: () => void;
-  tone?: 'cyan' | 'pink' | 'muted';
+  tone?: 'amber' | 'cyan' | 'pink' | 'muted';
 };
+
+type ScreenBackButtonProps = {
+  onPress: () => void;
+};
+
+const webFocusOutline = Platform.select({
+  web: { outlineColor: colors.cyan } as unknown as ViewStyle,
+  default: {}
+});
 
 export function OnboardingHeader({
   label,
@@ -42,16 +43,7 @@ export function OnboardingHeader({
     <View style={style}>
       <View style={styles.headerRow}>
         {onBack ? (
-          <Pressable
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-            onPress={onBack}
-            style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-          >
-            <TerminalText glow tone="cyan" variant="button">
-              {'<'}
-            </TerminalText>
-          </Pressable>
+          <ScreenBackButton onPress={onBack} />
         ) : (
           <View style={styles.backPlaceholder} />
         )}
@@ -63,11 +55,7 @@ export function OnboardingHeader({
         </TerminalText>
       </View>
       {progressWidth ? (
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={{ max: 100, min: 0, now: Math.max(0, Math.min(100, progress ?? 0)) }}
-          style={styles.progressTrack}
-        >
+        <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
       ) : null}
@@ -75,7 +63,23 @@ export function OnboardingHeader({
   );
 }
 
+export function ScreenBackButton({ onPress }: ScreenBackButtonProps) {
+  return (
+    <Pressable
+      accessibilityLabel="Back"
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
+    >
+      <TerminalText glow tone="cyan" variant="button">
+        {'<'}
+      </TerminalText>
+    </Pressable>
+  );
+}
+
 export function CompactTextButton({
+  disabled = false,
   label,
   onPress,
   tone = 'cyan'
@@ -85,10 +89,21 @@ export function CompactTextButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.textButton, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.textButton,
+        pressed ? styles.pressed : null,
+        disabled ? styles.disabled : null
+      ]}
     >
-      <TerminalText glow={tone !== 'muted'} tone={textTone} variant="button">
+      <TerminalText
+        glow={tone !== 'muted'}
+        tone={textTone}
+        uppercase={false}
+        variant="button"
+      >
         {label}
       </TerminalText>
     </Pressable>
@@ -97,24 +112,24 @@ export function CompactTextButton({
 
 const styles = StyleSheet.create({
   headerRow: {
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm
   },
   backButton: {
-    width: componentSizes.minimumTouchTarget,
-    height: componentSizes.minimumTouchTarget,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: borders.hairline,
-    borderColor: colors.borderInteractive,
+    borderWidth: 1,
+    borderColor: colors.borderCyanButton,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceInteractive,
-    ...interactionStates.webFocus
+    backgroundColor: colors.surfaceCyanGhost,
+    ...webFocusOutline
   },
   backPlaceholder: {
-    width: componentSizes.minimumTouchTarget
+    width: 44
   },
   stepText: {
     flex: 1,
@@ -138,13 +153,16 @@ const styles = StyleSheet.create({
     ...cyberGlow.cyan
   },
   textButton: {
-    minHeight: componentSizes.minimumTouchTarget,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    ...interactionStates.webFocus
+    ...webFocusOutline
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.7
+  },
+  disabled: {
+    opacity: 0.45
   }
 });

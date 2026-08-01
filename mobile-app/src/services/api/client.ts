@@ -113,6 +113,17 @@ function getApiErrorMessage(body: unknown, status: number) {
   ) {
     return body.message;
   }
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    'error' in body &&
+    typeof body.error === 'object' &&
+    body.error !== null &&
+    'message' in body.error &&
+    typeof body.error.message === 'string'
+  ) {
+    return body.error.message;
+  }
 
   return `GoGymGo API request failed with status ${status}.`;
 }

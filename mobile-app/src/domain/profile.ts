@@ -1,4 +1,4 @@
-export type IdentityMode = 'private' | 'alias' | 'real';
+export type IdentityMode = 'private' | 'alias' | 'real_name';
 
 export type PublicIdentity = {
   callsign: string;
@@ -6,17 +6,42 @@ export type PublicIdentity = {
   mode: IdentityMode;
 };
 
+export type AccountProfile = {
+  callsign: string;
+  publicIdentityMode: IdentityMode;
+  publicName: string | null;
+  screenName: string;
+};
+
+export type UpdateAccountProfileInput = {
+  publicIdentityMode: IdentityMode;
+  publicName: string | null;
+  screenName?: string;
+};
+
 export const defaultPublicIdentity: PublicIdentity = {
-  callsign: 'GHOST_RUNNER',
+  callsign: '',
   displayName: '',
   mode: 'private'
 };
 
-export function normalizePublicIdentity(identity: PublicIdentity): PublicIdentity {
-  const callsign = identity.callsign.trim() || defaultPublicIdentity.callsign;
+export function createPrivateIdentity(userId: string | null | undefined): PublicIdentity {
+  const suffix = (userId ?? '')
+    .replace(/[^a-z0-9]/gi, '')
+    .slice(-6)
+    .toUpperCase();
+  const callsign = suffix ? `PLAYER_${suffix}` : 'GOGYMGO_PLAYER';
 
   return {
     callsign,
+    displayName: '',
+    mode: 'private'
+  };
+}
+
+export function normalizePublicIdentity(identity: PublicIdentity): PublicIdentity {
+  return {
+    callsign: identity.callsign.trim(),
     displayName: identity.displayName.trim(),
     mode: identity.mode
   };
@@ -29,7 +54,20 @@ export function resolvePublicName(identity: PublicIdentity) {
     return normalized.displayName;
   }
 
-  return normalized.callsign;
+  return normalized.callsign || 'IDENTITY NOT SET';
+}
+
+export function publicIdentityFromAccountProfile(
+  profile: AccountProfile
+): PublicIdentity {
+  return normalizePublicIdentity({
+    callsign: profile.callsign,
+    displayName:
+      profile.publicIdentityMode === 'private'
+        ? ''
+        : profile.publicName ?? profile.screenName,
+    mode: profile.publicIdentityMode
+  });
 }
 
 export function getPublicInitials(publicName: string) {
@@ -61,7 +99,7 @@ export function parseStoredPublicIdentity(rawValue: string | null): PublicIdenti
     if (
       typeof callsign !== 'string' ||
       typeof displayName !== 'string' ||
-      (mode !== 'private' && mode !== 'alias' && mode !== 'real')
+      (mode !== 'private' && mode !== 'alias' && mode !== 'real_name')
     ) {
       return null;
     }

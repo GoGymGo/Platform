@@ -1,178 +1,274 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { InlineHelpButton } from '@/components/clarity';
+import { CompetitionHubNav } from '@/components/competitionHubNav';
 import { CompactTextButton } from '@/components/onboarding';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { colors, componentSizes, fontFamilies, fontSizes, interactionStates, spacing } from '@/constants/theme';
+import { RecoverableError } from '@/components/reliability';
+import { UserAlias } from '@/components/streakRewards';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
+import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import type { CategoryLeaderboardRow } from '@/data/appData';
-import { useCategoryLeaderboard } from '@/data/appDataHooks';
+import { useCategoryLeaderboard, useMyStreaks } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
+import { getCompetitionRankLabel } from '@/domain/competition';
+import { useScreenMemory } from '@/hooks/useScreenMemory';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
+import { recordFlowMetric } from '@/services/flowMetrics';
+import { useAuth } from '@/state/auth';
+import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useProfile } from '@/state/profile';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const goalCategories = [1, 2, 3, 4, 5, 6, 7] as const satisfies readonly GoalCategory[];
 
 export default function LeaderboardScreen() {
   const router = useRouter();
+  const { width: viewportWidth } = useWindowDimensions();
+  const compactRankings = viewportWidth < 360;
+  const { user } = useAuth();
+  const { competitionRegion } = useCompetitionRegion();
   const { publicName } = useProfile();
-  const { campaign, economics } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const {
     competition,
+    currentWeekVerified,
+    totalEntries,
     weeklyGoal
   } = useWorkoutProgress();
-  const [selectedGoal, setSelectedGoal] = useState<GoalCategory | null>(null);
-  const [showRankingRules, setShowRankingRules] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useScreenMemory<GoalCategory | null>(
+    'leaderboard:selected-goal',
+    null
+  );
+  const [showCategoryPicker, setShowCategoryPicker] = useScreenMemory(
+    'leaderboard:category-picker',
+    false
+  );
+  const [showRankingRules, setShowRankingRules] = useScreenMemory(
+    'leaderboard:ranking-rules',
+    false
+  );
   const displayedGoal = selectedGoal ?? (weeklyGoal as GoalCategory);
-  const { data: selectedLeaderboard, isPending: leaderboardPending } =
-    useCategoryLeaderboard(displayedGoal);
+  const selectedLeaderboardQuery = useCategoryLeaderboard(displayedGoal);
+  const {
+    data: selectedLeaderboard,
+    isPending: leaderboardPending
+  } = selectedLeaderboardQuery;
+  const { data: myGoalLeaderboard } =
+    useCategoryLeaderboard(weeklyGoal as GoalCategory);
+  const { data: streakSummary } = useMyStreaks();
   const competitionNotStarted = competition.phase === 'before-month';
   const hasSettledWeek = competition.periodResults.some((period) => period.status === 'settled');
   const categoryScore = competition.periodEntriesBeforePerfectMonth;
-  const sponsorConfirmed = campaign.status === 'approved';
   const standingsVisible = !competitionNotStarted;
+  const myRank = myGoalLeaderboard?.rows.find(
+    ({ alias }) => alias.toLowerCase() === publicName.toLowerCase()
+  )?.rank;
+  const currentRankLabel = getCompetitionRankLabel({
+    competitionNotStarted,
+    hasSettledWeek,
+    rank: myRank
+  });
+  const challengeStatus = competitionNotStarted
+    ? 'NOT STARTED'
+    : competition.phase === 'bonus-days'
+      ? 'COMPLETE'
+      : competition.currentPeriod?.availability === 'matched'
+        ? 'IN PROGRESS'
+        : 'PAIRING NEEDED';
 
   return (
     <ScreenContainer>
-      <SponsorBanner compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
+        memoryKey="leaderboard"
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
       >
         <View style={styles.header}>
-          <TerminalText glow tone="cyan" variant="label">
-            {campaign.region}{' // MONTHLY COMPETITION'}
-          </TerminalText>
+          <View style={styles.headerTopLine}>
+            <TerminalText glow tone="cyan" variant="label">
+              {competitionRegion.label}{' // MONTHLY COMPETITION'}
+            </TerminalText>
+            <InlineHelpButton
+              label="Open competition guide"
+              onPress={() => router.push('/how-it-works?from=leaderboard')}
+            />
+          </View>
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            REGIONAL RANKINGS
+            REGIONAL COMPETITION
           </TerminalText>
           <TerminalText style={styles.intro} tone="muted" uppercase={false} variant="body">
-            Category Score determines your rank. Prize Draw Entries determine
-            your odds of being paid.
+            Track your standing, Prize Draw Entries and Weekly Challenge.
           </TerminalText>
         </View>
+
+        <CompetitionHubNav active="rankings" style={styles.hubNav} />
 
         <HUDBorderBox glow style={styles.myStandingCard} tone="cyan">
           <View style={styles.standingHeader}>
             <View style={styles.standingIdentity}>
               <TerminalText tone="dim" variant="label">
-                YOUR STANDING
+                YOUR MONTH
               </TerminalText>
-              <TerminalText style={styles.myName} tone="text" uppercase={false} variant="body">
-                {publicName}
-              </TerminalText>
+              <UserAlias
+                alias={publicName}
+                streaks={streakSummary?.streaks}
+                textStyle={styles.myName}
+                uppercase={false}
+              />
             </View>
             <TerminalText glow tone="cyan" variant="label">
-              {weeklyGoal}-DAY CATEGORY
+              {weeklyGoal}-DAY GOAL GROUP
             </TerminalText>
           </View>
-          {competitionNotStarted ? (
-            <HUDBorderBox style={styles.standingPending} tone="muted">
-              <TerminalText glow tone="cyan" variant="label">
-                RANKINGS OPEN AFTER SCORING WEEK 1
+          <View style={styles.overviewGrid}>
+            <OverviewMetric
+              label="CURRENT RANK"
+              tone="cyan"
+              value={currentRankLabel}
+            />
+            <OverviewMetric
+              label="WEEKLY GOAL"
+              tone="green"
+              value={`${Math.min(currentWeekVerified, weeklyGoal)}/${weeklyGoal}`}
+            />
+            <OverviewMetric
+              label="PRIZE DRAW ENTRIES"
+              tone="pink"
+              value={String(totalEntries)}
+            />
+            <OverviewMetric
+              label="WEEKLY CHALLENGE"
+              tone={challengeStatus === 'PAIRING NEEDED' ? 'amber' : 'cyan'}
+              value={challengeStatus}
+            />
+          </View>
+          <TerminalText live="polite" tone="dim" uppercase={false} variant="caption">
+            {competitionNotStarted
+              ? 'Rankings begin after the first scoring week.'
+              : `Goal Score ${categoryScore} sets your rank after each completed week. Prize Draw Entries set your winning odds.`}
+          </TerminalText>
+          <CompactTextButton
+            label={showRankingRules ? 'Hide ranking details' : 'How ranking works'}
+            onPress={() => setShowRankingRules((current) => !current)}
+            tone={showRankingRules ? 'muted' : 'cyan'}
+          />
+          {showRankingRules ? (
+            <View style={styles.rankingRules}>
+              <TerminalText tone="muted" uppercase={false} variant="caption">
+                Goal Score includes each settled week&apos;s 1x, 2x or 3x Weekly
+                Challenge result. Equal scores are resolved by verified
+                competition days, then the published audited tie-break.
               </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="body">
-                Verified workouts currently build your personal workout history. Your
-                first category score appears after scoring week 1 settles.
-              </TerminalText>
-            </HUDBorderBox>
-          ) : (
-            <>
-              <View style={styles.standingMetrics}>
-                <View style={styles.standingMetric}>
-                  <TerminalText glow style={styles.standingValue} tone="cyan" variant="value">
-                    {hasSettledWeek ? 'SYNCING' : 'PENDING'}
-                  </TerminalText>
-                  <TerminalText tone="muted" variant="micro">
-                    CURRENT RANK
-                  </TerminalText>
-                </View>
-                <View style={styles.metricDivider} />
-                <View style={styles.standingMetric}>
-                  <TerminalText glow style={styles.standingValue} tone="cyan" variant="value">
-                    {categoryScore}
-                  </TerminalText>
-                  <TerminalText tone="muted" variant="micro">
-                    CATEGORY SCORE
-                  </TerminalText>
-                </View>
-              </View>
-              <TerminalText tone="dim" variant="caption">
-                {hasSettledWeek
-                  ? 'CURRENT CATEGORY RANK UPDATES AFTER EACH SCORING WEEK.'
-                  : 'YOUR FIRST RANK APPEARS WHEN THE CURRENT SCORING WEEK SETTLES.'}
-              </TerminalText>
-            </>
-          )}
+            </View>
+          ) : null}
         </HUDBorderBox>
 
         {standingsVisible ? <>
         <View style={styles.categorySection}>
-          <TerminalText glow tone="cyan" variant="label">
-            VIEW CATEGORY
-          </TerminalText>
-          <View accessibilityRole="radiogroup" style={styles.categorySelector}>
-            {goalCategories.map((goal) => {
-              const selected = goal === displayedGoal;
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showCategoryPicker }}
+            onPress={() => setShowCategoryPicker((current) => !current)}
+            style={({ pressed }) => [
+              styles.categoryPickerButton,
+              pressed ? styles.pressed : null
+            ]}
+          >
+            <View style={styles.categoryPickerCopy}>
+              <TerminalText tone="dim" variant="micro">
+                WEEKLY GOAL GROUP
+              </TerminalText>
+              <TerminalText glow tone="cyan" variant="body">
+                {displayedGoal}-DAY WEEKLY GOAL
+              </TerminalText>
+            </View>
+            <TerminalText glow tone="cyan" variant="micro">
+              {showCategoryPicker ? 'CLOSE' : 'CHANGE'}
+            </TerminalText>
+          </Pressable>
+          {showCategoryPicker ? (
+            <View accessibilityRole="radiogroup" style={styles.categorySelector}>
+              {goalCategories.map((goal) => {
+                const selected = goal === displayedGoal;
 
-              return (
-                <Pressable
-                  accessibilityLabel={`${goal}-day category`}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  key={goal}
-                  onPress={() => setSelectedGoal(goal)}
-                  style={({ pressed }) => [
-                    styles.categoryOption,
-                    selected ? styles.categoryOptionSelected : null,
-                    pressed ? styles.pressed : null
-                  ]}
-                >
-                  <TerminalText glow={selected} tone={selected ? 'cyan' : 'dim'} variant="button">
-                    {goal}
-                  </TerminalText>
-                </Pressable>
-              );
-            })}
-          </View>
+                return (
+                  <Pressable
+                    aria-checked={selected}
+                    accessibilityLabel={`${goal}-day Weekly Goal group`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    key={goal}
+                    onPress={() => {
+                      setSelectedGoal(goal);
+                      setShowCategoryPicker(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.categoryOption,
+                      selected ? styles.categoryOptionSelected : null,
+                      pressed ? styles.pressed : null
+                    ]}
+                  >
+                    <TerminalText glow={selected} tone={selected ? 'cyan' : 'dim'} variant="button">
+                      {goal}
+                    </TerminalText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
 
         <HUDBorderBox glow style={styles.topTenPanel} tone="cyan">
           <View style={styles.topTenHeader}>
             <View style={styles.topTenHeading}>
               <TerminalText glow tone="cyan" variant="label">
-                TOP 10{' // '}{displayedGoal}-DAY CATEGORY
+                TOP 10{' // '}{displayedGoal}-DAY GOAL
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                Top three finishers receive 3x, 2x and 1.5x entry boosts.
+                Top three finishers receive 3x, 2x and 1.5x Prize Draw Entry boosts.
               </TerminalText>
             </View>
             <TerminalText tone="dim" variant="micro">
-              CATEGORY SCORE
+              GOAL SCORE
             </TerminalText>
           </View>
 
           <View style={styles.topTenList}>
+            {selectedLeaderboardQuery.isError ? (
+              <RecoverableError
+                body="The current Goal group could not be loaded. Your saved goal and rank are unchanged."
+                onRetry={() => {
+                  void recordFlowMetric(user?.uid, 'flow-retry', 'leaderboard');
+                  void selectedLeaderboardQuery.refetch();
+                }}
+                retrying={selectedLeaderboardQuery.isFetching}
+                title="COULD NOT LOAD STANDINGS"
+              />
+            ) : null}
             {selectedLeaderboard?.rows.map((row) => (
               <LeaderboardResultRow
+                compact={compactRankings}
                 isCurrentUser={row.alias.toLowerCase() === publicName.toLowerCase()}
                 key={row.rank}
                 multiplier={row.rank <= 3
-                  ? campaign.economics.categoryPodiumMultipliers[row.rank as 1 | 2 | 3]
+                  ? podiumMultipliers[row.rank as 1 | 2 | 3]
                   : undefined}
                 row={row}
               />
             ))}
-            {!leaderboardPending && !selectedLeaderboard ? (
+            {!selectedLeaderboardQuery.isError && !leaderboardPending && !selectedLeaderboard ? (
               <HUDBorderBox style={styles.emptyStandings} tone="muted">
                 <TerminalText glow tone="amber" variant="label">
                   STANDINGS NOT AVAILABLE YET
@@ -184,70 +280,52 @@ export default function LeaderboardScreen() {
             ) : null}
           </View>
 
-          <CompactTextButton
-            label={showRankingRules ? 'HIDE RANKING RULES' : 'HOW RANKING WORKS'}
-            onPress={() => setShowRankingRules((current) => !current)}
-            tone={showRankingRules ? 'muted' : 'cyan'}
-          />
-
-          {showRankingRules ? (
-            <HUDBorderBox style={styles.rankingRules} tone="muted">
-              <TerminalText tone="muted" uppercase={false} variant="caption">
-                Category Score updates after each scoring week settles and includes
-                that week&apos;s 1x, 2x or 3x Period Match result.
-              </TerminalText>
-              <TerminalText tone="dim" uppercase={false} variant="caption">
-                Equal scores are resolved by verified competition days, then the
-                published audited tie-break.
-              </TerminalText>
-            </HUDBorderBox>
-          ) : null}
         </HUDBorderBox>
         </> : null}
 
-        <CyberButtonOutline
-          label="VIEW WINNERS CIRCLE ->"
-          onPress={() => router.push('/winners-circle')}
-          style={styles.winnersButton}
-        />
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/leaderboard/draw')}
-          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-        >
-          <HUDBorderBox glow={sponsorConfirmed} style={styles.drawCard} tone={sponsorConfirmed ? 'pink' : 'cyan'}>
-            <View style={styles.drawCopy}>
-              <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="micro">
-                PRIZE DRAW // 15% OF PLAYERS GET PAID
-              </TerminalText>
-              <TerminalText style={styles.drawTitle} tone="text" variant="body">
-                {sponsorConfirmed
-                  ? `${formatCampaignCurrency(economics.prizeDrawAmount)} PAYOUT POOL`
-                  : 'PRIZE DETAILS PUBLISHED SOON'}
-              </TerminalText>
-            </View>
-            <TerminalText glow tone={sponsorConfirmed ? 'pink' : 'cyan'} variant="button">
-              -&gt;
-            </TerminalText>
-          </HUDBorderBox>
-        </Pressable>
       </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
+function OverviewMetric({
+  label,
+  tone,
+  value
+}: {
+  label: string;
+  tone: 'amber' | 'cyan' | 'green' | 'pink';
+  value: string;
+}) {
+  return (
+    <View style={styles.overviewMetric}>
+      <TerminalText glow style={styles.overviewValue} tone={tone} variant="body">
+        {value}
+      </TerminalText>
+      <TerminalText tone="dim" variant="micro">
+        {label}
+      </TerminalText>
+    </View>
+  );
+}
+
 function LeaderboardResultRow({
+  compact,
   isCurrentUser,
   multiplier,
   row
 }: {
+  compact: boolean;
   isCurrentUser: boolean;
   multiplier?: number;
   row: CategoryLeaderboardRow;
 }) {
   return (
-    <View style={[styles.resultRow, isCurrentUser ? styles.currentUserRow : null]}>
+    <View style={[
+      styles.resultRow,
+      compact ? styles.resultRowCompact : null,
+      isCurrentUser ? styles.currentUserRow : null
+    ]}>
       <TerminalText
         glow={row.rank <= 3}
         style={styles.rankText}
@@ -257,9 +335,15 @@ function LeaderboardResultRow({
         {String(row.rank).padStart(2, '0')}
       </TerminalText>
       <View style={styles.resultCopy}>
-        <TerminalText style={styles.resultName} tone="text" variant="body">
-          {row.alias}
-        </TerminalText>
+        <UserAlias
+          alias={row.alias}
+          streaks={row.streaks}
+          style={[
+            styles.resultIdentity,
+            compact ? styles.resultIdentityCompact : null
+          ]}
+          textStyle={styles.resultName}
+        />
         {isCurrentUser ? (
           <TerminalText tone="cyan" variant="micro">
             YOU
@@ -285,12 +369,19 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
     gap: spacing.xs,
     marginBottom: spacing.lg
+  },
+  headerTopLine: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md
   },
   title: {
     fontFamily: fontFamilies.display,
@@ -319,31 +410,47 @@ const styles = StyleSheet.create({
   myName: {
     fontFamily: fontFamilies.display
   },
-  standingMetrics: {
+  overviewGrid: {
     flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: spacing.lg
+    flexWrap: 'wrap',
+    gap: spacing.sm
   },
-  standingPending: {
-    gap: spacing.sm,
-    padding: spacing.md
+  overviewMetric: {
+    width: '48%',
+    minHeight: 68,
+    justifyContent: 'center',
+    gap: 2,
+    padding: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderCyanSubtle
   },
-  standingMetric: {
-    flex: 1,
-    gap: 2
+  overviewValue: {
+    fontFamily: fontFamilies.display
   },
-  standingValue: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.valueLarge,
-    lineHeight: 36
-  },
-  metricDivider: {
-    width: 1,
-    backgroundColor: colors.divider
+  hubNav: {
+    marginBottom: spacing.lg
   },
   categorySection: {
     gap: spacing.sm,
     marginBottom: spacing.lg
+  },
+  categoryPickerButton: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderCyanButton,
+    borderRadius: 8,
+    backgroundColor: colors.panelAlpha70
+  },
+  categoryPickerCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2
   },
   categorySelector: {
     flexDirection: 'row',
@@ -352,7 +459,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderMuted,
     borderRadius: 8,
-    backgroundColor: colors.surfaceInteractive
+    backgroundColor: colors.panelAlpha70
   },
   categoryOption: {
     minWidth: 0,
@@ -360,8 +467,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 5,
-    ...interactionStates.webFocus
+    borderRadius: 5
   },
   categoryOptionSelected: {
     backgroundColor: colors.surfaceCyanActive
@@ -382,7 +488,7 @@ const styles = StyleSheet.create({
   },
   topTenList: {
     borderTopWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   emptyStandings: {
     gap: spacing.sm,
@@ -399,7 +505,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.xs,
     borderBottomWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
+  },
+  resultRowCompact: {
+    minHeight: 72
   },
   currentUserRow: {
     borderLeftWidth: 2,
@@ -415,7 +524,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flex: 1
   },
+  resultIdentity: {
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs
+  },
+  resultIdentityCompact: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2
+  },
   resultName: {
+    flexShrink: 1,
     fontFamily: fontFamilies.bodyStrong
   },
   multiplierBadge: {
@@ -434,14 +555,15 @@ const styles = StyleSheet.create({
   },
   rankingRules: {
     gap: spacing.sm,
-    padding: spacing.md
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderMuted
   },
   winnersButton: {
     marginTop: spacing.md
   },
   pressableCard: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   drawCard: {
     flexDirection: 'row',
@@ -461,6 +583,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

@@ -7,7 +7,6 @@ import {
 import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type {
-  CompetitionMode,
   CompetitionStatus,
   JsonObject,
 } from '../../database/database.types';
@@ -66,11 +65,7 @@ export class AdminCompetitionConfigurationService {
           input.regionPolicyId,
           input.monthKey,
         );
-        await this.assertRegionAndCurrency(
-          transaction,
-          input.regionPolicyId,
-          input.currency,
-        );
+        await this.assertRegionExists(transaction, input.regionPolicyId);
         const duplicate = await transaction
           .selectFrom('competitions')
           .select('id')
@@ -88,11 +83,9 @@ export class AdminCompetitionConfigurationService {
         const competition = await transaction
           .insertInto('competitions')
           .values({
-            currency: input.currency,
             ends_at: validated.schedule.endsAt,
             entrant_cap: input.entrantCap ?? null,
             minimum_entrants: input.minimumEntrants,
-            mode: input.mode ?? 'cash',
             month_key: input.monthKey,
             name: input.name.trim(),
             region_policy_id: input.regionPolicyId,
@@ -184,11 +177,7 @@ export class AdminCompetitionConfigurationService {
           input.regionPolicyId,
           input.monthKey,
         );
-        await this.assertRegionAndCurrency(
-          transaction,
-          input.regionPolicyId,
-          input.currency,
-        );
+        await this.assertRegionExists(transaction, input.regionPolicyId);
         const duplicate = await transaction
           .selectFrom('competitions')
           .select('id')
@@ -208,11 +197,9 @@ export class AdminCompetitionConfigurationService {
           .updateTable('competitions')
           .set({
             configuration_version: sql<number>`configuration_version + 1`,
-            currency: input.currency,
             ends_at: validated.schedule.endsAt,
             entrant_cap: input.entrantCap ?? null,
             minimum_entrants: input.minimumEntrants,
-            mode: input.mode ?? 'cash',
             month_key: input.monthKey,
             name: input.name.trim(),
             region_policy_id: input.regionPolicyId,
@@ -380,7 +367,7 @@ export class AdminCompetitionConfigurationService {
 
   private validateDraft(input: CreateCompetitionDraftDto) {
     const schedule = parseCompetitionSchedule(input);
-    const rules = parseAdminCompetitionRules(input.rules, input.mode ?? 'cash');
+    const rules = parseAdminCompetitionRules(input.rules);
     assertUniqueGoalBrackets(input.goalBrackets);
     if (
       input.entrantCap !== undefined &&
@@ -395,26 +382,19 @@ export class AdminCompetitionConfigurationService {
     return { rules, schedule };
   }
 
-  private async assertRegionAndCurrency(
+  private async assertRegionExists(
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
     regionPolicyId: string,
-    currency: string,
   ): Promise<void> {
     const region = await transaction
       .selectFrom('region_policies')
-      .select(['currency', 'id'])
+      .select('id')
       .where('id', '=', regionPolicyId)
       .executeTakeFirst();
     if (!region) {
       throw new NotFoundException({
         code: 'REGION_POLICY_NOT_FOUND',
         message: 'The region policy was not found.',
-      });
-    }
-    if (region.currency !== currency) {
-      throw new BadRequestException({
-        code: 'COMPETITION_CURRENCY_MISMATCH',
-        message: 'Competition currency must match the region policy.',
       });
     }
   }
@@ -434,7 +414,6 @@ export class AdminCompetitionConfigurationService {
     competition: {
       ends_at: Date;
       id: string;
-      mode: CompetitionMode;
       region_policy_id: string;
       registration_closes_at: Date;
       registration_opens_at: Date;
@@ -448,39 +427,41 @@ export class AdminCompetitionConfigurationService {
         message: 'Only a draft competition can be published.',
       });
     }
-    if (competition.mode === 'non_cash_demo') {
-      throw new ConflictException({
-        code: 'DEMO_COMPETITION_ADMIN_PUBLISH_DISABLED',
-        message:
-          'Non-cash demo competitions can only be activated by the guarded local foundation bootstrap.',
-      });
-    }
     const now = new Date();
-    if (
-      competition.registration_closes_at <= now ||
-      competition.starts_at <= now
-    ) {
+    if (competition.ends_at <= now) {
       throw new ConflictException({
         code: 'COMPETITION_PUBLISH_WINDOW_CLOSED',
-        message:
-          'Registration close and competition start must be future times.',
+        message: 'An ended competition cannot be published.',
       });
     }
-    const [region, bracket] = await Promise.all([
+    const [region, bracket, reward] = await Promise.all([
       transaction
         .selectFrom('region_policies')
-        .select([
-          'competition_enabled',
-          'payout_enabled',
-          'valid_from',
-          'valid_to',
-        ])
+        .select(['competition_enabled', 'valid_from', 'valid_to'])
         .where('id', '=', competition.region_policy_id)
         .executeTakeFirst(),
       transaction
         .selectFrom('competition_goal_brackets')
         .select('goal_days')
         .where('competition_id', '=', competition.id)
+        .executeTakeFirst(),
+      transaction
+        .selectFrom('reward_catalog_items')
+        .select('id')
+        .where('competition_id', '=', competition.id)
+        .where('status', '=', 'published')
+        .where((expression) =>
+          expression.or([
+            expression('available_from', 'is', null),
+            expression('available_from', '<=', competition.ends_at),
+          ]),
+        )
+        .where((expression) =>
+          expression.or([
+            expression('available_until', 'is', null),
+            expression('available_until', '>', competition.ends_at),
+          ]),
+        )
         .executeTakeFirst(),
     ]);
     if (!region) {
@@ -489,11 +470,10 @@ export class AdminCompetitionConfigurationService {
         message: 'The region policy was not found.',
       });
     }
-    if (!region.competition_enabled || !region.payout_enabled) {
+    if (!region.competition_enabled) {
       throw new ConflictException({
         code: 'REGION_NOT_ENABLED_FOR_COMPETITION',
-        message:
-          'Competition and payout operations must be enabled for the region.',
+        message: 'Competition operations must be enabled for the region.',
       });
     }
     if (
@@ -510,6 +490,13 @@ export class AdminCompetitionConfigurationService {
       throw new ConflictException({
         code: 'COMPETITION_GOAL_BRACKET_REQUIRED',
         message: 'At least one goal bracket is required before publishing.',
+      });
+    }
+    if (!reward) {
+      throw new ConflictException({
+        code: 'COMPETITION_REWARD_REQUIRED',
+        message:
+          'Publish at least one in-stock brand reward before publishing the competition.',
       });
     }
     return 'registration';
@@ -551,10 +538,8 @@ export class AdminCompetitionConfigurationService {
     version: number,
   ): JsonObject {
     return {
-      currency: input.currency,
       endsAt: input.endsAt,
       monthKey: input.monthKey,
-      mode: input.mode ?? 'cash',
       regionPolicyId: input.regionPolicyId,
       rulesVersion: input.rulesVersion,
       startsAt: input.startsAt,

@@ -5,7 +5,7 @@ export function createOpenApiDocument(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('GoGymGo API')
     .setDescription(
-      'Authoritative API for GoGymGo accounts, verified competition activity, ledgers, results, and payouts.',
+      'Authoritative API for GoGymGo accounts, verified competition activity, regional brand rewards, claims, and results.',
     )
     .setVersion('1.0.0')
     .addBearerAuth(
@@ -16,14 +16,6 @@ export function createOpenApiDocument(app: INestApplication) {
         description: 'Firebase ID token verified by the GoGymGo API.',
       },
       'firebase',
-    )
-    .addBasicAuth(
-      {
-        description: 'Dedicated credentials configured only for Hyperwallet.',
-        type: 'http',
-        scheme: 'basic',
-      },
-      'hyperwallet-webhook',
     )
     .build();
 

@@ -10,9 +10,10 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, interactionStates, spacing } from '@/constants/theme';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type RuleTone = 'cyan' | 'pink' | 'amber';
@@ -27,14 +28,14 @@ type CommitmentRule = {
 const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '01',
-    title: 'REGISTRATION WINDOW',
-    body: 'Advance registration opens during the calendar month before the competition. Late registration closes at 11:59 PM on day 6.',
+    title: 'JOIN WHILE PUBLISHED',
+    body: 'Once a regional competition is published, eligible players may join before it starts or at any time while it is active. Enrollment closes when the competition ends, reaches its entrant cap, or is cancelled.',
     tone: 'cyan'
   },
   {
     index: '02',
-    title: '100 PLAYERS TO LAUNCH',
-    body: 'At least 100 players across the region must register by day 1. A campaign may have a sponsor-advised player cap.',
+    title: 'REGIONAL MINIMUM TO LAUNCH',
+    body: 'The regional competition launches only after its published minimum number of eligible players registers.',
     tone: 'cyan'
   },
   {
@@ -52,31 +53,31 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '05',
     title: 'VERIFY SESSIONS',
-    body: 'Heart-rate device or Partner Gym QR sessions must include quick identity checks.',
+    body: 'Heart-rate device and Partner Gym QR sessions include quick device presence checks.',
     tone: 'cyan'
   },
   {
     index: '06',
     title: 'WEEKLY 2X BONUS',
-    body: 'If you and your Period Match both hit the Weekly Goal, you both earn the 2x Period Match Bonus for that scoring week.',
+    body: 'If you and your Weekly Challenge partner both hit the Weekly Goal, you both earn the 2x Weekly Challenge Bonus for that scoring week.',
     tone: 'cyan'
   },
   {
     index: '07',
     title: 'MAKE-UP 3X BONUS',
-    body: 'If your matched player misses, complete one extra verified workout before the scoring week closes to earn the 3x Period Match Bonus.',
+    body: 'If your Weekly Challenge partner misses, complete one extra verified workout before the scoring week closes to earn the 3x Weekly Challenge Bonus.',
     tone: 'pink'
   },
   {
     index: '08',
     title: 'NO EXTRA DAY EXCEPTION',
-    body: 'A seven-day player, or a late entrant who fills every day remaining in scoring week 1, receives 3x automatically if their matched player misses.',
+    body: 'A seven-day player, or a late entrant who fills every day remaining in scoring week 1, receives 3x automatically if their Weekly Challenge partner misses.',
     tone: 'amber'
   },
   {
     index: '09',
-    title: 'TOP THREE CATEGORY FINISHERS',
-    body: 'The Top Three Category Finishers multiply their actual four-week total after Period Match results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.',
+    title: 'TOP THREE GOAL-GROUP FINISHERS',
+    body: 'The top three finishers in each Weekly Goal group multiply their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.',
     tone: 'pink'
   },
   {
@@ -88,7 +89,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '11',
     title: 'PERFECT MONTH // FINAL 10X',
-    body: 'The Perfect Month 10x is applied last to the Period Match-adjusted, category-adjusted total plus all Bonus Day entries.',
+    body: 'The Perfect Month 10x is applied last to the Weekly Challenge-adjusted, goal-group-adjusted total plus all Bonus Day entries.',
     tone: 'pink'
   }
 ];
@@ -96,13 +97,22 @@ const commitmentRules: readonly CommitmentRule[] = [
 export default function CommitmentRulesModal() {
   const router = useRouter();
   const [expandedRuleIndex, setExpandedRuleIndex] = useState<string>('01');
-  const { campaign, economics, enrollment } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
   const { weeklyGoal } = useWorkoutProgress();
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const currentRules = commitmentRules.map((rule) =>
-    rule.index === '09'
+    rule.index === '02' && currentCompetition
       ? {
           ...rule,
-          body: `The Top Three Category Finishers receive ${campaign.economics.categoryPodiumMultipliers[1]}x, ${campaign.economics.categoryPodiumMultipliers[2]}x and ${campaign.economics.categoryPodiumMultipliers[3]}x multipliers on their actual four-week total after Period Match results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
+          body: `At least ${currentCompetition.minimumEntrants.toLocaleString()} eligible players across the region must register before this competition can launch.`,
+          title: `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS TO LAUNCH`
+        }
+      : rule.index === '09'
+      ? {
+          ...rule,
+          body: `The top three finishers in each Weekly Goal group receive ${podiumMultipliers[1]}x, ${podiumMultipliers[2]}x and ${podiumMultipliers[3]}x multipliers on their actual four-week total after Weekly Challenge results. Bonus Days 29-31 are added next, then Perfect Month 10x is applied last.`
         }
       : rule.index === '10'
         ? {
@@ -113,10 +123,10 @@ export default function CommitmentRulesModal() {
   );
 
   return (
-    <ScreenContainer contentStyle={styles.screen} surface="modal">
+    <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
         <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-          COMMITMENT RULES
+          WEEKLY GOAL RULES
         </TerminalText>
         <CyberButtonOutline
           label="CLOSE"
@@ -135,12 +145,27 @@ export default function CommitmentRulesModal() {
             LOCK YOUR{'\n'}MONTH CLEARLY.
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Your selection carries forward each month. Changes for the upcoming
-            month lock at 11:59:59 PM on the final day before the competition
-            month. Late registration ends at the conclusion of day 6, and
-            scoring starts on the registration day.
+            Choose any published Weekly Goal. If the competition has already
+            started, your eligible scoring begins when enrollment is confirmed.
+            Registration remains available until the competition ends, reaches
+            its entrant cap, or is cancelled.
           </TerminalText>
         </View>
+
+        <HUDBorderBox style={styles.atGlanceCard} tone="cyan">
+          <TerminalText glow tone="cyan" variant="label">
+            RULES AT A GLANCE
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            1. Choose a goal of 1-7 verified workout days per week.
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            2. Only one verified workout per calendar day counts.
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            3. Hit all four weekly goals to earn the Perfect Month bonus.
+          </TerminalText>
+        </HUDBorderBox>
 
         <View style={styles.rulesList}>
           {currentRules.map((rule) => (
@@ -155,26 +180,23 @@ export default function CommitmentRulesModal() {
 
         <HUDBorderBox glow style={styles.summaryCard} tone="cyan">
           <TerminalText style={styles.summaryLabel} tone="muted" variant="label">
-            CURRENT PRIZE DRAW
+            REGIONAL LAUNCH
           </TerminalText>
           <TerminalText glow style={styles.summaryValue} tone="cyan" variant="title">
-            {formatCampaignCurrency(economics.prizeDrawAmount)} - {economics.prizeDrawWinnerCount.toLocaleString()} PROJECTED WINNERS
+            {currentCompetition
+              ? `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS REQUIRED`
+              : 'REGIONAL MINIMUM PENDING'}
           </TerminalText>
           <TerminalText style={styles.summaryCopy} tone="muted" uppercase={false} variant="body">
-            Hit all four Weekly Goals to unlock Prize Draw Entries and apply
-            10x. Late registrants use a reduced goal based on days left in
-            scoring week 1. The Top Three Category Finishers receive an
-            additional month-end multiplier. The regional field requires{' '}
-            {enrollment.minimumEntrants} players to launch and keeps late
-            registration open through day 6
-            {enrollment.maximumEntrants === null
-              ? ' without a cap for this campaign.'
-              : ` unless the ${enrollment.maximumEntrants.toLocaleString()}-player sponsor cap is reached first.`}
+            Registration remains open until the published competition ends
+            {currentCompetition?.entrantCap == null
+              ? '.'
+              : ` or until the ${currentCompetition.entrantCap.toLocaleString()}-player cap is reached.`}
           </TerminalText>
         </HUDBorderBox>
 
         <CyberButtonPrimary
-          label="BACK TO COMMITMENT ->"
+          label="BACK TO WEEKLY GOAL ->"
           onPress={() => goBackOrReplace(router, '/commitment')}
         />
       </ScreenScrollView>
@@ -196,10 +218,7 @@ function RuleRow({
       accessibilityRole="button"
       accessibilityState={{ expanded }}
       onPress={onToggle}
-      style={({ pressed }) => [
-        styles.rulePressable,
-        pressed ? styles.rulePressed : null
-      ]}
+      style={({ pressed }) => pressed ? styles.rulePressed : null}
     >
       <HUDBorderBox glow={expanded && rule.tone === 'pink'} style={styles.ruleRow} tone={rule.tone}>
         <View style={styles.ruleIndexBox}>
@@ -230,7 +249,7 @@ function RuleRow({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',
@@ -241,7 +260,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.divider
+    borderBottomColor: colors.borderCyanSubtle
   },
   headerLabel: {
     flex: 1,
@@ -274,6 +293,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg
   },
+  atGlanceCard: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    padding: spacing.lg
+  },
   ruleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -289,7 +313,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderCyanMuted,
     borderRadius: 10,
-    backgroundColor: colors.surfaceOverlay
+    backgroundColor: colors.backgroundAlpha72
   },
   ruleCopy: {
     flex: 1
@@ -309,10 +333,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body
   },
   rulePressed: {
-    ...interactionStates.pressed
-  },
-  rulePressable: {
-    ...interactionStates.webFocus
+    opacity: 0.76
   },
   summaryCard: {
     marginBottom: spacing.xl,

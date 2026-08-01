@@ -19,7 +19,7 @@ External deletion happens before the local database transaction. Each external a
 
 The worker:
 
-- defers deletion while an active competition or non-final payout still requires the account, leaving access intact for operator review;
+- defers deletion while an active competition or open reward claim still requires the account, leaving access intact for operator review;
 - deletes the Firebase account, treating an already-absent user as success;
 - enumerates and deletes every active, pending, rejected, superseded, removed, or expired profile-media object that has not already been deleted, plus every previous privacy-export object;
 - removes push tokens and queued/sent notification records;
@@ -30,7 +30,7 @@ The worker:
 - clears privacy-request reasons and marks the account `deleted`;
 - records an immutable completion event without personal information.
 
-The database retains pseudonymized account legal receipt bundles, competition enrollments, rules acceptance facts, workout evidence, entry ledgers, draws, winnings, payout claims/payments, provider mappings, fraud evidence, and operator audit events. Legal receipts identify the exact document version, content digest, jurisdiction, locale, required action, and server acceptance time; they do not retain IP addresses or device fingerprints. These records protect competition integrity and meet financial, tax, fraud, dispute, and legal-hold obligations. Retention schedules and Hyperwallet subprocessor handling require legal approval; the deletion endpoint must not claim that legally retained records were erased.
+The database retains pseudonymized account legal receipt bundles, competition enrollments, rules acceptance facts, workout evidence, entry ledgers, draws, reward awards, fraud evidence, and operator audit events. Assigned coupon ciphertext is excluded from the user's export, and unassigned codes are never linked to user identity. Legal receipts identify the exact document version, content digest, jurisdiction, locale, required action, and server acceptance time; they do not retain IP addresses or device fingerprints. These records protect contest integrity and meet fraud, dispute, and legal-hold obligations. Retention schedules and brand fulfillment subprocessors require legal approval; the deletion endpoint must not claim that legally retained records were erased.
 
 ## Failure and incident behavior
 

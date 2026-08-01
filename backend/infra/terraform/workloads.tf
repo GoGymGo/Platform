@@ -211,8 +211,15 @@ resource "google_cloud_run_v2_job" "migration" {
 
       containers {
         image   = var.container_image
-        command = ["npm"]
-        args    = ["run", "migrate:deploy"]
+        command = ["node"]
+        args = [
+          "node_modules/node-pg-migrate/bin/node-pg-migrate.js",
+          "up",
+          "--migrations-dir",
+          "dist/migrations",
+          "--database-url-var",
+          "DATABASE_URL",
+        ]
 
         resources {
           limits = {

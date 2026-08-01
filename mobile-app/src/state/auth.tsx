@@ -32,6 +32,12 @@ import {
   socialProviderAvailability,
   type SocialUserCredential
 } from '@/services/auth/socialAuth';
+import { recordAccountLegalAcceptance } from '@/services/legalAcceptance';
+import { useAppTour } from '@/state/appTour';
+import {
+  appTourAuthToken,
+  appTourUser
+} from '@/testing/appTourData';
 
 export type AuthenticatedUser = {
   displayName: string | null;
@@ -68,6 +74,85 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const { active: appTourActive } = useAppTour();
+
+  return appTourActive
+    ? <AppTourAuthProvider>{children}</AppTourAuthProvider>
+    : <FirebaseAuthProvider>{children}</FirebaseAuthProvider>;
+}
+
+function AppTourAuthProvider({ children }: PropsWithChildren) {
+  const { scenario } = useAppTour();
+  const [syncedScenario, setSyncedScenario] = useState(scenario);
+  const [user, setUser] = useState<AuthenticatedUser | null>(
+    scenario === 'new-player' ? null : appTourUser
+  );
+
+  if (syncedScenario !== scenario) {
+    setSyncedScenario(scenario);
+    setUser((currentUser) =>
+      scenario === 'new-player'
+        ? null
+        : currentUser ?? appTourUser
+    );
+  }
+  const createAccount = useCallback(async (email: string) => {
+    const createdUser: AuthenticatedUser = {
+      ...appTourUser,
+      email,
+      emailVerified: false,
+      providerIds: ['password']
+    };
+    setUser(createdUser);
+    return {
+      isNewUser: true,
+      user: createdUser
+    } satisfies AuthSignInResult;
+  }, []);
+  const refreshUser = useCallback(async () => {
+    if (!user) {
+      return null;
+    }
+
+    const verifiedUser = {
+      ...user,
+      emailVerified: true
+    };
+    setUser(verifiedUser);
+    return verifiedUser;
+  }, [user]);
+  const signIn = useCallback(async () => {
+    setUser(appTourUser);
+    return {
+      isNewUser: false,
+      user: appTourUser
+    } satisfies AuthSignInResult;
+  }, []);
+  const signOutUser = useCallback(async () => {
+    setUser(null);
+  }, []);
+  const value: AuthContextValue = {
+    appleSignInAvailable: scenario !== 'new-player',
+    createAccount,
+    firebaseConfigured: true,
+    getIdToken: async () => appTourAuthToken,
+    googleSignInAvailable: scenario !== 'new-player',
+    loading: false,
+    missingConfiguration: [],
+    refreshUser,
+    resendVerificationEmail: async () => undefined,
+    sendPasswordReset: async () => undefined,
+    signInWithApple: signIn,
+    signInWithEmail: signIn,
+    signInWithGoogle: signIn,
+    signOutUser,
+    user
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function FirebaseAuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
 
@@ -96,6 +181,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void sendEmailVerification(credential.user).catch(() => {
       // The verification screen offers an explicit resend action.
     });
+    void recordAccountLegalAcceptance(credential.user.uid).catch(() => {
+      // Account creation must not fail after Firebase has already created the user.
+      // The production API will record the authoritative acceptance separately.
+    });
+
     const result = mapCredential(credential, true);
     setUser(result.user);
     return result;
@@ -115,6 +205,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signInWithGoogle = useCallback(async () => {
     const credential = await signInWithGoogleProvider(requireFirebaseAuth());
     const result = mapSocialCredential(credential);
+    if (result.isNewUser) {
+      void recordAccountLegalAcceptance(result.user.uid).catch(() => {
+        // The production API will retry the authoritative acceptance record.
+      });
+    }
     setUser(result.user);
     return result;
   }, []);
@@ -122,6 +217,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signInWithApple = useCallback(async () => {
     const credential = await signInWithAppleProvider(requireFirebaseAuth());
     const result = mapSocialCredential(credential);
+    if (result.isNewUser) {
+      void recordAccountLegalAcceptance(result.user.uid).catch(() => {
+        // The production API will retry the authoritative acceptance record.
+      });
+    }
     setUser(result.user);
     return result;
   }, []);
@@ -147,7 +247,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     await reload(currentUser);
-    await currentUser.getIdToken(true);
     const refreshedUser = mapFirebaseUser(currentUser);
     setUser(refreshedUser);
     return refreshedUser;

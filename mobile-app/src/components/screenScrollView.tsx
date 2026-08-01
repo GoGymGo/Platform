@@ -1,19 +1,46 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef } from 'react';
-import { ScrollView, type ScrollViewProps } from 'react-native';
+import {
+  ScrollView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewProps
+} from 'react-native';
 
-export function ScreenScrollView(props: ScrollViewProps) {
-  const scrollRef = useRef<ScrollView>(null);
+type ScreenScrollViewProps = ScrollViewProps & {
+  memoryKey?: string;
+};
 
-  useFocusEffect(
-    useCallback(() => {
-      const resetHandle = setTimeout(() => {
-        scrollRef.current?.scrollTo({ animated: false, y: 0 });
-      }, 0);
+const rememberedOffsets = new Map<string, number>();
 
-      return () => clearTimeout(resetHandle);
-    }, [])
+export function ScreenScrollView({
+  contentOffset,
+  memoryKey,
+  onScroll,
+  scrollEventThrottle,
+  ...props
+}: ScreenScrollViewProps) {
+  const rememberedOffset = memoryKey
+    ? rememberedOffsets.get(memoryKey) ?? 0
+    : 0;
+
+  const handleScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>
+  ) => {
+    if (memoryKey) {
+      rememberedOffsets.set(memoryKey, event.nativeEvent.contentOffset.y);
+    }
+    onScroll?.(event);
+  };
+
+  return (
+    <ScrollView
+      {...props}
+      contentOffset={contentOffset ?? (
+        memoryKey
+          ? { x: 0, y: rememberedOffset }
+          : undefined
+      )}
+      onScroll={memoryKey || onScroll ? handleScroll : undefined}
+      scrollEventThrottle={scrollEventThrottle ?? (memoryKey ? 16 : undefined)}
+    />
   );
-
-  return <ScrollView {...props} ref={scrollRef} />;
 }

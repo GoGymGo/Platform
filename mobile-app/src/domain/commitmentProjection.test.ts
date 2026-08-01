@@ -12,12 +12,7 @@ import {
 
 const settings: CampaignEconomicsSettings = {
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
-  creatorPayoutPerVerifiedUser: 0.05,
-  goGymGoPerVerifiedUser: 0.95,
-  prizeDrawPayoutExponent: 0.5,
-  prizeDrawPerVerifiedUser: 2,
-  prizeDrawWinnerRate: 0.15,
-  sponsorPerVerifiedUser: 3
+  rewardWinnerRate: 0.15
 };
 
 const monthCases = [
@@ -97,7 +92,7 @@ describe('month-aware commitment projections', () => {
             ) {
               for (const perfectMonthMultiplier of perfectMonthOptions) {
                 const expected =
-                  (matchSubtotal * categoryMultiplier + remainderDays * weeklyGoal) *
+                  (Math.floor(matchSubtotal * categoryMultiplier) + remainderDays * weeklyGoal) *
                   perfectMonthMultiplier;
                 const actual = calculateMonthAwareCommitmentWeight(
                   {

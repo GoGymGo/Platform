@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { createAppTourAccountReadinessRepository } from './appTourData';
+
+test('new-player App Tour starts onboarding without completed setup', async () => {
+  const account = createAppTourAccountReadinessRepository('new-player');
+
+  assert.equal(await account.getCurrentRegionVerification(), null);
+  assert.equal(await account.getCurrentEnrollment(), null);
+  assert.equal((await account.getLegalReceiptStatus()).complete, false);
+});
+
+test('new-player App Tour records each onboarding milestone in memory', async () => {
+  const account = createAppTourAccountReadinessRepository('new-player');
+  const verification = await account.createRegionVerification({
+    latitude: 43.6532,
+    longitude: -79.3832,
+    method: 'device_location'
+  });
+  const legalBundle = await account.getCurrentLegalDocuments('CA-ON', 'en');
+  const legalReceipt = await account.recordLegalReceipt(legalBundle);
+  const competition = await account.getCurrentCompetition(
+    '2026-08',
+    verification.regionCode
+  );
+
+  assert.equal(
+    (await account.getCurrentRegionVerification())?.id,
+    verification.id
+  );
+  assert.equal(legalReceipt.complete, true);
+  assert.ok(legalReceipt.receiptBundleId);
+  assert.deepEqual(
+    legalBundle.documents.map(({ documentKey }) => documentKey),
+    ['privacy_policy', 'terms_of_service']
+  );
+  assert.ok(competition);
+
+  const enrollment = await account.enrollInCompetition(competition.id, {
+    ageEligibilityAttested: true,
+    goalDays: 4,
+    legalReceiptBundleId: legalReceipt.receiptBundleId,
+    regionVerificationId: verification.id,
+    rulesAccepted: true
+  });
+
+  assert.equal(enrollment.goalDays, 4);
+  assert.equal((await account.getCurrentEnrollment())?.id, enrollment.id);
+});

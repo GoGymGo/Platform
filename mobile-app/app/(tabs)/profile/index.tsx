@@ -1,5 +1,5 @@
-import { type Href, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
@@ -12,22 +12,16 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { SponsorRail as SponsorBanner } from '@/components/sponsor';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
-import { colors, componentSizes, fontFamilies, interactionStates, spacing } from '@/constants/theme';
-import { useCurrentUserPayout } from '@/data/appDataHooks';
+import { UserAlias } from '@/components/streakRewards';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { useMyStreaks } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
+import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { useAuth } from '@/state/auth';
-import {
-  getVerificationPreference,
-  hasSubmittedCreatorApplication,
-  type VerificationPreference
-} from '@/state/onboardingPreferences';
 import { useProfile } from '@/state/profile';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
-import { useDemoEnrollment } from '@/state/demoEnrollment';
 
 type ProfileStat = {
   accent: 'cyan' | 'green' | 'pink';
@@ -44,74 +38,28 @@ type SettingsRow = {
 };
 
 type SettingsGroups = {
-  competition: readonly SettingsRow[];
+  preferences: readonly SettingsRow[];
   legal: readonly SettingsRow[];
-  partnerships: readonly SettingsRow[];
 };
 
 function getSettingsRows(
-  creatorApplicationSubmitted: boolean,
   verificationSourceLabel: string,
-  hasPayoutClaim: boolean
+  verificationSourceSaved: boolean
 ): SettingsGroups {
   return {
-    competition: [
+    preferences: [
       {
-        title: 'WORKOUT VERIFICATION',
+        title: 'WORKOUT DEVICE',
         subtitle: verificationSourceLabel,
-        status: 'DEFAULT',
+        status: verificationSourceSaved ? 'DEFAULT' : 'NOT SET',
         tone: 'muted',
         route: '/verification?source=profile' as Href
       },
       {
-        title: 'WORKOUT CALENDAR',
-        subtitle: 'VERIFIED DAYS, PERSONAL STREAKS AND WORKOUT LOGS',
-        tone: 'cyan',
-        route: '/calendar' as Href
-      },
-      {
-        title: 'HOW GOGYMGO WORKS',
-        subtitle: 'GOALS, PERIOD MATCHES AND PRIZE DRAW ENTRIES',
-        tone: 'cyan',
+        title: 'HOW THE COMPETITION WORKS',
+        subtitle: 'GOALS, ENTRIES, RANKINGS AND REWARDS',
+        tone: 'muted',
         route: '/how-it-works?from=profile' as Href
-      },
-      {
-        title: 'HYPERWALLET PAYOUT ACCOUNT',
-        subtitle: hasPayoutClaim
-          ? 'CONNECT A BANK ACCOUNT TO RECEIVE YOUR PRIZE'
-          : 'ONLY NEEDED IF YOU ARE SELECTED FOR A PAYOUT',
-        status: hasPayoutClaim ? 'ACTION REQUIRED' : 'NOT NEEDED',
-        tone: hasPayoutClaim ? 'green' : 'muted',
-        route: '/profile/payout' as Href
-      },
-    ],
-    partnerships: [
-      {
-        title: 'CREATOR WORKOUTS',
-        subtitle: 'FOLLOW A CREATOR OR START YOUR OWN WORKOUT',
-        tone: 'cyan',
-        route: '/workouts?source=profile'
-      },
-      {
-        title: 'APPLY AS A CREATOR',
-        subtitle: creatorApplicationSubmitted
-          ? 'CREATOR INTEREST RECORDED'
-          : 'SUBMIT LOCAL FOLLOW-ALONG WORKOUTS',
-        status: creatorApplicationSubmitted ? 'SUBMITTED' : undefined,
-        tone: creatorApplicationSubmitted ? 'green' : 'cyan',
-        route: '/creator/apply?source=profile' as Href
-      },
-      {
-        title: 'APPLY AS A SPONSOR',
-        subtitle: 'FUND A TARGETED REGIONAL CAMPAIGN',
-        tone: 'cyan',
-        route: '/sponsor/apply'
-      },
-      {
-        title: 'REGISTER A GYM',
-        subtitle: 'REQUEST A GOGYMGO QR CODE FOR YOUR LOCATION',
-        tone: 'cyan',
-        route: '/gym/register'
       }
     ],
     legal: [
@@ -123,15 +71,27 @@ function getSettingsRows(
       },
       {
         title: 'TERMS OF SERVICE',
-        subtitle: 'PRIZE DRAW RULES // VERIFICATION TERMS',
+        subtitle: 'ACCOUNT // VERIFICATION // SERVICE TERMS',
         tone: 'muted',
         route: '/terms-of-service' as Href
       },
       {
-        title: 'BIOMETRIC / CAMERA CONSENT',
-        subtitle: 'LOCAL CHECKS // NO IMAGERY STORED',
+        title: 'OFFICIAL CONTEST RULES',
+        subtitle: 'ELIGIBILITY // ENTRIES // DRAW // PRIZES',
         tone: 'muted',
-        route: '/biometric-camera-consent' as Href
+        route: '/official-rules' as Href
+      },
+      {
+        title: 'DEVICE PRESENCE / QR CAMERA CONSENT',
+        subtitle: 'LOCAL CHECKS // NO BIOMETRIC OR QR IMAGERY STORED',
+        tone: 'muted',
+        route: '/consent-settings' as Href
+      },
+      {
+        title: 'ACCOUNT DATA & DELETION',
+        subtitle: 'EXPORT DATA // REQUEST ACCOUNT DELETION',
+        tone: 'muted',
+        route: '/account-data' as Href
       }
     ]
   };
@@ -139,9 +99,10 @@ function getSettingsRows(
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
   const { signOutUser, user } = useAuth();
-  const { publicName, roles } = useProfile();
-  const { demoEnrollment } = useDemoEnrollment();
+  const { publicName } = useProfile();
+  const { data: streakSummary } = useMyStreaks();
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const publicInitials = getPublicInitials(publicName);
   const {
@@ -151,16 +112,13 @@ export default function ProfileScreen() {
     totalEntries,
     verifiedSessionCount
   } = useWorkoutProgress();
-  const [creatorApplicationSubmitted, setCreatorApplicationSubmitted] = useState(false);
-  const [verificationPreference, setVerificationPreference] =
-    useState<VerificationPreference>({
-      method: 'heartRate',
-      sourceKey: 'heartRateDevice',
-      sourceLabel: 'HEART-RATE DEVICE'
-    });
+  const { preference: verificationPreference, saved: verificationPreferenceSaved } =
+    useWorkoutVerificationPreference();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string>();
-  const [showPartnerTools, setShowPartnerTools] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [showCompetitionSettings, setShowCompetitionSettings] = useState(false);
+  const [showLegal, setShowLegal] = useState(false);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState<string>();
   const {
@@ -168,6 +126,7 @@ export default function ProfileScreen() {
     clearProfileImage,
     isPickingImage,
     profileImageMessage,
+    profileImageStatus,
     profileImageUri
   } = useProfileImagePicker();
   const profileStats: readonly ProfileStat[] = [
@@ -175,47 +134,15 @@ export default function ProfileScreen() {
     { value: String(verifiedSessionCount), label: 'VERIFIED', accent: 'green' },
     {
       value: String(totalEntries),
-      label: isDemoVerificationEnabled
-        ? demoEnrollment
-          ? 'DEMO ENROLLED // NO PRIZES'
-          : 'DEMO // NOT ENROLLED'
-        : 'PRIZE DRAW ENTRIES',
+      label: 'PRIZE DRAW ENTRIES',
       accent: 'pink'
     }
   ];
-  const { data: payoutClaim } = useCurrentUserPayout(user?.uid);
   const settingsGroups = getSettingsRows(
-    creatorApplicationSubmitted,
-    verificationPreference.sourceLabel,
-    Boolean(payoutClaim)
+    verificationPreferenceSaved ? verificationPreference.sourceLabel : 'CHOOSE AT FIRST WORKOUT',
+    verificationPreferenceSaved
   );
   const providerLabel = formatProviderLabel(user?.providerIds ?? []);
-  const isOperator = roles.some((role) =>
-    ['admin', 'fraud_operator', 'operator'].includes(role)
-  );
-
-  useEffect(() => {
-    let mounted = true;
-
-    if (!user) {
-      return () => {
-        mounted = false;
-      };
-    }
-
-    void Promise.all([
-      hasSubmittedCreatorApplication(user.uid),
-      getVerificationPreference(user.uid)
-    ]).then(([submitted, preference]) => {
-      if (mounted) {
-        setCreatorApplicationSubmitted(submitted);
-        setVerificationPreference(preference);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
 
   async function performSignOut() {
     setSigningOut(true);
@@ -250,7 +177,6 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -262,35 +188,89 @@ export default function ProfileScreen() {
             initials={publicInitials}
             showStatus={Boolean(user?.emailVerified)}
           />
-          <TerminalText glow style={styles.profileName} tone="cyan" variant="title">
-            {publicName}
-          </TerminalText>
-          <CompactTextButton
-            label="EDIT ALIAS"
-            onPress={() => router.push('/identity?source=profile' as Href)}
+          <UserAlias
+            alias={publicName}
+            glow
+            streaks={streakSummary?.streaks}
+            style={styles.profileAlias}
+            textStyle={styles.profileName}
+            tone="cyan"
+            variant="title"
           />
-          <View style={styles.profileImageActions}>
-            <CyberButtonOutline
-              disabled={isPickingImage}
-              label={isPickingImage ? 'PREPARING...' : profileImageUri ? 'CHANGE PICTURE' : 'ADD PICTURE'}
-              onPress={chooseProfileImage}
-              style={styles.profileImageButton}
-            />
-            {profileImageUri ? (
-              <CyberButtonOutline
-                label="REMOVE"
-                onPress={clearProfileImage}
-                style={styles.profileImageButton}
-                tone="red"
+          <CyberButtonOutline
+            label={showProfileEditor ? 'DONE EDITING' : 'EDIT PROFILE'}
+            onPress={() => setShowProfileEditor((current) => !current)}
+            style={styles.editProfileButton}
+          />
+          {showProfileEditor ? (
+            <View style={styles.profileEditor}>
+              <CompactTextButton
+                label="EDIT ALIAS"
+                onPress={() => router.push('/identity?source=profile' as Href)}
               />
-            ) : null}
-          </View>
-          {profileImageMessage ? (
-            <TerminalText style={styles.profileImageMessage} tone="muted" variant="caption">
+              <View style={styles.profileImageActions}>
+                <CyberButtonOutline
+                  disabled={isPickingImage}
+                  label={
+                    isPickingImage
+                      ? 'PREPARING...'
+                      : profileImageUri
+                        ? 'CHANGE PICTURE'
+                        : 'ADD PICTURE'
+                  }
+                  onPress={chooseProfileImage}
+                  style={styles.profileImageButton}
+                />
+                {profileImageUri ? (
+                  <CyberButtonOutline
+                    label="REMOVE"
+                    onPress={clearProfileImage}
+                    style={styles.profileImageButton}
+                    tone="red"
+                  />
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+          {showProfileEditor && profileImageMessage ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="muted"
+              variant="caption"
+            >
               {profileImageMessage}
             </TerminalText>
           ) : null}
+          {showProfileEditor && profileImageStatus === 'pending_review' ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="amber"
+              variant="caption"
+            >
+              PICTURE PENDING MODERATION
+            </TerminalText>
+          ) : null}
         </View>
+
+        {deviceSaved === '1' ? (
+          <HUDBorderBox style={styles.savedDeviceNotice} tone="green">
+            <View style={styles.savedDeviceCopy}>
+              <TerminalText glow live="polite" tone="green" variant="label">
+                WORKOUT DEVICE SAVED
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="caption">
+                This device will be selected automatically for your next workout.
+              </TerminalText>
+            </View>
+            <CompactTextButton
+              label="Dismiss"
+              onPress={() => router.replace('/profile')}
+              tone="muted"
+            />
+          </HUDBorderBox>
+        ) : null}
 
         <HUDBorderBox style={styles.accountCard} tone="cyan">
           <TerminalText tone="dim" variant="label">
@@ -299,7 +279,7 @@ export default function ProfileScreen() {
           <View style={styles.accountRow}>
             <View style={styles.profileImageCopy}>
               <TerminalText tone="text" uppercase={false} variant="body">
-                {user?.email ?? 'ACCOUNT EMAIL UNAVAILABLE'}
+                {user?.email ?? 'NO EMAIL ON FILE'}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
                 {user
@@ -321,12 +301,7 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           {profileStats.map((stat) => (
             <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
-              <TerminalText
-                glow
-                style={styles.statValue}
-                tone={stat.accent}
-                variant="value"
-              >
+              <TerminalText glow style={styles.statValue} tone={stat.accent} variant="value">
                 {stat.value}
               </TerminalText>
               <TerminalText style={styles.statLabel} tone="muted" variant="micro">
@@ -336,106 +311,125 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <HUDBorderBox style={styles.regionCard} tone="cyan">
-          <View style={styles.regionCopy}>
-            <TerminalText tone="dim" variant="label">
-              COMPETITION REGION
-            </TerminalText>
-            <TerminalText glow tone="cyan" variant="body">
-              {competitionRegion.label}
-            </TerminalText>
-            <TerminalText tone="amber" variant="caption">
-              {regionVerification
-                ? `SERVER REVIEW // ${regionVerification.status.toUpperCase()}`
-                : 'BC REGION SUBMISSION REQUIRED'}
-            </TerminalText>
-          </View>
-          <CyberButtonOutline
-            label={regionVerification?.status === 'approved' ? 'VIEW' : 'CHECK STATUS'}
-            onPress={() => router.push('/region?source=profile' as Href)}
-            style={styles.regionButton}
-          />
-        </HUDBorderBox>
+        <CyberButtonOutline
+          label="FRIENDS + INVITES ->"
+          onPress={() => router.push('/squad/social' as Href)}
+          style={styles.sectionToggle}
+        />
 
-        {isOperator ? (
-          <HUDBorderBox style={styles.regionCard} tone="green">
-            <View style={styles.regionCopy}>
-              <TerminalText tone="green" variant="label">
-                OPERATOR TOOLS
+        <CyberButtonOutline
+          label={showCompetitionSettings ? 'HIDE APP SETTINGS' : 'APP SETTINGS'}
+          onPress={() => setShowCompetitionSettings((current) => !current)}
+          style={styles.sectionToggle}
+        />
+        {showCompetitionSettings ? (
+          <>
+            <HUDBorderBox style={styles.regionCard} tone="cyan">
+              <View style={styles.regionCopy}>
+                <TerminalText tone="dim" variant="label">
+                  COMPETITION REGION
+                </TerminalText>
+                <TerminalText glow tone="cyan" variant="body">
+                  {competitionRegion.label}
+                </TerminalText>
+                <TerminalText
+                  tone={regionVerification?.status === 'verified' ? 'green' : 'amber'}
+                  variant="caption"
+                >
+                  {regionVerification
+                    ? regionVerification.status === 'verified'
+                      ? 'VERIFIED BY DEVICE LOCATION'
+                      : 'LOCATION RECHECK REQUIRED'
+                    : 'LOCATION VERIFICATION REQUIRED'}
+                </TerminalText>
+              </View>
+              <CyberButtonOutline
+                label="CHANGE"
+                onPress={() => router.push('/region?source=profile' as Href)}
+                style={styles.regionButton}
+              />
+            </HUDBorderBox>
+
+            <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
+              WORKOUT PREFERENCE
+            </TerminalText>
+            <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="muted">
+              {settingsGroups.preferences.map((row) => (
+                <SettingsItem key={row.title} row={row} />
+              ))}
+            </HUDBorderBox>
+
+            <Pressable
+              aria-checked={remindersEnabled}
+              aria-disabled={notificationBusy}
+              accessibilityHint="Turn Weekly Goal, Weekly Challenge and Bonus Day alerts on or off"
+              accessibilityLabel="Competition reminders"
+              accessibilityRole="switch"
+              accessibilityState={{
+                checked: remindersEnabled,
+                disabled: notificationBusy
+              }}
+              disabled={notificationBusy}
+              onPress={() => void updateNotifications(!remindersEnabled)}
+              style={({ pressed }) => (pressed ? styles.pressed : null)}
+            >
+              <HUDBorderBox
+                glow={remindersEnabled}
+                style={styles.notificationCard}
+                tone={remindersEnabled ? 'cyan' : 'muted'}
+              >
+                <View style={styles.notificationCopy}>
+                  <TerminalText
+                    glow={remindersEnabled}
+                    tone={remindersEnabled ? 'cyan' : 'text'}
+                    variant="body"
+                  >
+                    COMPETITION REMINDERS
+                  </TerminalText>
+                  <TerminalText tone="muted" variant="caption">
+                    WEEKLY GOAL, WEEKLY CHALLENGE AND BONUS DAY ALERTS
+                  </TerminalText>
+                  <TerminalText tone={remindersEnabled ? 'green' : 'dim'} variant="micro">
+                    {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
+                  </TerminalText>
+                </View>
+                <Switch
+                  accessible={false}
+                  pointerEvents="none"
+                  thumbColor={remindersEnabled ? colors.cyan : colors.dim}
+                  trackColor={{
+                    false: colors.panelSoft,
+                    true: colors.surfaceCyanActive
+                  }}
+                  value={remindersEnabled}
+                />
+              </HUDBorderBox>
+            </Pressable>
+            {notificationMessage ? (
+              <TerminalText
+                live="assertive"
+                style={styles.notificationMessage}
+                tone="amber"
+                uppercase={false}
+                variant="caption"
+              >
+                {notificationMessage}
               </TerminalText>
-              <TerminalText tone="muted" variant="caption">
-                APPROVE OR REJECT PENDING BC DEMO REGION SUBMISSIONS
-              </TerminalText>
-            </View>
-            <CyberButtonOutline
-              label="OPEN QUEUE"
-              onPress={() => router.push('/profile/region-reviews' as Href)}
-              style={styles.regionButton}
-            />
-          </HUDBorderBox>
-        ) : null}
-
-        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
-          COMPETITION
-        </TerminalText>
-        <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="muted">
-          {settingsGroups.competition.map((row) => (
-            <SettingsItem key={row.title} row={row} />
-          ))}
-        </HUDBorderBox>
-
-        <HUDBorderBox
-          glow={remindersEnabled}
-          style={styles.notificationCard}
-          tone={remindersEnabled ? 'cyan' : 'muted'}
-        >
-          <View style={styles.notificationCopy}>
-            <TerminalText glow={remindersEnabled} tone={remindersEnabled ? 'cyan' : 'text'} variant="body">
-              COMPETITION REMINDERS
-            </TerminalText>
-            <TerminalText tone="muted" variant="caption">
-              WEEKLY GOAL, PERIOD MATCH AND BONUS DAY ALERTS
-            </TerminalText>
-            <TerminalText tone={remindersEnabled ? 'green' : 'dim'} variant="micro">
-              {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
-            </TerminalText>
-          </View>
-          <Switch
-            accessibilityLabel="Competition reminders"
-            disabled={notificationBusy}
-            onValueChange={(enabled) => void updateNotifications(enabled)}
-            thumbColor={remindersEnabled ? colors.cyan : colors.dim}
-            trackColor={{ false: colors.panelSoft, true: colors.surfaceCyanActive }}
-            value={remindersEnabled}
-          />
-        </HUDBorderBox>
-        {notificationMessage ? (
-          <TerminalText style={styles.notificationMessage} tone="amber" variant="caption">
-            {notificationMessage}
-          </TerminalText>
+            ) : null}
+          </>
         ) : null}
 
         <CyberButtonOutline
-          label={showPartnerTools ? 'HIDE PARTNER OPTIONS' : 'PARTNER WITH GOGYMGO'}
-          onPress={() => setShowPartnerTools((current) => !current)}
-          style={styles.partnerToggle}
+          label={showLegal ? 'HIDE LEGAL & PRIVACY' : 'LEGAL & PRIVACY'}
+          onPress={() => setShowLegal((current) => !current)}
         />
-        {showPartnerTools ? (
-          <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="cyan">
-            {settingsGroups.partnerships.map((row) => (
+        {showLegal ? (
+          <HUDBorderBox style={[styles.settingsCard, styles.legalCard]} tone="muted">
+            {settingsGroups.legal.map((row) => (
               <SettingsItem key={row.title} row={row} />
             ))}
           </HUDBorderBox>
         ) : null}
-
-        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
-          LEGAL + PRIVACY
-        </TerminalText>
-        <HUDBorderBox style={styles.settingsCard} tone="muted">
-          {settingsGroups.legal.map((row) => (
-            <SettingsItem key={row.title} row={row} />
-          ))}
-        </HUDBorderBox>
 
         {signOutError ? <AuthStatusNotice message={signOutError} tone="red" /> : null}
         <CyberButtonOutline
@@ -481,10 +475,7 @@ function SettingsItem({ row }: { row: SettingsRow }) {
           router.push(row.route);
         }
       }}
-      style={({ pressed }) => [
-        styles.settingsRow,
-        pressed && isPressable ? styles.pressed : null
-      ]}
+      style={({ pressed }) => [styles.settingsRow, pressed && isPressable ? styles.pressed : null]}
     >
       <View style={styles.settingsCopy}>
         <TerminalText style={styles.settingsTitle} tone="text" variant="body">
@@ -514,16 +505,43 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
+  },
+  sectionToggle: {
+    marginBottom: spacing.md
   },
   profileHeader: {
     alignItems: 'center',
     marginBottom: 22
   },
   profileName: {
-    marginTop: spacing.md,
     fontFamily: fontFamilies.display
+  },
+  profileAlias: {
+    justifyContent: 'center',
+    marginTop: spacing.md
+  },
+  editProfileButton: {
+    width: '100%',
+    marginTop: spacing.md
+  },
+  profileEditor: {
+    width: '100%',
+    alignItems: 'stretch',
+    marginTop: spacing.sm
+  },
+  savedDeviceNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.md
+  },
+  savedDeviceCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: spacing.xs
   },
   accountCard: {
     gap: spacing.sm,
@@ -598,8 +616,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginLeft: spacing.xs
   },
-  partnerToggle: {
-    marginBottom: spacing.lg
+  legalCard: {
+    marginTop: spacing.sm
   },
   notificationCard: {
     flexDirection: 'row',
@@ -624,8 +642,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.whiteAlpha05,
-    ...interactionStates.webFocus
+    borderBottomColor: colors.whiteAlpha05
   },
   settingsCopy: {
     flex: 1
@@ -643,6 +660,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

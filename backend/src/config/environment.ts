@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Buffer } from 'node:buffer';
 
 const booleanString = z
   .enum(['true', 'false'])
@@ -68,17 +69,8 @@ export const environmentSchema = z
     OTEL_ENABLED: booleanString.default(false),
     OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
     OTEL_SERVICE_NAME: optionalTrimmedString,
-    AUTH_MODE: z.enum(['firebase', 'test']).default('firebase'),
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
-    DEMO_VERIFICATION_ENABLED: booleanString.default(false),
-    DEMO_VERIFICATION_REGION_CODE: z.literal('CA-BC').default('CA-BC'),
-    DEMO_VERIFICATION_TTL_SECONDS: z.coerce
-      .number()
-      .int()
-      .min(60)
-      .max(900)
-      .default(300),
     DATABASE_URL: z
       .string()
       .url()
@@ -131,41 +123,9 @@ export const environmentSchema = z
       .url()
       .default('https://exp.host/--/api/v2/push/send'),
     EXPO_PUSH_ACCESS_TOKEN: optionalTrimmedString,
-    HYPERWALLET_ENABLED: booleanString.default(false),
-    HYPERWALLET_API_URL: z
-      .string()
-      .url()
-      .default('https://uat-api.paylution.com/rest/v4'),
-    HYPERWALLET_PORTAL_URL: optionalUrl,
-    HYPERWALLET_PROGRAM_TOKEN: optionalTrimmedString,
-    HYPERWALLET_USERNAME: optionalTrimmedString,
-    HYPERWALLET_PASSWORD: optionalTrimmedString,
-    HYPERWALLET_WEBHOOK_USERNAME: optionalTrimmedString,
-    HYPERWALLET_WEBHOOK_PASSWORD: optionalTrimmedString,
+    REWARD_CODE_ENCRYPTION_KEY: optionalTrimmedString,
   })
   .superRefine((environment, context) => {
-    if (
-      environment.NODE_ENV === 'production' &&
-      environment.DEMO_VERIFICATION_ENABLED
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'DEMO_VERIFICATION_ENABLED cannot be true in production.',
-        path: ['DEMO_VERIFICATION_ENABLED'],
-      });
-    }
-
-    if (
-      environment.NODE_ENV === 'production' &&
-      environment.AUTH_MODE !== 'firebase'
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'AUTH_MODE must be firebase in production.',
-        path: ['AUTH_MODE'],
-      });
-    }
-
     if (
       environment.NODE_ENV === 'production' &&
       !environment.FIREBASE_PROJECT_ID
@@ -177,37 +137,102 @@ export const environmentSchema = z
       });
     }
 
-    if (environment.HYPERWALLET_ENABLED) {
-      const requiredKeys = [
-        'HYPERWALLET_PORTAL_URL',
-        'HYPERWALLET_PROGRAM_TOKEN',
-        'HYPERWALLET_USERNAME',
-        'HYPERWALLET_PASSWORD',
-      ] as const;
-
-      for (const key of requiredKeys) {
-        if (!environment[key]) {
-          context.addIssue({
-            code: 'custom',
-            message: `${key} is required when HYPERWALLET_ENABLED is true.`,
-            path: [key],
-          });
-        }
+    if (environment.NODE_ENV === 'production') {
+      const databaseHost = new URL(environment.DATABASE_URL).hostname
+        .trim()
+        .toLowerCase();
+      if (
+        databaseHost === 'localhost' ||
+        databaseHost === '127.0.0.1' ||
+        databaseHost === '::1'
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'DATABASE_URL must not use a loopback host in production.',
+          path: ['DATABASE_URL'],
+        });
       }
 
-      if (environment.RUNTIME_ROLE === 'api') {
-        for (const key of [
-          'HYPERWALLET_WEBHOOK_USERNAME',
-          'HYPERWALLET_WEBHOOK_PASSWORD',
-        ] as const) {
-          if (!environment[key]) {
-            context.addIssue({
-              code: 'custom',
-              message: `${key} is required by the API when HYPERWALLET_ENABLED is true.`,
-              path: [key],
-            });
-          }
-        }
+      const corsOrigins = environment.CORS_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+      if (
+        corsOrigins.some(
+          (origin) => !/^https:\/\/[^/?#]+(?::\d+)?$/i.test(origin),
+        )
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'CORS_ORIGINS must contain only exact HTTPS origins in production.',
+          path: ['CORS_ORIGINS'],
+        });
+      }
+
+      if (environment.FIREBASE_AUTH_EMULATOR_HOST) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'FIREBASE_AUTH_EMULATOR_HOST must not be configured in production.',
+          path: ['FIREBASE_AUTH_EMULATOR_HOST'],
+        });
+      }
+      if (environment.OPENAPI_ENABLED) {
+        context.addIssue({
+          code: 'custom',
+          message: 'OPENAPI_ENABLED must be false in production.',
+          path: ['OPENAPI_ENABLED'],
+        });
+      }
+      if (environment.PRETTY_LOGS_ENABLED) {
+        context.addIssue({
+          code: 'custom',
+          message: 'PRETTY_LOGS_ENABLED must be false in production.',
+          path: ['PRETTY_LOGS_ENABLED'],
+        });
+      }
+      if (!environment.TRUST_PROXY) {
+        context.addIssue({
+          code: 'custom',
+          message: 'TRUST_PROXY must be true in production.',
+          path: ['TRUST_PROXY'],
+        });
+      }
+      if (!environment.REWARD_CODE_ENCRYPTION_KEY) {
+        context.addIssue({
+          code: 'custom',
+          message: 'REWARD_CODE_ENCRYPTION_KEY is required in production.',
+          path: ['REWARD_CODE_ENCRYPTION_KEY'],
+        });
+      }
+      if (!environment.EXPO_PUSH_API_URL.startsWith('https://')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'EXPO_PUSH_API_URL must use HTTPS in production.',
+          path: ['EXPO_PUSH_API_URL'],
+        });
+      }
+      if (
+        environment.OTEL_EXPORTER_OTLP_ENDPOINT &&
+        !environment.OTEL_EXPORTER_OTLP_ENDPOINT.startsWith('https://')
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'OTEL_EXPORTER_OTLP_ENDPOINT must use HTTPS in production.',
+          path: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+        });
+      }
+    }
+
+    if (environment.REWARD_CODE_ENCRYPTION_KEY) {
+      const key = Buffer.from(environment.REWARD_CODE_ENCRYPTION_KEY, 'base64');
+      if (key.length !== 32) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'REWARD_CODE_ENCRYPTION_KEY must be a base64-encoded 32-byte key.',
+          path: ['REWARD_CODE_ENCRYPTION_KEY'],
+        });
       }
     }
 
@@ -227,14 +252,6 @@ export const environmentSchema = z
     }
 
     if (environment.PRIVACY_OPERATIONS_ENABLED) {
-      if (environment.AUTH_MODE !== 'firebase') {
-        context.addIssue({
-          code: 'custom',
-          message:
-            'AUTH_MODE must be firebase when PRIVACY_OPERATIONS_ENABLED is true.',
-          path: ['AUTH_MODE'],
-        });
-      }
       for (const key of ['PRIVACY_EXPORT_BUCKET'] as const) {
         if (!environment[key]) {
           context.addIssue({

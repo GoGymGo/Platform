@@ -5,9 +5,9 @@ import type { CompetitionRules } from '../competitions/competition-rules';
 
 export const sessionEvidenceCategories = [
   'deviceAttestation',
-  'faceCheck',
   'gymQr',
   'heartRate',
+  'presenceCheck',
 ] as const;
 
 export type SessionEvidenceCategory =
@@ -22,7 +22,11 @@ export type SessionEvidenceFindings = Record<
 export interface SessionEvidenceEventSource {
   clientEventId: string;
   eventType:
-    'device_attestation' | 'face_check' | 'gym_qr_scan' | 'heart_rate_sample';
+    | 'device_attestation'
+    | 'face_check'
+    | 'gym_qr_scan'
+    | 'heart_rate_sample'
+    | 'presence_check';
   id: string;
   occurredAt: Date;
   payload: JsonValue;
@@ -57,9 +61,6 @@ export interface SessionEvidenceReview {
     deviceAttestation: SessionEvidenceCategoryReview & {
       uniqueTokenCount: number;
     };
-    faceCheck: SessionEvidenceCategoryReview & {
-      maximumConfidence: number | null;
-    };
     gymQr: SessionEvidenceCategoryReview & {
       uniquePayloadCount: number;
     };
@@ -68,6 +69,7 @@ export interface SessionEvidenceReview {
       maximumBpm: number | null;
       minimumBpm: number | null;
     };
+    presenceCheck: SessionEvidenceCategoryReview;
   };
   evidenceSnapshotSha256: string;
   limitations: string[];
@@ -97,10 +99,9 @@ export function buildSessionEvidenceReview(
     'heart_rate_sample',
     'heartRateBpm',
   );
-  const faceConfidences = numericPayloadValues(
-    orderedEvents,
-    'face_check',
-    'faceMatchConfidence',
+  const presenceEvents = orderedEvents.filter(
+    (event) =>
+      event.eventType === 'presence_check' || event.eventType === 'face_check',
   );
   const qrEvents = orderedEvents.filter(
     (event) => event.eventType === 'gym_qr_scan',
@@ -146,15 +147,6 @@ export function buildSessionEvidenceReview(
         uniqueTokenCount: uniqueStringPayloadValues(deviceEvents, 'tokenHash')
           .length,
       },
-      faceCheck: {
-        count: faceConfidences.length,
-        maximumConfidence: maximum(faceConfidences),
-        minimumRequiredCount: source.rules.requireFaceCheck ? 1 : 0,
-        required: source.rules.requireFaceCheck,
-        trustStates: trustStates(
-          orderedEvents.filter((event) => event.eventType === 'face_check'),
-        ),
-      },
       gymQr: {
         count: qrEvents.length,
         minimumRequiredCount: source.rules.requireGymQr ? 1 : 0,
@@ -181,6 +173,12 @@ export function buildSessionEvidenceReview(
             (event) => event.eventType === 'heart_rate_sample',
           ),
         ),
+      },
+      presenceCheck: {
+        count: presenceEvents.length,
+        minimumRequiredCount: source.rules.requirePresenceCheck ? 1 : 0,
+        required: source.rules.requirePresenceCheck,
+        trustStates: trustStates(presenceEvents),
       },
     },
     evidenceSnapshotSha256: createHash('sha256')

@@ -7,32 +7,33 @@ import {
   useState,
   type PropsWithChildren
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { AppState } from 'react-native';
 
 import {
-  defaultPublicIdentity,
+  createPrivateIdentity,
   normalizePublicIdentity,
   parseStoredPublicIdentity,
+  publicIdentityFromAccountProfile,
   resolvePublicName,
   type IdentityMode,
   type PublicIdentity
 } from '@/domain/profile';
+import { useAppData } from '@/data/appDataHooks';
+import type { AvatarMedia } from '@/domain/accountSettings';
 import { createUserStorage } from '@/services/storage/userStorage';
-import {
-  getAccountProfile,
-  toPublicIdentity,
-  updateAccountPublicIdentity
-} from '@/services/profile';
-import { useApi } from '@/state/api';
+import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
+import { appTourPublicIdentity } from '@/testing/appTourData';
 
 type ProfileContextValue = {
   hasPublicIdentity: boolean;
   identityMode: IdentityMode;
   profileImageUri: string | null;
+  profileImageStatus: AvatarMedia['status'] | 'local' | null;
   profileReady: boolean;
   publicIdentity: PublicIdentity;
   publicName: string;
-  roles: readonly string[];
   removeProfileImage: () => Promise<void>;
   setIdentityMode: (mode: IdentityMode) => Promise<void>;
   setProfileImage: (uri: string) => Promise<void>;
@@ -44,7 +45,9 @@ const publicIdentityStorageKey = '@gogymgo/public-identity';
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: PropsWithChildren) {
-  const { api } = useApi();
+  const queryClient = useQueryClient();
+  const { accountSettings, mode } = useAppData();
+  const { active: appTourActive } = useAppTour();
   const { loading: authLoading, user } = useAuth();
   const userId = user?.uid ?? null;
   const userStorage = useMemo(
@@ -52,13 +55,23 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     [userId]
   );
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
-  const [profileReady, setProfileReady] = useState(false);
-  const [publicIdentity, setPublicIdentityState] = useState<PublicIdentity>(defaultPublicIdentity);
-  const [hasPublicIdentity, setHasPublicIdentity] = useState(false);
-  const [roles, setRoles] = useState<readonly string[]>([]);
+  const [profileImageStatus, setProfileImageStatus] = useState<
+    AvatarMedia['status'] | 'local' | null
+  >(null);
+  const [profileReady, setProfileReady] = useState(appTourActive);
+  const [publicIdentity, setPublicIdentityState] = useState<PublicIdentity>(
+    appTourActive ? appTourPublicIdentity : createPrivateIdentity(userId)
+  );
+  const [hasPublicIdentity, setHasPublicIdentity] = useState(appTourActive);
 
   useEffect(() => {
     let active = true;
+
+    if (appTourActive) {
+      return () => {
+        active = false;
+      };
+    }
 
     if (authLoading) {
       return () => {
@@ -77,114 +90,222 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       };
     }
 
-    void (async () => {
-      let storedIdentity: PublicIdentity | null = null;
-
-      try {
-        const [storedImage, storedIdentityValue] = await Promise.all([
-          userStorage.getItem(profileImageStorageKey),
-          userStorage.getItem(publicIdentityStorageKey)
-        ]);
+    void Promise.all([
+      userStorage.getItem(profileImageStorageKey),
+      userStorage.getItem(publicIdentityStorageKey),
+      mode === 'api'
+        ? accountSettings.getAvatar().catch(() => null)
+        : Promise.resolve(null),
+      mode === 'api'
+        ? accountSettings.getProfile().catch(() => null)
+        : Promise.resolve(null)
+    ])
+      .then(([storedImage, storedIdentity, avatarState, accountProfile]) => {
         if (!active) {
           return;
         }
 
-        if (storedImage) {
-          setProfileImageUri(storedImage);
-        }
-
-        storedIdentity = parseStoredPublicIdentity(storedIdentityValue);
-        if (storedIdentity) {
-          setPublicIdentityState(storedIdentity);
-          setHasPublicIdentity(true);
-        }
-      } catch {
-        // Generated profile defaults remain available when storage cannot be read.
-      }
-
-      if (api && userId) {
-        try {
-          const serverProfile = await getAccountProfile(api);
-          const serverIdentity = toPublicIdentity(serverProfile);
-          if (!active) {
-            return;
-          }
-          setPublicIdentityState(serverIdentity);
-          setHasPublicIdentity(true);
-          setRoles(serverProfile.roles);
-          await userStorage.setItem(
-            publicIdentityStorageKey,
-            JSON.stringify(serverIdentity)
+        if (mode === 'api') {
+          setProfileImageUri(avatarState?.active?.readUrl ?? null);
+          setProfileImageStatus(
+            avatarState?.latest?.status ?? avatarState?.active?.status ?? null
           );
-        } catch {
-          // Authenticated server state wins when available; stored state remains the fallback.
+        } else if (storedImage) {
+          setProfileImageUri(storedImage);
+          setProfileImageStatus('local');
         }
-      }
 
-      if (active) {
-        setProfileReady(true);
-      }
-    })().catch(() => {
-      if (active) {
-        // A usable generated identity remains available after an unexpected load error.
-        setProfileReady(true);
-      }
-    });
+        const serverIdentity = accountProfile
+          ? publicIdentityFromAccountProfile(accountProfile)
+          : null;
+        const parsedIdentity = parseStoredPublicIdentity(storedIdentity);
+        const restoredIdentity = serverIdentity ?? parsedIdentity;
+        if (restoredIdentity) {
+          setPublicIdentityState(restoredIdentity);
+          setHasPublicIdentity(true);
+          if (serverIdentity) {
+            void userStorage.setItem(
+              publicIdentityStorageKey,
+              JSON.stringify(serverIdentity)
+            ).catch(() => {
+              // The server remains authoritative if the local cache cannot refresh.
+            });
+          }
+        }
+      })
+      .catch(() => {
+        // Generated profile defaults remain available when storage cannot be read.
+      })
+      .finally(() => {
+        if (active) {
+          setProfileReady(true);
+        }
+      });
 
     return () => {
       active = false;
     };
-  }, [api, authLoading, userId, userStorage]);
+  }, [accountSettings, appTourActive, authLoading, mode, userStorage]);
+
+  useEffect(() => {
+    if (appTourActive || authLoading || mode !== 'api' || !userId) {
+      return undefined;
+    }
+
+    let active = true;
+    const synchronize = () => {
+      void Promise.all([
+        accountSettings.getProfile(),
+        accountSettings.getAvatar().catch(() => null)
+      ])
+        .then(([profile, avatarState]) => {
+          if (!active) return;
+          const identity = publicIdentityFromAccountProfile(profile);
+          setPublicIdentityState(identity);
+          setHasPublicIdentity(true);
+          if (avatarState) {
+            setProfileImageUri(avatarState.active?.readUrl ?? null);
+            setProfileImageStatus(
+              avatarState.latest?.status ??
+              avatarState.active?.status ??
+              null
+            );
+          }
+          void userStorage?.setItem(
+            publicIdentityStorageKey,
+            JSON.stringify(identity)
+          ).catch(() => {
+            // The active server identity remains available in memory.
+          });
+        })
+        .catch(() => {
+          // Keep the last synchronized identity while the API is unreachable.
+        });
+    };
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'active') synchronize();
+    });
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [
+    accountSettings,
+    appTourActive,
+    authLoading,
+    mode,
+    userId,
+    userStorage
+  ]);
 
   const setProfileImage = useCallback(async (uri: string) => {
+    const previousImage = profileImageUri;
+    const previousStatus = profileImageStatus;
     setProfileImageUri(uri);
 
     try {
-      await userStorage?.setItem(profileImageStorageKey, uri);
-    } catch {
-      // Keep the selected image for the active session if persistence fails.
+      if (mode === 'api') {
+        const result = await accountSettings.uploadAvatar(uri);
+        setProfileImageStatus(result.status);
+        if (result.state.active?.readUrl) {
+          setProfileImageUri(result.state.active.readUrl);
+        }
+      } else {
+        setProfileImageStatus('local');
+        await userStorage?.setItem(profileImageStorageKey, uri);
+      }
+    } catch (error) {
+      setProfileImageUri(previousImage);
+      setProfileImageStatus(previousStatus);
+      throw error;
     }
-  }, [userStorage]);
+  }, [accountSettings, mode, profileImageStatus, profileImageUri, userStorage]);
 
   const removeProfileImage = useCallback(async () => {
-    setProfileImageUri(null);
-
     try {
-      await userStorage?.removeItem(profileImageStorageKey);
-    } catch {
-      // The generated avatar is already restored for the active session.
+      if (mode === 'api') {
+        await accountSettings.removeAvatar();
+      } else {
+        await userStorage?.removeItem(profileImageStorageKey);
+      }
+      setProfileImageUri(null);
+      setProfileImageStatus(null);
+    } catch (error) {
+      throw error;
     }
-  }, [userStorage]);
+  }, [accountSettings, mode, userStorage]);
 
   const setPublicIdentity = useCallback(async (identity: PublicIdentity) => {
     const normalized = normalizePublicIdentity(identity);
-    const nextIdentity = api && userId
-      ? toPublicIdentity(await updateAccountPublicIdentity(api, normalized))
+    const synchronized = mode === 'api'
+      ? publicIdentityFromAccountProfile(
+          await accountSettings.updateProfile({
+            publicIdentityMode: normalized.mode,
+            publicName:
+              normalized.mode === 'private'
+                ? null
+                : normalized.displayName,
+            ...(normalized.mode === 'alias'
+              ? { screenName: normalized.displayName }
+              : {})
+          })
+        )
       : normalized;
-    setPublicIdentityState(nextIdentity);
+    setPublicIdentityState(synchronized);
     setHasPublicIdentity(true);
+    void queryClient.invalidateQueries({
+      queryKey: ['social', userId ?? 'anonymous']
+    });
 
     try {
-      await userStorage?.setItem(publicIdentityStorageKey, JSON.stringify(nextIdentity));
+      await userStorage?.setItem(
+        publicIdentityStorageKey,
+        JSON.stringify(synchronized)
+      );
     } catch {
       // Keep the selected identity for the active session if persistence fails.
     }
-  }, [api, userId, userStorage]);
+  }, [accountSettings, mode, queryClient, userId, userStorage]);
 
-  const setIdentityMode = useCallback(async (mode: IdentityMode) => {
-    const normalized = normalizePublicIdentity({ ...publicIdentity, mode });
-    const nextIdentity = api && userId
-      ? toPublicIdentity(await updateAccountPublicIdentity(api, normalized))
-      : normalized;
-    setPublicIdentityState(nextIdentity);
+  const setIdentityMode = useCallback(async (nextMode: IdentityMode) => {
+    const nextIdentity = normalizePublicIdentity({
+      ...publicIdentity,
+      mode: nextMode
+    });
+    const synchronized = mode === 'api'
+      ? publicIdentityFromAccountProfile(
+          await accountSettings.updateProfile({
+            publicIdentityMode: nextIdentity.mode,
+            publicName:
+              nextIdentity.mode === 'private'
+                ? null
+                : nextIdentity.displayName
+          })
+        )
+      : nextIdentity;
+    setPublicIdentityState(synchronized);
     setHasPublicIdentity(true);
+    void queryClient.invalidateQueries({
+      queryKey: ['social', userId ?? 'anonymous']
+    });
 
     try {
-      await userStorage?.setItem(publicIdentityStorageKey, JSON.stringify(nextIdentity));
+      await userStorage?.setItem(
+        publicIdentityStorageKey,
+        JSON.stringify(synchronized)
+      );
     } catch {
       // Keep the selected mode for the active session if persistence fails.
     }
-  }, [api, publicIdentity, userId, userStorage]);
+  }, [
+    accountSettings,
+    mode,
+    publicIdentity,
+    queryClient,
+    userId,
+    userStorage
+  ]);
 
   const publicName = resolvePublicName(publicIdentity);
   const value = useMemo<ProfileContextValue>(
@@ -192,10 +313,10 @@ export function ProfileProvider({ children }: PropsWithChildren) {
       hasPublicIdentity,
       identityMode: publicIdentity.mode,
       profileImageUri,
+      profileImageStatus,
       profileReady,
       publicIdentity,
       publicName,
-      roles,
       removeProfileImage,
       setIdentityMode,
       setProfileImage,
@@ -204,11 +325,11 @@ export function ProfileProvider({ children }: PropsWithChildren) {
     [
       hasPublicIdentity,
       profileImageUri,
+      profileImageStatus,
       profileReady,
       publicIdentity,
       publicName,
       removeProfileImage,
-      roles,
       setIdentityMode,
       setProfileImage,
       setPublicIdentity

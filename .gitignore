@@ -4,11 +4,15 @@
 # Expo and React Native generated output
 **/.expo/
 **/.expo-shared/
+**/.expo-ci-production/
 **/dist/
 **/coverage/
 **/web-build/
 **/.expo-audit-export/
 **/.expo-export-check/
+/artifacts/
+/output/
+/tmp/
 
 # Logs and local runtime noise
 *.log

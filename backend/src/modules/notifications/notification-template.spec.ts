@@ -7,7 +7,7 @@ describe('notification templates', () => {
         competitionId: 'competition-1',
       }),
     ).toEqual({
-      body: 'This competition was cancelled. No workout or payout action is required.',
+      body: 'This competition was cancelled. No further workout action is required.',
       data: {
         competitionId: 'competition-1',
         route: '/competitions',
@@ -16,13 +16,13 @@ describe('notification templates', () => {
     });
   });
 
-  it('renders payout setup copy without financial or identity details', () => {
+  it('renders reward claim copy without exposing the coupon code', () => {
     expect(
-      renderNotification('payout_action_required', { claimId: 'claim-1' }),
+      renderNotification('reward_awarded', { awardId: 'award-1' }),
     ).toEqual({
-      body: 'Set up your hosted Hyperwallet account so your prize can be paid.',
-      data: { claimId: 'claim-1', route: '/profile/payout' },
-      title: 'Your GoGymGo prize is ready',
+      body: 'You won a brand reward. Open My Rewards to claim it.',
+      data: { awardId: 'award-1', route: '/rewards/awards' },
+      title: 'You won a GoGymGo reward',
     });
   });
 

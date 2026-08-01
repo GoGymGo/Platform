@@ -1,154 +1,105 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, Platform, StyleSheet, View } from 'react-native';
 
-import { AuthStatusNotice, AuthTextField } from '@/components/auth';
+import { AccountLegalAgreement } from '@/components/accountLegalAgreement';
+import { AuthStatusNotice } from '@/components/auth';
 import {
-  ScreenScrollView,
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
+  ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
-import type { CompetitionRegion } from '@/config/regions';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
-import {
-  isCompleteCanadianPostalCode,
-  normalizeCanadianPostalCode,
-  resolveCompetitionRegionFromPostalCode
-} from '@/domain/competitionRegionVerification';
+import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { ApiError } from '@/services/api/client';
 import { verifyCompetitionRegionWithDeviceLocation } from '@/services/competitionRegionVerification';
-import type { BcRegionEvidence } from '@/services/regionFoundation';
+import { useAppTour } from '@/state/appTour';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 
 type VerificationState =
   | 'idle'
   | 'checking'
-  | 'candidate-found'
+  | 'verified'
   | 'permission-denied'
   | 'location-unavailable'
+  | 'service-error'
   | 'unsupported-region';
 
 export default function RegionScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const {
     competitionRegion,
-    refreshCompetitionRegionVerification,
     regionVerification,
     verifyCompetitionRegion
   } = useCompetitionRegion();
-  const [candidateRegion, setCandidateRegion] = useState<CompetitionRegion | null>(null);
-  const [candidateEvidence, setCandidateEvidence] =
-    useState<BcRegionEvidence | null>(null);
-  const [verificationState, setVerificationState] = useState<VerificationState>('idle');
-  const [postalCode, setPostalCode] = useState('');
-  const [postalError, setPostalError] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [showPostalFallback, setShowPostalFallback] = useState(false);
+  const createRegionVerification = useCreateRegionVerification();
+  const [verificationState, setVerificationState] =
+    useState<VerificationState>('idle');
   const isProfileSource = source === 'profile';
-  const reviewLocked =
-    regionVerification?.status === 'approved' ||
-    regionVerification?.status === 'pending';
+  const isHomeSource = source === 'home';
+  const approvedRegionReady =
+    regionVerification?.status === 'verified' &&
+    Boolean(regionVerification.verificationId);
+  const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
+  const permissionDeniedMessage =
+    'LOCATION ACCESS WAS NOT ALLOWED. ENABLE LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
 
   async function checkDeviceLocation() {
-    setPostalError('');
-    setSubmitError('');
-    setCandidateRegion(null);
-    setCandidateEvidence(null);
     setVerificationState('checking');
 
-    const result = await verifyCompetitionRegionWithDeviceLocation();
-
-    if (result.status === 'candidate-found') {
-      setCandidateRegion(result.region);
-      setCandidateEvidence({
-        ...result.coordinates,
-        method: 'device-location'
-      });
-      setVerificationState('candidate-found');
-      return;
-    }
-
-    setVerificationState(result.status);
-    setShowPostalFallback(true);
-  }
-
-  function checkPostalCode() {
-    const normalizedPostalCode = normalizeCanadianPostalCode(postalCode);
-    setPostalCode(normalizedPostalCode);
-
-    if (!isCompleteCanadianPostalCode(normalizedPostalCode)) {
-      setPostalError('ENTER A COMPLETE CANADIAN POSTAL CODE.');
-      return;
-    }
-
-    const region = resolveCompetitionRegionFromPostalCode(normalizedPostalCode);
-
-    if (!region) {
-      setCandidateRegion(null);
-      setCandidateEvidence(null);
-      setVerificationState('unsupported-region');
-      setPostalError('GOGYMGO IS NOT ACTIVE IN THIS POSTAL AREA YET.');
-      return;
-    }
-
-    setPostalError('');
-    setSubmitError('');
-    setCandidateRegion(region);
-    setCandidateEvidence({ method: 'postal-code', postalCode: normalizedPostalCode });
-    setVerificationState('candidate-found');
-  }
-
-  async function submitRegionForReview() {
-    if (!candidateRegion || !candidateEvidence || submitting) {
-      return;
-    }
-
-    setSubmitError('');
-    setSubmitting(true);
-    try {
-      await verifyCompetitionRegion(candidateRegion, candidateEvidence);
-      setCandidateRegion(null);
-      setCandidateEvidence(null);
-      setVerificationState('idle');
-    } catch {
-      setSubmitError(
-        'BC REGION REVIEW COULD NOT BE SUBMITTED. CHECK THE API AND TRY AGAIN.'
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleReviewAction() {
-    if (regionVerification?.status === 'approved') {
-      router.replace(isProfileSource ? '/profile' : '/consents');
-      return;
-    }
-    if (regionVerification?.status === 'pending') {
-      setSubmitError('');
-      setSubmitting(true);
+    if (appTourActive) {
       try {
-        await refreshCompetitionRegionVerification();
+        const serverVerification = await createRegionVerification.mutateAsync({
+          latitude: 43.6532,
+          longitude: -79.3832,
+          method: 'device_location'
+        });
+        await verifyCompetitionRegion(serverVerification);
+        setVerificationState('verified');
+        if (isProfileSource) {
+          router.replace('/profile');
+        }
       } catch {
-        setSubmitError('REVIEW STATUS COULD NOT BE REFRESHED. TRY AGAIN.');
-      } finally {
-        setSubmitting(false);
+        setVerificationState('service-error');
       }
       return;
     }
-    await submitRegionForReview();
+
+    const result = await verifyCompetitionRegionWithDeviceLocation();
+    if (result.status !== 'location-read') {
+      setVerificationState(result.status);
+      return;
+    }
+
+    try {
+      const serverVerification = await createRegionVerification.mutateAsync({
+        ...result.coordinates,
+        method: 'device_location'
+      });
+      await verifyCompetitionRegion(serverVerification);
+      setVerificationState('verified');
+
+      if (isProfileSource) {
+        router.replace('/profile');
+      }
+    } catch (error) {
+      setVerificationState(
+        getApiErrorCode(error) === 'LOCATION_OUTSIDE_SUPPORTED_REGION'
+          ? 'unsupported-region'
+          : 'service-error'
+      );
+    }
   }
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -156,169 +107,178 @@ export default function RegionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label={isProfileSource ? 'COMPETITION REGION' : 'REGION CHECK'}
+          label={isProfileSource ? 'COMPETITION REGION' : 'REGION + AGREEMENTS'}
           onBack={() => goBackOrReplace(
             router,
-            isProfileSource ? '/profile' : '/identity'
+            isProfileSource ? '/profile' : isHomeSource ? '/home' : '/join'
           )}
-          progress={isProfileSource ? 100 : 40}
-          step={isProfileSource ? 'PROFILE' : 'STEP 02 / 05'}
+          progress={isProfileSource ? 100 : 50}
+          step={isProfileSource ? 'PROFILE' : 'SETUP // 1 OF 2'}
         />
 
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          {isProfileSource ? 'RESUBMIT YOUR BC REGION' : 'CONFIRM YOUR BC REGION'}
+          {isProfileSource
+            ? 'REVERIFY YOUR REGION'
+            : approvedRegionReady
+              ? 'REGION VERIFIED'
+              : 'VERIFY YOUR REGION'}
         </TerminalText>
-        <TerminalText style={styles.body} tone="muted" variant="body">
-          BRITISH COLUMBIA IS THE ONLY DEMO REGION. YOUR SUBMISSION SETS THE
-          PACIFIC TIME ZONE, BUT THE SERVER MUST REVIEW ELIGIBILITY.
+        <TerminalText
+          style={styles.body}
+          tone="muted"
+          uppercase={false}
+          variant="body"
+        >
+          {approvedRegionReady && !isProfileSource
+            ? `${competitionRegion.label} sets your competition, available rewards and local scoring time.`
+            : 'Your verified location sets your regional competition, available rewards and local scoring time.'}
         </TerminalText>
 
-        <HUDBorderBox style={styles.privacyCard} tone="cyan">
-          <TerminalText tone="cyan" variant="label">
-            ONE-TIME LOCATION CHECK
-          </TerminalText>
-          <TerminalText tone="muted" variant="body">
-            GOGYMGO CHECKS YOUR LOCATION WHILE THIS SCREEN IS OPEN. WE SAVE YOUR
-            BC REGION SUBMISSION, NOT YOUR EXACT LOCATION, AND NEVER TRACK YOU
-            IN THE BACKGROUND.
-          </TerminalText>
-        </HUDBorderBox>
+        {!approvedRegionReady || isProfileSource ? (
+          <HUDBorderBox style={styles.privacyCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
+              ONE-TIME LOCATION CHECK
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              GoGymGo sends your location once for a secure region check. We
+              save the approved region—not your coordinates—and never track you
+              in the background.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : null}
 
-        {regionVerification ? (
+        {isProfileSource && regionVerification ? (
           <HUDBorderBox style={styles.currentCard} tone="muted">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
                 <TerminalText tone="dim" variant="label">
-                  CURRENT REGION SUBMISSION
+                  CURRENT VERIFIED REGION
                 </TerminalText>
                 <TerminalText tone="text" variant="body">
                   {competitionRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText tone="amber" variant="label">
-                {regionVerification.status.toUpperCase()}
+              <TerminalText tone="green" variant="label">
+                VERIFIED
               </TerminalText>
             </View>
-            <TerminalText tone="muted" uppercase={false} variant="caption">
-              {regionVerification.status === 'pending'
-                ? 'An operator must approve this submission before demo enrollment is available.'
-                : regionVerification.status === 'approved'
-                  ? 'Your BC demo eligibility is approved. You may continue.'
-                  : 'Submit a new BC check to continue with demo enrollment.'}
-            </TerminalText>
           </HUDBorderBox>
         ) : null}
 
-        <CyberButtonPrimary
-          disabled={verificationState === 'checking' || reviewLocked}
-          label={verificationState === 'checking' ? 'CHECKING LOCATION...' : 'USE MY LOCATION ->'}
-          onPress={() => void checkDeviceLocation()}
-          style={styles.primaryAction}
-        />
+        {!approvedRegionReady || isProfileSource ? (
+          <CyberButtonPrimary
+            disabled={verificationState === 'checking'}
+            label={
+              verificationState === 'checking'
+                ? 'VERIFYING REGION...'
+                : 'USE MY LOCATION ->'
+            }
+            onPress={() => void checkDeviceLocation()}
+            style={styles.primaryAction}
+          />
+        ) : null}
 
         {verificationState === 'permission-denied' ? (
           <AuthStatusNotice
-            message="LOCATION ACCESS WAS NOT ALLOWED. USE YOUR POSTAL CODE OR ENABLE LOCATION IN DEVICE SETTINGS."
+            message={permissionDeniedMessage}
             tone="amber"
           />
         ) : null}
         {verificationState === 'location-unavailable' ? (
           <AuthStatusNotice
-            message="YOUR LOCATION COULD NOT BE READ. CHECK DEVICE LOCATION SERVICES, TRY AGAIN OR VERIFY WITH YOUR POSTAL CODE."
+            message="YOUR LOCATION COULD NOT BE READ. CHECK DEVICE LOCATION SERVICES AND TRY AGAIN."
             tone="amber"
           />
         ) : null}
-        {verificationState === 'unsupported-region' && !postalError ? (
+        {verificationState === 'unsupported-region' ? (
           <AuthStatusNotice
-            message="GOGYMGO IS NOT ACTIVE IN YOUR CURRENT REGION YET. VERIFY YOUR HOME POSTAL CODE TO CHECK ANOTHER ELIGIBLE AREA."
+            message="GOGYMGO IS NOT ACTIVE IN YOUR CURRENT REGION YET."
             tone="amber"
           />
         ) : null}
-
-        {submitError ? (
-          <AuthStatusNotice message={submitError} tone="amber" />
+        {verificationState === 'service-error' ? (
+          <AuthStatusNotice
+            message="REGION VERIFICATION COULD NOT BE COMPLETED. CHECK YOUR CONNECTION AND TRY AGAIN."
+            tone="red"
+          />
         ) : null}
 
         {verificationState === 'permission-denied' ? (
           <CyberButtonOutline
-            label="OPEN DEVICE SETTINGS"
-            onPress={() => void Linking.openSettings()}
+            label={Platform.OS === 'web' ? 'RETRY AFTER ALLOWING' : 'OPEN DEVICE SETTINGS'}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                void checkDeviceLocation();
+                return;
+              }
+              void Linking.openSettings();
+            }}
           />
         ) : null}
 
-        <CyberButtonOutline
-          label={showPostalFallback ? 'HIDE POSTAL CODE' : 'VERIFY WITH POSTAL CODE'}
-          disabled={reviewLocked}
-          onPress={() => setShowPostalFallback((visible) => !visible)}
-        />
-
-        {showPostalFallback ? (
-          <HUDBorderBox style={styles.postalCard} tone="muted">
-            <TerminalText tone="cyan" variant="label">
-              HOME POSTAL CODE
-            </TerminalText>
-            <TerminalText tone="muted" variant="caption">
-              USE THIS IF LOCATION ACCESS IS UNAVAILABLE OR YOU ARE CURRENTLY TRAVELLING.
-            </TerminalText>
-            <AuthTextField
-              autoCapitalize="characters"
-              autoComplete="postal-code"
-              error={postalError}
-              label="CANADIAN POSTAL CODE"
-              maxLength={7}
-              onChangeText={(value) => {
-                setPostalCode(normalizeCanadianPostalCode(value));
-                setPostalError('');
-              }}
-              placeholder="A1A 1A1"
-              returnKeyType="done"
-              value={postalCode}
-            />
-            <CyberButtonOutline label="CHECK POSTAL CODE" onPress={checkPostalCode} />
-          </HUDBorderBox>
-        ) : null}
-
-        {candidateRegion ? (
-          <HUDBorderBox glow style={styles.verifiedCard} tone="amber">
+        {approvedRegionReady ? (
+          <HUDBorderBox glow style={styles.verifiedCard} tone="green">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
-                <TerminalText tone="amber" variant="label">
-                  BC CANDIDATE FOUND
+                <TerminalText tone="green" variant="label">
+                  VERIFIED REGION
                 </TerminalText>
                 <TerminalText glow tone="cyan" variant="title">
-                  {candidateRegion.label}
+                  {competitionRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText glow tone="amber" variant="label">
-                READY TO SUBMIT
+              <TerminalText glow tone="green" variant="label">
+                VERIFIED
               </TerminalText>
             </View>
-            <TerminalText tone="muted" variant="caption">
-              {`THIS CHECK ONLY PREPARES A ${candidateRegion.label} REVIEW. IT DOES NOT ENROLL YOU, CREATE AN ENTRY OR ENABLE A PAYOUT.`}
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              You will compete in {competitionRegion.label} and see rewards
+              available for this region.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
 
-        <CyberButtonPrimary
-          disabled={
-            submitting ||
-            (!reviewLocked && (!candidateRegion || !candidateEvidence))
-          }
-          label={submitting
-            ? 'CHECKING BC REVIEW...'
-            : regionVerification?.status === 'approved'
-              ? isProfileSource
-                ? 'RETURN TO PROFILE ->'
-                : 'CONTINUE WITH APPROVED BC REGION ->'
-              : regionVerification?.status === 'pending'
-                ? 'CHECK REVIEW STATUS'
-                : 'SUBMIT BC REGION FOR REVIEW ->'}
-          onPress={() => void handleReviewAction()}
-          style={styles.continueAction}
-        />
+        {approvedRegionReady && !isProfileSource ? (
+          <CyberButtonOutline
+            disabled={verificationState === 'checking'}
+            label={
+              verificationState === 'checking'
+                ? 'REVERIFYING REGION...'
+                : 'REVERIFY WITH MY LOCATION ->'
+            }
+            onPress={() => void checkDeviceLocation()}
+          />
+        ) : null}
+
+        {approvedRegionReady && !isProfileSource ? (
+          <AccountLegalAgreement
+            jurisdictionCode={jurisdictionCode}
+            onComplete={() => router.replace(
+              isHomeSource ? '/commitment?source=home' : '/commitment'
+            )}
+          />
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
+}
+
+function getApiErrorCode(error: unknown) {
+  if (
+    !(error instanceof ApiError) ||
+    !error.body ||
+    typeof error.body !== 'object'
+  ) {
+    return null;
+  }
+  const body = error.body as {
+    code?: unknown;
+    error?: { code?: unknown };
+  };
+  if (typeof body.code === 'string') {
+    return body.code;
+  }
+  return typeof body.error?.code === 'string' ? body.error.code : null;
 }
 
 const styles = StyleSheet.create({
@@ -350,10 +310,6 @@ const styles = StyleSheet.create({
   primaryAction: {
     marginTop: spacing.sm
   },
-  postalCard: {
-    gap: spacing.md,
-    padding: spacing.lg
-  },
   verifiedCard: {
     gap: spacing.md,
     padding: spacing.lg
@@ -366,8 +322,5 @@ const styles = StyleSheet.create({
   resultCopy: {
     flex: 1,
     gap: spacing.xs
-  },
-  continueAction: {
-    marginTop: spacing.sm
   }
 });

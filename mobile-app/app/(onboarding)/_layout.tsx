@@ -2,19 +2,23 @@ import { Stack } from 'expo-router';
 
 import { AuthGate } from '@/components/auth';
 import { colors } from '@/constants/theme';
-
-const onboardingScreenOptions = {
-  headerShown: false,
-  contentStyle: {
-    backgroundColor: colors.background
-  },
-  animation: 'slide_from_right'
-} as const;
+import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 
 export default function OnboardingLayout() {
+  const reduceMotion = useReducedMotionPreference();
+
   return (
     <AuthGate>
-      <Stack initialRouteName="identity" screenOptions={onboardingScreenOptions}>
+      <Stack
+        initialRouteName="identity"
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: colors.background
+          },
+          animation: reduceMotion ? 'none' : 'slide_from_right'
+        }}
+      >
         <Stack.Screen name="welcome" />
         <Stack.Screen name="identity" />
         <Stack.Screen name="region" />

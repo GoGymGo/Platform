@@ -11,6 +11,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
+import { DataCollectionNotice } from '@/components/legal';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -20,16 +21,13 @@ import {
   type SponsorApplicationErrors
 } from '@/domain/sponsorApplication';
 import { recordSponsorApplication } from '@/services/sponsorApplication';
-import { isApiUnavailableError } from '@/services/api/availability';
 import { useApi } from '@/state/api';
 import { useCompetitionRegion } from '@/state/competitionRegion';
-import { formatCampaignCurrency, useSponsorCampaign } from '@/state/sponsorCampaign';
 
 export default function SponsorApplicationScreen() {
   const router = useRouter();
   const { api } = useApi();
   const { competitionRegion } = useCompetitionRegion();
-  const { campaign } = useSponsorCampaign();
   const [companyName, setCompanyName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [errors, setErrors] = useState<SponsorApplicationErrors>({});
@@ -39,7 +37,11 @@ export default function SponsorApplicationScreen() {
   const [targetRegion, setTargetRegion] = useState(competitionRegion.label);
 
   async function submitApplication() {
-    const input = normalizeSponsorApplication({ companyName, contactEmail, targetRegion });
+    const input = normalizeSponsorApplication({
+      companyName,
+      contactEmail,
+      targetRegion
+    });
     const nextErrors = validateSponsorApplication(input);
     setErrors(nextErrors);
 
@@ -52,10 +54,10 @@ export default function SponsorApplicationScreen() {
     try {
       await recordSponsorApplication(api, input);
       setSubmitted(true);
-    } catch (error) {
-      setSubmissionError(isApiUnavailableError(error)
-        ? 'SPONSOR APPLICATIONS REQUIRE A CONFIGURED API.'
-        : 'SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+    } catch {
+      setSubmissionError(
+        'SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -80,26 +82,19 @@ export default function SponsorApplicationScreen() {
           SPONSOR A REGION
         </TerminalText>
         <TerminalText tone="muted" uppercase={false} variant="body">
-          Reach verified GoGymGo members in a chosen region through sponsor
-          placements that appear throughout the monthly competition.
+          Support a regional GoGymGo competition through approved prizes and participant rewards.
         </TerminalText>
 
         <View style={styles.valueList}>
+          <SponsorValue label="TARGETED REACH" value="REGION + COMPETITION COMMUNITY" />
           <SponsorValue
-            label="TARGETED REACH"
-            value="REGION + COMMITMENT CATEGORY"
+            label="PARTNERSHIP OPTIONS"
+            value="COMPETITION REWARDS"
           />
-          <SponsorValue
-            label="CAMPAIGN PLACEMENTS"
-            value="APP OPEN, CHECK-IN, COMPLETION + RANKS"
-          />
-          <SponsorValue
-            label="CURRENT TARGET"
-            value={`${formatCampaignCurrency(campaign.economics.sponsorPerVerifiedUser)} PER VERIFIED USER`}
-          />
+          <SponsorValue label="REWARD FORMAT" value="PHYSICAL PRIZES + COUPON CODES" />
         </View>
 
-        <HUDBorderBox style={styles.form} tone="muted">
+        <HUDBorderBox style={styles.form} tone="cyan">
           <AuthTextField
             error={errors.companyName}
             label="COMPANY NAME"
@@ -128,13 +123,20 @@ export default function SponsorApplicationScreen() {
             <AuthStatusNotice message={submissionError} tone="red" />
           ) : submitted ? (
             <AuthStatusNotice
-              message="SPONSOR INTEREST RECORDED. GOGYMGO WILL CONNECT THIS FORM TO THE CAMPAIGN BACKEND BEFORE LAUNCH."
+              message="APPLICATION SUBMITTED. THE GOGYMGO TEAM WILL REVIEW IT AND FOLLOW UP BY EMAIL."
               tone="green"
             />
           ) : null}
+          <DataCollectionNotice message="We use these business contact details to review this sponsor request, prevent misuse and contact you about the requested partnership. They are not added to a marketing list through this form." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
-            label={submitted ? 'INTEREST RECORDED' : submitting ? 'RECORDING...' : 'APPLY AS A SPONSOR ->'}
+            label={
+              submitted
+                ? 'INTEREST RECORDED'
+                : submitting
+                  ? 'RECORDING...'
+                  : 'APPLY AS A SPONSOR ->'
+            }
             onPress={submitApplication}
           />
         </HUDBorderBox>
@@ -170,13 +172,13 @@ const styles = StyleSheet.create({
   },
   valueList: {
     borderTopWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   valueRow: {
     gap: spacing.xs,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   valueText: {
     fontFamily: fontFamilies.body

@@ -1,23 +1,33 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { StreakCountsDto } from '../../streaks/dto/streak.dto';
 
-export class PayoutWinnerResponseDto {
+export class RewardWinnerResponseDto {
   @ApiProperty({ type: String })
   alias!: string;
 
   @ApiProperty({ type: Number })
-  amountMinor!: number;
+  awardRank!: number;
 
-  @ApiProperty({ type: Number })
-  payoutRank!: number;
+  @ApiProperty({ type: String })
+  sponsorName!: string;
+
+  @ApiProperty({ type: String })
+  rewardTitle!: string;
+
+  @ApiProperty({ enum: ['coupon', 'physical'], type: String })
+  rewardType!: 'coupon' | 'physical';
+
+  @ApiProperty({ type: StreakCountsDto })
+  streaks!: StreakCountsDto;
 }
 
 export class SettledCompetitionResponseDto {
-  @ApiProperty({ type: Number })
-  payoutExponent!: number;
+  @ApiProperty({ type: String })
+  competitionName!: string;
 
-  @ApiProperty({ type: Number })
-  payoutPoolAmountMinor!: number;
+  @ApiProperty({ type: String })
+  monthKey!: string;
 
-  @ApiProperty({ type: Number })
-  payoutWinnerCount!: number;
+  @ApiProperty({ minimum: 0, type: Number })
+  rewardCount!: number;
 }

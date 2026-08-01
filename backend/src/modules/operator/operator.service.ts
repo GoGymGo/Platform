@@ -54,10 +54,8 @@ export class OperatorService {
           heartbeat,
           competitionStartsDue,
           notificationsPending,
-          paymentsUncertain,
           profileMediaCleanupPending,
           privacyOperationsPending,
-          webhooksPending,
         ] = await Promise.all([
           transaction
             .selectFrom('worker_heartbeats')
@@ -81,16 +79,6 @@ export class OperatorService {
             .where('attempt_count', '<', 5)
             .executeTakeFirstOrThrow(),
           transaction
-            .selectFrom('payout_payments')
-            .select((expression) =>
-              expression.fn.countAll<number>().as('count'),
-            )
-            .where('provider_status', 'in', [
-              'SUBMITTING',
-              'SUBMISSION_UNCERTAIN',
-            ])
-            .executeTakeFirstOrThrow(),
-          transaction
             .selectFrom('profile_media')
             .select((expression) =>
               expression.fn.countAll<number>().as('count'),
@@ -110,14 +98,6 @@ export class OperatorService {
               expression.fn.countAll<number>().as('count'),
             )
             .where('status', '=', 'processing')
-            .executeTakeFirstOrThrow(),
-          transaction
-            .selectFrom('provider_webhooks')
-            .select((expression) =>
-              expression.fn.countAll<number>().as('count'),
-            )
-            .where('state', 'in', ['failed', 'received'])
-            .where('attempt_count', '<', 10)
             .executeTakeFirstOrThrow(),
         ]);
 
@@ -143,12 +123,10 @@ export class OperatorService {
           queues: {
             competitionStartsDue: Number(competitionStartsDue.count),
             notificationsPending: Number(notificationsPending.count),
-            paymentsUncertain: Number(paymentsUncertain.count),
             profileMediaCleanupPending: Number(
               profileMediaCleanupPending.count,
             ),
             privacyOperationsPending: Number(privacyOperationsPending.count),
-            webhooksPending: Number(webhooksPending.count),
           },
           worker: {
             heartbeatAgeSeconds:
@@ -172,7 +150,7 @@ export class OperatorService {
       .transaction()
       .execute(async (transaction) => {
         const operator = await this.requireOperator(principal, transaction);
-        const [sessions, regions, payouts, partners, privacy, profileMedia] =
+        const [sessions, regions, partners, privacy, profileMedia] =
           await Promise.all([
             transaction
               .selectFrom('workout_sessions')
@@ -198,20 +176,6 @@ export class OperatorService {
               .where('verification.status', '=', 'pending')
               .where('verification.user_id', '!=', operator.id)
               .orderBy('verification.created_at')
-              .limit(100)
-              .execute(),
-            transaction
-              .selectFrom('payout_claims')
-              .select(['created_at', 'id', 'status'])
-              .where('status', 'in', [
-                'pending_review',
-                'action_required',
-                'verification_pending',
-                'ready',
-                'processing',
-                'failed',
-              ])
-              .orderBy('created_at')
               .limit(100)
               .execute(),
             transaction
@@ -244,7 +208,6 @@ export class OperatorService {
             regionCode: item.region_code,
             verificationMethod: item.method,
           })),
-          ...payouts.map((item) => this.queueItem(item, 'payout_claim')),
           ...partners.map((item) =>
             this.queueItem(item, 'partner_application'),
           ),

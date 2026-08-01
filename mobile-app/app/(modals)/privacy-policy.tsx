@@ -1,6 +1,11 @@
-import { LegalDocumentScreen } from '@/components/legal';
+import { ConnectedLegalDocumentScreen } from '@/components/connectedLegalDocumentScreen';
 import { privacyPolicy } from '@/constants/legal';
 
 export default function PrivacyPolicyModal() {
-  return <LegalDocumentScreen document={privacyPolicy} />;
+  return (
+    <ConnectedLegalDocumentScreen
+      documentKey="privacy_policy"
+      fallback={privacyPolicy}
+    />
+  );
 }

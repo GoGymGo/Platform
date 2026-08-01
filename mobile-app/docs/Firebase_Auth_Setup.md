@@ -68,7 +68,7 @@ The backend must also become authoritative for:
 - accepted Privacy Policy and Terms versions;
 - onboarding completion;
 - public profile and region;
-- prize and payout eligibility;
+- contest and reward eligibility;
 - revoked or blocked sessions;
 - account deletion and data-retention workflows.
 

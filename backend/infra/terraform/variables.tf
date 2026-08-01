@@ -215,36 +215,6 @@ variable "push_notifications_enabled" {
   default     = false
 }
 
-variable "hyperwallet_enabled" {
-  description = "Enable Hyperwallet only after the account, program, webhook, and secrets pass UAT."
-  type        = bool
-  default     = false
-}
-
-variable "hyperwallet_api_url" {
-  description = "Environment-specific Hyperwallet REST base URL."
-  type        = string
-  default     = null
-  nullable    = true
-
-  validation {
-    condition     = !var.hyperwallet_enabled || (var.hyperwallet_api_url != null && can(regex("^https://", var.hyperwallet_api_url)))
-    error_message = "hyperwallet_api_url must be an HTTPS URL when Hyperwallet is enabled."
-  }
-}
-
-variable "hyperwallet_portal_url" {
-  description = "Environment-specific hosted Hyperwallet payee portal URL."
-  type        = string
-  default     = null
-  nullable    = true
-
-  validation {
-    condition     = !var.hyperwallet_enabled || (var.hyperwallet_portal_url != null && can(regex("^https://", var.hyperwallet_portal_url)))
-    error_message = "hyperwallet_portal_url must be an HTTPS URL when Hyperwallet is enabled."
-  }
-}
-
 variable "otel_exporter_otlp_endpoint" {
   description = "Optional HTTPS OTLP collector endpoint; leaving it null disables application export."
   type        = string

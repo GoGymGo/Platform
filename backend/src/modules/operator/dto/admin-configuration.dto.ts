@@ -9,7 +9,6 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
-  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -21,14 +20,14 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import type { CompetitionMode } from '../../../database/database.types';
 import { OperatorReasonDto } from './operator.dto';
+import { regionCodePattern } from '../../regions/region-code';
 
 export class CreateRegionPolicyDto extends OperatorReasonDto {
   @ApiProperty({ example: 'victoria-bc', maxLength: 64, type: String })
   @IsString()
   @Length(2, 64)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  @Matches(regionCodePattern)
   code!: string;
 
   @ApiProperty({ example: 'CA', type: String })
@@ -71,10 +70,6 @@ export class CreateRegionPolicyDto extends OperatorReasonDto {
   @IsBoolean()
   competitionEnabled!: boolean;
 
-  @ApiProperty({ type: Boolean })
-  @IsBoolean()
-  payoutEnabled!: boolean;
-
   @ApiProperty({ maxLength: 64, type: String })
   @IsString()
   @Length(1, 64)
@@ -113,15 +108,6 @@ export class GoalBracketDto {
 }
 
 export class CreateCompetitionDraftDto extends OperatorReasonDto {
-  @ApiPropertyOptional({
-    default: 'cash',
-    enum: ['cash', 'non_cash_demo'],
-    type: String,
-  })
-  @IsOptional()
-  @IsIn(['cash', 'non_cash_demo'])
-  mode?: CompetitionMode;
-
   @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
   regionPolicyId!: string;
@@ -134,10 +120,6 @@ export class CreateCompetitionDraftDto extends OperatorReasonDto {
   @IsString()
   @Length(2, 160)
   name!: string;
-
-  @ApiProperty({ enum: ['CAD', 'MXN', 'USD'], type: String })
-  @Matches(/^(CAD|MXN|USD)$/)
-  currency!: string;
 
   @ApiProperty({ maxLength: 64, type: String })
   @IsString()
@@ -254,7 +236,7 @@ export class CreateCreatorWorkoutDto extends OperatorReasonDto {
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
   @ArrayUnique()
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { each: true })
+  @Matches(regionCodePattern, { each: true })
   regionCodes!: string[];
 }
 

@@ -39,4 +39,31 @@ describe('API authentication boundary', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('surfaces the backend error-envelope message', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(
+      JSON.stringify({
+        error: {
+          code: 'SCREEN_NAME_TAKEN',
+          message: 'That screen name is already in use.'
+        }
+      }),
+      { headers: { 'content-type': 'application/json' }, status: 409 }
+    );
+
+    try {
+      const api = createApiClient({
+        baseUrl: 'https://api.example.com',
+        getAccessToken: async () => 'token'
+      });
+
+      await assert.rejects(
+        api.request('/v1/me'),
+        /That screen name is already in use\./
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

@@ -5,14 +5,13 @@ import { StyleSheet, View } from 'react-native';
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import { SponsorRail } from '@/components/sponsor';
+import { DataCollectionNotice } from '@/components/legal';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -22,7 +21,6 @@ import {
   type GymRegistrationErrors
 } from '@/domain/gymRegistration';
 import { recordGymRegistrationRequest } from '@/services/gymRegistration';
-import { isApiUnavailableError } from '@/services/api/availability';
 import { useApi } from '@/state/api';
 
 export default function GymRegistrationScreen() {
@@ -58,10 +56,10 @@ export default function GymRegistrationScreen() {
     try {
       await recordGymRegistrationRequest(api, input);
       setSubmitted(true);
-    } catch (error) {
-      setSubmissionError(isApiUnavailableError(error)
-        ? 'GYM REGISTRATION REQUIRES A CONFIGURED API.'
-        : 'GYM REGISTRATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.');
+    } catch {
+      setSubmissionError(
+        'GYM REGISTRATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -69,7 +67,6 @@ export default function GymRegistrationScreen() {
 
   return (
     <ScreenContainer>
-      <SponsorRail compact />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -88,8 +85,8 @@ export default function GymRegistrationScreen() {
             REGISTER A GYM
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Request a GoGymGo entry and exit QR-code set for one gym location.
-            We review the location and manager details before activation.
+            Request a GoGymGo entry and exit QR-code set for one gym location. We review the
+            location and manager details before activation.
           </TerminalText>
         </View>
 
@@ -99,7 +96,7 @@ export default function GymRegistrationScreen() {
           <ProcessRow index="03" text="APPROVED GYMS RECEIVE ENTRY + EXIT QR CODES" />
         </View>
 
-        <HUDBorderBox style={styles.form} tone="muted">
+        <HUDBorderBox style={styles.form} tone="cyan">
           <AuthTextField
             error={errors.gymName}
             label="GYM NAME"
@@ -146,17 +143,19 @@ export default function GymRegistrationScreen() {
               tone="green"
             />
           ) : null}
+          <DataCollectionNotice message="We use the manager contact and gym-location details to review this QR request, verify the location, prevent misuse and contact the applicant. They are not added to a marketing list through this form." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
-            label={submitted ? 'REQUEST RECORDED' : submitting ? 'RECORDING...' : 'REQUEST GYM QR CODES ->'}
+            label={
+              submitted
+                ? 'REQUEST RECORDED'
+                : submitting
+                  ? 'RECORDING...'
+                  : 'REQUEST GYM QR CODES ->'
+            }
             onPress={submitRequest}
           />
         </HUDBorderBox>
-
-        <CyberButtonOutline
-          label="BACK"
-          onPress={() => goBackOrReplace(router, '/join')}
-        />
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -198,7 +197,7 @@ const styles = StyleSheet.create({
   },
   processList: {
     borderTopWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   processRow: {
     minHeight: 48,
@@ -206,7 +205,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     borderBottomWidth: 1,
-    borderColor: colors.divider
+    borderColor: colors.borderCyanSubtle
   },
   processText: {
     flex: 1,

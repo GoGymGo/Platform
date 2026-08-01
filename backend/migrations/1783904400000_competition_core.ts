@@ -60,7 +60,6 @@ export function up(pgm: MigrationBuilder): void {
     month_key: { type: 'char(7)', notNull: true },
     name: { type: 'varchar(160)', notNull: true },
     status: { type: 'competition_status', notNull: true, default: 'draft' },
-    currency: { type: 'char(3)', notNull: true },
     rules_version: { type: 'varchar(64)', notNull: true },
     rules: { type: 'jsonb', notNull: true },
     minimum_entrants: { type: 'integer', notNull: true, default: 100 },
@@ -479,39 +478,6 @@ export function up(pgm: MigrationBuilder): void {
     check: 'entry_count > 0 AND snapshot_position > 0',
   });
 
-  pgm.createTable('draw_winners', {
-    id: {
-      type: 'uuid',
-      primaryKey: true,
-      default: pgm.func('gen_random_uuid()'),
-    },
-    draw_id: {
-      type: 'uuid',
-      notNull: true,
-      references: 'competition_draws',
-      onDelete: 'RESTRICT',
-    },
-    user_id: {
-      type: 'uuid',
-      notNull: true,
-      references: 'users',
-      onDelete: 'RESTRICT',
-    },
-    payout_rank: { type: 'integer', notNull: true },
-    amount_minor: { type: 'bigint', notNull: true },
-    currency: { type: 'char(3)', notNull: true },
-    created_at: timestamp,
-  });
-  pgm.addConstraint('draw_winners', 'draw_winners_user_unique', {
-    unique: ['draw_id', 'user_id'],
-  });
-  pgm.addConstraint('draw_winners', 'draw_winners_rank_unique', {
-    unique: ['draw_id', 'payout_rank'],
-  });
-  pgm.addConstraint('draw_winners', 'draw_winners_positive', {
-    check: 'payout_rank > 0 AND amount_minor > 0',
-  });
-
   pgm.sql(`
     CREATE TRIGGER session_events_append_only
     BEFORE UPDATE OR DELETE ON session_events
@@ -525,20 +491,15 @@ export function up(pgm: MigrationBuilder): void {
     BEFORE UPDATE OR DELETE ON draw_entries
     FOR EACH ROW EXECUTE FUNCTION gogymgo_reject_append_only_mutation();
 
-    CREATE TRIGGER draw_winners_append_only
-    BEFORE UPDATE OR DELETE ON draw_winners
-    FOR EACH ROW EXECUTE FUNCTION gogymgo_reject_append_only_mutation();
   `);
 }
 
 export function down(pgm: MigrationBuilder): void {
-  pgm.sql('DROP TRIGGER IF EXISTS draw_winners_append_only ON draw_winners;');
   pgm.sql('DROP TRIGGER IF EXISTS draw_entries_append_only ON draw_entries;');
   pgm.sql('DROP TRIGGER IF EXISTS entry_ledger_append_only ON entry_ledger;');
   pgm.sql(
     'DROP TRIGGER IF EXISTS session_events_append_only ON session_events;',
   );
-  pgm.dropTable('draw_winners');
   pgm.dropTable('draw_entries');
   pgm.dropTable('competition_draws');
   pgm.dropTable('competition_progress');

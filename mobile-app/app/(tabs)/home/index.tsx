@@ -1,33 +1,45 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
+  ScreenLoadingState,
   ScreenScrollView,
+  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import {
-  BrandVideoAdPlaceholder,
-  SponsorRail as SponsorBanner
-} from '@/components/sponsor';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { isDemoVerificationEnabled } from '@/config/demoVerification';
-import { colors, componentSizes, cyberGlow, fontFamilies, interactionStates, radii, spacing, fontSizes } from '@/constants/theme';
+import { CompactTextButton } from '@/components/onboarding';
+import {
+  RecoverableError,
+  useAccessibilityAnnouncement
+} from '@/components/reliability';
+import { StreakRewards, UserAlias } from '@/components/streakRewards';
+import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
   useCreatorWorkouts,
-  useCurrentUserPayout
+  useMyRewardAwards,
+  useMyStreaks,
+  useWeeklyChallengeRequests
 } from '@/data/appDataHooks';
+import {
+  getAppResumeRequestStatus,
+  getAppResumeTarget
+} from '@/domain/appResume';
 import { getPublicInitials } from '@/domain/profile';
-import { formatPayoutAmount, needsPayoutSetup } from '@/domain/payout';
-import { bcDemoRegionCode } from '@/services/regionFoundation';
-import { useProfile } from '@/state/profile';
+import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
+import { useScreenMemory } from '@/hooks/useScreenMemory';
+import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
+import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
-import { formatCampaignDate, useSponsorCampaign } from '@/state/sponsorCampaign';
+import { useCompetitionRegion } from '@/state/competitionRegion';
+import { useProfile } from '@/state/profile';
 import { useWorkoutProgress } from '@/state/workoutProgress';
-import { useDemoEnrollment } from '@/state/demoEnrollment';
 
 type HomeStat = {
   label: string;
@@ -35,12 +47,32 @@ type HomeStat = {
   value: string;
 };
 
+function formatCampaignDate(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(year, month - 1, day, 12));
+}
+
 export default function HomeScreen() {
   const router = useRouter();
+  const { goalDays, registered, resume } = useLocalSearchParams<{
+    goalDays?: string;
+    registered?: string;
+    resume?: string;
+  }>();
   const { user } = useAuth();
-  const { profileImageUri, publicName } = useProfile();
-  const { enrollment } = useSponsorCampaign();
-  const { demoEnrollment } = useDemoEnrollment();
+  const { regionVerification } = useCompetitionRegion();
+  const competitionRegionCode = regionVerification?.regionCode ?? '';
+  const [showMore, setShowMore] = useScreenMemory('home:show-more', false);
+  const [resumeRetrying, setResumeRetrying] = useState(false);
+  const resumeHandledRef = useRef(false);
+  const resumeStartedRef = useRef(false);
+  const goalMetricRecordedRef = useRef(false);
+  const { profileImageUri, profileReady, publicName } = useProfile();
   const publicInitials = getPublicInitials(publicName);
   const {
     activeSession,
@@ -49,10 +81,29 @@ export default function HomeScreen() {
     currentWeekIndex,
     currentWeekVerified,
     prizeDrawEligible,
+    progressReady,
     totalEntries,
     verifiedSessionCount,
     weeklyGoal
   } = useWorkoutProgress();
+  const {
+    checking: registrationChecking,
+    currentCompetition,
+    error: registrationError,
+    ready: registrationReady,
+    retry: retryRegistration,
+    retrying: registrationRetrying,
+    setupActionLabel,
+    setupMessage,
+    setupRoute,
+    setupStep
+  } = useSessionRegistrationAccess();
+  const {
+    preference: verificationPreference,
+    ready: verificationPreferenceReady,
+    saved: verificationPreferenceSaved,
+    workoutStartRoute
+  } = useWorkoutVerificationPreference();
   const currentPeriod = competition.currentPeriod;
   const completedSessions = Math.min(currentWeekVerified, weeklyGoal);
   const remainingSessions = Math.max(weeklyGoal - completedSessions, 0);
@@ -67,52 +118,37 @@ export default function HomeScreen() {
     data: currentEntrantsData,
     isPending: currentEntrantsPending
   } = useCompetitionEnrollmentCount(
-    isDemoVerificationEnabled ? bcDemoRegionCode : competitionRegion,
+    competitionRegionCode,
     competition.competitionMonthKey
   );
-  const { data: creatorWorkouts = [] } = useCreatorWorkouts();
-  const { data: payoutClaimData } = useCurrentUserPayout(user?.uid);
+  const { data: creatorWorkouts = [] } = useCreatorWorkouts(
+    competitionRegionCode
+  );
+  const rewardAwardsQuery = useMyRewardAwards();
+  const { data: rewardAwards = [] } = rewardAwardsQuery;
+  const weeklyChallengeRequestsQuery = useWeeklyChallengeRequests(
+    competition.competitionMonthKey,
+    weeklyGoal,
+    competitionRegionCode,
+    currentPeriod?.index ?? 1
+  );
+  const { data: streakSummary, isPending: streaksPending } = useMyStreaks();
   const currentEntrants = currentEntrantsData ?? null;
-  const payoutClaim = payoutClaimData ?? null;
-  const featuredCreatorWorkout =
-    creatorWorkouts.find((workout) => workout.joined) ?? null;
-  const launchConfirmed = !isDemoVerificationEnabled &&
+  const unclaimedReward = rewardAwards.find((award) => award.status === 'awarded');
+  const featuredCreatorWorkout = creatorWorkouts[0] ?? null;
+  const minimumEntrants = currentCompetition?.minimumEntrants ?? null;
+  const launchConfirmed =
     currentEntrants !== null &&
-    currentEntrants >= enrollment.minimumEntrants;
-  const entrantsNeeded = isDemoVerificationEnabled || currentEntrants === null
+    minimumEntrants !== null &&
+    currentEntrants >= minimumEntrants;
+  const entrantsNeeded = currentEntrants === null || minimumEntrants === null
     ? null
-    : Math.max(0, enrollment.minimumEntrants - currentEntrants);
-  const enrollmentStatusLabel = isDemoVerificationEnabled
-    ? 'DEMO ENROLLMENT'
-    : 'REGIONAL LAUNCH';
-  const enrollmentStatusValue = currentEntrantsPending
-    ? `CHECKING ${isDemoVerificationEnabled ? 'DEMO ENROLLMENT' : 'REGISTRATION'} COUNT`
-    : currentEntrants === null
-      ? 'TOTAL NOT CONNECTED'
-      : isDemoVerificationEnabled
-        ? `${currentEntrants.toLocaleString()} ACTIVE DEMO ${currentEntrants === 1 ? 'ENROLLMENT' : 'ENROLLMENTS'}`
-        : `${currentEntrants.toLocaleString()} / ${enrollment.minimumEntrants.toLocaleString()} REGISTERED`;
-  const enrollmentStatusTone = isDemoVerificationEnabled
-    ? currentEntrants === null ? 'dim' : 'green'
-    : launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber';
-  const enrollmentStatusCopy = isDemoVerificationEnabled
-    ? currentEntrants === null
-      ? 'The live demo enrollment total will appear when regional enrollment sync is available.'
-      : `${currentEntrants} zero-value BC demo ${currentEntrants === 1 ? 'enrollment is' : 'enrollments are'} active. No launch minimum applies.`
-    : launchConfirmed
-      ? 'Competition launch confirmed.'
-      : entrantsNeeded === null
-        ? 'The live registration total will appear when regional enrollment sync is available.'
-        : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`;
+    : Math.max(0, minimumEntrants - currentEntrants);
   const liveMultiplier = currentPeriod?.liveMultiplier ?? 0;
   const stats: readonly HomeStat[] = [
     {
       value: String(totalEntries),
-      label: isDemoVerificationEnabled
-        ? demoEnrollment
-          ? 'DEMO ENROLLED // NO PRIZES'
-          : 'DEMO // NOT ENROLLED'
-        : 'PRIZE DRAW ENTRIES',
+      label: 'PRIZE DRAW ENTRIES',
       tone: 'pink'
     },
     {
@@ -123,66 +159,231 @@ export default function HomeScreen() {
     {
       value: currentPeriod
         ? `${Math.min(currentPeriod.opponentVerifiedCount, weeklyGoal)}/${weeklyGoal}`
-        : `--/${weeklyGoal}`,
-      label: currentPeriod ? 'MATCH DAYS' : 'MATCH PENDING',
+        : 'NOT STARTED',
+      label: currentPeriod ? 'PARTNER DAYS' : 'WEEKLY CHALLENGE',
       tone: 'cyan'
     }
   ];
 
+  const workoutAccessMode = getWorkoutAccessMode(competitionNotStarted);
+  const workoutUnavailable = workoutAccessMode === 'upcoming';
+  const workoutEntryTarget = getWorkoutEntryTarget({
+    activeSession: activeSession !== null,
+    registrationReady
+  });
+  const setupRequired = workoutEntryTarget === 'setup';
+  const registeredGoal = Number(goalDays);
+  const successGoal = Number.isInteger(registeredGoal) && registeredGoal > 0
+    ? registeredGoal
+    : weeklyGoal;
+  const setupEyebrow =
+    setupStep === 'region'
+      ? 'REGION REQUIRED'
+      : setupStep === 'agreements'
+        ? 'ACCOUNT AGREEMENTS'
+        : 'WEEKLY GOAL';
+  const setupTitle =
+    setupStep === 'region'
+      ? 'VERIFY YOUR REGION'
+      : setupStep === 'agreements'
+        ? 'REVIEW + CONTINUE'
+        : 'CHOOSE YOUR WEEKLY GOAL';
+  const resumeRequested = resume === '1';
+  const pendingChallengeInvite = (weeklyChallengeRequestsQuery.data ?? [])
+    .some(({ direction }) => direction === 'incoming');
+  const immediateResumeTarget = getAppResumeTarget({
+    activeWorkout: activeSession !== null,
+    pendingChallengeInvite: false,
+    setupRoute: setupRoute ?? null,
+    unclaimedReward: false
+  });
+  const secondaryResumeLoading =
+    !immediateResumeTarget &&
+    (
+      weeklyChallengeRequestsQuery.isLoading ||
+      rewardAwardsQuery.isLoading
+    );
+  const secondaryResumeError =
+    !immediateResumeTarget &&
+    (
+      weeklyChallengeRequestsQuery.isError ||
+      rewardAwardsQuery.isError
+    );
+  const {
+    error: resumeError,
+    loading: resumeLoading
+  } = getAppResumeRequestStatus({
+    hasImmediateTarget: immediateResumeTarget !== null,
+    registrationError,
+    registrationLoading: registrationChecking,
+    secondaryError: secondaryResumeError,
+    secondaryLoading: secondaryResumeLoading
+  });
+
+  useAccessibilityAnnouncement(
+    registered === '1'
+      ? `Weekly Goal set to ${successGoal} ${successGoal === 1 ? 'day' : 'days'}.`
+      : null
+  );
+
+  useEffect(() => {
+    if (registered !== '1' || goalMetricRecordedRef.current) {
+      return;
+    }
+    goalMetricRecordedRef.current = true;
+    void recordFlowMetric(user?.uid, 'weekly-goal-completed', 'weekly-goal');
+  }, [registered, user?.uid]);
+
+  useEffect(() => {
+    if (!resumeRequested || resumeHandledRef.current) {
+      return;
+    }
+
+    if (!resumeStartedRef.current) {
+      resumeStartedRef.current = true;
+      void recordFlowMetric(user?.uid, 'resume-started', 'home');
+    }
+
+    if (resumeLoading || resumeError) {
+      return;
+    }
+
+    const target = getAppResumeTarget({
+      activeWorkout: activeSession !== null,
+      pendingChallengeInvite,
+      setupRoute: setupRoute ?? null,
+      unclaimedReward: Boolean(unclaimedReward)
+    });
+    resumeHandledRef.current = true;
+    void recordFlowMetric(user?.uid, 'resume-completed', 'home');
+    if (target?.kind === 'active-workout') {
+      void recordFlowMetric(user?.uid, 'workout-resumed', 'workout');
+    }
+    router.replace((target?.route ?? '/home') as Href);
+  }, [
+    activeSession,
+    pendingChallengeInvite,
+    resumeError,
+    resumeLoading,
+    resumeRequested,
+    router,
+    setupRoute,
+    unclaimedReward,
+    user?.uid
+  ]);
+
+  const retryResume = async () => {
+    setResumeRetrying(true);
+    void recordFlowMetric(user?.uid, 'flow-retry', 'home');
+    try {
+      await Promise.all([
+        retryRegistration(),
+        weeklyChallengeRequestsQuery.refetch(),
+        rewardAwardsQuery.refetch()
+      ]);
+    } finally {
+      setResumeRetrying(false);
+    }
+  };
+
+  if (
+    !profileReady ||
+    !progressReady ||
+    registrationChecking ||
+    !verificationPreferenceReady
+  ) {
+    return <ScreenLoadingState body="Checking your profile and competition registration." />;
+  }
+
+  if (resumeRequested && resumeLoading) {
+    return <ScreenLoadingState body="Finding the next unfinished task." />;
+  }
+
   return (
     <ScreenContainer>
-      <SponsorBanner />
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
+        memoryKey="home"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <TerminalText glow tone="cyan" variant="label">
-              ACCOUNT READY // {competitionRegion}
+              {setupRequired
+                ? 'SETUP INCOMPLETE'
+                : 'ACCOUNT READY // ' + competitionRegion}
             </TerminalText>
-            <TerminalText glow style={styles.username} tone="cyan" variant="title">
-              {publicName}
-            </TerminalText>
+            <UserAlias
+              accessibilityRole="text"
+              alias={publicName}
+              glow
+              streaks={streakSummary?.streaks}
+              textStyle={styles.username}
+              tone="cyan"
+              variant="title"
+            />
           </View>
           <ProfileAvatar imageUri={profileImageUri} initials={publicInitials} showStatus size={46} />
         </View>
 
-        {needsPayoutSetup(payoutClaim) && payoutClaim ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/profile/payout')}
-            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-          >
-            <HUDBorderBox glow style={styles.payoutAlert} tone="pink">
-              <View style={styles.payoutAlertCopy}>
-                <TerminalText glow tone="pink" variant="label">
-                  YOU WON {formatPayoutAmount(payoutClaim)}
-                </TerminalText>
-                <TerminalText tone="text" uppercase={false} variant="body">
-                  Set up Hyperwallet to receive your prize.
-                </TerminalText>
-              </View>
-              <TerminalText glow tone="pink" variant="button">
-                -&gt;
+        {registered === '1' ? (
+          <HUDBorderBox glow style={styles.registrationSuccess} tone="green">
+            <View style={styles.registrationSuccessCopy}>
+              <TerminalText glow tone="green" variant="label">
+                WEEKLY GOAL SET // {successGoal} {successGoal === 1 ? 'DAY' : 'DAYS'}
               </TerminalText>
-            </HUDBorderBox>
-          </Pressable>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                You&apos;re ready. Your next action is shown below.
+              </TerminalText>
+            </View>
+            <CompactTextButton
+              label="DISMISS"
+              onPress={() => router.replace('/home')}
+              tone="muted"
+            />
+          </HUDBorderBox>
         ) : null}
 
-        <HUDBorderBox glow style={styles.commitmentCard} tone="cyan">
+        {resumeRequested && resumeError ? (
+          <RecoverableError
+            body="GoGymGo could not finish checking your setup, invitations and rewards. Retry the check, or continue to Home without losing any data."
+            continueLabel="Continue to Home"
+            onContinue={() => {
+              resumeHandledRef.current = true;
+              router.replace('/home');
+            }}
+            onRetry={() => void retryResume()}
+            retrying={resumeRetrying || registrationRetrying}
+            style={styles.resumeError}
+            title="COULD NOT RESUME"
+          />
+        ) : null}
+
+        <HUDBorderBox
+          glow
+          style={styles.commitmentCard}
+          tone={setupRequired ? 'amber' : 'cyan'}
+        >
           <View style={styles.commitmentHeader}>
             <View style={styles.commitmentTitleBlock}>
-              <TerminalText glow tone="cyan" variant="label">
-                {isBonusDayPhase
+              <TerminalText
+                glow
+                tone={setupRequired ? 'amber' : 'cyan'}
+                variant="label"
+              >
+                {setupRequired
+                  ? setupEyebrow
+                  : isBonusDayPhase
                   ? 'BONUS DAYS 29-31'
                   : competitionNotStarted
                     ? 'UPCOMING COMPETITION'
                     : `WEEK ${currentWeekIndex ?? 1} // ${completedSessions > 0 ? 'IN MOTION' : 'READY'}`}
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
-                {isBonusDayPhase
+                {setupRequired
+                  ? setupTitle
+                  : isBonusDayPhase
                   ? `ADD ${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} PER DAY`
                   : competitionNotStarted
                     ? 'YOUR WEEKLY GOAL IS SET'
@@ -191,15 +392,17 @@ export default function HomeScreen() {
                       : 'START YOUR FIRST SESSION'}
               </TerminalText>
               <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
-                {isBonusDayPhase
+                {setupRequired
+                  ? setupMessage
+                  : isBonusDayPhase
                   ? `Verify one workout on each remaining day to add ${weeklyGoal} prize draw ${weeklyGoal === 1 ? 'entry' : 'entries'} per day.`
                   : competitionNotStarted
                     ? 'Check in and maintain an elevated heart rate for 30 minutes to verify your workout.'
                     : remainingSessions > 0
                       ? `Complete ${remainingSessions} more verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal. Only one workout per calendar day counts.`
-                      : 'Weekly goal hit. Check your Period Match to see whether a 2x or 3x bonus is active.'}
+                      : 'Weekly goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
               </TerminalText>
-              {competitionNotStarted ? (
+              {!setupRequired && competitionNotStarted ? (
                 <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
                   SCORING STARTS {competitionStartMonth.toUpperCase()} 1ST 12:00AM.
                 </TerminalText>
@@ -207,21 +410,25 @@ export default function HomeScreen() {
             </View>
             <View style={styles.multiplierBlock}>
               <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
-                {competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
+                {setupRequired
+                  ? '--'
+                  : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
-                {competitionNotStarted
+                {setupRequired
+                  ? 'NEXT STEP'
+                  : competitionNotStarted
                   ? 'DAY GOAL'
-                  : liveMultiplier === 3
-                    ? 'ARMED'
+                   : liveMultiplier === 3
+                    ? 'BONUS READY'
                     : liveMultiplier === 2
-                      ? 'MATCH'
-                      : 'NO BONUS'}
+                      ? 'TEAM BONUS'
+                      : 'BASE ENTRIES'}
               </TerminalText>
             </View>
           </View>
 
-          <View style={styles.weekDots}>
+          {!setupRequired ? <View style={styles.weekDots}>
             {Array.from({ length: weeklyGoal }, (_, index) => (
               <View
                 key={index}
@@ -231,161 +438,267 @@ export default function HomeScreen() {
                 ]}
               />
             ))}
-          </View>
+          </View> : null}
 
           <CyberButtonPrimary
-            label={activeSession ? 'RETURN TO ACTIVE SESSION ->' : 'START VERIFIED WORKOUT ->'}
-            onPress={() => router.push(activeSession ? '/workout/active' : '/workout/check-in')}
+            disabled={!setupRequired && workoutUnavailable && !activeSession}
+            label={setupRequired
+              ? setupActionLabel
+              : activeSession
+               ? 'Return to workout'
+               : workoutUnavailable
+                 ? `VERIFIED WORKOUTS START ${competitionStartMonth.toUpperCase()} 1`
+                 : 'Start workout'}
+            onPress={() => {
+              if (workoutEntryTarget === 'setup' && setupRoute) {
+                router.push(setupRoute as Href);
+                return;
+              }
+              router.push(
+                workoutEntryTarget === 'active-session'
+                  ? '/workout/active'
+                  : workoutStartRoute
+              );
+            }}
           />
+          {setupRequired ? (
+            <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
+              Complete this step before starting a verified workout.
+            </TerminalText>
+          ) : workoutUnavailable ? (
+            <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
+              Verified competition workouts open when scoring begins on {competitionStartLabel}.
+            </TerminalText>
+          ) : null}
+          {!activeSession && !setupRequired ? (
+            <TerminalText style={styles.defaultMethod} tone="muted" uppercase={false} variant="caption">
+              {verificationPreferenceSaved
+                ? `Default device: ${verificationPreference.sourceLabel}. Change it from Profile.`
+                : 'Choose your workout device when you start your first verified workout.'}
+            </TerminalText>
+          ) : null}
 
-          {competitionNotStarted ? (
+          {!setupRequired && competitionNotStarted ? (
             <View style={styles.launchStatus}>
               <View style={styles.launchHeader}>
                 <TerminalText tone="dim" variant="micro">
-                  {enrollmentStatusLabel}
+                  REGIONAL LAUNCH
                 </TerminalText>
                 <TerminalText
-                  glow={isDemoVerificationEnabled ? currentEntrants !== null : launchConfirmed}
-                  tone={enrollmentStatusTone}
+                  glow={launchConfirmed}
+                  tone={launchConfirmed ? 'green' : currentEntrants === null ? 'dim' : 'amber'}
                   variant="label"
                 >
-                  {enrollmentStatusValue}
+                  {currentEntrantsPending
+                    ? 'CHECKING REGISTRATION COUNT'
+                    : currentEntrants === null
+                      ? 'REGISTRATION TOTAL UNAVAILABLE'
+                    : minimumEntrants === null
+                      ? `${currentEntrants.toLocaleString()} REGISTERED`
+                      : `${currentEntrants.toLocaleString()} / ${minimumEntrants.toLocaleString()} REGISTERED`}
                 </TerminalText>
               </View>
-              <TerminalText tone={isDemoVerificationEnabled || launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
-                {enrollmentStatusCopy}
+              <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
+                {launchConfirmed
+                  ? 'Competition launch confirmed.'
+                  : entrantsNeeded === null
+                    ? 'The registration total could not be loaded. Check again later.'
+                    : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
               </TerminalText>
             </View>
           ) : null}
         </HUDBorderBox>
 
-        <View style={styles.statsRow}>
-          {stats.map((stat) => (
-            <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
-              <TerminalText
-                glow
-                style={styles.statValue}
-                tone={stat.tone}
-                variant="value"
-              >
-                {stat.value}
-              </TerminalText>
-              <TerminalText style={styles.statLabel} tone="muted" variant="micro">
-                {stat.label}
+        {unclaimedReward ? (
+          <Pressable
+            accessibilityHint="Open My Rewards to claim this award"
+            accessibilityRole="button"
+            onPress={() => router.push('/rewards/awards')}
+            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+          >
+            <HUDBorderBox glow style={styles.rewardAlert} tone="pink">
+              <View style={styles.rewardAlertCopy}>
+                <TerminalText glow tone="pink" variant="label">
+                  REWARD READY // {unclaimedReward.title}
+                </TerminalText>
+                <TerminalText tone="text" uppercase={false} variant="body">
+                  Claim it in My Rewards. No payment setup is required.
+                </TerminalText>
+              </View>
+              <TerminalText glow tone="pink" variant="button">
+                -&gt;
               </TerminalText>
             </HUDBorderBox>
-          ))}
-        </View>
-        <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
-          {isDemoVerificationEnabled
-            ? demoEnrollment
-              ? 'Your zero-value BC demo enrollment is active. It creates no prize draw entries, winner eligibility or payout state.'
-              : 'BC demo mode creates no prize draw entries, winner eligibility or payout state.'
-            : prizeDrawEligible
-            ? competitionNotStarted
-              ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
-              : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
-            : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
-        </TerminalText>
+          </Pressable>
+        ) : null}
 
-        <BrandVideoAdPlaceholder
-          compact
-          onPress={() => router.push('/sponsor-offer')}
-          placement="appOpen"
-          style={styles.videoAd}
+        <CyberButtonOutline
+          label={showMore ? 'Hide Explore' : 'Explore GoGymGo'}
+          onPress={() => setShowMore((current) => !current)}
+          style={styles.moreButton}
         />
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/calendar' as Href)}
-          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-        >
-          <HUDBorderBox style={styles.calendarCard} tone="cyan">
-            <View style={styles.calendarCopy}>
-              <TerminalText glow tone="cyan" variant="micro">
-                WORKOUT CALENDAR
-              </TerminalText>
-              <TerminalText style={styles.calendarTitle} tone="text" uppercase variant="body">
-                VIEW CHECKED DAYS AND PERSONAL GYM LOGS
-              </TerminalText>
-            </View>
-            <TerminalText tone="cyan" variant="button">
-              -&gt;
+        {showMore ? (
+          <View style={styles.secondaryContent}>
+            <TerminalText glow tone="cyan" variant="label">
+              EXPLORE
             </TerminalText>
-          </HUDBorderBox>
-        </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/squad')}
-          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-        >
-          <HUDBorderBox style={styles.pactCard} tone="cyan">
-            <View style={styles.pactAvatars}>
-              <View style={styles.pactAvatarYou}>
-                <TerminalText style={styles.pactAvatarTextDark} tone="dim" variant="button">
-                  {publicInitials}
-                </TerminalText>
-              </View>
-              <View style={styles.pactAvatarMatch}>
-                <TerminalText tone="muted" variant="button">
-                  {getPublicInitials(currentPeriod?.opponentAlias ?? 'MATCH')}
-                </TerminalText>
-              </View>
-            </View>
-            <View style={styles.pactCopy}>
-              <TerminalText glow tone="cyan" variant="micro">
-                PERIOD MATCH
-              </TerminalText>
-              <TerminalText style={styles.pactTitle} tone="text" uppercase variant="body">
-                {isBonusDayPhase
-                  ? `BONUS DAYS 29-31 // +${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} EACH`
-                  : competitionNotStarted
-                    ? `MATCHING OPENS ${competitionStartLabel.toUpperCase()}`
-                    : `${currentPeriod?.opponentAlias ?? 'MATCHING IN PROGRESS'} // ${currentPeriod?.opponentVerifiedCount ?? 0}/${weeklyGoal}`}
-              </TerminalText>
-            </View>
-            <TerminalText tone="cyan" variant="button">
-              -&gt;
-            </TerminalText>
-          </HUDBorderBox>
-        </Pressable>
-
-        {featuredCreatorWorkout ? <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(`/workouts/${featuredCreatorWorkout.id}`)}
-          style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-        >
-          <HUDBorderBox style={styles.workoutCard} tone="cyan">
-            <View style={styles.videoPreview}>
-              <View style={styles.videoBadgeRow}>
-                <View style={styles.creatorBadge}>
-                  <TerminalText glow tone="cyan" variant="micro">
-                    CREATOR WORKOUT
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/how-it-works?from=home')}
+              style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+            >
+              <HUDBorderBox style={styles.guideCard} tone="cyan">
+                <View style={styles.guideCopy}>
+                  <TerminalText tone="dim" variant="micro">
+                    QUICK REFERENCE
+                  </TerminalText>
+                  <TerminalText tone="text" uppercase={false} variant="body">
+                    How the competition works
+                  </TerminalText>
+                  <TerminalText tone="muted" uppercase={false} variant="caption">
+                    Goal, verified workouts, entries, rankings and rewards.
                   </TerminalText>
                 </View>
-                <View style={styles.channelBadge}>
+                <TerminalText tone="cyan" variant="button">
+                  -&gt;
+                </TerminalText>
+              </HUDBorderBox>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/calendar' as Href)}
+              style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+            >
+              <HUDBorderBox style={styles.calendarCard} tone="cyan">
+                <View style={styles.calendarCopy}>
                   <TerminalText glow tone="cyan" variant="micro">
-                    OFFICIAL CHANNEL
+                    WORKOUT CALENDAR
+                  </TerminalText>
+                  <TerminalText style={styles.calendarTitle} tone="text" uppercase={false} variant="body">
+                    Review checked days and workout history
                   </TerminalText>
                 </View>
-              </View>
-              <View style={styles.playCircle}>
-                <TerminalText glow tone="cyan" variant="micro">
-                  VIEW
+                <TerminalText tone="cyan" variant="button">
+                  -&gt;
                 </TerminalText>
-              </View>
+              </HUDBorderBox>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/squad')}
+              style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+            >
+              <HUDBorderBox style={styles.pactCard} tone="cyan">
+                <View style={styles.pactAvatars}>
+                  <View style={styles.pactAvatarYou}>
+                    <TerminalText style={styles.pactAvatarTextDark} tone="dim" variant="button">
+                      {publicInitials}
+                    </TerminalText>
+                  </View>
+                  <View style={styles.pactAvatarMatch}>
+                    <TerminalText tone="muted" variant="button">
+                      {getPublicInitials(currentPeriod?.opponentAlias ?? 'PARTNER')}
+                    </TerminalText>
+                  </View>
+                </View>
+                <View style={styles.pactCopy}>
+                  <TerminalText glow tone="cyan" variant="micro">
+                    WEEKLY CHALLENGE
+                  </TerminalText>
+                  {isBonusDayPhase || competitionNotStarted || !currentPeriod ? (
+                    <TerminalText style={styles.pactTitle} tone="text" uppercase={false} variant="body">
+                      {isBonusDayPhase
+                        ? `Bonus Days: +${weeklyGoal} ${weeklyGoal === 1 ? 'entry' : 'entries'} each`
+                        : competitionNotStarted
+                          ? `Challenges open ${competitionStartLabel}`
+                          : 'Pairing in progress'}
+                    </TerminalText>
+                  ) : (
+                    <View style={styles.pactOpponent}>
+                      <UserAlias
+                        alias={currentPeriod.opponentAlias}
+                        streaks={currentPeriod.opponentStreaks}
+                        textStyle={styles.pactTitle}
+                        uppercase={false}
+                      />
+                      <TerminalText tone="cyan" variant="micro">
+                        {currentPeriod.opponentVerifiedCount}/{weeklyGoal} THIS WEEK
+                      </TerminalText>
+                    </View>
+                  )}
+                </View>
+                <TerminalText tone="cyan" variant="button">
+                  -&gt;
+                </TerminalText>
+              </HUDBorderBox>
+            </Pressable>
+
+            <StreakRewards
+              isLoading={streaksPending}
+              summary={streakSummary}
+            />
+
+            <View style={styles.statsRow}>
+              {stats.map((stat) => (
+                <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
+                  <TerminalText glow style={styles.statValue} tone={stat.tone} variant="value">
+                    {stat.value}
+                  </TerminalText>
+                  <TerminalText style={styles.statLabel} tone="muted" variant="micro">
+                    {stat.label}
+                  </TerminalText>
+                </HUDBorderBox>
+              ))}
             </View>
-            <View style={styles.workoutCopy}>
-              <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
-                {featuredCreatorWorkout.name}
-              </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="body">
-                Optional follow-along workout. Session verification still happens in GoGymGo.
-              </TerminalText>
-            </View>
-          </HUDBorderBox>
-        </Pressable> : null}
+            <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
+              {prizeDrawEligible
+                ? competitionNotStarted
+                  ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
+                  : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
+                : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
+            </TerminalText>
+
+            {featuredCreatorWorkout ? <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push(`/workouts/${featuredCreatorWorkout.id}`)}
+              style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+            >
+              <HUDBorderBox style={styles.workoutCard} tone="cyan">
+                <View style={styles.videoPreview}>
+                  <View style={styles.videoBadgeRow}>
+                    <View style={styles.creatorBadge}>
+                      <TerminalText glow tone="cyan" variant="micro">
+                        CREATOR WORKOUT
+                      </TerminalText>
+                    </View>
+                    <View style={styles.channelBadge}>
+                      <TerminalText glow tone="cyan" variant="micro">
+                        OFFICIAL CHANNEL
+                      </TerminalText>
+                    </View>
+                  </View>
+                  <View style={styles.playCircle}>
+                    <TerminalText glow tone="cyan" variant="micro">
+                      VIEW
+                    </TerminalText>
+                  </View>
+                </View>
+                <View style={styles.workoutCopy}>
+                  <TerminalText style={styles.workoutTitle} tone="text" uppercase variant="body">
+                    {featuredCreatorWorkout.name}
+                  </TerminalText>
+                  <TerminalText tone="muted" uppercase={false} variant="body">
+                    Optional follow-along workout. Session verification still happens in GoGymGo.
+                  </TerminalText>
+                </View>
+              </HUDBorderBox>
+            </Pressable> : null}
+          </View>
+        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -396,7 +709,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: componentSizes.tabScreenBottomInset,
+    paddingBottom: 132,
     backgroundColor: colors.background
   },
   header: {
@@ -414,24 +727,51 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressableCard: {
-    width: '100%',
-    ...interactionStates.webFocus
+    width: '100%'
   },
   videoAd: {
     marginBottom: spacing.lg,
   },
-  commitmentCard: {
-    marginBottom: spacing.lg,
-    padding: spacing.xl
-  },
-  payoutAlert: {
+  registrationSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     marginBottom: spacing.lg,
+    padding: spacing.md
+  },
+  registrationSuccessCopy: {
+    flex: 1,
+    gap: spacing.xs
+  },
+  resumeError: {
+    marginBottom: spacing.lg
+  },
+  commitmentCard: {
+    marginBottom: spacing.lg,
     padding: spacing.lg
   },
-  payoutAlertCopy: {
+  defaultMethod: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
+  },
+  moreButton: {
+    marginTop: spacing.sm
+  },
+  secondaryContent: {
+    gap: spacing.lg,
+    marginTop: spacing.lg
+  },
+  streakRewards: {
+    marginBottom: spacing.lg
+  },
+  rewardAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.md
+  },
+  rewardAlertCopy: {
     flex: 1,
     gap: spacing.xs
   },
@@ -440,7 +780,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.md,
-    marginBottom: spacing.lg
+    marginBottom: spacing.md
   },
   commitmentTitleBlock: {
     flex: 1
@@ -454,6 +794,11 @@ const styles = StyleSheet.create({
   commitmentCopy: {
     marginTop: spacing.sm,
     fontFamily: fontFamilies.body
+  },
+  previewWorkoutNote: {
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.body,
+    textAlign: 'center'
   },
   launchStatus: {
     gap: spacing.xs,
@@ -481,7 +826,7 @@ const styles = StyleSheet.create({
   weekDots: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: spacing.lg
+    marginBottom: spacing.md
   },
   weekDot: {
     flex: 1,
@@ -497,11 +842,13 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: spacing.sm
   },
   statCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 100,
     minHeight: 84,
     alignItems: 'flex-start',
     justifyContent: 'center',
@@ -527,6 +874,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md,
     padding: spacing.lg
+  },
+  guideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg
+  },
+  guideCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2
   },
   calendarCopy: {
     flex: 1
@@ -571,6 +929,9 @@ const styles = StyleSheet.create({
   pactCopy: {
     flex: 1
   },
+  pactOpponent: {
+    gap: 2
+  },
   pactTitle: {
     marginTop: 2,
     fontFamily: fontFamilies.bodyStrong
@@ -585,7 +946,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.surfaceInteractive
+    backgroundColor: colors.panelAlpha70
   },
   videoBadgeRow: {
     width: '100%',
@@ -628,6 +989,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.display
   },
   pressed: {
-    ...interactionStates.pressed
+    opacity: 0.74,
+    transform: [{ scale: 0.99 }]
   }
 });

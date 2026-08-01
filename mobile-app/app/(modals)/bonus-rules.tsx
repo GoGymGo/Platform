@@ -9,9 +9,10 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useSponsorCampaign } from '@/state/sponsorCampaign';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 type RuleTone = 'cyan' | 'pink';
@@ -28,55 +29,58 @@ const bonusRules: readonly BonusRule[] = [
     value: '1-7 DAYS',
     label: 'HIT YOUR GOAL BY DAYS PICKED',
     description:
-      'CHOOSE 1 TO 7 VERIFIED WORKOUT DAYS PER WEEK. HIGHER COMMITMENTS CAN EARN MORE ENTRIES WHEN COMPLETED.',
+      'Choose 1 to 7 verified workout days per week. Higher Weekly Goals can earn more entries when completed.',
     tone: 'cyan'
   },
   {
     value: 'x2',
-    label: 'YOU + MATCHED PLAYER BOTH SUCCEED',
+    label: 'YOU + WEEKLY CHALLENGE PARTNER BOTH SUCCEED',
     description:
-      'WHEN YOU AND YOUR PERIOD MATCH BOTH HIT THE SAME WEEKLY GOAL, YOU BOTH RECEIVE THE 2X PERIOD MATCH BONUS.',
+      'When you and your Weekly Challenge partner both hit the same goal, you both receive the 2x weekly bonus.',
     tone: 'cyan'
   },
   {
     value: 'x3',
-    label: 'MATCHED PLAYER MISSES + YOU DO EXTRA DAY',
+    label: 'WEEKLY CHALLENGE PARTNER MISSES + YOU DO EXTRA DAY',
     description:
-      'IF YOUR MATCHED PLAYER MISSES, ONE EXTRA VERIFIED WORKOUT ACTIVATES YOUR 3X PERIOD MATCH BONUS. 3X IS AUTOMATIC WHEN YOUR GOAL ALREADY USES EVERY AVAILABLE DAY.',
+      'If your partner misses, one extra verified workout activates your 3x bonus. The bonus is automatic when your goal already uses every available day.',
     tone: 'pink'
   },
   {
     value: 'x10',
     label: 'PERFECT MONTH',
     description:
-      'THE 10X PERFECT-MONTH BONUS APPLIES TO ALL PRIZE DRAW ENTRIES EARNED ACROSS THE FOUR SCORING WEEKS, INCLUDING PERIOD MATCH BONUSES, CATEGORY-FINISH BONUSES AND BONUS DAYS 29-31.',
+      'The 10x Perfect Month bonus applies after all four scoring weeks, including Weekly Challenge, goal-group and Bonus Day entries.',
     tone: 'pink'
   }
 ];
 
 export default function BonusRulesModal() {
   const router = useRouter();
-  const { campaign } = useSponsorCampaign();
+  const { currentCompetition } = useSessionRegistrationAccess();
   const { weeklyGoal } = useWorkoutProgress();
+  const podiumMultipliers = resolveCategoryPodiumMultipliers(
+    currentCompetition?.rules
+  );
   const rulesWithCategoryWinners: readonly BonusRule[] = [
     ...bonusRules.slice(0, 3),
     {
-      value: `${campaign.economics.categoryPodiumMultipliers[1]}x / ${campaign.economics.categoryPodiumMultipliers[2]}x / ${campaign.economics.categoryPodiumMultipliers[3]}x`,
-      label: 'TOP THREE CATEGORY FINISHERS',
-      description: 'THE TOP THREE FINISHERS IN EACH COMMITMENT CATEGORY MULTIPLY THEIR ACTUAL FOUR-WEEK TOTAL AFTER 1X, 2X OR 3X PERIOD MATCH RESULTS. BONUS DAYS 29-31 ARE ADDED NEXT, THEN PERFECT-MONTH 10X IS APPLIED LAST.',
+      value: `${podiumMultipliers[1]}x / ${podiumMultipliers[2]}x / ${podiumMultipliers[3]}x`,
+      label: 'TOP THREE GOAL-GROUP FINISHERS',
+      description: 'The top three finishers in each Weekly Goal group multiply their four-week total. Bonus Days are added next, then Perfect Month 10x is applied last.',
       tone: 'pink'
     },
     ...bonusRules.slice(3),
     {
       value: `+${weeklyGoal} / DAY`,
       label: 'BONUS DAYS 29-31',
-      description: `WHEN THE MONTH HAS DAYS 29-31, EACH VERIFIED BONUS DAY ADDS ${weeklyGoal} PRIZE DRAW ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'}, EQUAL TO YOUR SELECTED WEEKLY GOAL, BEFORE THE FINAL PERFECT-MONTH 10X.`,
+      description: `When the month has days 29-31, each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before the final Perfect Month 10x.`,
       tone: 'pink'
     }
   ];
 
   return (
-    <ScreenContainer contentStyle={styles.screen} surface="modal">
+    <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
         <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
           BONUS RULES
@@ -97,10 +101,9 @@ export default function BonusRulesModal() {
           <TerminalText glow style={styles.title} tone="cyan" variant="title">
             HOW ENTRIES{'\n'}MULTIPLY.
           </TerminalText>
-          <TerminalText style={styles.body} tone="muted" variant="body">
-            ENTRIES ARE EARNED THROUGH VERIFIED WORKOUTS. BONUS MULTIPLIERS
-            REWARD STRONGER COMMITMENTS, MATCHED ACCOUNTABILITY, AND PERFECT
-            MONTHS.
+          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+            Verified workouts earn entries. Consistency, Weekly Challenge
+            teamwork and a Perfect Month can multiply them.
           </TerminalText>
         </View>
 
@@ -112,12 +115,12 @@ export default function BonusRulesModal() {
 
         <HUDBorderBox glow style={styles.callout} tone="cyan">
           <TerminalText glow style={styles.calloutLabel} tone="cyan" variant="label">
-            PERIOD MATCH BONUS
+            WEEKLY CHALLENGE BONUS
           </TerminalText>
-          <TerminalText style={styles.calloutCopy} tone="muted" variant="body">
-            BOTH HIT THE GOAL: YOU BOTH EARN 2X. IF YOUR MATCHED PLAYER MISSES: COMPLETE
-            ONE EXTRA VERIFIED WORKOUT TO EARN 3X. SEVEN-DAY PLAYERS ACTIVATE
-            3X AUTOMATICALLY WHEN THEIR MATCHED PLAYER MISSES.
+          <TerminalText style={styles.calloutCopy} tone="muted" uppercase={false} variant="body">
+            Both hit the goal: 2x each. If your partner misses, complete one
+            extra verified workout for 3x. The 3x bonus is automatic when no
+            extra day is available.
           </TerminalText>
         </HUDBorderBox>
 
@@ -142,7 +145,7 @@ function RuleCard({ rule }: { rule: BonusRule }) {
         <TerminalText glow style={styles.ruleLabel} tone={rule.tone} variant="label">
           {rule.label}
         </TerminalText>
-        <TerminalText style={styles.ruleDescription} tone="muted" variant="body">
+        <TerminalText style={styles.ruleDescription} tone="muted" uppercase={false} variant="body">
           {rule.description}
         </TerminalText>
       </View>
@@ -153,7 +156,7 @@ function RuleCard({ rule }: { rule: BonusRule }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.surfaceModal
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderCyanMuted,
     borderRadius: 12,
-    backgroundColor: colors.surfaceOverlay
+    backgroundColor: colors.backgroundAlpha72
   },
   ruleValue: {
     fontFamily: fontFamilies.display,

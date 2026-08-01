@@ -1,7 +1,7 @@
 import {
   calculateFinalPrizeDrawWeight,
   calculateWeeklyMatchEntries,
-  type CampaignEconomicsSettings,
+  type PrizeDrawWeightSettings,
   type PrizeDrawWeightInput
 } from '@/domain/campaignEconomics';
 import { clampWeeklyGoal } from '@/domain/competition';
@@ -60,7 +60,7 @@ export function calculateMonthAwareCommitmentWeight(
   input: MonthAwareCommitmentWeightInput,
   categoryRank: number | null,
   competitionMonthKey: string,
-  settings: CampaignEconomicsSettings
+  settings: PrizeDrawWeightSettings
 ) {
   return calculateFinalPrizeDrawWeight(
     {
@@ -81,7 +81,7 @@ export function calculateMonthAwareCommitmentWeight(
 export function calculateMaximumCommitmentEntries(
   weeklyGoal: number,
   competitionMonthKey: string,
-  settings: CampaignEconomicsSettings
+  settings: PrizeDrawWeightSettings
 ) {
   const periodEntriesBeforePerfectMonth = calculateWeeklyMatchEntries(
     weeklyGoal,

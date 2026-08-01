@@ -1,18 +1,31 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Modal,
+  Platform,
+  StyleSheet,
+  View
+} from 'react-native';
 
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
+  ScreenScrollView,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
+import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { sessionTimeScale } from '@/config/runtime';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
-import { getSessionElapsedSeconds, workoutRules } from '@/domain/workoutProgress';
-import { readWorkoutTelemetry } from '@/services/workoutTelemetry';
+import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
+import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
+import { useAppTour } from '@/state/appTour';
+import { appTourSimulatedHeartRateBpm } from '@/testing/appTourData';
 import { formatDateKey, useWorkoutProgress } from '@/state/workoutProgress';
 
 function formatClock(totalSeconds: number) {
@@ -22,16 +35,26 @@ function formatClock(totalSeconds: number) {
 }
 
 export default function ActiveWorkoutScreen() {
+  useKeepAwake('gogymgo-active-workout', { suppressDeactivateWarnings: true });
+  const reduceMotion = useReducedMotionPreference();
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const {
     activeSession,
     cancelActiveWorkout,
-    recordHeartRateSample,
+    midSessionAlertsReady,
+    sessionActionError,
+    sessionActionPending,
     triggerMidSessionCheck
   } = useWorkoutProgress();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showSessionDetails, setShowSessionDetails] = useState(false);
+  const [showSessionOptions, setShowSessionOptions] = useState(false);
+  const cancelDialogRef = useRef<View>(null);
   const activeSessionStartedAt = activeSession?.startedAt;
+  const activeSessionMinimumSeconds =
+    activeSession?.minimumSessionSeconds ?? 1;
 
   useEffect(() => {
     if (!activeSessionStartedAt) {
@@ -41,8 +64,12 @@ export default function ActiveWorkoutScreen() {
     const updateElapsedTime = () => {
       setElapsedSeconds(
         Math.min(
-          getSessionElapsedSeconds(activeSessionStartedAt, new Date()),
-          workoutRules.minimumSessionSeconds
+          getSessionElapsedSeconds(
+            activeSessionStartedAt,
+            new Date(),
+            sessionTimeScale
+          ),
+          activeSessionMinimumSeconds
         )
       );
     };
@@ -53,58 +80,61 @@ export default function ActiveWorkoutScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activeSessionStartedAt]);
+  }, [activeSessionMinimumSeconds, activeSessionStartedAt]);
 
   const session = useMemo(() => {
-    const telemetry = readWorkoutTelemetry();
     const progressPercent = Math.min(
       100,
-      Math.round((elapsedSeconds / workoutRules.minimumSessionSeconds) * 100)
+      Math.round((elapsedSeconds / activeSessionMinimumSeconds) * 100)
     );
-    const minimumReached = elapsedSeconds >= workoutRules.minimumSessionSeconds;
-    const midSessionVerified = activeSession?.midSessionVerified ?? false;
-    const currentHeartRateElevated = Boolean(
-      telemetry && telemetry.heartRate >= workoutRules.minimumAverageHeartRateBpm
+    const minimumReached = elapsedSeconds >= activeSessionMinimumSeconds;
+    const presenceReady = Boolean(
+      activeSession &&
+        (!activeSession.presenceCheckRequired || activeSession.midSessionVerified)
     );
     const heartRateReady = activeSession?.verificationMethod !== 'heartRate' || Boolean(
       activeSession &&
-        activeSession.heartRateObservedSeconds >= workoutRules.minimumSessionSeconds &&
-        activeSession.averageHeartRateBpm >= workoutRules.minimumAverageHeartRateBpm
+        activeSession.heartRateSamplesSubmitted >=
+          activeSession.requiredHeartRateSamples
     );
+    const missingHeartRateSamples = activeSession?.verificationMethod === 'heartRate'
+      ? Math.max(
+          0,
+          activeSession.requiredHeartRateSamples -
+            activeSession.heartRateSamplesSubmitted
+        )
+      : 0;
 
     return {
       averageHeartRate: activeSession?.averageHeartRateBpm ?? 0,
       clock: formatClock(elapsedSeconds),
       finishCta:
-        minimumReached && midSessionVerified && heartRateReady
-          ? 'FINISH & CHECK OUT ->'
+        minimumReached && presenceReady && heartRateReady
+          ? 'Verify and finish'
           : minimumReached
-            ? !midSessionVerified
-              ? 'MID-SESSION FACE CHECK REQUIRED'
-              : `AVERAGE MUST REACH ${workoutRules.minimumAverageHeartRateBpm} BPM`
-            : 'FINISH UNLOCKS AT 30:00',
-      heartRate: telemetry?.heartRate ?? 0,
-      currentHeartRateElevated,
-      telemetryAvailable: telemetry !== null,
+            ? !presenceReady
+              ? 'Presence check required'
+              : `${missingHeartRateSamples} heart-rate samples remaining`
+            : `Available at ${formatClock(activeSessionMinimumSeconds)}`,
+      heartRate: appTourActive
+        ? activeSession?.averageHeartRateBpm ?? appTourSimulatedHeartRateBpm
+        : 0,
+      telemetryAvailable: appTourActive,
       heartRateReady,
       progressPercent,
-      ready: minimumReached && midSessionVerified && heartRateReady
+      ready: minimumReached && presenceReady && heartRateReady
     };
-  }, [activeSession, elapsedSeconds]);
-
-  useEffect(() => {
-    if (
-      activeSession?.verificationMethod === 'heartRate' &&
-      session.telemetryAvailable &&
-      elapsedSeconds > 0
-    ) {
-      recordHeartRateSample(session.heartRate, elapsedSeconds);
-    }
-  }, [activeSession?.verificationMethod, elapsedSeconds, recordHeartRateSample, session.heartRate, session.telemetryAvailable]);
+  }, [
+    activeSession,
+    activeSessionMinimumSeconds,
+    appTourActive,
+    elapsedSeconds
+  ]);
 
   useEffect(() => {
     if (
       activeSession &&
+      activeSession.presenceCheckRequired &&
       !activeSession.midSessionCheckPrompted &&
       !activeSession.midSessionVerified &&
       elapsedSeconds >= activeSession.midSessionCheckAtSeconds
@@ -119,36 +149,111 @@ export default function ActiveWorkoutScreen() {
   if (!activeSession) {
     return (
       <SessionUnavailable
-        body="START FROM THE SESSION TAB SO CHECK-IN, TIMER AND CHECKPOINTS CAN BE TRACKED TOGETHER."
+        body="Start from the Session tab so check-in, the timer, and verification checkpoints can be tracked together."
         onAction={() => router.replace('/session' as Href)}
       />
     );
   }
 
+  const isHeartRateVerification = activeSession.verificationMethod === 'heartRate';
+  const heartRateTone: 'green' | 'amber' = session.telemetryAvailable
+    ? 'green'
+    : 'amber';
+  const heartRateStatus = !session.telemetryAvailable
+    ? 'NO DEVICE CONNECTED'
+    : 'LIVE SIGNAL';
+  const presenceTone: 'cyan' | 'green' | 'amber' =
+    !activeSession.presenceCheckRequired
+      ? 'green'
+      : activeSession.midSessionVerified
+    ? 'green'
+    : activeSession.midSessionCheckPrompted
+      ? 'amber'
+      : 'cyan';
+  const presenceValue = !activeSession.presenceCheckRequired
+    ? 'NOT REQUIRED'
+    : activeSession.midSessionVerified
+    ? 'COMPLETE'
+    : activeSession.midSessionCheckPrompted
+      ? 'ACTION NEEDED'
+      : 'IN PROGRESS';
+  const alertTone: 'cyan' | 'green' | 'amber' =
+    !activeSession.presenceCheckRequired
+      ? 'green'
+      : activeSession.midSessionVerified
+    ? 'green'
+    : activeSession.midSessionCheckPrompted
+      ? 'amber'
+      : 'cyan';
+  const alertValue = !activeSession.presenceCheckRequired
+    ? 'NOT REQUIRED'
+    : activeSession.midSessionVerified
+    ? 'COMPLETE'
+    : activeSession.midSessionCheckPrompted
+      ? 'ACTION NEEDED'
+      : midSessionAlertsReady
+        ? 'READY'
+        : 'IN PROGRESS';
+
   return (
-    <ScreenContainer contentStyle={styles.screen}>
+    <ScreenContainer>
+      <ScreenScrollView
+        bounces={false}
+        contentContainerStyle={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
-        <HUDBorderBox style={styles.recordingPill} tone="cyan">
+        <View style={styles.sessionHeading}>
           <View style={styles.recordingDot} />
           <TerminalText glow tone="cyan" variant="micro">
-            SESSION TRACKING
+            SESSION ACTIVE
           </TerminalText>
-        </HUDBorderBox>
+        </View>
         <TerminalText style={styles.headerLabel} tone="muted" variant="label">
-          SESSION ACTIVE
+          {isHeartRateVerification ? 'HEART RATE' : 'PARTNER GYM QR'}
         </TerminalText>
       </View>
+      <WorkoutFlowProgress stage="verify" style={styles.workoutFlowProgress} />
 
-      <View style={styles.centerContent}>
-        <TerminalText tone="dim" variant="label">
-          ELAPSED
-        </TerminalText>
-        <TerminalText glow style={styles.clock} tone="cyan" variant="display">
-          {session.clock}
-        </TerminalText>
-        <TerminalText style={styles.minimumLabel} tone="muted" variant="label">
-          OF 30:00 MINIMUM
-        </TerminalText>
+      <HUDBorderBox glow style={styles.livePanel} tone="cyan">
+        <View style={styles.liveMetrics}>
+          <View style={styles.timerMetric}>
+            <TerminalText tone="dim" variant="micro">
+              ELAPSED TIME
+            </TerminalText>
+            <TerminalText glow style={styles.clock} tone="cyan" variant="display">
+              {session.clock}
+            </TerminalText>
+            <TerminalText style={styles.minimumLabel} tone="muted" variant="micro">
+              {formatClock(activeSession.minimumSessionSeconds)} MINIMUM
+            </TerminalText>
+          </View>
+
+          <View style={styles.metricDivider} />
+
+          <View
+            accessible
+            accessibilityLabel={session.telemetryAvailable
+              ? `Live heart rate ${session.heartRate} beats per minute. ${heartRateStatus}.`
+              : 'Live heart rate unavailable. No device connected.'}
+            style={styles.heartRateMetric}
+          >
+            <TerminalText tone="dim" variant="micro">
+              LIVE HEART RATE
+            </TerminalText>
+            <View style={styles.heartRateValueRow}>
+              <TerminalText glow style={styles.heartRateValue} tone={heartRateTone} variant="display">
+                {session.telemetryAvailable ? session.heartRate : '--'}
+              </TerminalText>
+              <TerminalText style={styles.bpmLabel} tone="muted" variant="micro">
+                BPM
+              </TerminalText>
+            </View>
+            <TerminalText glow tone={heartRateTone} variant="micro">
+              {heartRateStatus}
+            </TerminalText>
+          </View>
+        </View>
 
         <View style={styles.progressSection}>
           <View style={styles.progressTrack}>
@@ -159,69 +264,14 @@ export default function ActiveWorkoutScreen() {
               START
             </TerminalText>
             <TerminalText tone="dim" variant="micro">
-              MID-PING
+              CHECK
             </TerminalText>
             <TerminalText tone="dim" variant="micro">
               END
             </TerminalText>
           </View>
         </View>
-
-        <View style={styles.metricRow}>
-          {activeSession.verificationMethod === 'heartRate' ? (
-            <>
-              <HUDBorderBox style={styles.metricCard} tone={session.currentHeartRateElevated ? 'green' : 'amber'}>
-                <TerminalText glow tone={session.currentHeartRateElevated ? 'green' : 'amber'} variant="label">
-                  CURRENT BPM
-                </TerminalText>
-                <TerminalText style={styles.metricValue} tone="text" variant="value">
-                  {session.telemetryAvailable ? session.heartRate : '--'}
-                </TerminalText>
-                <TerminalText tone={session.currentHeartRateElevated ? 'green' : 'amber'} variant="micro">
-                  {session.currentHeartRateElevated ? 'ABOVE TARGET' : 'BELOW TARGET'}
-                </TerminalText>
-              </HUDBorderBox>
-
-              <HUDBorderBox style={styles.metricCard} tone={session.heartRateReady ? 'green' : 'cyan'}>
-                <TerminalText glow tone={session.heartRateReady ? 'green' : 'cyan'} variant="label">
-                  30-MIN AVG
-                </TerminalText>
-                <TerminalText style={styles.metricValue} tone="text" variant="value">
-                  {session.averageHeartRate}
-                </TerminalText>
-                <TerminalText tone={session.heartRateReady ? 'green' : 'cyan'} variant="micro">
-                  {workoutRules.minimumAverageHeartRateBpm}+ REQUIRED
-                </TerminalText>
-              </HUDBorderBox>
-            </>
-          ) : (
-            <>
-              <HUDBorderBox style={styles.metricCard} tone="green">
-                <TerminalText glow tone="green" variant="label">
-                  ENTRY QR
-                </TerminalText>
-                <TerminalText style={styles.metricValue} tone="text" variant="value">
-                  OK
-                </TerminalText>
-                <TerminalText tone="green" variant="micro">
-                  CHECKED IN
-                </TerminalText>
-              </HUDBorderBox>
-              <HUDBorderBox style={styles.metricCard} tone="cyan">
-                <TerminalText glow tone="cyan" variant="label">
-                  EXIT QR
-                </TerminalText>
-                <TerminalText style={styles.metricValue} tone="text" variant="value">
-                  END
-                </TerminalText>
-                <TerminalText tone="cyan" variant="micro">
-                  SCAN AT CHECKOUT
-                </TerminalText>
-              </HUDBorderBox>
-            </>
-          )}
-        </View>
-      </View>
+      </HUDBorderBox>
 
       {activeSession.verificationMethod === 'heartRate' && !session.telemetryAvailable ? (
         <HUDBorderBox style={styles.telemetryNotice} tone="amber">
@@ -234,31 +284,70 @@ export default function ActiveWorkoutScreen() {
         </HUDBorderBox>
       ) : null}
 
-      <View style={styles.statusList}>
-        <SessionStatusRow
-          label="EFFORT"
-          tone={activeSession.verificationMethod === 'heartRate'
-            ? session.currentHeartRateElevated ? 'green' : 'amber'
-            : 'green'}
-          value={activeSession.verificationMethod === 'heartRate'
-            ? session.currentHeartRateElevated ? 'HEART RATE ON TRACK' : 'RAISE YOUR HEART RATE'
-            : 'PARTNER GYM CHECK-IN ACTIVE'}
+      <HUDBorderBox style={styles.verificationPanel} tone={session.ready ? 'green' : 'cyan'}>
+        <View style={styles.verificationHeader}>
+          <View style={styles.verificationHeadingCopy}>
+            <TerminalText tone="dim" variant="micro">
+              VERIFICATION
+            </TerminalText>
+            <TerminalText glow tone={session.ready ? 'green' : 'cyan'} variant="label">
+              {isHeartRateVerification ? 'HEART RATE SESSION' : 'PARTNER GYM CHECK-IN'}
+            </TerminalText>
+          </View>
+          <TerminalText tone={session.ready ? 'green' : 'cyan'} variant="micro">
+            {session.ready ? 'COMPLETE' : 'IN PROGRESS'}
+          </TerminalText>
+        </View>
+
+        <TerminalText tone="muted" uppercase={false} variant="body">
+          Your timer and verification progress save automatically. Keep moving;
+          GoGymGo will tell you when an action is needed.
+        </TerminalText>
+
+        <CyberButtonOutline
+          label={showSessionDetails ? 'HIDE SESSION DETAILS' : 'VIEW SESSION DETAILS'}
+          onPress={() => setShowSessionDetails((visible) => !visible)}
         />
-        <SessionStatusRow
-          label="FACE CHECK"
-          tone={activeSession.midSessionVerified
-            ? 'green'
-            : activeSession.midSessionCheckPrompted ? 'amber' : 'cyan'}
-          value={activeSession.midSessionVerified
-            ? 'VERIFIED'
-            : activeSession.midSessionCheckPrompted ? 'ACTION REQUIRED' : 'WILL APPEAR AUTOMATICALLY'}
-        />
-        <SessionStatusRow
-          label="SESSION SAVE"
-          tone="cyan"
-          value={`AUTO-SAVED // ${formatDateKey(activeSession.dateKey).toUpperCase()}`}
-        />
-      </View>
+
+        {showSessionDetails ? (
+          <>
+            <View style={styles.verificationGrid}>
+              {isHeartRateVerification ? (
+                <>
+                  <SessionStatusCell
+                    label="AVG BPM"
+                    tone={session.heartRateReady ? 'green' : 'cyan'}
+                    value={activeSession.heartRateObservedSeconds > 0
+                      ? `${session.averageHeartRate} BPM`
+                      : '-- BPM'}
+                  />
+                  <SessionStatusCell
+                    label="SAMPLES"
+                    tone={session.heartRateReady ? 'green' : 'amber'}
+                    value={`${activeSession.heartRateSamplesSubmitted}/${activeSession.requiredHeartRateSamples}`}
+                  />
+                </>
+              ) : (
+                <>
+                  <SessionStatusCell label="ENTRY QR" tone="green" value="COMPLETE" />
+                  <SessionStatusCell label="EXIT QR" tone="cyan" value="ACTION NEEDED" />
+                </>
+              )}
+              <SessionStatusCell label="PRESENCE" tone={presenceTone} value={presenceValue} />
+              <SessionStatusCell label="ALERT" tone={alertTone} value={alertValue} />
+            </View>
+
+            <View style={styles.saveFooter}>
+              <TerminalText tone="dim" variant="micro">
+                SESSION SAVE
+              </TerminalText>
+              <TerminalText tone="cyan" variant="micro">
+                AUTO-SAVED // {formatDateKey(activeSession.dateKey).toUpperCase()}
+              </TerminalText>
+            </View>
+          </>
+        ) : null}
+      </HUDBorderBox>
 
       <CyberButtonPrimary
         disabled={!session.ready}
@@ -267,61 +356,119 @@ export default function ActiveWorkoutScreen() {
         tone={session.ready ? 'green' : 'cyan'}
       />
 
-      <View style={styles.actionRow}>
-        {activeSession.midSessionCheckPrompted && !activeSession.midSessionVerified ? (
+      {activeSession.midSessionCheckPrompted && !activeSession.midSessionVerified ? (
+        <View style={styles.actionRow}>
           <CyberButtonOutline
-            label="COMPLETE FACE CHECK"
+            label="Verify now"
             onPress={() => router.push('/workout/ping')}
             style={styles.actionButton}
             tone="amber"
           />
-        ) : null}
-
-        <CyberButtonOutline
-          label="END SESSION"
-          onPress={() => setShowCancelConfirm(true)}
-          style={styles.actionButton}
-          tone="red"
-        />
-      </View>
-
-      {showCancelConfirm ? (
-        <HUDBorderBox glow style={styles.confirmCard} tone="red">
-          <TerminalText style={styles.confirmCopy} tone="red" variant="body">
-            END THIS SESSION? PROGRESS FROM THIS WORKOUT WILL NOT COUNT.
-          </TerminalText>
-          <View style={styles.confirmRow}>
-            <CyberButtonOutline
-              label="KEEP GOING"
-              onPress={() => setShowCancelConfirm(false)}
-              style={styles.confirmButton}
-            />
-
-            <CyberButtonOutline
-              label="END NOW"
-              onPress={() => {
-                cancelActiveWorkout();
-                router.replace('/home');
-              }}
-              style={styles.confirmButton}
-              tone="red"
-            />
-          </View>
-        </HUDBorderBox>
+        </View>
       ) : null}
 
       <CyberButtonOutline
-        label="LEAVE SCREEN // SESSION CONTINUES"
+        accessibilityHint="Return Home while this workout continues in the background"
+        label="Leave timer running"
         onPress={() => {
           router.replace('/home');
         }}
         style={styles.backButton}
       />
+      <TerminalText live="polite" style={styles.alertHelp} tone="muted" uppercase={false} variant="caption">
+        You can leave this screen. Return when notified for a presence check.
+      </TerminalText>
+
+      <CyberButtonOutline
+        accessibilityHint="Show secondary controls for this workout"
+        label={showSessionOptions ? 'HIDE SESSION OPTIONS' : 'SESSION OPTIONS'}
+        onPress={() => setShowSessionOptions((visible) => !visible)}
+        style={styles.sessionOptionsButton}
+      />
+      {showSessionOptions ? (
+        <HUDBorderBox style={styles.sessionOptionsPanel} tone="red">
+          <TerminalText tone="muted" uppercase={false} variant="caption">
+            Only end the session if you want to discard this workout&apos;s progress.
+          </TerminalText>
+          <CyberButtonOutline
+            accessibilityHint="Cancel this workout without earning verification credit"
+            label="End without saving"
+            onPress={() => setShowCancelConfirm(true)}
+            tone="red"
+          />
+        </HUDBorderBox>
+      ) : null}
+      </ScreenScrollView>
+
+      <Modal
+        animationType={reduceMotion ? 'none' : 'fade'}
+        onRequestClose={() => setShowCancelConfirm(false)}
+        onShow={() => {
+          if (Platform.OS === 'web') {
+            const dialog = cancelDialogRef.current as unknown as { focus?: () => void };
+            dialog.focus?.();
+            return;
+          }
+
+          const node = findNodeHandle(cancelDialogRef.current);
+          if (node) {
+            AccessibilityInfo.setAccessibilityFocus(node);
+          }
+        }}
+        transparent
+        visible={showCancelConfirm}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            accessibilityLabel="Cancel workout confirmation"
+            accessibilityRole="alert"
+            accessibilityViewIsModal
+            ref={cancelDialogRef}
+            style={styles.modalDialog}
+            tabIndex={-1}
+          >
+            <HUDBorderBox glow style={styles.confirmCard} tone="red">
+              <TerminalText glow tone="red" variant="label">
+                END WORKOUT WITHOUT SAVING?
+              </TerminalText>
+              <TerminalText style={styles.confirmCopy} tone="text" uppercase={false} variant="body">
+                Progress from this workout will not count. This cannot be undone.
+              </TerminalText>
+              <View style={styles.confirmRow}>
+                <CyberButtonOutline
+                  label="Keep workout running"
+                  onPress={() => setShowCancelConfirm(false)}
+                  style={styles.confirmButton}
+                />
+                <CyberButtonOutline
+                  disabled={sessionActionPending}
+                  label="End without saving"
+                  onPress={() => {
+                    void cancelActiveWorkout().then((cancelled) => {
+                      if (cancelled) {
+                        setShowCancelConfirm(false);
+                        router.replace('/home');
+                      }
+                    });
+                  }}
+                  style={styles.confirmButton}
+                  tone="red"
+                />
+              </View>
+              {sessionActionError ? (
+                <TerminalText live="assertive" tone="red" uppercase={false} variant="caption">
+                  {sessionActionError}
+                </TerminalText>
+              ) : null}
+            </HUDBorderBox>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
 
-function SessionStatusRow({
+function SessionStatusCell({
   label,
   tone,
   value
@@ -331,20 +478,20 @@ function SessionStatusRow({
   value: string;
 }) {
   return (
-    <HUDBorderBox style={styles.statusRow} tone={tone}>
+    <View style={styles.statusCell}>
       <TerminalText tone="dim" variant="micro">
         {label}
       </TerminalText>
       <TerminalText glow tone={tone} variant="label">
         {value}
       </TerminalText>
-    </HUDBorderBox>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: 26,
@@ -355,16 +502,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-    marginBottom: 18
+    marginBottom: spacing.md
   },
-  recordingPill: {
-    width: 'auto',
+  workoutFlowProgress: {
+    marginBottom: spacing.md
+  },
+  sessionHeading: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: radii.sm
+    paddingVertical: spacing.xs
   },
   recordingDot: {
     width: 7,
@@ -378,24 +525,57 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.terminal,
     textAlign: 'right'
   },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
+  livePanel: {
+    marginBottom: spacing.sm,
+    padding: 18
+  },
+  liveMetrics: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    minHeight: 112
+  },
+  timerMetric: {
+    flex: 1.08,
+    minWidth: 0,
     justifyContent: 'center'
   },
   clock: {
-    marginTop: 6,
+    marginTop: spacing.xs,
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.heroTimer,
-    lineHeight: 68
+    fontSize: fontSizes.timer,
+    lineHeight: 48
   },
   minimumLabel: {
-    marginTop: 6,
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.terminal
+  },
+  metricDivider: {
+    width: 1,
+    marginHorizontal: spacing.md,
+    backgroundColor: colors.borderCyanSoft
+  },
+  heartRateMetric: {
+    flex: 0.92,
+    minWidth: 0,
+    justifyContent: 'center'
+  },
+  heartRateValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginVertical: spacing.xs
+  },
+  heartRateValue: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.display,
+    lineHeight: 50
+  },
+  bpmLabel: {
     fontFamily: fontFamilies.terminal
   },
   progressSection: {
     width: '100%',
-    marginVertical: 26
+    marginTop: 18
   },
   progressTrack: {
     height: 8,
@@ -414,40 +594,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 7
   },
-  metricRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    width: '100%'
-  },
-  metricCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 18
-  },
-  metricValue: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.display
-  },
   telemetryNotice: {
     gap: spacing.xs,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
     padding: spacing.md
   },
   telemetryNoticeCopy: {
     fontFamily: fontFamilies.body
   },
-  statusList: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm
+  verificationPanel: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    padding: 16
   },
-  statusRow: {
-    minHeight: 44,
+  verificationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderCyanHairline
+  },
+  verificationHeadingCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  verificationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm
+  },
+  statusCell: {
+    width: '48%',
+    minWidth: 0,
+    minHeight: 66,
+    justifyContent: 'center',
+    gap: 2,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.sm,
+    backgroundColor: colors.whiteAlpha05
+  },
+  saveFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderCyanHairline
   },
   actionRow: {
     flexDirection: 'row',
@@ -461,8 +658,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm
   },
   confirmCard: {
-    marginTop: 10,
-    padding: spacing.md
+    padding: spacing.lg
   },
   confirmCopy: {
     marginBottom: 10,
@@ -483,5 +679,30 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginTop: 10,
     paddingVertical: 11
+  },
+  alertHelp: {
+    marginTop: spacing.sm,
+    textAlign: 'center'
+  },
+  sessionOptionsButton: {
+    minHeight: 44,
+    marginTop: spacing.md,
+    paddingVertical: 11
+  },
+  sessionOptionsPanel: {
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.md
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.blackAlpha80
+  },
+  modalDialog: {
+    width: '100%',
+    maxWidth: 460
   }
 });

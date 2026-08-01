@@ -15,14 +15,14 @@ export function buildSessionEventPayload(
         heartRateBpm: event.heartRateBpm,
         trust: 'unverified_client_evidence',
       };
-    case 'face_check':
-      if (event.faceMatchConfidence === undefined) {
-        throw invalidEvent('A face-check event requires faceMatchConfidence.');
-      }
+    case 'presence_check':
       return {
-        faceMatchConfidence: event.faceMatchConfidence,
-        trust: 'unverified_client_evidence',
+        trust: 'local_device_authentication_result',
       };
+    case 'face_check':
+      throw invalidEvent(
+        'Legacy face-check evidence is no longer accepted. Submit a privacy-preserving presence check.',
+      );
     case 'gym_qr_scan':
       if (!event.qrPayload) {
         throw invalidEvent('A gym QR event requires qrPayload.');

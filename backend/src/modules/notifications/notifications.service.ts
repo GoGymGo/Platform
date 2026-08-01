@@ -1,5 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
+import type { Selectable } from 'kysely';
 import type { Transaction } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { Environment } from '../../config/environment';
@@ -21,6 +23,11 @@ interface PushDeviceJson extends JsonObject {
   platform: 'android' | 'ios';
   provider: 'expo';
 }
+
+const notificationLeaseMilliseconds = 30_000;
+type ClaimedNotification = Selectable<Database['notification_deliveries']> & {
+  lease_token: string;
+};
 
 @Injectable()
 export class NotificationsService {
@@ -136,17 +143,11 @@ export class NotificationsService {
     if (!this.pushEnabled) {
       return 0;
     }
-    const deliveries = await this.database.connection
-      .selectFrom('notification_deliveries')
-      .selectAll()
-      .where('status', 'in', ['pending', 'failed'])
-      .where('attempt_count', '<', 5)
-      .where('scheduled_at', '<=', new Date())
-      .orderBy('scheduled_at')
-      .limit(limit)
-      .execute();
     let sent = 0;
-    for (const delivery of deliveries) {
+    for (let index = 0; index < limit; index += 1) {
+      const delivery = await this.claimNextDelivery(new Date());
+      if (!delivery) break;
+
       const devices = await this.database.connection
         .selectFrom('push_devices')
         .select('push_token')
@@ -154,7 +155,12 @@ export class NotificationsService {
         .where('enabled', '=', true)
         .execute();
       if (devices.length === 0) {
-        await this.updateDelivery(delivery.id, 'cancelled', null);
+        await this.updateDelivery(
+          delivery.id,
+          delivery.lease_token,
+          'cancelled',
+          null,
+        );
         continue;
       }
 
@@ -166,31 +172,90 @@ export class NotificationsService {
         await this.pushClient.send(
           devices.map((device) => ({ ...content, to: device.push_token })),
         );
-        await this.updateDelivery(delivery.id, 'sent', null);
-        sent += 1;
+        const completed = await this.updateDelivery(
+          delivery.id,
+          delivery.lease_token,
+          'sent',
+          null,
+        );
+        if (completed) {
+          sent += 1;
+        }
       } catch (error) {
-        await this.updateDelivery(delivery.id, 'failed', this.safeError(error));
+        await this.updateDelivery(
+          delivery.id,
+          delivery.lease_token,
+          'failed',
+          this.safeError(error),
+        );
       }
     }
     return sent;
   }
 
+  private claimNextDelivery(now: Date): Promise<ClaimedNotification | null> {
+    const leaseToken = randomUUID();
+    const leaseExpiresAt = new Date(
+      now.getTime() + notificationLeaseMilliseconds,
+    );
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const candidate = await transaction
+          .selectFrom('notification_deliveries')
+          .select('id')
+          .where('status', 'in', ['pending', 'failed'])
+          .where('attempt_count', '<', 5)
+          .where('scheduled_at', '<=', now)
+          .where((expression) =>
+            expression.or([
+              expression('lease_expires_at', 'is', null),
+              expression('lease_expires_at', '<=', now),
+            ]),
+          )
+          .orderBy('scheduled_at')
+          .orderBy('id')
+          .forUpdate()
+          .skipLocked()
+          .executeTakeFirst();
+        if (!candidate) return null;
+
+        const claimed = await transaction
+          .updateTable('notification_deliveries')
+          .set({
+            lease_expires_at: leaseExpiresAt,
+            lease_token: leaseToken,
+            updated_at: now,
+          })
+          .where('id', '=', candidate.id)
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        return { ...claimed, lease_token: leaseToken };
+      });
+  }
+
   private async updateDelivery(
     id: string,
+    leaseToken: string,
     status: 'cancelled' | 'failed' | 'sent',
     lastError: string | null,
-  ): Promise<void> {
-    await this.database.connection
+  ): Promise<boolean> {
+    const updated = await this.database.connection
       .updateTable('notification_deliveries')
       .set({
         attempt_count: (expression) => expression('attempt_count', '+', 1),
         last_error: lastError,
+        lease_expires_at: null,
+        lease_token: null,
         sent_at: status === 'sent' ? new Date() : null,
         status,
         updated_at: new Date(),
       })
       .where('id', '=', id)
-      .execute();
+      .where('lease_token', '=', leaseToken)
+      .returning('id')
+      .executeTakeFirst();
+    return Boolean(updated);
   }
 
   private toJsonObject(value: unknown): JsonObject {

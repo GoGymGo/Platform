@@ -1,0 +1,16 @@
+{
+  "name": "@gogymgo/brand",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./tokens": "./src/tokens.js",
+    "./assets/*": "./assets/*"
+  },
+  "types": "./src/index.d.ts",
+  "scripts": {
+    "build": "node scripts/validate.mjs",
+    "check": "node scripts/validate.mjs"
+  }
+}

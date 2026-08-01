@@ -1,0 +1,52 @@
+{
+  "name": "@gogymgo/platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoGymGo member app, landing site, admin dashboard, API and cloud platform.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "5.2.3"
+    },
+    "gaxios": {
+      "uuid": "11.1.1"
+    },
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    },
+    "postcss": "8.5.25",
+    "sharp": "0.35.3",
+    "teeny-request": {
+      "uuid": "11.1.1"
+    },
+    "uuid": "11.1.1",
+    "ws": "8.21.1",
+    "xcode": {
+      "uuid": "11.1.1"
+    }
+  },
+  "devDependencies": {
+    "uuid": "11.1.1",
+    "ws": "8.21.1"
+  },
+  "scripts": {
+    "build": "npm run contracts:generate && npm run build --workspace @gogymgo/brand && npm run build --workspace @gogymgo/contracts && npm run build --workspace @gogymgo/api && npm run build --workspace @gogymgo/admin && npm run build --workspace @gogymgo/landing && npm run build --workspace @gogymgo/member-app",
+    "check": "npm run contracts:check && npm run check --workspace @gogymgo/brand && npm run check --workspace @gogymgo/member-app && npm run check --workspace @gogymgo/api && npm run check --workspace @gogymgo/admin && npm run check --workspace @gogymgo/landing",
+    "contracts:check": "npm run check --workspace @gogymgo/contracts",
+    "contracts:generate": "npm run generate --workspace @gogymgo/contracts",
+    "start:member": "npm run web --workspace @gogymgo/member-app",
+    "start:admin": "npm run dev --workspace @gogymgo/admin",
+    "start:landing": "npm run dev --workspace @gogymgo/landing",
+    "start:api": "npm run start:dev --workspace @gogymgo/api",
+    "start:worker": "npm run start:worker --workspace @gogymgo/api",
+    "test": "npm run test --workspace @gogymgo/member-app && npm run test --workspace @gogymgo/api && npm run test --workspace @gogymgo/admin && npm run test --workspace @gogymgo/landing"
+  }
+}

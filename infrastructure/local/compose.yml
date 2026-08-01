@@ -1,0 +1,75 @@
+services:
+  database:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: gogymgo
+      POSTGRES_PASSWORD: gogymgo
+      POSTGRES_USER: gogymgo
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gogymgo -d gogymgo']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - '5432:5432'
+    volumes:
+      - gogymgo_postgres:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    command:
+      [
+        'node',
+        'node_modules/node-pg-migrate/bin/node-pg-migrate.js',
+        'up',
+        '--migrations-dir',
+        'dist/migrations',
+        '--database-url-var',
+        'DATABASE_URL',
+      ]
+    environment: &runtime_environment
+      DATABASE_URL: postgresql://gogymgo:gogymgo@database:5432/gogymgo
+      PRETTY_LOGS_ENABLED: 'false'
+      NODE_ENV: development
+      OPENAPI_ENABLED: 'true'
+      PUSH_NOTIFICATIONS_ENABLED: 'false'
+    depends_on:
+      database:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    environment:
+      <<: *runtime_environment
+      REWARD_CODE_ENCRYPTION_KEY: ${REWARD_CODE_ENCRYPTION_KEY:?Set REWARD_CODE_ENCRYPTION_KEY in services/api/.env}
+      RUNTIME_ROLE: api
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - '${GOGYMGO_API_HOST_PORT:-3000}:3000'
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    command:
+      [
+        'node',
+        '--require',
+        './dist/observability/instrumentation.js',
+        'dist/worker.js',
+      ]
+    environment:
+      <<: *runtime_environment
+      RUNTIME_ROLE: worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  gogymgo_postgres:

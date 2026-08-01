@@ -5,14 +5,22 @@ import sharp from "sharp";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const adminDirectory = resolve(scriptDirectory, "..");
-const workspaceDirectory = resolve(adminDirectory, "..");
+const workspaceDirectory = resolve(adminDirectory, "..", "..");
 const mobileImagesDirectory = resolve(
   workspaceDirectory,
-  "mobile-app",
+  "apps",
+  "member-app",
   "assets",
   "images",
 );
-const markSource = resolve(adminDirectory, "public", "brand-mark.svg");
+const markSource = resolve(
+  workspaceDirectory,
+  "packages",
+  "brand",
+  "assets",
+  "logos",
+  "mark.svg",
+);
 const markSvg = await readFile(markSource, "utf8");
 
 async function renderMark(size) {
@@ -79,4 +87,4 @@ await Promise.all([
   ),
 ]);
 
-console.log("Generated GoGymGo brand assets from public/brand-mark.svg.");
+console.log("Generated GoGymGo application assets from packages/brand/assets/logos/mark.svg.");

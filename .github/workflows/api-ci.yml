@@ -1,0 +1,68 @@
+name: API CI
+
+on:
+  pull_request:
+    paths:
+      - "services/api/**"
+      - "infrastructure/gcp/terraform/**"
+      - "infrastructure/local/**"
+      - "packages/contracts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/api-ci.yml"
+      - ".github/workflows/deployment.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - "infrastructure/gcp/terraform/**"
+      - "infrastructure/local/**"
+      - "packages/contracts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/api-ci.yml"
+      - ".github/workflows/deployment.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - uses: actions/setup-node@v6
+        with:
+          cache: npm
+          cache-dependency-path: package-lock.json
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: terraform -chdir=infrastructure/gcp/terraform fmt -check -recursive
+      - run: terraform -chdir=infrastructure/gcp/terraform init -backend=false -input=false
+      - run: terraform -chdir=infrastructure/gcp/terraform validate
+      - run: terraform -chdir=infrastructure/gcp/terraform test
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          exit-code: "1"
+          format: table
+          hide-progress: true
+          scan-ref: infrastructure/gcp/terraform
+          scan-type: config
+          severity: HIGH,CRITICAL
+      - run: npm run check --workspace @gogymgo/api
+        env:
+          RUN_DATABASE_INTEGRATION: "true"
+      - run: npm run audit:deps --workspace @gogymgo/api
+      - run: docker compose -f infrastructure/local/compose.yml config --quiet
+        env:
+          REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      - run: docker build --file services/api/Dockerfile --tag gogymgo-api:ci .

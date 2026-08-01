@@ -1,10 +1,14 @@
 # Dependencies
 **/node_modules/
+**/.node_modules-incomplete/
 
 # Expo and React Native generated output
 **/.expo/
 **/.expo-shared/
 **/.expo-ci-production/
+**/.firebase/
+**/.vinext/
+**/.wrangler/
 **/dist/
 **/coverage/
 **/web-build/
@@ -43,3 +47,7 @@ Thumbs.db
 **/crash.log
 **/crash.*.log
 !**/.terraform.lock.hcl
+
+# Release and deployment archives
+*.dump
+*.zip

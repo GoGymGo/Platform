@@ -32,7 +32,11 @@ test("server-renders the GoGymGo administrator entry screen", async () => {
   assert.match(html, /<title>GoGymGo Admin<\/title>/i);
   assert.match(html, /GoGymGo/);
   assert.match(html, /ADMIN CONTROL/);
-  assert.match(html, /VERIFYING ADMIN ACCESS/);
+  assert.match(
+    html,
+    /VERIFYING ADMIN ACCESS|Firebase sign-in has not been configured/,
+  );
+  assert.doesNotMatch(html, /CONTROL DECK ONLINE|SYSTEM OVERVIEW/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);
   assert.doesNotMatch(
     html,

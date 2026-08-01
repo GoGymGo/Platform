@@ -50,6 +50,32 @@ const navigation: { id: AdminSection; label: string; short: string }[] = [
 
 const creatorFeaturesEnabled = false;
 
+function BrandMark() {
+  return (
+    <span aria-label="GoGymGo" className="brand-mark" role="img">
+      <span aria-hidden="true" className="brand-mark-letter">
+        G
+      </span>
+    </span>
+  );
+}
+
+function BrandWordmark() {
+  return (
+    <strong aria-label="GoGymGo" className="brand-wordmark">
+      <span aria-hidden="true" className="brand-wordmark-cyan">
+        GO
+      </span>
+      <span aria-hidden="true" className="brand-wordmark-pink">
+        GYM
+      </span>
+      <span aria-hidden="true" className="brand-wordmark-cyan">
+        GO
+      </span>
+    </strong>
+  );
+}
+
 const defaultCompetitionRules = {
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 10,
@@ -250,9 +276,9 @@ export function AdminDashboard({
     return (
       <div className="boot-screen">
         <div className="brand-lockup">
-          <span className="brand-mark">G</span>
+          <BrandMark />
           <span>
-            <strong>GoGymGo</strong>
+            <BrandWordmark />
             <small>ADMIN CONTROL</small>
           </span>
         </div>
@@ -276,9 +302,9 @@ export function AdminDashboard({
     <div className="admin-shell">
       <aside className="sidebar">
         <div className="brand-lockup sidebar-brand">
-          <span className="brand-mark">G</span>
+          <BrandMark />
           <span>
-            <strong>GoGymGo</strong>
+            <BrandWordmark />
             <small>ADMIN CONTROL</small>
           </span>
         </div>
@@ -621,9 +647,9 @@ function SignInScreen({
     <main className="sign-in-screen">
       <section className="sign-in-intro">
         <div className="brand-lockup">
-          <span className="brand-mark">G</span>
+          <BrandMark />
           <span>
-            <strong>GoGymGo</strong>
+            <BrandWordmark />
             <small>ADMIN CONTROL</small>
           </span>
         </div>
@@ -1268,8 +1294,8 @@ function ContentPanel({
           <div className="alert warning compact">
             <span>!</span>
             <p>
-              Creator features are paused for testing. Existing catalog records stay
-              visible, but creating, editing, publishing and unpublishing workouts is disabled.
+              Creator features are disabled for the current release. Existing catalog records stay
+              available for administrative review, but creator-workout changes are disabled.
             </p>
           </div>
         ) : null}
@@ -1791,7 +1817,7 @@ function RegionForm({
             <input defaultValue={19} max={99} min={13} name="minimumAge" required type="number" />
           </Field>
           <Field label="POLICY VERSION">
-            <input name="policyVersion" placeholder="2026-pilot-v1" required />
+            <input name="policyVersion" placeholder="2026-09-v1" required />
           </Field>
           <Field label="BOUNDARY VERSION">
             <input name="boundaryVersion" placeholder="approved-source-v1" required />

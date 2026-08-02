@@ -5,6 +5,7 @@ on:
     paths:
       - "services/api/**"
       - "infrastructure/gcp/terraform/**"
+      - "infrastructure/aws/terraform/**"
       - "infrastructure/local/**"
       - "packages/contracts/**"
       - "package.json"
@@ -16,6 +17,7 @@ on:
     paths:
       - "services/api/**"
       - "infrastructure/gcp/terraform/**"
+      - "infrastructure/aws/terraform/**"
       - "infrastructure/local/**"
       - "packages/contracts/**"
       - "package.json"
@@ -50,12 +52,24 @@ jobs:
       - run: terraform -chdir=infrastructure/gcp/terraform init -backend=false -input=false
       - run: terraform -chdir=infrastructure/gcp/terraform validate
       - run: terraform -chdir=infrastructure/gcp/terraform test
+      - run: terraform -chdir=infrastructure/aws/terraform fmt -check -recursive
+      - run: terraform -chdir=infrastructure/aws/terraform init -backend=false -input=false
+      - run: terraform -chdir=infrastructure/aws/terraform validate
+      - run: terraform -chdir=infrastructure/aws/terraform test
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
           exit-code: "1"
           format: table
           hide-progress: true
           scan-ref: infrastructure/gcp/terraform
+          scan-type: config
+          severity: HIGH,CRITICAL
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          exit-code: "1"
+          format: table
+          hide-progress: true
+          scan-ref: infrastructure/aws/terraform
           scan-type: config
           severity: HIGH,CRITICAL
       - run: npm run check --workspace @gogymgo/api

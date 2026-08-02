@@ -1,0 +1,199 @@
+data "aws_iam_policy_document" "ecs_tasks_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      identifiers = ["ecs-tasks.amazonaws.com"]
+      type        = "Service"
+    }
+  }
+}
+
+resource "aws_iam_role" "ecs_execution" {
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name               = "${local.name}-ecs-execution"
+}
+
+data "aws_iam_policy_document" "ecs_execution" {
+  statement {
+    actions = [
+      "ecr:GetAuthorizationToken",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = [aws_ecr_repository.backend.arn]
+  }
+
+  statement {
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["${aws_cloudwatch_log_group.application.arn}:*"]
+  }
+
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = values(aws_secretsmanager_secret.runtime)[*].arn
+  }
+
+  statement {
+    actions   = ["kms:Decrypt"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_execution" {
+  name   = "${local.name}-ecs-execution"
+  policy = data.aws_iam_policy_document.ecs_execution.json
+  role   = aws_iam_role.ecs_execution.id
+}
+
+resource "aws_iam_role" "api" {
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name               = "${local.name}-api"
+}
+
+resource "aws_iam_role" "worker" {
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name               = "${local.name}-worker"
+}
+
+resource "aws_iam_role" "migration" {
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name               = "${local.name}-migration"
+}
+
+data "aws_iam_policy_document" "api" {
+  statement {
+    actions = ["s3:GetObject", "s3:PutObject"]
+    resources = [
+      "${aws_s3_bucket.user_content.arn}/avatars/*",
+      "${aws_s3_bucket.privacy_exports.arn}/privacy-exports/*",
+    ]
+  }
+
+  statement {
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "api" {
+  name   = "${local.name}-api-storage"
+  policy = data.aws_iam_policy_document.api.json
+  role   = aws_iam_role.api.id
+}
+
+data "aws_iam_policy_document" "worker" {
+  statement {
+    actions = ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
+    resources = [
+      "${aws_s3_bucket.user_content.arn}/*",
+      "${aws_s3_bucket.privacy_exports.arn}/*",
+    ]
+  }
+
+  statement {
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "worker" {
+  name   = "${local.name}-worker-storage"
+  policy = data.aws_iam_policy_document.worker.json
+  role   = aws_iam_role.worker.id
+}
+
+resource "aws_iam_openid_connect_provider" "github" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  url             = "https://token.actions.githubusercontent.com"
+}
+
+data "aws_iam_policy_document" "github_deploy_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      type        = "Federated"
+    }
+    condition {
+      test     = "StringEquals"
+      values   = ["sts.amazonaws.com"]
+      variable = "token.actions.githubusercontent.com:aud"
+    }
+    condition {
+      test     = "StringEquals"
+      values   = ["repo:${var.github_repository}:environment:${var.environment}"]
+      variable = "token.actions.githubusercontent.com:sub"
+    }
+  }
+}
+
+resource "aws_iam_role" "github_deploy" {
+  assume_role_policy   = data.aws_iam_policy_document.github_deploy_assume.json
+  max_session_duration = 3600
+  name                 = "${local.name}-github-deploy"
+}
+
+data "aws_iam_policy_document" "github_deploy" {
+  statement {
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:CompleteLayerUpload",
+      "ecr:DescribeImages",
+      "ecr:DescribeRepositories",
+      "ecr:InitiateLayerUpload",
+      "ecr:PutImage",
+      "ecr:UploadLayerPart",
+    ]
+    resources = [aws_ecr_repository.backend.arn]
+  }
+
+  statement {
+    actions = [
+      "ecs:DescribeServices",
+      "ecs:DescribeTaskDefinition",
+      "ecs:DescribeTasks",
+      "ecs:RegisterTaskDefinition",
+      "ecs:RunTask",
+      "ecs:UpdateService",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = ["iam:PassRole"]
+    resources = [
+      aws_iam_role.api.arn,
+      aws_iam_role.ecs_execution.arn,
+      aws_iam_role.migration.arn,
+      aws_iam_role.worker.arn,
+    ]
+    condition {
+      test     = "StringEquals"
+      values   = ["ecs-tasks.amazonaws.com"]
+      variable = "iam:PassedToService"
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "github_deploy" {
+  name   = "${local.name}-release"
+  policy = data.aws_iam_policy_document.github_deploy.json
+  role   = aws_iam_role.github_deploy.id
+}

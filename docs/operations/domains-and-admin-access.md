@@ -8,7 +8,7 @@ hosting provider reports the custom domain as verified and staging UAT passes.
 - Cloudflare account authoritative for `gogymgo.com`
 - GoGymGo Sites workspace containing the preserved landing and admin projects
 - Firebase console access to the production project
-- Google Cloud billing and project-owner access for `gogymgo-prod-8cb8b`
+- Administrator access to the dedicated `GoGymGo-Production` AWS member account
 - GitHub environment administration for the private `GoGymGo/Platform` repo
 
 ## Domain mapping order
@@ -48,16 +48,21 @@ Create separate `staging` and `production` environments. Production deployment
 remains manual. Configure environment-scoped values without placing secret
 payloads in repository variables:
 
-- `GCP_PROJECT_ID`
-- `GCP_REGION` (`northamerica-northeast1`)
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`
-- `GCP_DEPLOY_SERVICE_ACCOUNT`
-- `BACKEND_NAME_PREFIX` when the default is not used
+- `AWS_ACCOUNT_ID`
+- `AWS_REGION` (`ca-central-1`)
+- `AWS_DEPLOY_ROLE_ARN`
+- `ECR_REPOSITORY`
+- `ECS_CLUSTER`
+- `ECS_API_SERVICE` and `ECS_API_TASK_DEFINITION`
+- `ECS_WORKER_SERVICE` and `ECS_WORKER_TASK_DEFINITION`
+- `ECS_MIGRATION_TASK_DEFINITION`, `ECS_MIGRATION_SUBNETS`, and
+  `ECS_MIGRATION_SECURITY_GROUPS`
+- `API_URL`
 - public API and Firebase configuration required by each frontend
 
-Use distinct deployment identities, Firebase projects, databases, secrets and
-URLs for staging and production. Keep secret values in Google Secret Manager or
-the hosting provider's encrypted environment storage.
+Use distinct AWS accounts, deployment identities, Firebase projects, databases,
+secrets, Terraform state and URLs for staging and production. Keep secret values
+in AWS Secrets Manager or the hosting provider's encrypted environment storage.
 
 ## Verification
 

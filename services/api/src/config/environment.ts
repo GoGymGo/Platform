@@ -70,13 +70,18 @@ export const environmentSchema = z
     OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
     OTEL_SERVICE_NAME: optionalTrimmedString,
     FIREBASE_PROJECT_ID: optionalTrimmedString,
+    FIREBASE_SERVICE_ACCOUNT_JSON: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
     DATABASE_URL: z
       .string()
       .url()
       .default('postgresql://gogymgo:gogymgo@localhost:5432/gogymgo'),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
-    GCP_STORAGE_BUCKET: optionalTrimmedString,
+    PRIVATE_OBJECT_STORAGE_PROVIDER: z
+      .enum(['google-cloud', 'aws-s3'])
+      .default('google-cloud'),
+    PRIVATE_CONTENT_BUCKET: optionalTrimmedString,
+    AWS_REGION: optionalTrimmedString,
     PROFILE_MEDIA_ENABLED: booleanString.default(false),
     PROFILE_MEDIA_MAX_BYTES: z.coerce
       .number()
@@ -274,12 +279,26 @@ export const environmentSchema = z
       }
     }
 
-    if (environment.PROFILE_MEDIA_ENABLED && !environment.GCP_STORAGE_BUCKET) {
+    if (
+      environment.PRIVATE_OBJECT_STORAGE_PROVIDER === 'aws-s3' &&
+      !environment.AWS_REGION
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AWS_REGION is required when private storage uses aws-s3.',
+        path: ['AWS_REGION'],
+      });
+    }
+
+    if (
+      environment.PROFILE_MEDIA_ENABLED &&
+      !environment.PRIVATE_CONTENT_BUCKET
+    ) {
       context.addIssue({
         code: 'custom',
         message:
-          'GCP_STORAGE_BUCKET is required when PROFILE_MEDIA_ENABLED is true.',
-        path: ['GCP_STORAGE_BUCKET'],
+          'PRIVATE_CONTENT_BUCKET is required when PROFILE_MEDIA_ENABLED is true.',
+        path: ['PRIVATE_CONTENT_BUCKET'],
       });
     }
 

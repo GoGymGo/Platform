@@ -14,7 +14,7 @@ export async function getGoGymGoFirebaseApp(
     process.env.FIREBASE_AUTH_EMULATOR_HOST = emulatorHost;
   }
 
-  const { applicationDefault, getApps, initializeApp } =
+  const { applicationDefault, cert, getApps, initializeApp } =
     await import('firebase-admin/app');
   const existingApp = getApps().find((app) => app.name === firebaseAppName);
   if (existingApp) {
@@ -22,11 +22,26 @@ export async function getGoGymGoFirebaseApp(
   }
 
   const projectId = config.get('FIREBASE_PROJECT_ID', { infer: true });
+  const serviceAccountJson = config.get('FIREBASE_SERVICE_ACCOUNT_JSON', {
+    infer: true,
+  });
+  let credential = applicationDefault();
+  if (serviceAccountJson) {
+    try {
+      const serviceAccount: unknown = JSON.parse(serviceAccountJson);
+      if (typeof serviceAccount !== 'object' || serviceAccount === null) {
+        throw new Error('Firebase service account must be a JSON object.');
+      }
+      credential = cert(serviceAccount);
+    } catch {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.');
+    }
+  }
   return initializeApp(
     emulatorHost
       ? { projectId }
       : {
-          credential: applicationDefault(),
+          credential,
           ...(projectId ? { projectId } : {}),
         },
     firebaseAppName,

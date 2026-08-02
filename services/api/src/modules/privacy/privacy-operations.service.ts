@@ -40,7 +40,7 @@ export class PrivacyOperationsService {
   ) {
     this.enabled = config.get('PRIVACY_OPERATIONS_ENABLED', { infer: true });
     this.exportBucket = config.get('PRIVACY_EXPORT_BUCKET', { infer: true });
-    this.contentBucket = config.get('GCP_STORAGE_BUCKET', { infer: true });
+    this.contentBucket = config.get('PRIVATE_CONTENT_BUCKET', { infer: true });
     this.exportRetentionDays = config.get('PRIVACY_EXPORT_RETENTION_DAYS', {
       infer: true,
     });

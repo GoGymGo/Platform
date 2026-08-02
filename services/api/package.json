@@ -46,6 +46,8 @@
     "check": "npm run format:check && npm run typecheck && npm run lint && npm run test:cov && npm run test:e2e && npm run test:integration && npm run openapi:generate && npm run format:check && npm run audit:contract && npm run audit:source && npm run build && npm run audit:production-build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1101.0",
+    "@aws-sdk/s3-request-presigner": "3.1101.0",
     "@google-cloud/storage": "7.21.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

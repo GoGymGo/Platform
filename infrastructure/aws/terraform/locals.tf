@@ -71,6 +71,7 @@ locals {
     {
       DATABASE_URL                  = aws_secretsmanager_secret.runtime["DATABASE_URL"].arn
       FIREBASE_SERVICE_ACCOUNT_JSON = aws_secretsmanager_secret.runtime["FIREBASE_SERVICE_ACCOUNT_JSON"].arn
+      REWARD_CODE_ENCRYPTION_KEY    = aws_secretsmanager_secret.runtime["REWARD_CODE_ENCRYPTION_KEY"].arn
     },
     var.privacy_operations_enabled ? {
       PRIVACY_PSEUDONYMIZATION_KEY = aws_secretsmanager_secret.runtime["PRIVACY_PSEUDONYMIZATION_KEY"].arn

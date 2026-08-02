@@ -83,12 +83,12 @@ run "feature_secrets_remain_role_scoped" {
   }
 
   assert {
-    condition     = length(local.api_secret_environment) == 3 && length(local.worker_secret_environment) == 4
+    condition     = length(local.api_secret_environment) == 3 && length(local.worker_secret_environment) == 5
     error_message = "API-only and worker-only secret injection must remain isolated."
   }
 
   assert {
-    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && !contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
+    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
     error_message = "Runtime tasks must not receive secrets they do not consume."
   }
 }

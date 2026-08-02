@@ -96,6 +96,22 @@ jobs:
             exit 1
           fi
 
+      - name: Verify runtime secret mappings
+        shell: bash
+        run: |
+          set -euo pipefail
+          for task_definition in \
+            "$ECS_API_TASK_DEFINITION" \
+            "$ECS_WORKER_TASK_DEFINITION"; do
+            secret_count="$(aws ecs describe-task-definition \
+              --task-definition "$task_definition" \
+              | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length')"
+            if [[ "$secret_count" != "1" ]]; then
+              echo "${task_definition} must map REWARD_CODE_ENCRYPTION_KEY exactly once." >&2
+              exit 1
+            fi
+          done
+
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -236,9 +252,16 @@ jobs:
             --task-definition "$worker_definition" \
             --desired-count 1 \
             --force-new-deployment > /dev/null
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "$ECS_WORKER_SERVICE"
+          if ! aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE"; then
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_WORKER_SERVICE" \
+              --desired-count 0 > /dev/null || true
+            echo "The worker failed to stabilize and was returned to zero tasks." >&2
+            exit 1
+          fi
 
       - name: Deploy the API with circuit-breaker rollback
         shell: bash

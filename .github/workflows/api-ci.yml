@@ -83,3 +83,7 @@ jobs:
         env:
           REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       - run: docker build --file services/api/Dockerfile --tag gogymgo-api:ci .
+      - name: Verify the production image can run migrations
+        run: >-
+          docker run --rm --entrypoint node gogymgo-api:ci
+          node_modules/node-pg-migrate/bin/node-pg-migrate.js --help

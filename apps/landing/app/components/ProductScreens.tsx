@@ -98,7 +98,7 @@ function TimerScreen() {
           <i />
           SESSION ACTIVE
         </span>
-        <strong>HEART RATE</strong>
+        <strong>GYM QR</strong>
       </div>
       <div className="app-hud app-live-panel">
         <div className="app-live-metrics">
@@ -108,9 +108,9 @@ function TimerScreen() {
             <small>30:00 MINIMUM</small>
           </div>
           <div>
-            <span>LIVE HEART RATE</span>
-            <strong>138</strong>
-            <small>BPM // ON TRACK</small>
+            <span>SERVER TIMER</span>
+            <strong>11:18</strong>
+            <small>REMAINING // ON TRACK</small>
           </div>
         </div>
         <div className="app-workout-progress">
@@ -125,12 +125,12 @@ function TimerScreen() {
       <div className="app-hud app-verification-card">
         <div>
           <span>VERIFICATION</span>
-          <strong>HEART RATE SESSION</strong>
+          <strong>STATIC QR SESSION</strong>
         </div>
         <b>IN PROGRESS</b>
         <p>
-          Your timer and verification progress save automatically. GoGymGo
-          tells you when an action is needed.
+          Scan the same poster again after 30 minutes. GoGymGo rechecks live
+          proximity and completes the session using server time.
         </p>
       </div>
       <div className="app-disabled-action">FINISH UNLOCKS AT 30:00</div>
@@ -219,7 +219,7 @@ export function ProductScreens() {
               focused panels, one primary action, and clear status at every
               step.
             </p>
-            <Link className="text-link" href="/demo">
+            <Link className="text-link" href="https://app.gogymgo.com/demo">
               WALK THROUGH THE REAL FLOW <span aria-hidden="true">→</span>
             </Link>
           </div>

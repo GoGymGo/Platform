@@ -12,6 +12,7 @@ import { CompetitionsModule } from './modules/competitions/competitions.module';
 import { DrawsModule } from './modules/draws/draws.module';
 import { CreatorWorkoutsModule } from './modules/creator-workouts/creator-workouts.module';
 import { HealthModule } from './modules/health/health.module';
+import { GymsModule } from './modules/gyms/gyms.module';
 import { LeaderboardsModule } from './modules/leaderboards/leaderboards.module';
 import { LegalModule } from './modules/legal/legal.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
@@ -68,6 +69,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
                 'req.body.codes',
                 'req.body.pushToken',
                 'req.body.deviceEvidenceToken',
+                'req.body.credential',
                 'req.body.qrPayload',
                 'req.body.latitude',
                 'req.body.longitude',
@@ -111,6 +113,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
     OperatorModule,
     OperationsModule,
     HealthModule,
+    GymsModule,
     ProfilesModule,
     PartnersModule,
     RegionsModule,

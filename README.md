@@ -72,4 +72,4 @@ The helper starts PostGIS, migrations, the API, worker, Expo web app and optiona
 
 Staging and production use separate Firebase, Google Cloud, database, secret, deployment-identity and URL configuration. Production deployment is manual through the protected `Platform Deployment` GitHub Actions workflow.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [product requirements](docs/product/product-requirements.md), [architecture](docs/architecture/api.md), and [operations](docs/operations/api-deployment.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [product requirements](docs/product/product-requirements.md), [QR verification architecture](docs/architecture/session-evidence-review.md), [September pilot runbook](docs/operations/september-qr-pilot.md), [production domains and admin access](docs/operations/domains-and-admin-access.md), and [API deployment](docs/operations/api-deployment.md).

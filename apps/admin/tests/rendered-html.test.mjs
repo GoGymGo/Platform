@@ -45,8 +45,9 @@ test("server-renders the GoGymGo administrator entry screen", async () => {
 });
 
 test("keeps authorization and mutation safeguards in the implementation", async () => {
-  const [dashboard, proxy, layout, packageJson] = await Promise.all([
+  const [dashboard, pilot, proxy, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/pilot-operations.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/api/gogymgo/[...path]/route.ts", import.meta.url),
       "utf8",
@@ -63,6 +64,17 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /name="reason"/);
   assert.match(dashboard, /ADMINISTRATIVE ACTION/);
   assert.match(dashboard, /idempotency-key/);
+  assert.match(dashboard, /operator\/gym-locations/);
+  assert.match(dashboard, /operator\/gym-sessions/);
+  assert.match(dashboard, /operator\/region-waitlist/);
+  assert.match(dashboard, /operator\/interest-submissions/);
+  assert.match(dashboard, /operator\/partner-applications/);
+  assert.match(dashboard, /operator\/cash-fulfillments/);
+  assert.match(pilot, /STATIC QR PILOT/);
+  assert.match(pilot, /DOWNLOAD SVG FOR PRINTING/);
+  assert.match(pilot, /Sessions \+ incomplete visits/);
+  assert.match(pilot, /owner|cash handoff/i);
+  assert.doesNotMatch(pilot, /dangerouslySetInnerHTML/);
 
   assert.match(proxy, /path\[0\]\s*!==\s*"operator"/);
   assert.match(proxy, /This administrative route is not available/);

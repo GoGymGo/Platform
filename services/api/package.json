@@ -40,7 +40,8 @@
     "audit:contract": "node scripts/audit-frontend-contract.mjs",
     "audit:deps": "npm audit --omit=dev --audit-level=high",
     "admin:bootstrap": "ts-node --project tsconfig.json scripts/bootstrap-admin.ts",
-    "configure:internal-legal-drafts": "ts-node --project tsconfig.json scripts/configure-internal-legal-drafts.ts",
+    "pilot:reset-onboarding": "ts-node --project tsconfig.json scripts/reset-pilot-onboarding.ts",
+    "pilot:import-landing-d1": "ts-node --project tsconfig.json scripts/import-landing-d1.ts",
     "configure:september-2026-island-pilot": "ts-node --project tsconfig.json scripts/configure-september-2026-island-pilot.ts",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm run test:cov && npm run test:e2e && npm run test:integration && npm run openapi:generate && npm run format:check && npm run audit:contract && npm run audit:source && npm run build && npm run audit:production-build"
   },
@@ -70,6 +71,7 @@
     "pg": "^8.22.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.4.3"
@@ -85,6 +87,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.20.0",
+    "@types/qrcode": "^1.5.6",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

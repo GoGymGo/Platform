@@ -14,8 +14,8 @@ export class RewardWinnerResponseDto {
   @ApiProperty({ type: String })
   rewardTitle!: string;
 
-  @ApiProperty({ enum: ['coupon', 'physical'], type: String })
-  rewardType!: 'coupon' | 'physical';
+  @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
+  rewardType!: 'cash' | 'coupon' | 'physical';
 
   @ApiProperty({ type: StreakCountsDto })
   streaks!: StreakCountsDto;

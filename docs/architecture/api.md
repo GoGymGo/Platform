@@ -96,8 +96,8 @@ Code completion does not replace these staging approvals:
    32-byte coupon encryption key;
 3. sponsor contracts covering inventory, images, terms, expiry, fulfillment,
    substitutions, support ownership, and secure coupon delivery;
-4. real-device notification, integrity, signed-QR, wearable, and liveness tests
-   for every evidence type required by policy;
+4. real-device notification, camera, static-QR and live-location tests for the
+   September pilot policy;
 5. counsel-approved contest and privacy documents for each enabled region and
    locale, plus operator, export, erasure, and incident rehearsals;
 6. load tests confirming API, worker, and database connection budgets.

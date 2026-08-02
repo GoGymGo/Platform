@@ -53,7 +53,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '05',
     title: 'VERIFY SESSIONS',
-    body: 'Heart-rate device and Partner Gym QR sessions include quick device presence checks.',
+    body: 'Scan the same approved gym QR on entry and exit. Both scans require live location within the gym geofence.',
     tone: 'cyan'
   },
   {

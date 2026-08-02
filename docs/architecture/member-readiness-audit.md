@@ -90,6 +90,10 @@ and equivalent tests/render behavior.
 
 ## Remaining release-blocking inputs and connections
 
+The September browser pilot uses only the connected static gym QR and live
+location flow. Wearable, heart-rate, biometric and random-presence items below
+are retained as historical/future readiness notes and are not pilot blockers.
+
 The authoritative status matrix and integration order live in
 `backend-handoff-architecture.md`. Code checks are green. Store release remains
 blocked until the release owner supplies or approves:
@@ -98,9 +102,8 @@ blocked until the release owner supplies or approves:
 2. the EAS owner and initialized EAS project ID;
 3. a public HTTPS production API deployment;
 4. public privacy-policy and account-deletion URLs with approved wording;
-5. at least one genuine workout evidence provider (wearable/heart-rate or
-   verified partner-gym QR); and
-6. physical-device validation for QR camera, device presence, push token,
+5. the real condo gym and issued static QR credential; and
+6. physical-device validation for QR camera, location, push token,
    notification permission, and signed avatar upload states.
 
 ## Required verification for completion
@@ -111,8 +114,8 @@ blocked until the release owner supplies or approves:
   retry.
 - Exercise every API-backed surface in loading, empty, success, validation,
   unauthorized, conflict, server-error, offline, and idempotent-retry states.
-- Complete one QR workout and one non-QR workout on physical iOS and Android
-  devices, including a mid-session presence check.
+- Complete one 30-minute QR entry/exit session with two real browser accounts
+  at the staging condo gym.
 - Verify one full monthly competition lifecycle: enrollment, four Weekly
   Challenges, bonus days, settlement, Winners Circle, and reward claim.
 - Confirm aliases and at most two streak badges wherever a player alias appears.

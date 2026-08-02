@@ -1,4 +1,4 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
@@ -17,7 +17,6 @@ import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useMyStreaks } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
-import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { useAuth } from '@/state/auth';
 import { useProfile } from '@/state/profile';
 import { useCompetitionRegion } from '@/state/competitionRegion';
@@ -42,19 +41,9 @@ type SettingsGroups = {
   legal: readonly SettingsRow[];
 };
 
-function getSettingsRows(
-  verificationSourceLabel: string,
-  verificationSourceSaved: boolean
-): SettingsGroups {
+function getSettingsRows(): SettingsGroups {
   return {
     preferences: [
-      {
-        title: 'WORKOUT DEVICE',
-        subtitle: verificationSourceLabel,
-        status: verificationSourceSaved ? 'DEFAULT' : 'NOT SET',
-        tone: 'muted',
-        route: '/verification?source=profile' as Href
-      },
       {
         title: 'HOW THE COMPETITION WORKS',
         subtitle: 'GOALS, ENTRIES, RANKINGS AND REWARDS',
@@ -82,12 +71,6 @@ function getSettingsRows(
         route: '/official-rules' as Href
       },
       {
-        title: 'DEVICE PRESENCE / QR CAMERA CONSENT',
-        subtitle: 'LOCAL CHECKS // NO BIOMETRIC OR QR IMAGERY STORED',
-        tone: 'muted',
-        route: '/consent-settings' as Href
-      },
-      {
         title: 'ACCOUNT DATA & DELETION',
         subtitle: 'EXPORT DATA // REQUEST ACCOUNT DELETION',
         tone: 'muted',
@@ -99,7 +82,6 @@ function getSettingsRows(
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
   const { signOutUser, user } = useAuth();
   const { publicName } = useProfile();
   const { data: streakSummary } = useMyStreaks();
@@ -112,8 +94,6 @@ export default function ProfileScreen() {
     totalEntries,
     verifiedSessionCount
   } = useWorkoutProgress();
-  const { preference: verificationPreference, saved: verificationPreferenceSaved } =
-    useWorkoutVerificationPreference();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string>();
   const [showProfileEditor, setShowProfileEditor] = useState(false);
@@ -138,10 +118,7 @@ export default function ProfileScreen() {
       accent: 'pink'
     }
   ];
-  const settingsGroups = getSettingsRows(
-    verificationPreferenceSaved ? verificationPreference.sourceLabel : 'CHOOSE AT FIRST WORKOUT',
-    verificationPreferenceSaved
-  );
+  const settingsGroups = getSettingsRows();
   const providerLabel = formatProviderLabel(user?.providerIds ?? []);
 
   async function performSignOut() {
@@ -253,24 +230,6 @@ export default function ProfileScreen() {
             </TerminalText>
           ) : null}
         </View>
-
-        {deviceSaved === '1' ? (
-          <HUDBorderBox style={styles.savedDeviceNotice} tone="green">
-            <View style={styles.savedDeviceCopy}>
-              <TerminalText glow live="polite" tone="green" variant="label">
-                WORKOUT DEVICE SAVED
-              </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="caption">
-                This device will be selected automatically for your next workout.
-              </TerminalText>
-            </View>
-            <CompactTextButton
-              label="Dismiss"
-              onPress={() => router.replace('/profile')}
-              tone="muted"
-            />
-          </HUDBorderBox>
-        ) : null}
 
         <HUDBorderBox style={styles.accountCard} tone="cyan">
           <TerminalText tone="dim" variant="label">

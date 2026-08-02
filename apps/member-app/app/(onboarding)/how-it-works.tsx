@@ -18,7 +18,7 @@ import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const loopSteps = [
   ['COMMIT', 'Choose 1-7 verified workout days per week.'],
-  ['VERIFY', 'Use a heart-rate device or partner-gym QR.'],
+  ['VERIFY', 'Scan the approved gym QR on entry and again after 30 minutes.'],
   [
     'BUILD ODDS',
     'Earn prize draw entries through consistency, teamwork and competition'

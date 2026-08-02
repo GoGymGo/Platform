@@ -218,8 +218,10 @@ function auditAppTourCoverage(appDirectory) {
   );
   const routeExemptions = new Set([
     '/app-tour',
+    '/demo',
     '/consents',
     '/entry-confirmed',
+    '/scan',
     '/test-preview'
   ]);
   const dynamicRouteExamples = new Map([
@@ -609,6 +611,10 @@ function auditAuthoritativeSessionRulesBoundary() {
     path.join(projectRoot, 'app/(modals)/qr-scanner.tsx'),
     'utf8'
   );
+  const gymScanRepository = fs.readFileSync(
+    path.join(projectRoot, 'src/data/gymScanRepository.ts'),
+    'utf8'
+  );
 
   for (const marker of [
     'serverSession.requirements.minSessionMinutes',
@@ -634,9 +640,12 @@ function auditAuthoritativeSessionRulesBoundary() {
       'app/workout/check-out.tsx: check-out must use the started session duration'
     );
   }
-  if (!qrScanner.includes('activeSession.minimumSessionSeconds')) {
+  if (
+    !qrScanner.includes('result.remainingSeconds') ||
+    !gymScanRepository.includes("'/v1/gym-scans'")
+  ) {
     issues.push(
-      'app/(modals)/qr-scanner.tsx: partner-gym exit must use the started session duration'
+      'app/(modals)/qr-scanner.tsx: pilot QR status must use the authoritative scan endpoint and server remaining time'
     );
   }
 }

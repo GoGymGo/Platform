@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -32,6 +34,13 @@ export class AdminLegalDocumentsService {
     idempotencyKey: string,
     input: PublishLegalDocumentDto,
   ): Promise<AdminLegalDocumentResponseDto> {
+    if (input.ownerApprovalConfirmed !== true) {
+      throw new BadRequestException({
+        code: 'LEGAL_OWNER_APPROVAL_REQUIRED',
+        message:
+          'The GoGymGo owner must explicitly approve this exact legal version before publication.',
+      });
+    }
     const jurisdictionCode = normalizeJurisdictionCode(input.jurisdictionCode);
     const locale = normalizeLegalLocale(input.locale);
     const title = input.title.trim();
@@ -51,6 +60,15 @@ export class AdminLegalDocumentsService {
           principal,
           transaction,
         );
+        if (
+          principal.email?.trim().toLowerCase() !== 's1ck5ense123@gmail.com'
+        ) {
+          throw new ForbiddenException({
+            code: 'LEGAL_OWNER_APPROVAL_REQUIRED',
+            message:
+              'Only the configured GoGymGo owner may approve a legal version for publication.',
+          });
+        }
         const lockKey = [input.documentKey, jurisdictionCode, locale].join(':');
         await sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`.execute(
           transaction,
@@ -98,6 +116,8 @@ export class AdminLegalDocumentsService {
             effective_at: effectiveAt,
             jurisdiction_code: jurisdictionCode,
             locale,
+            owner_approved_at: now,
+            owner_approved_by_user_id: admin.id,
             receipt_requirement: input.receiptRequirement,
             title,
             version: input.version.trim(),
@@ -127,6 +147,8 @@ export class AdminLegalDocumentsService {
             effectiveAt: effectiveAt.toISOString(),
             jurisdictionCode,
             locale,
+            ownerApprovedAt: now.toISOString(),
+            ownerApprovedByUserId: admin.id,
             receiptRequirement: input.receiptRequirement,
             version: input.version,
           },

@@ -10,7 +10,7 @@ const steps = [
   {
     number: "02",
     title: "Verify each workout",
-    copy: "Follow one guided timer using an eligible heart-rate device or a partner gym QR flow.",
+    copy: "Scan the approved gym poster on entry and exit while GoGymGo keeps the authoritative 30-minute timer.",
   },
   {
     number: "03",
@@ -100,11 +100,11 @@ export default function Home() {
             to win fitness brand rewards.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary" href="/demo">
+            <Link className="button button-primary" href="https://app.gogymgo.com/demo">
               TRY THE APP FLOW <span aria-hidden="true">→</span>
             </Link>
-            <Link className="button button-secondary" href="/gym-goers">
-              PRE-REGISTER <span aria-hidden="true">↗</span>
+            <Link className="button button-secondary" href="https://app.gogymgo.com/join">
+              JOIN BETA <span aria-hidden="true">↗</span>
             </Link>
           </div>
           <p className="hero-note">
@@ -171,7 +171,7 @@ export default function Home() {
             results screens as the mobile app. It stays on your device and
             never creates a real account or competition entry.
           </p>
-          <Link className="button button-primary" href="/demo">
+          <Link className="button button-primary" href="https://app.gogymgo.com/demo">
             OPEN THE APP DEMO <span aria-hidden="true">→</span>
           </Link>
         </div>
@@ -276,7 +276,7 @@ export default function Home() {
           <h2>See the app. Then choose how you want to join.</h2>
         </div>
         <div className="final-actions">
-          <Link className="button button-primary" href="/demo">
+          <Link className="button button-primary" href="https://app.gogymgo.com/demo">
             TRY THE APP FLOW <span aria-hidden="true">→</span>
           </Link>
           <Link className="button button-secondary" href="/gym-goers">

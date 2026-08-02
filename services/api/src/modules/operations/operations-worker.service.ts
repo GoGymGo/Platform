@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CompetitionLifecycleService } from '../competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../competitions/competition-scoring.service';
+import { GymsService } from '../gyms/gyms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
 import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
@@ -9,6 +10,7 @@ export interface WorkerRunResult {
   competitionsActivated: number;
   competitionsCancelled: number;
   competitionPeriodsSettled: number;
+  incompleteGymSessionsExpired: number;
   notificationsSent: number;
   profileMediaCleanupFailed: number;
   profileMediaDeleted: number;
@@ -22,6 +24,7 @@ export class OperationsWorkerService {
   constructor(
     private readonly competitions: CompetitionLifecycleService,
     private readonly competitionScoring: CompetitionScoringService,
+    private readonly gyms: GymsService,
     private readonly notifications: NotificationsService,
     private readonly profileMedia: ProfileMediaCleanupService,
     private readonly privacy: PrivacyOperationsService,
@@ -49,6 +52,10 @@ export class OperationsWorkerService {
       () => this.competitionScoring.processDuePeriods(),
       0,
     );
+    const incompleteGymSessionsExpired = await attempt(
+      () => this.gyms.expireIncompleteSessions(),
+      0,
+    );
     const profileMedia = await attempt(() => this.profileMedia.process(), {
       deleted: 0,
       failed: 0,
@@ -74,6 +81,7 @@ export class OperationsWorkerService {
       competitionsActivated: competitions.activated,
       competitionsCancelled: competitions.cancelled,
       competitionPeriodsSettled,
+      incompleteGymSessionsExpired,
       notificationsSent,
       profileMediaCleanupFailed: profileMedia.failed,
       profileMediaDeleted: profileMedia.deleted,

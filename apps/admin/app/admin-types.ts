@@ -67,7 +67,7 @@ export type Reward = {
   id: string;
   imageUrl: string | null;
   inventoryTotal: number;
-  rewardType: "coupon" | "physical";
+  rewardType: "cash" | "coupon" | "physical";
   sponsorName: string;
   status: string;
   termsUrl: string | null;
@@ -99,6 +99,7 @@ export type LegalDocument = {
   id: string;
   jurisdictionCode: string;
   locale: string;
+  ownerApprovedAt: string | null;
   receiptRequirement: string;
   status: "effective" | "scheduled" | "withdrawn";
   title: string;
@@ -159,9 +160,29 @@ export type SystemHealth = {
 
 export type AdminSection =
   | "overview"
+  | "pilot"
   | "competitions"
   | "rewards"
   | "regions"
   | "content"
   | "operations"
   | "audit";
+import type {
+  CashFulfillmentRecordDto,
+  GymLocationResponseDto,
+  GymQrCredentialResponseDto,
+  OperatorAuditHistoryDto,
+  OperatorGymSessionDto,
+  OperatorInterestSubmissionDto,
+  OperatorPartnerApplicationDto,
+  RegionWaitlistEntryDto,
+} from "@gogymgo/contracts";
+
+export type CashFulfillment = CashFulfillmentRecordDto;
+export type GymLocation = GymLocationResponseDto;
+export type GymQrCredential = GymQrCredentialResponseDto;
+export type GymSession = OperatorGymSessionDto;
+export type InterestSubmission = OperatorInterestSubmissionDto;
+export type PartnerApplication = OperatorPartnerApplicationDto;
+export type PilotAuditEvent = OperatorAuditHistoryDto;
+export type RegionWaitlistEntry = RegionWaitlistEntryDto;

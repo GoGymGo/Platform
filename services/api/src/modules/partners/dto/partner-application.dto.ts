@@ -1,6 +1,7 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsString, IsUrl, Length, MaxLength } from 'class-validator';
 import type {
+  JsonValue,
   PartnerApplicationStatus,
   PartnerApplicationType,
 } from '../../../database/database.types';
@@ -83,4 +84,15 @@ export class PartnerApplicationResponseDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   submittedAt!: string;
+}
+
+export class OperatorPartnerApplicationDto extends PartnerApplicationResponseDto {
+  @ApiPropertyOptional({ format: 'email', nullable: true, type: String })
+  contactEmail!: string | null;
+
+  @ApiProperty({ type: Object })
+  payload!: JsonValue;
+
+  @ApiProperty({ type: String })
+  region!: string;
 }

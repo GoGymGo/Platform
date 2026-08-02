@@ -104,10 +104,10 @@ export class CompetitionResponseDto {
   @ApiProperty({ isArray: true, type: Number })
   goalDays!: number[];
 
-  @ApiProperty({ minimum: 100, type: Number })
+  @ApiProperty({ minimum: 2, type: Number })
   minimumEntrants!: number;
 
-  @ApiProperty({ minimum: 100, nullable: true, type: Number })
+  @ApiProperty({ minimum: 2, nullable: true, type: Number })
   entrantCap!: number | null;
 
   @ApiProperty({ format: 'date-time', type: String })

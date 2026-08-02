@@ -27,6 +27,10 @@ import type {
   SystemHealth,
   WorkQueueItem,
 } from "./admin-types";
+import {
+  PilotOperationsPanel,
+  type PilotData,
+} from "./pilot-operations";
 
 type AuthStage = "checking" | "denied" | "ready" | "signed-out";
 type HttpMethod = "POST" | "PUT";
@@ -40,6 +44,7 @@ type ConfirmAction = {
 
 const navigation: { id: AdminSection; label: string; short: string }[] = [
   { id: "overview", label: "Overview", short: "OV" },
+  { id: "pilot", label: "QR Pilot", short: "QR" },
   { id: "competitions", label: "Competitions", short: "CO" },
   { id: "rewards", label: "Rewards", short: "RW" },
   { id: "regions", label: "Regions", short: "RG" },
@@ -49,6 +54,15 @@ const navigation: { id: AdminSection; label: string; short: string }[] = [
 ];
 
 const creatorFeaturesEnabled = false;
+
+const emptyPilotData: PilotData = {
+  auditEvents: [],
+  gyms: [],
+  interestSubmissions: [],
+  partnerApplications: [],
+  sessions: [],
+  waitlist: [],
+};
 
 function BrandMark() {
   return (
@@ -81,9 +95,9 @@ const defaultCompetitionRules = {
   minHeartRateSamples: 10,
   minSessionMinutes: 30,
   perfectMonthMultiplier: 10,
-  requireDeviceAttestation: true,
+  requireDeviceAttestation: false,
   requireGymQr: true,
-  requirePresenceCheck: true,
+  requirePresenceCheck: false,
   signupPrizeDrawEntries: 1,
   verifiedSessionCategoryScore: 10,
   verifiedSessionPrizeDrawEntries: 2,
@@ -107,6 +121,7 @@ export function AdminDashboard({
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [queue, setQueue] = useState<WorkQueueItem[]>([]);
+  const [pilotData, setPilotData] = useState<PilotData>(emptyPilotData);
   const [loadError, setLoadError] = useState(
     firebaseConfigured
       ? ""
@@ -150,17 +165,47 @@ export function AdminDashboard({
     setBusy(true);
     setLoadError("");
     try {
-      const [dashboardResult, healthResult, queueResult] = await Promise.all([
+      const [
+        dashboardResult,
+        healthResult,
+        queueResult,
+        gyms,
+        sessions,
+        waitlist,
+        interestSubmissions,
+        partnerApplications,
+        auditEvents,
+      ] = await Promise.all([
         adminRequest<DashboardSnapshot>(
           activeUser,
           "operator/configuration/dashboard",
         ),
         adminRequest<SystemHealth>(activeUser, "operator/system-health"),
         adminRequest<WorkQueueItem[]>(activeUser, "operator/work-queue"),
+        adminRequest<PilotData["gyms"]>(activeUser, "operator/gym-locations"),
+        adminRequest<PilotData["sessions"]>(activeUser, "operator/gym-sessions"),
+        adminRequest<PilotData["waitlist"]>(activeUser, "operator/region-waitlist"),
+        adminRequest<PilotData["interestSubmissions"]>(
+          activeUser,
+          "operator/interest-submissions",
+        ),
+        adminRequest<PilotData["partnerApplications"]>(
+          activeUser,
+          "operator/partner-applications",
+        ),
+        adminRequest<PilotData["auditEvents"]>(activeUser, "operator/audit-history"),
       ]);
       setSnapshot(dashboardResult);
       setHealth(healthResult);
       setQueue(queueResult);
+      setPilotData({
+        auditEvents,
+        gyms,
+        interestSubmissions,
+        partnerApplications,
+        sessions,
+        waitlist,
+      });
       setAuthStage("ready");
     } catch (error) {
       const status =
@@ -197,18 +242,19 @@ export function AdminDashboard({
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  async function mutate(
+  async function mutate<T = unknown>(
     successMessage: string,
     path: string,
     method: HttpMethod,
     body: unknown,
-  ) {
+  ): Promise<T> {
     setSubmitting(true);
     setLoadError("");
     try {
-      await request(path, { body, method });
+      const result = await request<T>(path, { body, method });
       if (user) await refresh(user);
       setToast(successMessage);
+      return result;
     } catch (error) {
       setLoadError(errorMessage(error));
       throw error;
@@ -255,6 +301,7 @@ export function AdminDashboard({
     setSnapshot(null);
     setHealth(null);
     setQueue([]);
+    setPilotData(emptyPilotData);
     setAuthStage("signed-out");
   }
 
@@ -411,6 +458,62 @@ export function AdminDashboard({
                   tone: action === "cancel" ? "danger" : "primary",
                 })
               }
+            />
+          ) : null}
+          {section === "pilot" ? (
+            <PilotOperationsPanel
+              {...pilotData}
+              competitions={snapshot.competitions}
+              onAssignGym={async (competitionId, gymId, body) => {
+                await mutate(
+                  "Gym assigned to competition.",
+                  `operator/competitions/${competitionId}/gym-locations/${gymId}`,
+                  "POST",
+                  body,
+                );
+              }}
+              onCreateGym={async (body) => {
+                await mutate(
+                  "Gym location created.",
+                  "operator/gym-locations",
+                  "POST",
+                  body,
+                );
+              }}
+              onIssueQr={(gymId, body) =>
+                mutate(
+                  "Printable QR poster issued.",
+                  `operator/gym-locations/${gymId}/qr-credentials`,
+                  "POST",
+                  body,
+                )
+              }
+              onRecordCash={async (body) => {
+                await mutate(
+                  "Cash handoff recorded.",
+                  "operator/cash-fulfillments",
+                  "POST",
+                  body,
+                );
+              }}
+              onRevokeQr={async (gymId, body) => {
+                await mutate(
+                  "QR credential revoked.",
+                  `operator/gym-locations/${gymId}/qr-credentials/revoke`,
+                  "POST",
+                  body,
+                );
+              }}
+              onUpdateGym={async (gymId, body) => {
+                await mutate(
+                  "Gym location updated.",
+                  `operator/gym-locations/${gymId}`,
+                  "PUT",
+                  body,
+                );
+              }}
+              regions={snapshot.regions}
+              submitting={submitting}
             />
           ) : null}
           {section === "rewards" ? (
@@ -1368,6 +1471,7 @@ function ContentPanel({
                 <th>Scope</th>
                 <th>Version</th>
                 <th>Effective</th>
+                <th>Owner approval</th>
                 <th>Status</th>
                 <th aria-label="Actions" />
               </tr>
@@ -1384,6 +1488,11 @@ function ContentPanel({
                   </td>
                   <td>{document.version}</td>
                   <td>{formatDate(document.effectiveAt)}</td>
+                  <td>
+                    <span className={`status-tag ${document.ownerApprovedAt ? "active" : "draft"}`}>
+                      {document.ownerApprovedAt ? "approved" : "not approved"}
+                    </span>
+                  </td>
                   <td>
                     <span className={`status-tag ${document.status}`}>
                       {document.status}
@@ -1596,10 +1705,10 @@ function CompetitionForm({
             />
           </Field>
           <Field label="MINIMUM ENTRANTS">
-            <input defaultValue={competition?.minimumEntrants ?? 100} min={100} name="minimumEntrants" required type="number" />
+            <input defaultValue={competition?.minimumEntrants ?? 2} min={2} name="minimumEntrants" required type="number" />
           </Field>
           <Field label="ENTRANT CAP (OPTIONAL)">
-            <input defaultValue={competition?.entrantCap ?? ""} min={100} name="entrantCap" type="number" />
+            <input defaultValue={competition?.entrantCap ?? ""} min={2} name="entrantCap" type="number" />
           </Field>
           <Field label="REGISTRATION OPENS">
             <input defaultValue={toLocalDateTime(competition?.registrationOpensAt ?? dates.registrationOpensAt)} name="registrationOpensAt" required type="datetime-local" />
@@ -1701,6 +1810,7 @@ function RewardForm({
             <select defaultValue={reward?.rewardType ?? "physical"} name="rewardType">
               <option value="physical">Physical</option>
               <option value="coupon">Coupon code</option>
+              <option value="cash">Cash</option>
             </select>
           </Field>
           <Field label="INVENTORY">
@@ -1962,6 +2072,7 @@ function LegalDocumentForm({
         effectiveAt: toIso(form, "effectiveAt"),
         jurisdictionCode: String(form.get("jurisdictionCode")),
         locale: String(form.get("locale")),
+        ownerApprovalConfirmed: form.get("ownerApprovalConfirmed") === "on",
         reason: String(form.get("reason")),
         receiptRequirement: String(form.get("receiptRequirement")),
         title: String(form.get("title")),
@@ -2013,6 +2124,12 @@ function LegalDocumentForm({
             />
           </Field>
           <ReasonField defaultValue="Publish a counsel-approved legal document version." />
+          <label className="check-row field wide">
+            <input name="ownerApprovalConfirmed" required type="checkbox" />
+            <span>
+              I am the GoGymGo owner and explicitly approve this exact version for publication.
+            </span>
+          </label>
         </FormGrid>
         {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions onClose={onClose} submitting={submitting} submitLabel="PUBLISH VERSION" />

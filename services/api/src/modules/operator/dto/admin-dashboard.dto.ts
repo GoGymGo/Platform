@@ -258,6 +258,9 @@ export class AdminDashboardLegalDocumentDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   effectiveAt!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  ownerApprovedAt!: string | null;
 }
 
 export class AdminDashboardAuditEventDto {

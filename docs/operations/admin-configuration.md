@@ -14,7 +14,7 @@ All routes use the `/v1/operator/configuration` prefix:
 - `PUT /creator-workouts/:id` replaces an unpublished workout when `expectedVersion` matches.
 - `POST /creator-workouts/:id/status-action` publishes or unpublishes a workout when `expectedVersion` matches.
 
-Competition publication requires a future registration close and start, a region policy covering the full lifecycle, enabled competition operations, at least one goal bracket, and at least one published catalog reward. Creator workout publication requires absolute HTTPS media URLs and currently enabled target regions.
+Competition publication requires a future registration close and start, a region policy covering the full lifecycle, enabled competition operations, at least one goal bracket, at least one published catalog reward, and, when QR verification is required, at least one assigned active gym. Creator workout publication requires absolute HTTPS media URLs and currently enabled target regions.
 
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, it instead cancels the competition, withdraws active enrollments, queues a neutral cancellation notification, and records an append-only audit event.
 
@@ -22,14 +22,21 @@ The worker changes a published competition from `registration` to `active` at it
 
 There is deliberately no public role-grant endpoint. A user must verify their Firebase email and sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:
 
+The first production administrator is deliberately restricted to
+`s1ck5ense123@gmail.com`.
+
 ```powershell
-$env:BOOTSTRAP_ADMIN_FIREBASE_UID='<firebase uid>'
+$env:BOOTSTRAP_ADMIN_EMAIL='s1ck5ense123@gmail.com'
 $env:BOOTSTRAP_ADMIN_REASON='<approved change-ticket reason>'
 $env:CONFIRM_BOOTSTRAP_ADMIN='yes'
-npm.cmd run admin:bootstrap
+npm.cmd run admin:bootstrap --workspace @gogymgo/api
 ```
 
-`DATABASE_URL` must already come from the runtime secret manager. Do not place any of these values in source control, shell scripts, CI logs, or Expo environment variables. The command is idempotent, does not print the Firebase UID, and records `user.admin_bootstrapped` in the append-only operator audit ledger.
+`DATABASE_URL` must already come from the runtime secret manager. Do not place any of these values in source control, shell scripts, CI logs, or Expo environment variables. The command resolves the already-created database user by email, is idempotent and records `user.admin_bootstrapped` in the append-only operator audit ledger.
+
+Publishing a legal document is additionally restricted to this owner email and
+requires explicit approval of the exact immutable version. Unapproved legacy
+documents are not returned by the member legal API.
 
 After the first bootstrap, role administration should be implemented as a separate, dual-approval security workflow before additional administrators are delegated. Do not broaden the configuration endpoints to grant roles.
 

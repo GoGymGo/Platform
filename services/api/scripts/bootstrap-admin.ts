@@ -14,11 +14,15 @@ async function main(): Promise<void> {
     );
   }
   const databaseUrl = requiredEnvironment('DATABASE_URL');
-  const firebaseUid = requiredEnvironment('BOOTSTRAP_ADMIN_FIREBASE_UID');
+  const administratorEmail = (
+    process.env.BOOTSTRAP_ADMIN_EMAIL ?? 's1ck5ense123@gmail.com'
+  )
+    .trim()
+    .toLowerCase();
   const reason = requiredEnvironment('BOOTSTRAP_ADMIN_REASON');
-  if (firebaseUid.length > 128) {
+  if (administratorEmail !== 's1ck5ense123@gmail.com') {
     throw new Error(
-      'BOOTSTRAP_ADMIN_FIREBASE_UID must be at most 128 characters.',
+      'The production pilot bootstrap is restricted to s1ck5ense123@gmail.com.',
     );
   }
   if (reason.length < 8 || reason.length > 500) {
@@ -37,13 +41,14 @@ async function main(): Promise<void> {
     const user = await client.query<{ id: string; roles: string[] }>(
       `SELECT id, roles
        FROM users
-       WHERE firebase_uid = $1
+       WHERE lower(email) = $1
+         AND status = 'active'
        FOR UPDATE`,
-      [firebaseUid],
+      [administratorEmail],
     );
     if (user.rowCount !== 1) {
       throw new Error(
-        'The user must sign in once before the administrator role can be granted.',
+        's1ck5ense123@gmail.com must sign in once before the administrator role can be granted.',
       );
     }
     const current = user.rows[0];

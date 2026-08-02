@@ -44,7 +44,7 @@ export type LedgerReason =
   | 'verified_session'
   | 'weekly_match';
 export type DrawStatus = 'cancelled' | 'locked' | 'settled';
-export type RewardType = 'coupon' | 'physical';
+export type RewardType = 'cash' | 'coupon' | 'physical';
 export type RewardCatalogStatus = 'archived' | 'draft' | 'published';
 export type RewardAwardStatus =
   'awarded' | 'cancelled' | 'claimed' | 'fulfilled' | 'redeemed';
@@ -91,6 +91,11 @@ export type WeeklyChallengeRequestStatus =
   'accepted' | 'cancelled' | 'declined' | 'pending';
 export type CreatorVideoSubmissionStatus =
   'approved' | 'in_review' | 'rejected' | 'submitted' | 'withdrawn';
+export type GymQrCredentialStatus = 'active' | 'revoked';
+export type GymScanType = 'early_exit' | 'entry' | 'exit';
+export type GymScanOutcome = 'rejected' | 'started' | 'too_early' | 'verified';
+export type RegionWaitlistStatus =
+  'closed' | 'contacted' | 'launched' | 'waiting';
 
 export interface UsersTable {
   id: Generated<string>;
@@ -99,6 +104,7 @@ export interface UsersTable {
   email_verified: boolean;
   roles: string[];
   status: AccountStatus;
+  pilot_onboarding_reset_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -327,6 +333,12 @@ export interface LegalDocumentsTable {
   content_sha256: string;
   receipt_requirement: LegalReceiptRequirement;
   effective_at: Timestamp;
+  owner_approved_at: NullableTimestamp;
+  owner_approved_by_user_id: ColumnType<
+    string | null,
+    string | null | undefined,
+    string | null
+  >;
   created_at: Timestamp;
 }
 
@@ -422,6 +434,10 @@ export interface WorkoutSessionsTable {
   client_started_at: NullableTimestamp;
   started_at: Timestamp;
   completed_at: NullableTimestamp;
+  gym_location_id: string | null;
+  gym_credential_version: number | null;
+  expires_at: NullableTimestamp;
+  verification_mode: Generated<string>;
   verification_summary: ColumnType<
     JsonValue | null,
     JsonValue | null | undefined,
@@ -429,6 +445,49 @@ export interface WorkoutSessionsTable {
   >;
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+export interface GymLocationsTable {
+  id: Generated<string>;
+  region_policy_id: string;
+  name: string;
+  address: string;
+  coordinates: unknown;
+  radius_meters: number;
+  active: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface GymQrCredentialsTable {
+  id: Generated<string>;
+  gym_location_id: string;
+  credential_version: number;
+  token_hash: string;
+  status: GymQrCredentialStatus;
+  issued_by_user_id: string;
+  issued_at: Timestamp;
+  revoked_by_user_id: string | null;
+  revoked_at: NullableTimestamp;
+  revocation_reason: string | null;
+}
+
+export interface CompetitionGymLocationsTable {
+  competition_id: string;
+  gym_location_id: string;
+  created_at: Timestamp;
+}
+
+export interface GymScanEventsTable {
+  id: Generated<string>;
+  session_id: string;
+  user_id: string;
+  gym_location_id: string;
+  credential_version: number;
+  client_event_hash: string;
+  scan_type: GymScanType;
+  outcome: GymScanOutcome;
+  server_timestamp: Timestamp;
 }
 
 export interface SessionEventsTable {
@@ -547,6 +606,51 @@ export interface PartnerApplicationsTable {
   status: PartnerApplicationStatus;
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+export interface RegionWaitlistEntriesTable {
+  id: Generated<string>;
+  user_id: string | null;
+  email: string;
+  requested_region: string;
+  country_code: string | null;
+  subdivision_code: string | null;
+  source: string;
+  status: RegionWaitlistStatus;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface InterestSubmissionsTable {
+  id: Generated<string>;
+  audience: 'brand' | 'gym_goer';
+  email: string;
+  full_name: string;
+  company_name: string | null;
+  website: string | null;
+  region: string;
+  goal_days: number | null;
+  workout_style: string | null;
+  partnership_interest: string | null;
+  discovery_source: string | null;
+  message: string | null;
+  consent: boolean;
+  source: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface CashFulfillmentsTable {
+  id: Generated<string>;
+  reward_award_id: string;
+  competition_id: string;
+  winner_user_id: string;
+  amount_cents: number;
+  currency: string;
+  fulfilled_by_user_id: string;
+  fulfilled_at: Timestamp;
+  fulfillment_note: string;
+  created_at: Timestamp;
 }
 
 export interface PushDevicesTable {
@@ -676,6 +780,7 @@ export interface Database {
   account_legal_receipts: AccountLegalReceiptsTable;
   account_verification_consent_events: AccountVerificationConsentEventsTable;
   competition_draws: CompetitionDrawsTable;
+  competition_gym_locations: CompetitionGymLocationsTable;
   competition_enrollments: CompetitionEnrollmentsTable;
   competition_goal_brackets: CompetitionGoalBracketsTable;
   competition_matches: CompetitionMatchesTable;
@@ -684,14 +789,19 @@ export interface Database {
   competition_rule_acceptances: CompetitionRuleAcceptancesTable;
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;
+  cash_fulfillments: CashFulfillmentsTable;
   entry_ledger: EntryLedgerTable;
   friend_requests: FriendRequestsTable;
   friendships: FriendshipsTable;
+  gym_locations: GymLocationsTable;
+  gym_qr_credentials: GymQrCredentialsTable;
+  gym_scan_events: GymScanEventsTable;
   challenge_contact_invitations: ChallengeContactInvitationsTable;
   creator_workouts: CreatorWorkoutsTable;
   creator_video_submissions: CreatorVideoSubmissionsTable;
   creator_workout_plans: CreatorWorkoutPlansTable;
   idempotency_keys: IdempotencyKeysTable;
+  interest_submissions: InterestSubmissionsTable;
   legal_document_events: LegalDocumentEventsTable;
   legal_documents: LegalDocumentsTable;
   operator_audit_events: OperatorAuditEventsTable;
@@ -703,6 +813,7 @@ export interface Database {
   profiles: ProfilesTable;
   push_devices: PushDevicesTable;
   region_policies: RegionPoliciesTable;
+  region_waitlist_entries: RegionWaitlistEntriesTable;
   region_verifications: RegionVerificationsTable;
   reward_awards: RewardAwardsTable;
   reward_catalog_items: RewardCatalogItemsTable;

@@ -1,6 +1,6 @@
 export const competitionEnrollmentRules = {
   maximumWeeklyGoal: 7,
-  minimumEntrants: 100
+  minimumEntrants: 2
 } as const;
 
 export type CompetitionEnrollmentPolicy = {
@@ -159,7 +159,7 @@ function validatePolicy(policy: CompetitionEnrollmentPolicy) {
     !Number.isFinite(policy.minimumEntrants) ||
     policy.minimumEntrants < competitionEnrollmentRules.minimumEntrants
   ) {
-    throw new Error('Competition enrollment requires at least 100 entrants.');
+    throw new Error('Competition enrollment requires at least 2 entrants.');
   }
 
   if (

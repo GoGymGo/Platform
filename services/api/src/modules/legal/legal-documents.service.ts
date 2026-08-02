@@ -59,7 +59,12 @@ export class LegalDocumentsService {
           query.jurisdictionCode,
           query.locale,
         );
-        return this.buildStatus(transaction, user.id, bundle);
+        return this.buildStatus(
+          transaction,
+          user.id,
+          user.pilot_onboarding_reset_at,
+          bundle,
+        );
       });
   }
 
@@ -91,12 +96,19 @@ export class LegalDocumentsService {
           requiredDocuments,
         );
 
-        const existing = await transaction
+        let existingQuery = transaction
           .selectFrom('account_legal_receipt_bundles')
           .select('id')
           .where('user_id', '=', user.id)
-          .where('bundle_sha256', '=', bundle.bundleSha256)
-          .executeTakeFirst();
+          .where('bundle_sha256', '=', bundle.bundleSha256);
+        if (user.pilot_onboarding_reset_at) {
+          existingQuery = existingQuery.where(
+            'accepted_at',
+            '>',
+            user.pilot_onboarding_reset_at,
+          );
+        }
+        const existing = await existingQuery.executeTakeFirst();
         if (!existing) {
           const now = new Date();
           const receiptBundle = await transaction
@@ -128,7 +140,12 @@ export class LegalDocumentsService {
             .execute();
         }
 
-        const status = await this.buildStatus(transaction, user.id, bundle);
+        const status = await this.buildStatus(
+          transaction,
+          user.id,
+          user.pilot_onboarding_reset_at,
+          bundle,
+        );
         if (!status.complete) {
           throw new ServiceUnavailableException({
             code: 'LEGAL_RECEIPT_BUNDLE_INCOMPLETE',
@@ -159,6 +176,21 @@ export class LegalDocumentsService {
         code: 'CURRENT_LEGAL_RECEIPT_BUNDLE_REQUIRED',
         message:
           'A current account legal receipt bundle owned by this account is required.',
+      });
+    }
+    const account = await transaction
+      .selectFrom('users')
+      .select('pilot_onboarding_reset_at')
+      .where('id', '=', userId)
+      .executeTakeFirstOrThrow();
+    if (
+      account.pilot_onboarding_reset_at &&
+      receiptBundle.accepted_at <= account.pilot_onboarding_reset_at
+    ) {
+      throw new ConflictException({
+        code: 'LEGAL_RECEIPT_BUNDLE_STALE',
+        message:
+          'The pilot legal documents must be reviewed again before enrollment.',
       });
     }
 
@@ -242,6 +274,7 @@ export class LegalDocumentsService {
       .where('document.jurisdiction_code', 'in', hierarchy)
       .where('document.locale', '=', locale)
       .where('document.effective_at', '<=', now)
+      .where('document.owner_approved_at', 'is not', null)
       .execute();
 
     const selected = new Map<string, (typeof candidates)[number]>();
@@ -356,14 +389,22 @@ export class LegalDocumentsService {
   private async buildStatus(
     executor: DatabaseExecutor,
     userId: string,
+    onboardingResetAt: Date | null,
     bundle: CurrentLegalDocumentsResponseDto,
   ): Promise<LegalReceiptStatusResponseDto> {
-    const accepted = await executor
+    let acceptedQuery = executor
       .selectFrom('account_legal_receipt_bundles as bundle')
       .select(['bundle.accepted_at', 'bundle.id'])
       .where('bundle.user_id', '=', userId)
-      .where('bundle.bundle_sha256', '=', bundle.bundleSha256)
-      .executeTakeFirst();
+      .where('bundle.bundle_sha256', '=', bundle.bundleSha256);
+    if (onboardingResetAt) {
+      acceptedQuery = acceptedQuery.where(
+        'bundle.accepted_at',
+        '>',
+        onboardingResetAt,
+      );
+    }
+    const accepted = await acceptedQuery.executeTakeFirst();
     const requiredIds = new Set(
       this.requiredDocuments(bundle).map((document) => document.id),
     );

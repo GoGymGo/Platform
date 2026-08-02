@@ -44,14 +44,18 @@ The generated GeoJSON is stored at
   cancelled
 - Competition: September 1 at 12:00 a.m. PDT through October 1 at 12:00 a.m.
   PDT
-- Minimum entrants: 100
+- Minimum entrants: 2
 - Entrant cap: none
 - Weekly goals: one through seven days
 - Minimum verified session: 30 minutes
 - Heart-rate sample requirement: none for the pilot
 - Device attestation: not required for the pilot
-- Presence check: required
-- Partner-gym QR: not required
+- Presence check: not used in the pilot
+- Partner-gym QR: required
+- Gym geofence: 75 m with a 50 m maximum accepted accuracy reading
+- Static QR flow: scan on entry and scan the same poster after 30 minutes
+- Session expiry: four hours; a missing exit earns no credit
+- Reward: one $50 CAD cash reward sponsored by GoGymGo
 
 The competition remains a draft until at least one real, in-stock reward has
 been created and published. Do not use placeholder sponsor, prize, coupon or
@@ -59,11 +63,11 @@ fulfillment data to bypass this publication gate.
 
 ## Rebuild and verify
 
-From `backend` with the preview database running:
+From the monorepo root with the preview database running:
 
 ```powershell
 $env:DATABASE_URL = 'postgresql://gogymgo:gogymgo@127.0.0.1:5432/gogymgo'
-npm.cmd run configure:september-2026-island-pilot
+npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
 The dry run regenerates the boundary artifact and verifies 20 representative
@@ -72,21 +76,22 @@ has been bootstrapped:
 
 ```powershell
 $env:APPLY_PILOT_CONFIGURATION = 'yes'
-npm.cmd run configure:september-2026-island-pilot
+npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
 The configuration command is idempotent for the region policy and competition
 month. It uses the backend's audited operator services for database writes.
 
-After a real reward has been created and published, publish the competition
-through the same audited competition service. Publication immediately opens
-registration:
+After the real gym has been assigned and the legal, reward and UAT gates pass,
+publish the competition through the same audited competition service.
+Publication immediately opens registration:
 
 ```powershell
 $env:APPLY_PILOT_CONFIGURATION = 'yes'
 $env:PUBLISH_PILOT_COMPETITION = 'yes'
-npm.cmd run configure:september-2026-island-pilot
+npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
-The command refuses to publish if no published reward remains available through
-the October 1 competition end. It never creates placeholder reward data.
+The command creates and publishes the sole real $50 CAD cash reward and refuses
+to publish if any additional pilot reward is published. It never creates
+placeholder sponsor or fulfillment data.

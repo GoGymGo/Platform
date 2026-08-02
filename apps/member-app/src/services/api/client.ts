@@ -1,3 +1,5 @@
+import { assertLiveServicesAllowed } from '@/config/demoMode';
+
 export type ApiClientOptions = {
   baseUrl: string;
   getAccessToken: (forceRefresh?: boolean) => Promise<string>;
@@ -48,6 +50,7 @@ export function createApiClient({
       path: string,
       options: ApiRequestOptions<TBody> = {}
     ) => {
+      assertLiveServicesAllowed('GoGymGo API');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       const abortFromCaller = () => controller.abort();

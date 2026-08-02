@@ -115,6 +115,13 @@ export class RegionsService {
         if (regionCode) {
           query = query.where('region.code', '=', regionCode);
         }
+        if (user.pilot_onboarding_reset_at) {
+          query = query.where(
+            'verification.created_at',
+            '>',
+            user.pilot_onboarding_reset_at,
+          );
+        }
 
         const verification = await query
           .orderBy('verification.created_at', 'desc')

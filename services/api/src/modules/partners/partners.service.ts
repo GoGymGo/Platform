@@ -11,10 +11,12 @@ import type {
   PartnerApplicationType,
 } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import { AdminAuthorizationService } from '../operator/admin-authorization.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   CreatorApplicationDto,
   GymApplicationDto,
+  OperatorPartnerApplicationDto,
   PartnerApplicationResponseDto,
   SponsorApplicationDto,
 } from './dto/partner-application.dto';
@@ -34,7 +36,41 @@ export class PartnersService {
     private readonly database: DatabaseService,
     private readonly idempotency: IdempotencyService,
     private readonly profiles: ProfilesService,
+    private readonly adminAuthorization: AdminAuthorizationService,
   ) {}
+
+  async listApplications(
+    principal: AuthenticatedPrincipal,
+  ): Promise<OperatorPartnerApplicationDto[]> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.adminAuthorization.requireAdmin(principal, transaction);
+        const applications = await transaction
+          .selectFrom('partner_applications')
+          .select([
+            'application_type',
+            'contact_email',
+            'created_at',
+            'id',
+            'payload',
+            'region',
+            'status',
+          ])
+          .orderBy('created_at', 'desc')
+          .limit(500)
+          .execute();
+        return applications.map((application) => ({
+          applicationType: application.application_type,
+          contactEmail: application.contact_email,
+          id: application.id,
+          payload: application.payload,
+          region: application.region,
+          status: application.status,
+          submittedAt: application.created_at.toISOString(),
+        }));
+      });
+  }
 
   async submitCreator(
     principal: AuthenticatedPrincipal,

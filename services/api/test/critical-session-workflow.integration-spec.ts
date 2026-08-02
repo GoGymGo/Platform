@@ -969,6 +969,8 @@ describeWithDatabase('critical session and ledger workflow', () => {
           effective_at: effectiveAt,
           jurisdiction_code: 'GLOBAL',
           locale: 'en-CA',
+          owner_approved_at: effectiveAt,
+          owner_approved_by_user_id: operatorUserId,
           receipt_requirement: document.receiptRequirement,
           title: document.title,
           version: 'integration-v1',

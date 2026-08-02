@@ -23,7 +23,8 @@ does not match it. Nothing here references or shares Souvenote resources.
   alarms, and a per-account budget;
 - separate least-privilege API, worker, migration, and execution roles;
 - a GitHub OIDC deployment role restricted to the matching protected GitHub
-  environment. No long-lived AWS deployment key is required.
+  environment and the repository's immutable owner/repository IDs. No
+  long-lived AWS deployment key is required.
 
 The cost-controlled pilot intentionally gives Fargate tasks public egress while
 their security groups allow no direct inbound traffic. This avoids NAT Gateway

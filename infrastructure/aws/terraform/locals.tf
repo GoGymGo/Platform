@@ -1,6 +1,9 @@
 locals {
   name = "${var.name_prefix}-${var.environment}"
 
+  github_repository_parts = split("/", var.github_repository)
+  github_oidc_subject      = "repo:${local.github_repository_parts[0]}@${var.github_repository_owner_id}/${local.github_repository_parts[1]}@${var.github_repository_id}:environment:${var.environment}"
+
   tags = {
     Application = "GoGymGo"
     Environment = var.environment

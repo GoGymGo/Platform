@@ -132,7 +132,7 @@ data "aws_iam_policy_document" "github_deploy_assume" {
     }
     condition {
       test     = "StringEquals"
-      values   = ["repo:${var.github_repository}:environment:${var.environment}"]
+      values   = [local.github_oidc_subject]
       variable = "token.actions.githubusercontent.com:sub"
     }
   }

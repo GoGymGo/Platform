@@ -66,6 +66,11 @@ run "safe_isolated_foundation" {
     error_message = "The application KMS key must have an explicit service-aware key policy."
   }
 
+  assert {
+    condition     = local.github_oidc_subject == "repo:GoGymGo@275516911/Platform@1294409363:environment:staging"
+    error_message = "The GitHub deployment role must trust the immutable repository identity for the selected environment."
+  }
+
 }
 
 run "feature_secrets_remain_role_scoped" {

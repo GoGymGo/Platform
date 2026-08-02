@@ -1,6 +1,10 @@
 account_id = "111122223333"
 environment = "staging"
 
+github_repository          = "GoGymGo/Platform"
+github_repository_owner_id = "275516911"
+github_repository_id       = "1294409363"
+
 container_image    = "111122223333.dkr.ecr.ca-central-1.amazonaws.com/gogymgo-staging-backend/api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
 firebase_project_id = "replace-with-isolated-firebase-project-id"
 

@@ -108,13 +108,27 @@ resource "aws_budgets_budget" "monthly" {
   name         = "${local.name}-monthly"
   time_unit    = "MONTHLY"
 
+  # Measure gross service usage before promotional credits are applied. If
+  # credits were included, a healthy shared-credit balance could suppress the
+  # budget even while the environment's underlying run rate increased.
+  cost_types {
+    include_credit = false
+    include_refund = false
+  }
+
   dynamic "notification" {
-    for_each = var.budget_notification_email == null ? [] : [50, 80, 100]
+    for_each = var.budget_notification_email == null ? [] : [
+      { type = "ACTUAL", threshold = 25 },
+      { type = "ACTUAL", threshold = 50 },
+      { type = "ACTUAL", threshold = 80 },
+      { type = "ACTUAL", threshold = 100 },
+      { type = "FORECASTED", threshold = 100 },
+    ]
     content {
       comparison_operator        = "GREATER_THAN"
-      notification_type          = "FORECASTED"
+      notification_type          = notification.value.type
       subscriber_email_addresses = [var.budget_notification_email]
-      threshold                  = notification.value
+      threshold                  = notification.value.threshold
       threshold_type             = "PERCENTAGE"
     }
   }

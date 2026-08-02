@@ -47,8 +47,23 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = length(aws_ecs_service.api.load_balancer) == 0
+    error_message = "The bootstrap API service must not attach an unassociated target group before an HTTPS certificate and listener exist."
+  }
+
+  assert {
     condition     = local.api_environment.PRIVATE_OBJECT_STORAGE_PROVIDER == "aws-s3" && local.api_environment.AWS_REGION == "ca-central-1"
     error_message = "AWS tasks must select the S3 adapter explicitly."
+  }
+
+  assert {
+    condition     = aws_budgets_budget.monthly.cost_types[0].include_credit == false && aws_budgets_budget.monthly.cost_types[0].include_refund == false
+    error_message = "The staging budget must measure gross usage before credits and refunds obscure the underlying run rate."
+  }
+
+  assert {
+    condition     = aws_kms_key.data.policy != null
+    error_message = "The application KMS key must have an explicit service-aware key policy."
   }
 
 }

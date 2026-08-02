@@ -215,7 +215,7 @@ variable "monthly_budget_usd" {
 }
 
 variable "budget_notification_email" {
-  description = "Optional email for 50, 80, and 100 percent budget notifications."
+  description = "Optional email for gross-cost actual and forecast budget notifications."
   type        = string
   default     = null
   nullable    = true

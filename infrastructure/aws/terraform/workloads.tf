@@ -196,7 +196,7 @@ resource "aws_ecs_service" "api" {
   desired_count                      = var.api_desired_count
   enable_execute_command             = false
   force_new_deployment               = false
-  health_check_grace_period_seconds  = 60
+  health_check_grace_period_seconds  = var.api_certificate_arn == null ? null : 60
   launch_type                        = "FARGATE"
   name                               = "${local.name}-api"
   platform_version                   = "LATEST"
@@ -209,10 +209,14 @@ resource "aws_ecs_service" "api" {
     rollback = true
   }
 
-  load_balancer {
-    container_name   = "api"
-    container_port   = 3000
-    target_group_arn = aws_lb_target_group.api.arn
+  dynamic "load_balancer" {
+    for_each = var.api_certificate_arn == null ? [] : [var.api_certificate_arn]
+
+    content {
+      container_name   = "api"
+      container_port   = 3000
+      target_group_arn = aws_lb_target_group.api.arn
+    }
   }
 
   network_configuration {
@@ -222,6 +226,8 @@ resource "aws_ecs_service" "api" {
   }
 
   lifecycle { ignore_changes = [desired_count, task_definition] }
+
+  depends_on = [aws_lb_listener.https]
 }
 
 resource "aws_ecs_service" "worker" {

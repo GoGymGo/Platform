@@ -1,14 +1,18 @@
 # AWS account and cost plan
 
-Status: no-deploy migration prepared; no AWS resources or DNS changes have been
-made. Account emails, the real Terraform plan, and the Firebase credential method
-remain approval gates.
+Status: the isolated `GoGymGo-Staging` member account and its cost-controlled AWS
+foundation are deployed in `ca-central-1`. The private database, application
+login, PostGIS extension, runtime secrets, GitHub OIDC role, budget, and alarms
+are bootstrapped. API and worker desired counts remain zero. ACM is waiting for
+Cloudflare DNS validation; Google workload identity setup, the first application
+deployment, migrations, and UAT remain gated. Production is untouched.
 
 ## Isolation gate
 
 Keep the existing AWS Organizations management account named `Souvenote` as the
-billing and governance account only. Create two member accounts with unique root
-email aliases:
+billing and governance account only. The staging member account uses
+`contact@gogymgo.com`; create a separate production member account only after the
+production approval gate:
 
 - `GoGymGo-Staging`
 - `GoGymGo-Production`
@@ -20,10 +24,13 @@ Terraform requires the expected account ID and configures the AWS provider's
 `allowed_account_ids` guard, so an apply fails before creating resources if the
 operator is authenticated to Souvenote or the other GoGymGo environment.
 
-AWS Organizations credit sharing may make management-account promotional credits
-available to member accounts, subject to the credit's service and account
-eligibility. Confirm coverage in Billing after the first staging usage appears;
-budgets alert but do not stop resources automatically.
+AWS Organizations credit sharing is active, and the shared $5,000 AWS Activate
+credit currently lists every service used by this foundation as eligible. Eligible
+staging usage is therefore applied to the shared credit before the payment card.
+Taxes, ineligible services, and usage after the credit expires or is exhausted can
+still reach the card. Confirm the first staging line items in Billing after the
+usual 24-48 hour reporting delay; budgets alert but do not stop resources
+automatically.
 
 ## Resources per active environment
 
@@ -86,17 +93,16 @@ Pricing references: [AWS Fargate pricing](https://aws.amazon.com/fargate/pricing
 
 ## Approval sequence
 
-1. Supply the two unique account root email aliases. Never supply passwords,
-   verification codes, or access keys.
-2. Create the two member accounts and verify that Souvenote has no GoGymGo
-   workloads, secrets, or Terraform state.
-3. Bootstrap separate encrypted Terraform state in each member account.
-4. Populate staging inputs and generate a real saved Terraform plan.
-5. Review the exact plan and cost estimate; only then approve staging apply.
-6. Choose and approve Firebase credential federation from AWS. Do not create a
-   long-lived Firebase service-account key unless federation is proven
-   impractical and the exception is explicitly approved.
-7. Populate approved secret values outside Terraform state, issue ACM, and
-   review the exact Cloudflare DNS change.
-8. Run staging deployment and UAT. Production remains blocked on a separate
-   account plan, legal/owner approvals, and explicit production approval.
+1. Add the ACM validation CNAME in Cloudflare and wait for the certificate to be
+   issued; review the separate API hostname record before enabling it.
+2. Configure a staging-only Google workload identity pool/provider and
+   least-privilege Firebase service account. Do not create a long-lived Firebase
+   service-account key unless federation is proven impractical and the exception
+   is explicitly approved.
+3. Store the generated non-secret AWS external-account configuration in the
+   existing staging credential secret.
+4. Review and deploy an exact application image digest, run the one-shot migration
+   task, and scale the API and worker only for the approved UAT window.
+5. Verify health, authentication, alarms, and credit application after billing
+   data appears. Production remains blocked on a separate account plan,
+   legal/owner approvals, and explicit production approval.

@@ -83,11 +83,15 @@ placed in Terraform variables or state. Before starting ECS tasks:
    `DATABASE_URL` secret.
 3. Store a random base64-encoded 32-byte value in
    `REWARD_CODE_ENCRYPTION_KEY`.
-4. Prefer Google workload identity federation for Firebase access from AWS.
-   The current compatibility path accepts a least-privilege service-account JSON
-   in `FIREBASE_SERVICE_ACCOUNT_JSON`, injected only into the API and worker, but
-   creating that long-lived key requires an explicit exception approval and a
-   rotation plan.
+4. Configure Google workload identity federation for Firebase access from AWS.
+   Store the generated AWS external-account configuration JSON in the existing
+   `FIREBASE_SERVICE_ACCOUNT_JSON` secret. The API validates its Google endpoints,
+   provider audience, and project-scoped service-account URL, then exchanges the
+   ambient ECS task-role credentials for a short-lived Google access token. The
+   application ignores the configuration's metadata credential source, so it does
+   not attempt to use EC2 instance metadata from Fargate. A long-lived
+   service-account key remains a compatibility path only and requires an explicit
+   exception approval and rotation plan.
 5. Populate optional worker secrets only when the related feature is approved.
 
 The application continues using environment-specific Firebase Authentication

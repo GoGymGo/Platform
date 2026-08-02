@@ -72,6 +72,28 @@ The backend must also become authoritative for:
 - revoked or blocked sessions;
 - account deletion and data-retention workflows.
 
+### AWS staging credentials
+
+The AWS-hosted API and worker should authenticate to Firebase through Google
+Workload Identity Federation, not a downloaded service-account private key:
+
+1. Create a staging-only workload identity pool and AWS provider in the GoGymGo
+   Firebase project's Google Cloud project.
+2. Restrict the provider to the GoGymGo staging AWS account and ECS task-role
+   principals. Do not authorize the Souvenote account or a production role.
+3. Create a staging service account with only the Firebase permissions needed by
+   the API and worker, then grant the federated staging principal
+   `roles/iam.workloadIdentityUser` on that service account.
+4. Generate an AWS external-account credential configuration that uses service
+   account impersonation. Store that JSON in the existing staging
+   `FIREBASE_SERVICE_ACCOUNT_JSON` AWS secret.
+
+At runtime, the application validates the configuration's Google endpoints and
+project-scoped service-account URL, obtains temporary credentials from the ECS
+task role, and exchanges them for a short-lived Google access token. No Google
+private key or long-lived AWS access key is stored in GitHub, the task definition,
+or the repository.
+
 ## 7. Required Validation
 
 Before authentication is called production-ready, verify:

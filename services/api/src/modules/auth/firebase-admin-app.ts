@@ -1,6 +1,10 @@
 import type { ConfigService } from '@nestjs/config';
 import type { App } from 'firebase-admin/app';
 import type { Environment } from '../../config/environment';
+import {
+  createFirebaseAwsFederatedCredential,
+  isFirebaseAwsFederationConfig,
+} from './firebase-aws-federated-credential';
 
 const firebaseAppName = 'gogymgo-api';
 
@@ -28,13 +32,34 @@ export async function getGoGymGoFirebaseApp(
   let credential = applicationDefault();
   if (serviceAccountJson) {
     try {
-      const serviceAccount: unknown = JSON.parse(serviceAccountJson);
-      if (typeof serviceAccount !== 'object' || serviceAccount === null) {
-        throw new Error('Firebase service account must be a JSON object.');
+      const credentialConfig: unknown = JSON.parse(serviceAccountJson);
+      if (isFirebaseAwsFederationConfig(credentialConfig)) {
+        if (!projectId) {
+          throw new Error(
+            'FIREBASE_PROJECT_ID is required for workload identity federation.',
+          );
+        }
+        const region = config.get('AWS_REGION', { infer: true });
+        if (!region) {
+          throw new Error(
+            'AWS_REGION is required for workload identity federation.',
+          );
+        }
+        credential = createFirebaseAwsFederatedCredential(
+          credentialConfig,
+          projectId,
+          region,
+        );
+      } else {
+        if (typeof credentialConfig !== 'object' || credentialConfig === null) {
+          throw new Error('Firebase credential must be a JSON object.');
+        }
+        credential = cert(credentialConfig);
       }
-      credential = cert(serviceAccount);
     } catch {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.');
+      throw new Error(
+        'FIREBASE_SERVICE_ACCOUNT_JSON must contain a valid service-account key or AWS workload identity configuration.',
+      );
     }
   }
   return initializeApp(

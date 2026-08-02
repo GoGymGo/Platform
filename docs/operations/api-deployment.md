@@ -27,7 +27,8 @@ apply the rewritten baseline over an existing production migration ledger.
 - ECS Fargate API, worker service, and one-shot migration task;
 - environment-specific Firebase applications and GitHub OIDC;
 - private KMS-encrypted user-content and privacy-export S3 buckets;
-- AWS Secrets Manager values for `DATABASE_URL`, Firebase credentials, a random 32-byte base64
+- AWS Secrets Manager values for `DATABASE_URL`, the Firebase AWS
+  external-account configuration, a random 32-byte base64
   `REWARD_CODE_ENCRYPTION_KEY`, and optional enabled-feature secrets;
 - TLS domain, monitoring channels, and allowlisted origins.
 

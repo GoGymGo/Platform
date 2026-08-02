@@ -83,7 +83,19 @@ jobs:
         env:
           REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       - run: docker build --file services/api/Dockerfile --tag gogymgo-api:ci .
-      - name: Verify the production image can run migrations
-        run: >-
-          docker run --rm --entrypoint node gogymgo-api:ci
-          node_modules/node-pg-migrate/bin/node-pg-migrate.js --help
+      - name: Verify production image runtime dependencies
+        run: |
+          docker run --rm --entrypoint node gogymgo-api:ci -e '
+            const fs = require("node:fs");
+            const certificatePath = process.env.NODE_EXTRA_CA_CERTS;
+            if (!certificatePath) {
+              throw new Error("NODE_EXTRA_CA_CERTS is not configured.");
+            }
+            const bundle = fs.readFileSync(certificatePath, "utf8");
+            const certificateCount = bundle.match(/-----BEGIN CERTIFICATE-----/g)?.length ?? 0;
+            if (certificateCount !== 3) {
+              throw new Error(`Expected 3 RDS root certificates; found ${certificateCount}.`);
+            }
+          '
+          docker run --rm --entrypoint node gogymgo-api:ci \
+            node_modules/node-pg-migrate/bin/node-pg-migrate.js --help

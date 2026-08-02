@@ -30,6 +30,8 @@ apply the rewritten baseline over an existing production migration ledger.
 - AWS Secrets Manager values for `DATABASE_URL`, the Firebase AWS
   external-account configuration, a random 32-byte base64
   `REWARD_CODE_ENCRYPTION_KEY`, and optional enabled-feature secrets;
+- a `DATABASE_URL` that uses `sslmode=verify-full` with the image's
+  checksum-pinned Amazon RDS root CA bundle;
 - TLS domain, monitoring channels, and allowlisted origins.
 
 Coupon encryption keys are API-only. Never place them in `.env` files committed

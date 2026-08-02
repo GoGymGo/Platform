@@ -80,8 +80,9 @@ placed in Terraform variables or state. Before starting ECS tasks:
 
 1. Use the AWS-managed RDS master secret only from a one-off operator session to
    create a least-privilege application login and enable `postgis`.
-2. Store an SSL-required `DATABASE_URL` for that login in the output
-   `DATABASE_URL` secret.
+2. Store a hostname-verifying `DATABASE_URL` with `sslmode=verify-full` for that
+   login in the output `DATABASE_URL` secret. The production image trusts the
+   checksum-pinned Amazon RDS root CA bundle for Canada Central.
 3. Store a random base64-encoded 32-byte value in
    `REWARD_CODE_ENCRYPTION_KEY`.
 4. Configure Google workload identity federation for Firebase access from AWS.

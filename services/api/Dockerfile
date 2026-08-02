@@ -22,6 +22,7 @@ WORKDIR /workspace
 
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/services/api/package.json ./services/api/package.json
+COPY --from=build --chown=node:node /workspace/services/api/node_modules ./services/api/node_modules
 COPY --from=build --chown=node:node /workspace/services/api/dist ./services/api/dist
 
 RUN rm -rf /usr/local/lib/node_modules/npm \

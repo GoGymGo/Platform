@@ -113,6 +113,8 @@ jobs:
           fi
           image_tag="${ECR_REGISTRY}/${ECR_REPOSITORY}:${actual_commit}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker build --file services/api/Dockerfile --tag "$image_tag" .
+          docker run --rm --entrypoint node "$image_tag" \
+            node_modules/node-pg-migrate/bin/node-pg-migrate.js --help > /dev/null
           echo "tag=${image_tag}" >> "$GITHUB_OUTPUT"
 
       - uses: aquasecurity/trivy-action@v0.36.0

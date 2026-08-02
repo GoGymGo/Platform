@@ -1,0 +1,76 @@
+import { createHash } from 'node:crypto';
+
+export const gymScanPolicy = {
+  maximumAccuracyMeters: 50,
+  minimumSessionMilliseconds: 30 * 60 * 1_000,
+  sessionExpiryMilliseconds: 4 * 60 * 60 * 1_000,
+} as const;
+
+export type GymScanRejectionReason =
+  | 'competition_unavailable'
+  | 'daily_limit_reached'
+  | 'gym_inactive'
+  | 'inaccurate_location'
+  | 'invalid_or_revoked_credential'
+  | 'outside_geofence'
+  | 'replayed_event'
+  | 'session_credential_mismatch'
+  | 'session_expired'
+  | 'session_gym_mismatch';
+
+export function hashOpaqueValue(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+export function isAcceptableLocationAccuracy(accuracyMeters: number): boolean {
+  return (
+    Number.isFinite(accuracyMeters) &&
+    accuracyMeters > 0 &&
+    accuracyMeters <= gymScanPolicy.maximumAccuracyMeters
+  );
+}
+
+export function isWithinGymGeofence(
+  distanceMeters: number,
+  radiusMeters: number,
+): boolean {
+  return (
+    Number.isFinite(distanceMeters) &&
+    Number.isFinite(radiusMeters) &&
+    distanceMeters >= 0 &&
+    distanceMeters <= radiusMeters
+  );
+}
+
+export function isMatchingSessionCredential(
+  sessionCredentialVersion: number | null,
+  scannedCredentialVersion: number,
+): boolean {
+  return sessionCredentialVersion === scannedCredentialVersion;
+}
+
+export function resolveActiveSessionScan(input: {
+  expiresAt: Date;
+  now: Date;
+  startedAt: Date;
+}):
+  | { outcome: 'rejected'; reason: 'session_expired' }
+  | { outcome: 'too_early'; remainingSeconds: number }
+  | { outcome: 'verified'; remainingSeconds: 0 } {
+  if (input.now.getTime() >= input.expiresAt.getTime()) {
+    return { outcome: 'rejected', reason: 'session_expired' };
+  }
+
+  const elapsedMilliseconds = input.now.getTime() - input.startedAt.getTime();
+  if (elapsedMilliseconds < gymScanPolicy.minimumSessionMilliseconds) {
+    return {
+      outcome: 'too_early',
+      remainingSeconds: Math.ceil(
+        (gymScanPolicy.minimumSessionMilliseconds - elapsedMilliseconds) /
+          1_000,
+      ),
+    };
+  }
+
+  return { outcome: 'verified', remainingSeconds: 0 };
+}

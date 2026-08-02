@@ -10,6 +10,11 @@ import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import { AdminCompetitionConfigurationService } from '../src/modules/operator/admin-competition-configuration.service';
 import { AdminRegionConfigurationService } from '../src/modules/operator/admin-region-configuration.service';
 import { CompetitionStatusAction } from '../src/modules/operator/dto/admin-configuration.dto';
+import { AdminRewardsService } from '../src/modules/rewards/admin-rewards.service';
+import {
+  RewardCatalogStatusAction,
+  RewardTypeDto,
+} from '../src/modules/rewards/dto/reward.dto';
 
 const databaseUrl =
   process.env.DATABASE_URL?.trim() ??
@@ -523,7 +528,7 @@ async function configureCompetition(
         goalDays,
         label: `${goalDays} ${goalDays === 1 ? 'DAY' : 'DAYS'} / WEEK`,
       })),
-      minimumEntrants: 100,
+      minimumEntrants: 2,
       monthKey: competitionMonthKey,
       name: 'GoGymGo September 2026 Island Pilot',
       reason:
@@ -537,8 +542,8 @@ async function configureCompetition(
         minSessionMinutes: 30,
         perfectMonthMultiplier: 10,
         requireDeviceAttestation: false,
-        requireGymQr: false,
-        requirePresenceCheck: true,
+        requireGymQr: true,
+        requirePresenceCheck: false,
         signupPrizeDrawEntries: 1,
         verifiedSessionCategoryScore: 1,
         verifiedSessionPrizeDrawEntries: 1,
@@ -549,6 +554,69 @@ async function configureCompetition(
       startsAt: '2026-09-01T07:00:00.000Z',
     },
   );
+}
+
+async function configurePilotReward(
+  database: DatabaseService,
+  service: AdminRewardsService,
+  principal: AuthenticatedPrincipal,
+  competitionId: string,
+): Promise<string> {
+  const title = 'GoGymGo $50 CAD Cash Reward';
+  const existing = await database.connection
+    .selectFrom('reward_catalog_items')
+    .select(['id', 'status', 'version'])
+    .where('competition_id', '=', competitionId)
+    .where('title', '=', title)
+    .executeTakeFirst();
+  const reward =
+    existing ??
+    (await service.create(
+      principal,
+      'configure-september-2026-cash-reward-v1',
+      {
+        availableFrom: '2026-09-01T07:00:00.000Z',
+        availableUntil: '2026-10-02T07:00:00.000Z',
+        competitionId,
+        description:
+          'One $50 CAD cash prize sponsored by GoGymGo and fulfilled by an audited in-person handoff.',
+        displayOrder: 1,
+        fulfillmentInstructions:
+          'Administrator records the in-person $50 CAD handoff, timestamp and fulfillment note in GoGymGo admin.',
+        inventoryTotal: 1,
+        reason:
+          'Configure the single GoGymGo-sponsored cash reward for the September 2026 pilot.',
+        rewardType: RewardTypeDto.CASH,
+        sponsorName: 'GoGymGo',
+        title,
+      },
+    ));
+  if (reward.status === 'draft') {
+    await service.changeStatus(
+      principal,
+      reward.id,
+      'publish-september-2026-cash-reward-v1',
+      {
+        action: RewardCatalogStatusAction.PUBLISH,
+        expectedVersion: reward.version,
+        reason:
+          'Publish the single funded $50 CAD pilot reward before competition publication.',
+      },
+    );
+  }
+  const otherPublished = await database.connection
+    .selectFrom('reward_catalog_items')
+    .select('id')
+    .where('competition_id', '=', competitionId)
+    .where('status', '=', 'published')
+    .where('id', '!=', reward.id)
+    .executeTakeFirst();
+  if (otherPublished) {
+    throw new Error(
+      'The September pilot must have exactly one published reward; archive additional published rewards in admin.',
+    );
+  }
+  return reward.id;
 }
 
 async function publishCompetitionWhenReady(
@@ -660,6 +728,12 @@ async function main(): Promise<void> {
       principal,
       regionPolicyId,
     );
+    const rewardId = await configurePilotReward(
+      database,
+      app.get(AdminRewardsService),
+      principal,
+      competition.id,
+    );
     const publication = await publishCompetitionWhenReady(
       database,
       app.get(AdminCompetitionConfigurationService),
@@ -671,6 +745,7 @@ async function main(): Promise<void> {
         `competition ${publication.id} is ${publication.status} ` +
         `(version ${publication.version}).`,
     );
+    console.log(`Cash reward ${rewardId} is the sole published pilot reward.`);
   } finally {
     await app.close();
   }

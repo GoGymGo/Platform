@@ -65,7 +65,7 @@ export class RewardCatalogItemResponseDto {
   @ApiProperty({ type: String })
   description!: string;
 
-  @ApiProperty({ enum: ['coupon', 'physical'], type: String })
+  @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
   rewardType!: RewardType;
 
   @ApiProperty({ format: 'uri', nullable: true, type: String })
@@ -90,7 +90,7 @@ export class RewardAwardResponseDto {
   })
   status!: RewardAwardStatus;
 
-  @ApiProperty({ enum: ['coupon', 'physical'], type: String })
+  @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
   rewardType!: RewardType;
 
   @ApiProperty({ type: String })
@@ -124,6 +124,7 @@ export class ClaimRewardResponseDto extends RewardAwardResponseDto {
 }
 
 export enum RewardTypeDto {
+  CASH = 'cash',
   COUPON = 'coupon',
   PHYSICAL = 'physical',
 }

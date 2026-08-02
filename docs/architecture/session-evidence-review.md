@@ -1,42 +1,49 @@
-# Session evidence review
+# Static QR pilot verification
 
 ## Trust decision
 
-Workout evidence submitted by the Expo app is an untrusted claim. Heart-rate values and the local device-presence result are client-authored; QR and device tokens are reduced to hashes before storage. A complete submission may enter `pending_review`, but it cannot award competition progress or entries until an authorized operator makes an accountable decision.
+The September 2026 pilot uses one static, versioned gym credential plus a live
+browser location reading. The credential proves which configured poster was
+scanned; it does not prove that the browser or location signal is tamper-proof.
+The API therefore treats every client field as an untrusted claim and makes the
+complete decision using server state and server time.
 
-Manual review is a controlled fallback, not cryptographic verification. Production reward contests remain launch-blocked until required evidence sources have approved server-side verification implementations and real-device/provider UAT.
+Wearables, heart-rate evidence, device attestation, Face ID/passcode prompts,
+biometric consent and random mid-session checks are outside the pilot. Their
+legacy implementation is not reachable from the production member flow.
 
-## Bound review flow
+## One endpoint, two scans
 
-1. An authorized operator reads `GET /v1/operator/sessions/{sessionId}/review`.
-2. The API derives a privacy-minimized summary from the immutable session and append-only events. It returns counts, bounded aggregates, declared trust states, rule-required flags, and an `evidenceSnapshotSha256`. Raw QR/device values and their stored hashes are not returned.
-3. The operator submits either `POST /v1/operator/sessions/{sessionId}/verify` or `POST /v1/operator/sessions/{sessionId}/reject` with the exact snapshot digest, a reason, and one typed finding for each evidence category.
-4. In a row-locked transaction, the API recomputes the digest. A stale or foreign digest fails closed. Approval requires every competition-required category to be `approved` and no category to be `rejected`; rejection requires at least one explicit `rejected` finding.
-5. The API, not the operator, builds the stored decision summary and writes the operator, reason, snapshot, findings, and terminal state to the audit log. Approval appends the entry-ledger award exactly once. Rejection appends no value and is retry-safe, allowing settlement to proceed once every session is terminal.
+`POST /v1/gym-scans` accepts an authenticated `GymScanRequest` containing the
+opaque credential, a client event UUID and a fresh location accuracy/coordinate
+reading. It returns one of `started`, `too_early`, `verified` or `rejected`.
 
-The digest commits to the session identity, competition, eligible date, policy version, exact rules, server start/completion times, state, and every stored event ID, type, timestamp, and payload. Event order is canonicalized so the same evidence always produces the same digest.
+1. The API hashes the credential and resolves only an active credential version.
+2. It rejects accuracy worse than 50 metres and uses PostGIS to enforce the
+   configured 75 metre gym radius.
+3. It row-locks the player and current session so concurrent scans serialize.
+4. A first eligible scan starts the authoritative timer.
+5. A scan before 30 minutes returns `too_early` with the remaining server time.
+6. A scan after 30 minutes rechecks the geofence and completes the session.
+7. Active sessions expire after four hours. Missing exits earn no credit.
+8. A unique competition/user/local-date ledger constraint permits at most one
+   verified competition day per `America/Vancouver` calendar date.
+
+The scan event UUID and idempotency key protect separate replay and network-retry
+cases. Revocation invalidates the printed credential immediately; reissuing a
+poster increments its credential version.
 
 ## Data minimization
 
-The operator response intentionally excludes:
+Raw latitude, longitude and accuracy are used only inside the scan transaction.
+They are not inserted into scan events, session summaries, operator audit events
+or application logs. Retained scan data is limited to the gym, credential
+version, scan type, server timestamp and outcome. Structured logging redacts the
+credential and all coordinate-like fields.
 
-- raw QR payloads and device-attestation tokens;
-- stored QR/token hashes;
-- precise location data;
-- unrelated identity-document or reward-fulfillment data; and
-- arbitrary client-authored evidence summaries.
+## Operational limitation
 
-Only safe aggregates needed for a decision are exposed. Structured logs continue to redact evidence fields.
-
-## Required production integrations
-
-Before enabling production contest verification, choose and implement the evidence providers required by the approved competition policy. The current repository does not claim these controls exist.
-
-- Verify Apple App Attest and Google Play Integrity assertions server-side, including nonce, app identity, timestamp, replay, and device-risk policy.
-- Replace generic gym QR claims with short-lived, partner-signed, server-verifiable credentials and replay controls.
-- Define an approved source and consent model for heart-rate evidence; a client-posted BPM is not a wearable-provider assertion.
-- Verify any required local device-presence result through an approved attestation boundary; never transmit biometric identifiers, templates, images, or confidence scores.
-- Retain only the minimum provider result, reference, policy version, and audit evidence approved by security, privacy, and legal review.
-- Exercise success, replay, timeout, provider outage, appeal, and false-positive cases in staging on real iOS and Android devices.
-
-Until those gates pass, the API accurately labels a successful decision as `operator_manual_review`; it never labels the evidence `provider_verified`.
+Static QR plus browser GPS is best-effort proximity verification, not tamper-proof
+location attestation. The pilot is appropriate only after staging tests at the
+real condo gym, owner-approved rules describe the method accurately, and the
+reward risk is accepted.

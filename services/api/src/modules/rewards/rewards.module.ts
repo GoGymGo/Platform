@@ -15,7 +15,7 @@ import { RewardsService } from './rewards.service';
     AdminRewardsController,
     RewardsController,
   ],
-  exports: [RewardsService],
+  exports: [AdminRewardsService, RewardsService],
   imports: [AdminAuthorizationModule, ProfilesModule],
   providers: [
     AdminRewardAwardsService,

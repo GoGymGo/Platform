@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CompetitionsModule } from '../competitions/competitions.module';
+import { GymsModule } from '../gyms/gyms.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PrivacyModule } from '../privacy/privacy.module';
 import { ProfilesModule } from '../profiles/profiles.module';
@@ -10,6 +11,7 @@ import { WorkerObservabilityService } from './worker-observability.service';
   exports: [OperationsWorkerService, WorkerObservabilityService],
   imports: [
     CompetitionsModule,
+    GymsModule,
     NotificationsModule,
     PrivacyModule,
     ProfilesModule,

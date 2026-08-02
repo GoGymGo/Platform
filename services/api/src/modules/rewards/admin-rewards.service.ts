@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { sql, type Transaction } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
-import type { Database, JsonObject } from '../../database/database.types';
+import type {
+  Database,
+  JsonObject,
+  RewardType,
+} from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
 import {
@@ -145,8 +149,7 @@ export class AdminRewardsService {
             message: 'A reward with winner awards cannot be reconfigured.',
           });
         }
-        const requestedRewardType =
-          input.rewardType === RewardTypeDto.COUPON ? 'coupon' : 'physical';
+        const requestedRewardType: RewardType = input.rewardType;
         if (current.reward_type !== requestedRewardType) {
           const couponCode = await transaction
             .selectFrom('reward_coupon_codes')
@@ -477,14 +480,15 @@ export class AdminRewardsService {
 
   private assertClaimPath(input: CreateRewardCatalogItemDto): void {
     if (
-      input.rewardType === RewardTypeDto.PHYSICAL &&
+      (input.rewardType === RewardTypeDto.PHYSICAL ||
+        input.rewardType === RewardTypeDto.CASH) &&
       !input.claimUrl &&
       !input.fulfillmentInstructions?.trim()
     ) {
       throw new BadRequestException({
-        code: 'REWARD_PHYSICAL_CLAIM_PATH_REQUIRED',
+        code: 'REWARD_FULFILLMENT_PATH_REQUIRED',
         message:
-          'Physical rewards require a secure claim URL or fulfillment instructions.',
+          'Physical and cash rewards require a secure claim URL or fulfillment instructions.',
       });
     }
   }

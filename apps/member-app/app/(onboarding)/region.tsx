@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 
 import { AccountLegalAgreement } from '@/components/accountLegalAgreement';
-import { AuthStatusNotice } from '@/components/auth';
+import { AuthStatusNotice, AuthTextField } from '@/components/auth';
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
@@ -15,10 +15,13 @@ import {
 import { OnboardingHeader } from '@/components/onboarding';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
+import { submitRegionWaitlist } from '@/data/regionWaitlistRepository';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { ApiError } from '@/services/api/client';
 import { verifyCompetitionRegionWithDeviceLocation } from '@/services/competitionRegionVerification';
 import { useAppTour } from '@/state/appTour';
+import { useApi } from '@/state/api';
+import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 
 type VerificationState =
@@ -33,6 +36,8 @@ type VerificationState =
 export default function RegionScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
+  const { api } = useApi();
+  const { user } = useAuth();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const {
     competitionRegion,
@@ -42,6 +47,10 @@ export default function RegionScreen() {
   const createRegionVerification = useCreateRegionVerification();
   const [verificationState, setVerificationState] =
     useState<VerificationState>('idle');
+  const [requestedRegion, setRequestedRegion] = useState('');
+  const [waitlistBusy, setWaitlistBusy] = useState(false);
+  const [waitlistJoined, setWaitlistJoined] = useState(false);
+  const [waitlistError, setWaitlistError] = useState<string | null>(null);
   const isProfileSource = source === 'profile';
   const isHomeSource = source === 'home';
   const approvedRegionReady =
@@ -95,6 +104,30 @@ export default function RegionScreen() {
           ? 'unsupported-region'
           : 'service-error'
       );
+    }
+  }
+
+  async function joinRegionWaitlist() {
+    if (!api || !user?.email || requestedRegion.trim().length < 2) {
+      setWaitlistError('Enter the city or region where you want GoGymGo to launch.');
+      return;
+    }
+    setWaitlistBusy(true);
+    setWaitlistError(null);
+    try {
+      await submitRegionWaitlist(api, {
+        email: user.email,
+        requestedRegion: requestedRegion.trim()
+      });
+      setWaitlistJoined(true);
+    } catch (error) {
+      setWaitlistError(
+        error instanceof Error
+          ? error.message
+          : 'The regional waitlist could not be updated. Try again.'
+      );
+    } finally {
+      setWaitlistBusy(false);
     }
   }
 
@@ -191,10 +224,43 @@ export default function RegionScreen() {
           />
         ) : null}
         {verificationState === 'unsupported-region' ? (
-          <AuthStatusNotice
-            message="GOGYMGO IS NOT ACTIVE IN YOUR CURRENT REGION YET."
-            tone="amber"
-          />
+          <HUDBorderBox glow style={styles.waitlistCard} tone="amber">
+            <TerminalText glow tone="amber" variant="label">
+              OUTSIDE THE SEPTEMBER PILOT REGION
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              The September pilot is available only on Vancouver Island and
+              the supported Gulf Islands. We will not place you in Toronto or
+              show another region&apos;s sample competition.
+            </TerminalText>
+            {waitlistJoined ? (
+              <TerminalText live="polite" glow tone="green" variant="label">
+                REGIONAL WAITLIST CONFIRMED
+              </TerminalText>
+            ) : (
+              <>
+                <AuthTextField
+                  autoCapitalize="words"
+                  label="YOUR CITY OR REGION"
+                  onChangeText={(value) => {
+                    setRequestedRegion(value);
+                    setWaitlistError(null);
+                  }}
+                  placeholder="Example: Vancouver, BC"
+                  value={requestedRegion}
+                />
+                {waitlistError ? (
+                  <AuthStatusNotice message={waitlistError} tone="red" />
+                ) : null}
+                <CyberButtonPrimary
+                  disabled={waitlistBusy}
+                  label={waitlistBusy ? 'JOINING WAITLIST...' : 'JOIN REGIONAL WAITLIST ->'}
+                  onPress={() => void joinRegionWaitlist()}
+                  tone="amber"
+                />
+              </>
+            )}
+          </HUDBorderBox>
         ) : null}
         {verificationState === 'service-error' ? (
           <AuthStatusNotice
@@ -311,6 +377,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm
   },
   verifiedCard: {
+    gap: spacing.md,
+    padding: spacing.lg
+  },
+  waitlistCard: {
     gap: spacing.md,
     padding: spacing.lg
   },

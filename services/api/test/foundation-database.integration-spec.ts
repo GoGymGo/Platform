@@ -43,7 +43,11 @@ describeWithDatabase('database migrations', () => {
         'entry_ledger',
         'friend_requests',
         'friendships',
+        'gym_locations',
+        'gym_qr_credentials',
+        'gym_scan_events',
         'idempotency_keys',
+        'interest_submissions',
         'legal_document_events',
         'legal_documents',
         'notification_deliveries',
@@ -55,6 +59,7 @@ describeWithDatabase('database migrations', () => {
         'privacy_requests',
         'push_devices',
         'region_policies',
+        'region_waitlist_entries',
         'region_verifications',
         'reward_awards',
         'reward_catalog_items',
@@ -66,6 +71,8 @@ describeWithDatabase('database migrations', () => {
         'users',
         'worker_heartbeats',
         'workout_sessions',
+        'cash_fulfillments',
+        'competition_gym_locations',
       ]),
     );
     expect(names).not.toContain('demo_verification_checkpoints');
@@ -75,6 +82,39 @@ describeWithDatabase('database migrations', () => {
         "SELECT extname FROM pg_extension WHERE extname = 'btree_gist'",
       ),
     ).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  it('installs the privacy-preserving static QR pilot schema', async () => {
+    const scanColumns = await pool.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'gym_scan_events'
+       ORDER BY column_name`,
+    );
+    const names = scanColumns.rows.map((row) => row.column_name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'client_event_hash',
+        'credential_version',
+        'gym_location_id',
+        'outcome',
+        'scan_type',
+        'server_timestamp',
+      ]),
+    );
+    expect(names).not.toEqual(
+      expect.arrayContaining(['accuracy_meters', 'latitude', 'longitude']),
+    );
+
+    const userReset = await pool.query<{ data_type: string }>(
+      `SELECT data_type
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'users'
+         AND column_name = 'pilot_onboarding_reset_at'`,
+    );
+    expect(userReset.rows).toEqual([{ data_type: 'timestamp with time zone' }]);
   });
 
   it('keeps obsolete demo and payment schema out of the release baseline', async () => {

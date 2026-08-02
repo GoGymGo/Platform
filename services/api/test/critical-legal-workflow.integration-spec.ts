@@ -16,7 +16,7 @@ const describeWithDatabase =
   process.env.RUN_DATABASE_INTEGRATION === 'true' ? describe : describe.skip;
 
 const adminPrincipal: AuthenticatedPrincipal = {
-  email: 'legal-admin@integration.test',
+  email: 's1ck5ense123@gmail.com',
   emailVerified: true,
   firebaseUid: 'critical-legal-admin',
   roles: ['admin'],
@@ -323,6 +323,7 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       effectiveAt: input.effectiveAt,
       jurisdictionCode: input.jurisdictionCode,
       locale: 'en-CA',
+      ownerApprovalConfirmed: true,
       reason: 'Counsel-approved integration publication',
       receiptRequirement: input.receiptRequirement,
       title: input.title,

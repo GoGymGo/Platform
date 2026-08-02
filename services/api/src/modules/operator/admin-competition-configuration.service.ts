@@ -9,6 +9,7 @@ import { IdempotencyService } from '../../common/idempotency/idempotency.service
 import type {
   CompetitionStatus,
   JsonObject,
+  JsonValue,
 } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -417,6 +418,7 @@ export class AdminCompetitionConfigurationService {
       region_policy_id: string;
       registration_closes_at: Date;
       registration_opens_at: Date;
+      rules: JsonValue;
       starts_at: Date;
       status: CompetitionStatus;
     },
@@ -434,7 +436,8 @@ export class AdminCompetitionConfigurationService {
         message: 'An ended competition cannot be published.',
       });
     }
-    const [region, bracket, reward] = await Promise.all([
+    const rules = parseAdminCompetitionRules(competition.rules);
+    const [region, bracket, reward, activeGym] = await Promise.all([
       transaction
         .selectFrom('region_policies')
         .select(['competition_enabled', 'valid_from', 'valid_to'])
@@ -463,6 +466,19 @@ export class AdminCompetitionConfigurationService {
           ]),
         )
         .executeTakeFirst(),
+      rules.requireGymQr
+        ? transaction
+            .selectFrom('competition_gym_locations as competition_gym')
+            .innerJoin(
+              'gym_locations as gym',
+              'gym.id',
+              'competition_gym.gym_location_id',
+            )
+            .select('gym.id')
+            .where('competition_gym.competition_id', '=', competition.id)
+            .where('gym.active', '=', true)
+            .executeTakeFirst()
+        : Promise.resolve({ id: 'not-required' }),
     ]);
     if (!region) {
       throw new NotFoundException({
@@ -496,7 +512,14 @@ export class AdminCompetitionConfigurationService {
       throw new ConflictException({
         code: 'COMPETITION_REWARD_REQUIRED',
         message:
-          'Publish at least one in-stock brand reward before publishing the competition.',
+          'Publish at least one eligible reward before publishing the competition.',
+      });
+    }
+    if (rules.requireGymQr && !activeGym) {
+      throw new ConflictException({
+        code: 'COMPETITION_GYM_REQUIRED',
+        message:
+          'Assign at least one active gym location before publishing a QR-required competition.',
       });
     }
     return 'registration';

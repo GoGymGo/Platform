@@ -25,7 +25,7 @@ interface ClaimRewardJson extends JsonObject {
   fulfillmentInstructions: string | null;
   id: string;
   imageUrl: string | null;
-  rewardType: 'coupon' | 'physical';
+  rewardType: 'cash' | 'coupon' | 'physical';
   sponsorName: string;
   status: 'awarded' | 'cancelled' | 'claimed' | 'fulfilled' | 'redeemed';
   title: string;
@@ -235,6 +235,13 @@ export class RewardsService {
             message: 'This reward award was cancelled and cannot be claimed.',
           });
         }
+        if (award.reward_type === 'cash') {
+          throw new ConflictException({
+            code: 'CASH_REWARD_REQUIRES_IN_PERSON_FULFILLMENT',
+            message:
+              'Cash rewards are recorded by an administrator during the in-person handoff.',
+          });
+        }
 
         const now = new Date();
         let couponCode: string | null = null;
@@ -365,7 +372,7 @@ export class RewardsService {
     claimed_at: Date | null;
     id: string;
     image_url: string | null;
-    reward_type: 'coupon' | 'physical';
+    reward_type: 'cash' | 'coupon' | 'physical';
     sponsor_name: string;
     status: 'awarded' | 'cancelled' | 'claimed' | 'fulfilled' | 'redeemed';
     title: string;

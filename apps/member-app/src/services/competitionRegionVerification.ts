@@ -1,5 +1,7 @@
 import * as Location from 'expo-location';
 
+import { assertLiveServicesAllowed } from '@/config/demoMode';
+
 export type RegionCoordinates = {
   latitude: number;
   longitude: number;
@@ -14,6 +16,7 @@ export type DeviceRegionVerificationResult =
   | { status: 'location-unavailable' };
 
 export async function verifyCompetitionRegionWithDeviceLocation(): Promise<DeviceRegionVerificationResult> {
+  assertLiveServicesAllowed('Device location');
   try {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
 

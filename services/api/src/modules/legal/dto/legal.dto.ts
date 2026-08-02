@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
+  Equals,
   IsBoolean,
   IsArray,
   IsDateString,
@@ -77,6 +78,16 @@ export enum LegalReceiptRequirementDto {
 }
 
 export class PublishLegalDocumentDto extends OperatorReasonDto {
+  @ApiProperty({
+    description:
+      'Explicit confirmation by the GoGymGo owner before publication.',
+    example: true,
+    type: Boolean,
+  })
+  @IsBoolean()
+  @Equals(true)
+  ownerApprovalConfirmed!: true;
+
   @ApiProperty({ example: 'terms_of_service', maxLength: 64, type: String })
   @Matches(/^[a-z][a-z0-9_]{1,63}$/)
   documentKey!: string;

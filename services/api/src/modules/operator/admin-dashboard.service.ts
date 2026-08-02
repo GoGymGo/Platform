@@ -267,6 +267,8 @@ export class AdminDashboardService {
               id: document.id,
               jurisdictionCode: document.jurisdiction_code,
               locale: document.locale,
+              ownerApprovedAt:
+                document.owner_approved_at?.toISOString() ?? null,
               receiptRequirement: document.receipt_requirement,
               status:
                 state === 'withdrawn'

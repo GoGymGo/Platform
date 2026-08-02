@@ -1,5 +1,6 @@
 import { CompetitionLifecycleService } from '../competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../competitions/competition-scoring.service';
+import { GymsService } from '../gyms/gyms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
 import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
@@ -8,6 +9,7 @@ import { OperationsWorkerService } from './operations-worker.service';
 function createWorker(overrides?: {
   competitionLifecycle?: jest.Mock;
   competitionScoring?: jest.Mock;
+  gyms?: jest.Mock;
   notifications?: jest.Mock;
   privacy?: jest.Mock;
   profileMedia?: jest.Mock;
@@ -15,6 +17,7 @@ function createWorker(overrides?: {
   calls: {
     competitionLifecycle: jest.Mock;
     competitionScoring: jest.Mock;
+    gyms: jest.Mock;
     notifications: jest.Mock;
     privacy: jest.Mock;
     profileMedia: jest.Mock;
@@ -27,6 +30,7 @@ function createWorker(overrides?: {
       jest.fn().mockResolvedValue({ activated: 2, cancelled: 1 }),
     competitionScoring:
       overrides?.competitionScoring ?? jest.fn().mockResolvedValue(3),
+    gyms: overrides?.gyms ?? jest.fn().mockResolvedValue(10),
     notifications: overrides?.notifications ?? jest.fn().mockResolvedValue(4),
     privacy:
       overrides?.privacy ??
@@ -50,6 +54,9 @@ function createWorker(overrides?: {
         processDuePeriods: calls.competitionScoring,
       } as unknown as CompetitionScoringService,
       {
+        expireIncompleteSessions: calls.gyms,
+      } as unknown as GymsService,
+      {
         processPending: calls.notifications,
       } as unknown as NotificationsService,
       { process: calls.profileMedia } as unknown as ProfileMediaCleanupService,
@@ -66,6 +73,7 @@ describe('OperationsWorkerService', () => {
       competitionsActivated: 2,
       competitionsCancelled: 1,
       competitionPeriodsSettled: 3,
+      incompleteGymSessionsExpired: 10,
       notificationsSent: 4,
       privacyExportsDeleted: 6,
       privacyOperationsCompleted: 5,
@@ -84,6 +92,7 @@ describe('OperationsWorkerService', () => {
     await expect(worker.runOnce()).rejects.toBeInstanceOf(AggregateError);
     expect(calls.competitionScoring).toHaveBeenCalledTimes(1);
     expect(calls.profileMedia).toHaveBeenCalledTimes(1);
+    expect(calls.gyms).toHaveBeenCalledTimes(1);
     expect(calls.privacy).toHaveBeenCalledTimes(1);
     expect(calls.notifications).toHaveBeenCalledTimes(1);
   });

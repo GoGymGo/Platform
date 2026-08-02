@@ -106,6 +106,32 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires authentication for QR scans and every pilot operator surface', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/gym-scans')
+      .set('Idempotency-Key', 'gym-scan-e2e')
+      .send({})
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/operator/gym-locations')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/operator/gym-sessions')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/operator/region-waitlist')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/operator/interest-submissions')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/operator/partner-applications')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/v1/operator/audit-history')
+      .expect(401);
+  });
+
   it('requires authentication across friend and challenge routes', async () => {
     await request(app.getHttpServer())
       .get('/v1/social/users?screenName=GHOST')

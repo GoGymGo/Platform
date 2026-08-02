@@ -8,22 +8,18 @@ import {
   ScreenLoadingState,
   TerminalText
 } from '@/components/cyber';
-import {
-  creatorFeaturesEnabled
-} from '@/config/features';
 import { RecoverableScreenError } from '@/components/reliability';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { getWorkoutAccessMode } from '@/domain/workoutAccess';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
-import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function SessionTabRoute() {
   const router = useRouter();
-  const { activeSession, competition } = useWorkoutProgress();
-  const competitionNotStarted = competition.phase === 'before-month';
-  const workoutAccessMode = getWorkoutAccessMode(competitionNotStarted);
-  const verifiedWorkoutUnavailable = workoutAccessMode === 'upcoming';
+  const { competition } = useWorkoutProgress();
+  const verifiedWorkoutUnavailable = getWorkoutAccessMode(
+    competition.phase === 'before-month'
+  ) === 'upcoming';
   const {
     checking: setupChecking,
     error: setupError,
@@ -34,19 +30,14 @@ export default function SessionTabRoute() {
     setupMessage,
     setupRoute
   } = useSessionRegistrationAccess();
-  const {
-    ready: verificationPreferenceReady,
-    workoutStartRoute
-  } = useWorkoutVerificationPreference();
 
-  if (setupChecking || !verificationPreferenceReady) {
-    return <ScreenLoadingState body="Checking your workout setup." />;
+  if (setupChecking) {
+    return <ScreenLoadingState body="Checking your competition setup." />;
   }
-
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your workout setup could not be checked. Retry before starting a verified session."
+        body="Your competition setup could not be checked. Retry before scanning a gym poster."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"
@@ -58,22 +49,20 @@ export default function SessionTabRoute() {
     <ScreenContainer contentStyle={styles.screen}>
       <View style={styles.header}>
         <TerminalText glow tone="cyan" variant="label">
-          SESSION START
+          SEPTEMBER QR PILOT
         </TerminalText>
         <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          CHOOSE YOUR WORKOUT
+          VERIFY A GYM VISIT
         </TerminalText>
         <TerminalText style={styles.helper} tone="muted" uppercase={false} variant="body">
-          {activeSession
-            ? 'Your verified workout is still running. Return to the timer to continue.'
-            : creatorFeaturesEnabled
-              ? 'Choose a creator workout or use your own plan. Both use the same verification.'
-              : 'Use your own workout plan and GoGymGo will guide you through verification.'}
+          Scan the same static GoGymGo poster when you enter and after at least
+          30 minutes. Server time and a live 75-metre location check determine
+          whether the workout day is verified.
         </TerminalText>
       </View>
 
       {!setupReady ? (
-        <HUDBorderBox glow style={styles.setupNotice} tone="amber">
+        <HUDBorderBox glow style={styles.notice} tone="amber">
           <TerminalText glow tone="amber" variant="label">
             FINISH SETUP
           </TerminalText>
@@ -83,44 +72,34 @@ export default function SessionTabRoute() {
           <CyberButtonPrimary
             label={setupActionLabel}
             onPress={() => {
-              if (setupRoute) {
-                router.push(setupRoute as Href);
-              }
+              if (setupRoute) router.push(setupRoute as Href);
             }}
           />
         </HUDBorderBox>
       ) : verifiedWorkoutUnavailable ? (
-        <HUDBorderBox style={styles.previewNotice} tone="muted">
-          <TerminalText glow tone="amber" variant="label">COMPETITION NOT STARTED</TerminalText>
+        <HUDBorderBox style={styles.notice} tone="muted">
+          <TerminalText glow tone="amber" variant="label">
+            COMPETITION NOT STARTED
+          </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Verified sessions unlock when the competition begins.
+            QR-verified sessions unlock when the September competition begins.
           </TerminalText>
         </HUDBorderBox>
-      ) : null}
-
-      {setupReady ? <View style={styles.actions}>
-        {activeSession ? (
+      ) : (
+        <HUDBorderBox glow style={styles.notice} tone="cyan">
+          <TerminalText glow tone="cyan" variant="label">
+            STATIC QR READY
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            Missing the exit scan earns no competition credit. A gym poster may
+            be replaced by an administrator; revoked posters are rejected.
+          </TerminalText>
           <CyberButtonPrimary
-            label="Return to workout"
-            onPress={() => router.push('/workout/active')}
+            label="SCAN GYM QR ->"
+            onPress={() => router.push('/qr-scanner')}
           />
-        ) : (
-          <>
-            {creatorFeaturesEnabled ? (
-              <CyberButtonPrimary
-                label="Choose a creator workout"
-                onPress={() => router.push('/workouts?source=session' as Href)}
-                tone="cyan"
-              />
-            ) : null}
-            <CyberButtonPrimary
-              disabled={verifiedWorkoutUnavailable}
-              label={verifiedWorkoutUnavailable ? 'Workouts not started' : 'Start my own workout'}
-              onPress={() => router.push(workoutStartRoute)}
-            />
-          </>
-        )}
-      </View> : null}
+        </HUDBorderBox>
+      )}
     </ScreenContainer>
   );
 }
@@ -144,22 +123,13 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   helper: {
-    maxWidth: 390,
+    maxWidth: 410,
     marginTop: spacing.sm,
     fontFamily: fontFamilies.body,
     textAlign: 'center'
   },
-  setupNotice: {
+  notice: {
     gap: spacing.md,
-    marginBottom: spacing.lg,
-    padding: spacing.lg
-  },
-  actions: {
-    gap: spacing.md
-  },
-  previewNotice: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
     padding: spacing.lg
   }
 });

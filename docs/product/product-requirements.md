@@ -1,6 +1,11 @@
 # GoGymGo product requirements
 
-Status: consolidated V1 product and implementation direction, July 16, 2026
+Status: connected browser-first QR pilot baseline, August 1, 2026
+
+The September 2026 pilot requirements in this document supersede earlier
+wearable, heart-rate, biometric and random-presence concepts. Those legacy
+capabilities may remain in isolated code for future research, but they are not
+reachable, required or approved for the pilot.
 
 ## 1. Product objective
 
@@ -19,8 +24,9 @@ V1 must prove that:
 - brands value privacy-safe verified-participation reporting; and
 - physical and coupon fulfillment can operate without consumer payment rails.
 
-No purchase is required. V1 contains no cash, wallet, bank-account, payee,
-payment-processor, transfer, stored-value, or tax-form flow.
+No purchase is required. The pilot has one administrator-recorded $50 CAD cash
+reward and no wallet, bank-account, payee, payment-processor, transfer,
+stored-value, or tax-form flow.
 
 ### Product principles
 
@@ -48,7 +54,7 @@ may remain stable when their mapping is documented.
 | Verified workout | A workout approved by server evidence review | Check-in when referring to the full workout | session, evidence events, review |
 | Challenge check-in | A completion recorded inside a social Challenge | Verified workout | challenge check-in |
 | Prize draw entry | A non-cash chance in a sponsor-funded draw | Ticket, point, payout | ledger entry |
-| Brand reward | A physical sponsor prize or coupon | Cash prize, payout | reward catalog and award |
+| Reward | The published pilot cash reward or a future approved sponsor reward | Payout | reward catalog and award |
 | Partner gym | A gym supporting entry and exit QR verification | Partner when the gym meaning is unclear | gym application and QR evidence |
 | Creator workout | Approved workout guidance that can be added to a calendar | Verified workout | creator catalog and plan |
 
@@ -77,15 +83,18 @@ The UI term **Alias** maps to the API field `screenName`. Alias validation is
 
 The required onboarding path is:
 
-1. verify the supported competition region and accept the current account
-   agreements on the same screen; and
-2. choose the Weekly Goal, accept the competition rules, confirm age
-   eligibility, and complete competition registration.
+1. create or sign into a Firebase account;
+2. verify the account email;
+3. complete **Use My Location**;
+4. verify Vancouver Island + Gulf Islands eligibility;
+5. accept the published Privacy Policy, Terms and official contest rules;
+6. confirm 19+ eligibility and choose a Weekly Goal; and
+7. join the September competition and reach Home.
 
 Public identity is not a registration blocker. The app generates a private,
 stable player callsign automatically; users may add a public Alias later from
-Profile. Workout-device selection and device-presence consent are requested
-just in time when the player starts their first verified workout.
+Profile. The pilot does not request wearable, health, biometric or local
+device-presence consent.
 
 Registration requirements:
 
@@ -113,7 +122,7 @@ Competition timing requirements:
 - An eligible player may join before the competition starts or while it is
   active. Enrollment closes only when the competition ends, reaches its
   published entrant cap, or is cancelled.
-- The competition requires at least 100 eligible entrants to launch and may
+- The September pilot requires at least two eligible entrants to launch and may
   optionally have a sponsor-approved maximum.
 - A player who joins after scoring begins may select any published Weekly Goal.
   Only verified results earned after enrollment is confirmed count.
@@ -123,37 +132,27 @@ Competition timing requirements:
 Users can start from a creator workout plan or their own workout, but both paths
 must enter the same authoritative verification lifecycle.
 
-Supported mobile methods:
-
-- **Heart-rate device:** collect eligible wearable or approved heart-rate
-  samples throughout the session.
-- **Partner gym QR:** retain and submit the validated entry and exit QR payloads
-  as immutable session evidence.
+The only pilot verification method is an approved static gym QR combined with
+a fresh browser location reading. The same poster is scanned on entry and exit.
 
 Required lifecycle:
 
 1. confirm the user is enrolled in the current active competition;
-2. complete the entry presence check or partner-gym entry QR plus presence
-   check;
-3. create one authoritative server session;
-4. run the required minimum timer and local mid-session presence check;
-5. append only real evidence events with unique event IDs and accepted times;
-6. complete heart-rate or exit-QR requirements;
-7. submit the session for server assessment and evidence review; and
-8. reconcile the final status through authoritative progress.
+2. scan an active, non-revoked gym QR while within the configured 75 m radius;
+3. create one authoritative server session and four-hour expiry;
+4. wait at least 30 minutes using server time;
+5. scan the same poster again with a fresh eligible location reading; and
+6. reconcile the verified or rejected result through authoritative progress.
 
 Evidence and trust requirements:
 
-- Face ID, Touch ID, fingerprint, or passcode checks run through the phone's
-  secure authentication UI. GoGymGo receives the result, not biometric data.
 - QR camera frames are processed locally and are not stored; the validated QR
   payload is the submitted evidence.
-- Heart-rate events are throttled to a reasonable evidence cadence rather than
-  sending every UI timer tick.
-- The app must never fabricate face confidence, device attestation, QR, or
-  wearable evidence.
-- A competition configuration requiring unsupported combined, face, or device
-  evidence fails closed with an explanatory message.
+- Raw location coordinates are used only for the immediate check and are not
+  persisted or logged.
+- The app must never fabricate QR, location, timer or verification evidence.
+- Wearable, heart-rate, Face ID/passcode, biometric-consent and random
+  mid-session checks are disabled for the pilot.
 - API mode uses real time. Timer acceleration is allowed only in an explicit
   local preview.
 - Cancelling a workout closes the server session so it cannot remain stranded
@@ -509,14 +508,15 @@ Included:
 
 Deferred:
 
-- user purchases, subscriptions, entry fees, cash, or stored-value rewards;
+- user purchases, subscriptions, entry fees, wallets, automated cash payments,
+  or stored-value rewards;
 - wallets, bank connections, payee onboarding, transfers, and tax forms;
 - GoGymGo collection of shipping addresses;
 - self-service brand fulfillment and automated third-party fulfillment;
 - creator-owned in-app video hosting and user-generated live video;
 - sponsor creative delivery, playback, impression/click ingestion, and
   advertising analytics until a production contract and approval gate exist;
-- unsupported combined biometric/device-attestation competition policies until
+- wearable and combined biometric/device-attestation competition policies until
   real signed evidence integrations are implemented and approved; and
 - global launch before region-by-region legal and operational approval.
 
@@ -541,11 +541,9 @@ As of July 30, 2026:
 - API adapters exist for legal/region/enrollment, sessions and progress, social
   features, creators, rewards, avatars, privacy, and push devices.
 
-The remaining work includes release deployment, store identity, legal approval,
-physical-device validation, and connecting a real wearable/heart-rate or
-verified partner-gym evidence provider. The client surfaces those methods as
-unavailable until a genuine provider exists instead of replacing server
-authority with locally fabricated records.
+The remaining release work is deployment, owner-approved legal text, the real
+condo gym configuration, Cloud billing and domains, and an on-site two-account
+staging UAT using the static QR poster.
 
 ## 12. Release gates
 
@@ -570,9 +568,9 @@ authority with locally fabricated records.
    calendar planning, Brand Reward publication, insufficient-code rejection,
    inventory bounds, draw idempotency, ownership checks, duplicate claims, and
    removed payout-route behavior.
-8. Physical iOS and Android devices pass QR camera, wearable/heart-rate,
-   presence check, notification, push token, signed avatar, accessibility,
-   offline/error, idempotent retry, and background/foreground exercises.
+8. Two physical browser devices pass QR camera, live-location, geofence,
+   accessibility, offline/error, idempotent retry, and background/foreground
+   exercises at the configured condo gym.
 9. One complete regional month is rehearsed: registration, minimum entrant
    decision, four Weekly Challenges, Bonus Days, settlement, Winners Circle,
    reward claim, fulfillment, privacy export/deletion, backup, restore, fraud,

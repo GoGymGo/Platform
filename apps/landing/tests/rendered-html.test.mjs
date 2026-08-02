@@ -17,7 +17,8 @@ test("the landing page contains the finished GoGymGo experience", async () => {
   assert.match(page, /Complete verified workouts/i);
   assert.match(page, /TRY THE APP FLOW/);
   assert.match(page, /OPEN THE APP DEMO/);
-  assert.match(layout, /href="\/demo"/);
+  assert.match(layout, /href="https:\/\/app\.gogymgo\.com\/demo"/);
+  assert.match(layout, /href="https:\/\/app\.gogymgo\.com\/join"/);
   assert.match(productScreens, /<GoalScreen \/>/);
   assert.match(productScreens, /<TimerScreen \/>/);
   assert.match(productScreens, /<RewardsLeaderboardScreen \/>/);
@@ -31,26 +32,12 @@ test("the landing page contains the finished GoGymGo experience", async () => {
   assert.doesNotMatch(page + layout + packageJson, /codex-preview|react-loading-skeleton/i);
 });
 
-test("the demo page mirrors the real app flow without backend side effects", async () => {
-  const [demoPage, demoCompetition] = await Promise.all([
-    readFile(new URL("app/demo/page.tsx", root), "utf8"),
-    readFile(new URL("app/components/DemoCompetition.tsx", root), "utf8"),
-  ]);
+test("the retired landing demo redirects to the canonical member demo", async () => {
+  const demoPage = await readFile(new URL("app/demo/page.tsx", root), "utf8");
 
-  assert.match(demoPage, /<DemoCompetition \/>/);
-  assert.match(demoCompetition, /INTERACTIVE APP WALKTHROUGH/);
-  assert.match(demoCompetition, /Use the <span>real flow\.<\/span>/);
-  assert.doesNotMatch(demoCompetition, /Try the loop/i);
-  assert.match(demoCompetition, /gogymgo-app-flow-demo-v2/);
-  assert.match(demoCompetition, /REGION \+ AGREEMENTS/);
-  assert.match(demoCompetition, /CHOOSE YOUR WEEKLY GOAL/);
-  assert.match(demoCompetition, /START WORKOUT/);
-  assert.match(demoCompetition, /COMPLETE DEMO SESSION/);
-  assert.match(demoCompetition, /WINNERS CIRCLE/);
-  assert.equal((demoCompetition.match(/id: "/g) ?? []).length, 8);
-  assert.match(
-    demoCompetition,
-    /no real account,\s+competition standing, Prize Draw Entry, or reward/i,
+  assert.match(demoPage, /redirect\("https:\/\/app\.gogymgo\.com\/demo"\)/);
+  await assert.rejects(
+    readFile(new URL("app/components/DemoCompetition.tsx", root), "utf8"),
   );
 });
 
@@ -66,4 +53,12 @@ test("both audience pages expose their intended forms", async () => {
   assert.match(brandPage, /Tell us about your brand/);
   assert.match(forms, /APPLY AS A FOUNDING PARTNER/);
   assert.match(forms, /fetch\("\/api\/interest"/);
+});
+
+test("interest forms use the GoGymGo API instead of D1", async () => {
+  const route = await readFile(new URL("app/api/interest/route.ts", root), "utf8");
+
+  assert.match(route, /GOGYMGO_API_URL/);
+  assert.match(route, /\/v1\/interest-submissions/);
+  assert.doesNotMatch(route, /env\.DB|interest_submissions|ensureInterestTable/);
 });

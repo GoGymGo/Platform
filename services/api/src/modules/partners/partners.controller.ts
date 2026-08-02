@@ -1,9 +1,10 @@
-import { Body, Controller, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiHeader,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -14,6 +15,7 @@ import { Public } from '../auth/public.decorator';
 import {
   CreatorApplicationDto,
   GymApplicationDto,
+  OperatorPartnerApplicationDto,
   PartnerApplicationResponseDto,
   SponsorApplicationDto,
 } from './dto/partner-application.dto';
@@ -61,5 +63,21 @@ export class PartnersController {
     @Body() input: GymApplicationDto,
   ): Promise<PartnerApplicationResponseDto> {
     return this.partners.submitGym(input);
+  }
+}
+
+@ApiTags('operator partner applications')
+@ApiBearerAuth('firebase')
+@Controller('operator/partner-applications')
+export class PartnerOperatorController {
+  constructor(private readonly partners: PartnersService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Review creator, sponsor and gym applications' })
+  @ApiOkResponse({ isArray: true, type: OperatorPartnerApplicationDto })
+  list(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<OperatorPartnerApplicationDto[]> {
+    return this.partners.listApplications(principal);
   }
 }

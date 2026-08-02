@@ -14,7 +14,7 @@ const points = [
   },
   {
     title: "VERIFY THE WORK",
-    copy: "Eligible heart-rate or partner gym QR evidence keeps competition fair.",
+    copy: "An approved gym QR scan plus live proximity keeps the September pilot fair.",
   },
   {
     title: "BRING FRIENDS",

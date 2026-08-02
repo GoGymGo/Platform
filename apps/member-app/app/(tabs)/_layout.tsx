@@ -1,11 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Tabs, useRouter } from 'expo-router';
-import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
-import { TerminalText } from '@/components/cyber';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
-import { useWorkoutProgress } from '@/state/workoutProgress';
+import { colors, fontFamilies } from '@/constants/theme';
 
 const tabScreenOptions = {
   headerShown: false,
@@ -44,9 +42,6 @@ const tabScreenOptions = {
 } as const;
 
 export default function TabsLayout() {
-  const router = useRouter();
-  const { activeSession } = useWorkoutProgress();
-
   return (
     <AuthGate>
       <View style={styles.layout}>
@@ -74,9 +69,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="session"
             options={{
-              title: activeSession ? 'Active' : 'Train',
-              tabBarBadge: activeSession ? 'LIVE' : undefined,
-              tabBarBadgeStyle: styles.liveBadge,
+              title: 'Train',
               tabBarAccessibilityLabel: 'Training tab',
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons color={color} name={focused ? 'play-circle' : 'play-circle-outline'} size={30} />
@@ -118,27 +111,6 @@ export default function TabsLayout() {
             }}
           />
         </Tabs>
-        {activeSession ? (
-          <Pressable
-            accessibilityHint="Return to the active workout timer"
-            accessibilityRole="button"
-            onPress={() => router.push('/workout/active')}
-            style={({ pressed }) => [styles.activeBanner, pressed ? styles.pressed : null]}
-          >
-            <View style={styles.liveDot} />
-            <View style={styles.activeCopy}>
-              <TerminalText glow tone="green" variant="micro">
-                SESSION ACTIVE
-              </TerminalText>
-              <TerminalText tone="text" uppercase={false} variant="body">
-                Tap to return to your timer and verification status.
-              </TerminalText>
-            </View>
-            <TerminalText glow tone="cyan" variant="button">
-              -&gt;
-            </TerminalText>
-          </Pressable>
-        ) : null}
       </View>
     </AuthGate>
   );
@@ -149,40 +121,4 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background
   },
-  liveBadge: {
-    color: colors.textOnPrimary,
-    backgroundColor: colors.statusSuccess,
-    fontFamily: fontFamilies.terminal,
-    fontSize: 9
-  },
-  activeBanner: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: 82,
-    left: spacing.md,
-    zIndex: 20,
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderSuccessGlow,
-    borderRadius: 12,
-    backgroundColor: colors.panelAlpha84
-  },
-  activeCopy: {
-    minWidth: 0,
-    flex: 1
-  },
-  liveDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.statusSuccess
-  },
-  pressed: {
-    opacity: 0.72
-  }
 });

@@ -62,3 +62,21 @@ test("interest forms use the GoGymGo API instead of D1", async () => {
   assert.match(route, /\/v1\/interest-submissions/);
   assert.doesNotMatch(route, /env\.DB|interest_submissions|ensureInterestTable/);
 });
+
+test("the historical D1 export is disabled, owner-restricted and read-only", async () => {
+  const route = await readFile(
+    new URL("app/api/internal/export-interest-submissions/route.ts", root),
+    "utf8",
+  );
+
+  assert.match(route, /LANDING_D1_EXPORT_ENABLED !== "yes"/);
+  assert.match(route, /LANDING_D1_EXPORT_OWNER_EMAIL/);
+  assert.match(route, /getChatGPTUser/);
+  assert.match(route, /user\.email\.trim\(\)\.toLowerCase\(\) !== ownerEmail/);
+  assert.match(route, /Content-Disposition/);
+  assert.match(route, /Cache-Control.*no-store/);
+  assert.match(route, /getDb\(\)/);
+  assert.match(route, /\.select\(\)/);
+  assert.doesNotMatch(route, /\.(?:insert|update|delete)\(/);
+  assert.doesNotMatch(route, /ensureInterestTable/);
+});

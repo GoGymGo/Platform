@@ -136,6 +136,29 @@ async function upsertRow(
   );
 }
 
+async function countDestinationMatches(
+  client: PoolClient,
+  uniqueRows: Map<string, LegacyInterestRow>,
+): Promise<number> {
+  const result = await client.query<{ count: string }>(
+    `SELECT count(*)::text AS count
+     FROM interest_submissions
+     WHERE (audience, email) IN (
+       SELECT item->>'audience', lower(item->>'email')
+       FROM jsonb_array_elements($1::jsonb) AS item
+     )`,
+    [
+      JSON.stringify(
+        [...uniqueRows.values()].map(({ audience, email }) => ({
+          audience,
+          email,
+        })),
+      ),
+    ],
+  );
+  return Number(result.rows[0]?.count ?? 0);
+}
+
 async function main(): Promise<void> {
   if (process.env.CONFIRM_LANDING_D1_IMPORT !== 'yes') {
     throw new Error(
@@ -163,32 +186,29 @@ async function main(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    for (const row of uniqueRows.values()) await upsertRow(client, row);
-    const verified = await client.query<{ count: string }>(
-      `SELECT count(*)::text AS count
-       FROM interest_submissions
-       WHERE (audience, email) IN (
-         SELECT item->>'audience', lower(item->>'email')
-         FROM jsonb_array_elements($1::jsonb) AS item
-       )`,
-      [
-        JSON.stringify(
-          [...uniqueRows.values()].map(({ audience, email }) => ({
-            audience,
-            email,
-          })),
-        ),
-      ],
+    const destinationMatchesBefore = await countDestinationMatches(
+      client,
+      uniqueRows,
     );
-    const verifiedCount = Number(verified.rows[0]?.count ?? 0);
+    for (const row of uniqueRows.values()) await upsertRow(client, row);
+    const verifiedCount = await countDestinationMatches(client, uniqueRows);
     if (verifiedCount !== uniqueRows.size) {
       throw new Error(
         `Count verification failed: expected ${uniqueRows.size}, found ${verifiedCount}.`,
       );
     }
     await client.query('COMMIT');
+    const sourceDuplicates = rows.length - uniqueRows.size;
+    const inserted = uniqueRows.size - destinationMatchesBefore;
     console.log(
-      `Imported and verified ${verifiedCount} unique D1 interest submissions.`,
+      'Landing D1 import counts: ' +
+        `source=${rows.length}; ` +
+        `unique=${uniqueRows.size}; ` +
+        `sourceDuplicates=${sourceDuplicates}; ` +
+        `destinationDuplicates=${destinationMatchesBefore}; ` +
+        `inserted=${inserted}; ` +
+        `updated=${destinationMatchesBefore}; ` +
+        `verified=${verifiedCount}.`,
     );
   } catch (error) {
     await client.query('ROLLBACK');

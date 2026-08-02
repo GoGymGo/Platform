@@ -22,7 +22,9 @@ if [[ "$mode" != "plan" && "$mode" != "apply" && "$mode" != "verify" ]]; then
   exit 2
 fi
 
-for command_name in gcloud python3; do
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+
+for command_name in gcloud "$PYTHON_BIN"; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     printf 'Required command is unavailable: %s\n' "$command_name" >&2
     exit 1
@@ -101,16 +103,16 @@ verify_configuration() {
       --project="$PROJECT_ID" \
       --format='json'
   )"
-  provider_account_id="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["aws"]["accountId"])' <<<"$provider_json")"
-  provider_condition="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["attributeCondition"])' <<<"$provider_json")"
+  provider_account_id="$("$PYTHON_BIN" -c 'import json,sys; print(json.load(sys.stdin)["aws"]["accountId"])' <<<"$provider_json")"
+  provider_condition="$("$PYTHON_BIN" -c 'import json,sys; print(json.load(sys.stdin)["attributeCondition"])' <<<"$provider_json")"
   provider_mapping_account="$(
-    python3 -c 'import json,sys; print(json.load(sys.stdin)["attributeMapping"]["attribute.aws_account"])' <<<"$provider_json"
+    "$PYTHON_BIN" -c 'import json,sys; print(json.load(sys.stdin)["attributeMapping"]["attribute.aws_account"])' <<<"$provider_json"
   )"
   provider_mapping_subject="$(
-    python3 -c 'import json,sys; print(json.load(sys.stdin)["attributeMapping"]["google.subject"])' <<<"$provider_json"
+    "$PYTHON_BIN" -c 'import json,sys; print(json.load(sys.stdin)["attributeMapping"]["google.subject"])' <<<"$provider_json"
   )"
   provider_mapping_role="$(
-    python3 -c 'import json,sys; print(json.load(sys.stdin)["attributeMapping"]["attribute.aws_role"])' <<<"$provider_json"
+    "$PYTHON_BIN" -c 'import json,sys; print(json.load(sys.stdin)["attributeMapping"]["attribute.aws_role"])' <<<"$provider_json"
   )"
 
   [[ "$provider_account_id" == "$AWS_ACCOUNT_ID" ]]
@@ -129,7 +131,7 @@ verify_configuration() {
       --format='json'
   )"
   for role_name in "$API_ROLE_NAME" "$WORKER_ROLE_NAME"; do
-    python3 -c \
+    "$PYTHON_BIN" -c \
       'import json,sys; policy=json.load(sys.stdin); role=sys.argv[1]; member=sys.argv[2]; sys.exit(0 if any(b.get("role") == role and member in b.get("members", []) for b in policy.get("bindings", [])) else 1)' \
       'roles/iam.workloadIdentityUser' "${PRINCIPAL_PREFIX}/${role_name}" <<<"$service_account_policy_json"
   done
@@ -138,7 +140,7 @@ verify_configuration() {
     gcloud projects get-iam-policy "$PROJECT_ID" \
       --format='json'
   )"
-  python3 -c \
+  "$PYTHON_BIN" -c \
     'import json,sys; policy=json.load(sys.stdin); role=sys.argv[1]; member=sys.argv[2]; sys.exit(0 if any(b.get("role") == role and member in b.get("members", []) for b in policy.get("bindings", [])) else 1)' \
     "$CUSTOM_ROLE_NAME" "serviceAccount:${SERVICE_ACCOUNT_EMAIL}" <<<"$project_policy_json"
 

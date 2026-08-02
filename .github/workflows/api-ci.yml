@@ -6,6 +6,7 @@ on:
       - "services/api/**"
       - "infrastructure/gcp/terraform/**"
       - "infrastructure/aws/terraform/**"
+      - "infrastructure/aws/firebase-wif/**"
       - "infrastructure/local/**"
       - "packages/contracts/**"
       - "package.json"
@@ -18,6 +19,7 @@ on:
       - "services/api/**"
       - "infrastructure/gcp/terraform/**"
       - "infrastructure/aws/terraform/**"
+      - "infrastructure/aws/firebase-wif/**"
       - "infrastructure/local/**"
       - "packages/contracts/**"
       - "package.json"
@@ -56,6 +58,7 @@ jobs:
       - run: terraform -chdir=infrastructure/aws/terraform init -backend=false -input=false
       - run: terraform -chdir=infrastructure/aws/terraform validate
       - run: terraform -chdir=infrastructure/aws/terraform test
+      - run: bash infrastructure/aws/firebase-wif/test.sh
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
           exit-code: "1"

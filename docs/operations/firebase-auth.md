@@ -77,16 +77,24 @@ The backend must also become authoritative for:
 The AWS-hosted API and worker should authenticate to Firebase through Google
 Workload Identity Federation, not a downloaded service-account private key:
 
-1. Create a staging-only workload identity pool and AWS provider in the GoGymGo
-   Firebase project's Google Cloud project.
-2. Restrict the provider to the GoGymGo staging AWS account and ECS task-role
-   principals. Do not authorize the Souvenote account or a production role.
-3. Create a staging service account with only the Firebase permissions needed by
-   the API and worker, then grant the federated staging principal
-   `roles/iam.workloadIdentityUser` on that service account.
+1. In Google Cloud Shell, sign in to an account that can administer the existing
+   `gogymgo-8cb8b` project.
+2. Run `infrastructure/aws/firebase-wif/setup.sh plan`, review the fixed staging
+   boundaries, then run `apply` and `verify`.
+3. The script restricts federation to AWS account `340700539877` and the
+   `gogymgo-staging-api` and `gogymgo-staging-worker` task roles. It grants only
+   `firebaseauth.users.get` and `firebaseauth.users.delete` through a dedicated
+   staging service account.
 4. Generate an AWS external-account credential configuration that uses service
    account impersonation. Store that JSON in the existing staging
    `FIREBASE_SERVICE_ACCOUNT_JSON` AWS secret.
+
+The bootstrap does not link a Google billing account, activate a Google trial,
+or create a service-account key. Google IAM and Workload Identity Federation
+have no IAM usage charge; Firebase Authentication remains subject to the
+existing Firebase project's plan and quotas. Keep the Souvenote Google project,
+any production role, and every production Firebase project outside these
+bindings.
 
 At runtime, the application validates the configuration's Google endpoints and
 project-scoped service-account URL, obtains temporary credentials from the ECS

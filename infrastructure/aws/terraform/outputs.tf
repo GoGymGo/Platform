@@ -28,6 +28,14 @@ output "deployment_role_arn" {
   value       = aws_iam_role.github_deploy.arn
 }
 
+output "firebase_aws_role_arns" {
+  description = "Staging ECS task roles that may be allowlisted by the Firebase workload identity provider."
+  value = {
+    api    = aws_iam_role.api.arn
+    worker = aws_iam_role.worker.arn
+  }
+}
+
 output "ecr_repository_url" {
   description = "Environment-specific immutable image repository."
   value       = aws_ecr_repository.backend.repository_url

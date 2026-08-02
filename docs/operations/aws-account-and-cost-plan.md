@@ -2,10 +2,11 @@
 
 Status: the isolated `GoGymGo-Staging` member account and its cost-controlled AWS
 foundation are deployed in `ca-central-1`. The private database, application
-login, PostGIS extension, runtime secrets, GitHub OIDC role, budget, and alarms
-are bootstrapped. API and worker desired counts remain zero. ACM is waiting for
-Cloudflare DNS validation; Google workload identity setup, the first application
-deployment, migrations, and UAT remain gated. Production is untouched.
+login, PostGIS extension, runtime secrets, GitHub OIDC role, budget, alarms, ACM
+certificate, HTTPS listener, and DNS-only `api-staging.gogymgo.com` record are
+bootstrapped. API and worker desired counts remain zero. Google workload identity
+setup, the first application deployment, migrations, and UAT remain gated.
+Production is untouched.
 
 ## Isolation gate
 
@@ -93,8 +94,8 @@ Pricing references: [AWS Fargate pricing](https://aws.amazon.com/fargate/pricing
 
 ## Approval sequence
 
-1. Add the ACM validation CNAME in Cloudflare and wait for the certificate to be
-   issued; review the separate API hostname record before enabling it.
+1. The ACM validation and API hostname DNS gates are complete. Keep the API
+   record DNS-only until the first healthy staging release is verified.
 2. Configure a staging-only Google workload identity pool/provider and
    least-privilege Firebase service account. Do not create a long-lived Firebase
    service-account key unless federation is proven impractical and the exception

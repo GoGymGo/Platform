@@ -4,6 +4,21 @@ import { FormEvent, useState } from "react";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
+function readErrorMessage(error: unknown) {
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return "We couldn't save your information. Please try again.";
+}
+
 async function submitInterest(
   form: HTMLFormElement,
   audience: "gym_goer" | "brand",
@@ -20,9 +35,9 @@ async function submitInterest(
     }),
   });
 
-  const body = (await response.json()) as { error?: string };
+  const body = (await response.json()) as { error?: unknown };
   if (!response.ok) {
-    throw new Error(body.error ?? "We couldn’t save your information.");
+    throw new Error(readErrorMessage(body.error));
   }
 }
 

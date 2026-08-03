@@ -14,11 +14,11 @@ test('new-player App Tour starts onboarding without completed setup', async () =
 test('new-player App Tour records each onboarding milestone in memory', async () => {
   const account = createAppTourAccountReadinessRepository('new-player');
   const verification = await account.createRegionVerification({
-    latitude: 43.6532,
-    longitude: -79.3832,
+    latitude: 49.1659,
+    longitude: -123.9401,
     method: 'device_location'
   });
-  const legalBundle = await account.getCurrentLegalDocuments('CA-ON', 'en');
+  const legalBundle = await account.getCurrentLegalDocuments('CA-BC', 'en');
   const legalReceipt = await account.recordLegalReceipt(legalBundle);
   const competition = await account.getCurrentCompetition(
     '2026-08',
@@ -28,6 +28,10 @@ test('new-player App Tour records each onboarding milestone in memory', async ()
   assert.equal(
     (await account.getCurrentRegionVerification())?.id,
     verification.id
+  );
+  assert.equal(
+    verification.regionCode,
+    'vancouver-island-gulf-islands-bc'
   );
   assert.equal(legalReceipt.complete, true);
   assert.ok(legalReceipt.receiptBundleId);

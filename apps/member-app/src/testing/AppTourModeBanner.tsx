@@ -17,7 +17,7 @@ import { recordAppTourVisit } from '@/testing/appTourReview';
 export function AppTourModeBanner() {
   const pathname = usePathname();
   const router = useRouter();
-  const { active, enterTour } = useAppTour();
+  const { active, demoActive, enterTour } = useAppTour();
   const routeIndex = findAppTourRouteIndex(pathname);
   const currentRoute = routeIndex >= 0 ? appTourRoutes[routeIndex] : null;
   const previousRoute = routeIndex > 0 ? appTourRoutes[routeIndex - 1] : null;
@@ -34,6 +34,7 @@ export function AppTourModeBanner() {
 
   if (
     !active ||
+    demoActive ||
     pathname === '/app-tour' ||
     pathname === '/test-preview'
   ) {

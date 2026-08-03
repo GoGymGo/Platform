@@ -45,13 +45,22 @@ const productionAliases = new Map([
     path.join(projectRoot, 'src/production-stubs/AppTourQrSimulator.tsx')
   ]
 ]);
+const publicWebDemoModules = new Set([
+  '@/state/appTour',
+  '@/testing/appTourData',
+  '@/testing/appTourRegion'
+]);
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const keepBrowserTestPreview =
     !context.dev &&
     platform === 'web' &&
     browserTestPreviewBuildEnabled;
-  const productionModule = context.dev || keepBrowserTestPreview
+  const keepPublicWebDemo =
+    !context.dev &&
+    platform === 'web' &&
+    publicWebDemoModules.has(moduleName);
+  const productionModule = context.dev || keepBrowserTestPreview || keepPublicWebDemo
     ? undefined
     : productionAliases.get(moduleName);
   const browserPreviewModule = keepBrowserTestPreview

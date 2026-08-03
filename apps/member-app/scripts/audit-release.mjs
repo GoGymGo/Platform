@@ -220,10 +220,14 @@ if (
   !metroConfig.includes('context.dev') ||
   !metroConfig.includes("platform === 'web'") ||
   !metroConfig.includes('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW') ||
+  !metroConfig.includes('publicWebDemoModules') ||
+  !metroConfig.includes('keepPublicWebDemo') ||
+  !metroConfig.includes('@/state/appTour') ||
   !metroConfig.includes('@/testing/appTourData') ||
+  !metroConfig.includes('@/testing/appTourRegion') ||
   !metroConfig.includes('@/testing/AppTourScreen')
 ) {
-  issues.push('production Metro builds must replace development App Tour data and UI with release stubs');
+  issues.push('production Metro builds must retain the isolated web Demo data while replacing internal test-tour UI and native fixtures with release stubs');
 }
 
 if (issues.length > 0) {

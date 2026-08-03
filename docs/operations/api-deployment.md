@@ -60,7 +60,8 @@ After deploying the exact reviewed API commit, dispatch `Platform Deployment`
 with scope `pilot-configuration`, environment `staging`, and the same full
 source commit. The job refuses production, verifies the isolated AWS account and
 the immutable deployed image, then runs the idempotent Vancouver Island pilot
-configuration as a one-shot ECS task. It does not publish the draft competition.
+configuration from the API task definition on the isolated migration network.
+It does not publish the draft competition.
 The final gate requires the active `2026-09-pilot-v1` policy to appear through
 `GET /v1/regions`.
 

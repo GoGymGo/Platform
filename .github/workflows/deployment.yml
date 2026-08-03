@@ -50,7 +50,6 @@ jobs:
       ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
       ECS_MIGRATION_SECURITY_GROUPS: ${{ vars.ECS_MIGRATION_SECURITY_GROUPS }}
       ECS_MIGRATION_SUBNETS: ${{ vars.ECS_MIGRATION_SUBNETS }}
-      ECS_MIGRATION_TASK_DEFINITION: ${{ vars.ECS_MIGRATION_TASK_DEFINITION }}
       ECS_WORKER_SERVICE: ${{ vars.ECS_WORKER_SERVICE }}
       ECS_WORKER_TASK_DEFINITION: ${{ vars.ECS_WORKER_TASK_DEFINITION }}
     steps:
@@ -336,6 +335,7 @@ jobs:
       AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_API_TASK_DEFINITION: ${{ vars.ECS_API_TASK_DEFINITION }}
       ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
       ECS_MIGRATION_SECURITY_GROUPS: ${{ vars.ECS_MIGRATION_SECURITY_GROUPS }}
       ECS_MIGRATION_SUBNETS: ${{ vars.ECS_MIGRATION_SUBNETS }}
@@ -355,10 +355,10 @@ jobs:
             AWS_DEPLOY_ROLE_ARN \
             AWS_REGION \
             ECR_REPOSITORY \
+            ECS_API_TASK_DEFINITION \
             ECS_CLUSTER \
             ECS_MIGRATION_SECURITY_GROUPS \
-            ECS_MIGRATION_SUBNETS \
-            ECS_MIGRATION_TASK_DEFINITION; do
+            ECS_MIGRATION_SUBNETS; do
             if [[ -z "${!name:-}" ]]; then
               echo "The protected environment must define ${name}." >&2
               exit 1
@@ -390,7 +390,7 @@ jobs:
           fi
 
           aws ecs describe-task-definition \
-            --task-definition "$ECS_MIGRATION_TASK_DEFINITION" \
+            --task-definition "$ECS_API_TASK_DEFINITION" \
             --query taskDefinition > pilot-task.json
           image="$(jq -r '.containerDefinitions[0].image' pilot-task.json)"
           digest="${image##*@}"
@@ -423,7 +423,7 @@ jobs:
             --cluster "$ECS_CLUSTER" \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[${ECS_MIGRATION_SUBNETS}],securityGroups=[${ECS_MIGRATION_SECURITY_GROUPS}],assignPublicIp=ENABLED}" \
-            --task-definition "$ECS_MIGRATION_TASK_DEFINITION" \
+            --task-definition "$ECS_API_TASK_DEFINITION" \
             --overrides "$overrides" \
             --query 'tasks[0].taskArn' \
             --output text)"

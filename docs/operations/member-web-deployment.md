@@ -62,7 +62,7 @@ authenticated requests will succeed.
 The stable browser app is served by CloudFront from a private, public-access-
 blocked S3 bucket in the same isolated GoGymGo AWS account as its API. The S3
 origin is reachable only through CloudFront Origin Access Control. A CloudFront
-Function sends extensionless Expo Router paths such as `/demo` and `/join` to
+Function sends extensionless Expo Router paths such as `/sign-up` and `/join` to
 the SPA entrypoint. Do not promote a bundle containing a Quick Tunnel or local
 API URL.
 
@@ -78,7 +78,7 @@ For a permanent release:
 7. verify sign-in, profile/region restoration, enrollment, reads and a
    non-destructive write with a staging Firebase account.
 
-The protected workflow forces a clean Expo export, audits demo isolation and
+The protected workflow forces a clean Expo export, rejects public sample data and
 production markers, verifies the compiled API origin, assumes a separate
 least-privilege AWS OIDC role, synchronizes the private S3 origin, invalidates
 CloudFront and checks both public routes. The staging environment must define:

@@ -134,7 +134,7 @@ infrastructure apply cannot silently move application code ahead of migrations.
 The separate `Member Web Deployment` workflow builds the exact approved commit
 against its permanent API URL, rejects temporary or local endpoints, audits the
 browser bundle, publishes it through the narrow member-web role, invalidates
-CloudFront, and verifies `/demo` and `/join`.
+CloudFront, and verifies `/sign-up` and `/join`.
 
 ## Staging cost control
 

@@ -191,7 +191,7 @@ export default function CreatorApplicationScreen() {
             error={errors.region}
             label="YOUR REGION"
             onChangeText={setRegion}
-            placeholder="Toronto"
+            placeholder="Nanaimo"
             value={region}
           />
           <AuthTextField

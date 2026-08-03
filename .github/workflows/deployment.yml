@@ -22,6 +22,7 @@ on:
         options:
           - platform
           - member-web
+          - pilot-configuration
 
 permissions:
   contents: read
@@ -322,3 +323,139 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       source_commit: ${{ inputs.source_commit }}
+
+  pilot-configuration:
+    if: inputs.scope == 'pilot-configuration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      API_URL: ${{ vars.API_URL }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_MIGRATION_SECURITY_GROUPS: ${{ vars.ECS_MIGRATION_SECURITY_GROUPS }}
+      ECS_MIGRATION_SUBNETS: ${{ vars.ECS_MIGRATION_SUBNETS }}
+      ECS_MIGRATION_TASK_DEFINITION: ${{ vars.ECS_MIGRATION_TASK_DEFINITION }}
+    steps:
+      - name: Validate the staging configuration target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.environment }}" != "staging" ]]; then
+            echo "The September pilot configuration is restricted to staging." >&2
+            exit 1
+          fi
+          for name in \
+            API_URL \
+            AWS_ACCOUNT_ID \
+            AWS_DEPLOY_ROLE_ARN \
+            AWS_REGION \
+            ECR_REPOSITORY \
+            ECS_CLUSTER \
+            ECS_MIGRATION_SECURITY_GROUPS \
+            ECS_MIGRATION_SUBNETS \
+            ECS_MIGRATION_TASK_DEFINITION; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "The protected environment must define ${name}." >&2
+              exit 1
+            fi
+          done
+          if [[ "$AWS_REGION" != "ca-central-1" ]]; then
+            echo "GoGymGo releases are restricted to ca-central-1." >&2
+            exit 1
+          fi
+          if [[ ! "${{ inputs.source_commit }}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_commit must be a full lowercase Git commit SHA." >&2
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gogymgo-pilot-configuration-${{ github.run_id }}
+
+      - name: Verify the isolated account and deployed commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_account="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "$actual_account" != "$AWS_ACCOUNT_ID" ]]; then
+            echo "OIDC assumed account ${actual_account}; expected ${AWS_ACCOUNT_ID}." >&2
+            exit 1
+          fi
+
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_MIGRATION_TASK_DEFINITION" \
+            --query taskDefinition > pilot-task.json
+          image="$(jq -r '.containerDefinitions[0].image' pilot-task.json)"
+          digest="${image##*@}"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "The migration task is not pinned to an immutable image digest." >&2
+            exit 1
+          fi
+          if ! aws ecr describe-images \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids "imageDigest=${digest}" \
+              --query 'imageDetails[0].imageTags' \
+              --output text | tr '\t' '\n' | grep -q "^${{ inputs.source_commit }}-"; then
+            echo "The migration task image was not built from the requested source commit." >&2
+            exit 1
+          fi
+
+      - name: Apply the Vancouver Island pilot configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_name="$(jq -r '.containerDefinitions[0].name' pilot-task.json)"
+          overrides="$(jq -nc --arg name "$container_name" '{
+            containerOverrides: [{
+              name: $name,
+              command: ["node", "dist/operations/configure-september-2026-island-pilot.js"],
+              environment: [{name: "APPLY_PILOT_CONFIGURATION", value: "yes"}]
+            }]
+          }')"
+          task_arn="$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${ECS_MIGRATION_SUBNETS}],securityGroups=[${ECS_MIGRATION_SECURITY_GROUPS}],assignPublicIp=ENABLED}" \
+            --task-definition "$ECS_MIGRATION_TASK_DEFINITION" \
+            --overrides "$overrides" \
+            --query 'tasks[0].taskArn' \
+            --output text)"
+          if [[ -z "$task_arn" || "$task_arn" == "None" ]]; then
+            echo "ECS did not start the pilot-configuration task." >&2
+            exit 1
+          fi
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task_arn"
+          exit_code="$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$task_arn" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)"
+          if [[ "$exit_code" != "0" ]]; then
+            aws ecs describe-tasks \
+              --cluster "$ECS_CLUSTER" \
+              --tasks "$task_arn" \
+              --query 'tasks[0].{stoppedReason:stoppedReason,containers:containers[*].{name:name,reason:reason,exitCode:exitCode}}'
+            exit 1
+          fi
+
+      - name: Verify the active pilot region
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            --retry 12 \
+            --retry-all-errors \
+            --retry-delay 5 \
+            "${API_URL}/v1/regions" \
+            | jq -e '.[] | select(
+                .code == "vancouver-island-gulf-islands-bc" and
+                .competitionEnabled == true and
+                .policyVersion == "2026-09-pilot-v1"
+              )' > /dev/null

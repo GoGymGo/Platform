@@ -195,7 +195,7 @@ jobs:
           aws cloudfront wait invalidation-completed \
             --distribution-id "$MEMBER_WEB_DISTRIBUTION_ID" \
             --id "$invalidation_id"
-          for route in demo join; do
+          for route in sign-up join; do
             curl --fail --show-error --silent \
               --retry 12 \
               --retry-all-errors \

@@ -26,6 +26,7 @@ ADD --checksum=sha256:7e458e5489c48a92217efbe527da1203dc0fddebd802261fae9eed85fe
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/services/api/package.json ./services/api/package.json
 COPY --from=build --chown=node:node /workspace/services/api/node_modules ./services/api/node_modules
+COPY --from=build --chown=node:node /workspace/services/api/config ./services/api/config
 COPY --from=build --chown=node:node /workspace/services/api/dist ./services/api/dist
 
 RUN chmod 0444 /etc/ssl/certs/aws-rds-ca-central-1-bundle.pem \

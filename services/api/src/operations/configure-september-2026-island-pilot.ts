@@ -2,19 +2,19 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 import { sql } from 'kysely';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { AppModule } from '../src/app.module';
-import { DatabaseService } from '../src/database/database.service';
-import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
-import { AdminCompetitionConfigurationService } from '../src/modules/operator/admin-competition-configuration.service';
-import { AdminRegionConfigurationService } from '../src/modules/operator/admin-region-configuration.service';
-import { CompetitionStatusAction } from '../src/modules/operator/dto/admin-configuration.dto';
-import { AdminRewardsService } from '../src/modules/rewards/admin-rewards.service';
+import { AppModule } from '../app.module';
+import { DatabaseService } from '../database/database.service';
+import type { AuthenticatedPrincipal } from '../modules/auth/auth.types';
+import { AdminCompetitionConfigurationService } from '../modules/operator/admin-competition-configuration.service';
+import { AdminRegionConfigurationService } from '../modules/operator/admin-region-configuration.service';
+import { CompetitionStatusAction } from '../modules/operator/dto/admin-configuration.dto';
+import { AdminRewardsService } from '../modules/rewards/admin-rewards.service';
 import {
   RewardCatalogStatusAction,
   RewardTypeDto,
-} from '../src/modules/rewards/dto/reward.dto';
+} from '../modules/rewards/dto/reward.dto';
 
 const databaseUrl =
   process.env.DATABASE_URL?.trim() ??
@@ -72,6 +72,11 @@ const includedLocalTrustAreas = [
 type GeoJsonGeometry = {
   coordinates: unknown;
   type: string;
+};
+
+type GeoJsonMultiPolygon = {
+  coordinates: number[][][][];
+  type: 'MultiPolygon';
 };
 
 type GeoJsonFeatureCollection = {
@@ -460,6 +465,38 @@ async function persistBoundaryArtifact(
   return outputPath;
 }
 
+async function loadBoundaryArtifact(): Promise<BoundaryResult> {
+  const inputPath = resolve(
+    process.cwd(),
+    'config',
+    'regions',
+    `${regionCode}.geojson`,
+  );
+  const artifact = JSON.parse(await readFile(inputPath, 'utf8')) as {
+    geometry?: GeoJsonMultiPolygon;
+    properties?: { boundaryVersion?: string };
+  };
+  if (
+    !artifact.geometry ||
+    artifact.geometry.type !== 'MultiPolygon' ||
+    !Array.isArray(artifact.geometry.coordinates) ||
+    artifact.properties?.boundaryVersion !== boundaryVersion
+  ) {
+    throw new Error(
+      `The committed ${regionCode} boundary artifact is missing or has the wrong version.`,
+    );
+  }
+  return {
+    area_square_kilometres: '0',
+    boundary: artifact.geometry,
+    maximum_ring_points: Math.max(
+      ...artifact.geometry.coordinates.flat().map((ring) => ring.length),
+    ),
+    polygon_count: artifact.geometry.coordinates.length,
+    valid: true,
+  };
+}
+
 async function configureRegion(
   database: DatabaseService,
   service: AdminRegionConfigurationService,
@@ -693,22 +730,26 @@ async function main(): Promise<void> {
   });
   try {
     const database = app.get(DatabaseService);
-    const [province, localTrustAreas] = await Promise.all([
-      fetchGeoJson(statisticsCanadaProvinceBoundaryUrl),
-      fetchGeoJson(bcLocalTrustAreasUrl),
-    ]);
-    const boundary = await buildBoundary(database, province, localTrustAreas);
+    const boundary = applyConfiguration
+      ? await loadBoundaryArtifact()
+      : await (async () => {
+          const [province, localTrustAreas] = await Promise.all([
+            fetchGeoJson(statisticsCanadaProvinceBoundaryUrl),
+            fetchGeoJson(bcLocalTrustAreasUrl),
+          ]);
+          return buildBoundary(database, province, localTrustAreas);
+        })();
     await validateBoundaryPoints(database, boundary);
-    const outputPath = await persistBoundaryArtifact(boundary);
 
     console.log(
       `Boundary ready: ${boundary.polygon_count} polygons, ` +
         `${boundary.area_square_kilometres} km², ` +
         `${boundary.maximum_ring_points} maximum ring points.`,
     );
-    console.log(`Boundary artifact: ${outputPath}`);
 
     if (!applyConfiguration) {
+      const outputPath = await persistBoundaryArtifact(boundary);
+      console.log(`Boundary artifact: ${outputPath}`);
       console.log(
         'Dry run complete. Set APPLY_PILOT_CONFIGURATION=yes to apply it.',
       );

@@ -54,6 +54,16 @@ to Git, Expo variables, Terraform state, container images, or logs.
 9. Complete the rolling replacement while monitoring API failures, worker heartbeat,
    database saturation, reward-claim failures, notifications, and privacy work.
 
+## Staging pilot configuration
+
+After deploying the exact reviewed API commit, dispatch `Platform Deployment`
+with scope `pilot-configuration`, environment `staging`, and the same full
+source commit. The job refuses production, verifies the isolated AWS account and
+the immutable deployed image, then runs the idempotent Vancouver Island pilot
+configuration as a one-shot ECS task. It does not publish the draft competition.
+The final gate requires the active `2026-09-pilot-v1` policy to appear through
+`GET /v1/regions`.
+
 The protected GitHub workflow enforces migration, worker, rolling API, and
 readiness order. Terraform ignores image-only drift so an infrastructure apply
 cannot bypass it.

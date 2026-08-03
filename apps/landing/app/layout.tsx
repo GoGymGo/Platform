@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { MobileNavigation } from "./components/MobileNavigation";
 import "./globals.css";
 import "./experience.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const host =
+    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
   const protocol =
     requestHeaders.get("x-forwarded-proto") ??
     (host?.includes("localhost") ? "http" : "https");
@@ -86,8 +88,13 @@ export default function RootLayout({
               <Link href="https://app.gogymgo.com/demo">DEMO</Link>
               <Link href="/gym-goers">GYM GOERS</Link>
               <Link href="/brands">FITNESS BRANDS</Link>
+              <Link href="https://admin.gogymgo.com">ADMIN</Link>
             </nav>
-            <Link className="header-cta" href="https://app.gogymgo.com/join">
+            <MobileNavigation />
+            <Link
+              className="header-cta button-primary"
+              href="https://app.gogymgo.com/"
+            >
               JOIN BETA <span aria-hidden="true">→</span>
             </Link>
           </div>
@@ -111,13 +118,14 @@ export default function RootLayout({
             <div>
               <p className="footer-label">THE PRODUCT</p>
               <Link href="/#how-it-works">How GoGymGo works</Link>
-              <Link href="https://app.gogymgo.com/demo">Interactive app walkthrough</Link>
               <span>Launching region by region</span>
             </div>
           </div>
           <div className="shell footer-bottom">
             <span>© {new Date().getFullYear()} GoGymGo</span>
-            <span>NO PURCHASE REQUIRED // REWARDS SUBJECT TO REGIONAL RULES</span>
+            <span>
+              NO PURCHASE REQUIRED // REWARDS SUBJECT TO REGIONAL RULES
+            </span>
           </div>
         </footer>
       </body>

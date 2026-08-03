@@ -8,8 +8,16 @@
 .demo-page {
   overflow: hidden;
   background:
-    radial-gradient(circle at 80% 4%, rgba(52, 229, 232, 0.08), transparent 25rem),
-    radial-gradient(circle at 9% 60%, rgba(255, 45, 155, 0.035), transparent 28rem),
+    radial-gradient(
+      circle at 80% 4%,
+      rgba(52, 229, 232, 0.08),
+      transparent 25rem
+    ),
+    radial-gradient(
+      circle at 9% 60%,
+      rgba(255, 45, 155, 0.035),
+      transparent 28rem
+    ),
     var(--background);
 }
 
@@ -51,6 +59,58 @@
   line-height: 1.5;
 }
 
+.hero-challenge-callout {
+  max-width: 600px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 24px;
+  margin-top: 26px;
+  padding: 18px 20px;
+  border: 1px solid rgba(52, 229, 232, 0.42);
+  border-radius: 12px;
+  background:
+    linear-gradient(100deg, rgba(52, 229, 232, 0.1), transparent 68%),
+    rgba(9, 19, 23, 0.78);
+  box-shadow: inset 0 0 24px rgba(52, 229, 232, 0.04);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.hero-challenge-callout:hover,
+.hero-challenge-callout:focus-visible {
+  border-color: rgba(52, 229, 232, 0.76);
+  box-shadow:
+    inset 0 0 24px rgba(52, 229, 232, 0.08),
+    0 0 28px rgba(52, 229, 232, 0.1);
+  transform: translateY(-2px);
+}
+
+.hero-challenge-callout span {
+  grid-column: 1 / -1;
+  color: var(--green);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.hero-challenge-callout strong {
+  color: var(--text);
+  font-family: "Orbitron", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.hero-challenge-callout b {
+  align-self: end;
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
 .landing-hero .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -76,8 +136,7 @@
   border: 1px solid rgba(52, 229, 232, 0.5);
   border-radius: 28px;
   background:
-    linear-gradient(180deg, rgba(52, 229, 232, 0.035), transparent 28%),
-    #080b0e;
+    linear-gradient(180deg, rgba(52, 229, 232, 0.035), transparent 28%), #080b0e;
   box-shadow:
     0 0 42px rgba(52, 229, 232, 0.15),
     0 30px 70px rgba(0, 0, 0, 0.36);
@@ -93,6 +152,27 @@
   background: rgba(143, 216, 220, 0.28);
   content: "";
   transform: translateX(-50%);
+}
+
+.hero-app-preview.hero-app-preview--capture {
+  max-width: 360px;
+  min-height: 0;
+  aspect-ratio: 430 / 931;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.hero-app-preview--capture::before {
+  display: none;
+}
+
+.hero-app-capture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  object-fit: cover;
+  object-position: top;
 }
 
 .hero-app-status {
@@ -300,8 +380,7 @@
   border-radius: 28px;
   color: var(--text);
   background:
-    linear-gradient(180deg, rgba(52, 229, 232, 0.025), transparent 30%),
-    #080b0e;
+    linear-gradient(180deg, rgba(52, 229, 232, 0.025), transparent 30%), #080b0e;
   box-shadow:
     0 0 28px rgba(52, 229, 232, 0.1),
     0 22px 44px rgba(0, 0, 0, 0.26);
@@ -317,6 +396,25 @@
   background: rgba(143, 216, 220, 0.24);
   content: "";
   transform: translateX(-50%);
+}
+
+.product-phone.product-phone--capture {
+  min-height: 0;
+  aspect-ratio: 430 / 886;
+  padding: 8px;
+}
+
+.product-phone--capture::before {
+  display: none;
+}
+
+.product-screen-capture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  object-fit: cover;
+  object-position: top;
 }
 
 .product-phone-content {
@@ -1028,8 +1126,7 @@
   border: 1px solid rgba(52, 229, 232, 0.5);
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(52, 229, 232, 0.025), transparent 27%),
-    #080b0e;
+    linear-gradient(180deg, rgba(52, 229, 232, 0.025), transparent 27%), #080b0e;
   box-shadow:
     0 0 38px rgba(52, 229, 232, 0.14),
     0 30px 70px rgba(0, 0, 0, 0.34);
@@ -2150,7 +2247,7 @@
   }
 
   .site-header .wordmark {
-    font-size: 25px;
+    font-size: 21px;
   }
 
   .site-header nav {
@@ -2158,7 +2255,7 @@
   }
 
   .header-cta {
-    min-height: 42px;
+    min-height: 44px;
     padding-inline: 13px;
     font-size: 10px;
   }
@@ -2178,6 +2275,14 @@
 
   .landing-hero .hero-actions {
     display: grid;
+  }
+
+  .hero-challenge-callout {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-challenge-callout b {
+    margin-top: 4px;
   }
 
   .landing-hero .button {

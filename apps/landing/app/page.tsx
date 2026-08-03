@@ -54,31 +54,20 @@ const brandSignals = [
 
 function HeroAppPreview() {
   return (
-    <div className="hero-app-preview" aria-label="Preview of the GoGymGo Home screen">
-      <div className="hero-app-status">
-        <span>ACCOUNT READY // VANCOUVER</span>
-        <b>CA</b>
-      </div>
-      <strong className="hero-app-alias">CAMERON12</strong>
-      <div className="hero-app-card">
-        <span>WEEK 1 // READY</span>
-        <h2>START YOUR FIRST SESSION</h2>
-        <p>
-          Complete 4 verified workouts this week to hit your Weekly Goal.
-        </p>
-        <div className="hero-app-goal">
-          <strong>4</strong>
-          <span>DAY GOAL</span>
-        </div>
-        <div className="hero-app-button">START WORKOUT →</div>
-      </div>
-      <div className="hero-app-nav" aria-hidden="true">
-        <span className="is-active">HOME</span>
-        <span>LOG</span>
-        <span>TRAIN</span>
-        <span>COMPETE</span>
-        <span>ME</span>
-      </div>
+    <div
+      className="hero-app-preview hero-app-preview--capture"
+      aria-label="GoGymGo member app Weekly Goal selection screen"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        alt="GoGymGo member app screen with a four-day Weekly Goal selected"
+        className="hero-app-capture"
+        decoding="async"
+        height={886}
+        loading="eager"
+        src="/app/weekly-goal.png"
+        width={430}
+      />
     </div>
   );
 }
@@ -99,11 +88,22 @@ export default function Home() {
             Complete verified workouts, compete in your region and earn chances
             to win fitness brand rewards.
           </p>
+          <Link
+            className="hero-challenge-callout"
+            href="https://app.gogymgo.com/"
+          >
+            <span>SEPTEMBER 2026 // VANCOUVER ISLAND</span>
+            <strong>
+              Join our beta to participate in the $100 September Vancouver
+              Island Challenge.
+            </strong>
+            <b>REGISTER IN THE APP →</b>
+          </Link>
           <div className="hero-actions">
-            <Link className="button button-primary" href="https://app.gogymgo.com/demo">
-              TRY THE APP FLOW <span aria-hidden="true">→</span>
-            </Link>
-            <Link className="button button-secondary" href="https://app.gogymgo.com/join">
+            <Link
+              className="button button-primary"
+              href="https://app.gogymgo.com/"
+            >
               JOIN BETA <span aria-hidden="true">↗</span>
             </Link>
           </div>
@@ -168,14 +168,14 @@ export default function Home() {
           <h2>Use the flow before you register.</h2>
           <p>
             Move through the same setup, Weekly Goal, workout, completion, and
-            results screens as the mobile app. It stays on your device and
-            never creates a real account or competition entry.
+            results screens as the mobile app. It stays on your device and never
+            creates a real account or competition entry.
           </p>
-          <Link className="button button-primary" href="https://app.gogymgo.com/demo">
-            OPEN THE APP DEMO <span aria-hidden="true">→</span>
-          </Link>
         </div>
-        <div className="demo-promo-sequence" aria-label="Three parts of the app demo">
+        <div
+          className="demo-promo-sequence"
+          aria-label="Three parts of the app demo"
+        >
           <div>
             <span>01</span>
             <strong>SET UP</strong>
@@ -239,7 +239,10 @@ export default function Home() {
               BECOME A FOUNDING PARTNER <span aria-hidden="true">→</span>
             </Link>
           </div>
-          <div className="brand-console" aria-label="Example brand reward placement">
+          <div
+            className="brand-console"
+            aria-label="Example brand reward placement"
+          >
             <div className="console-header">
               <span>REWARD PLACEMENT</span>
               <span className="console-live">PARTNER INTAKE OPEN</span>
@@ -276,9 +279,6 @@ export default function Home() {
           <h2>See the app. Then choose how you want to join.</h2>
         </div>
         <div className="final-actions">
-          <Link className="button button-primary" href="https://app.gogymgo.com/demo">
-            TRY THE APP FLOW <span aria-hidden="true">→</span>
-          </Link>
           <Link className="button button-secondary" href="/gym-goers">
             I&apos;M A GYM GOER <span aria-hidden="true">↗</span>
           </Link>

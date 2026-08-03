@@ -99,8 +99,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <p className="eyebrow">STATIC QR PILOT</p>
             <h2>Gym locations + posters</h2>
             <p>
-              Configure the exact geofence, issue one static poster and revoke it
-              immediately if the credential is exposed.
+              Configure the exact geofence, issue one static poster and revoke
+              it immediately if the credential is exposed.
             </p>
           </div>
         </div>
@@ -126,21 +126,46 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </label>
           <label>
             <span>LATITUDE</span>
-            <input max="90" min="-90" name="latitude" required step="any" type="number" />
+            <input
+              max="90"
+              min="-90"
+              name="latitude"
+              required
+              step="any"
+              type="number"
+            />
           </label>
           <label>
             <span>LONGITUDE</span>
-            <input max="180" min="-180" name="longitude" required step="any" type="number" />
+            <input
+              max="180"
+              min="-180"
+              name="longitude"
+              required
+              step="any"
+              type="number"
+            />
           </label>
           <label>
             <span>RADIUS (METRES)</span>
-            <input defaultValue="75" max="500" min="10" name="radiusMeters" required type="number" />
+            <input
+              defaultValue="75"
+              max="500"
+              min="10"
+              name="radiusMeters"
+              required
+              type="number"
+            />
           </label>
           <label className="pilot-form-wide">
             <span>ADMINISTRATIVE REASON</span>
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
-          <button className="primary-button" disabled={props.submitting} type="submit">
+          <button
+            className="primary-button"
+            disabled={props.submitting}
+            type="submit"
+          >
             + CREATE GYM
           </button>
         </form>
@@ -153,7 +178,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               <GymCard
                 gym={gym}
                 key={gym.id}
-                onIssue={async (input) => setPoster(await props.onIssueQr(gym.id, input))}
+                onIssue={async (input) =>
+                  setPoster(await props.onIssueQr(gym.id, input))
+                }
                 onRevoke={(input) => props.onRevokeQr(gym.id, input)}
                 onUpdate={(input) => props.onUpdateGym(gym.id, input)}
                 submitting={props.submitting}
@@ -162,7 +189,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </div>
         )}
 
-        {poster ? <PosterPreview credential={poster} onClose={() => setPoster(null)} /> : null}
+        {poster ? (
+          <PosterPreview credential={poster} onClose={() => setPoster(null)} />
+        ) : null}
       </section>
 
       <section className="panel">
@@ -188,16 +217,24 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <span>GYM</span>
             <select name="gymId" required>
               <option value="">Choose gym</option>
-              {props.gyms.filter((gym) => gym.active).map((gym) => (
-                <option key={gym.id} value={gym.id}>{gym.name}</option>
-              ))}
+              {props.gyms
+                .filter((gym) => gym.active)
+                .map((gym) => (
+                  <option key={gym.id} value={gym.id}>
+                    {gym.name}
+                  </option>
+                ))}
             </select>
           </label>
           <label className="pilot-form-wide">
             <span>ADMINISTRATIVE REASON</span>
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
-          <button className="primary-button" disabled={props.submitting} type="submit">
+          <button
+            className="primary-button"
+            disabled={props.submitting}
+            type="submit"
+          >
             ASSIGN GYM
           </button>
         </form>
@@ -210,7 +247,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         rows={props.sessions.map((session) => [
           session.gymName,
           formatDateTime(session.startedAt),
-          session.completedAt ? formatDateTime(session.completedAt) : "Missing exit scan",
+          session.completedAt
+            ? formatDateTime(session.completedAt)
+            : "Missing exit scan",
           session.incomplete ? "incomplete" : session.status,
         ])}
         title="Sessions + incomplete visits"
@@ -262,7 +301,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">IN-PERSON CASH HANDOFF</p>
             <h2>Record fulfillment</h2>
-            <p>The draw must already be settled. This action is permanent and audited.</p>
+            <p>
+              The draw must already be settled. This action is permanent and
+              audited.
+            </p>
           </div>
         </div>
         <form className="pilot-form" onSubmit={recordCash}>
@@ -272,17 +314,37 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </label>
           <label>
             <span>AMOUNT (CENTS)</span>
-            <input defaultValue="5000" min="1" name="amountCents" required type="number" />
+            <input
+              defaultValue="10000"
+              min="1"
+              name="amountCents"
+              required
+              type="number"
+            />
           </label>
           <label>
             <span>CURRENCY</span>
-            <input defaultValue="CAD" maxLength={3} minLength={3} name="currency" required />
+            <input
+              defaultValue="CAD"
+              maxLength={3}
+              minLength={3}
+              name="currency"
+              required
+            />
           </label>
           <label className="pilot-form-wide">
             <span>FULFILLMENT NOTE + REASON</span>
-            <input name="reason" placeholder="Cash handed to winner in person by …" required />
+            <input
+              name="reason"
+              placeholder="Cash handed to winner in person by …"
+              required
+            />
           </label>
-          <button className="danger-button" disabled={props.submitting} type="submit">
+          <button
+            className="danger-button"
+            disabled={props.submitting}
+            type="submit"
+          >
             RECORD CASH HANDOFF
           </button>
         </form>
@@ -342,7 +404,8 @@ function GymCard({
         <h3>{gym.name}</h3>
         <p>{gym.address}</p>
         <small>
-          {gym.latitude.toFixed(6)}, {gym.longitude.toFixed(6)} · {gym.radiusMeters} m · QR v{gym.activeCredentialVersion || "—"}
+          {gym.latitude.toFixed(6)}, {gym.longitude.toFixed(6)} ·{" "}
+          {gym.radiusMeters} m · QR v{gym.activeCredentialVersion || "—"}
         </small>
       </div>
       <div className="inline-actions pilot-gym-actions">
@@ -357,7 +420,11 @@ function GymCard({
         <button
           className="danger-button"
           disabled={submitting || !gym.activeCredentialVersion}
-          onClick={() => void onRevoke({ reason: "Revoke the current static QR credential." })}
+          onClick={() =>
+            void onRevoke({
+              reason: "Revoke the current static QR credential.",
+            })
+          }
           type="button"
         >
           REVOKE QR
@@ -366,14 +433,64 @@ function GymCard({
       <details className="pilot-details">
         <summary>Edit gym + geofence</summary>
         <form className="pilot-form" onSubmit={update}>
-          <label><span>NAME</span><input defaultValue={gym.name} name="name" required /></label>
-          <label><span>ADDRESS</span><input defaultValue={gym.address} name="address" required /></label>
-          <label><span>LATITUDE</span><input defaultValue={gym.latitude} max="90" min="-90" name="latitude" required step="any" type="number" /></label>
-          <label><span>LONGITUDE</span><input defaultValue={gym.longitude} max="180" min="-180" name="longitude" required step="any" type="number" /></label>
-          <label><span>RADIUS</span><input defaultValue={gym.radiusMeters} max="500" min="10" name="radiusMeters" required type="number" /></label>
-          <label className="check-field"><input defaultChecked={gym.active} name="active" type="checkbox" /><span>ACTIVE</span></label>
-          <label className="pilot-form-wide"><span>REASON</span><input defaultValue={administrativeReason} name="reason" required /></label>
-          <button className="secondary-button" disabled={submitting} type="submit">SAVE GYM</button>
+          <label>
+            <span>NAME</span>
+            <input defaultValue={gym.name} name="name" required />
+          </label>
+          <label>
+            <span>ADDRESS</span>
+            <input defaultValue={gym.address} name="address" required />
+          </label>
+          <label>
+            <span>LATITUDE</span>
+            <input
+              defaultValue={gym.latitude}
+              max="90"
+              min="-90"
+              name="latitude"
+              required
+              step="any"
+              type="number"
+            />
+          </label>
+          <label>
+            <span>LONGITUDE</span>
+            <input
+              defaultValue={gym.longitude}
+              max="180"
+              min="-180"
+              name="longitude"
+              required
+              step="any"
+              type="number"
+            />
+          </label>
+          <label>
+            <span>RADIUS</span>
+            <input
+              defaultValue={gym.radiusMeters}
+              max="500"
+              min="10"
+              name="radiusMeters"
+              required
+              type="number"
+            />
+          </label>
+          <label className="check-field">
+            <input defaultChecked={gym.active} name="active" type="checkbox" />
+            <span>ACTIVE</span>
+          </label>
+          <label className="pilot-form-wide">
+            <span>REASON</span>
+            <input defaultValue={administrativeReason} name="reason" required />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={submitting}
+            type="submit"
+          >
+            SAVE GYM
+          </button>
         </form>
       </details>
     </article>
@@ -391,14 +508,22 @@ function PosterPreview({
   return (
     <div className="poster-preview">
       <div>
-        <strong>PRINTABLE QR POSTER · VERSION {credential.credentialVersion}</strong>
-        <button className="text-button" onClick={onClose} type="button">Close</button>
+        <strong>
+          PRINTABLE QR POSTER · VERSION {credential.credentialVersion}
+        </strong>
+        <button className="text-button" onClick={onClose} type="button">
+          Close
+        </button>
       </div>
       {/* The SVG is rendered as an image, never injected as executable markup. */}
       {/* Generated data URLs cannot use the Sites image optimizer. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img alt="Printable GoGymGo gym QR poster" src={source} />
-      <a className="primary-button" download={`gogymgo-gym-qr-v${credential.credentialVersion}.svg`} href={source}>
+      <a
+        className="primary-button"
+        download={`gogymgo-gym-qr-v${credential.credentialVersion}.svg`}
+        href={source}
+      >
         DOWNLOAD SVG FOR PRINTING
       </a>
     </div>
@@ -420,11 +545,35 @@ function PilotTable({
 }) {
   return (
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div></div>
-      {rows.length === 0 ? <p className="empty-copy">{empty}</p> : (
-        <div className="table-wrap"><table><thead><tr>{headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead>
-          <tbody>{rows.map((row, rowIndex) => <tr key={`${title}-${rowIndex}`}>{row.map((cell, cellIndex) => <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>)}</tr>)}</tbody>
-        </table></div>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2>{title}</h2>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="empty-copy">{empty}</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {headings.map((heading) => (
+                  <th key={heading}>{heading}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`${title}-${rowIndex}`}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

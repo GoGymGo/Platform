@@ -1,6 +1,8 @@
 import { AdminDashboard } from "./admin-dashboard";
 import type { FirebaseClientConfig } from "./admin-types";
 
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   const firebaseConfig: FirebaseClientConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",

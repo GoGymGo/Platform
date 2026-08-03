@@ -30,16 +30,17 @@ test("the landing page contains real member-app screen captures", async () => {
   assert.match(page, /Complete verified workouts/i);
   assert.match(layout, /href="https:\/\/app\.gogymgo\.com\/demo"/);
   assert.match(layout, /href="https:\/\/app\.gogymgo\.com\/"/);
+  assert.doesNotMatch(layout, />ADMIN<\/[^>]+>/);
   assert.match(
     layout,
-    /href="https:\/\/admin\.gogymgo\.com">ADMIN<\/[^>]+>/,
+    /href="https:\/\/gogymgo-admin-control\.wilson-1212\.chatgpt\.site\/">\s*Administrator sign-in/,
   );
   assert.match(layout, /className="header-cta button-primary"/);
   assert.match(layout, /<MobileNavigation \/>/);
   assert.match(mobileNavigation, /aria-expanded=\{isOpen\}/);
   assert.match(mobileNavigation, /Mobile navigation/);
   assert.match(mobileNavigation, /https:\/\/app\.gogymgo\.com\/demo/);
-  assert.match(mobileNavigation, /https:\/\/admin\.gogymgo\.com/);
+  assert.doesNotMatch(mobileNavigation, /ADMIN|admin\.gogymgo\.com/);
   assert.match(
     page,
     /className="button button-primary"\s+href="https:\/\/app\.gogymgo\.com\/"/,
@@ -55,7 +56,7 @@ test("the landing page contains real member-app screen captures", async () => {
   );
   assert.equal(
     (layout.match(/href="https:\/\/app\.gogymgo\.com\/demo"/g) ?? []).length,
-    1,
+    2,
   );
   assert.match(page, /\/app\/weekly-goal\.png/);
   assert.match(page, /member app Weekly Goal selection screen/);

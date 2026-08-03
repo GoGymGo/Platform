@@ -299,8 +299,7 @@ main {
 
 .topbar-actions,
 .inline-actions,
-.form-actions,
-.provider-grid {
+.form-actions {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1367,26 +1366,9 @@ td small {
   margin-top: 4px;
 }
 
-.divider {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  margin: 24px 0;
-  color: var(--muted-2);
-  font-size: 9px;
-}
-
-.divider::before,
-.divider::after {
-  height: 1px;
-  background: var(--line);
-  content: "";
-}
-
-.provider-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.sign-in-panel .stacked-form input,
+.sign-in-panel .primary-button {
+  min-height: 48px;
 }
 
 .fine-print,
@@ -1509,7 +1491,7 @@ td small {
   .sign-in-intro {
     min-height: auto;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-top: 1px solid var(--line);
     padding: 36px 24px;
   }
 
@@ -1522,7 +1504,8 @@ td small {
   }
 
   .sign-in-panel {
-    min-height: 620px;
+    min-height: 0;
+    order: -1;
     padding: 40px 24px;
   }
 }

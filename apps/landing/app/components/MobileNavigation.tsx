@@ -8,7 +8,6 @@ const navigationItems = [
   { href: "https://app.gogymgo.com/demo", label: "DEMO" },
   { href: "/gym-goers", label: "GYM GOERS" },
   { href: "/brands", label: "FITNESS BRANDS" },
-  { href: "https://admin.gogymgo.com", label: "ADMIN" },
 ] as const;
 
 export function MobileNavigation() {

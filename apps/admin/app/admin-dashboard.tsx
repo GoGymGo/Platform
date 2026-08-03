@@ -4,12 +4,9 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
   getAuth,
-  GoogleAuthProvider,
-  OAuthProvider,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
@@ -114,9 +111,7 @@ export function AdminDashboard({
     .filter(([key]) => key !== "measurementId")
     .every(([, value]) => Boolean(value));
   const [section, setSection] = useState<AdminSection>("overview");
-  const [authStage, setAuthStage] = useState<AuthStage>(
-    firebaseConfigured ? "checking" : "signed-out",
-  );
+  const [authStage, setAuthStage] = useState<AuthStage>("signed-out");
   const [user, setUser] = useState<User | null>(null);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
@@ -221,19 +216,30 @@ export function AdminDashboard({
 
   useEffect(() => {
     if (!firebaseConfigured) return;
-    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    void setPersistence(auth, browserLocalPersistence);
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setSnapshot(null);
-      if (nextUser) {
-        setAuthStage("checking");
-        void refresh(nextUser);
-      } else {
+    try {
+      const app =
+        getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      void setPersistence(auth, browserLocalPersistence).catch((error) => {
+        setLoadError(authErrorMessage(error));
+      });
+      return onAuthStateChanged(auth, (nextUser) => {
+        setUser(nextUser);
+        setSnapshot(null);
+        if (nextUser) {
+          setAuthStage("checking");
+          void refresh(nextUser);
+        } else {
+          setAuthStage("signed-out");
+        }
+      });
+    } catch (error) {
+      queueMicrotask(() => {
         setAuthStage("signed-out");
-      }
-    });
+        setLoadError(authErrorMessage(error));
+      });
+      return;
+    }
   }, [firebaseConfig, firebaseConfigured, refresh]);
 
   useEffect(() => {
@@ -272,25 +278,16 @@ export function AdminDashboard({
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     try {
-      const auth = getAuth();
+      if (!firebaseConfigured) {
+        throw new Error(
+          "Administrator sign-in is not configured for this deployment.",
+        );
+      }
+      const app =
+        getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+      const auth = getAuth(app);
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      setLoadError(authErrorMessage(error));
-    }
-  }
-
-  async function handleProviderSignIn(provider: "apple" | "google") {
-    setLoadError("");
-    try {
-      const auth = getAuth();
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(
-        auth,
-        provider === "google"
-          ? new GoogleAuthProvider()
-          : new OAuthProvider("apple.com"),
-      );
     } catch (error) {
       setLoadError(authErrorMessage(error));
     }
@@ -312,7 +309,6 @@ export function AdminDashboard({
         error={loadError}
         firebaseConfigured={firebaseConfigured}
         onEmailSignIn={handleEmailSignIn}
-        onProviderSignIn={handleProviderSignIn}
         onSignOut={user ? handleSignOut : undefined}
         signedInEmail={user?.email ?? undefined}
       />
@@ -734,7 +730,6 @@ function SignInScreen({
   error,
   firebaseConfigured,
   onEmailSignIn,
-  onProviderSignIn,
   onSignOut,
   signedInEmail,
 }: {
@@ -742,7 +737,6 @@ function SignInScreen({
   error: string;
   firebaseConfigured: boolean;
   onEmailSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onProviderSignIn: (provider: "apple" | "google") => Promise<void>;
   onSignOut?: () => Promise<void>;
   signedInEmail?: string;
 }) {
@@ -769,9 +763,9 @@ function SignInScreen({
         <div className="security-list">
           <span>01</span>
           <p>
-            <strong>Database-authorized access</strong>
-            Firebase sign-in identifies you. The backend admin role decides
-            what you may change.
+            <strong>GoGymGo-issued accounts only</strong>
+            There is no public registration. GoGymGo provides credentials
+            directly to approved gym owners and regional directors.
           </p>
           <span>02</span>
           <p>
@@ -782,8 +776,8 @@ function SignInScreen({
         </div>
       </section>
       <section className="sign-in-panel">
-        <p className="eyebrow">ADMIN AUTHENTICATION</p>
-        <h2>{denied ? "Admin access required" : "Sign in to continue"}</h2>
+        <p className="eyebrow">INVITATION-ONLY OPERATOR ACCESS</p>
+        <h2>{denied ? "Operator access required" : "Sign in to continue"}</h2>
         {denied ? (
           <div className="alert error compact" role="alert">
             <span>!</span>
@@ -811,7 +805,7 @@ function SignInScreen({
           <>
             <form className="stacked-form" onSubmit={(event) => void onEmailSignIn(event)}>
               <label>
-                ADMIN EMAIL
+                GOGYMGO-ISSUED EMAIL
                 <input
                   autoComplete="username"
                   name="email"
@@ -835,31 +829,12 @@ function SignInScreen({
                 ENTER ADMIN CONTROL
               </button>
             </form>
-            <div className="divider">
-              <span>OR USE YOUR CONNECTED ACCOUNT</span>
-            </div>
-            <div className="provider-grid">
-              <button
-                className="secondary-button"
-                onClick={() => void onProviderSignIn("google")}
-                type="button"
-              >
-                GOOGLE
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() => void onProviderSignIn("apple")}
-                type="button"
-              >
-                APPLE
-              </button>
-            </div>
           </>
         )}
         <p className="fine-print">
-          Authentication never grants itself permission. Only active,
-          email-verified accounts with the authoritative database admin role
-          may enter.
+          A valid password does not grant access by itself. Only active,
+          email-verified accounts provisioned directly by GoGymGo and assigned
+          the authoritative database admin role may enter.
         </p>
       </section>
     </main>

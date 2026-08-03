@@ -88,7 +88,6 @@ export default function RootLayout({
               <Link href="https://app.gogymgo.com/demo">DEMO</Link>
               <Link href="/gym-goers">GYM GOERS</Link>
               <Link href="/brands">FITNESS BRANDS</Link>
-              <Link href="https://admin.gogymgo.com">ADMIN</Link>
             </nav>
             <MobileNavigation />
             <Link
@@ -118,6 +117,10 @@ export default function RootLayout({
             <div>
               <p className="footer-label">THE PRODUCT</p>
               <Link href="/#how-it-works">How GoGymGo works</Link>
+              <Link href="https://app.gogymgo.com/demo">App demo</Link>
+              <Link href="https://gogymgo-admin-control.wilson-1212.chatgpt.site/">
+                Administrator sign-in
+              </Link>
               <span>Launching region by region</span>
             </div>
           </div>

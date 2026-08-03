@@ -343,6 +343,11 @@ async function findAdministrator(
   database: DatabaseService,
 ): Promise<AuthenticatedPrincipal> {
   const requestedUid = process.env.PILOT_ADMIN_FIREBASE_UID?.trim();
+  const requestedEmail = (
+    process.env.PILOT_ADMIN_EMAIL ?? 's1ck5ense123@gmail.com'
+  )
+    .trim()
+    .toLowerCase();
   let query = database.connection
     .selectFrom('users')
     .select(['email', 'email_verified', 'firebase_uid', 'roles'])
@@ -350,13 +355,15 @@ async function findAdministrator(
     .where(sql<boolean>`'admin' = ANY(roles)`);
   if (requestedUid) {
     query = query.where('firebase_uid', '=', requestedUid);
+  } else {
+    query = query.where(sql<boolean>`lower(email) = ${requestedEmail}`);
   }
   const administrators = await query.execute();
   if (administrators.length !== 1) {
     throw new Error(
       requestedUid
         ? 'PILOT_ADMIN_FIREBASE_UID does not identify one active administrator.'
-        : 'Exactly one active administrator is required; set PILOT_ADMIN_FIREBASE_UID.',
+        : 'PILOT_ADMIN_EMAIL does not identify one active administrator.',
     );
   }
   const administrator = administrators[0];

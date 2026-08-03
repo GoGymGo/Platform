@@ -453,6 +453,17 @@ function auditAppTourProductionBoundary() {
   if (!stateSource.includes('if (!browserTestPreviewEnabled)')) {
     issues.push('src/state/appTour.tsx: enterTour must reject unavailable preview activation');
   }
+  for (const marker of [
+    "Platform.OS === 'web'",
+    "pathname === '/demo'",
+    "firstParam(params.demo) === '1'",
+    'enterDemo',
+    'demoActive'
+  ]) {
+    if (!stateSource.includes(marker)) {
+      issues.push(`src/state/appTour.tsx: public Demo activation is missing ${marker}`);
+    }
+  }
   if (!routeSource.includes('if (!__DEV__)')) {
     issues.push('app/app-tour.tsx: production builds must redirect away from the App Tour');
   }
@@ -483,6 +494,12 @@ function auditAppTourProductionBoundary() {
   }
   if (!metroSource.includes('context.dev')) {
     issues.push('metro.config.js: production module aliases must be selected from the Metro development flag');
+  }
+  if (
+    !metroSource.includes('publicWebDemoModules') ||
+    !metroSource.includes('keepPublicWebDemo')
+  ) {
+    issues.push('metro.config.js: public Demo data must remain available only to production web exports');
   }
   if (
     !metroSource.includes("platform === 'web'") ||

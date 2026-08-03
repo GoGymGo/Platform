@@ -4,17 +4,17 @@ import type {
 } from '@/config/regions';
 
 export const appTourRegion: CompetitionRegion = {
-  id: 'toronto-on',
-  label: 'TORONTO',
-  timeZone: 'America/Toronto'
+  id: 'vancouver-island-gulf-islands-bc',
+  label: 'VANCOUVER ISLAND + GULF ISLANDS',
+  timeZone: 'America/Vancouver'
 };
 
 export const appTourRegionVerification: CompetitionRegionVerification = {
   expiresAt: '2099-01-01T00:00:00.000Z',
-  jurisdictionCode: 'CA-ON',
+  jurisdictionCode: 'CA-BC',
   method: 'device-location',
   region: appTourRegion,
-  regionCode: 'toronto-on',
+  regionCode: 'vancouver-island-gulf-islands-bc',
   regionPolicyId: '10000000-0000-4000-8000-000000000003',
   status: 'verified',
   verificationId: '10000000-0000-4000-8000-000000000004',

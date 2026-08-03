@@ -7,6 +7,7 @@ import {
   type PropsWithChildren
 } from 'react';
 import { useGlobalSearchParams, usePathname } from 'expo-router';
+import { Platform } from 'react-native';
 
 import {
   browserTestPreviewBuildEnabled,
@@ -22,6 +23,8 @@ export type AppTourScenario =
 
 type AppTourContextValue = {
   active: boolean;
+  demoActive: boolean;
+  enterDemo: (scenario?: AppTourScenario) => void;
   enterTour: (scenario?: AppTourScenario) => void;
   exitTour: () => void;
   scenario: AppTourScenario;
@@ -33,12 +36,13 @@ export function AppTourProvider({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const params = useGlobalSearchParams<{
     appTour?: string | string[];
+    demo?: string | string[];
     tourScenario?: string | string[];
   }>();
   const requestedScenario = parseScenario(firstParam(params.tourScenario));
   const browserPreviewLanding =
     browserTestPreviewBuildEnabled && pathname === '/';
-  const tourRequested =
+  const browserTourRequested =
     browserTestPreviewEnabled &&
     (
       pathname === '/app-tour' ||
@@ -46,12 +50,28 @@ export function AppTourProvider({ children }: PropsWithChildren) {
       browserPreviewLanding ||
       firstParam(params.appTour) === '1'
     );
-  const [active, setActive] = useState(tourRequested);
+  const publicDemoRequested =
+    Platform.OS === 'web' &&
+    (pathname === '/demo' || firstParam(params.demo) === '1');
+  const [active, setActive] = useState(browserTourRequested);
+  const [demoActive, setDemoActive] = useState(publicDemoRequested);
   const [scenario, setScenario] = useState<AppTourScenario>(
     requestedScenario ?? (browserPreviewLanding ? 'new-player' : 'ready')
   );
-  const effectiveActive = active || tourRequested;
-  const effectiveScenario = requestedScenario ?? scenario;
+  const effectiveDemoActive = demoActive || publicDemoRequested;
+  const effectiveActive = active || browserTourRequested || effectiveDemoActive;
+  const effectiveScenario = effectiveDemoActive
+    ? scenario
+    : requestedScenario ?? scenario;
+
+  const enterDemo = useCallback((nextScenario: AppTourScenario = 'ready') => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    setScenario(nextScenario);
+    setDemoActive(true);
+  }, []);
 
   const enterTour = useCallback((nextScenario: AppTourScenario = 'ready') => {
     if (!browserTestPreviewEnabled) {
@@ -64,17 +84,20 @@ export function AppTourProvider({ children }: PropsWithChildren) {
 
   const exitTour = useCallback(() => {
     setActive(false);
+    setDemoActive(false);
     setScenario('ready');
   }, []);
 
   const value = useMemo(
     () => ({
       active: effectiveActive,
+      demoActive: effectiveDemoActive,
+      enterDemo,
       enterTour,
       exitTour,
       scenario: effectiveScenario
     }),
-    [effectiveActive, effectiveScenario, enterTour, exitTour]
+    [effectiveActive, effectiveDemoActive, effectiveScenario, enterDemo, enterTour, exitTour]
   );
 
   return (

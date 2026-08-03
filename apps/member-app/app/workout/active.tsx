@@ -16,6 +16,7 @@ import {
   HUDBorderBox,
   ScreenScrollView,
   ScreenContainer,
+  ScreenLoadingState,
   TerminalText
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
@@ -38,7 +39,10 @@ export default function ActiveWorkoutScreen() {
   useKeepAwake('gogymgo-active-workout', { suppressDeactivateWarnings: true });
   const reduceMotion = useReducedMotionPreference();
   const router = useRouter();
-  const { active: appTourActive } = useAppTour();
+  const {
+    active: appTourActive,
+    demoActive
+  } = useAppTour();
   const {
     activeSession,
     cancelActiveWorkout,
@@ -147,6 +151,10 @@ export default function ActiveWorkoutScreen() {
   const progressWidth = `${session.progressPercent}%` as `${number}%`;
 
   if (!activeSession) {
+    if (demoActive) {
+      return <ScreenLoadingState body="Loading the sample workout." />;
+    }
+
     return (
       <SessionUnavailable
         body="Start from the Session tab so check-in, the timer, and verification checkpoints can be tracked together."

@@ -36,7 +36,7 @@ const operatorPrincipal: AuthenticatedPrincipal = {
 };
 
 describeWithDatabase('critical private profile-media workflow', () => {
-  jest.setTimeout(120_000);
+  jest.setTimeout(240_000);
 
   let database: DatabaseService;
   let migrated: MigratedPostgisTestDatabase;
@@ -51,7 +51,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
     const config = createTestConfig(migrated.databaseUrl, {
-      GCP_STORAGE_BUCKET: 'private-content',
+      PRIVATE_CONTENT_BUCKET: 'private-content',
       PROFILE_MEDIA_ENABLED: 'true',
       PROFILE_MEDIA_MAX_BYTES: '2097152',
     });

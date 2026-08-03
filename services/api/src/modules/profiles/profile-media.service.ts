@@ -45,7 +45,7 @@ export class ProfileMediaService {
     @Inject(PRIVATE_OBJECT_STORAGE)
     private readonly objectStorage: PrivateObjectStorage,
   ) {
-    this.bucket = config.get('GCP_STORAGE_BUCKET', { infer: true });
+    this.bucket = config.get('PRIVATE_CONTENT_BUCKET', { infer: true });
     this.enabled = config.get('PROFILE_MEDIA_ENABLED', { infer: true });
     this.maxBytes = config.get('PROFILE_MEDIA_MAX_BYTES', { infer: true });
     this.readTtlSeconds = config.get('PROFILE_MEDIA_READ_TTL_SECONDS', {

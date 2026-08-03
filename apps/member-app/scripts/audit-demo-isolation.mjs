@@ -21,22 +21,28 @@ for (const pattern of [
   }
 }
 
-for (const required of [
-  'DEMO // SAMPLE DATA // NO ACCOUNT OR BACKEND',
-  'VANCOUVER ISLAND + GULF ISLANDS',
-  'SIMULATE QR ENTRY',
-  'one real second equals one sample minute'
+for (const prohibited of [
+  'SAMPLE DATA',
+  'HARBOUR VIEW CONDO GYM',
+  'SIMULATE QR',
+  'sample minute'
 ]) {
-  if (!demo.includes(required)) {
-    issues.push(`app/demo.tsx is missing required isolated-demo copy: ${required}`);
+  if (demo.includes(prohibited)) {
+    issues.push(`app/demo.tsx contains retired public-demo content: ${prohibited}`);
   }
 }
 
+if (!demo.includes("Redirect href=\"/join\"")) {
+  issues.push('app/demo.tsx must redirect old public-demo links to /join.');
+}
+
 if (
-  !rootLayout.includes("pathname === '/demo'") ||
-  !rootLayout.includes('return <DemoNavigation')
+  !rootLayout.includes('isPublicDemoRuntime()') ||
+  !rootLayout.includes("window.location.replace('/join')") ||
+  !rootLayout.includes('return <Redirect href="/join"') ||
+  rootLayout.includes('DemoNavigation')
 ) {
-  issues.push('app/_layout.tsx does not bypass authenticated providers for /demo.');
+  issues.push('app/_layout.tsx must redirect /demo before live providers initialize.');
 }
 
 for (const [relativePath, serviceName] of [
@@ -60,6 +66,6 @@ if (issues.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    'Demo isolation audit passed: no account, Firebase, camera, location or API path is reachable from /demo.'
+    'Retired demo audit passed: /demo redirects to /join without sample data or live-service access.'
   );
 }

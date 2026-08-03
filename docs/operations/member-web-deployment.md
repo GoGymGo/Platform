@@ -57,11 +57,14 @@ npx.cmd firebase-tools@15.25.0 hosting:channel:deploy connected-browser `
 The hosted origin must be added to the API's exact `CORS_ORIGINS` list before
 authenticated requests will succeed.
 
-## Permanent user deployment
+## Permanent AWS user deployment
 
-Firebase Hosting can provide the stable HTTPS frontend. A permanent launch also
-requires an always-on HTTPS API and PostgreSQL/PostGIS service. Do not promote a
-bundle containing a Quick Tunnel API URL to the live Hosting channel.
+The stable browser app is served by CloudFront from a private, public-access-
+blocked S3 bucket in the same isolated GoGymGo AWS account as its API. The S3
+origin is reachable only through CloudFront Origin Access Control. A CloudFront
+Function sends extensionless Expo Router paths such as `/sign-up` and `/join` to
+the SPA entrypoint. Do not promote a bundle containing a Quick Tunnel or local
+API URL.
 
 For a permanent release:
 
@@ -70,9 +73,20 @@ For a permanent release:
 3. configure exact frontend CORS origins and production secrets;
 4. build Expo web with the permanent `EXPO_PUBLIC_API_URL`;
 5. run the frontend, backend, contract and production-bundle gates;
-6. deploy Firebase Hosting with `firebase deploy --only hosting`;
+6. dispatch `Member Web Deployment` with the protected environment and exact
+   40-character source commit;
 7. verify sign-in, profile/region restoration, enrollment, reads and a
    non-destructive write with a staging Firebase account.
+
+The protected workflow forces a clean Expo export, rejects public sample data and
+production markers, verifies the compiled API origin, assumes a separate
+least-privilege AWS OIDC role, synchronizes the private S3 origin, invalidates
+CloudFront and checks both public routes. The staging environment must define:
+
+- `MEMBER_WEB_BUCKET`, `MEMBER_WEB_DISTRIBUTION_ID`,
+  `MEMBER_WEB_DEPLOY_ROLE_ARN`, and `MEMBER_WEB_URL` from Terraform output;
+- `API_URL`, `AWS_ACCOUNT_ID`, and `AWS_REGION`;
+- the public `EXPO_PUBLIC_FIREBASE_*` browser configuration.
 
 Device permissions, notification registrations, unfinished form drafts and
 active hardware evidence collection remain device-specific by design. Their
@@ -104,7 +118,7 @@ internal-draft wording and engineering fixture names. The separate store-release
 audit intentionally remains blocked until the real operator, contact, privacy,
 terms and contest-rule documents replace the source placeholders.
 
-For a time-limited Firebase Hosting link:
+For an optional time-limited Firebase Hosting link:
 
 ```powershell
 npx.cmd firebase-tools@15.25.0 hosting:channel:deploy browser-testing `

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { JsonObject } from '../../database/database.types';
@@ -169,7 +170,7 @@ export class RegionsService {
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
         const now = new Date();
-        const policies = await transaction
+        const activePolicies = await transaction
           .selectFrom('region_policies as policy')
           .select([
             'policy.boundary_version',
@@ -180,6 +181,13 @@ export class RegionsService {
             'policy.policy_version',
             'policy.subdivision_code',
             'policy.timezone',
+            sql<boolean>`ST_Covers(
+              ${sql.ref('policy.boundary')}::geometry,
+              ST_SetSRID(
+                ST_MakePoint(${request.longitude}, ${request.latitude}),
+                4326
+              )
+            )`.as('contains_location'),
           ])
           .where('policy.competition_enabled', '=', true)
           .where('policy.valid_from', '<=', now)
@@ -189,17 +197,16 @@ export class RegionsService {
               expression('policy.valid_to', '>', now),
             ]),
           )
-          .where(
-            sql<boolean>`ST_Covers(
-              ${sql.ref('policy.boundary')}::geometry,
-              ST_SetSRID(
-                ST_MakePoint(${request.longitude}, ${request.latitude}),
-                4326
-              )
-            )`,
-          )
-          .limit(2)
           .execute();
+        if (activePolicies.length === 0) {
+          throw new ServiceUnavailableException({
+            code: 'REGION_VERIFICATION_UNAVAILABLE',
+            message: 'GoGymGo region verification is temporarily unavailable.',
+          });
+        }
+        const policies = activePolicies.filter(
+          (policy) => policy.contains_location,
+        );
         if (policies.length === 0) {
           throw new BadRequestException({
             code: 'LOCATION_OUTSIDE_SUPPORTED_REGION',

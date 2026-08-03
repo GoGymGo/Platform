@@ -226,13 +226,18 @@ export default function RegionScreen() {
         {verificationState === 'unsupported-region' ? (
           <HUDBorderBox glow style={styles.waitlistCard} tone="amber">
             <TerminalText glow tone="amber" variant="label">
-              OUTSIDE THE SEPTEMBER PILOT REGION
+              LOCATION NOT VERIFIED
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              The September pilot is available only on Vancouver Island and
-              the supported Gulf Islands. We will not place you in Toronto or
-              show another region&apos;s sample competition.
+              We could not confirm that this device is inside Vancouver Island
+              or a supported Gulf Island. Check that your browser or device
+              location is enabled and accurate, then try again. If you are
+              outside the pilot area, join the regional waitlist below.
             </TerminalText>
+            <CyberButtonOutline
+              label="TRY LOCATION AGAIN"
+              onPress={() => void checkDeviceLocation()}
+            />
             {waitlistJoined ? (
               <TerminalText live="polite" glow tone="green" variant="label">
                 REGIONAL WAITLIST CONFIRMED
@@ -246,7 +251,7 @@ export default function RegionScreen() {
                     setRequestedRegion(value);
                     setWaitlistError(null);
                   }}
-                  placeholder="Example: Vancouver, BC"
+                  placeholder="Example: Nanaimo, BC"
                   value={requestedRegion}
                 />
                 {waitlistError ? (

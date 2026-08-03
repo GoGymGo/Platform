@@ -18,13 +18,19 @@ FROM node:24-alpine AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/aws-rds-ca-central-1-bundle.pem
 WORKDIR /workspace
+
+ADD --checksum=sha256:7e458e5489c48a92217efbe527da1203dc0fddebd802261fae9eed85fedb1e9f https://truststore.pki.rds.amazonaws.com/ca-central-1/ca-central-1-bundle.pem /etc/ssl/certs/aws-rds-ca-central-1-bundle.pem
 
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/services/api/package.json ./services/api/package.json
+COPY --from=build --chown=node:node /workspace/services/api/node_modules ./services/api/node_modules
+COPY --from=build --chown=node:node /workspace/services/api/config ./services/api/config
 COPY --from=build --chown=node:node /workspace/services/api/dist ./services/api/dist
 
-RUN rm -rf /usr/local/lib/node_modules/npm \
+RUN chmod 0444 /etc/ssl/certs/aws-rds-ca-central-1-bundle.pem \
+  && rm -rf /usr/local/lib/node_modules/npm \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 WORKDIR /workspace/services/api

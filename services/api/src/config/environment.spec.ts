@@ -25,6 +25,7 @@ describe('environment validation', () => {
     expect(environment.DATABASE_URL).toContain('localhost:5432');
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
+    expect(environment.PRIVATE_OBJECT_STORAGE_PROVIDER).toBe('google-cloud');
     expect(environment.PROFILE_MEDIA_MAX_BYTES).toBe(2 * 1_024 * 1_024);
     expect(environment.PRIVACY_EXPORT_RETENTION_DAYS).toBe(7);
     expect(environment.OTEL_ENABLED).toBe(false);
@@ -167,15 +168,32 @@ describe('environment validation', () => {
         NODE_ENV: 'test',
         PROFILE_MEDIA_ENABLED: 'true',
       }),
-    ).toThrow(/GCP_STORAGE_BUCKET is required/i);
+    ).toThrow(/PRIVATE_CONTENT_BUCKET is required/i);
 
     expect(
       validateEnvironment({
-        GCP_STORAGE_BUCKET: 'private-content',
+        PRIVATE_CONTENT_BUCKET: 'private-content',
         NODE_ENV: 'test',
         PROFILE_MEDIA_ENABLED: 'true',
       }).PROFILE_MEDIA_ENABLED,
     ).toBe(true);
+  });
+
+  it('requires an AWS region for S3-backed private storage', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'test',
+        PRIVATE_OBJECT_STORAGE_PROVIDER: 'aws-s3',
+      }),
+    ).toThrow(/AWS_REGION is required/i);
+
+    expect(
+      validateEnvironment({
+        AWS_REGION: 'ca-central-1',
+        NODE_ENV: 'test',
+        PRIVATE_OBJECT_STORAGE_PROVIDER: 'aws-s3',
+      }).PRIVATE_OBJECT_STORAGE_PROVIDER,
+    ).toBe('aws-s3');
   });
 
   it('requires the Expo access token only in the sending worker', () => {

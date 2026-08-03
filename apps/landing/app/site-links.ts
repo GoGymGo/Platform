@@ -9,6 +9,8 @@ export const siteLinks = {
   memberApp: "https://app.gogymgo.com/",
   officialRules: "https://app.gogymgo.com/official-rules",
   privacy: "https://app.gogymgo.com/privacy-policy",
+  publicSiteHelp: "/contact#public-site-help",
+  regionalUpdates: "/gym-goers#gym-form",
   terms: "https://app.gogymgo.com/terms-of-service",
 } as const;
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PublicSiteFeedbackForm } from "../components/PublicSiteFeedbackForm";
 import { siteLinks } from "../site-links";
 
 export const metadata: Metadata = {
@@ -28,6 +29,12 @@ const contactPaths = [
     label: "OPEN THE MEMBER APP",
     title: "Existing member support",
   },
+  {
+    copy: "Report an accessibility barrier, broken public link, form problem, or readability issue without going through the member app.",
+    href: siteLinks.publicSiteHelp,
+    label: "REPORT A PUBLIC-SITE PROBLEM",
+    title: "Public-site feedback",
+  },
 ];
 
 export default function ContactPage() {
@@ -54,6 +61,23 @@ export default function ContactPage() {
             </article>
           ))}
         </div>
+
+        <section
+          aria-labelledby="public-site-help-title"
+          className="feedback-panel"
+          id="public-site-help"
+        >
+          <div className="feedback-panel__intro">
+            <p className="eyebrow">PUBLIC SITE // ACCESSIBILITY &amp; FEEDBACK</p>
+            <h2 id="public-site-help-title">Tell us what blocked you.</h2>
+            <p>
+              Use this form for the public website only. Include the affected
+              page and enough detail to reproduce the issue. Account,
+              competition, and workout support remains inside the member app.
+            </p>
+          </div>
+          <PublicSiteFeedbackForm />
+        </section>
       </div>
     </main>
   );

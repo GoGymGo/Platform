@@ -38,6 +38,12 @@
   letter-spacing: 0.06em;
 }
 
+.hero-note a {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .pilot-console {
   overflow: hidden;
   border: 1px solid rgba(52, 229, 232, 0.52);
@@ -91,6 +97,33 @@
 .pilot-console__reward p {
   margin-top: 10px;
   color: var(--muted);
+}
+
+.pilot-console__window {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 20px 22px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.pilot-console__window span {
+  color: var(--dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+}
+
+.pilot-console__window strong {
+  color: var(--text);
+  font-family: "Orbitron", sans-serif;
+  font-size: 19px;
+}
+
+.pilot-console__window p {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .pilot-console__facts {
@@ -149,6 +182,10 @@
   align-items: start;
   gap: 46px;
   margin: 48px auto 0;
+}
+
+.product-swipe-hint {
+  display: none;
 }
 
 .product-screen-card {
@@ -214,10 +251,33 @@
 }
 
 @media (max-width: 720px) {
+  .product-swipe-hint {
+    display: block;
+    margin-top: 32px;
+    color: var(--dim);
+    font-family: "Share Tech Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+
   .product-screen-grid {
-    max-width: 430px;
-    grid-template-columns: 1fr;
-    gap: 54px;
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(min(82vw, 360px), 1fr));
+    gap: 18px;
+    margin-top: 18px;
+    overflow-x: auto;
+    padding: 3px 3px 16px;
+    scroll-snap-type: x mandatory;
+    scrollbar-color: var(--cyan) rgba(52, 229, 232, 0.08);
+  }
+
+  .product-screen-grid:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 5px;
+  }
+
+  .product-screen-card {
+    scroll-snap-align: start;
   }
 }
 

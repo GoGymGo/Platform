@@ -47,11 +47,15 @@ export default function AccessibilityPage() {
             <h2>Report a barrier</h2>
             <p>
               If something prevents you from reading, navigating, or completing
-              a public form, use the relevant route on our contact page and
-              include the page, device, browser, and problem you encountered.
+              a public form, send a public-site report with the page, device,
+              browser, and problem you encountered. You do not need a member
+              account to report a barrier.
             </p>
-            <Link className="button button-secondary" href={siteLinks.contact}>
-              GO TO CONTACT OPTIONS →
+            <Link
+              className="button button-secondary"
+              href={siteLinks.publicSiteHelp}
+            >
+              REPORT AN ACCESSIBILITY BARRIER →
             </Link>
           </section>
           <p className="fine-print">Last updated August 3, 2026.</p>

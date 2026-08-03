@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { septemberCampaign } from "../campaign";
 import { GymGoerForm } from "../components/InterestForms";
 import { siteLinks } from "../site-links";
 
@@ -36,16 +37,27 @@ export default function GymGoersPage() {
         <div className="audience-copy">
           <p className="eyebrow">
             <span className="status-dot" />
-            SEPTEMBER BETA + REGIONAL UPDATES
+            SEPTEMBER BETA // {septemberCampaign.registrationLabel}
           </p>
           <h1>
             Join now—or hear when your region is <span>next.</span>
           </h1>
           <p>
-            The September 2026 beta is limited to eligible gym-goers age 19+
-            on Vancouver Island + Gulf Islands. If that is you, register in the
-            app. Everywhere else, join the free regional update list below.
+            The September 2026 beta is limited to eligible gym-goers age{" "}
+            {septemberCampaign.minimumAge}+ on {septemberCampaign.regionName}.
+            If that is you, register in the app. Everywhere else, join the free
+            regional update list below.
           </p>
+          <dl className="audience-summary">
+            <div>
+              <dt>COMPETITION WINDOW</dt>
+              <dd>{septemberCampaign.displayWindow}</dd>
+            </div>
+            <div>
+              <dt>REGISTRATION STATUS</dt>
+              <dd>The app confirms current availability</dd>
+            </div>
+          </dl>
           <div className="audience-actions">
             <Link className="button button-primary" href={siteLinks.memberApp}>
               JOIN SEPTEMBER BETA <span aria-hidden="true">→</span>
@@ -65,8 +77,8 @@ export default function GymGoersPage() {
             <span>REGIONAL UPDATE LIST // FREE</span>
             <h2 id="gym-form-title">Get updates for your region</h2>
             <p>
-              This takes about 30 seconds. It does not create an app account or
-              register you for the September beta.
+              Enter your email and region. This does not create an app account
+              or register you for the September beta.
             </p>
             <small>Fields marked * are required.</small>
           </div>

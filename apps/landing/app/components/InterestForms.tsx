@@ -8,7 +8,6 @@ type FormState = "idle" | "submitting" | "success" | "error";
 
 async function submitInterest(
   form: HTMLFormElement,
-  audience: "gym_goer" | "brand",
   fallbackError: string,
 ) {
   const formData = new FormData(form);
@@ -22,8 +21,35 @@ async function submitInterest(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       ...payload,
-      audience,
+      audience: "brand",
       consent: formData.get("consent") === "on",
+    }),
+  });
+
+  let body: { error?: string } = {};
+  try {
+    body = (await response.json()) as { error?: string };
+  } catch {
+    // Some upstream failures have no JSON body. Keep the message user-safe.
+  }
+
+  if (!response.ok) {
+    throw new Error(body.error ?? fallbackError);
+  }
+}
+
+async function submitRegionalUpdates(
+  form: HTMLFormElement,
+  fallbackError: string,
+) {
+  const formData = new FormData(form);
+  const response = await fetch("/api/regional-updates", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contactFax: formData.get("contactFax"),
+      email: formData.get("email"),
+      requestedRegion: formData.get("region"),
     }),
   });
 
@@ -76,12 +102,19 @@ function Success({ brand = false }: { brand?: boolean }) {
   );
 }
 
-function PrivacyNotice() {
+function PrivacyNotice({ context }: { context: "brand" | "updates" }) {
   return (
     <p className="form-privacy">
-      Review the GoGymGo <Link href={siteLinks.privacy}>Privacy Policy</Link>.
-      Product registration also requires the current{" "}
-      <Link href={siteLinks.terms}>Terms of Service</Link>.
+      {context === "updates"
+        ? "We use these details for regional availability emails. You can unsubscribe from any update. "
+        : "We use these details to review and respond to this inquiry. Any campaign requires separate written approval. "}
+      Review the GoGymGo <Link href={siteLinks.privacy}>Privacy Policy</Link>
+      {context === "brand" ? (
+        <>
+          {" "}and <Link href={siteLinks.terms}>Terms of Service</Link>
+        </>
+      ) : null}
+      .
     </p>
   );
 }
@@ -102,9 +135,8 @@ export function GymGoerForm() {
     setState("submitting");
     setError("");
     try {
-      await submitInterest(
+      await submitRegionalUpdates(
         event.currentTarget,
-        "gym_goer",
         "We couldn’t save your information. Please try again.",
       );
       setState("success");
@@ -131,17 +163,6 @@ export function GymGoerForm() {
     >
       <div className="field-grid">
         <div className="field">
-          <label htmlFor="fullName">FULL NAME *</label>
-          <input
-            autoComplete="name"
-            id="fullName"
-            maxLength={100}
-            name="fullName"
-            placeholder="Your name"
-            required
-          />
-        </div>
-        <div className="field">
           <label htmlFor="email">EMAIL *</label>
           <input
             autoComplete="email"
@@ -153,9 +174,6 @@ export function GymGoerForm() {
             type="email"
           />
         </div>
-      </div>
-
-      <div className="field-grid">
         <div className="field">
           <label htmlFor="city">CITY / REGION *</label>
           <input
@@ -167,54 +185,6 @@ export function GymGoerForm() {
             required
           />
         </div>
-        <div className="field">
-          <label htmlFor="workoutStyle">HOW DO YOU TRAIN? *</label>
-          <select defaultValue="" id="workoutStyle" name="workoutStyle" required>
-            <option disabled value="">
-              Select one
-            </option>
-            <option value="strength">Strength training</option>
-            <option value="cardio">Cardio / endurance</option>
-            <option value="classes">Fitness classes</option>
-            <option value="mixed">A mix of everything</option>
-            <option value="starting">I’m getting started</option>
-          </select>
-        </div>
-      </div>
-
-      <fieldset className="field">
-        <legend className="fieldset-label">YOUR IDEAL WEEKLY GOAL *</legend>
-        <div className="radio-grid">
-          {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-            <div className="radio-card" key={days}>
-              <input
-                id={`goal-${days}`}
-                name="goalDays"
-                required
-                type="radio"
-                value={days}
-              />
-              <label htmlFor={`goal-${days}`}>
-                {days} {days === 1 ? "DAY" : "DAYS"}
-              </label>
-            </div>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="field">
-        <label htmlFor="discoverySource">
-          HOW DID YOU HEAR ABOUT US? (OPTIONAL)
-        </label>
-        <select defaultValue="" id="discoverySource" name="discoverySource">
-          <option value="">Select one</option>
-          <option value="friend">Friend or family</option>
-          <option value="social">Social media</option>
-          <option value="gym">My gym</option>
-          <option value="creator">Fitness creator</option>
-          <option value="search">Search</option>
-          <option value="other">Other</option>
-        </select>
       </div>
 
       <div className="visually-hidden" aria-hidden="true">
@@ -234,7 +204,7 @@ export function GymGoerForm() {
           regional availability and launch updates. *
         </label>
       </div>
-      <PrivacyNotice />
+      <PrivacyNotice context="updates" />
 
       {state === "error" ? (
         <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>
@@ -250,8 +220,8 @@ export function GymGoerForm() {
         {state === "submitting" ? "SAVING…" : "GET REGIONAL UPDATES →"}
       </button>
       <p className="fine-print" id="gym-form-note">
-        This free update list does not create an app account, competition entry,
-        or guarantee launch availability in your region.
+        This free update list does not create an app account or competition
+        entry, and it does not guarantee launch availability in your region.
       </p>
     </form>
   );
@@ -275,7 +245,6 @@ export function BrandForm() {
     try {
       await submitInterest(
         event.currentTarget,
-        "brand",
         "We couldn’t save your partnership request. Please try again.",
       );
       setState("success");
@@ -409,7 +378,7 @@ export function BrandForm() {
           partnership opportunities. *
         </label>
       </div>
-      <PrivacyNotice />
+      <PrivacyNotice context="brand" />
 
       {state === "error" ? (
         <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>

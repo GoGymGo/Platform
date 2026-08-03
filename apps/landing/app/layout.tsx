@@ -45,9 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
         ? [
             {
               url: socialImage,
-              width: 1536,
-              height: 1024,
-              alt: "GoGymGo — Make consistency count.",
+              width: 1200,
+              height: 630,
+              alt: "GoGymGo September 2026 beta — Make consistency count.",
             },
           ]
         : undefined,

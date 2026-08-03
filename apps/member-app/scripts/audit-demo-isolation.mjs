@@ -21,28 +21,35 @@ for (const pattern of [
   }
 }
 
-for (const prohibited of [
-  'SAMPLE DATA',
-  'HARBOUR VIEW CONDO GYM',
-  'SIMULATE QR',
-  'sample minute'
+for (const required of [
+  'DEMO // SAMPLE DATA // NO ACCOUNT OR BACKEND',
+  'MAIN APP SCREEN TOUR',
+  'NEXT SCREEN ->',
+  "id: 'home'",
+  "id: 'calendar'",
+  "id: 'train'",
+  "id: 'leaderboard'",
+  "id: 'winners-circle'",
+  "id: 'rewards'",
+  "id: 'awards'",
+  "id: 'weekly-challenge'",
+  "id: 'social'",
+  "id: 'challenge-gym'",
+  "id: 'profile'",
+  "id: 'account-data'"
 ]) {
-  if (demo.includes(prohibited)) {
-    issues.push(`app/demo.tsx contains retired public-demo content: ${prohibited}`);
+  if (!demo.includes(required)) {
+    issues.push(`app/demo.tsx is missing required isolated-demo copy: ${required}`);
   }
 }
 
-if (!demo.includes("Redirect href=\"/join\"")) {
-  issues.push('app/demo.tsx must redirect old public-demo links to /join.');
-}
-
 if (
-  !rootLayout.includes('isPublicDemoRuntime()') ||
-  !rootLayout.includes("window.location.replace('/join')") ||
-  !rootLayout.includes('return <Redirect href="/join"') ||
-  rootLayout.includes('DemoNavigation')
+  !rootLayout.includes("pathname === '/demo'") ||
+  !rootLayout.includes('return <DemoNavigation') ||
+  rootLayout.includes('RetiredDemoRedirect') ||
+  rootLayout.includes("window.location.replace('/join')")
 ) {
-  issues.push('app/_layout.tsx must redirect /demo before live providers initialize.');
+  issues.push('app/_layout.tsx must render /demo without initializing authenticated providers.');
 }
 
 for (const [relativePath, serviceName] of [
@@ -66,6 +73,6 @@ if (issues.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    'Retired demo audit passed: /demo redirects to /join without sample data or live-service access.'
+    'Demo isolation audit passed: /demo contains only static sample data and cannot reach account, Firebase, camera, location or API services.'
   );
 }

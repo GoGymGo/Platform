@@ -1,7 +1,7 @@
 import { Rajdhani_500Medium } from '@expo-google-fonts/rajdhani/500Medium';
 import { Rajdhani_600SemiBold } from '@expo-google-fonts/rajdhani/600SemiBold';
 import { useFonts } from 'expo-font';
-import { Redirect, SplashScreen, Stack } from 'expo-router';
+import { SplashScreen, Stack, usePathname } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -21,7 +21,6 @@ import { WorkoutProgressProvider, useWorkoutProgress } from '@/state/workoutProg
 import { useMidSessionNotificationNavigation } from '@/hooks/useMidSessionNotificationNavigation';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { AppTourModeBanner } from '@/testing/AppTourModeBanner';
-import { isPublicDemoRuntime } from '@/config/demoMode';
 
 const screenOptions = {
   headerShown: false,
@@ -79,10 +78,11 @@ export default function RootLayout() {
 }
 
 function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
+  const pathname = usePathname();
   const { active } = useAppTour();
 
-  if (isPublicDemoRuntime()) {
-    return <RetiredDemoRedirect />;
+  if (pathname === '/demo') {
+    return <DemoNavigation reduceMotion={reduceMotion} />;
   }
 
   return (
@@ -92,14 +92,21 @@ function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
   );
 }
 
-function RetiredDemoRedirect() {
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.location.replace('/join');
-    }
-  }, []);
-
-  return <Redirect href="/join" />;
+function DemoNavigation({ reduceMotion }: { reduceMotion: boolean }) {
+  return (
+    <View style={styles.navigationRoot}>
+      <StatusBar style="light" />
+      <Stack
+        initialRouteName="demo"
+        screenOptions={{
+          ...screenOptions,
+          animation: reduceMotion ? 'none' : 'fade'
+        }}
+      >
+        <Stack.Screen name="demo" />
+      </Stack>
+    </View>
+  );
 }
 
 function AuthenticatedApp({ reduceMotion }: { reduceMotion: boolean }) {

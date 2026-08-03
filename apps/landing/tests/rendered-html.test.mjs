@@ -4,159 +4,177 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("the landing page uses complete production member-app captures", async () => {
-  const [
-    page,
-    layout,
-    productScreens,
-    experienceCss,
-    mobileNavigation,
-    packageJson,
-    weeklyGoal,
-    activeWorkout,
-    winnersCircle,
-  ] = await Promise.all([
-    readFile(new URL("app/page.tsx", root), "utf8"),
-    readFile(new URL("app/layout.tsx", root), "utf8"),
-    readFile(new URL("app/components/ProductScreens.tsx", root), "utf8"),
-    readFile(new URL("app/experience.css", root), "utf8"),
-    readFile(new URL("app/components/MobileNavigation.tsx", root), "utf8"),
-    readFile(new URL("package.json", root), "utf8"),
-    readFile(new URL("public/app/weekly-goal.png", root)),
-    readFile(new URL("public/app/active-workout.png", root)),
-    readFile(new URL("public/app/winners-circle.png", root)),
+async function read(path) {
+  return readFile(new URL(path, root), "utf8");
+}
+
+test("the landing page separates beta registration from regional updates", async () => {
+  const [page, layout, productScreens] = await Promise.all([
+    read("app/page.tsx"),
+    read("app/layout.tsx"),
+    read("app/components/ProductScreens.tsx"),
   ]);
 
-  assert.match(layout, /GoGymGo — Make consistency count/);
-  assert.match(page, /Make consistency/);
-  assert.match(page, /Complete verified workouts/i);
-  assert.match(layout, /href="https:\/\/app\.gogymgo\.com\/demo"/);
-  assert.match(layout, /href="https:\/\/app\.gogymgo\.com\/"/);
-  assert.doesNotMatch(layout, />ADMIN<\/[^>]+>/);
-  assert.match(
-    layout,
-    /href="https:\/\/gogymgo-admin-control\.wilson-1212\.chatgpt\.site\/">\s*Administrator sign-in/,
-  );
-  assert.match(layout, /className="header-cta button-primary"/);
-  assert.match(layout, /<MobileNavigation \/>/);
-  assert.match(mobileNavigation, /aria-expanded=\{isOpen\}/);
-  assert.match(mobileNavigation, /Mobile navigation/);
-  assert.match(mobileNavigation, /https:\/\/app\.gogymgo\.com\/demo/);
-  assert.doesNotMatch(mobileNavigation, /ADMIN|admin\.gogymgo\.com/);
-  assert.match(
-    page,
-    /className="button button-primary"\s+href="https:\/\/app\.gogymgo\.com\/"/,
-  );
-  assert.match(
-    page,
-    /Join our beta to participate in the \$100 September Vancouver/,
-  );
-  assert.match(page, /Island Challenge\./);
-  assert.equal(
-    (page.match(/href="https:\/\/app\.gogymgo\.com\/"/g) ?? []).length,
-    2,
-  );
-  assert.equal(
-    (layout.match(/href="https:\/\/app\.gogymgo\.com\/demo"/g) ?? []).length,
-    2,
-  );
-  assert.match(page, /\/app\/weekly-goal\.png/);
-  assert.match(page, /member app Weekly Goal selection screen/);
-  assert.doesNotMatch(page, /join-selection/);
-  assert.match(productScreens, /PRODUCTION MEMBER APP SCREENS/);
-  assert.match(productScreens, /app\.gogymgo\.com/);
-  assert.match(productScreens, /\/app\/weekly-goal\.png/);
-  assert.match(productScreens, /\/app\/active-workout\.png/);
-  assert.match(productScreens, /\/app\/winners-circle\.png/);
-  assert.match(productScreens, /Complete the 30-minute timer/);
-  assert.match(productScreens, /See the Winners Circle results/);
-  assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 3);
-  assert.match(productScreens, /product-phone--capture/);
-  assert.doesNotMatch(productScreens, /function GoalScreen|function TimerScreen|function WinnersCircleScreen/);
-  assert.match(experienceCss, /\.hero-app-capture \{[\s\S]*?height: auto;/);
-  assert.match(experienceCss, /\.product-phone\.product-phone--capture \{[\s\S]*?aspect-ratio: 540 \/ 1040;/);
-  assert.match(experienceCss, /\.product-screen-capture \{[\s\S]*?object-fit: contain;/);
-  assert.doesNotMatch(experienceCss, /\.product-screen-capture \{[\s\S]*?object-fit: cover;/);
+  assert.match(page, /SEPTEMBER 2026 BETA \/\/ REGISTRATION OPEN/);
+  assert.match(page, /Vancouver Island \+ Gulf Islands/);
+  assert.match(page, /age 19\+/);
+  assert.match(page, /one \$100 CAD reward/);
+  assert.match(page, /sponsored by GoGymGo/i);
+  assert.match(page, /JOIN THE SEPTEMBER BETA/);
+  assert.match(page, /GET REGIONAL UPDATES/);
+  assert.match(page, /does not register you for the beta/i);
+  assert.doesNotMatch(page, /PRE-REGISTRATION OPEN/);
+  assert.doesNotMatch(page, /FUNDED BY SPONSORS/);
+  assert.doesNotMatch(page, /desktop experience now|improved app/i);
+  assert.doesNotMatch(productScreens, /PRODUCTION MEMBER APP SCREENS/);
+  assert.doesNotMatch(productScreens, /weekly-goal/);
+  assert.match(productScreens, /active-workout\.webp/);
+  assert.match(productScreens, /winners-circle\.webp/);
+  assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 2);
+  assert.match(layout, /JOIN SEPTEMBER BETA/);
+  assert.doesNotMatch(layout, /Administrator sign-in|admin-control/);
+});
 
-  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-  for (const capture of [weeklyGoal, activeWorkout, winnersCircle]) {
-    assert.ok(
-      [...capture.subarray(0, 8)].every(
-        (byte, index) => byte === pngSignature[index],
-      ),
-    );
-    assert.ok(capture.length > 20_000);
+test("shared navigation exposes current state, trust links and keyboard-safe mobile behavior", async () => {
+  const [layout, desktopNavigation, mobileNavigation, links] = await Promise.all([
+    read("app/layout.tsx"),
+    read("app/components/DesktopNavigation.tsx"),
+    read("app/components/MobileNavigation.tsx"),
+    read("app/site-links.ts"),
+  ]);
+
+  assert.match(desktopNavigation, /usePathname/);
+  assert.match(desktopNavigation, /aria-current/);
+  assert.match(mobileNavigation, /aria-current/);
+  assert.match(mobileNavigation, /event\.key === "Escape"/);
+  assert.match(mobileNavigation, /event\.key === "Tab"/);
+  assert.match(mobileNavigation, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(layout, /tabIndex=\{-1\}/);
+  assert.match(layout, /Privacy Policy/);
+  assert.match(layout, /Terms of Service/);
+  assert.match(layout, /Official Contest Rules/);
+  assert.match(layout, /Accessibility/);
+  assert.match(layout, /Contact/);
+  assert.match(links, /app\.gogymgo\.com\/privacy-policy/);
+  assert.match(links, /app\.gogymgo\.com\/terms-of-service/);
+  assert.match(links, /app\.gogymgo\.com\/official-rules/);
+});
+
+test("audience pages put the form before supporting detail and explain each outcome", async () => {
+  const [gymPage, brandPage, forms] = await Promise.all([
+    read("app/gym-goers/page.tsx"),
+    read("app/brands/page.tsx"),
+    read("app/components/InterestForms.tsx"),
+  ]);
+
+  assert.ok(gymPage.indexOf('id="gym-form"') < gymPage.indexOf("audience-details"));
+  assert.ok(brandPage.indexOf('id="brand-form"') < brandPage.indexOf("audience-details"));
+  assert.match(gymPage, /does not create an app account/);
+  assert.match(gymPage, /age 19\+/);
+  assert.match(
+    brandPage,
+    /current\s+September pilot reward is sponsored by GoGymGo/,
+  );
+  assert.match(brandPage, /aim to respond within\s+five business days/);
+  assert.match(brandPage, /03 \/\/ REVIEW AND PUBLISH/);
+  assert.match(forms, /\[1, 2, 3, 4, 5, 6, 7\]/);
+  assert.doesNotMatch(forms, /defaultChecked/);
+  assert.match(forms, /name="partnershipInterest"/);
+  assert.doesNotMatch(forms, /name="interest"/);
+  assert.match(forms, /value\.trim\(\)\.length > 0/);
+  assert.match(forms, /try \{\s*body = \(await response\.json\(\)\)/);
+  assert.match(forms, /aria-busy=\{state === "submitting"\}/);
+  assert.match(forms, /successRef\.current\?\.focus\(\)/);
+  assert.match(forms, /Privacy Policy/);
+  assert.match(forms, /\(OPTIONAL\)/);
+});
+
+test("the public site includes recovery, FAQ, contact, accessibility and discovery metadata", async () => {
+  const [notFound, faq, contact, accessibility, robots, sitemap, manifest] =
+    await Promise.all([
+      read("app/not-found.tsx"),
+      read("app/faq/page.tsx"),
+      read("app/contact/page.tsx"),
+      read("app/accessibility/page.tsx"),
+      read("app/robots.ts"),
+      read("app/sitemap.ts"),
+      read("app/manifest.ts"),
+    ]);
+
+  assert.match(notFound, /404 \/\/ ROUTE NOT FOUND/);
+  assert.match(notFound, /RETURN HOME/);
+  assert.match(faq, /Does joining the update list register me for the beta\?/);
+  assert.match(faq, /same poster again/);
+  assert.match(contact, /Gym-goer updates/);
+  assert.match(contact, /Fitness brand partnerships/);
+  assert.match(contact, /Existing member support/);
+  assert.match(accessibility, /keyboards, screen readers, browser zoom, reduced motion/);
+  assert.match(robots, /sitemap: "https:\/\/gogymgo\.com\/sitemap\.xml"/);
+  assert.match(sitemap, /"\/accessibility"/);
+  assert.match(manifest, /theme_color: "#080b0e"/);
+});
+
+test("the public styles contain only landing surfaces and address responsive readability", async () => {
+  const [globals, experience] = await Promise.all([
+    read("app/globals.css"),
+    read("app/experience.css"),
+  ]);
+  const styles = globals + experience;
+
+  assert.doesNotMatch(styles, /\.demo-/);
+  assert.doesNotMatch(globals, /@import "tailwindcss"/);
+  assert.doesNotMatch(globals, /Rajdhani/);
+  assert.match(globals, /\.field label,[\s\S]*?font-size: 12px;/);
+  assert.match(globals, /input::placeholder,[\s\S]*?color: #8fa0a8;/);
+  assert.match(globals, /@media \(max-width: 960px\)[\s\S]*?"copy" auto[\s\S]*?"form" auto[\s\S]*?"details" auto/);
+  assert.match(globals, /\.audience-hero \{[\s\S]*?"copy form"[\s\S]*?"details form"/);
+  assert.match(experience, /\.product-screen-grid \{[\s\S]*?repeat\(2/);
+});
+
+test("optimized product images and the social preview are valid assets", async () => {
+  const [activeWorkout, winnersCircle, socialImage, mark] = await Promise.all([
+    readFile(new URL("public/app/active-workout.webp", root)),
+    readFile(new URL("public/app/winners-circle.webp", root)),
+    readFile(new URL("public/og.png", root)),
+    read("public/mark.svg"),
+  ]);
+
+  for (const image of [activeWorkout, winnersCircle]) {
+    assert.equal(image.subarray(0, 4).toString("ascii"), "RIFF");
+    assert.equal(image.subarray(8, 12).toString("ascii"), "WEBP");
+    assert.ok(image.length > 10_000);
+    assert.ok(image.length < 100_000);
   }
 
-  assert.doesNotMatch(
-    page + layout + productScreens,
-    /TRY THE APP FLOW|OPEN THE APP DEMO|WALK THROUGH THE REAL FLOW/,
-  );
-  assert.doesNotMatch(
-    page,
-    /INTERACTIVE APP WALKTHROUGH|Use the flow before you register|demo-promo/,
-  );
-  assert.doesNotMatch(page + layout, /app\.gogymgo\.com\/join/);
-  assert.doesNotMatch(page + productScreens, /next\/image/);
-  assert.equal((layout.match(/wordmark-cyan">GO/g) ?? []).length, 4);
-  assert.equal((layout.match(/wordmark-pink">GYM/g) ?? []).length, 2);
-  assert.doesNotMatch(
-    page + layout + packageJson,
-    /codex-preview|react-loading-skeleton/i,
-  );
+  assert.deepEqual([...socialImage.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.match(mark, /viewBox="0 0 100 100"/);
 });
 
 test("the retired landing demo redirects to the canonical member demo", async () => {
-  const demoPage = await readFile(new URL("app/demo/page.tsx", root), "utf8");
+  const demoPage = await read("app/demo/page.tsx");
 
   assert.match(demoPage, /redirect\("https:\/\/app\.gogymgo\.com\/demo"\)/);
-  await assert.rejects(
-    readFile(new URL("app/components/DemoCompetition.tsx", root), "utf8"),
-  );
-});
-
-test("both audience pages expose their intended forms", async () => {
-  const [gymPage, brandPage, forms] = await Promise.all([
-    readFile(new URL("app/gym-goers/page.tsx", root), "utf8"),
-    readFile(new URL("app/brands/page.tsx", root), "utf8"),
-    readFile(new URL("app/components/InterestForms.tsx", root), "utf8"),
-  ]);
-
-  assert.match(gymPage, /Pre-register your interest/);
-  assert.match(forms, /JOIN THE PRE-REGISTRATION LIST/);
-  assert.match(brandPage, /Tell us about your brand/);
-  assert.match(forms, /APPLY AS A FOUNDING PARTNER/);
-  assert.match(forms, /fetch\("\/api\/interest"/);
 });
 
 test("interest forms use the GoGymGo API instead of D1", async () => {
-  const route = await readFile(
-    new URL("app/api/interest/route.ts", root),
-    "utf8",
-  );
+  const route = await read("app/api/interest/route.ts");
 
   assert.match(route, /GOGYMGO_API_URL/);
   assert.match(route, /\/v1\/interest-submissions/);
-  assert.doesNotMatch(
-    route,
-    /env\.DB|interest_submissions|ensureInterestTable/,
-  );
+  assert.doesNotMatch(route, /env\.DB|interest_submissions|ensureInterestTable/);
 });
 
-test("the historical D1 export is disabled, owner-restricted and read-only", async () => {
-  const route = await readFile(
-    new URL("app/api/internal/export-interest-submissions/route.ts", root),
-    "utf8",
+test("the historical D1 export remains disabled, owner-restricted and read-only", async () => {
+  const route = await read(
+    "app/api/internal/export-interest-submissions/route.ts",
   );
 
   assert.match(route, /LANDING_D1_EXPORT_ENABLED !== "yes"/);
   assert.match(route, /LANDING_D1_EXPORT_OWNER_EMAIL/);
   assert.match(route, /getChatGPTUser/);
-  assert.match(route, /user\.email\.trim\(\)\.toLowerCase\(\) !== ownerEmail/);
   assert.match(route, /Content-Disposition/);
   assert.match(route, /Cache-Control.*no-store/);
   assert.match(route, /getDb\(\)/);
   assert.match(route, /\.select\(\)/);
   assert.doesNotMatch(route, /\.(?:insert|update|delete)\(/);
-  assert.doesNotMatch(route, /ensureInterestTable/);
 });

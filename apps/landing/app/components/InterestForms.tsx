@@ -1,15 +1,22 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { siteLinks } from "../site-links";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
 async function submitInterest(
   form: HTMLFormElement,
   audience: "gym_goer" | "brand",
+  fallbackError: string,
 ) {
   const formData = new FormData(form);
-  const payload = Object.fromEntries(formData.entries());
+  const payload = Object.fromEntries(
+    Array.from(formData.entries()).filter(([, value]) => {
+      return typeof value !== "string" || value.trim().length > 0;
+    }),
+  );
   const response = await fetch("/api/interest", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -20,42 +27,86 @@ async function submitInterest(
     }),
   });
 
-  const body = (await response.json()) as { error?: string };
+  let body: { error?: string } = {};
+  try {
+    body = (await response.json()) as { error?: string };
+  } catch {
+    // Some upstream failures have no JSON body. Keep the message user-safe.
+  }
+
   if (!response.ok) {
-    throw new Error(body.error ?? "We couldn’t save your information.");
+    throw new Error(body.error ?? fallbackError);
   }
 }
 
-function Success({
-  brand = false,
-}: {
-  brand?: boolean;
-}) {
+function Success({ brand = false }: { brand?: boolean }) {
+  const successRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    successRef.current?.focus();
+  }, []);
+
   return (
-    <div className="form-success" role="status">
+    <div
+      aria-live="polite"
+      className="form-success"
+      ref={successRef}
+      role="status"
+      tabIndex={-1}
+    >
       <div className="success-mark" aria-hidden="true">
         ✓
       </div>
-      <h2>{brand ? "Application received." : "You’re on the list."}</h2>
+      <h2>
+        {brand
+          ? "Partnership request received."
+          : "You’re on the regional update list."}
+      </h2>
       <p>
         {brand
-          ? "Thanks for your interest in GoGymGo. We’ll follow up at your work email as founding partnership opportunities open."
-          : "We’ll email you with launch news and let you know when pre-registration opens in your region."}
+          ? "We review inquiries weekly and aim to follow up at your work email within five business days. Campaign timing still depends on fit and approval."
+          : "This does not register you for the September beta. We’ll email as regional availability changes."}
       </p>
+      {!brand ? (
+        <Link className="button button-secondary" href={siteLinks.memberApp}>
+          ELIGIBLE FOR SEPTEMBER? REGISTER IN THE APP →
+        </Link>
+      ) : null}
     </div>
+  );
+}
+
+function PrivacyNotice() {
+  return (
+    <p className="form-privacy">
+      Review the GoGymGo <Link href={siteLinks.privacy}>Privacy Policy</Link>.
+      Product registration also requires the current{" "}
+      <Link href={siteLinks.terms}>Terms of Service</Link>.
+    </p>
   );
 }
 
 export function GymGoerForm() {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (state === "error") {
+      errorRef.current?.focus();
+    }
+  }, [state]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("submitting");
     setError("");
     try {
-      await submitInterest(event.currentTarget, "gym_goer");
+      await submitInterest(
+        event.currentTarget,
+        "gym_goer",
+        "We couldn’t save your information. Please try again.",
+      );
       setState("success");
     } catch (cause) {
       setError(
@@ -72,7 +123,12 @@ export function GymGoerForm() {
   }
 
   return (
-    <form className="interest-form" onSubmit={onSubmit}>
+    <form
+      aria-busy={state === "submitting"}
+      aria-describedby="gym-form-note"
+      className="interest-form"
+      onSubmit={onSubmit}
+    >
       <div className="field-grid">
         <div className="field">
           <label htmlFor="fullName">FULL NAME *</label>
@@ -107,7 +163,7 @@ export function GymGoerForm() {
             id="city"
             maxLength={100}
             name="region"
-            placeholder="e.g. Vancouver, BC"
+            placeholder="e.g. Victoria, BC"
             required
           />
         </div>
@@ -127,28 +183,29 @@ export function GymGoerForm() {
       </div>
 
       <fieldset className="field">
-        <legend className="fieldset-label">
-          YOUR IDEAL WEEKLY GOAL *
-        </legend>
+        <legend className="fieldset-label">YOUR IDEAL WEEKLY GOAL *</legend>
         <div className="radio-grid">
-          {[2, 3, 4, 5].map((days) => (
+          {[1, 2, 3, 4, 5, 6, 7].map((days) => (
             <div className="radio-card" key={days}>
               <input
-                defaultChecked={days === 3}
                 id={`goal-${days}`}
                 name="goalDays"
                 required
                 type="radio"
                 value={days}
               />
-              <label htmlFor={`goal-${days}`}>{days} DAYS</label>
+              <label htmlFor={`goal-${days}`}>
+                {days} {days === 1 ? "DAY" : "DAYS"}
+              </label>
             </div>
           ))}
         </div>
       </fieldset>
 
       <div className="field">
-        <label htmlFor="discoverySource">HOW DID YOU HEAR ABOUT US?</label>
+        <label htmlFor="discoverySource">
+          HOW DID YOU HEAR ABOUT US? (OPTIONAL)
+        </label>
         <select defaultValue="" id="discoverySource" name="discoverySource">
           <option value="">Select one</option>
           <option value="friend">Friend or family</option>
@@ -170,16 +227,17 @@ export function GymGoerForm() {
         />
       </div>
 
-      <label className="consent-row">
-        <input name="consent" required type="checkbox" />
-        <span>
+      <div className="consent-group">
+        <input id="gymConsent" name="consent" required type="checkbox" />
+        <label htmlFor="gymConsent">
           I agree that GoGymGo may store this information and email me about
-          pre-registration, regional availability, and launch updates. *
-        </span>
-      </label>
+          regional availability and launch updates. *
+        </label>
+      </div>
+      <PrivacyNotice />
 
       {state === "error" ? (
-        <p className="form-status" role="alert">
+        <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>
           {error}
         </p>
       ) : null}
@@ -189,11 +247,11 @@ export function GymGoerForm() {
         disabled={state === "submitting"}
         type="submit"
       >
-        {state === "submitting" ? "SAVING…" : "JOIN THE PRE-REGISTRATION LIST →"}
+        {state === "submitting" ? "SAVING…" : "GET REGIONAL UPDATES →"}
       </button>
-      <p className="fine-print">
-        Pre-registration is free and does not create a competition entry or
-        guarantee launch availability in your region.
+      <p className="fine-print" id="gym-form-note">
+        This free update list does not create an app account, competition entry,
+        or guarantee launch availability in your region.
       </p>
     </form>
   );
@@ -202,19 +260,30 @@ export function GymGoerForm() {
 export function BrandForm() {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (state === "error") {
+      errorRef.current?.focus();
+    }
+  }, [state]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("submitting");
     setError("");
     try {
-      await submitInterest(event.currentTarget, "brand");
+      await submitInterest(
+        event.currentTarget,
+        "brand",
+        "We couldn’t save your partnership request. Please try again.",
+      );
       setState("success");
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "We couldn’t save your application. Please try again.",
+          : "We couldn’t save your partnership request. Please try again.",
       );
       setState("error");
     }
@@ -225,7 +294,12 @@ export function BrandForm() {
   }
 
   return (
-    <form className="interest-form" onSubmit={onSubmit}>
+    <form
+      aria-busy={state === "submitting"}
+      aria-describedby="brand-form-note"
+      className="interest-form"
+      onSubmit={onSubmit}
+    >
       <div className="field-grid">
         <div className="field">
           <label htmlFor="brandFullName">YOUR NAME *</label>
@@ -265,7 +339,7 @@ export function BrandForm() {
           />
         </div>
         <div className="field">
-          <label htmlFor="website">WEBSITE</label>
+          <label htmlFor="website">WEBSITE (OPTIONAL)</label>
           <input
             autoComplete="url"
             id="website"
@@ -284,32 +358,37 @@ export function BrandForm() {
             id="brandRegion"
             maxLength={160}
             name="region"
-            placeholder="e.g. Canada, Pacific Northwest"
+            placeholder="e.g. British Columbia"
             required
           />
         </div>
         <div className="field">
-          <label htmlFor="interest">PARTNERSHIP INTEREST *</label>
-          <select defaultValue="" id="interest" name="interest" required>
+          <label htmlFor="partnershipInterest">PARTNERSHIP INTEREST *</label>
+          <select
+            defaultValue=""
+            id="partnershipInterest"
+            name="partnershipInterest"
+            required
+          >
             <option disabled value="">
               Select one
             </option>
             <option value="regional-sponsor">Regional campaign sponsor</option>
-            <option value="brand-rewards">Brand Reward supplier</option>
+            <option value="brand-rewards">Product or coupon inventory</option>
             <option value="creator-campaign">Creator workout campaign</option>
             <option value="gym-partnership">Partner gym network</option>
-            <option value="explore">Let’s explore</option>
+            <option value="explore">Explore the right fit</option>
           </select>
         </div>
       </div>
 
       <div className="field">
-        <label htmlFor="message">TELL US WHAT YOU HAVE IN MIND</label>
+        <label htmlFor="message">CAMPAIGN DETAILS (OPTIONAL)</label>
         <textarea
           id="message"
           maxLength={1200}
           name="message"
-          placeholder="Your goals, timing, target audience, reward ideas, or anything else that would help us understand the fit."
+          placeholder="Share your preferred timing, audience, region, inventory, budget range, fulfillment plan, or reporting needs."
         />
       </div>
 
@@ -323,16 +402,17 @@ export function BrandForm() {
         />
       </div>
 
-      <label className="consent-row">
-        <input name="consent" required type="checkbox" />
-        <span>
+      <div className="consent-group">
+        <input id="brandConsent" name="consent" required type="checkbox" />
+        <label htmlFor="brandConsent">
           I agree that GoGymGo may store this information and contact me about
           partnership opportunities. *
-        </span>
-      </label>
+        </label>
+      </div>
+      <PrivacyNotice />
 
       {state === "error" ? (
-        <p className="form-status" role="alert">
+        <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>
           {error}
         </p>
       ) : null}
@@ -342,12 +422,14 @@ export function BrandForm() {
         disabled={state === "submitting"}
         type="submit"
       >
-        {state === "submitting" ? "SENDING…" : "APPLY AS A FOUNDING PARTNER →"}
+        {state === "submitting"
+          ? "SENDING…"
+          : "REQUEST A PARTNERSHIP REVIEW →"}
       </button>
-      <p className="fine-print">
-        Submitting this form does not create a campaign or partnership
-        agreement. All placements, rewards, claims, and regional terms require
-        approval.
+      <p className="fine-print" id="brand-form-note">
+        Submitting this form does not create a campaign or agreement. Placements,
+        rewards, creative, reporting, claims, and regional terms require review
+        and written approval.
       </p>
     </form>
   );

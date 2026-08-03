@@ -1,27 +1,19 @@
 const productScreens = [
   {
-    src: "/app/weekly-goal.png",
-    alt: "Production GoGymGo Weekly Goal screen with a seven-day goal selected",
-    height: 1040,
+    alt: "GoGymGo active workout screen showing elapsed server time and live verification status",
+    height: 800,
+    src: "/app/active-workout.webp",
+    step: "01 // VERIFY",
+    title: "Follow the authoritative workout timer",
     width: 540,
-    step: "01 // COMMIT",
-    title: "Choose a goal you can repeat",
   },
   {
-    src: "/app/active-workout.png",
-    alt: "Production GoGymGo active workout screen with live heart-rate verification",
+    alt: "GoGymGo Winners Circle screen showing published competition results",
     height: 800,
+    src: "/app/winners-circle.webp",
+    step: "02 // RESULTS",
+    title: "Review published competition results",
     width: 540,
-    step: "02 // VERIFY",
-    title: "Complete the 30-minute timer",
-  },
-  {
-    src: "/app/winners-circle.png",
-    alt: "Production GoGymGo Winners Circle showing verified prize-draw results",
-    height: 800,
-    width: 540,
-    step: "03 // RESULTS",
-    title: "See the Winners Circle results",
   },
 ] as const;
 
@@ -31,16 +23,13 @@ export function ProductScreens() {
       <div className="shell">
         <div className="section-heading product-showcase-heading">
           <div>
-            <p className="eyebrow">PRODUCTION MEMBER APP SCREENS</p>
-            <h2>The same screens players use in the app.</h2>
+            <p className="eyebrow">INSIDE THE MEMBER APP</p>
+            <h2>From verified workout to published result.</h2>
           </div>
-          <div>
-            <p>
-              These captures come directly from app.gogymgo.com and preserve
-              each complete screen: set a Weekly Goal, verify a live workout,
-              and review the Winners Circle results.
-            </p>
-          </div>
+          <p>
+            The app keeps live verification separate from final competition
+            results, so pending activity is never presented as approved credit.
+          </p>
         </div>
         <div className="product-screen-grid">
           {productScreens.map((screen) => (
@@ -52,7 +41,7 @@ export function ProductScreens() {
                   className="product-screen-capture"
                   decoding="async"
                   height={screen.height}
-                  loading={screen.src === "/app/weekly-goal.png" ? "eager" : "lazy"}
+                  loading="lazy"
                   src={screen.src}
                   width={screen.width}
                 />

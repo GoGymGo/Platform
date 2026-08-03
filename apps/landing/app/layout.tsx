@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { DesktopNavigation } from "./components/DesktopNavigation";
 import { MobileNavigation } from "./components/MobileNavigation";
+import { siteLinks } from "./site-links";
 import "./globals.css";
 import "./experience.css";
 
@@ -24,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s | GoGymGo",
     },
     description:
-      "GoGymGo turns verified gym attendance into streaks, friend challenges, regional competition, and chances to win fitness brand rewards.",
+      "GoGymGo turns eligible partner-gym workouts into verified goals, regional competition, social challenges, and published rewards.",
     applicationName: "GoGymGo",
     keywords: [
       "gym motivation",
@@ -36,15 +38,15 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "GoGymGo — Make consistency count",
       description:
-        "Verified workouts. Friend challenges. Regional competition. Fitness brand rewards.",
+        "Verified partner-gym workouts. Weekly Goals. Regional competition. Published rewards.",
       type: "website",
       siteName: "GoGymGo",
       images: socialImage
         ? [
             {
               url: socialImage,
-              width: 1731,
-              height: 909,
+              width: 1536,
+              height: 1024,
               alt: "GoGymGo — Make consistency count.",
             },
           ]
@@ -54,9 +56,16 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title: "GoGymGo — Make consistency count",
       description:
-        "Verified workouts. Friend challenges. Regional competition. Fitness brand rewards.",
+        "Verified partner-gym workouts. Weekly Goals. Regional competition. Published rewards.",
       images: socialImage ? [socialImage] : undefined,
     },
+    alternates: {
+      canonical: "/",
+    },
+    icons: {
+      icon: "/mark.svg",
+    },
+    manifest: "/manifest.webmanifest",
   };
 }
 
@@ -83,22 +92,22 @@ export default function RootLayout({
               <span className="wordmark-pink">GYM</span>
               <span className="wordmark-cyan">GO</span>
             </Link>
-            <nav aria-label="Primary navigation">
-              <Link href="/#how-it-works">HOW IT WORKS</Link>
-              <Link href="https://app.gogymgo.com/demo">DEMO</Link>
-              <Link href="/gym-goers">GYM GOERS</Link>
-              <Link href="/brands">FITNESS BRANDS</Link>
-            </nav>
+            <DesktopNavigation />
             <MobileNavigation />
             <Link
               className="header-cta button-primary"
-              href="https://app.gogymgo.com/"
+              href={siteLinks.memberApp}
+              aria-label="Join the September 2026 beta in the GoGymGo app"
             >
-              JOIN BETA <span aria-hidden="true">→</span>
+              <span className="header-cta-long">JOIN SEPTEMBER BETA</span>
+              <span className="header-cta-short">JOIN BETA</span>
+              <b aria-hidden="true">→</b>
             </Link>
           </div>
         </header>
-        <div id="main-content">{children}</div>
+        <div id="main-content" tabIndex={-1}>
+          {children}
+        </div>
         <footer className="site-footer">
           <div className="shell footer-grid">
             <div>
@@ -110,25 +119,31 @@ export default function RootLayout({
               <p>Make consistency count.</p>
             </div>
             <div>
-              <p className="footer-label">JOIN EARLY</p>
-              <Link href="/gym-goers">Gym-goer pre-registration</Link>
-              <Link href="/brands">Fitness brand partnerships</Link>
+              <p className="footer-label">GYM GOERS</p>
+              <Link href={siteLinks.memberApp}>September beta registration</Link>
+              <Link href={siteLinks.gymGoers}>Regional launch updates</Link>
+              <Link href="/#how-it-works">How GoGymGo works</Link>
             </div>
             <div>
-              <p className="footer-label">THE PRODUCT</p>
-              <Link href="/#how-it-works">How GoGymGo works</Link>
-              <Link href="https://app.gogymgo.com/demo">App demo</Link>
-              <Link href="https://gogymgo-admin-control.wilson-1212.chatgpt.site/">
-                Administrator sign-in
-              </Link>
-              <span>Launching region by region</span>
+              <p className="footer-label">EXPLORE</p>
+              <Link href={siteLinks.brands}>Fitness brand partnerships</Link>
+              <Link href={siteLinks.demo}>App demo</Link>
+              <Link href={siteLinks.faq}>Frequently asked questions</Link>
+              <Link href={siteLinks.contact}>Contact</Link>
+            </div>
+            <div>
+              <p className="footer-label">LEGAL & ACCESS</p>
+              <Link href={siteLinks.privacy}>Privacy Policy</Link>
+              <Link href={siteLinks.terms}>Terms of Service</Link>
+              <Link href={siteLinks.officialRules}>Official Contest Rules</Link>
+              <Link href={siteLinks.accessibility}>Accessibility</Link>
             </div>
           </div>
           <div className="shell footer-bottom">
             <span>© {new Date().getFullYear()} GoGymGo</span>
-            <span>
-              NO PURCHASE REQUIRED // REWARDS SUBJECT TO REGIONAL RULES
-            </span>
+            <Link href={siteLinks.officialRules}>
+              NO PURCHASE REQUIRED // ELIGIBILITY AND REGIONAL RULES APPLY
+            </Link>
           </div>
         </footer>
       </body>

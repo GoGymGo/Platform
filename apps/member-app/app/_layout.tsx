@@ -1,7 +1,7 @@
 import { Rajdhani_500Medium } from '@expo-google-fonts/rajdhani/500Medium';
 import { Rajdhani_600SemiBold } from '@expo-google-fonts/rajdhani/600SemiBold';
 import { useFonts } from 'expo-font';
-import { Redirect, SplashScreen, Stack, usePathname } from 'expo-router';
+import { Redirect, SplashScreen, Stack } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -21,6 +21,7 @@ import { WorkoutProgressProvider, useWorkoutProgress } from '@/state/workoutProg
 import { useMidSessionNotificationNavigation } from '@/hooks/useMidSessionNotificationNavigation';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { AppTourModeBanner } from '@/testing/AppTourModeBanner';
+import { isPublicDemoRuntime } from '@/config/demoMode';
 
 const screenOptions = {
   headerShown: false,
@@ -78,11 +79,10 @@ export default function RootLayout() {
 }
 
 function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
-  const pathname = usePathname();
   const { active } = useAppTour();
 
-  if (pathname === '/demo') {
-    return <Redirect href="/join" />;
+  if (isPublicDemoRuntime()) {
+    return <RetiredDemoRedirect />;
   }
 
   return (
@@ -90,6 +90,16 @@ function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
       <AuthenticatedApp reduceMotion={reduceMotion} />
     </AuthProvider>
   );
+}
+
+function RetiredDemoRedirect() {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.replace('/join');
+    }
+  }, []);
+
+  return <Redirect href="/join" />;
 }
 
 function AuthenticatedApp({ reduceMotion }: { reduceMotion: boolean }) {

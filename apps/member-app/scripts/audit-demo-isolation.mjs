@@ -37,7 +37,8 @@ if (!demo.includes("Redirect href=\"/join\"")) {
 }
 
 if (
-  !rootLayout.includes("pathname === '/demo'") ||
+  !rootLayout.includes('isPublicDemoRuntime()') ||
+  !rootLayout.includes("window.location.replace('/join')") ||
   !rootLayout.includes('return <Redirect href="/join"') ||
   rootLayout.includes('DemoNavigation')
 ) {

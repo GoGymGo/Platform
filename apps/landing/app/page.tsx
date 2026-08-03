@@ -56,17 +56,17 @@ function HeroAppPreview() {
   return (
     <div
       className="hero-app-preview hero-app-preview--capture"
-      aria-label="GoGymGo member app Weekly Goal selection screen"
+      aria-label="Production GoGymGo member app Weekly Goal selection screen"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        alt="GoGymGo member app screen with a four-day Weekly Goal selected"
+        alt="Production GoGymGo member app screen with a seven-day Weekly Goal selected"
         className="hero-app-capture"
         decoding="async"
-        height={886}
+        height={1040}
         loading="eager"
         src="/app/weekly-goal.png"
-        width={430}
+        width={540}
       />
     </div>
   );

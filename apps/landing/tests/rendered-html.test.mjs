@@ -4,7 +4,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("the landing page contains complete high-fidelity member-app previews", async () => {
+test("the landing page uses complete production member-app captures", async () => {
   const [
     page,
     layout,
@@ -12,6 +12,9 @@ test("the landing page contains complete high-fidelity member-app previews", asy
     experienceCss,
     mobileNavigation,
     packageJson,
+    weeklyGoal,
+    activeWorkout,
+    winnersCircle,
   ] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
@@ -19,6 +22,9 @@ test("the landing page contains complete high-fidelity member-app previews", asy
     readFile(new URL("app/experience.css", root), "utf8"),
     readFile(new URL("app/components/MobileNavigation.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
+    readFile(new URL("public/app/weekly-goal.png", root)),
+    readFile(new URL("public/app/active-workout.png", root)),
+    readFile(new URL("public/app/winners-circle.png", root)),
   ]);
 
   assert.match(layout, /GoGymGo — Make consistency count/);
@@ -57,16 +63,30 @@ test("the landing page contains complete high-fidelity member-app previews", asy
   assert.match(page, /\/app\/weekly-goal\.png/);
   assert.match(page, /member app Weekly Goal selection screen/);
   assert.doesNotMatch(page, /join-selection/);
-  assert.match(productScreens, /HIGH-FIDELITY APP PREVIEWS/);
+  assert.match(productScreens, /PRODUCTION MEMBER APP SCREENS/);
+  assert.match(productScreens, /app\.gogymgo\.com/);
+  assert.match(productScreens, /\/app\/weekly-goal\.png/);
+  assert.match(productScreens, /\/app\/active-workout\.png/);
+  assert.match(productScreens, /\/app\/winners-circle\.png/);
   assert.match(productScreens, /Complete the 30-minute timer/);
-  assert.match(productScreens, /CONFIRM 4-DAY GOAL/);
-  assert.match(productScreens, /FINISH UNLOCKS AT 30:00/);
-  assert.match(productScreens, /WINNERS CIRCLE/);
-  assert.match(productScreens, /GOAL CHAMPIONS/);
-  assert.match(productScreens, /PRIZE DRAW WINNERS/);
-  assert.doesNotMatch(productScreens, /<img|product-screen-capture|\/app\/competition\.png/);
-  assert.match(experienceCss, /\.product-phone \{[\s\S]*?min-height: 790px;[\s\S]*?height: 100%;/);
-  assert.match(experienceCss, /\.app-result-row > div strong \{[\s\S]*?overflow-wrap: anywhere;/);
+  assert.match(productScreens, /See the Winners Circle results/);
+  assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 3);
+  assert.match(productScreens, /product-phone--capture/);
+  assert.doesNotMatch(productScreens, /function GoalScreen|function TimerScreen|function WinnersCircleScreen/);
+  assert.match(experienceCss, /\.hero-app-capture \{[\s\S]*?height: auto;/);
+  assert.match(experienceCss, /\.product-phone\.product-phone--capture \{[\s\S]*?aspect-ratio: 540 \/ 1040;/);
+  assert.match(experienceCss, /\.product-screen-capture \{[\s\S]*?object-fit: contain;/);
+  assert.doesNotMatch(experienceCss, /\.product-screen-capture \{[\s\S]*?object-fit: cover;/);
+
+  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+  for (const capture of [weeklyGoal, activeWorkout, winnersCircle]) {
+    assert.ok(
+      [...capture.subarray(0, 8)].every(
+        (byte, index) => byte === pngSignature[index],
+      ),
+    );
+    assert.ok(capture.length > 20_000);
+  }
 
   assert.doesNotMatch(
     page + layout + productScreens,

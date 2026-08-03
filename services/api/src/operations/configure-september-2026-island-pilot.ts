@@ -1,12 +1,16 @@
 import 'reflect-metadata';
 
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { sql } from 'kysely';
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { AppModule } from '../app.module';
+import type { Environment } from '../config/environment';
 import { DatabaseService } from '../database/database.service';
 import type { AuthenticatedPrincipal } from '../modules/auth/auth.types';
+import { getGoGymGoFirebaseApp } from '../modules/auth/firebase-admin-app';
 import { AdminCompetitionConfigurationService } from '../modules/operator/admin-competition-configuration.service';
 import { AdminRegionConfigurationService } from '../modules/operator/admin-region-configuration.service';
 import { CompetitionStatusAction } from '../modules/operator/dto/admin-configuration.dto';
@@ -341,6 +345,7 @@ async function buildBoundary(
 
 async function findAdministrator(
   database: DatabaseService,
+  config: ConfigService<Environment, true>,
 ): Promise<AuthenticatedPrincipal> {
   const requestedUid = process.env.PILOT_ADMIN_FIREBASE_UID?.trim();
   const requestedEmail = (
@@ -359,24 +364,136 @@ async function findAdministrator(
     query = query.where(sql<boolean>`lower(email) = ${requestedEmail}`);
   }
   const administrators = await query.execute();
-  if (administrators.length !== 1) {
+  if (administrators.length === 1) {
+    const administrator = administrators[0];
+    if (!administrator.email || !administrator.email_verified) {
+      throw new Error('The pilot administrator must have a verified email.');
+    }
+    return {
+      email: administrator.email,
+      emailVerified: true,
+      firebaseUid: administrator.firebase_uid,
+      roles: administrator.roles,
+      tokenIssuedAt: Math.floor(Date.now() / 1_000),
+    };
+  }
+  if (administrators.length > 1 || requestedUid) {
     throw new Error(
       requestedUid
         ? 'PILOT_ADMIN_FIREBASE_UID does not identify one active administrator.'
         : 'PILOT_ADMIN_EMAIL does not identify one active administrator.',
     );
   }
-  const administrator = administrators[0];
-  if (!administrator.email || !administrator.email_verified) {
-    throw new Error('The pilot administrator must have a verified email.');
+  if (requestedEmail !== 's1ck5ense123@gmail.com') {
+    throw new Error(
+      'Only the verified GoGymGo bootstrap owner can be created automatically.',
+    );
   }
-  return {
-    email: administrator.email,
-    emailVerified: true,
-    firebaseUid: administrator.firebase_uid,
-    roles: administrator.roles,
-    tokenIssuedAt: Math.floor(Date.now() / 1_000),
-  };
+
+  const { getAuth } = await import('firebase-admin/auth');
+  const firebaseApp = await getGoGymGoFirebaseApp(config);
+  const firebaseUser =
+    await getAuth(firebaseApp).getUserByEmail(requestedEmail);
+  if (
+    firebaseUser.disabled ||
+    !firebaseUser.emailVerified ||
+    firebaseUser.email?.trim().toLowerCase() !== requestedEmail
+  ) {
+    throw new Error(
+      'The GoGymGo bootstrap owner must be enabled with a verified email.',
+    );
+  }
+
+  return database.connection.transaction().execute(async (transaction) => {
+    const uidUser = await transaction
+      .selectFrom('users')
+      .select([
+        'email',
+        'email_verified',
+        'firebase_uid',
+        'id',
+        'roles',
+        'status',
+      ])
+      .where('firebase_uid', '=', firebaseUser.uid)
+      .forUpdate()
+      .executeTakeFirst();
+    const emailUsers = await transaction
+      .selectFrom('users')
+      .select(['firebase_uid'])
+      .where(sql<boolean>`lower(email) = ${requestedEmail}`)
+      .forUpdate()
+      .execute();
+    if (emailUsers.some((user) => user.firebase_uid !== firebaseUser.uid)) {
+      throw new Error(
+        'The bootstrap owner email is already associated with another Firebase identity.',
+      );
+    }
+
+    const now = new Date();
+    const user =
+      uidUser ??
+      (await transaction
+        .insertInto('users')
+        .values({
+          created_at: now,
+          email: requestedEmail,
+          email_verified: true,
+          firebase_uid: firebaseUser.uid,
+          roles: ['user'],
+          status: 'active',
+          updated_at: now,
+        })
+        .returning([
+          'email',
+          'email_verified',
+          'firebase_uid',
+          'id',
+          'roles',
+          'status',
+        ])
+        .executeTakeFirstOrThrow());
+    if (user.status !== 'active') {
+      throw new Error('The GoGymGo bootstrap owner is not active.');
+    }
+
+    const nextRoles = [...new Set([...user.roles, 'admin', 'user'])].sort();
+    const updated = await transaction
+      .updateTable('users')
+      .set({
+        email: requestedEmail,
+        email_verified: true,
+        roles: nextRoles,
+        updated_at: now,
+      })
+      .where('id', '=', user.id)
+      .returning(['email', 'email_verified', 'firebase_uid', 'roles'])
+      .executeTakeFirstOrThrow();
+    if (!uidUser || !user.roles.includes('admin')) {
+      await transaction
+        .insertInto('operator_audit_events')
+        .values({
+          action: 'user.admin_bootstrapped',
+          actor_user_id: null,
+          created_at: now,
+          entity_id: user.id,
+          entity_type: 'users',
+          next_state: { roles: nextRoles },
+          previous_state: uidUser ? { roles: user.roles } : null,
+          reason:
+            'Bootstrap the verified GoGymGo owner for the September 2026 staging pilot.',
+          request_id: `bootstrap-pilot-admin:${randomUUID()}`,
+        })
+        .executeTakeFirstOrThrow();
+    }
+    return {
+      email: updated.email ?? requestedEmail,
+      emailVerified: updated.email_verified,
+      firebaseUid: updated.firebase_uid,
+      roles: updated.roles,
+      tokenIssuedAt: Math.floor(Date.now() / 1_000),
+    };
+  });
 }
 
 async function validateBoundaryPoints(
@@ -763,7 +880,10 @@ async function main(): Promise<void> {
       return;
     }
 
-    const principal = await findAdministrator(database);
+    const principal = await findAdministrator(
+      database,
+      app.get(ConfigService<Environment, true>),
+    );
     const regionPolicyId = await configureRegion(
       database,
       app.get(AdminRegionConfigurationService),

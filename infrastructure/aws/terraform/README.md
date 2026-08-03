@@ -19,12 +19,14 @@ does not match it. Nothing here references or shares Souvenote resources.
 - an internet-facing TLS Application Load Balancer whose API target is reachable
   only from its security group;
 - private KMS-encrypted content and seven-day privacy-export S3 buckets;
+- a private versioned member-app S3 origin, CloudFront HTTPS distribution, SPA
+  route function, and browser security headers;
 - immutable ECR images, encrypted Secrets Manager containers, CloudWatch logs,
   alarms, and a per-account budget;
 - separate least-privilege API, worker, migration, and execution roles;
-- a GitHub OIDC deployment role restricted to the matching protected GitHub
-  environment and the repository's immutable owner/repository IDs. No
-  long-lived AWS deployment key is required.
+- separate backend and member-web GitHub OIDC deployment roles restricted to
+  the matching protected GitHub environment and the repository's immutable
+  owner/repository IDs. No long-lived AWS deployment key is required.
 
 The cost-controlled pilot intentionally gives Fargate tasks public egress while
 their security groups allow no direct inbound traffic. This avoids NAT Gateway
@@ -107,6 +109,12 @@ validation record and pointing the API hostname at the load balancer are separat
 Cloudflare approval gates. Until an issued `api_certificate_arn` is supplied,
 the load balancer has no listener and cannot forward application traffic.
 
+CloudFront certificates are different: request the `app.gogymgo.com`
+certificate in `us-east-1`, add its Cloudflare DNS validation CNAME, and wait for
+issuance before setting `member_web_certificate_arn`. Once Terraform returns the
+distribution hostname, add a DNS-only `app` CNAME to that exact hostname. The
+bucket itself remains private and is never used as a website endpoint.
+
 ## Ordered release
 
 The protected GitHub workflow checks out an exact 40-character commit, verifies
@@ -122,6 +130,11 @@ Production must have required reviewers configured on the GitHub environment.
 
 Terraform ignores image-only task-definition and service drift so an
 infrastructure apply cannot silently move application code ahead of migrations.
+
+The separate `Member Web Deployment` workflow builds the exact approved commit
+against its permanent API URL, rejects temporary or local endpoints, audits the
+browser bundle, publishes it through the narrow member-web role, invalidates
+CloudFront, and verifies `/demo` and `/join`.
 
 ## Staging cost control
 

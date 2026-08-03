@@ -14,17 +14,26 @@ on:
         description: Full 40-character Git commit SHA to build and deploy
         required: true
         type: string
+      scope:
+        description: Workload to deploy
+        required: true
+        default: platform
+        type: choice
+        options:
+          - platform
+          - member-web
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: platform-deploy-${{ inputs.environment }}
+  group: gogymgo-deploy-${{ inputs.scope }}-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
+    if: inputs.scope == 'platform'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
@@ -306,3 +315,10 @@ jobs:
             --retry-all-errors \
             --retry-delay 10 \
             "${API_URL}/v1/health/ready"
+
+  member-web:
+    if: inputs.scope == 'member-web'
+    uses: ./.github/workflows/member-web-deployment.yml
+    with:
+      environment: ${{ inputs.environment }}
+      source_commit: ${{ inputs.source_commit }}

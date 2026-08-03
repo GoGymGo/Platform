@@ -4,9 +4,8 @@ Status: the isolated `GoGymGo-Staging` member account and its cost-controlled AW
 foundation are deployed in `ca-central-1`. The private database, application
 login, PostGIS extension, runtime secrets, GitHub OIDC role, budget, alarms, ACM
 certificate, HTTPS listener, and DNS-only `api-staging.gogymgo.com` record are
-bootstrapped. API and worker desired counts remain zero. Google workload identity
-setup, the first application deployment, migrations, and UAT remain gated.
-Production is untouched.
+bootstrapped. The API and worker completed their first healthy staging release.
+The first browser deployment and its UAT remain gated. Production is untouched.
 
 ## Isolation gate
 
@@ -42,11 +41,13 @@ automatically.
 - one ECS Fargate API task, one Fargate worker task, and an on-demand migration
   task, with separate runtime roles and no direct inbound task access;
 - one internet-facing HTTPS Application Load Balancer and ACM certificate;
-- one immutable ECR repository, two private encrypted S3 buckets, one KMS key,
+- one immutable ECR repository, three private encrypted S3 buckets, one KMS key,
   five application secret containers plus the RDS-managed master secret;
+- one CloudFront distribution with a private S3 origin and a low-cost SPA route
+  function for the browser member app;
 - CloudWatch logs, five alarms, and one monthly AWS Budget;
-- one GitHub OIDC provider and a deployment role restricted to the matching
-  `GoGymGo/Platform` protected GitHub environment.
+- one GitHub OIDC provider and separate backend and member-web deployment roles
+  restricted to the matching `GoGymGo/Platform` protected GitHub environment.
 
 Cloudflare remains the DNS and admin-access edge. DNS is a separate approval gate.
 
@@ -65,7 +66,7 @@ meaningful internet egress, and unusual log, request, or storage volume.
 | 20 GB RDS GP3                                      |                   $2.54 | $0.127/GB-month                                |
 | Six Secrets Manager secrets                        |             about $2.40 | five runtime plus one RDS-managed secret       |
 | One customer-managed KMS key                       |             about $1.00 | requests are additional                        |
-| ECR, S3, logs, alarms, requests, and backup growth |                  $3-$10 | low-volume pilot allowance                     |
+| ECR, S3, CloudFront, logs, alarms, and backups    |                  $3-$10 | low-volume pilot allowance                     |
 | **Active staging total**                           | **about $75-$90/month** | before tax and material egress                 |
 
 Starting production with `db.t4g.small`, one API task, and one worker task is

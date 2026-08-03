@@ -15,8 +15,10 @@ hosting provider reports the custom domain as verified and staging UAT passes.
 
 1. In the landing Sites project, add `gogymgo.com` and copy the verification
    and routing records supplied by Sites.
-2. In production Firebase Hosting, add `app.gogymgo.com` and copy the exact
-   verification and routing records supplied by Firebase.
+2. Request the member-app ACM certificate in `us-east-1`, add only its exact
+   DNS validation CNAME, and wait for ACM to report `ISSUED`. Supply that ARN to
+   the environment Terraform root, then point `app.gogymgo.com` at the resulting
+   CloudFront distribution with a DNS-only Cloudflare CNAME.
 3. In the admin Sites project, add `admin.gogymgo.com` and copy the exact
    verification and routing records supplied by Sites.
 4. Add those records in Cloudflare DNS. Preserve unrelated mail and
@@ -58,6 +60,8 @@ payloads in repository variables:
 - `ECS_MIGRATION_TASK_DEFINITION`, `ECS_MIGRATION_SUBNETS`, and
   `ECS_MIGRATION_SECURITY_GROUPS`
 - `API_URL`
+- `MEMBER_WEB_BUCKET`, `MEMBER_WEB_DISTRIBUTION_ID`,
+  `MEMBER_WEB_DEPLOY_ROLE_ARN`, and `MEMBER_WEB_URL`
 - public API and Firebase configuration required by each frontend
 
 Use distinct AWS accounts, deployment identities, Firebase projects, databases,
@@ -68,7 +72,9 @@ in AWS Secrets Manager or the hosting provider's encrypted environment storage.
 
 - `gogymgo.com` renders the public landing site and posts interest to the API.
 - `app.gogymgo.com/demo` works without Firebase, camera, location or API calls.
-- `app.gogymgo.com/join` uses production Firebase and the production API.
+- `app.gogymgo.com/join` uses the explicitly approved environment's Firebase
+  project and API. During beta this is staging; moving the hostname to production
+  is a separate DNS and release approval.
 - `admin.gogymgo.com` rejects an unapproved email at Cloudflare, rejects a
   non-admin Firebase user at the API, and permits the bootstrapped owner.
 - CORS allows only the reviewed production origins.

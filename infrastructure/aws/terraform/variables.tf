@@ -134,6 +134,29 @@ variable "api_domain" {
   }
 }
 
+variable "member_web_domain" {
+  description = "Public hostname for the browser member app. CloudFront uses its default hostname until a certificate is supplied."
+  type        = string
+  default     = "app.gogymgo.com"
+
+  validation {
+    condition     = can(regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$", var.member_web_domain))
+    error_message = "member_web_domain must be a valid lowercase DNS hostname."
+  }
+}
+
+variable "member_web_certificate_arn" {
+  description = "Issued us-east-1 ACM certificate ARN for the CloudFront member-app hostname. Leave null until DNS validation is complete."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.member_web_certificate_arn == null || can(regex("^arn:aws:acm:us-east-1:${var.account_id}:certificate/[0-9a-f-]+$", var.member_web_certificate_arn))
+    error_message = "member_web_certificate_arn must be a us-east-1 ACM certificate ARN in this environment's dedicated AWS account."
+  }
+}
+
 variable "vpc_cidr" {
   description = "Dedicated VPC CIDR for this account and environment."
   type        = string

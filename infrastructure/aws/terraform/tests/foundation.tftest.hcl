@@ -42,6 +42,26 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_s3_bucket_public_access_block.member_web.restrict_public_buckets && aws_s3_bucket_public_access_block.member_web.block_public_policy && aws_s3_bucket_ownership_controls.member_web.rule[0].object_ownership == "BucketOwnerEnforced"
+    error_message = "The member-app origin must remain private and ACL-free."
+  }
+
+  assert {
+    condition     = aws_cloudfront_origin_access_control.member_web.signing_behavior == "always" && aws_cloudfront_distribution.member_web.default_cache_behavior[0].viewer_protocol_policy == "redirect-to-https"
+    error_message = "CloudFront must sign private origin requests and force browser HTTPS."
+  }
+
+  assert {
+    condition     = strcontains(aws_cloudfront_function.member_web_spa.code, "request.uri = '/index.html'")
+    error_message = "CloudFront must route extensionless Expo Router paths through the SPA entrypoint."
+  }
+
+  assert {
+    condition     = aws_iam_role.github_member_web_deploy.name == "gogymgo-staging-github-member-web"
+    error_message = "Member-app publishing must use a separate environment-scoped GitHub role."
+  }
+
+  assert {
     condition     = aws_ecs_service.api.network_configuration[0].assign_public_ip && aws_vpc_security_group_ingress_rule.api_load_balancer.from_port == 3000 && aws_vpc_security_group_ingress_rule.api_load_balancer.cidr_ipv4 == null
     error_message = "The NAT-free pilot requires public task egress while security-group rules keep API ingress load-balancer-only."
   }

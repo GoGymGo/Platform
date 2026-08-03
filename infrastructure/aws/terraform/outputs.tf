@@ -28,6 +28,17 @@ output "deployment_role_arn" {
   value       = aws_iam_role.github_deploy.arn
 }
 
+output "member_web" {
+  description = "Protected GitHub environment values for browser member-app releases."
+  value = {
+    bucket              = aws_s3_bucket.member_web.bucket
+    deployment_role_arn = aws_iam_role.github_member_web_deploy.arn
+    distribution_domain = aws_cloudfront_distribution.member_web.domain_name
+    distribution_id     = aws_cloudfront_distribution.member_web.id
+    url                 = var.member_web_certificate_arn == null ? "https://${aws_cloudfront_distribution.member_web.domain_name}" : "https://${var.member_web_domain}"
+  }
+}
+
 output "firebase_aws_role_arns" {
   description = "Staging ECS task roles that may be allowlisted by the Firebase workload identity provider."
   value = {

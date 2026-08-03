@@ -197,3 +197,42 @@ resource "aws_iam_role_policy" "github_deploy" {
   policy = data.aws_iam_policy_document.github_deploy.json
   role   = aws_iam_role.github_deploy.id
 }
+
+resource "aws_iam_role" "github_member_web_deploy" {
+  assume_role_policy   = data.aws_iam_policy_document.github_deploy_assume.json
+  max_session_duration = 3600
+  name                 = "${local.name}-github-member-web"
+}
+
+data "aws_iam_policy_document" "github_member_web_deploy" {
+  statement {
+    actions = [
+      "s3:GetBucketLocation",
+      "s3:ListBucket",
+    ]
+    resources = [aws_s3_bucket.member_web.arn]
+  }
+
+  statement {
+    actions = [
+      "s3:DeleteObject",
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+    resources = ["${aws_s3_bucket.member_web.arn}/*"]
+  }
+
+  statement {
+    actions = [
+      "cloudfront:CreateInvalidation",
+      "cloudfront:GetInvalidation",
+    ]
+    resources = [aws_cloudfront_distribution.member_web.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "github_member_web_deploy" {
+  name   = "${local.name}-member-web-release"
+  policy = data.aws_iam_policy_document.github_member_web_deploy.json
+  role   = aws_iam_role.github_member_web_deploy.id
+}

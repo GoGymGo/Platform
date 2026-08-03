@@ -17,6 +17,11 @@ cors_origins = [
 api_certificate_arn = null
 api_domain          = "api-staging.gogymgo.com"
 
+# CloudFront certificates must be issued in us-east-1. Until the certificate is
+# validated, the distribution remains reachable only through its AWS hostname.
+member_web_certificate_arn = null
+member_web_domain          = "app.gogymgo.com"
+
 # Cost-controlled pilot defaults. Production should begin with db.t4g.small,
 # a $150 budget, and deletion protection. Multi-AZ remains a separate HA gate.
 database_instance_class = "db.t4g.micro"

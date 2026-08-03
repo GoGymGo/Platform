@@ -6,10 +6,10 @@ const productScreens = [
     title: "Choose a goal you can repeat",
   },
   {
-    src: "/app/train.png",
-    alt: "GoGymGo member app screen for verifying a gym visit",
+    src: "/app/active-workout.png",
+    alt: "GoGymGo member app screen showing the active 30-minute workout timer",
     step: "02 // VERIFY",
-    title: "Verify each gym visit",
+    title: "Complete the 30-minute timer",
   },
   {
     src: "/app/competition.png",
@@ -31,7 +31,8 @@ export function ProductScreens() {
           <div>
             <p>
               These are live captures from the member app: choose a Weekly
-              Goal, verify a gym visit, and follow the regional competition.
+              Goal, complete the workout timer, and follow the regional
+              competition.
             </p>
           </div>
         </div>

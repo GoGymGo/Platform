@@ -9,19 +9,21 @@ test("the landing page contains real member-app screen captures", async () => {
     page,
     layout,
     productScreens,
+    experienceCss,
     mobileNavigation,
     packageJson,
     weeklyGoal,
-    train,
+    activeWorkout,
     competition,
   ] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("app/components/ProductScreens.tsx", root), "utf8"),
+    readFile(new URL("app/experience.css", root), "utf8"),
     readFile(new URL("app/components/MobileNavigation.tsx", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("public/app/weekly-goal.png", root)),
-    readFile(new URL("public/app/train.png", root)),
+    readFile(new URL("public/app/active-workout.png", root)),
     readFile(new URL("public/app/competition.png", root)),
   ]);
 
@@ -62,16 +64,30 @@ test("the landing page contains real member-app screen captures", async () => {
   assert.match(page, /member app Weekly Goal selection screen/);
   assert.doesNotMatch(page, /join-selection/);
   assert.match(productScreens, /\/app\/weekly-goal\.png/);
-  assert.match(productScreens, /\/app\/train\.png/);
+  assert.match(productScreens, /\/app\/active-workout\.png/);
   assert.match(productScreens, /\/app\/competition\.png/);
+  assert.match(productScreens, /Complete the 30-minute timer/);
   assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 3);
   assert.match(productScreens, /product-phone--capture/);
   assert.match(productScreens, /REAL MEMBER APP SCREENS/);
   assert.match(productScreens, /live captures from the member app/);
+  assert.match(
+    experienceCss,
+    /\.product-screen-card:nth-child\(2\) \.product-phone,[\s\S]*?\.product-screen-card:nth-child\(3\) \.product-phone \{[\s\S]*?transform: none;[\s\S]*?border-color: rgba\(52, 229, 232, 0\.42\);/,
+  );
+  assert.match(experienceCss, /\.product-screen-capture \{[\s\S]*?object-fit: contain;/);
 
   const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-  for (const capture of [weeklyGoal, train, competition]) {
-    assert.deepEqual([...capture.subarray(0, 8)], pngSignature);
+  const jpegSignature = [255, 216, 255];
+  for (const capture of [weeklyGoal, activeWorkout, competition]) {
+    const isPng = [...capture.subarray(0, 8)].every(
+      (byte, index) => byte === pngSignature[index],
+    );
+    const isJpeg = [...capture.subarray(0, 3)].every(
+      (byte, index) => byte === jpegSignature[index],
+    );
+
+    assert.ok(isPng || isJpeg);
     assert.ok(capture.length > 10_000);
   }
 

@@ -361,7 +361,7 @@
 
 .product-screen-card {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 1fr auto;
   align-content: start;
   min-width: 0;
 }
@@ -369,9 +369,9 @@
 .product-phone {
   position: relative;
   width: 100%;
-  min-height: 690px;
-  overflow: hidden;
-  padding: 23px 16px 30px;
+  min-height: 790px;
+  height: 100%;
+  padding: 25px 18px 34px;
   border: 1px solid rgba(52, 229, 232, 0.42);
   border-radius: 28px;
   color: var(--text);
@@ -424,7 +424,7 @@
 }
 
 .product-phone-content {
-  height: 100%;
+  min-height: 100%;
 }
 
 .product-phone-homebar,
@@ -533,6 +533,26 @@
   line-height: 1.45;
 }
 
+.app-publication-note {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 224, 102, 0.25);
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(255, 224, 102, 0.055);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.app-publication-note strong {
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+}
+
 .app-day-picker {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -628,6 +648,59 @@
   text-align: center;
 }
 
+.app-confirmation-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid rgba(52, 229, 232, 0.2);
+  border-radius: 11px;
+  background: rgba(13, 22, 34, 0.5);
+}
+
+.app-confirmation-row > span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(77, 255, 136, 0.5);
+  border-radius: 7px;
+  color: var(--green);
+  background: rgba(77, 255, 136, 0.08);
+}
+
+.app-confirmation-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.app-primary-action,
+.app-secondary-action,
+.app-danger-action {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  margin-top: 10px;
+  border: 1px solid rgba(52, 229, 232, 0.42);
+  border-radius: 11px;
+  color: var(--cyan);
+  background: rgba(52, 229, 232, 0.08);
+  font-family: "Orbitron", sans-serif;
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.app-primary-action {
+  color: #031013;
+  background: var(--cyan);
+  box-shadow: 0 0 18px rgba(52, 229, 232, 0.24);
+}
+
 .app-compact-action {
   grid-column: 1 / -1;
   min-height: 34px;
@@ -678,6 +751,108 @@
 .app-live-panel {
   padding: 18px 14px 14px;
   box-shadow: 0 0 20px rgba(52, 229, 232, 0.14);
+}
+
+.app-timer-panel {
+  display: grid;
+  justify-items: center;
+  padding: 18px 14px 13px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(52, 229, 232, 0.14);
+}
+
+.app-timer-panel > span,
+.app-timer-panel > small {
+  color: var(--dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.app-timer-panel > strong {
+  margin: 6px 0 2px;
+  color: var(--cyan);
+  font-family: "Orbitron", sans-serif;
+  font-size: 46px;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(52, 229, 232, 0.48);
+}
+
+.app-timer-panel .app-workout-progress,
+.app-timer-panel .app-workout-labels {
+  width: 100%;
+}
+
+.app-session-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.app-session-metrics > div {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 12px 8px;
+  border: 1px solid rgba(52, 229, 232, 0.26);
+  border-radius: 11px;
+  background: rgba(52, 229, 232, 0.045);
+  text-align: center;
+}
+
+.app-session-metrics span,
+.app-session-metrics small {
+  color: var(--dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+.app-session-metrics strong {
+  color: var(--text);
+  font-family: "Orbitron", sans-serif;
+  font-size: 24px;
+}
+
+.app-session-metrics small {
+  color: var(--green);
+}
+
+.app-session-statuses {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.app-session-statuses > div {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(90px, 0.7fr) 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid rgba(52, 229, 232, 0.2);
+  border-radius: 10px;
+  background: rgba(13, 22, 34, 0.5);
+}
+
+.app-session-statuses span,
+.app-session-statuses strong {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 9px;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
+}
+
+.app-session-statuses span {
+  color: var(--dim);
+}
+
+.app-session-statuses strong {
+  color: var(--cyan);
+  text-align: right;
 }
 
 .app-live-metrics {
@@ -802,6 +977,38 @@
   opacity: 0.58;
 }
 
+.app-danger-action {
+  border-color: rgba(255, 70, 84, 0.4);
+  color: #ff4654;
+  background: rgba(255, 70, 84, 0.07);
+}
+
+.app-secondary-action {
+  margin-top: 8px;
+}
+
+.app-competition-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: -5px 0 18px;
+  border-bottom: 1px solid rgba(52, 229, 232, 0.14);
+}
+
+.app-competition-tabs span {
+  padding: 9px 2px;
+  color: var(--dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.app-competition-tabs span.is-active {
+  border-bottom: 2px solid var(--pink);
+  color: var(--pink);
+  background: rgba(255, 45, 155, 0.05);
+}
+
 .app-results-heading > span {
   color: var(--pink);
   font-family: "Share Tech Mono", monospace;
@@ -820,6 +1027,14 @@
   color: var(--text);
   font-family: "Share Tech Mono", monospace;
   font-size: 11px;
+}
+
+.app-results-heading > small {
+  display: block;
+  margin: -7px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .app-results-summary {
@@ -852,6 +1067,76 @@
   color: var(--dim);
   font-family: "Share Tech Mono", monospace;
   font-size: 8px;
+}
+
+.app-result-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.app-result-tabs span {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 5px;
+  border: 1px solid rgba(125, 148, 155, 0.2);
+  border-radius: 8px;
+  color: var(--dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 8px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.app-result-tabs span.is-active {
+  border-color: rgba(52, 229, 232, 0.4);
+  color: var(--cyan);
+  background: rgba(52, 229, 232, 0.07);
+}
+
+.app-results-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 14px 3px 6px;
+  font-family: "Share Tech Mono", monospace;
+  line-height: 1.25;
+}
+
+.app-results-section-heading strong {
+  color: var(--cyan);
+  font-size: 9px;
+}
+
+.app-results-section-heading span {
+  color: var(--dim);
+  font-size: 7px;
+  text-align: right;
+}
+
+.app-results-section-heading--pink strong {
+  color: var(--pink);
+}
+
+.app-results-list--compact {
+  gap: 6px;
+}
+
+.app-results-list--compact .app-result-row {
+  min-height: 56px;
+}
+
+.app-result-row--champion {
+  border-color: rgba(52, 229, 232, 0.28);
+  background: rgba(52, 229, 232, 0.035);
+}
+
+.app-result-row--champion > span,
+.app-result-row--champion > b {
+  color: var(--cyan);
 }
 
 .app-results-label {
@@ -895,11 +1180,11 @@
 }
 
 .app-result-row > div strong {
-  overflow: hidden;
   color: var(--text);
   font-family: "Orbitron", sans-serif;
   font-size: 10px;
-  text-overflow: ellipsis;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .app-result-row > div small {
@@ -915,6 +1200,7 @@
   font-size: 8px;
   line-height: 1.35;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .app-results-note {
@@ -2329,7 +2615,7 @@
   }
 
   .product-phone {
-    min-height: 650px;
+    min-height: 760px;
     padding-inline: 13px;
     border-radius: 22px;
   }

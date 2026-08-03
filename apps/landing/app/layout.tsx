@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { DesktopNavigation } from "./components/DesktopNavigation";
 import { MobileNavigation } from "./components/MobileNavigation";
+import { septemberCampaign } from "./campaign";
 import { siteLinks } from "./site-links";
 import "./globals.css";
 import "./experience.css";
@@ -26,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s | GoGymGo",
     },
     description:
-      "GoGymGo turns eligible partner-gym workouts into verified goals, regional competition, social challenges, and published rewards.",
+      `Join the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`,
     applicationName: "GoGymGo",
     keywords: [
       "gym motivation",
@@ -38,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "GoGymGo — Make consistency count",
       description:
-        "Verified partner-gym workouts. Weekly Goals. Regional competition. Published rewards.",
+        `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`,
       type: "website",
       siteName: "GoGymGo",
       images: socialImage
@@ -56,7 +57,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title: "GoGymGo — Make consistency count",
       description:
-        "Verified partner-gym workouts. Weekly Goals. Regional competition. Published rewards.",
+        `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`,
       images: socialImage ? [socialImage] : undefined,
     },
     alternates: {
@@ -121,7 +122,7 @@ export default function RootLayout({
             <div>
               <p className="footer-label">GYM GOERS</p>
               <Link href={siteLinks.memberApp}>September beta registration</Link>
-              <Link href={siteLinks.gymGoers}>Regional launch updates</Link>
+              <Link href={siteLinks.regionalUpdates}>Regional launch updates</Link>
               <Link href="/#how-it-works">How GoGymGo works</Link>
             </div>
             <div>

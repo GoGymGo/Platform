@@ -35,9 +35,12 @@ export default function GymGoersPage() {
     <main className="audience-page">
       <div className="shell audience-hero">
         <div className="audience-copy">
-          <p className="eyebrow">
-            <span className="status-dot" />
-            SEPTEMBER BETA // {septemberCampaign.registrationLabel}
+          <p className="eyebrow campaign-status">
+            <span>SEPTEMBER 2026 BETA</span>
+            <span className="campaign-status__state">
+              <span className="status-dot" />
+              {septemberCampaign.registrationLabel}
+            </span>
           </p>
           <h1>
             Join now—or hear when your region is <span>next.</span>

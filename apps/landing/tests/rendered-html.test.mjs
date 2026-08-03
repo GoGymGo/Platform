@@ -43,6 +43,10 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(page, /JOIN THE SEPTEMBER BETA/);
   assert.match(page, /siteLinks\.regionalUpdates/);
   assert.match(page, /siteLinks\.officialRules/);
+  assert.match(page, /className="eyebrow campaign-status"/);
+  assert.match(page, /aria-label="Important eligibility notes" className="hero-qualifiers"/);
+  assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ MIN/);
+  assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
   assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
   assert.match(productScreens, /active-workout\.webp/);
@@ -51,6 +55,7 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(productScreens, /tabIndex=\{0\}/);
   assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 2);
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
+  assert.match(layout, /href=\{siteLinks\.regionalUpdates\}>Regional launch updates/);
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
   assert.doesNotMatch(layout, /Administrator sign-in|admin-control/);
@@ -167,6 +172,11 @@ test("FAQ, contact and public information pages are scannable and discoverable",
   assert.match(notFound, /404 \/\/ ROUTE NOT FOUND/);
   assert.match(faq, /<details className="faq-item"/);
   assert.match(faq, /<summary>/);
+  assert.match(faq, /const faqGroups = \[/);
+  assert.match(faq, /JOINING & ELIGIBILITY/);
+  assert.match(faq, /WORKOUTS & WEEKLY GOALS/);
+  assert.match(faq, /REWARDS & PARTNERSHIPS/);
+  assert.match(faq, /className="faq-group-title"/);
   assert.match(faq, /Which gyms count as approved partner gyms\?/);
   assert.match(faq, /Does joining the update list register me for the beta\?/);
   assert.match(contact, /Gym-goer updates/);
@@ -192,12 +202,39 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(globals, /\.form-card \{[\s\S]*?position: static/);
   assert.match(globals, /@media \(min-width: 961px\) and \(min-height: 1050px\)[\s\S]*?position: sticky/);
   assert.match(globals, /\.info-page__header h1 \{[\s\S]*?overflow-wrap: anywhere/);
+  assert.match(globals, /\.site-header \.wordmark \{[\s\S]*?min-height: 44px/);
+  assert.match(globals, /\.campaign-status \{/);
+  assert.match(globals, /\.faq-group-title \{/);
+  assert.match(globals, /\.contact-card \{[\s\S]*?min-height: 220px/);
   assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.section \{[\s\S]*?padding-block: 64px/);
+  assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.info-page__header h1 \{[\s\S]*?font-size: clamp\(34px, 10vw, 40px\)[\s\S]*?overflow-wrap: normal[\s\S]*?word-break: normal/);
   assert.match(globals, /\.text-link \{[\s\S]*?min-height: 44px/);
   assert.match(globals, /\.contact-grid \{[\s\S]*?repeat\(2/);
   assert.match(globals, /\.faq-item summary \{/);
   assert.match(experience, /scroll-snap-type: x mandatory/);
+  assert.match(experience, /\.hero-qualifiers \{/);
+  assert.match(experience, /\.hero-qualifiers li \{/);
   assert.match(experience, /grid-template-columns: repeat\(2, minmax\(min\(82vw, 360px\), 1fr\)\)/);
+});
+
+test("campaign metadata describes the public September experience precisely", async () => {
+  const [page, layout, manifest] = await Promise.all([
+    read("app/page.tsx"),
+    read("app/layout.tsx"),
+    read("app/manifest.ts"),
+  ]);
+
+  for (const source of [page, layout, manifest]) {
+    assert.match(source, /September/);
+    assert.doesNotMatch(source, /social challenges/i);
+  }
+
+  assert.match(layout, /Free September beta/);
+  assert.match(layout, /septemberCampaign\.minimumAge/);
+  assert.match(layout, /septemberCampaign\.regionName/);
+  assert.match(manifest, /Free September 2026 beta/);
+  assert.match(manifest, /septemberCampaign\.minimumAge/);
+  assert.match(manifest, /septemberCampaign\.regionName/);
 });
 
 test("optimized product images and wide social preview are valid assets", async () => {

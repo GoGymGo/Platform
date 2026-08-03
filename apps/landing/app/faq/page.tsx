@@ -130,6 +130,24 @@ const questions = [
   },
 ];
 
+const faqGroups = [
+  {
+    id: "joining",
+    label: "JOINING & ELIGIBILITY",
+    questions: questions.slice(0, 5),
+  },
+  {
+    id: "workouts",
+    label: "WORKOUTS & WEEKLY GOALS",
+    questions: questions.slice(5, 8),
+  },
+  {
+    id: "rewards",
+    label: "REWARDS & PARTNERSHIPS",
+    questions: questions.slice(8),
+  },
+] as const;
+
 export default function FaqPage() {
   return (
     <main className="info-page">
@@ -143,15 +161,28 @@ export default function FaqPage() {
           </p>
         </header>
 
-        <div className="faq-list">
-          {questions.map((item) => (
-            <details className="faq-item" key={item.question}>
-              <summary>
-                <span>{item.question}</span>
-                <b aria-hidden="true">+</b>
-              </summary>
-              <div className="faq-answer">{item.answer}</div>
-            </details>
+        <div className="faq-groups">
+          {faqGroups.map((group) => (
+            <section
+              aria-labelledby={`faq-${group.id}`}
+              className="faq-group"
+              key={group.id}
+            >
+              <h2 className="faq-group-title" id={`faq-${group.id}`}>
+                {group.label}
+              </h2>
+              <div className="faq-list">
+                {group.questions.map((item) => (
+                  <details className="faq-item" key={item.question}>
+                    <summary>
+                      <span>{item.question}</span>
+                      <b aria-hidden="true">+</b>
+                    </summary>
+                    <div className="faq-answer">{item.answer}</div>
+                  </details>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
 

@@ -30,15 +30,30 @@
   margin-top: 30px;
 }
 
-.hero-note {
-  margin-top: 18px;
-  color: var(--dim);
-  font-family: "Share Tech Mono", monospace;
-  font-size: 12px;
-  letter-spacing: 0.06em;
+.hero-qualifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.hero-note a {
+.hero-qualifiers li {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(52, 229, 232, 0.18);
+  border-radius: 7px;
+  color: var(--dim);
+  background: rgba(52, 229, 232, 0.025);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.hero-qualifiers a {
   color: var(--cyan);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -293,6 +308,10 @@
 
   .hero-actions {
     display: grid;
+  }
+
+  .hero-qualifiers li {
+    min-height: 44px;
   }
 
   .pilot-console__header {

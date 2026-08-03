@@ -33,7 +33,7 @@ const structuredData = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     description:
-      "Verified partner-gym workouts, Weekly Goals, regional competition, social challenges, and published rewards.",
+      "Free September 2026 beta for eligible gym-goers age 19+ on Vancouver Island and the supported Gulf Islands.",
     name: "GoGymGo",
     url: "https://gogymgo.com",
   },
@@ -96,9 +96,12 @@ export default function Home() {
 
       <section className="landing-hero shell">
         <div className="hero-copy">
-          <p className="eyebrow">
-            <span className="status-dot" />
-            SEPTEMBER 2026 BETA // {septemberCampaign.registrationLabel}
+          <p className="eyebrow campaign-status">
+            <span>SEPTEMBER 2026 BETA</span>
+            <span className="campaign-status__state">
+              <span className="status-dot" />
+              {septemberCampaign.registrationLabel}
+            </span>
           </p>
           <h1>
             Make consistency <span>count.</span>
@@ -123,10 +126,14 @@ export default function Home() {
               GET REGIONAL UPDATES <span aria-hidden="true">→</span>
             </Link>
           </div>
-          <p className="hero-note">
-            NO PURCHASE REQUIRED // APPROVED PARTNER GYM REQUIRED // REGIONAL
-            RULES APPLY // <Link href={siteLinks.officialRules}>READ OFFICIAL RULES</Link>
-          </p>
+          <ul aria-label="Important eligibility notes" className="hero-qualifiers">
+            <li>NO PURCHASE REQUIRED</li>
+            <li>APPROVED PARTNER GYM REQUIRED</li>
+            <li>REGIONAL RULES APPLY</li>
+            <li>
+              <Link href={siteLinks.officialRules}>READ OFFICIAL RULES</Link>
+            </li>
+          </ul>
         </div>
         <SeptemberChallengePanel />
       </section>
@@ -145,7 +152,7 @@ export default function Home() {
             <span>WEEKLY GOAL DAYS</span>
           </div>
           <div>
-            <strong>30:00</strong>
+            <strong>{septemberCampaign.minimumSessionMinutes}+ MIN</strong>
             <span>VERIFIED MINIMUM</span>
           </div>
           <div>

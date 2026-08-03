@@ -159,41 +159,6 @@ export default function Home() {
 
       <ProductScreens />
 
-      <section className="section shell demo-promo">
-        <div>
-          <p className="eyebrow">
-            <span className="status-dot" />
-            INTERACTIVE APP WALKTHROUGH
-          </p>
-          <h2>Use the flow before you register.</h2>
-          <p>
-            Move through the same setup, Weekly Goal, workout, completion, and
-            results screens as the mobile app. It stays on your device and never
-            creates a real account or competition entry.
-          </p>
-        </div>
-        <div
-          className="demo-promo-sequence"
-          aria-label="Three parts of the app demo"
-        >
-          <div>
-            <span>01</span>
-            <strong>SET UP</strong>
-            <small>Region + Weekly Goal</small>
-          </div>
-          <div>
-            <span>02</span>
-            <strong>VERIFY</strong>
-            <small>Method + active timer</small>
-          </div>
-          <div>
-            <span>03</span>
-            <strong>COMPETE</strong>
-            <small>Results + rewards</small>
-          </div>
-        </div>
-      </section>
-
       <section className="section section-panel">
         <div className="shell">
           <div className="section-heading">

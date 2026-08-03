@@ -2031,56 +2031,6 @@ h3 {
   font-size: 9px;
 }
 
-/* Demo callout on the landing page */
-.demo-promo {
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  align-items: center;
-  gap: 80px;
-}
-
-.demo-promo > div:first-child > p:not(.eyebrow) {
-  max-width: 600px;
-  margin-bottom: 30px;
-  color: var(--muted);
-  font-size: 20px;
-}
-
-.demo-promo-sequence {
-  display: grid;
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: rgba(11, 17, 24, 0.72);
-}
-
-.demo-promo-sequence > div {
-  display: grid;
-  grid-template-columns: 48px 0.7fr 1fr;
-  align-items: center;
-  gap: 15px;
-  min-height: 92px;
-  padding: 18px 24px;
-}
-
-.demo-promo-sequence > div + div {
-  border-top: 1px solid var(--line);
-}
-
-.demo-promo-sequence span {
-  color: var(--cyan);
-  font-family: "Share Tech Mono", monospace;
-  font-size: 12px;
-}
-
-.demo-promo-sequence strong {
-  font-family: "Orbitron", sans-serif;
-  font-size: 13px;
-}
-
-.demo-promo-sequence small {
-  color: var(--muted);
-}
-
 /* Interactive demo competition */
 .demo-page {
   min-height: 76vh;
@@ -2762,14 +2712,9 @@ h3 {
     margin-top: 22px;
   }
 
-  .demo-promo,
   .demo-join-layout,
   .demo-dashboard-grid {
     grid-template-columns: 1fr;
-  }
-
-  .demo-promo {
-    gap: 48px;
   }
 
   .demo-join-copy {
@@ -2920,16 +2865,6 @@ h3 {
   .audience-points,
   .field-grid {
     grid-template-columns: 1fr;
-  }
-
-  .demo-promo-sequence > div {
-    grid-template-columns: 38px 1fr;
-    gap: 5px 12px;
-    padding-inline: 18px;
-  }
-
-  .demo-promo-sequence small {
-    grid-column: 2;
   }
 
   .demo-page {

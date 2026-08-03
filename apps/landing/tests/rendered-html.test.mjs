@@ -95,6 +95,10 @@ test("the landing page contains real member-app screen captures", async () => {
     page + layout + productScreens,
     /TRY THE APP FLOW|OPEN THE APP DEMO|WALK THROUGH THE REAL FLOW/,
   );
+  assert.doesNotMatch(
+    page,
+    /INTERACTIVE APP WALKTHROUGH|Use the flow before you register|demo-promo/,
+  );
   assert.doesNotMatch(page + layout, /app\.gogymgo\.com\/join/);
   assert.doesNotMatch(page + productScreens, /next\/image/);
   assert.equal((layout.match(/wordmark-cyan">GO/g) ?? []).length, 4);

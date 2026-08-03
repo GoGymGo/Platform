@@ -55,7 +55,7 @@ The generated GeoJSON is stored at
 - Gym geofence: 75 m with a 50 m maximum accepted accuracy reading
 - Static QR flow: scan on entry and scan the same poster after 30 minutes
 - Session expiry: four hours; a missing exit earns no credit
-- Reward: one $50 CAD cash reward sponsored by GoGymGo
+- Reward: one $100 CAD cash reward sponsored by GoGymGo
 
 The competition remains a draft until at least one real, in-stock reward has
 been created and published. Do not use placeholder sponsor, prize, coupon or
@@ -92,6 +92,6 @@ $env:PUBLISH_PILOT_COMPETITION = 'yes'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
-The command creates and publishes the sole real $50 CAD cash reward and refuses
+The command creates and publishes the sole real $100 CAD cash reward and refuses
 to publish if any additional pilot reward is published. It never creates
 placeholder sponsor or fulfillment data.

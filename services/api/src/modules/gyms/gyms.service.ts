@@ -932,13 +932,13 @@ export class GymsService {
           });
         }
         if (
-          input.amountCents !== 5_000 ||
+          input.amountCents !== 10_000 ||
           input.currency.trim().toUpperCase() !== 'CAD'
         ) {
           throw new BadRequestException({
             code: 'PILOT_CASH_AMOUNT_INVALID',
             message:
-              'The September pilot cash handoff must be exactly $50 CAD.',
+              'The September pilot cash handoff must be exactly $100 CAD.',
           });
         }
         const now = new Date();

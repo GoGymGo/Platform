@@ -17,10 +17,26 @@ describe('production legal fallbacks', () => {
     }
   });
 
-  it('does not present unpublished fallback documents as accepted legal copy', () => {
-    assert.equal(privacyPolicy.effectiveDate, 'NOT PUBLISHED');
-    assert.equal(termsOfService.effectiveDate, 'NOT PUBLISHED');
-    assert.equal(officialContestRules.effectiveDate, 'NOT PUBLISHED');
-    assert.match(officialContestRules.intro, /No GoGymGo competition is open/);
+  it('contains complete, effective documents for every public legal screen', () => {
+    for (const document of [privacyPolicy, termsOfService, officialContestRules]) {
+      assert.equal(document.effectiveDate, 'AUGUST 3, 2026');
+      assert.ok(document.intro.length > 80);
+      assert.ok(document.sections.length >= 15);
+    }
+
+    const privacyCopy = JSON.stringify(privacyPolicy);
+    assert.match(privacyCopy, /Privacy Officer/);
+    assert.match(privacyCopy, /Access, Correction, And Complaints/i);
+    assert.match(privacyCopy, /seven days/);
+
+    const termsCopy = JSON.stringify(termsOfService);
+    assert.match(termsCopy, /Fitness Safety And No Medical Advice/i);
+    assert.match(termsCopy, /British Columbia Law And Disputes/i);
+    assert.match(termsCopy, /Nothing requires private arbitration/i);
+
+    const rulesCopy = JSON.stringify(officialContestRules);
+    assert.match(rulesCopy, /one \$100 CAD cash prize/i);
+    assert.match(rulesCopy, /Material Factors Affecting Odds/i);
+    assert.match(rulesCopy, /skill-testing question/i);
   });
 });

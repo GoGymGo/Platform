@@ -11,6 +11,8 @@ import type { Environment } from '../config/environment';
 import { DatabaseService } from '../database/database.service';
 import type { AuthenticatedPrincipal } from '../modules/auth/auth.types';
 import { getGoGymGoFirebaseApp } from '../modules/auth/firebase-admin-app';
+import { AdminLegalDocumentsService } from '../modules/legal/admin-legal-documents.service';
+import { hashLegalDocumentContent } from '../modules/legal/legal-document';
 import { AdminCompetitionConfigurationService } from '../modules/operator/admin-competition-configuration.service';
 import { AdminRegionConfigurationService } from '../modules/operator/admin-region-configuration.service';
 import { CompetitionStatusAction } from '../modules/operator/dto/admin-configuration.dto';
@@ -33,6 +35,28 @@ const boundaryVersion = 'statcan-2021-islands-trust-2026-01-v1';
 const competitionMonthKey = '2026-09';
 const applyConfiguration = process.env.APPLY_PILOT_CONFIGURATION === 'yes';
 const publishCompetition = process.env.PUBLISH_PILOT_COMPETITION === 'yes';
+
+type PublicLegalDocument = {
+  content: {
+    intro: string;
+    sections: {
+      body?: string;
+      bullets?: string[];
+      heading: string;
+    }[];
+  };
+  documentKey: string;
+  effectiveAt: string;
+  jurisdictionCode: string;
+  locale: string;
+  receiptRequirement: 'accept' | 'acknowledge' | 'none';
+  title: string;
+  version: string;
+};
+
+type PublicLegalConfiguration = {
+  documents: PublicLegalDocument[];
+};
 
 const statisticsCanadaProvinceBoundaryUrl =
   'https://geo.statcan.gc.ca/geo_wa/rest/services/2021/' +
@@ -621,6 +645,99 @@ async function loadBoundaryArtifact(): Promise<BoundaryResult> {
   };
 }
 
+async function loadPublicLegalConfiguration(): Promise<PublicLegalConfiguration> {
+  const inputPath = resolve(
+    process.cwd(),
+    'config',
+    'legal',
+    'public-ca-bc-en.json',
+  );
+  const configuration = JSON.parse(
+    await readFile(inputPath, 'utf8'),
+  ) as Partial<PublicLegalConfiguration>;
+  const documents = configuration.documents;
+  const expectedKeys = new Set([
+    'official_contest_rules',
+    'privacy_policy',
+    'terms_of_service',
+  ]);
+  if (
+    !Array.isArray(documents) ||
+    documents.length !== expectedKeys.size ||
+    documents.some(
+      (document) =>
+        !expectedKeys.delete(document.documentKey) ||
+        document.jurisdictionCode !== 'GLOBAL' ||
+        document.locale !== 'en' ||
+        !document.title?.trim() ||
+        !document.version?.trim() ||
+        !document.content?.intro?.trim() ||
+        !Array.isArray(document.content.sections) ||
+        document.content.sections.length === 0,
+    ) ||
+    expectedKeys.size !== 0
+  ) {
+    throw new Error(
+      'The public legal configuration must contain complete Privacy, Terms, and Official Rules documents.',
+    );
+  }
+  return { documents };
+}
+
+async function publishPublicLegalDocuments(
+  database: DatabaseService,
+  service: AdminLegalDocumentsService,
+  principal: AuthenticatedPrincipal,
+): Promise<string[]> {
+  const configuration = await loadPublicLegalConfiguration();
+  const published: string[] = [];
+
+  for (const document of configuration.documents) {
+    const contentSha256 = hashLegalDocumentContent(
+      document.title,
+      document.content,
+    );
+    const existing = await database.connection
+      .selectFrom('legal_documents')
+      .select(['content_sha256', 'id'])
+      .where('document_key', '=', document.documentKey)
+      .where('jurisdiction_code', '=', document.jurisdictionCode)
+      .where('locale', '=', document.locale)
+      .where('version', '=', document.version)
+      .executeTakeFirst();
+    if (existing) {
+      if (existing.content_sha256 !== contentSha256) {
+        throw new Error(
+          `Published legal version ${document.documentKey}:${document.version} does not match the approved public copy.`,
+        );
+      }
+      published.push(existing.id);
+      continue;
+    }
+
+    const result = await service.publish(
+      principal,
+      `publish-${document.documentKey}-2026-08-03-public-beta-v1`,
+      {
+        content: document.content,
+        documentKey: document.documentKey,
+        effectiveAt: document.effectiveAt,
+        jurisdictionCode: document.jurisdictionCode,
+        locale: document.locale,
+        ownerApprovalConfirmed: true,
+        reason:
+          'Publish the exact public legal copy requested and approved by the GoGymGo owner on August 3, 2026.',
+        receiptRequirement: document.receiptRequirement,
+        title: document.title,
+        version: document.version,
+      },
+    );
+    published.push(result.id);
+  }
+
+  return published;
+}
+
 async function configureRegion(
   database: DatabaseService,
   service: AdminRegionConfigurationService,
@@ -723,7 +840,7 @@ async function configurePilotReward(
   principal: AuthenticatedPrincipal,
   competitionId: string,
 ): Promise<string> {
-  const title = 'GoGymGo $50 CAD Cash Reward';
+  const title = 'GoGymGo $100 CAD Cash Reward';
   const existing = await database.connection
     .selectFrom('reward_catalog_items')
     .select(['id', 'status', 'version'])
@@ -734,19 +851,19 @@ async function configurePilotReward(
     existing ??
     (await service.create(
       principal,
-      'configure-september-2026-cash-reward-v1',
+      'configure-september-2026-100-cash-reward-v1',
       {
         availableFrom: '2026-09-01T07:00:00.000Z',
         availableUntil: '2026-10-02T07:00:00.000Z',
         competitionId,
         description:
-          'One $50 CAD cash prize sponsored by GoGymGo and fulfilled by an audited in-person handoff.',
+          'One $100 CAD cash prize sponsored by GoGymGo and fulfilled by an audited in-person handoff.',
         displayOrder: 1,
         fulfillmentInstructions:
-          'Administrator records the in-person $50 CAD handoff, timestamp and fulfillment note in GoGymGo admin.',
+          'Administrator records the in-person $100 CAD handoff, timestamp and fulfillment note in GoGymGo admin.',
         inventoryTotal: 1,
         reason:
-          'Configure the single GoGymGo-sponsored cash reward for the September 2026 pilot.',
+          'Configure the single $100 CAD GoGymGo-sponsored cash reward for the September 2026 pilot.',
         rewardType: RewardTypeDto.CASH,
         sponsorName: 'GoGymGo',
         title,
@@ -756,12 +873,31 @@ async function configurePilotReward(
     await service.changeStatus(
       principal,
       reward.id,
-      'publish-september-2026-cash-reward-v1',
+      'publish-september-2026-100-cash-reward-v1',
       {
         action: RewardCatalogStatusAction.PUBLISH,
         expectedVersion: reward.version,
         reason:
-          'Publish the single funded $50 CAD pilot reward before competition publication.',
+          'Publish the single funded $100 CAD pilot reward before competition publication.',
+      },
+    );
+  }
+  const legacyReward = await database.connection
+    .selectFrom('reward_catalog_items')
+    .select(['id', 'status', 'version'])
+    .where('competition_id', '=', competitionId)
+    .where('title', '=', 'GoGymGo $50 CAD Cash Reward')
+    .executeTakeFirst();
+  if (legacyReward?.status === 'published') {
+    await service.changeStatus(
+      principal,
+      legacyReward.id,
+      'archive-september-2026-50-cash-reward-v1',
+      {
+        action: RewardCatalogStatusAction.ARCHIVE,
+        expectedVersion: legacyReward.version,
+        reason:
+          'Replace the earlier $50 pilot reward with the owner-requested $100 CAD reward.',
       },
     );
   }
@@ -884,6 +1020,11 @@ async function main(): Promise<void> {
       database,
       app.get(ConfigService<Environment, true>),
     );
+    const legalDocumentIds = await publishPublicLegalDocuments(
+      database,
+      app.get(AdminLegalDocumentsService),
+      principal,
+    );
     const regionPolicyId = await configureRegion(
       database,
       app.get(AdminRegionConfigurationService),
@@ -914,6 +1055,9 @@ async function main(): Promise<void> {
         `(version ${publication.version}).`,
     );
     console.log(`Cash reward ${rewardId} is the sole published pilot reward.`);
+    console.log(
+      `Public legal documents configured: ${legalDocumentIds.join(', ')}.`,
+    );
   } finally {
     await app.close();
   }

@@ -24,7 +24,7 @@ V1 must prove that:
 - brands value privacy-safe verified-participation reporting; and
 - physical and coupon fulfillment can operate without consumer payment rails.
 
-No purchase is required. The pilot has one administrator-recorded $50 CAD cash
+No purchase is required. The pilot has one administrator-recorded $100 CAD cash
 reward and no wallet, bank-account, payee, payment-processor, transfer,
 stored-value, or tax-form flow.
 

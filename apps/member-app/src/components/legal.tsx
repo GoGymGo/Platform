@@ -56,9 +56,20 @@ function formatReadableLegalCopy(value: string) {
     .replace(/\bgogymgo\b/gi, 'GoGymGo')
     .replace(/\bqr\b/gi, 'QR')
     .replace(/\bface id\b/gi, 'Face ID')
+    .replace(/\btouch id\b/gi, 'Touch ID')
+    .replace(/\bcad\b/gi, 'CAD')
+    .replace(/\bbc\b/gi, 'BC')
+    .replace(/\bpdt\b/gi, 'PDT')
+    .replace(/\bai\b/gi, 'AI')
+    .replace(/\bid\b/gi, 'ID')
     .replace(/\bos\b/gi, 'OS')
-    .replace(/\bus\b/gi, 'US')
     .replace(/\bcanada\b/gi, 'Canada')
+    .replace(/\bbritish columbia\b/gi, 'British Columbia')
+    .replace(/\bvancouver island\b/gi, 'Vancouver Island')
+    .replace(/\bgulf islands\b/gi, 'Gulf Islands')
+    .replace(/\bprivacy policy\b/gi, 'Privacy Policy')
+    .replace(/\bofficial contest rules\b/gi, 'Official Contest Rules')
+    .replace(/\bweekly goal\b/gi, 'Weekly Goal')
     .replace(/\bcalifornia\b/gi, 'California');
 }
 

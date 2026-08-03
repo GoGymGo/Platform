@@ -1,3 +1,4 @@
+import { ConnectedLegalDocumentScreen } from '@/components/connectedLegalDocumentScreen';
 import { LegalDocumentScreen } from '@/components/legal';
 import { officialContestRules, type LegalDocument } from '@/constants/legal';
 import { useAppTour } from '@/state/appTour';
@@ -22,9 +23,14 @@ const browserPreviewRules: LegalDocument = {
 export default function OfficialContestRulesModal() {
   const { active: appTourActive } = useAppTour();
 
+  if (appTourActive) {
+    return <LegalDocumentScreen document={browserPreviewRules} />;
+  }
+
   return (
-    <LegalDocumentScreen
-      document={appTourActive ? browserPreviewRules : officialContestRules}
+    <ConnectedLegalDocumentScreen
+      documentKey="official_contest_rules"
+      fallback={officialContestRules}
     />
   );
 }

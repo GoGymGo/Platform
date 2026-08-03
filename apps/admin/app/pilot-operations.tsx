@@ -272,7 +272,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </label>
           <label>
             <span>AMOUNT (CENTS)</span>
-            <input defaultValue="5000" min="1" name="amountCents" required type="number" />
+            <input defaultValue="10000" min="1" name="amountCents" required type="number" />
           </label>
           <label>
             <span>CURRENCY</span>

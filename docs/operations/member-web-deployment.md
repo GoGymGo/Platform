@@ -112,11 +112,12 @@ The preview build sets `EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW=true` only for
 that export command. Store and permanent connected builds must leave the flag
 false so Metro replaces every sample-data module with its production stub.
 
-The exported preview also replaces the unfinished release legal documents with
-short, clearly labeled browser-preview notices. `audit:web-test-preview` rejects
-internal-draft wording and engineering fixture names. The separate store-release
-audit intentionally remains blocked until the real operator, contact, privacy,
-terms and contest-rule documents replace the source placeholders.
+The exported preview replaces the public release legal documents with short,
+clearly labeled browser-preview notices. `audit:web-test-preview` rejects
+internal-only wording and engineering fixture names. Release builds use the
+owner-approved Privacy Policy, Terms of Service and Official Contest Rules from
+`services/api/config/legal/public-ca-bc-en.json`; the protected configuration
+operation publishes that same source and the member app bundles it as fallback.
 
 For an optional time-limited Firebase Hosting link:
 

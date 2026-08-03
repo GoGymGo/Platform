@@ -4,8 +4,10 @@ Status: the isolated `GoGymGo-Staging` member account and its cost-controlled AW
 foundation are deployed in `ca-central-1`. The private database, application
 login, PostGIS extension, runtime secrets, GitHub OIDC role, budget, alarms, ACM
 certificate, HTTPS listener, and DNS-only `api-staging.gogymgo.com` record are
-bootstrapped. The API and worker completed their first healthy staging release.
-The first browser deployment and its UAT remain gated. Production is untouched.
+bootstrapped. The API and worker completed their first healthy staging release,
+and the browser app is live through the private S3/CloudFront path at
+`app.gogymgo.com`. Public routes, API readiness, and browser CORS are verified;
+authenticated account UAT remains gated. Production is untouched.
 
 ## Isolation gate
 

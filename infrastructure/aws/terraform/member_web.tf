@@ -19,6 +19,10 @@ resource "aws_s3_bucket_public_access_block" "member_web" {
   restrict_public_buckets = true
 }
 
+# The bucket contains only compiled public browser assets. SSE-S3 provides
+# encryption at rest without a customer-managed key's fixed and per-request
+# cost; authenticated user data remains in the separate KMS-encrypted buckets.
+#trivy:ignore:AVD-AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "member_web" {
   bucket = aws_s3_bucket.member_web.id
 
@@ -119,6 +123,10 @@ resource "aws_cloudfront_response_headers_policy" "member_web" {
   }
 }
 
+# This distribution serves immutable static assets from a private origin and
+# accepts only read methods. AWS Shield Standard remains automatic; a paid WAF
+# is a separate traffic/risk gate rather than a staging fixed-cost dependency.
+#trivy:ignore:AVD-AWS-0011
 resource "aws_cloudfront_distribution" "member_web" {
   aliases             = var.member_web_certificate_arn == null ? [] : [var.member_web_domain]
   comment             = "GoGymGo ${var.environment} browser member app"

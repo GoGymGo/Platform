@@ -1,7 +1,7 @@
 import { Rajdhani_500Medium } from '@expo-google-fonts/rajdhani/500Medium';
 import { Rajdhani_600SemiBold } from '@expo-google-fonts/rajdhani/600SemiBold';
 import { useFonts } from 'expo-font';
-import { SplashScreen, Stack, usePathname } from 'expo-router';
+import { SplashScreen, Stack } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -78,34 +78,12 @@ export default function RootLayout() {
 }
 
 function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
-  const pathname = usePathname();
   const { active } = useAppTour();
-
-  if (pathname === '/demo') {
-    return <DemoNavigation reduceMotion={reduceMotion} />;
-  }
 
   return (
     <AuthProvider key={active ? 'tour' : 'app'}>
       <AuthenticatedApp reduceMotion={reduceMotion} />
     </AuthProvider>
-  );
-}
-
-function DemoNavigation({ reduceMotion }: { reduceMotion: boolean }) {
-  return (
-    <View style={styles.navigationRoot}>
-      <StatusBar style="light" />
-      <Stack
-        initialRouteName="demo"
-        screenOptions={{
-          ...screenOptions,
-          animation: reduceMotion ? 'none' : 'fade'
-        }}
-      >
-        <Stack.Screen name="demo" />
-      </Stack>
-    </View>
   );
 }
 

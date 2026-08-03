@@ -23,9 +23,20 @@ for (const pattern of [
 
 for (const required of [
   'DEMO // SAMPLE DATA // NO ACCOUNT OR BACKEND',
-  'VANCOUVER ISLAND + GULF ISLANDS',
-  'SIMULATE QR ENTRY',
-  'one real second equals one sample minute'
+  'MAIN APP SCREEN TOUR',
+  'NEXT SCREEN ->',
+  "id: 'home'",
+  "id: 'calendar'",
+  "id: 'train'",
+  "id: 'leaderboard'",
+  "id: 'winners-circle'",
+  "id: 'rewards'",
+  "id: 'awards'",
+  "id: 'weekly-challenge'",
+  "id: 'social'",
+  "id: 'challenge-gym'",
+  "id: 'profile'",
+  "id: 'account-data'"
 ]) {
   if (!demo.includes(required)) {
     issues.push(`app/demo.tsx is missing required isolated-demo copy: ${required}`);

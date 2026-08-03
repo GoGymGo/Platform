@@ -62,12 +62,14 @@ test("home offers direct next steps without repeating long feature sections", as
 });
 
 test("mobile navigation uses native modal semantics and current-page state", async () => {
-  const [layout, desktopNavigation, mobileNavigation, globals] = await Promise.all([
+  const [layout, desktopNavigation, mobileNavigation, globals, links] = await Promise.all([
     read("app/layout.tsx"),
     read("app/components/DesktopNavigation.tsx"),
     read("app/components/MobileNavigation.tsx"),
     read("app/globals.css"),
+    read("app/site-links.ts"),
   ]);
+  const primaryNavigation = links.slice(links.indexOf("export const primaryNavigationItems"));
 
   assert.match(desktopNavigation, /usePathname/);
   assert.match(desktopNavigation, /aria-current/);
@@ -80,6 +82,13 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(globals, /\.mobile-navigation__panel\[open\][\s\S]*?display: block/);
   assert.match(globals, /\.mobile-navigation__panel::backdrop/);
   assert.match(globals, /\.desktop-navigation a \{[\s\S]*?padding: 8px 6px/);
+  assert.match(globals, /@media \(max-width: 980px\)[\s\S]*?\.desktop-navigation \{[\s\S]*?display: none/);
+  assert.doesNotMatch(globals, /@media \(max-width: 1080px\)/);
+  assert.equal((primaryNavigation.match(/label:/g) ?? []).length, 4);
+  assert.doesNotMatch(primaryNavigation, /siteLinks\.demo|label: "DEMO"/);
+  assert.match(layout, /aria-label="Open the GoGymGo app demo"/);
+  assert.match(layout, /href=\{siteLinks\.demo\}/);
+  assert.match(layout, /App demo <span aria-hidden="true">↗<\/span>/);
   assert.match(layout, /tabIndex=\{-1\}/);
 });
 
@@ -208,6 +217,10 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(globals, /\.contact-card \{[\s\S]*?min-height: 220px/);
   assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.section \{[\s\S]*?padding-block: 64px/);
   assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.info-page__header h1 \{[\s\S]*?font-size: clamp\(34px, 10vw, 40px\)[\s\S]*?overflow-wrap: normal[\s\S]*?word-break: normal/);
+  assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.footer-grid a \{[\s\S]*?min-height: 44px/);
+  assert.match(globals, /@media \(max-width: 340px\)[\s\S]*?\.site-header \.wordmark \{[\s\S]*?font-size: 18px/);
+  assert.match(globals, /@media \(max-width: 340px\)[\s\S]*?\.header-inner \{[\s\S]*?gap: 6px/);
+  assert.match(globals, /@media \(max-width: 340px\)[\s\S]*?\.header-cta \{[\s\S]*?padding-inline: 10px/);
   assert.match(globals, /\.text-link \{[\s\S]*?min-height: 44px/);
   assert.match(globals, /\.contact-grid \{[\s\S]*?repeat\(2/);
   assert.match(globals, /\.faq-item summary \{/);

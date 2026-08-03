@@ -1350,7 +1350,7 @@ h3 {
   margin-top: 36px;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 980px) {
   .desktop-navigation {
     display: none;
   }
@@ -1547,7 +1547,7 @@ h3 {
   }
 
   .footer-grid a {
-    min-height: 36px;
+    min-height: 44px;
     display: flex;
     align-items: center;
   }
@@ -1642,6 +1642,21 @@ h3 {
     padding: 0;
     border: 0;
     background: transparent;
+  }
+}
+
+@media (max-width: 340px) {
+  .site-header .wordmark {
+    font-size: 18px;
+  }
+
+  .header-inner {
+    gap: 6px;
+  }
+
+  .header-cta {
+    padding-inline: 10px;
+    font-size: 9px;
   }
 }
 

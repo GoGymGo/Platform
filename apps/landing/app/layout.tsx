@@ -127,8 +127,13 @@ export default function RootLayout({
             </div>
             <div>
               <p className="footer-label">EXPLORE</p>
+              <Link
+                aria-label="Open the GoGymGo app demo"
+                href={siteLinks.demo}
+              >
+                App demo <span aria-hidden="true">↗</span>
+              </Link>
               <Link href={siteLinks.brands}>Fitness brand partnerships</Link>
-              <Link href={siteLinks.demo}>App demo</Link>
               <Link href={siteLinks.faq}>Frequently asked questions</Link>
               <Link href={siteLinks.contact}>Contact</Link>
             </div>

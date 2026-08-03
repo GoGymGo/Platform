@@ -35,8 +35,4 @@ export const primaryNavigationItems = [
     href: siteLinks.faq,
     label: "FAQ",
   },
-  {
-    href: siteLinks.demo,
-    label: "DEMO",
-  },
 ] as const;

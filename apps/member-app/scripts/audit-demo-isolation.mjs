@@ -37,10 +37,11 @@ if (!demo.includes("Redirect href=\"/join\"")) {
 }
 
 if (
-  rootLayout.includes("pathname === '/demo'") ||
+  !rootLayout.includes("pathname === '/demo'") ||
+  !rootLayout.includes('return <Redirect href="/join"') ||
   rootLayout.includes('DemoNavigation')
 ) {
-  issues.push('app/_layout.tsx must not isolate the retired /demo route from normal navigation.');
+  issues.push('app/_layout.tsx must redirect /demo before live providers initialize.');
 }
 
 for (const [relativePath, serviceName] of [

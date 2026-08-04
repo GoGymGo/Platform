@@ -34,6 +34,7 @@ type HttpMethod = "POST" | "PUT";
 
 type ConfirmAction = {
   actionLabel: string;
+  auditReason?: string;
   description: string;
   execute: (reason: string) => Promise<void>;
   tone?: "danger" | "primary";
@@ -434,6 +435,10 @@ export function AdminDashboard({
                     action === "publish"
                       ? "Publish competition"
                       : "Cancel competition",
+                  auditReason:
+                    action === "publish"
+                      ? "Publish the approved competition after operator confirmation."
+                      : undefined,
                   description:
                     action === "publish"
                       ? `${competition.name} will become visible and joinable in the player app immediately.`
@@ -2174,12 +2179,13 @@ function ConfirmationDialog({
   const [formError, setFormError] = useState("");
   async function confirm() {
     setFormError("");
-    if (reason.trim().length < 8) {
+    const auditReason = action.auditReason ?? reason.trim();
+    if (auditReason.length < 8) {
       setFormError("Add a clear audit reason of at least 8 characters.");
       return;
     }
     try {
-      await action.execute(reason.trim());
+      await action.execute(auditReason);
       onClose();
     } catch (error) {
       setFormError(errorMessage(error));
@@ -2188,22 +2194,29 @@ function ConfirmationDialog({
   return (
     <ModalShell onClose={onClose} title={action.actionLabel} compact>
       <p className="modal-copy">{action.description}</p>
-      <Field label="REQUIRED AUDIT REASON">
-        <textarea
-          autoFocus
-          minLength={8}
-          onChange={(event) => setReason(event.target.value)}
-          placeholder="Explain why this change is authorized."
-          rows={4}
-          value={reason}
-        />
-      </Field>
+      {action.auditReason ? (
+        <p className="modal-copy audit-note">
+          Your confirmation will be recorded automatically in the audit history.
+        </p>
+      ) : (
+        <Field label="REQUIRED AUDIT REASON">
+          <textarea
+            autoFocus
+            minLength={8}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Explain why this change is authorized."
+            rows={4}
+            value={reason}
+          />
+        </Field>
+      )}
       {formError ? <p className="form-error">{formError}</p> : null}
       <div className="form-actions">
         <button className="secondary-button" onClick={onClose} type="button">
           GO BACK
         </button>
         <button
+          autoFocus={Boolean(action.auditReason)}
           className={action.tone === "danger" ? "danger-button" : "primary-button"}
           disabled={submitting}
           onClick={() => void confirm()}

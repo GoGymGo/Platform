@@ -1130,6 +1130,13 @@ td small {
   line-height: 1.55;
 }
 
+.modal-copy.audit-note {
+  border-left: 2px solid var(--cyan);
+  padding-left: 12px;
+  color: var(--cyan-soft);
+  font-size: 12px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

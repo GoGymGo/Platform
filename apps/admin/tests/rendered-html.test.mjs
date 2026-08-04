@@ -88,6 +88,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   );
   assert.match(dashboard, /name="reason"/);
   assert.match(dashboard, /ADMINISTRATIVE ACTION/);
+  assert.match(
+    dashboard,
+    /Publish the approved competition after operator confirmation/,
+  );
+  assert.match(dashboard, /recorded automatically in the audit history/);
+  assert.match(dashboard, /action\.auditReason \?\?/);
   assert.match(dashboard, /idempotency-key/);
   assert.match(dashboard, /operator\/gym-locations/);
   assert.match(dashboard, /operator\/gym-sessions/);

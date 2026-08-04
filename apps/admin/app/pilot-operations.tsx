@@ -8,6 +8,7 @@ import type {
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
 import { FormEvent, useState } from "react";
+import { parseCoordinate } from "./coordinate-input";
 import type {
   Competition,
   GymLocation,
@@ -53,30 +54,88 @@ const administrativeReason =
 
 export function PilotOperationsPanel(props: PilotOperationsProps) {
   const [poster, setPoster] = useState<GymQrCredential | null>(null);
+  const [createGymError, setCreateGymError] = useState("");
+  const [createGymSuccess, setCreateGymSuccess] = useState("");
+  const [assignGymError, setAssignGymError] = useState("");
+  const [assignGymSuccess, setAssignGymSuccess] = useState("");
 
   async function createGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await props.onCreateGym({
-      address: String(form.get("address") ?? "").trim(),
-      latitude: Number(form.get("latitude")),
-      longitude: Number(form.get("longitude")),
-      name: String(form.get("name") ?? "").trim(),
-      radiusMeters: Number(form.get("radiusMeters")),
-      reason: String(form.get("reason") ?? "").trim(),
-      regionPolicyId: String(form.get("regionPolicyId") ?? ""),
-    });
-    event.currentTarget.reset();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const name = String(form.get("name") ?? "").trim();
+    const address = String(form.get("address") ?? "").trim();
+    const regionPolicyId = String(form.get("regionPolicyId") ?? "");
+    const reason = String(form.get("reason") ?? "").trim();
+    const radiusMeters = Number(form.get("radiusMeters"));
+
+    setCreateGymError("");
+    setCreateGymSuccess("");
+
+    try {
+      if (name.length < 2) throw new Error("Gym name is required.");
+      if (
+        props.gyms.some(
+          (gym) => gym.name.trim().toLowerCase() === name.toLowerCase(),
+        )
+      ) {
+        throw new Error(
+          `${name} already exists. Select it in the assignment form below.`,
+        );
+      }
+      if (address.length < 5) {
+        throw new Error("Enter the gym's complete street address.");
+      }
+      if (!regionPolicyId) throw new Error("Choose the gym's region.");
+      if (!Number.isInteger(radiusMeters) || radiusMeters < 10 || radiusMeters > 500) {
+        throw new Error("Radius must be a whole number from 10 to 500 metres.");
+      }
+      if (reason.length < 8) {
+        throw new Error("Administrative reason must be at least 8 characters.");
+      }
+
+      await props.onCreateGym({
+        address,
+        latitude: parseCoordinate(String(form.get("latitude") ?? ""), "latitude"),
+        longitude: parseCoordinate(
+          String(form.get("longitude") ?? ""),
+          "longitude",
+        ),
+        name,
+        radiusMeters,
+        reason,
+        regionPolicyId,
+      });
+      formElement.reset();
+      setCreateGymSuccess(
+        `${name} was created and is now available in the assignment form below.`,
+      );
+    } catch (error) {
+      setCreateGymError(formErrorMessage(error));
+    }
   }
 
   async function assignGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await props.onAssignGym(
-      String(form.get("competitionId") ?? ""),
-      String(form.get("gymId") ?? ""),
-      { reason: String(form.get("reason") ?? "").trim() },
-    );
+    const competitionId = String(form.get("competitionId") ?? "");
+    const gymId = String(form.get("gymId") ?? "");
+    const reason = String(form.get("reason") ?? "").trim();
+    setAssignGymError("");
+    setAssignGymSuccess("");
+
+    try {
+      if (!competitionId) throw new Error("Choose a competition.");
+      if (!gymId) throw new Error("Choose an active gym.");
+      if (reason.length < 8) {
+        throw new Error("Administrative reason must be at least 8 characters.");
+      }
+      await props.onAssignGym(competitionId, gymId, { reason });
+      const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
+      setAssignGymSuccess(`${gymName} is assigned to the September competition.`);
+    } catch (error) {
+      setAssignGymError(formErrorMessage(error));
+    }
   }
 
   async function recordCash(event: FormEvent<HTMLFormElement>) {
@@ -104,7 +163,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </p>
           </div>
         </div>
-        <form className="pilot-form" onSubmit={createGym}>
+        <form className="pilot-form" noValidate onSubmit={createGym}>
           <label>
             <span>GYM NAME</span>
             <input name="name" required />
@@ -127,23 +186,23 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <label>
             <span>LATITUDE</span>
             <input
-              max="90"
-              min="-90"
+              aria-describedby="gym-coordinate-help"
+              inputMode="decimal"
               name="latitude"
+              placeholder={'48.123456 or 48\u00b0 7\u2032 24\u2033 N'}
               required
-              step="any"
-              type="number"
+              type="text"
             />
           </label>
           <label>
             <span>LONGITUDE</span>
             <input
-              max="180"
-              min="-180"
+              aria-describedby="gym-coordinate-help"
+              inputMode="decimal"
               name="longitude"
+              placeholder={'-123.123456 or 123\u00b0 7\u2032 24\u2033 W'}
               required
-              step="any"
-              type="number"
+              type="text"
             />
           </label>
           <label>
@@ -161,13 +220,28 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <span>ADMINISTRATIVE REASON</span>
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
+          <p className="pilot-form-help" id="gym-coordinate-help">
+            Paste either decimal coordinates or the degree/minute/second format
+            shown by your phone&rsquo;s Compass app. West is saved as a negative
+            longitude automatically.
+          </p>
           <button
             className="primary-button"
             disabled={props.submitting}
             type="submit"
           >
-            + CREATE GYM
+            {props.submitting ? "CREATING GYM..." : "+ CREATE GYM"}
           </button>
+          {createGymError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {createGymError}
+            </p>
+          ) : null}
+          {createGymSuccess ? (
+            <p aria-live="polite" className="pilot-form-message form-success">
+              {createGymSuccess}
+            </p>
+          ) : null}
         </form>
 
         {props.gyms.length === 0 ? (
@@ -201,7 +275,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <h2>Assign a gym to September</h2>
           </div>
         </div>
-        <form className="pilot-form" onSubmit={assignGym}>
+        <form className="pilot-form" noValidate onSubmit={assignGym}>
           <label>
             <span>COMPETITION</span>
             <select name="competitionId" required>
@@ -235,8 +309,18 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             disabled={props.submitting}
             type="submit"
           >
-            ASSIGN GYM
+            {props.submitting ? "ASSIGNING GYM..." : "ASSIGN GYM"}
           </button>
+          {assignGymError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {assignGymError}
+            </p>
+          ) : null}
+          {assignGymSuccess ? (
+            <p aria-live="polite" className="pilot-form-message form-success">
+              {assignGymSuccess}
+            </p>
+          ) : null}
         </form>
       </section>
 
@@ -364,6 +448,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       />
     </div>
   );
+}
+
+function formErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "The request could not be completed.";
 }
 
 function GymCard({

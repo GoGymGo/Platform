@@ -96,6 +96,9 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /operator\/partner-applications/);
   assert.match(dashboard, /operator\/cash-fulfillments/);
   assert.match(pilot, /STATIC QR PILOT/);
+  assert.match(pilot, /Compass app/);
+  assert.match(pilot, /available in the assignment form below/);
+  assert.match(pilot, /formErrorMessage/);
   assert.match(pilot, /DOWNLOAD SVG FOR PRINTING/);
   assert.match(pilot, /Sessions \+ incomplete visits/);
   assert.match(pilot, /owner|cash handoff/i);

@@ -44,6 +44,17 @@ export default function AccessibilityPage() {
             </p>
           </section>
           <section>
+            <h2>Privacy-conscious public-site measurement</h2>
+            <p>
+              To find confusing public journeys, this site counts a fixed list
+              of interactions such as app-link clicks, FAQ opens, and the first
+              use of a public form. These measurement events contain only the
+              event name, public page path, and time. They do not store cookies,
+              identifiers, eligibility-check answers, form values, precise
+              location, or member-app activity.
+            </p>
+          </section>
+          <section>
             <h2>Report a barrier</h2>
             <p>
               If something prevents you from reading, navigating, or completing

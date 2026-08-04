@@ -1,4 +1,6 @@
 export const septemberCampaign = {
+  competitionEndAt: "2026-10-01T07:00:00.000Z",
+  competitionStartAt: "2026-09-01T07:00:00.000Z",
   competitionWindow:
     "September 1, 2026 at 12:00 a.m. PDT to October 1, 2026 at 12:00 a.m. PDT",
   compactWindow: "SEP 1 → OCT 1",
@@ -30,3 +32,36 @@ export const septemberCampaign = {
   timeWindow: "12:00 a.m. PDT to 12:00 a.m. PDT",
   weeklyGoalRange: "1–7 days",
 } as const;
+
+export type SeptemberCampaignPhase = "registration" | "active" | "ended";
+
+export function getSeptemberCampaignState(now = new Date()) {
+  const currentTime = now.getTime();
+  const startTime = Date.parse(septemberCampaign.competitionStartAt);
+  const endTime = Date.parse(septemberCampaign.competitionEndAt);
+
+  if (currentTime >= endTime) {
+    return {
+      phase: "ended" as const,
+      primaryAction: "regionalUpdates" as const,
+      primaryLabel: "GET REGIONAL UPDATES",
+      statusLabel: "COMPETITION ENDED",
+    };
+  }
+
+  if (currentTime >= startTime) {
+    return {
+      phase: "active" as const,
+      primaryAction: "memberApp" as const,
+      primaryLabel: "CHECK CURRENT AVAILABILITY",
+      statusLabel: "COMPETITION ACTIVE",
+    };
+  }
+
+  return {
+    phase: "registration" as const,
+    primaryAction: "memberApp" as const,
+    primaryLabel: "JOIN SEPTEMBER BETA",
+    statusLabel: septemberCampaign.registrationLabel,
+  };
+}

@@ -87,6 +87,7 @@ export function PublicSiteFeedbackForm() {
       aria-busy={state === "submitting"}
       aria-describedby="public-site-feedback-note"
       className="interest-form feedback-form"
+      data-analytics-form="feedback_form_start"
       onSubmit={onSubmit}
     >
       <div className="field-grid">

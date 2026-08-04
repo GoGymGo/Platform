@@ -54,9 +54,162 @@
 }
 
 .hero-qualifiers a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 10px;
   color: var(--cyan);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.hero-qualifiers li:has(a) {
+  padding: 0;
+}
+
+.eligibility-section {
+  border-block: 1px solid rgba(52, 229, 232, 0.16);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(52, 229, 232, 0.08), transparent 24rem),
+    rgba(11, 17, 24, 0.48);
+}
+
+.eligibility-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(480px, 1fr);
+  align-items: start;
+  gap: 72px;
+}
+
+.eligibility-intro {
+  display: grid;
+  gap: 20px;
+}
+
+.eligibility-intro h2 {
+  margin-top: -8px;
+}
+
+.eligibility-intro > p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 17px;
+}
+
+.eligibility-availability-note {
+  padding: 18px;
+  border-left: 2px solid var(--amber);
+  background: rgba(255, 224, 102, 0.045);
+  font-size: 14px !important;
+}
+
+.eligibility-check {
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: rgba(7, 13, 18, 0.82);
+}
+
+.eligibility-question {
+  display: grid;
+  gap: 8px;
+}
+
+.eligibility-question label {
+  color: var(--text);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.eligibility-question select {
+  width: 100%;
+  height: 50px;
+  padding: 0 13px;
+  border: 1px solid rgba(52, 229, 232, 0.3);
+  border-radius: 8px;
+  outline: none;
+  color: var(--text);
+  background: rgba(7, 13, 18, 0.92);
+}
+
+.eligibility-question select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(52, 229, 232, 0.13);
+}
+
+.eligibility-result {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: rgba(52, 229, 232, 0.05);
+}
+
+.eligibility-result--not-eligible {
+  border-color: rgba(255, 224, 102, 0.5);
+  background: rgba(255, 224, 102, 0.05);
+}
+
+.eligibility-result h3 {
+  font-size: 17px;
+}
+
+.eligibility-result p {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.eligibility-result .button {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.eligibility-result__actions,
+.transparency-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.transparency-section {
+  border-block: 1px solid rgba(255, 45, 155, 0.16);
+  background: radial-gradient(circle at 85% 25%, rgba(255, 45, 155, 0.07), transparent 28rem);
+}
+
+.transparency-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 44px;
+}
+
+.transparency-card {
+  min-height: 176px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(11, 17, 24, 0.75);
+}
+
+.transparency-card h3 {
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.transparency-card p {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.transparency-actions {
+  margin-top: 24px;
 }
 
 .pilot-console {
@@ -263,6 +416,15 @@
   .pilot-console {
     width: min(100%, 680px);
   }
+
+  .eligibility-layout {
+    grid-template-columns: 1fr;
+    gap: 38px;
+  }
+
+  .eligibility-intro {
+    max-width: 760px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -312,6 +474,31 @@
 
   .hero-qualifiers li {
     min-height: 44px;
+  }
+
+  .eligibility-check {
+    padding: 22px 18px;
+  }
+
+  .eligibility-result .button,
+  .eligibility-result__actions,
+  .transparency-actions {
+    width: 100%;
+  }
+
+  .eligibility-result__actions,
+  .transparency-actions {
+    display: grid;
+  }
+
+  .transparency-grid {
+    grid-template-columns: 1fr;
+    margin-top: 32px;
+  }
+
+  .transparency-card {
+    min-height: 0;
+    padding: 22px;
   }
 
   .pilot-console__header {

@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
+import { AppLink } from "./components/AppLink";
 import { DesktopNavigation } from "./components/DesktopNavigation";
 import { MobileNavigation } from "./components/MobileNavigation";
-import { septemberCampaign } from "./campaign";
+import { PublicSiteAnalytics } from "./components/PublicSiteAnalytics";
 import { siteLinks } from "./site-links";
 import "./globals.css";
 import "./experience.css";
@@ -19,6 +21,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const socialImage = metadataBase
     ? new URL("/og.png", metadataBase).toString()
     : undefined;
+  const campaignState = getSeptemberCampaignState();
+  const description =
+    campaignState.phase === "ended"
+      ? `Review the September 2026 GoGymGo beta and request updates about future availability on ${septemberCampaign.regionName}.`
+      : `Join the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`;
+  const socialDescription =
+    campaignState.phase === "ended"
+      ? "The September 2026 beta has ended. Review the pilot and request future regional updates."
+      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`;
 
   return {
     metadataBase,
@@ -26,8 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
       default: "GoGymGo — Make consistency count",
       template: "%s | GoGymGo",
     },
-    description:
-      `Join the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`,
+    description,
     applicationName: "GoGymGo",
     keywords: [
       "gym motivation",
@@ -38,8 +48,7 @@ export async function generateMetadata(): Promise<Metadata> {
     ],
     openGraph: {
       title: "GoGymGo — Make consistency count",
-      description:
-        `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`,
+      description: socialDescription,
       type: "website",
       siteName: "GoGymGo",
       images: socialImage
@@ -56,8 +65,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "GoGymGo — Make consistency count",
-      description:
-        `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`,
+      description: socialDescription,
       images: socialImage ? [socialImage] : undefined,
     },
     alternates: {
@@ -80,6 +88,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const campaignState = getSeptemberCampaignState();
+  const memberRegistrationAvailable =
+    campaignState.primaryAction === "memberApp";
+
   return (
     <html lang="en">
       <body>
@@ -95,15 +107,30 @@ export default function RootLayout({
             </Link>
             <DesktopNavigation />
             <MobileNavigation />
-            <Link
-              className="header-cta button-primary"
-              href={siteLinks.memberApp}
-              aria-label="Join the September 2026 beta in the GoGymGo app"
-            >
-              <span className="header-cta-long">JOIN SEPTEMBER BETA</span>
-              <span className="header-cta-short">JOIN BETA</span>
-              <b aria-hidden="true">→</b>
-            </Link>
+            {memberRegistrationAvailable ? (
+              <AppLink
+                analyticsEvent="member_app_click"
+                className="header-cta button-primary"
+                href={siteLinks.memberApp}
+              >
+                <span className="header-cta-long">
+                  {campaignState.primaryLabel}
+                </span>
+                <span className="header-cta-short">
+                  {campaignState.phase === "active" ? "CHECK APP" : "JOIN BETA"}
+                </span>
+              </AppLink>
+            ) : (
+              <Link
+                className="header-cta button-primary"
+                data-analytics-event="regional_updates_click"
+                href={siteLinks.regionalUpdates}
+              >
+                <span className="header-cta-long">GET REGIONAL UPDATES</span>
+                <span className="header-cta-short">UPDATES</span>
+                <b aria-hidden="true">→</b>
+              </Link>
+            )}
           </div>
         </header>
         <div id="main-content" tabIndex={-1}>
@@ -121,37 +148,56 @@ export default function RootLayout({
             </div>
             <div>
               <p className="footer-label">GYM GOERS</p>
-              <Link href={siteLinks.memberApp}>September beta registration</Link>
-              <Link href={siteLinks.regionalUpdates}>Regional launch updates</Link>
+              {memberRegistrationAvailable ? (
+                <AppLink
+                  analyticsEvent="member_app_click"
+                  href={siteLinks.memberApp}
+                >
+                  September beta registration
+                </AppLink>
+              ) : (
+                <Link href={siteLinks.gymGoers}>September beta details</Link>
+              )}
+              <Link
+                data-analytics-event="regional_updates_click"
+                href={siteLinks.regionalUpdates}
+              >
+                Regional launch updates
+              </Link>
               <Link href="/#how-it-works">How GoGymGo works</Link>
             </div>
             <div>
               <p className="footer-label">EXPLORE</p>
+              <AppLink analyticsEvent="demo_click" href={siteLinks.demo}>
+                App demo
+              </AppLink>
               <Link
-                aria-label="Open the GoGymGo app demo"
-                href={siteLinks.demo}
+                data-analytics-event="brand_partnership_click"
+                href={siteLinks.brands}
               >
-                App demo <span aria-hidden="true">↗</span>
+                Fitness brand partnerships
               </Link>
-              <Link href={siteLinks.brands}>Fitness brand partnerships</Link>
               <Link href={siteLinks.faq}>Frequently asked questions</Link>
               <Link href={siteLinks.contact}>Contact</Link>
             </div>
             <div>
               <p className="footer-label">LEGAL & ACCESS</p>
-              <Link href={siteLinks.privacy}>Privacy Policy</Link>
-              <Link href={siteLinks.terms}>Terms of Service</Link>
-              <Link href={siteLinks.officialRules}>Official Contest Rules</Link>
+              <AppLink href={siteLinks.privacy}>Privacy Policy</AppLink>
+              <AppLink href={siteLinks.terms}>Terms of Service</AppLink>
+              <AppLink href={siteLinks.officialRules}>
+                Official Contest Rules
+              </AppLink>
               <Link href={siteLinks.accessibility}>Accessibility</Link>
             </div>
           </div>
           <div className="shell footer-bottom">
             <span>© {new Date().getFullYear()} GoGymGo</span>
-            <Link href={siteLinks.officialRules}>
+            <AppLink href={siteLinks.officialRules}>
               NO PURCHASE REQUIRED // ELIGIBILITY AND REGIONAL RULES APPLY
-            </Link>
+            </AppLink>
           </div>
         </footer>
+        <PublicSiteAnalytics />
       </body>
     </html>
   );

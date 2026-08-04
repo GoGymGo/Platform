@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AppLink } from "../components/AppLink";
 import { PublicSiteFeedbackForm } from "../components/PublicSiteFeedbackForm";
 import { siteLinks } from "../site-links";
 
@@ -12,18 +13,22 @@ export const metadata: Metadata = {
 
 const contactPaths = [
   {
+    analyticsEvent: "regional_updates_click",
     copy: "Join the free regional update list for launch and availability news. This does not register you for a competition.",
     href: `${siteLinks.gymGoers}#gym-form`,
     label: "OPEN REGIONAL UPDATE FORM",
     title: "Gym-goer updates",
   },
   {
+    analyticsEvent: "brand_partnership_click",
     copy: "Tell us about the region, timing, inventory, and campaign model your fitness brand is exploring.",
     href: `${siteLinks.brands}#brand-form`,
     label: "OPEN PARTNERSHIP FORM",
     title: "Fitness brand partnerships",
   },
   {
+    analyticsEvent: "member_app_click",
+    appBound: true,
     copy: "Account, eligibility, legal-document, workout, or competition support belongs inside the member experience where the relevant state is available.",
     href: siteLinks.memberApp,
     label: "OPEN THE MEMBER APP",
@@ -55,9 +60,25 @@ export default function ContactPage() {
             <article className="contact-card" key={path.title}>
               <h2>{path.title}</h2>
               <p>{path.copy}</p>
-              <Link className="text-link" href={path.href}>
-                {path.label} <span aria-hidden="true">→</span>
-              </Link>
+              {"appBound" in path && path.appBound ? (
+                <AppLink
+                  analyticsEvent={path.analyticsEvent}
+                  className="text-link"
+                  href={path.href}
+                >
+                  {path.label}
+                </AppLink>
+              ) : (
+                <Link
+                  className="text-link"
+                  data-analytics-event={
+                    "analyticsEvent" in path ? path.analyticsEvent : undefined
+                  }
+                  href={path.href}
+                >
+                  {path.label} <span aria-hidden="true">→</span>
+                </Link>
+              )}
             </article>
           ))}
         </div>

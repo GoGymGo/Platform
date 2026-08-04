@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { septemberCampaign } from "../campaign";
+import { getSeptemberCampaignState, septemberCampaign } from "../campaign";
+import { AppLink } from "../components/AppLink";
 import { GymGoerForm } from "../components/InterestForms";
 import { siteLinks } from "../site-links";
 
@@ -31,25 +32,41 @@ const points = [
 ];
 
 export default function GymGoersPage() {
+  const campaignState = getSeptemberCampaignState();
+  const memberRegistrationAvailable =
+    campaignState.primaryAction === "memberApp";
+
   return (
     <main className="audience-page">
       <div className="shell audience-hero">
         <div className="audience-copy">
           <p className="eyebrow campaign-status">
             <span>SEPTEMBER 2026 BETA</span>
-            <span className="campaign-status__state">
+            <span
+              className={`campaign-status__state campaign-status__state--${campaignState.phase}`}
+            >
               <span className="status-dot" />
-              {septemberCampaign.registrationLabel}
+              {campaignState.statusLabel}
             </span>
           </p>
           <h1>
             Join now—or hear when your region is <span>next.</span>
           </h1>
           <p>
-            The September 2026 beta is limited to eligible gym-goers age{" "}
-            {septemberCampaign.minimumAge}+ on {septemberCampaign.regionName}.
-            If that is you, register in the app. Everywhere else, join the free
-            regional update list below.
+            {campaignState.phase === "ended" ? (
+              <>
+                The September 2026 beta has ended. Review the published pilot
+                details and join the free regional update list for future
+                availability.
+              </>
+            ) : (
+              <>
+                The September 2026 beta is limited to eligible gym-goers age{" "}
+                {septemberCampaign.minimumAge}+ on {septemberCampaign.regionName}.
+                If that is you, register in the app. Everywhere else, join the
+                free regional update list below.
+              </>
+            )}
           </p>
           <dl className="audience-summary">
             <div>
@@ -62,12 +79,32 @@ export default function GymGoersPage() {
             </div>
           </dl>
           <div className="audience-actions">
-            <Link className="button button-primary" href={siteLinks.memberApp}>
-              JOIN SEPTEMBER BETA <span aria-hidden="true">→</span>
-            </Link>
-            <Link className="text-link" href="#gym-form">
-              GET REGIONAL UPDATES <span aria-hidden="true">↓</span>
-            </Link>
+            {memberRegistrationAvailable ? (
+              <>
+                <AppLink
+                  analyticsEvent="member_app_click"
+                  className="button button-primary"
+                  href={siteLinks.memberApp}
+                >
+                  {campaignState.primaryLabel}
+                </AppLink>
+                <Link
+                  className="text-link"
+                  data-analytics-event="regional_updates_click"
+                  href="#gym-form"
+                >
+                  GET REGIONAL UPDATES <span aria-hidden="true">↓</span>
+                </Link>
+              </>
+            ) : (
+              <Link
+                className="button button-primary"
+                data-analytics-event="regional_updates_click"
+                href="#gym-form"
+              >
+                GET REGIONAL UPDATES <span aria-hidden="true">↓</span>
+              </Link>
+            )}
           </div>
         </div>
 

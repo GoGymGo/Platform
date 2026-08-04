@@ -65,3 +65,28 @@ export const publicSiteFeedback = sqliteTable(
     ),
   ],
 );
+
+export const publicSiteEvents = sqliteTable(
+  "public_site_events",
+  {
+    id: text("id").primaryKey(),
+    eventName: text("event_name", {
+      enum: [
+        "member_app_click",
+        "regional_updates_click",
+        "brand_partnership_click",
+        "demo_click",
+        "faq_open",
+        "gym_form_start",
+        "brand_form_start",
+        "feedback_form_start",
+        "eligibility_check_completed",
+      ],
+    }).notNull(),
+    path: text("path").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("idx_public_site_events_created").on(table.createdAt),
+  ],
+);

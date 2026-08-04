@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { septemberCampaign } from "../campaign";
+import { getSeptemberCampaignState, septemberCampaign } from "../campaign";
+import { AppLink } from "../components/AppLink";
 import { siteLinks } from "../site-links";
 
 export const metadata: Metadata = {
@@ -65,7 +66,9 @@ const questions = [
       <p>
         Joining is free and no purchase is required. Eligibility, regional
         rules, published competition terms, and approved partner-gym access
-        still apply. Read the <Link href={siteLinks.officialRules}>Official Contest Rules</Link> before joining.
+        still apply. Read the{" "}
+        <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
+        before joining.
       </p>
     ),
     question: "Does GoGymGo cost money to join?",
@@ -111,7 +114,8 @@ const questions = [
         affect Prize Draw Entry weight, but category
         placement never guarantees the reward. An audited draw determines the
         reward winner after results settle. The published{" "}
-        <Link href={siteLinks.officialRules}>Official Contest Rules</Link> control
+        <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
+        control
         if any summary differs.
       </p>
     ),
@@ -149,6 +153,10 @@ const faqGroups = [
 ] as const;
 
 export default function FaqPage() {
+  const campaignState = getSeptemberCampaignState();
+  const memberRegistrationAvailable =
+    campaignState.primaryAction === "memberApp";
+
   return (
     <main className="info-page">
       <div className="shell info-page__shell">
@@ -160,6 +168,14 @@ export default function FaqPage() {
             regional updates, verified workouts, rewards, and partnerships.
           </p>
         </header>
+
+        <nav aria-label="FAQ sections" className="faq-jump-nav">
+          {faqGroups.map((group) => (
+            <Link href={`#faq-${group.id}`} key={group.id}>
+              {group.label}
+            </Link>
+          ))}
+        </nav>
 
         <div className="faq-groups">
           {faqGroups.map((group) => (
@@ -192,13 +208,31 @@ export default function FaqPage() {
             <h2 id="faq-next-step">Choose the path that matches you.</h2>
           </div>
           <div className="info-actions">
-            <Link className="button button-primary" href={siteLinks.memberApp}>
-              JOIN SEPTEMBER BETA →
-            </Link>
-            <Link className="button button-secondary" href={siteLinks.regionalUpdates}>
+            {memberRegistrationAvailable ? (
+              <AppLink
+                analyticsEvent="member_app_click"
+                className="button button-primary"
+                href={siteLinks.memberApp}
+              >
+                {campaignState.primaryLabel}
+              </AppLink>
+            ) : null}
+            <Link
+              className={
+                memberRegistrationAvailable
+                  ? "button button-secondary"
+                  : "button button-primary"
+              }
+              data-analytics-event="regional_updates_click"
+              href={siteLinks.regionalUpdates}
+            >
               GET REGIONAL UPDATES →
             </Link>
-            <Link className="button button-secondary" href={siteLinks.brands}>
+            <Link
+              className="button button-secondary"
+              data-analytics-event="brand_partnership_click"
+              href={siteLinks.brands}
+            >
               EXPLORE PARTNERSHIPS →
             </Link>
           </div>

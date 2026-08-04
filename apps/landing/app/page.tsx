@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { septemberCampaign } from "./campaign";
+import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
+import { AppLink } from "./components/AppLink";
+import { EligibilityCheck } from "./components/EligibilityCheck";
 import { ProductScreens } from "./components/ProductScreens";
 import { siteLinks } from "./site-links";
 
@@ -21,6 +23,25 @@ const steps = [
   },
 ];
 
+const transparencyFacts = [
+  {
+    title: "ONE DISCLOSED REWARD",
+    copy: `The September pilot has one ${septemberCampaign.reward} reward sponsored by ${septemberCampaign.rewardSponsor}. No outside brand sponsors the current reward.`,
+  },
+  {
+    title: "NO PURCHASE REQUIRED",
+    copy: "Joining is free. Age, location, published legal terms, competition availability, and approved partner-gym access still apply.",
+  },
+  {
+    title: "VERIFICATION BEFORE CREDIT",
+    copy: `A workout stays pending until the submitted entry scan, exit scan, fresh location readings, and ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed.`,
+  },
+  {
+    title: "CURRENT GYM STATUS",
+    copy: "A public partner-gym directory is not published. The member app is authoritative for active GoGymGo posters and current availability.",
+  },
+] as const;
+
 const structuredData = [
   {
     "@context": "https://schema.org",
@@ -39,7 +60,7 @@ const structuredData = [
   },
 ];
 
-function SeptemberChallengePanel() {
+function SeptemberChallengePanel({ statusLabel }: { statusLabel: string }) {
   return (
     <aside
       aria-label="September 2026 beta challenge details"
@@ -47,7 +68,7 @@ function SeptemberChallengePanel() {
     >
       <div className="pilot-console__header">
         <span>SEPTEMBER 2026 BETA</span>
-        <b>{septemberCampaign.registrationLabel}</b>
+        <b>{statusLabel}</b>
       </div>
       <div className="pilot-console__reward">
         <span>ONE PUBLISHED REWARD</span>
@@ -87,6 +108,10 @@ function SeptemberChallengePanel() {
 }
 
 export default function Home() {
+  const campaignState = getSeptemberCampaignState();
+  const memberRegistrationAvailable =
+    campaignState.primaryAction === "memberApp";
+
   return (
     <main className="landing-page">
       <script
@@ -98,44 +123,75 @@ export default function Home() {
         <div className="hero-copy">
           <p className="eyebrow campaign-status">
             <span>SEPTEMBER 2026 BETA</span>
-            <span className="campaign-status__state">
+            <span
+              className={`campaign-status__state campaign-status__state--${campaignState.phase}`}
+            >
               <span className="status-dot" />
-              {septemberCampaign.registrationLabel}
+              {campaignState.statusLabel}
             </span>
           </p>
           <h1>
             Make consistency <span>count.</span>
           </h1>
           <p className="hero-lede">
-            Eligible gym-goers age {septemberCampaign.minimumAge}+ on{" "}
-            {septemberCampaign.regionName} can join the free September beta and
-            compete for one {septemberCampaign.reward} reward sponsored by{" "}
-            {septemberCampaign.rewardSponsor}.
+            {campaignState.phase === "ended" ? (
+              <>
+                The September 2026 beta has ended. Review how the pilot worked
+                or request updates about future availability in your region.
+              </>
+            ) : (
+              <>
+                Eligible gym-goers age {septemberCampaign.minimumAge}+ on{" "}
+                {septemberCampaign.regionName} can join the free September beta
+                and compete for one {septemberCampaign.reward} reward sponsored
+                by {septemberCampaign.rewardSponsor}.
+              </>
+            )}
           </p>
           <div className="hero-actions">
-            <Link
-              className="button button-primary"
-              href={siteLinks.memberApp}
-            >
-              JOIN THE SEPTEMBER BETA <span aria-hidden="true">→</span>
-            </Link>
-            <Link
-              className="button button-secondary"
-              href={siteLinks.regionalUpdates}
-            >
-              GET REGIONAL UPDATES <span aria-hidden="true">→</span>
-            </Link>
+            {memberRegistrationAvailable ? (
+              <AppLink
+                analyticsEvent="member_app_click"
+                className="button button-primary"
+                href={siteLinks.memberApp}
+              >
+                {campaignState.primaryLabel}
+              </AppLink>
+            ) : (
+              <Link
+                className="button button-primary"
+                data-analytics-event="regional_updates_click"
+                href={siteLinks.regionalUpdates}
+              >
+                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
+              </Link>
+            )}
+            {memberRegistrationAvailable ? (
+              <Link
+                className="button button-secondary"
+                data-analytics-event="regional_updates_click"
+                href={siteLinks.regionalUpdates}
+              >
+                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
+              </Link>
+            ) : (
+              <Link className="button button-secondary" href={siteLinks.faq}>
+                REVIEW SEPTEMBER DETAILS <span aria-hidden="true">→</span>
+              </Link>
+            )}
           </div>
           <ul aria-label="Important eligibility notes" className="hero-qualifiers">
             <li>NO PURCHASE REQUIRED</li>
             <li>APPROVED PARTNER GYM REQUIRED</li>
             <li>REGIONAL RULES APPLY</li>
             <li>
-              <Link href={siteLinks.officialRules}>READ OFFICIAL RULES</Link>
+              <AppLink href={siteLinks.officialRules}>
+                READ OFFICIAL RULES
+              </AppLink>
             </li>
           </ul>
         </div>
-        <SeptemberChallengePanel />
+        <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
       </section>
 
       <section
@@ -162,6 +218,8 @@ export default function Home() {
         </div>
       </section>
 
+      {campaignState.phase !== "ended" ? <EligibilityCheck /> : null}
+
       <section className="section shell" id="how-it-works">
         <div className="section-heading">
           <div>
@@ -184,6 +242,40 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="section transparency-section" id="pilot-transparency">
+        <div className="shell">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">PILOT TRANSPARENCY // PUBLISHED FACTS</p>
+              <h2>What is fixed—and what is confirmed in the app.</h2>
+            </div>
+            <p>
+              These are the public September facts. The published Official
+              Contest Rules control if a summary differs.
+            </p>
+          </div>
+          <div className="transparency-grid">
+            {transparencyFacts.map((fact) => (
+              <article className="transparency-card" key={fact.title}>
+                <h3>{fact.title}</h3>
+                <p>{fact.copy}</p>
+              </article>
+            ))}
+          </div>
+          <div className="transparency-actions">
+            <AppLink
+              className="button button-secondary"
+              href={siteLinks.officialRules}
+            >
+              READ OFFICIAL CONTEST RULES
+            </AppLink>
+            <AppLink className="text-link" href={siteLinks.privacy}>
+              REVIEW THE PRIVACY POLICY
+            </AppLink>
+          </div>
+        </div>
+      </section>
+
       <ProductScreens />
 
       <section className="section brand-section brand-teaser-section">
@@ -198,7 +290,11 @@ export default function Home() {
               preparing future, approved regional campaigns with fitness brands
               that can supply real product or coupon inventory.
             </p>
-            <Link className="button button-pink" href={siteLinks.brands}>
+            <Link
+              className="button button-pink"
+              data-analytics-event="brand_partnership_click"
+              href={siteLinks.brands}
+            >
               EXPLORE A FOUNDING PARTNERSHIP <span aria-hidden="true">→</span>
             </Link>
           </div>
@@ -211,13 +307,31 @@ export default function Home() {
           <h2>Eligible now, waiting for your region, or representing a brand?</h2>
         </div>
         <div className="final-actions">
-          <Link className="button button-primary" href={siteLinks.memberApp}>
-            JOIN SEPTEMBER BETA <span aria-hidden="true">→</span>
-          </Link>
-          <Link className="button button-secondary" href={siteLinks.regionalUpdates}>
+          {memberRegistrationAvailable ? (
+            <AppLink
+              analyticsEvent="member_app_click"
+              className="button button-primary"
+              href={siteLinks.memberApp}
+            >
+              {campaignState.primaryLabel}
+            </AppLink>
+          ) : null}
+          <Link
+            className={
+              memberRegistrationAvailable
+                ? "button button-secondary"
+                : "button button-primary"
+            }
+            data-analytics-event="regional_updates_click"
+            href={siteLinks.regionalUpdates}
+          >
             GET REGIONAL UPDATES <span aria-hidden="true">→</span>
           </Link>
-          <Link className="button button-secondary" href={siteLinks.brands}>
+          <Link
+            className="button button-secondary"
+            data-analytics-event="brand_partnership_click"
+            href={siteLinks.brands}
+          >
             EXPLORE PARTNERSHIPS <span aria-hidden="true">→</span>
           </Link>
         </div>

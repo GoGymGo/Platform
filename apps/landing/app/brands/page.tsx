@@ -43,7 +43,11 @@ export default function BrandsPage() {
             brand.
           </p>
           <div className="audience-actions">
-            <Link className="button button-pink" href="#brand-form">
+            <Link
+              className="button button-pink"
+              data-analytics-event="brand_partnership_click"
+              href="#brand-form"
+            >
               REQUEST A PARTNERSHIP REVIEW <span aria-hidden="true">↓</span>
             </Link>
           </div>

@@ -247,7 +247,7 @@ export function GymGoerForm() {
   );
 }
 
-export function BrandForm() {
+export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }) {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -285,14 +285,14 @@ export function BrandForm() {
   return (
     <form
       aria-busy={state === "submitting"}
-      aria-describedby="brand-form-note"
+      aria-describedby="partner-form-note"
       className="interest-form"
       data-analytics-form="brand_form_start"
       onSubmit={onSubmit}
     >
       <fieldset className="form-section">
         <legend>
-          <span>01</span> CONTACT &amp; COMPANY
+          <span>01</span> CONTACT &amp; ORGANIZATION
         </legend>
         <div className="field-grid">
         <div className="field">
@@ -307,13 +307,13 @@ export function BrandForm() {
           />
         </div>
         <div className="field">
-          <label htmlFor="companyName">COMPANY *</label>
+          <label htmlFor="companyName">GYM OR COMPANY *</label>
           <input
             autoComplete="organization"
             id="companyName"
             maxLength={140}
             name="companyName"
-            placeholder="Company name"
+            placeholder="Gym or company name"
             required
           />
         </div>
@@ -364,7 +364,7 @@ export function BrandForm() {
           <div className="field">
             <label htmlFor="partnershipInterest">PARTNERSHIP INTEREST *</label>
             <select
-              defaultValue=""
+              defaultValue={defaultInterest}
               id="partnershipInterest"
               name="partnershipInterest"
               required
@@ -373,9 +373,10 @@ export function BrandForm() {
                 Select one
               </option>
               <option value="regional-sponsor">Regional campaign sponsor</option>
-              <option value="brand-rewards">Product or coupon inventory</option>
+              <option value="brand-partnership">Fitness brand / reward partner</option>
+              <option value="brand-rewards">Product or prize inventory</option>
               <option value="creator-campaign">Creator workout campaign</option>
-              <option value="gym-partnership">Partner gym network</option>
+              <option value="gym-partnership">Gym operator / partner location</option>
               <option value="explore">Explore the right fit</option>
             </select>
           </div>
@@ -431,7 +432,7 @@ export function BrandForm() {
           ? "SENDING…"
           : "REQUEST A PARTNERSHIP REVIEW →"}
       </button>
-      <p className="fine-print" id="brand-form-note">
+      <p className="fine-print" id="partner-form-note">
         Submitting this form does not create a campaign or agreement. Placements,
         rewards, creative, reporting, claims, and regional terms require review
         and written approval.

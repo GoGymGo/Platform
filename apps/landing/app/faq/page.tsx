@@ -7,7 +7,7 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/faq" },
   description:
-    "Answers about GoGymGo September beta eligibility, regional updates, Weekly Goals, verified workouts, rewards, and brand partnerships.",
+    "Answers about GoGymGo September beta eligibility, regional updates, Weekly Goals, verified workouts, rewards, gyms, and brand partnerships.",
   title: "Frequently asked questions",
 };
 
@@ -101,7 +101,8 @@ const questions = [
         Your Weekly Goal is the number of verified workout days you commit to in
         each scoring week. September participants choose from{" "}
         {septemberCampaign.weeklyGoalRange}, and the selection is locked after
-        enrollment.
+        enrollment. Complete that goal to bank the week’s Prize Draw Entries; a
+        higher completed goal earns more base entries.
       </p>
     ),
     question: "What is a Weekly Goal?",
@@ -109,17 +110,59 @@ const questions = [
   {
     answer: (
       <p>
+        Goal Score counts approved gym days: one approved workout per regional
+        calendar day adds {septemberCampaign.goalScorePerVerifiedDay} point.
+        Prize Draw Entries are separate and are banked only after you complete
+        the Weekly Goal you selected.
+      </p>
+    ),
+    question: "How are Goal Score and Prize Draw Entries different?",
+  },
+  {
+    answer: (
+      <p>
+        If you miss your selected Weekly Goal, that scoring week settles at zero
+        Prize Draw Entries. Approved days still remain part of your Goal Score,
+        but they do not create settled entries for a missed week.
+      </p>
+    ),
+    question: "What happens if I miss a Weekly Goal?",
+  },
+  {
+    answer: (
+      <p>
+        Complete your selected goal in all {septemberCampaign.scoringWeekCount}
+        scoring weeks to unlock the {septemberCampaign.perfectMonthMultiplier}×
+        Perfect Month multiplier on eligible entries after settlement. More
+        entries improve relative odds but never guarantee the reward.
+      </p>
+    ),
+    question: "How does the Perfect Month multiplier work?",
+  },
+  {
+    answer: (
+      <p>
         The September pilot has one {septemberCampaign.reward} cash reward
         sponsored by {septemberCampaign.rewardSponsor}. Verified activity can
-        affect Prize Draw Entry weight, but category
-        placement never guarantees the reward. An audited draw determines the
-        reward winner after results settle. The published{" "}
+        affect Prize Draw Entries, but having more entries never guarantees the
+        reward. An audited draw determines the reward winner after results
+        settle. The published{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
         control
         if any summary differs.
       </p>
     ),
     question: "What can September participants win?",
+  },
+  {
+    answer: (
+      <p>
+        Gym operators can request a review for one or more locations. GoGymGo
+        reviews the region, poster placement, member flow, operating support,
+        and verification requirements before any location is activated.
+      </p>
+    ),
+    question: "How can a gym become a partner?",
   },
   {
     answer: (
@@ -143,12 +186,12 @@ const faqGroups = [
   {
     id: "workouts",
     label: "WORKOUTS & WEEKLY GOALS",
-    questions: questions.slice(5, 8),
+    questions: questions.slice(5, 11),
   },
   {
     id: "rewards",
     label: "REWARDS & PARTNERSHIPS",
-    questions: questions.slice(8),
+    questions: questions.slice(11),
   },
 ] as const;
 
@@ -231,7 +274,7 @@ export default function FaqPage() {
             <Link
               className="button button-secondary"
               data-analytics-event="brand_partnership_click"
-              href={siteLinks.brands}
+              href={siteLinks.partners}
             >
               EXPLORE PARTNERSHIPS →
             </Link>

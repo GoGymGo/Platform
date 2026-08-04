@@ -15,19 +15,19 @@ export const metadata: Metadata = {
 const points = [
   {
     title: "CHOOSE 1–7 DAYS",
-    copy: "Set a Weekly Goal that matches your real routine. Your competition goal is locked after enrollment.",
+    copy: "Set a Weekly Goal that matches your routine. A higher completed goal earns more base Prize Draw Entries.",
   },
   {
-    title: "SCAN AT A PARTNER GYM",
-    copy: "Scan an approved gym poster on entry with a fresh eligible location reading.",
+    title: "BUILD GOAL SCORE",
+    copy: "One approved partner-gym workout per regional calendar day adds 1 point to Goal Score.",
   },
   {
-    title: "TRAIN FOR 30+ MINUTES",
-    copy: "Scan the same poster again after the authoritative 30-minute minimum to submit the workout for review.",
+    title: "BANK WEEKLY ENTRIES",
+    copy: "Complete your Weekly Goal to bank that week’s Prize Draw Entries. Miss it and the week settles at zero entries.",
   },
   {
-    title: "FOLLOW THE RESULT",
-    copy: "The app keeps pending review, verified credit, standings, and published results clearly separated.",
+    title: "COMPLETE ALL 4 WEEKS",
+    copy: "Meet your goal in every scoring week to unlock the 10× Perfect Month multiplier on eligible entries. Entries improve odds but never guarantee the reward.",
   },
 ];
 
@@ -129,8 +129,8 @@ export default function GymGoersPage() {
           aria-labelledby="gym-details-title"
           className="audience-details"
         >
-          <p className="eyebrow">WHAT A VERIFIED WORKOUT INVOLVES</p>
-          <h2 id="gym-details-title">A clear path from goal to result.</h2>
+          <p className="eyebrow">FROM VERIFIED DAY TO PRIZE DRAW ENTRIES</p>
+          <h2 id="gym-details-title">Know what each visit earns.</h2>
           <div className="audience-points">
             {points.map((point) => (
               <article className="audience-point" key={point.title}>

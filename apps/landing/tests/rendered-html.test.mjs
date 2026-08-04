@@ -63,7 +63,8 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
   assert.doesNotMatch(page, /brand-console|landing-feature-grid|proof-strip|brand-teaser-section/);
-  assert.match(page, /GET FUTURE-REGION UPDATES/);
+  assert.match(page, /GET REGIONAL UPDATES/);
+  assert.doesNotMatch(page, /GET FUTURE-REGION UPDATES/);
   assert.match(page, /PARTNER WITH GOGYMGO/);
   assert.match(page, /siteLinks\.partnerApplication/);
   assert.match(page, /<h2>Choose your next step\.<\/h2>/);
@@ -80,7 +81,7 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(productScreens, /tabIndex=\{0\}/);
   assert.equal((productScreens.match(/src="\/app\//g) ?? []).length, 1);
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
-  assert.match(layout, /href=\{siteLinks\.regionalUpdates\}[\s\S]*?Regional launch updates/);
+  assert.match(layout, /href=\{siteLinks\.regionalUpdates\}[\s\S]*?Regional updates/);
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
   assert.doesNotMatch(layout, /Administrator sign-in|admin-control/);
@@ -104,6 +105,41 @@ test("home explains Goal Score and Prize Draw Entries without conflating them", 
   assert.match(page, /Entries improve relative odds but never guarantee the/);
   assert.match(page, /Official Contest Rules/);
   assert.doesNotMatch(page, /every verified (?:visit|workout).*Prize Draw Entr/i);
+});
+
+test("linked gym-goer and FAQ pages preserve the complete scoring explanation", async () => {
+  const [gymPage, faq] = await Promise.all([
+    read("app/gym-goers/page.tsx"),
+    read("app/faq/page.tsx"),
+  ]);
+
+  for (const source of [gymPage, faq]) {
+    assert.match(source, /Goal Score/);
+    assert.match(source, /Prize Draw Entries/);
+    assert.match(source, /zero/);
+    assert.match(source, /Perfect Month multiplier/);
+    assert.match(source, /never guarantee/);
+  }
+
+  assert.match(gymPage, /higher completed goal earns more base Prize Draw Entries/);
+  assert.match(faq, /higher completed goal earns more base entries/);
+  assert.doesNotMatch(faq, /Prize Draw Entry weight/);
+});
+
+test("How competition works uses a stable landing anchor", async () => {
+  const [page, links, layout, hashScroll] = await Promise.all([
+    read("app/page.tsx"),
+    read("app/site-links.ts"),
+    read("app/layout.tsx"),
+    read("app/components/HashScrollManager.tsx"),
+  ]);
+
+  assert.match(page, /className="hero-scoring" id="competition-scoring"/);
+  assert.match(links, /href: "\/#competition-scoring"/);
+  assert.match(layout, /<HashScrollManager \/>/);
+  assert.match(hashScroll, /usePathname/);
+  assert.match(hashScroll, /document\.fonts\?\.ready/);
+  assert.match(hashScroll, /scrollIntoView\(\{ block: "start" \}\)/);
 });
 
 test("local preview and hosted deployment use compatible runtime settings", async () => {
@@ -131,11 +167,13 @@ test("mobile navigation uses native modal semantics and current-page state", asy
 
   assert.match(desktopNavigation, /usePathname/);
   assert.match(desktopNavigation, /aria-current/);
+  assert.match(desktopNavigation, /item\.href\.startsWith\("\/#"\)/);
   assert.match(mobileNavigation, /<dialog/);
   assert.match(mobileNavigation, /showModal\(\)/);
   assert.match(mobileNavigation, /onCancel/);
   assert.match(mobileNavigation, /aria-labelledby="mobile-navigation-label"/);
   assert.match(mobileNavigation, /toggleRef\.current\?\.focus\(\)/);
+  assert.match(mobileNavigation, /item\.href\.startsWith\("\/#"\)/);
   assert.doesNotMatch(mobileNavigation, /document\.body\.style|event\.key === "Tab"/);
   assert.match(globals, /\.mobile-navigation__panel\[open\][\s\S]*?display: block/);
   assert.match(globals, /\.mobile-navigation__panel::backdrop/);
@@ -143,10 +181,10 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(globals, /@media \(max-width: 980px\)[\s\S]*?\.desktop-navigation \{[\s\S]*?display: none/);
   assert.doesNotMatch(globals, /@media \(max-width: 1080px\)/);
   assert.equal((primaryNavigation.match(/label:/g) ?? []).length, 4);
-  assert.match(primaryNavigation, /href: "\/#how-it-works",\s+label: "HOW IT WORKS"/);
+  assert.match(primaryNavigation, /href: "\/#competition-scoring",\s+label: "HOW COMPETITION WORKS"/);
   assert.doesNotMatch(
     primaryNavigation,
-    /currentPath: "\/",\s+href: "\/#how-it-works"/,
+    /currentPath: "\/",\s+href: "\/#competition-scoring"/,
   );
   assert.doesNotMatch(primaryNavigation, /siteLinks\.demo|label: "DEMO"/);
   assert.match(layout, /<AppLink analyticsEvent="demo_click" href=\{siteLinks\.demo\}>/);
@@ -155,27 +193,33 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(layout, /tabIndex=\{-1\}/);
 });
 
-test("home replaces the eligibility quick check with an operational partner-gym path", async () => {
-  const [page, links, brands, forms] = await Promise.all([
+test("home replaces the eligibility quick check with a compact partner-gym path", async () => {
+  const [page, links, partners, forms] = await Promise.all([
     read("app/page.tsx"),
     read("app/site-links.ts"),
-    read("app/brands/page.tsx"),
+    read("app/partners/page.tsx"),
     read("app/components/InterestForms.tsx"),
   ]);
 
   assert.doesNotMatch(page, /EligibilityCheck|ELIGIBILITY \/\/ QUICK CHECK|CHECK MY ANSWERS/);
   await assert.rejects(access(new URL("app/components/EligibilityCheck.tsx", root)));
   assert.match(page, /FOR GYM OWNERS/);
-  assert.match(page, /Make verified visits easier to support/);
-  assert.match(page, /Keep verification off the front desk/);
-  assert.match(page, /Create another reason to return/);
-  assert.match(page, /BECOME A PARTNER GYM/);
+  assert.match(page, /Bring verified visits to your gym/);
+  assert.match(page, /Member-led verification, not front-desk work/);
+  assert.match(page, /Another reason for members to return/);
+  assert.match(page, /Three things to know before you start/);
+  assert.match(page, /REQUEST A PARTNERSHIP REVIEW/);
   assert.match(page, /data-analytics-event="brand_partnership_click"/);
-  assert.match(page, /href=\{siteLinks\.partnerApplication\}/);
-  assert.match(links, /partnerApplication: "\/brands#brand-form"/);
-  assert.match(brands, /partner-gym and fitness-brand inquiries/);
-  assert.match(brands, /Every gym and campaign is reviewed before activation/);
+  assert.match(page, /href=\{siteLinks\.gymPartnerApplication\}/);
+  assert.ok(page.indexOf("<ProductScreens />") < page.indexOf("gym-owner-section"));
+  assert.match(links, /partnerApplication: "\/partners#partner-form"/);
+  assert.match(links, /gymPartnerApplication: "\/partners\?interest=gym#partner-form"/);
+  assert.match(partners, /partner-gym and fitness-brand inquiries/);
+  assert.match(partners, /Every gym and campaign is reviewed before activation/);
+  assert.match(partners, /I OPERATE A GYM/);
+  assert.match(partners, /I REPRESENT A BRAND/);
   assert.match(forms, /value="gym-partnership"/);
+  assert.match(forms, /Gym operator \/ partner location/);
   assert.match(forms, /PARTNERSHIP DETAILS \(OPTIONAL\)/);
 });
 
@@ -242,19 +286,24 @@ test("regional updates are intentionally short and separate from registration", 
   assert.doesNotMatch(interestRoute, /env\.DB|ensureInterestTable/);
 });
 
-test("brand inquiry remains detailed and isolated from the regional list", async () => {
-  const [brandPage, forms] = await Promise.all([
+test("partner inquiry remains detailed, tailored and isolated from the regional list", async () => {
+  const [partnerPage, legacyPage, forms] = await Promise.all([
+    read("app/partners/page.tsx"),
     read("app/brands/page.tsx"),
     read("app/components/InterestForms.tsx"),
   ]);
 
-  assert.ok(brandPage.indexOf('id="brand-form"') < brandPage.indexOf("audience-details"));
-  assert.match(brandPage, /current\s+September pilot reward is sponsored by GoGymGo/);
+  assert.ok(partnerPage.indexOf("audience-details") < partnerPage.indexOf('id="partner-form"'));
+  assert.match(partnerPage, /current September pilot reward is sponsored by/);
+  assert.match(partnerPage, /defaultInterest/);
+  assert.match(legacyPage, /permanentRedirect\("\/partners"\)/);
   assert.match(forms, /fetch\("\/api\/interest"/);
   assert.match(forms, /name="partnershipInterest"/);
   assert.match(forms, /name="companyName"/);
   assert.equal((forms.match(/<fieldset className="form-section/g) ?? []).length, 3);
-  assert.match(forms, /<span>01<\/span> CONTACT &amp; COMPANY/);
+  assert.match(forms, /<span>01<\/span> CONTACT &amp; ORGANIZATION/);
+  assert.match(forms, /GYM OR COMPANY/);
+  assert.match(forms, /defaultValue=\{defaultInterest\}/);
   assert.match(forms, /<span>02<\/span> PARTNERSHIP FIT/);
   assert.match(forms, /<span>03<\/span> CONSENT &amp; NEXT STEP/);
   assert.match(forms, /written approval/);
@@ -318,13 +367,20 @@ test("FAQ, contact and public information pages are scannable and discoverable",
   assert.match(faq, /href=\{`#faq-\$\{group\.id\}`\}/);
   assert.match(faq, /Which gyms count as approved partner gyms\?/);
   assert.match(faq, /Does joining the update list register me for the beta\?/);
+  assert.match(faq, /How are Goal Score and Prize Draw Entries different\?/);
+  assert.match(faq, /What happens if I miss a Weekly Goal\?/);
+  assert.match(faq, /How does the Perfect Month multiplier work\?/);
+  assert.match(faq, /How can a gym become a partner\?/);
   assert.match(contact, /Gym-goer updates/);
-  assert.match(contact, /Fitness brand partnerships/);
+  assert.match(contact, /Gym and brand partnerships/);
   assert.match(contact, /Existing member support/);
   assert.match(contact, /Public-site feedback/);
-  assert.match(accessibilityPage, /keyboards, screen readers, browser zoom, reduced motion/);
+  assert.match(accessibilityPage, /WCAG 2\.2 Level AA/);
+  assert.match(accessibilityPage, /known limitations/);
   assert.match(robots, /sitemap: "https:\/\/gogymgo\.com\/sitemap\.xml"/);
   assert.match(sitemap, /"\/accessibility"/);
+  assert.match(sitemap, /"\/partners"/);
+  assert.doesNotMatch(sitemap, /"\/brands"/);
   assert.match(manifest, /theme_color: "#080b0e"/);
 });
 
@@ -345,9 +401,9 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(globals, /\.campaign-status \{/);
   assert.match(globals, /\.faq-group-title \{/);
   assert.match(globals, /\.faq-group-title \{[\s\S]*?scroll-margin-top: 106px/);
-  assert.match(globals, /\.contact-card \{[\s\S]*?min-height: 220px/);
+  assert.match(globals, /\.contact-card \{[\s\S]*?min-height: 190px/);
   assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.section \{[\s\S]*?padding-block: 64px/);
-  assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.info-page__header h1 \{[\s\S]*?font-size: clamp\(34px, 10vw, 40px\)[\s\S]*?overflow-wrap: normal[\s\S]*?word-break: normal/);
+  assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.info-page__header h1 \{[\s\S]*?font-size: clamp\(34px, 9\.2vw, 38px\)[\s\S]*?overflow-wrap: normal[\s\S]*?word-break: normal/);
   assert.match(globals, /@media \(max-width: 600px\)[\s\S]*?\.footer-grid a \{[\s\S]*?min-height: 44px/);
   assert.match(globals, /@media \(max-width: 340px\)[\s\S]*?\.site-header \.wordmark \{[\s\S]*?font-size: 18px/);
   assert.match(globals, /@media \(max-width: 340px\)[\s\S]*?\.header-inner \{[\s\S]*?gap: 6px/);
@@ -358,8 +414,8 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(experience, /scroll-snap-type: x mandatory/);
   assert.match(experience, /\.hero-scoring \{[\s\S]*?grid-column: 1 \/ -1/);
   assert.match(experience, /\.scoring-explainer ol \{[\s\S]*?grid-template-columns: repeat\(3/);
-  assert.match(experience, /\.gym-owner-grid \{[\s\S]*?grid-template-columns: repeat\(4/);
-  assert.match(experience, /@media \(max-width: 600px\)[\s\S]*?\.gym-owner-grid \{[\s\S]*?grid-template-columns: 1fr/);
+  assert.match(experience, /\.gym-owner-compact \{[\s\S]*?grid-template-columns:/);
+  assert.match(experience, /@media \(max-width: 600px\)[\s\S]*?\.gym-owner-compact \{[\s\S]*?grid-template-columns: 1fr/);
   assert.match(experience, /grid-template-columns: repeat\(2, minmax\(min\(82vw, 360px\), 1fr\)\)/);
 });
 

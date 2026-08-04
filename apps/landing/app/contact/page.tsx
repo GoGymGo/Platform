@@ -7,7 +7,7 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/contact" },
   description:
-    "Find the right GoGymGo contact path for regional launch updates, fitness brand partnerships, or member-app support.",
+    "Find the right GoGymGo contact path for regional launch updates, gym and brand partnerships, public-site feedback, or member-app support.",
   title: "Contact",
 };
 
@@ -21,10 +21,10 @@ const contactPaths = [
   },
   {
     analyticsEvent: "brand_partnership_click",
-    copy: "Tell us about the region, timing, inventory, and campaign model your fitness brand is exploring.",
-    href: `${siteLinks.brands}#brand-form`,
+    copy: "Gym operators can request a location review, while fitness brands can propose rewards or regional campaigns.",
+    href: siteLinks.partnerApplication,
     label: "OPEN PARTNERSHIP FORM",
-    title: "Fitness brand partnerships",
+    title: "Gym and brand partnerships",
   },
   {
     analyticsEvent: "member_app_click",

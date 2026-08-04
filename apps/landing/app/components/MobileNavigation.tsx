@@ -57,22 +57,39 @@ export function MobileNavigation() {
           <span className="mobile-navigation__label" id="mobile-navigation-label">
             NAVIGATION // OPEN
           </span>
-          {primaryNavigationItems.map((item, index) => (
-            <Link
-              aria-current={
-                "currentPath" in item && pathname === item.currentPath
-                  ? "page"
-                  : undefined
-              }
-              href={item.href}
-              key={item.href}
-              onClick={() => setIsOpen(false)}
-            >
+          {primaryNavigationItems.map((item, index) => {
+            const content = (
+              <>
               <span>{String(index + 1).padStart(2, "0")}</span>
               <strong>{item.label}</strong>
               <b aria-hidden="true">→</b>
-            </Link>
-          ))}
+              </>
+            );
+            const ariaCurrent =
+              "currentPath" in item && pathname === item.currentPath
+                ? "page"
+                : undefined;
+
+            return item.href.startsWith("/#") ? (
+              <a
+                aria-current={ariaCurrent}
+                href={item.href}
+                key={item.href}
+                onClick={() => setIsOpen(false)}
+              >
+                {content}
+              </a>
+            ) : (
+              <Link
+                aria-current={ariaCurrent}
+                href={item.href}
+                key={item.href}
+                onClick={() => setIsOpen(false)}
+              >
+                {content}
+              </Link>
+            );
+          })}
         </nav>
       </dialog>
     </div>

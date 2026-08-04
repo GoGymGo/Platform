@@ -1,14 +1,16 @@
 export const siteLinks = {
   accessibility: "/accessibility",
-  brands: "/brands",
+  brandPartnerApplication: "/partners?interest=brand#partner-form",
   contact: "/contact",
   demo: "https://app.gogymgo.com/demo",
   faq: "/faq",
+  gymPartnerApplication: "/partners?interest=gym#partner-form",
   gymGoers: "/gym-goers",
   home: "/",
   memberApp: "https://app.gogymgo.com/",
   officialRules: "https://app.gogymgo.com/official-rules",
-  partnerApplication: "/brands#brand-form",
+  partnerApplication: "/partners#partner-form",
+  partners: "/partners",
   privacy: "https://app.gogymgo.com/privacy-policy",
   publicSiteHelp: "/contact#public-site-help",
   regionalUpdates: "/gym-goers#gym-form",
@@ -17,8 +19,8 @@ export const siteLinks = {
 
 export const primaryNavigationItems = [
   {
-    href: "/#how-it-works",
-    label: "HOW IT WORKS",
+    href: "/#competition-scoring",
+    label: "HOW COMPETITION WORKS",
   },
   {
     currentPath: "/gym-goers",
@@ -26,8 +28,8 @@ export const primaryNavigationItems = [
     label: "GYM GOERS",
   },
   {
-    currentPath: "/brands",
-    href: siteLinks.brands,
+    currentPath: "/partners",
+    href: siteLinks.partners,
     label: "PARTNERS",
   },
   {

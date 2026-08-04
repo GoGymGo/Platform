@@ -5,6 +5,7 @@ import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
 import { AppLink } from "./components/AppLink";
 import { DesktopNavigation } from "./components/DesktopNavigation";
 import { MobileNavigation } from "./components/MobileNavigation";
+import { HashScrollManager } from "./components/HashScrollManager";
 import { PublicSiteAnalytics } from "./components/PublicSiteAnalytics";
 import { siteLinks } from "./site-links";
 import "./globals.css";
@@ -162,9 +163,11 @@ export default function RootLayout({
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                Regional launch updates
+                Regional updates
               </Link>
-              <Link href="/#how-it-works">How GoGymGo works</Link>
+              {/* A full navigation lets the responsive hash target settle reliably. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/#competition-scoring">How the competition works</a>
             </div>
             <div>
               <p className="footer-label">EXPLORE</p>
@@ -173,7 +176,7 @@ export default function RootLayout({
               </AppLink>
               <Link
                 data-analytics-event="brand_partnership_click"
-                href={siteLinks.brands}
+                href={siteLinks.partners}
               >
                 Partner with GoGymGo
               </Link>
@@ -197,6 +200,7 @@ export default function RootLayout({
             </AppLink>
           </div>
         </footer>
+        <HashScrollManager />
         <PublicSiteAnalytics />
       </body>
     </html>

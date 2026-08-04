@@ -58,18 +58,15 @@ const readinessFacts = [
 const gymOwnerBenefits = [
   {
     number: "01",
-    title: "Give members one clear flow",
-    copy: "An active partner poster supports the same entry and exit scan process on every eligible visit.",
+    title: "One consistent entry and exit poster flow",
   },
   {
     number: "02",
-    title: "Keep verification off the front desk",
-    copy: "Members follow the workout timer, location prompts, and evidence steps in the app on their own device.",
+    title: "Member-led verification, not front-desk work",
   },
   {
     number: "03",
-    title: "Create another reason to return",
-    copy: "Weekly goals and monthly competitions reinforce consistent visits without changing your core membership offering.",
+    title: "Another reason for members to return",
   },
 ] as const;
 
@@ -115,20 +112,12 @@ function SeptemberChallengePanel({ statusLabel }: { statusLabel: string }) {
       </div>
       <dl className="pilot-console__facts">
         <div>
-          <dt>WEEKLY GOAL</dt>
-          <dd>{septemberCampaign.weeklyGoalRange}</dd>
-        </div>
-        <div>
           <dt>MINIMUM AGE</dt>
           <dd>{septemberCampaign.minimumAge}+</dd>
         </div>
         <div>
           <dt>VERIFIED WORKOUT</dt>
           <dd>{septemberCampaign.minimumSessionMinutes}+ minutes</dd>
-        </div>
-        <div>
-          <dt>PERFECT MONTH</dt>
-          <dd>{septemberCampaign.perfectMonthMultiplier}× eligible entries</dd>
         </div>
       </dl>
       <div className="pilot-console__footer">
@@ -196,7 +185,7 @@ export default function Home() {
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                GET FUTURE-REGION UPDATES <span aria-hidden="true">→</span>
+                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
               </Link>
             )}
             {memberRegistrationAvailable ? (
@@ -205,7 +194,7 @@ export default function Home() {
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                GET FUTURE-REGION UPDATES <span aria-hidden="true">→</span>
+                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
               </Link>
             ) : (
               <Link className="button button-secondary" href={siteLinks.faq}>
@@ -221,7 +210,7 @@ export default function Home() {
         </div>
         <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
 
-        <div className="hero-scoring">
+        <div className="hero-scoring" id="competition-scoring">
           <div className="hero-scoring__heading">
             <div>
               <p className="eyebrow">HOW COMPETITION SCORING WORKS</p>
@@ -257,50 +246,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section gym-owner-section" id="gym-partners">
-        <div className="shell">
-          <div className="section-heading gym-owner-heading">
-            <div>
-              <p className="eyebrow eyebrow-pink">FOR GYM OWNERS</p>
-              <h2>Make verified visits easier to support.</h2>
-            </div>
-            <p>
-              GoGymGo gives eligible members a repeatable app-guided visit
-              flow, while your team provides the active partner poster and the
-              gym experience you already run.
-            </p>
-          </div>
-
-          <div className="gym-owner-grid">
-            {gymOwnerBenefits.map((benefit) => (
-              <article className="gym-owner-benefit" key={benefit.number}>
-                <span>{benefit.number}</span>
-                <h3>{benefit.title}</h3>
-                <p>{benefit.copy}</p>
-              </article>
-            ))}
-
-            <aside className="gym-owner-cta">
-              <p>PARTNER GYM INTAKE</p>
-              <h3>Bring GoGymGo to your gym.</h3>
-              <span>
-                Tell us about your location and operating setup. A submission
-                requests a partnership review; it does not activate a gym
-                immediately.
-              </span>
-              <Link
-                className="button button-pink"
-                data-analytics-event="brand_partnership_click"
-                href={siteLinks.partnerApplication}
-              >
-                BECOME A PARTNER GYM <span aria-hidden="true">→</span>
-              </Link>
-            </aside>
-          </div>
-        </div>
-      </section>
-
-      <section className="section shell" id="how-it-works">
+      <section className="section shell" id="joining-and-verification">
         <div className="section-heading">
           <div>
             <p className="eyebrow">JOINING &amp; VERIFICATION</p>
@@ -320,24 +266,15 @@ export default function Home() {
             </article>
           ))}
         </div>
-      </section>
-
-      <section className="section transparency-section" id="pilot-transparency">
-        <div className="shell">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">BEFORE YOU JOIN</p>
-              <h2>What to know before you start.</h2>
-            </div>
-            <p>
-              These summaries explain the public September basics. The
-              published Official Contest Rules control if a summary differs.
-            </p>
+        <div className="joining-readiness" id="before-you-join">
+          <div className="joining-readiness__heading">
+            <p className="eyebrow">BEFORE YOU JOIN</p>
+            <h3>Three things to know before you start.</h3>
           </div>
-          <div className="transparency-grid">
+          <div className="joining-readiness__grid">
             {readinessFacts.map((fact) => (
-              <article className="transparency-card" key={fact.title}>
-                <h3>{fact.title}</h3>
+              <article key={fact.title}>
+                <strong>{fact.title}</strong>
                 <p>{fact.copy}</p>
               </article>
             ))}
@@ -357,6 +294,43 @@ export default function Home() {
       </section>
 
       <ProductScreens />
+
+      <section className="section gym-owner-section" id="gym-partners">
+        <div className="shell gym-owner-compact">
+          <div className="gym-owner-compact__intro">
+            <p className="eyebrow eyebrow-pink">FOR GYM OWNERS</p>
+            <h2>Bring verified visits to your gym.</h2>
+            <p>
+              Members follow the app-guided verification flow on their own
+              device. Your team provides an active partner poster and the gym
+              experience you already run.
+            </p>
+            <Link
+              className="button button-pink gym-owner-compact__action"
+              data-analytics-event="brand_partnership_click"
+              href={siteLinks.gymPartnerApplication}
+            >
+              REQUEST A PARTNERSHIP REVIEW <span aria-hidden="true">→</span>
+            </Link>
+            <small>
+              A request starts a review; it does not activate a gym
+              immediately.
+            </small>
+          </div>
+
+          <ol className="gym-owner-benefit-list">
+            {gymOwnerBenefits.map((benefit) => (
+              <li key={benefit.number}>
+                <span>{benefit.number}</span>
+                <div>
+                  <strong>{benefit.title}</strong>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+        </div>
+      </section>
 
       <section className="section shell final-cta">
         <div>
@@ -382,7 +356,7 @@ export default function Home() {
             data-analytics-event="regional_updates_click"
             href={siteLinks.regionalUpdates}
           >
-            GET FUTURE-REGION UPDATES <span aria-hidden="true">→</span>
+            GET REGIONAL UPDATES <span aria-hidden="true">→</span>
           </Link>
           <Link
             className="button button-secondary"

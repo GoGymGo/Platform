@@ -53,6 +53,7 @@ export default function RegionScreen() {
   const [waitlistError, setWaitlistError] = useState<string | null>(null);
   const isProfileSource = source === 'profile';
   const isHomeSource = source === 'home';
+  const isGymScanSource = source === 'gym-scan';
   const approvedRegionReady =
     regionVerification?.status === 'verified' &&
     Boolean(regionVerification.verificationId);
@@ -320,7 +321,11 @@ export default function RegionScreen() {
           <AccountLegalAgreement
             jurisdictionCode={jurisdictionCode}
             onComplete={() => router.replace(
-              isHomeSource ? '/commitment?source=home' : '/commitment'
+              isHomeSource
+                ? '/commitment?source=home'
+                : isGymScanSource
+                  ? '/commitment?source=gym-scan'
+                  : '/commitment'
             )}
           />
         ) : null}

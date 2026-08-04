@@ -44,13 +44,20 @@ export function sites(): Plugin {
 
       if (await exists(wranglerConfig)) {
         const config = JSON.parse(await readFile(wranglerConfig, "utf8")) as {
+          compatibility_date?: string;
           compatibility_flags?: string[];
         };
 
+        config.compatibility_date = "2026-08-04";
+        config.compatibility_flags = config.compatibility_flags?.filter(
+          (flag) => flag !== "nodejs_compat",
+        );
+
         if (config.compatibility_flags?.length === 0) {
           delete config.compatibility_flags;
-          await writeFile(wranglerConfig, JSON.stringify(config));
         }
+
+        await writeFile(wranglerConfig, JSON.stringify(config));
       }
     },
   };

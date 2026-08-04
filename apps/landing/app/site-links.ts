@@ -16,7 +16,6 @@ export const siteLinks = {
 
 export const primaryNavigationItems = [
   {
-    currentPath: "/",
     href: "/#how-it-works",
     label: "HOW IT WORKS",
   },

@@ -119,6 +119,9 @@ h3 {
   z-index: 100;
   top: 8px;
   left: 8px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   padding: 9px 13px;
   border-radius: 6px;
   color: #04282a;

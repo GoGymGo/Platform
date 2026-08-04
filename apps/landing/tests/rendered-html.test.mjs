@@ -51,6 +51,8 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(page, /siteLinks\.regionalUpdates/);
   assert.match(page, /siteLinks\.officialRules/);
   assert.match(page, /className="eyebrow campaign-status"/);
+  assert.match(page, /Registration and competition entry continue in the member app/);
+  assert.match(page, /Regional updates do not create an app account/);
   assert.match(page, /aria-label="Important eligibility notes" className="hero-qualifiers"/);
   assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ MIN/);
   assert.doesNotMatch(page, />30:00</);
@@ -59,6 +61,8 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(productScreens, /active-workout\.webp/);
   assert.match(productScreens, /winners-circle\.webp/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS/);
+  assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS →/);
+  assert.doesNotMatch(productScreens, /â†’/);
   assert.match(productScreens, /tabIndex=\{0\}/);
   assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 2);
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
@@ -66,6 +70,19 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
   assert.doesNotMatch(layout, /Administrator sign-in|admin-control/);
+});
+
+test("local preview and hosted deployment use compatible runtime settings", async () => {
+  const [viteConfig, sitesPlugin] = await Promise.all([
+    read("vite.config.ts"),
+    read("build/sites-vite-plugin.ts"),
+  ]);
+
+  assert.match(viteConfig, /compatibility_date: "2026-05-22"/);
+  assert.match(viteConfig, /compatibility_flags: \["nodejs_compat"\]/);
+  assert.match(sitesPlugin, /config\.compatibility_date = "2026-08-04"/);
+  assert.match(sitesPlugin, /flag !== "nodejs_compat"/);
+  assert.match(sitesPlugin, /delete config\.compatibility_flags/);
 });
 
 test("mobile navigation uses native modal semantics and current-page state", async () => {
@@ -92,6 +109,11 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(globals, /@media \(max-width: 980px\)[\s\S]*?\.desktop-navigation \{[\s\S]*?display: none/);
   assert.doesNotMatch(globals, /@media \(max-width: 1080px\)/);
   assert.equal((primaryNavigation.match(/label:/g) ?? []).length, 4);
+  assert.match(primaryNavigation, /href: "\/#how-it-works",\s+label: "HOW IT WORKS"/);
+  assert.doesNotMatch(
+    primaryNavigation,
+    /currentPath: "\/",\s+href: "\/#how-it-works"/,
+  );
   assert.doesNotMatch(primaryNavigation, /siteLinks\.demo|label: "DEMO"/);
   assert.match(layout, /<AppLink analyticsEvent="demo_click" href=\{siteLinks\.demo\}>/);
   assert.match(layout, /href=\{siteLinks\.demo\}/);

@@ -31,7 +31,7 @@ export function ProductScreens() {
             results, so pending activity is never presented as approved credit.
           </p>
         </div>
-        <p className="product-swipe-hint">SWIPE TO PREVIEW BOTH APP SCREENS â†’</p>
+        <p className="product-swipe-hint">SWIPE TO PREVIEW BOTH APP SCREENS →</p>
         <div
           aria-label="Member app screen previews"
           className="product-screen-grid"

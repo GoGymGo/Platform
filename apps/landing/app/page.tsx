@@ -180,6 +180,11 @@ export default function Home() {
               </Link>
             )}
           </div>
+          <p className="hero-action-note">
+            {memberRegistrationAvailable
+              ? "Registration and competition entry continue in the member app. Regional updates do not create an app account."
+              : "Regional updates do not create an app account or competition entry."}
+          </p>
           <ul aria-label="Important eligibility notes" className="hero-qualifiers">
             <li>NO PURCHASE REQUIRED</li>
             <li>APPROVED PARTNER GYM REQUIRED</li>

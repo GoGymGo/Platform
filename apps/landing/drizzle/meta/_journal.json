@@ -8,6 +8,20 @@
       "when": 1785082826897,
       "tag": "0000_quick_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785794716684,
+      "tag": "0001_brown_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785801838358,
+      "tag": "0002_funny_expediter",
+      "breakpoints": true
     }
   ]
 }

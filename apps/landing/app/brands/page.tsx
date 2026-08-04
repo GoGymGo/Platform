@@ -1,28 +1,26 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { BrandForm } from "../components/InterestForms";
 
 export const metadata: Metadata = {
-  title: "Fitness brand partnerships",
+  alternates: { canonical: "/brands" },
   description:
-    "Apply to become a founding GoGymGo fitness brand partner through regional campaigns, Brand Rewards, creator activations, or partner gym programs.",
+    "Explore future GoGymGo regional campaigns, reward inventory, placements, approvals, and aggregate reporting for fitness brands.",
+  title: "Fitness brand partnerships",
 };
 
-const points = [
+const partnerSteps = [
   {
-    title: "REGIONAL REACH",
-    copy: "Support active gym communities in the regions that matter to your brand.",
+    title: "01 // CHOOSE THE CAMPAIGN",
+    copy: "Define the intended region, month, audience, placement, and destination before any public launch.",
   },
   {
-    title: "REWARD MOMENTS",
-    copy: "Supply physical products or coupon codes for audited regional draws.",
+    title: "02 // DEFINE REAL INVENTORY",
+    copy: "Confirm in-stock physical products or valid coupon inventory, terms, availability, fulfillment, and support responsibilities.",
   },
   {
-    title: "CONTEXTUAL PLACEMENT",
-    copy: "Appear in approved competition, workout-complete, and reward moments.",
-  },
-  {
-    title: "PRIVACY-SAFE REPORTING",
-    copy: "Measure aggregate reach and actions without private health or workout evidence.",
+    title: "03 // REVIEW AND PUBLISH",
+    copy: "Approve creative, disclosures, reporting scope, and regional requirements before anything appears in the app.",
   },
 ];
 
@@ -33,38 +31,68 @@ export default function BrandsPage() {
         <div className="audience-copy">
           <p className="eyebrow eyebrow-pink">
             <span className="status-dot" />
-            FOR FITNESS BRANDS
+            FOUNDING PARTNER PROGRAM
           </p>
           <h1>
-            Back the habit.
-            <br />
-            Earn real <span>attention.</span>
+            Reach verified gym communities at moments that <span>matter.</span>
           </h1>
           <p>
-            Join GoGymGo as a founding fitness brand partner. Help reward
-            verified consistency through regional campaigns designed around
-            participation—not private personal data.
+            GoGymGo is preparing future approved regional campaigns for fitness
+            brands that can support real product or coupon rewards. The current
+            September pilot reward is sponsored by GoGymGo, not an outside
+            brand.
           </p>
-          <div className="audience-points">
-            {points.map((point) => (
-              <div className="audience-point" key={point.title}>
-                <strong>{point.title}</strong>
-                <span>{point.copy}</span>
-              </div>
-            ))}
+          <div className="audience-actions">
+            <Link
+              className="button button-pink"
+              data-analytics-event="brand_partnership_click"
+              href="#brand-form"
+            >
+              REQUEST A PARTNERSHIP REVIEW <span aria-hidden="true">↓</span>
+            </Link>
           </div>
         </div>
 
-        <section className="form-card" aria-labelledby="brand-form-title">
+        <section
+          aria-labelledby="brand-form-title"
+          className="form-card"
+          id="brand-form"
+        >
           <div className="form-card-header">
             <span>FOUNDING PARTNER INTAKE // OPEN</span>
-            <h2 id="brand-form-title">Tell us about your brand</h2>
+            <h2 id="brand-form-title">Explore a future campaign</h2>
             <p>
-              Share the opportunity you’re exploring and we’ll follow up at
-              your work email.
+              Tell us the region, timing, inventory, and outcome you are
+              considering. We review inquiries weekly and aim to respond within
+              five business days.
             </p>
+            <small>Fields marked * are required.</small>
           </div>
           <BrandForm />
+        </section>
+
+        <section
+          aria-labelledby="brand-details-title"
+          className="audience-details"
+        >
+          <p className="eyebrow eyebrow-pink">HOW A PARTNERSHIP MOVES FORWARD</p>
+          <h2 id="brand-details-title">
+            Nothing is presented to players before approval.
+          </h2>
+          <div className="audience-points partner-steps">
+            {partnerSteps.map((step) => (
+              <article className="audience-point" key={step.title}>
+                <strong>{step.title}</strong>
+                <span>{step.copy}</span>
+              </article>
+            ))}
+          </div>
+          <p className="audience-disclosure">
+            Available placements and reporting depend on campaign approval,
+            regional rules, product readiness, inventory, and signed terms.
+            Private health data, exact location, and private workout evidence
+            are outside the partner reporting scope.
+          </p>
         </section>
       </div>
     </main>

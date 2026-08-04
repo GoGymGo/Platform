@@ -25,6 +25,6 @@ before removing that binding. Do not write new submissions to D1.
 User journeys belong to the canonical member application:
 
 - **Try Demo** -> `https://app.gogymgo.com/demo`
-- **Join Beta** -> `https://app.gogymgo.com/join`
+- **Join Beta** -> `https://app.gogymgo.com/` (the member-app welcome screen)
 
 Do not add a second demo implementation or account database to this app.

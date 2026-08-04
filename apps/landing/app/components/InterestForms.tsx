@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { siteLinks } from "../site-links";
+import { AppLink } from "./AppLink";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
-function readErrorMessage(error: unknown) {
+function readErrorMessage(error: unknown, fallbackError: string) {
   if (typeof error === "string" && error.trim()) {
     return error;
   }
@@ -16,61 +18,146 @@ function readErrorMessage(error: unknown) {
     }
   }
 
-  return "We couldn't save your information. Please try again.";
+  return fallbackError;
 }
 
 async function submitInterest(
   form: HTMLFormElement,
-  audience: "gym_goer" | "brand",
+  fallbackError: string,
 ) {
   const formData = new FormData(form);
-  const payload = Object.fromEntries(formData.entries());
+  const payload = Object.fromEntries(
+    Array.from(formData.entries()).filter(([, value]) => {
+      return typeof value !== "string" || value.trim().length > 0;
+    }),
+  );
   const response = await fetch("/api/interest", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       ...payload,
-      audience,
+      audience: "brand",
       consent: formData.get("consent") === "on",
     }),
   });
 
-  const body = (await response.json()) as { error?: unknown };
+  let body: { error?: unknown } = {};
+  try {
+    body = (await response.json()) as { error?: unknown };
+  } catch {
+    // Some upstream failures have no JSON body. Keep the message user-safe.
+  }
+
   if (!response.ok) {
-    throw new Error(readErrorMessage(body.error));
+    throw new Error(readErrorMessage(body.error, fallbackError));
   }
 }
 
-function Success({
-  brand = false,
-}: {
-  brand?: boolean;
-}) {
+async function submitRegionalUpdates(
+  form: HTMLFormElement,
+  fallbackError: string,
+) {
+  const formData = new FormData(form);
+  const response = await fetch("/api/regional-updates", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contactFax: formData.get("contactFax"),
+      email: formData.get("email"),
+      requestedRegion: formData.get("region"),
+    }),
+  });
+
+  let body: { error?: unknown } = {};
+  try {
+    body = (await response.json()) as { error?: unknown };
+  } catch {
+    // Some upstream failures have no JSON body. Keep the message user-safe.
+  }
+
+  if (!response.ok) {
+    throw new Error(readErrorMessage(body.error, fallbackError));
+  }
+}
+
+function Success({ brand = false }: { brand?: boolean }) {
+  const successRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    successRef.current?.focus();
+  }, []);
+
   return (
-    <div className="form-success" role="status">
+    <div
+      aria-live="polite"
+      className="form-success"
+      ref={successRef}
+      role="status"
+      tabIndex={-1}
+    >
       <div className="success-mark" aria-hidden="true">
         ✓
       </div>
-      <h2>{brand ? "Application received." : "You’re on the list."}</h2>
+      <h2>
+        {brand
+          ? "Partnership request received."
+          : "You’re on the regional update list."}
+      </h2>
       <p>
         {brand
-          ? "Thanks for your interest in GoGymGo. We’ll follow up at your work email as founding partnership opportunities open."
-          : "We’ll email you with launch news and let you know when pre-registration opens in your region."}
+          ? "We review inquiries weekly and aim to follow up at your work email within five business days. Campaign timing still depends on fit and approval."
+          : "This does not register you for the September beta. We’ll email as regional availability changes."}
       </p>
+      {!brand ? (
+        <AppLink
+          analyticsEvent="member_app_click"
+          className="button button-secondary"
+          href={siteLinks.memberApp}
+        >
+          ELIGIBLE FOR SEPTEMBER? REGISTER IN THE APP
+        </AppLink>
+      ) : null}
     </div>
+  );
+}
+
+function PrivacyNotice({ context }: { context: "brand" | "updates" }) {
+  return (
+    <p className="form-privacy">
+      {context === "updates"
+        ? "We use these details for regional availability emails. You can unsubscribe from any update. "
+        : "We use these details to review and respond to this inquiry. Any campaign requires separate written approval. "}
+      Review the GoGymGo <AppLink href={siteLinks.privacy}>Privacy Policy</AppLink>
+      {context === "brand" ? (
+        <>
+          {" "}and <AppLink href={siteLinks.terms}>Terms of Service</AppLink>
+        </>
+      ) : null}
+      .
+    </p>
   );
 }
 
 export function GymGoerForm() {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (state === "error") {
+      errorRef.current?.focus();
+    }
+  }, [state]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("submitting");
     setError("");
     try {
-      await submitInterest(event.currentTarget, "gym_goer");
+      await submitRegionalUpdates(
+        event.currentTarget,
+        "We couldn’t save your information. Please try again.",
+      );
       setState("success");
     } catch (cause) {
       setError(
@@ -87,19 +174,14 @@ export function GymGoerForm() {
   }
 
   return (
-    <form className="interest-form" onSubmit={onSubmit}>
+    <form
+      aria-busy={state === "submitting"}
+      aria-describedby="gym-form-note"
+      className="interest-form"
+      data-analytics-form="gym_form_start"
+      onSubmit={onSubmit}
+    >
       <div className="field-grid">
-        <div className="field">
-          <label htmlFor="fullName">FULL NAME *</label>
-          <input
-            autoComplete="name"
-            id="fullName"
-            maxLength={100}
-            name="fullName"
-            placeholder="Your name"
-            required
-          />
-        </div>
         <div className="field">
           <label htmlFor="email">EMAIL *</label>
           <input
@@ -112,9 +194,6 @@ export function GymGoerForm() {
             type="email"
           />
         </div>
-      </div>
-
-      <div className="field-grid">
         <div className="field">
           <label htmlFor="city">CITY / REGION *</label>
           <input
@@ -122,57 +201,10 @@ export function GymGoerForm() {
             id="city"
             maxLength={100}
             name="region"
-            placeholder="e.g. Vancouver, BC"
+            placeholder="e.g. Victoria, BC"
             required
           />
         </div>
-        <div className="field">
-          <label htmlFor="workoutStyle">HOW DO YOU TRAIN? *</label>
-          <select defaultValue="" id="workoutStyle" name="workoutStyle" required>
-            <option disabled value="">
-              Select one
-            </option>
-            <option value="strength">Strength training</option>
-            <option value="cardio">Cardio / endurance</option>
-            <option value="classes">Fitness classes</option>
-            <option value="mixed">A mix of everything</option>
-            <option value="starting">I’m getting started</option>
-          </select>
-        </div>
-      </div>
-
-      <fieldset className="field">
-        <legend className="fieldset-label">
-          YOUR IDEAL WEEKLY GOAL *
-        </legend>
-        <div className="radio-grid">
-          {[2, 3, 4, 5].map((days) => (
-            <div className="radio-card" key={days}>
-              <input
-                defaultChecked={days === 3}
-                id={`goal-${days}`}
-                name="goalDays"
-                required
-                type="radio"
-                value={days}
-              />
-              <label htmlFor={`goal-${days}`}>{days} DAYS</label>
-            </div>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="field">
-        <label htmlFor="discoverySource">HOW DID YOU HEAR ABOUT US?</label>
-        <select defaultValue="" id="discoverySource" name="discoverySource">
-          <option value="">Select one</option>
-          <option value="friend">Friend or family</option>
-          <option value="social">Social media</option>
-          <option value="gym">My gym</option>
-          <option value="creator">Fitness creator</option>
-          <option value="search">Search</option>
-          <option value="other">Other</option>
-        </select>
       </div>
 
       <div className="visually-hidden" aria-hidden="true">
@@ -185,16 +217,17 @@ export function GymGoerForm() {
         />
       </div>
 
-      <label className="consent-row">
-        <input name="consent" required type="checkbox" />
-        <span>
+      <div className="consent-group">
+        <input id="gymConsent" name="consent" required type="checkbox" />
+        <label htmlFor="gymConsent">
           I agree that GoGymGo may store this information and email me about
-          pre-registration, regional availability, and launch updates. *
-        </span>
-      </label>
+          regional availability and launch updates. *
+        </label>
+      </div>
+      <PrivacyNotice context="updates" />
 
       {state === "error" ? (
-        <p className="form-status" role="alert">
+        <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>
           {error}
         </p>
       ) : null}
@@ -204,11 +237,11 @@ export function GymGoerForm() {
         disabled={state === "submitting"}
         type="submit"
       >
-        {state === "submitting" ? "SAVING…" : "JOIN THE PRE-REGISTRATION LIST →"}
+        {state === "submitting" ? "SAVING…" : "GET REGIONAL UPDATES →"}
       </button>
-      <p className="fine-print">
-        Pre-registration is free and does not create a competition entry or
-        guarantee launch availability in your region.
+      <p className="fine-print" id="gym-form-note">
+        This free update list does not create an app account or competition
+        entry, and it does not guarantee launch availability in your region.
       </p>
     </form>
   );
@@ -217,19 +250,29 @@ export function GymGoerForm() {
 export function BrandForm() {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (state === "error") {
+      errorRef.current?.focus();
+    }
+  }, [state]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("submitting");
     setError("");
     try {
-      await submitInterest(event.currentTarget, "brand");
+      await submitInterest(
+        event.currentTarget,
+        "We couldn’t save your partnership request. Please try again.",
+      );
       setState("success");
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "We couldn’t save your application. Please try again.",
+          : "We couldn’t save your partnership request. Please try again.",
       );
       setState("error");
     }
@@ -240,8 +283,18 @@ export function BrandForm() {
   }
 
   return (
-    <form className="interest-form" onSubmit={onSubmit}>
-      <div className="field-grid">
+    <form
+      aria-busy={state === "submitting"}
+      aria-describedby="brand-form-note"
+      className="interest-form"
+      data-analytics-form="brand_form_start"
+      onSubmit={onSubmit}
+    >
+      <fieldset className="form-section">
+        <legend>
+          <span>01</span> CONTACT &amp; COMPANY
+        </legend>
+        <div className="field-grid">
         <div className="field">
           <label htmlFor="brandFullName">YOUR NAME *</label>
           <input
@@ -264,69 +317,80 @@ export function BrandForm() {
             required
           />
         </div>
-      </div>
+        </div>
 
-      <div className="field-grid">
+        <div className="field-grid">
+          <div className="field">
+            <label htmlFor="brandEmail">WORK EMAIL *</label>
+            <input
+              autoComplete="email"
+              id="brandEmail"
+              maxLength={254}
+              name="email"
+              placeholder="name@company.com"
+              required
+              type="email"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="website">WEBSITE (OPTIONAL)</label>
+            <input
+              autoComplete="url"
+              id="website"
+              maxLength={300}
+              name="website"
+              placeholder="https://"
+              type="url"
+            />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="form-section">
+        <legend>
+          <span>02</span> CAMPAIGN FIT
+        </legend>
+        <div className="field-grid">
+          <div className="field">
+            <label htmlFor="brandRegion">TARGET REGION(S) *</label>
+            <input
+              id="brandRegion"
+              maxLength={160}
+              name="region"
+              placeholder="e.g. British Columbia"
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="partnershipInterest">PARTNERSHIP INTEREST *</label>
+            <select
+              defaultValue=""
+              id="partnershipInterest"
+              name="partnershipInterest"
+              required
+            >
+              <option disabled value="">
+                Select one
+              </option>
+              <option value="regional-sponsor">Regional campaign sponsor</option>
+              <option value="brand-rewards">Product or coupon inventory</option>
+              <option value="creator-campaign">Creator workout campaign</option>
+              <option value="gym-partnership">Partner gym network</option>
+              <option value="explore">Explore the right fit</option>
+            </select>
+          </div>
+        </div>
+
         <div className="field">
-          <label htmlFor="brandEmail">WORK EMAIL *</label>
-          <input
-            autoComplete="email"
-            id="brandEmail"
-            maxLength={254}
-            name="email"
-            placeholder="name@company.com"
-            required
-            type="email"
+          <label htmlFor="message">CAMPAIGN DETAILS (OPTIONAL)</label>
+          <textarea
+            id="message"
+            maxLength={1200}
+            name="message"
+            placeholder="Share your preferred timing, audience, region, inventory, budget range, fulfillment plan, or reporting needs."
           />
         </div>
-        <div className="field">
-          <label htmlFor="website">WEBSITE</label>
-          <input
-            autoComplete="url"
-            id="website"
-            maxLength={300}
-            name="website"
-            placeholder="https://"
-            type="url"
-          />
-        </div>
-      </div>
-
-      <div className="field-grid">
-        <div className="field">
-          <label htmlFor="brandRegion">TARGET REGION(S) *</label>
-          <input
-            id="brandRegion"
-            maxLength={160}
-            name="region"
-            placeholder="e.g. Canada, Pacific Northwest"
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="interest">PARTNERSHIP INTEREST *</label>
-          <select defaultValue="" id="interest" name="interest" required>
-            <option disabled value="">
-              Select one
-            </option>
-            <option value="regional-sponsor">Regional campaign sponsor</option>
-            <option value="brand-rewards">Brand Reward supplier</option>
-            <option value="creator-campaign">Creator workout campaign</option>
-            <option value="gym-partnership">Partner gym network</option>
-            <option value="explore">Let’s explore</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="message">TELL US WHAT YOU HAVE IN MIND</label>
-        <textarea
-          id="message"
-          maxLength={1200}
-          name="message"
-          placeholder="Your goals, timing, target audience, reward ideas, or anything else that would help us understand the fit."
-        />
-      </div>
+      </fieldset>
 
       <div className="visually-hidden" aria-hidden="true">
         <label htmlFor="brandContactFax">Leave this field empty</label>
@@ -338,16 +402,22 @@ export function BrandForm() {
         />
       </div>
 
-      <label className="consent-row">
-        <input name="consent" required type="checkbox" />
-        <span>
-          I agree that GoGymGo may store this information and contact me about
-          partnership opportunities. *
-        </span>
-      </label>
+      <fieldset className="form-section form-section--consent">
+        <legend>
+          <span>03</span> CONSENT &amp; NEXT STEP
+        </legend>
+        <div className="consent-group">
+          <input id="brandConsent" name="consent" required type="checkbox" />
+          <label htmlFor="brandConsent">
+            I agree that GoGymGo may store this information and contact me about
+            partnership opportunities. *
+          </label>
+        </div>
+        <PrivacyNotice context="brand" />
+      </fieldset>
 
       {state === "error" ? (
-        <p className="form-status" role="alert">
+        <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>
           {error}
         </p>
       ) : null}
@@ -357,12 +427,14 @@ export function BrandForm() {
         disabled={state === "submitting"}
         type="submit"
       >
-        {state === "submitting" ? "SENDING…" : "APPLY AS A FOUNDING PARTNER →"}
+        {state === "submitting"
+          ? "SENDING…"
+          : "REQUEST A PARTNERSHIP REVIEW →"}
       </button>
-      <p className="fine-print">
-        Submitting this form does not create a campaign or partnership
-        agreement. All placements, rewards, claims, and regional terms require
-        approval.
+      <p className="fine-print" id="brand-form-note">
+        Submitting this form does not create a campaign or agreement. Placements,
+        rewards, creative, reporting, claims, and regional terms require review
+        and written approval.
       </p>
     </form>
   );

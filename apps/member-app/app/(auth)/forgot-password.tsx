@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -12,10 +12,13 @@ import { CyberButtonOutline, CyberButtonPrimary, HUDBorderBox } from '@/componen
 import { getAuthErrorMessage, validateEmail } from '@/domain/auth';
 import { spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { gymScanAuthNext, isGymScanContinuation } from '@/navigation/gymScanFlow';
 import { useAuth } from '@/state/auth';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { next } = useLocalSearchParams<{ next?: string }>();
+  const gymScanContinuation = isGymScanContinuation(next);
   const { firebaseConfigured, sendPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string>();
@@ -51,7 +54,10 @@ export default function ForgotPasswordScreen() {
       footer={(
         <CyberButtonOutline
           label="BACK TO SIGN IN"
-          onPress={() => goBackOrReplace(router, '/sign-in')}
+          onPress={() => goBackOrReplace(
+            router,
+            gymScanContinuation ? `/sign-in?next=${gymScanAuthNext}` : '/sign-in'
+          )}
         />
       )}
       title="RESET PASSWORD"

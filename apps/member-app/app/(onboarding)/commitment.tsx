@@ -63,6 +63,7 @@ export default function CommitmentScreen() {
   const { source } = useLocalSearchParams<{ source?: string }>();
   const { user } = useAuth();
   const isHomeSource = source === 'home';
+  const isGymScanSource = source === 'gym-scan';
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const { setWeeklyGoal, weeklyGoal } = useWorkoutProgress();
   const registrationReferenceDateKey = getCompetitionRegionDateKey(
@@ -200,13 +201,17 @@ export default function CommitmentScreen() {
         'bonus-days',
         'calculator-open'
       ].forEach((key) => clearScreenMemory(`${draftKey}:${key}`));
-      router.replace({
-        pathname: '/home',
-        params: {
-          goalDays: String(enrollmentResult.goalDays),
-          registered: '1'
-        }
-      });
+      if (isGymScanSource) {
+        router.replace('/qr-scanner?posterScan=1');
+      } else {
+        router.replace({
+          pathname: '/home',
+          params: {
+            goalDays: String(enrollmentResult.goalDays),
+            registered: '1'
+          }
+        });
+      }
     } catch (error) {
       setConfirmationError(
         error instanceof Error ? error.message : 'Registration could not be completed. Try again.'
@@ -227,7 +232,14 @@ export default function CommitmentScreen() {
       >
         <OnboardingHeader
           label="WEEKLY GOAL"
-          onBack={() => goBackOrReplace(router, isHomeSource ? '/home' : '/region')}
+          onBack={() => goBackOrReplace(
+            router,
+            isHomeSource
+              ? '/home'
+              : isGymScanSource
+                ? '/region?source=gym-scan'
+                : '/region'
+          )}
           progress={100}
           step="SETUP // 2 OF 2"
         />

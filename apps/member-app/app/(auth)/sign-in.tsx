@@ -25,11 +25,20 @@ import {
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
+import {
+  getGymScanPostAuthRoute,
+  gymScanAuthNext,
+  isGymScanContinuation
+} from '@/navigation/gymScanFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { challengeInvite, next } = useLocalSearchParams<{
+    challengeInvite?: string;
+    next?: string;
+  }>();
+  const gymScanContinuation = isGymScanContinuation(next);
   const { social } = useAppData();
   const {
     appleSignInAvailable,
@@ -48,7 +57,13 @@ export default function SignInScreen() {
     if (!result.user.emailVerified) {
       router.replace({
         pathname: '/verify-email',
-        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+        params: {
+          next: challengeInvite
+            ? `challenge:${challengeInvite}`
+            : gymScanContinuation
+              ? gymScanAuthNext
+              : 'home'
+        }
       });
       return;
     }
@@ -56,12 +71,19 @@ export default function SignInScreen() {
       await social.redeemContactInvitation(challengeInvite);
     }
     if (result.isNewUser) {
-      router.replace('/region');
+      router.replace(
+        gymScanContinuation ? getGymScanPostAuthRoute(true) : '/region'
+      );
       return;
     }
 
     if (challengeInvite) {
       router.replace('/squad/social');
+      return;
+    }
+
+    if (gymScanContinuation) {
+      router.replace(getGymScanPostAuthRoute(false));
       return;
     }
 
@@ -112,7 +134,13 @@ export default function SignInScreen() {
     if (!user.emailVerified) {
       router.replace({
         pathname: '/verify-email',
-        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+        params: {
+          next: challengeInvite
+            ? `challenge:${challengeInvite}`
+            : gymScanContinuation
+              ? gymScanAuthNext
+              : 'home'
+        }
       });
       return;
     }
@@ -122,6 +150,10 @@ export default function SignInScreen() {
       if (challengeInvite) {
         await social.redeemContactInvitation(challengeInvite);
         router.replace('/squad/social');
+        return;
+      }
+      if (gymScanContinuation) {
+        router.replace(getGymScanPostAuthRoute(false));
         return;
       }
       router.replace('/home?resume=1');
@@ -233,14 +265,22 @@ export default function SignInScreen() {
             <CyberButtonOutline
               disabled={busy}
               label="RESET PASSWORD"
-              onPress={() => router.push('/forgot-password')}
+              onPress={() => router.push(
+                gymScanContinuation
+                  ? { pathname: '/forgot-password', params: { next: gymScanAuthNext } }
+                  : '/forgot-password'
+              )}
             />
           </HUDBorderBox>
 
           <CyberButtonOutline
             disabled={busy}
             label="CREATE A NEW ACCOUNT"
-            onPress={() => router.replace('/sign-up')}
+            onPress={() => router.replace(
+              gymScanContinuation
+                ? { pathname: '/sign-up', params: { next: gymScanAuthNext } }
+                : '/sign-up'
+            )}
           />
         </View>
       )}

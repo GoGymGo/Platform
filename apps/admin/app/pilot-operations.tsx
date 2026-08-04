@@ -7,7 +7,7 @@ import type {
   OperatorReasonDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { parseCoordinate } from "./coordinate-input";
 import type {
   Competition,
@@ -53,9 +53,12 @@ const administrativeReason =
   "Configure the approved September 2026 static QR pilot.";
 
 export function PilotOperationsPanel(props: PilotOperationsProps) {
+  const createGymForm = useRef<HTMLFormElement>(null);
   const [poster, setPoster] = useState<GymQrCredential | null>(null);
   const [createGymError, setCreateGymError] = useState("");
   const [createGymSuccess, setCreateGymSuccess] = useState("");
+  const [locatingGym, setLocatingGym] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
   const [assignGymError, setAssignGymError] = useState("");
   const [assignGymSuccess, setAssignGymSuccess] = useState("");
 
@@ -115,6 +118,48 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     }
   }
 
+  function useCurrentLocation() {
+    setCreateGymError("");
+    setCreateGymSuccess("");
+    setLocationMessage("");
+
+    if (!navigator.geolocation) {
+      setCreateGymError(
+        "This browser cannot provide your location. Open the dashboard in Safari and try again.",
+      );
+      return;
+    }
+
+    setLocatingGym(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const form = createGymForm.current;
+        const latitude = form?.elements.namedItem("latitude");
+        const longitude = form?.elements.namedItem("longitude");
+        if (
+          !(latitude instanceof HTMLInputElement) ||
+          !(longitude instanceof HTMLInputElement)
+        ) {
+          setCreateGymError("The location fields could not be filled. Reload and try again.");
+          setLocatingGym(false);
+          return;
+        }
+
+        latitude.value = position.coords.latitude.toFixed(6);
+        longitude.value = position.coords.longitude.toFixed(6);
+        setLocationMessage(
+          `Location added automatically (accurate to about ${Math.round(position.coords.accuracy)} metres).`,
+        );
+        setLocatingGym(false);
+      },
+      (error) => {
+        setCreateGymError(locationErrorMessage(error));
+        setLocatingGym(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+    );
+  }
+
   async function assignGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -163,7 +208,12 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </p>
           </div>
         </div>
-        <form className="pilot-form" noValidate onSubmit={createGym}>
+        <form
+          className="pilot-form"
+          noValidate
+          onSubmit={createGym}
+          ref={createGymForm}
+        >
           <label>
             <span>GYM NAME</span>
             <input name="name" required />
@@ -221,10 +271,22 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
           <p className="pilot-form-help" id="gym-coordinate-help">
-            Paste either decimal coordinates or the degree/minute/second format
-            shown by your phone&rsquo;s Compass app. West is saved as a negative
-            longitude automatically.
+            Stand near the centre of the gym and let your phone fill both
+            coordinates. You can still paste Compass coordinates if needed.
           </p>
+          <button
+            className="secondary-button pilot-location-button"
+            disabled={props.submitting || locatingGym}
+            onClick={useCurrentLocation}
+            type="button"
+          >
+            {locatingGym ? "FINDING LOCATION..." : "USE MY CURRENT LOCATION"}
+          </button>
+          {locationMessage ? (
+            <p aria-live="polite" className="pilot-form-message location-success">
+              {locationMessage}
+            </p>
+          ) : null}
           <button
             className="primary-button"
             disabled={props.submitting}
@@ -452,6 +514,16 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 
 function formErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "The request could not be completed.";
+}
+
+function locationErrorMessage(error: GeolocationPositionError) {
+  if (error.code === error.PERMISSION_DENIED) {
+    return "Location access was not allowed. Open this page in Safari, allow location access when prompted, then try again.";
+  }
+  if (error.code === error.TIMEOUT) {
+    return "Your phone could not get a location in time. Move near a window or outdoors briefly, then try again.";
+  }
+  return "Your phone could not determine its location. Check that Location Services are enabled and try again.";
 }
 
 function GymCard({

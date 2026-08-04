@@ -1650,6 +1650,17 @@ td small {
   line-height: 1.45;
 }
 
+.pilot-location-button {
+  grid-column: 1 / -1;
+  min-height: 48px;
+}
+
+.pilot-form-message.location-success {
+  color: var(--cyan-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .pilot-form .check-field {
   display: flex;
   align-items: center;

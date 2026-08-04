@@ -56,13 +56,16 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(page, /className="eyebrow campaign-status"/);
   assert.match(page, /Registration and competition entry continue in the member app/);
   assert.match(page, /Regional updates do not create an app account/);
-  assert.match(page, /aria-label="Important eligibility notes" className="hero-qualifiers"/);
+  assert.match(page, /className="hero-scoring"/);
+  assert.match(page, /className="hero-scoring__heading"/);
+  assert.match(page, /From verified visit to monthly multiplier/);
   assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ minutes/);
   assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
   assert.doesNotMatch(page, /brand-console|landing-feature-grid|proof-strip|brand-teaser-section/);
   assert.match(page, /GET FUTURE-REGION UPDATES/);
   assert.match(page, /PARTNER WITH GOGYMGO/);
+  assert.match(page, /siteLinks\.partnerApplication/);
   assert.match(page, /<h2>Choose your next step\.<\/h2>/);
   assert.match(productScreens, /active-workout\.webp/);
   assert.match(productScreens, /name: "Chris_Mohan"/);
@@ -152,27 +155,28 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(layout, /tabIndex=\{-1\}/);
 });
 
-test("eligibility guidance is local-only, honest about gym availability, and app-confirmed", async () => {
-  const [page, checker, appLink] = await Promise.all([
+test("home replaces the eligibility quick check with an operational partner-gym path", async () => {
+  const [page, links, brands, forms] = await Promise.all([
     read("app/page.tsx"),
-    read("app/components/EligibilityCheck.tsx"),
-    read("app/components/AppLink.tsx"),
+    read("app/site-links.ts"),
+    read("app/brands/page.tsx"),
+    read("app/components/InterestForms.tsx"),
   ]);
 
-  assert.match(page, /<EligibilityCheck \/>/);
-  assert.match(page, /campaignState\.phase !== "ended"/);
-  assert.match(checker, /private on-page check is not saved/);
-  assert.match(checker, /has not published a public partner-gym directory/);
-  assert.match(checker, /name="age"/);
-  assert.match(checker, /name="region"/);
-  assert.match(checker, /name="partnerGym"/);
-  assert.match(checker, /type="radio"/);
-  assert.match(checker, /CHECK MY ANSWERS/);
-  assert.doesNotMatch(checker, /<select/);
-  assert.match(checker, /recordPublicSiteEvent\("eligibility_check_completed"\)/);
-  assert.doesNotMatch(checker, /fetch\(|localStorage|sessionStorage|document\.cookie/);
-  assert.match(appLink, /opens the GoGymGo app/);
-  assert.match(appLink, /aria-hidden="true" className="app-link-cue">\s+↗/);
+  assert.doesNotMatch(page, /EligibilityCheck|ELIGIBILITY \/\/ QUICK CHECK|CHECK MY ANSWERS/);
+  await assert.rejects(access(new URL("app/components/EligibilityCheck.tsx", root)));
+  assert.match(page, /FOR GYM OWNERS/);
+  assert.match(page, /Make verified visits easier to support/);
+  assert.match(page, /Keep verification off the front desk/);
+  assert.match(page, /Create another reason to return/);
+  assert.match(page, /BECOME A PARTNER GYM/);
+  assert.match(page, /data-analytics-event="brand_partnership_click"/);
+  assert.match(page, /href=\{siteLinks\.partnerApplication\}/);
+  assert.match(links, /partnerApplication: "\/brands#brand-form"/);
+  assert.match(brands, /partner-gym and fitness-brand inquiries/);
+  assert.match(brands, /Every gym and campaign is reviewed before activation/);
+  assert.match(forms, /value="gym-partnership"/);
+  assert.match(forms, /PARTNERSHIP DETAILS \(OPTIONAL\)/);
 });
 
 test("landing conversion measurement is anonymous, allowlisted, empty by default, and owner-exportable", async () => {
@@ -251,7 +255,7 @@ test("brand inquiry remains detailed and isolated from the regional list", async
   assert.match(forms, /name="companyName"/);
   assert.equal((forms.match(/<fieldset className="form-section/g) ?? []).length, 3);
   assert.match(forms, /<span>01<\/span> CONTACT &amp; COMPANY/);
-  assert.match(forms, /<span>02<\/span> CAMPAIGN FIT/);
+  assert.match(forms, /<span>02<\/span> PARTNERSHIP FIT/);
   assert.match(forms, /<span>03<\/span> CONSENT &amp; NEXT STEP/);
   assert.match(forms, /written approval/);
   assert.match(forms, /aria-busy=\{state === "submitting"\}/);
@@ -352,9 +356,10 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(globals, /\.contact-grid \{[\s\S]*?repeat\(2/);
   assert.match(globals, /\.faq-item summary \{/);
   assert.match(experience, /scroll-snap-type: x mandatory/);
-  assert.match(experience, /\.hero-qualifiers \{/);
-  assert.match(experience, /\.hero-qualifiers li \{/);
-  assert.match(experience, /\.hero-qualifiers a \{[\s\S]*?min-height: 44px/);
+  assert.match(experience, /\.hero-scoring \{[\s\S]*?grid-column: 1 \/ -1/);
+  assert.match(experience, /\.scoring-explainer ol \{[\s\S]*?grid-template-columns: repeat\(3/);
+  assert.match(experience, /\.gym-owner-grid \{[\s\S]*?grid-template-columns: repeat\(4/);
+  assert.match(experience, /@media \(max-width: 600px\)[\s\S]*?\.gym-owner-grid \{[\s\S]*?grid-template-columns: 1fr/);
   assert.match(experience, /grid-template-columns: repeat\(2, minmax\(min\(82vw, 360px\), 1fr\)\)/);
 });
 

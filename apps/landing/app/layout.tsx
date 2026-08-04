@@ -175,7 +175,7 @@ export default function RootLayout({
                 data-analytics-event="brand_partnership_click"
                 href={siteLinks.brands}
               >
-                Fitness brand partnerships
+                Partner with GoGymGo
               </Link>
               <Link href={siteLinks.faq}>Frequently asked questions</Link>
               <Link href={siteLinks.contact}>Contact</Link>

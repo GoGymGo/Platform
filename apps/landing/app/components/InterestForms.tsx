@@ -348,7 +348,7 @@ export function BrandForm() {
 
       <fieldset className="form-section">
         <legend>
-          <span>02</span> CAMPAIGN FIT
+          <span>02</span> PARTNERSHIP FIT
         </legend>
         <div className="field-grid">
           <div className="field">
@@ -382,12 +382,12 @@ export function BrandForm() {
         </div>
 
         <div className="field">
-          <label htmlFor="message">CAMPAIGN DETAILS (OPTIONAL)</label>
+          <label htmlFor="message">PARTNERSHIP DETAILS (OPTIONAL)</label>
           <textarea
             id="message"
             maxLength={1200}
             name="message"
-            placeholder="Share your preferred timing, audience, region, inventory, budget range, fulfillment plan, or reporting needs."
+            placeholder="Share your gym locations, member experience, preferred timing, region, inventory, fulfillment plan, or reporting needs."
           />
         </div>
       </fieldset>

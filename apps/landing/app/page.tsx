@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
 import { AppLink } from "./components/AppLink";
-import { EligibilityCheck } from "./components/EligibilityCheck";
 import { ProductScreens } from "./components/ProductScreens";
 import { siteLinks } from "./site-links";
 
@@ -53,6 +52,24 @@ const readinessFacts = [
   {
     title: "CHECK CURRENT GYM STATUS",
     copy: "A public partner-gym directory is not available. Look for an active GoGymGo poster; the app confirms whether it currently qualifies.",
+  },
+] as const;
+
+const gymOwnerBenefits = [
+  {
+    number: "01",
+    title: "Give members one clear flow",
+    copy: "An active partner poster supports the same entry and exit scan process on every eligible visit.",
+  },
+  {
+    number: "02",
+    title: "Keep verification off the front desk",
+    copy: "Members follow the workout timer, location prompts, and evidence steps in the app on their own device.",
+  },
+  {
+    number: "03",
+    title: "Create another reason to return",
+    copy: "Weekly goals and monthly competitions reinforce consistent visits without changing your core membership offering.",
   },
 ] as const;
 
@@ -114,6 +131,10 @@ function SeptemberChallengePanel({ statusLabel }: { statusLabel: string }) {
           <dd>{septemberCampaign.perfectMonthMultiplier}× eligible entries</dd>
         </div>
       </dl>
+      <div className="pilot-console__footer">
+        <span>NO PURCHASE REQUIRED // ACTIVE PARTNER POSTER REQUIRED</span>
+        <AppLink href={siteLinks.officialRules}>OFFICIAL RULES</AppLink>
+      </div>
     </aside>
   );
 }
@@ -160,30 +181,6 @@ export default function Home() {
             )}
           </p>
 
-          <div className="scoring-explainer">
-            <h2 className="visually-hidden">How competition scoring works</h2>
-            <ol>
-              {scoringSteps.map((step) => (
-                <li key={step.number}>
-                  <span>{step.number}</span>
-                  <div>
-                    <strong>{step.title}</strong>
-                    <p>{step.copy}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <p className="scoring-explainer__note">
-              Miss a Weekly Goal and that week settles at zero Prize Draw
-              Entries. Entries improve relative odds but never guarantee the
-              reward. The published{" "}
-              <AppLink href={siteLinks.officialRules}>
-                Official Contest Rules
-              </AppLink>{" "}
-              control if a summary differs.
-            </p>
-          </div>
-
           <div className="hero-actions">
             {memberRegistrationAvailable ? (
               <AppLink
@@ -221,26 +218,93 @@ export default function Home() {
               ? "Registration and competition entry continue in the member app. Regional updates do not create an app account."
               : "Regional updates do not create an app account or competition entry."}
           </p>
-          <ul aria-label="Important eligibility notes" className="hero-qualifiers">
-            <li>NO PURCHASE REQUIRED</li>
-            <li>ACTIVE GOGYMGO POSTER REQUIRED</li>
-            <li>
-              <AppLink href={siteLinks.officialRules}>
-                READ OFFICIAL RULES
-              </AppLink>
-            </li>
-          </ul>
         </div>
         <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
+
+        <div className="hero-scoring">
+          <div className="hero-scoring__heading">
+            <div>
+              <p className="eyebrow">HOW COMPETITION SCORING WORKS</p>
+              <h2>From verified visit to monthly multiplier.</h2>
+            </div>
+            <p>
+              Goal Score tracks approved gym days. Prize Draw Entries are
+              banked only after you complete the Weekly Goal you selected.
+            </p>
+          </div>
+          <div className="scoring-explainer">
+            <ol>
+              {scoringSteps.map((step) => (
+                <li key={step.number}>
+                  <span>{step.number}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.copy}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="scoring-explainer__note">
+              Miss a Weekly Goal and that week settles at zero Prize Draw
+              Entries. Entries improve relative odds but never guarantee the
+              reward. The published{" "}
+              <AppLink href={siteLinks.officialRules}>
+                Official Contest Rules
+              </AppLink>{" "}
+              control if a summary differs.
+            </p>
+          </div>
+        </div>
       </section>
 
-      {campaignState.phase !== "ended" ? <EligibilityCheck /> : null}
+      <section className="section gym-owner-section" id="gym-partners">
+        <div className="shell">
+          <div className="section-heading gym-owner-heading">
+            <div>
+              <p className="eyebrow eyebrow-pink">FOR GYM OWNERS</p>
+              <h2>Make verified visits easier to support.</h2>
+            </div>
+            <p>
+              GoGymGo gives eligible members a repeatable app-guided visit
+              flow, while your team provides the active partner poster and the
+              gym experience you already run.
+            </p>
+          </div>
+
+          <div className="gym-owner-grid">
+            {gymOwnerBenefits.map((benefit) => (
+              <article className="gym-owner-benefit" key={benefit.number}>
+                <span>{benefit.number}</span>
+                <h3>{benefit.title}</h3>
+                <p>{benefit.copy}</p>
+              </article>
+            ))}
+
+            <aside className="gym-owner-cta">
+              <p>PARTNER GYM INTAKE</p>
+              <h3>Bring GoGymGo to your gym.</h3>
+              <span>
+                Tell us about your location and operating setup. A submission
+                requests a partnership review; it does not activate a gym
+                immediately.
+              </span>
+              <Link
+                className="button button-pink"
+                data-analytics-event="brand_partnership_click"
+                href={siteLinks.partnerApplication}
+              >
+                BECOME A PARTNER GYM <span aria-hidden="true">→</span>
+              </Link>
+            </aside>
+          </div>
+        </div>
+      </section>
 
       <section className="section shell" id="how-it-works">
         <div className="section-heading">
           <div>
             <p className="eyebrow">JOINING &amp; VERIFICATION</p>
-            <h2>From eligibility to an approved gym day.</h2>
+            <h2>From signup to an approved gym day.</h2>
           </div>
           <p>
             Registration happens in the app. The landing-page update list does
@@ -323,7 +387,7 @@ export default function Home() {
           <Link
             className="button button-secondary"
             data-analytics-event="brand_partnership_click"
-            href={siteLinks.brands}
+            href={siteLinks.partnerApplication}
           >
             PARTNER WITH GOGYMGO <span aria-hidden="true">→</span>
           </Link>

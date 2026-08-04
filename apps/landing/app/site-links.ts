@@ -8,6 +8,7 @@ export const siteLinks = {
   home: "/",
   memberApp: "https://app.gogymgo.com/",
   officialRules: "https://app.gogymgo.com/official-rules",
+  partnerApplication: "/brands#brand-form",
   privacy: "https://app.gogymgo.com/privacy-policy",
   publicSiteHelp: "/contact#public-site-help",
   regionalUpdates: "/gym-goers#gym-form",
@@ -27,7 +28,7 @@ export const primaryNavigationItems = [
   {
     currentPath: "/brands",
     href: siteLinks.brands,
-    label: "FITNESS BRANDS",
+    label: "PARTNERS",
   },
   {
     currentPath: "/faq",

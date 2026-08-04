@@ -1,14 +1,16 @@
 .landing-hero {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.72fr);
-  align-items: start;
-  gap: 64px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(390px, 0.78fr);
+  align-items: stretch;
+  gap: 38px 54px;
   padding-block: 72px 76px;
 }
 
 .landing-hero .hero-copy {
-  max-width: 720px;
+  max-width: 680px;
+  display: grid;
+  align-content: start;
 }
 
 .landing-hero h1 {
@@ -16,22 +18,52 @@
 }
 
 .landing-hero .hero-lede {
-  max-width: 690px;
+  max-width: 650px;
   margin-top: 20px;
   color: var(--muted);
   font-size: 18px;
   line-height: 1.5;
 }
 
+.hero-scoring {
+  grid-column: 1 / -1;
+  padding: 28px;
+  border: 1px solid rgba(52, 229, 232, 0.28);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(52, 229, 232, 0.055), transparent 46%),
+    rgba(7, 13, 18, 0.72);
+}
+
+.hero-scoring__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.72fr);
+  align-items: end;
+  gap: 42px;
+}
+
+.hero-scoring__heading h2 {
+  max-width: 720px;
+  margin-top: 8px;
+  font-size: clamp(28px, 3vw, 42px);
+}
+
+.hero-scoring__heading > p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
 .scoring-explainer {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   margin-top: 24px;
 }
 
 .scoring-explainer ol {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -39,9 +71,11 @@
 
 .scoring-explainer li {
   display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 12px;
-  padding: 13px 14px;
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 14px;
+  min-height: 164px;
+  padding: 18px;
   border: 1px solid rgba(52, 229, 232, 0.2);
   border-radius: 9px;
   background: rgba(11, 17, 24, 0.62);
@@ -74,6 +108,7 @@
 }
 
 .scoring-explainer__note {
+  margin-top: 2px;
   padding-left: 12px;
   border-left: 2px solid var(--amber);
   color: var(--dim);
@@ -104,182 +139,78 @@
   line-height: 1.55;
 }
 
-.hero-qualifiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 14px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.hero-qualifiers li {
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border: 1px solid rgba(52, 229, 232, 0.18);
-  border-radius: 7px;
-  color: var(--dim);
-  background: rgba(52, 229, 232, 0.025);
-  font-family: "Share Tech Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-}
-
-.hero-qualifiers a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 6px 10px;
-  color: var(--cyan);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.hero-qualifiers li:has(a) {
-  padding: 0;
-}
-
-.eligibility-section {
+.gym-owner-section {
   border-block: 1px solid rgba(52, 229, 232, 0.16);
   background:
-    radial-gradient(circle at 12% 18%, rgba(52, 229, 232, 0.08), transparent 24rem),
+    radial-gradient(circle at 12% 18%, rgba(255, 45, 155, 0.08), transparent 24rem),
     rgba(11, 17, 24, 0.48);
 }
 
-.eligibility-layout {
+.gym-owner-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(480px, 1fr);
-  align-items: start;
-  gap: 56px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 36px;
 }
 
-.eligibility-intro {
-  display: grid;
-  gap: 16px;
+.gym-owner-benefit,
+.gym-owner-cta {
+  min-height: 268px;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(7, 13, 18, 0.78);
 }
 
-.eligibility-intro h2 {
-  margin-top: -8px;
+.gym-owner-benefit > span {
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
 }
 
-.eligibility-availability-note {
-  padding: 18px 18px 18px 20px;
-  border-left: 2px solid var(--amber);
-  background: rgba(255, 224, 102, 0.045);
+.gym-owner-benefit h3,
+.gym-owner-cta h3 {
+  margin-top: 24px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.gym-owner-benefit p {
+  margin-top: 12px;
   color: var(--muted);
   font-size: 15px;
+}
+
+.gym-owner-cta {
+  border-color: rgba(255, 45, 155, 0.48);
+  background:
+    linear-gradient(160deg, rgba(255, 45, 155, 0.11), transparent 64%),
+    rgba(11, 9, 17, 0.92);
+}
+
+.gym-owner-cta > p {
+  color: var(--pink);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.gym-owner-cta > span {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
   line-height: 1.55;
 }
 
-.eligibility-check {
-  display: grid;
-  gap: 16px;
-  padding: 28px;
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: rgba(7, 13, 18, 0.82);
-}
-
-.eligibility-question {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.eligibility-question legend {
-  padding: 0;
-  color: var(--text);
-  font-weight: 650;
-  line-height: 1.45;
-}
-
-.eligibility-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.eligibility-options--two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.eligibility-options label {
-  position: relative;
-  cursor: pointer;
-}
-
-.eligibility-options input {
-  position: absolute;
-  inset: 0;
+.gym-owner-cta .button {
   width: 100%;
-  height: 100%;
-  margin: 0;
-  cursor: pointer;
-  opacity: 0;
+  margin-top: auto;
+  padding-inline: 14px;
 }
 
-.eligibility-options span {
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 10px;
-  border: 1px solid rgba(52, 229, 232, 0.3);
-  border-radius: 8px;
-  color: var(--muted);
-  background: rgba(7, 13, 18, 0.92);
-  font-size: 14px;
-  font-weight: 650;
-  text-align: center;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
-}
-
-.eligibility-options input:focus-visible + span {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-
-.eligibility-options input:checked + span {
-  border-color: var(--cyan);
-  color: #04282a;
-  background: var(--cyan);
-  box-shadow: 0 0 18px rgba(52, 229, 232, 0.14);
-}
-
-.eligibility-result {
-  display: grid;
-  gap: 12px;
-  margin-top: 6px;
-  padding: 20px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: rgba(52, 229, 232, 0.05);
-}
-
-.eligibility-result--not-eligible {
-  border-color: rgba(255, 224, 102, 0.5);
-  background: rgba(255, 224, 102, 0.05);
-}
-
-.eligibility-result h3 {
-  font-size: 17px;
-}
-
-.eligibility-result p {
-  color: var(--muted);
-  font-size: 15px;
-}
-
-.eligibility-result .button {
-  justify-self: start;
-  margin-top: 4px;
-}
-
-.eligibility-result__actions,
 .transparency-actions {
   display: flex;
   flex-wrap: wrap;
@@ -325,6 +256,7 @@
 }
 
 .pilot-console {
+  height: 100%;
   overflow: hidden;
   border: 1px solid rgba(52, 229, 232, 0.52);
   border-radius: 22px;
@@ -446,6 +378,28 @@
   font-family: "Orbitron", sans-serif;
   font-size: 15px;
   line-height: 1.35;
+}
+
+.pilot-console__footer {
+  min-height: 84px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  color: var(--dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.pilot-console__footer a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .product-showcase {
@@ -763,17 +717,29 @@
     width: 100%;
   }
 
-  .eligibility-layout {
-    grid-template-columns: 1fr;
-    gap: 28px;
+  .hero-scoring {
+    grid-column: auto;
   }
 
-  .eligibility-intro {
-    max-width: 760px;
+  .hero-scoring__heading {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .gym-owner-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 720px) {
+  .scoring-explainer ol {
+    grid-template-columns: 1fr;
+  }
+
+  .scoring-explainer li {
+    min-height: 0;
+  }
+
   .product-swipe-hint {
     display: block;
     margin-top: 32px;
@@ -822,6 +788,11 @@
     font-size: clamp(28px, 8.4vw, 34px);
   }
 
+  .hero-scoring {
+    padding: 18px;
+    border-radius: 14px;
+  }
+
   .scoring-explainer {
     margin-top: 20px;
   }
@@ -841,23 +812,32 @@
     display: grid;
   }
 
-  .hero-qualifiers li {
-    min-height: 44px;
-  }
-
-  .eligibility-check {
-    padding: 20px 16px;
-  }
-
-  .eligibility-result .button,
-  .eligibility-result__actions,
   .transparency-actions {
     width: 100%;
   }
 
-  .eligibility-result__actions,
   .transparency-actions {
     display: grid;
+  }
+
+  .gym-owner-grid {
+    grid-template-columns: 1fr;
+    margin-top: 26px;
+  }
+
+  .gym-owner-benefit,
+  .gym-owner-cta {
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .gym-owner-benefit h3,
+  .gym-owner-cta h3 {
+    margin-top: 16px;
+  }
+
+  .gym-owner-cta .button {
+    margin-top: 22px;
   }
 
   .transparency-grid {
@@ -910,6 +890,13 @@
 
   .pilot-console__facts dd {
     font-size: 13px;
+  }
+
+  .pilot-console__footer {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px;
   }
 
   .product-phone {

@@ -50,8 +50,8 @@ export default function AccessibilityPage() {
               of interactions such as app-link clicks, FAQ opens, and the first
               use of a public form. These measurement events contain only the
               event name, public page path, and time. They do not store cookies,
-              identifiers, eligibility-check answers, form values, precise
-              location, or member-app activity.
+              identifiers, form values, precise location, or member-app
+              activity.
             </p>
           </section>
           <section>

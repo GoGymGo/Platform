@@ -5,22 +5,22 @@ import { BrandForm } from "../components/InterestForms";
 export const metadata: Metadata = {
   alternates: { canonical: "/brands" },
   description:
-    "Explore future GoGymGo regional campaigns, reward inventory, placements, approvals, and aggregate reporting for fitness brands.",
-  title: "Fitness brand partnerships",
+    "Explore GoGymGo partner-gym opportunities and future regional campaigns for gym operators and fitness brands.",
+  title: "Partner with GoGymGo",
 };
 
 const partnerSteps = [
   {
-    title: "01 // CHOOSE THE CAMPAIGN",
-    copy: "Define the intended region, month, audience, placement, and destination before any public launch.",
+    title: "01 // CHOOSE THE PARTNERSHIP",
+    copy: "Tell us whether you operate a gym, provide rewards, or want to support a future regional campaign.",
   },
   {
-    title: "02 // DEFINE REAL INVENTORY",
-    copy: "Confirm in-stock physical products or valid coupon inventory, terms, availability, fulfillment, and support responsibilities.",
+    title: "02 // CONFIRM THE OPERATING DETAILS",
+    copy: "Define the location, region, member experience, inventory, fulfillment, or support responsibilities that apply.",
   },
   {
-    title: "03 // REVIEW AND PUBLISH",
-    copy: "Approve creative, disclosures, reporting scope, and regional requirements before anything appears in the app.",
+    title: "03 // REVIEW AND ACTIVATE",
+    copy: "Agree on verification, creative, disclosures, reporting scope, and regional requirements before anything goes live.",
   },
 ];
 
@@ -34,13 +34,13 @@ export default function BrandsPage() {
             FOUNDING PARTNER PROGRAM
           </p>
           <h1>
-            Reach verified gym communities at moments that <span>matter.</span>
+            Build a partnership around real gym <span>visits.</span>
           </h1>
           <p>
-            GoGymGo is preparing future approved regional campaigns for fitness
-            brands that can support real product or coupon rewards. The current
-            September pilot reward is sponsored by GoGymGo, not an outside
-            brand.
+            GoGymGo reviews partner-gym and fitness-brand inquiries for future
+            regional programs. Gym operators can explore active-poster
+            verification, while brands can propose rewards and approved
+            campaigns. The current September pilot reward is sponsored by GoGymGo.
           </p>
           <div className="audience-actions">
             <Link
@@ -48,7 +48,7 @@ export default function BrandsPage() {
               data-analytics-event="brand_partnership_click"
               href="#brand-form"
             >
-              REQUEST A PARTNERSHIP REVIEW <span aria-hidden="true">↓</span>
+              START A PARTNERSHIP REQUEST <span aria-hidden="true">↓</span>
             </Link>
           </div>
         </div>
@@ -60,11 +60,11 @@ export default function BrandsPage() {
         >
           <div className="form-card-header">
             <span>FOUNDING PARTNER INTAKE // OPEN</span>
-            <h2 id="brand-form-title">Explore a future campaign</h2>
+            <h2 id="brand-form-title">Tell us where you fit</h2>
             <p>
-              Tell us the region, timing, inventory, and outcome you are
-              considering. We review inquiries weekly and aim to respond within
-              five business days.
+              Share your organization, region, locations, operating needs, or
+              campaign idea. We review inquiries weekly and aim to respond
+              within five business days.
             </p>
             <small>Fields marked * are required.</small>
           </div>
@@ -77,7 +77,7 @@ export default function BrandsPage() {
         >
           <p className="eyebrow eyebrow-pink">HOW A PARTNERSHIP MOVES FORWARD</p>
           <h2 id="brand-details-title">
-            Nothing is presented to players before approval.
+            Every gym and campaign is reviewed before activation.
           </h2>
           <div className="audience-points partner-steps">
             {partnerSteps.map((step) => (

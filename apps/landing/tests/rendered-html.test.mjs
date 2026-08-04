@@ -59,12 +59,15 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
   assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
   assert.match(productScreens, /active-workout\.webp/);
-  assert.match(productScreens, /winners-circle\.webp/);
+  assert.match(productScreens, /name: "Chris_Mohan"/);
+  assert.match(productScreens, /name: "JennyS"/);
+  assert.match(productScreens, /<small>Prize winner<\/small>/);
+  assert.doesNotMatch(productScreens, /Coupon winner/i);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS →/);
   assert.doesNotMatch(productScreens, /â†’/);
   assert.match(productScreens, /tabIndex=\{0\}/);
-  assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 2);
+  assert.equal((productScreens.match(/src="\/app\//g) ?? []).length, 1);
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
   assert.match(layout, /href=\{siteLinks\.regionalUpdates\}[\s\S]*?Regional launch updates/);
   assert.match(layout, /width: 1200/);

@@ -806,8 +806,8 @@
 
 @media (max-width: 600px) {
   .landing-hero {
-    gap: 28px;
-    padding-block: 40px 46px;
+    gap: 22px;
+    padding-block: 32px 38px;
   }
 
   .landing-hero .hero-lede {
@@ -815,7 +815,7 @@
   }
 
   .landing-page .section {
-    padding-block: 52px;
+    padding-block: 44px;
   }
 
   .landing-page h2 {
@@ -846,7 +846,7 @@
   }
 
   .eligibility-check {
-    padding: 22px 18px;
+    padding: 20px 16px;
   }
 
   .eligibility-result .button,
@@ -867,7 +867,15 @@
 
   .transparency-card {
     min-height: 0;
-    padding: 22px;
+    padding: 18px;
+  }
+
+  .product-swipe-hint {
+    margin-top: 24px;
+  }
+
+  .product-screen-grid {
+    margin-top: 14px;
   }
 
   .pilot-console__header {
@@ -875,7 +883,7 @@
   }
 
   .pilot-console__reward {
-    padding: 22px 10px;
+    padding: 18px 10px;
   }
 
   .pilot-console__reward strong {
@@ -883,7 +891,7 @@
   }
 
   .pilot-console__window {
-    padding: 20px 10px;
+    padding: 18px 10px;
   }
 
   .pilot-console__window strong {
@@ -896,8 +904,8 @@
   }
 
   .pilot-console__facts > div {
-    min-height: 74px;
-    padding: 12px;
+    min-height: 66px;
+    padding: 10px 12px;
   }
 
   .pilot-console__facts dd {

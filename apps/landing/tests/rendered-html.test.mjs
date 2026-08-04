@@ -29,6 +29,9 @@ test("campaign facts have one landing-owned source of truth", async () => {
   assert.match(campaign, /currentTime >= startTime/);
   assert.match(campaign, /primaryLabel: "CHECK CURRENT AVAILABILITY"/);
   assert.match(campaign, /primaryLabel: "GET REGIONAL UPDATES"/);
+  assert.match(campaign, /goalScorePerVerifiedDay: 1/);
+  assert.match(campaign, /scoringWeekCount: 4/);
+  assert.match(campaign, /perfectMonthMultiplier: 10/);
   assert.match(page, /getSeptemberCampaignState\(\)/);
   assert.match(gymPage, /getSeptemberCampaignState\(\)/);
   assert.match(faq, /septemberCampaign\.competitionWindow/);
@@ -45,7 +48,7 @@ test("home offers direct next steps without repeating long feature sections", as
     read("app/site-links.ts"),
   ]);
 
-  assert.match(page, /compete for one \{septemberCampaign\.reward\} reward/);
+  assert.match(page, /Choose a Weekly Goal of \{septemberCampaign\.weeklyGoalRange\}/);
   assert.match(page, /\{campaignState\.primaryLabel\}/);
   assert.match(page, /campaignState\.phase === "ended"/);
   assert.match(page, /siteLinks\.regionalUpdates/);
@@ -54,15 +57,20 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(page, /Registration and competition entry continue in the member app/);
   assert.match(page, /Regional updates do not create an app account/);
   assert.match(page, /aria-label="Important eligibility notes" className="hero-qualifiers"/);
-  assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ MIN/);
+  assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ minutes/);
   assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
-  assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
+  assert.doesNotMatch(page, /brand-console|landing-feature-grid|proof-strip|brand-teaser-section/);
+  assert.match(page, /GET FUTURE-REGION UPDATES/);
+  assert.match(page, /PARTNER WITH GOGYMGO/);
+  assert.match(page, /<h2>Choose your next step\.<\/h2>/);
   assert.match(productScreens, /active-workout\.webp/);
   assert.match(productScreens, /name: "Chris_Mohan"/);
   assert.match(productScreens, /name: "JennyS"/);
   assert.match(productScreens, /<small>Prize winner<\/small>/);
   assert.doesNotMatch(productScreens, /Coupon winner/i);
+  assert.match(productScreens, /Track your verified workout/);
+  assert.match(productScreens, /See final winners and prizes/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS →/);
   assert.doesNotMatch(productScreens, /â†’/);
@@ -73,6 +81,26 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
   assert.doesNotMatch(layout, /Administrator sign-in|admin-control/);
+});
+
+test("home explains Goal Score and Prize Draw Entries without conflating them", async () => {
+  const [campaign, page] = await Promise.all([
+    read("app/campaign.ts"),
+    read("app/page.tsx"),
+  ]);
+
+  assert.match(campaign, /goalScorePerVerifiedDay: 1/);
+  assert.match(campaign, /scoringWeekCount: 4/);
+  assert.match(campaign, /perfectMonthMultiplier: 10/);
+  assert.match(page, /One approved workout per regional calendar day adds/);
+  assert.match(page, /point to Goal Score/);
+  assert.match(page, /Meet your chosen Weekly Goal to bank that week’s Prize Draw Entries/);
+  assert.match(page, /A higher completed goal earns more base entries/);
+  assert.match(page, /Miss a Weekly Goal and that week settles at zero Prize Draw/);
+  assert.match(page, /Perfect Month multiplier on eligible entries after settlement/);
+  assert.match(page, /Entries improve relative odds but never guarantee the/);
+  assert.match(page, /Official Contest Rules/);
+  assert.doesNotMatch(page, /every verified (?:visit|workout).*Prize Draw Entr/i);
 });
 
 test("local preview and hosted deployment use compatible runtime settings", async () => {
@@ -138,6 +166,9 @@ test("eligibility guidance is local-only, honest about gym availability, and app
   assert.match(checker, /name="age"/);
   assert.match(checker, /name="region"/);
   assert.match(checker, /name="partnerGym"/);
+  assert.match(checker, /type="radio"/);
+  assert.match(checker, /CHECK MY ANSWERS/);
+  assert.doesNotMatch(checker, /<select/);
   assert.match(checker, /recordPublicSiteEvent\("eligibility_check_completed"\)/);
   assert.doesNotMatch(checker, /fetch\(|localStorage|sessionStorage|document\.cookie/);
   assert.match(appLink, /opens the GoGymGo app/);

@@ -5,40 +5,54 @@ import { EligibilityCheck } from "./components/EligibilityCheck";
 import { ProductScreens } from "./components/ProductScreens";
 import { siteLinks } from "./site-links";
 
-const steps = [
+const scoringSteps = [
   {
     number: "01",
-    title: "Confirm you are eligible",
-    copy: `The September beta is for gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}. The app confirms region and current rules before enrollment.`,
+    title: "Verify visits",
+    copy: `One approved workout per regional calendar day adds ${septemberCampaign.goalScorePerVerifiedDay} point to Goal Score.`,
+  },
+  {
+    number: "02",
+    title: "Complete your goal",
+    copy: "Meet your chosen Weekly Goal to bank that week’s Prize Draw Entries. A higher completed goal earns more base entries.",
+  },
+  {
+    number: "03",
+    title: "Multiply your month",
+    copy: `Meet your goal in all ${septemberCampaign.scoringWeekCount} scoring weeks to unlock a ${septemberCampaign.perfectMonthMultiplier}× Perfect Month multiplier on eligible entries after settlement.`,
+  },
+] as const;
+
+const journeySteps = [
+  {
+    number: "01",
+    title: "Confirm the basics",
+    copy: `Check the ${septemberCampaign.minimumAge}+ age, regional, and active partner-poster requirements before registration.`,
   },
   {
     number: "02",
     title: "Choose a Weekly Goal",
-    copy: `Commit to ${septemberCampaign.weeklyGoalRange} per scoring week. Your choice is locked for the September competition.`,
+    copy: `Commit to ${septemberCampaign.weeklyGoalRange} per scoring week. Your choice stays fixed for the September competition.`,
   },
   {
     number: "03",
     title: "Verify each workout",
-    copy: `At an approved partner gym, scan the same poster on entry and after at least ${septemberCampaign.minimumSessionMinutes} minutes with a fresh location reading.`,
+    copy: `Scan the same active poster on entry and after at least ${septemberCampaign.minimumSessionMinutes} minutes. Submitted evidence is reviewed before credit.`,
   },
-];
+] as const;
 
-const transparencyFacts = [
-  {
-    title: "ONE DISCLOSED REWARD",
-    copy: `The September pilot has one ${septemberCampaign.reward} reward sponsored by ${septemberCampaign.rewardSponsor}. No outside brand sponsors the current reward.`,
-  },
+const readinessFacts = [
   {
     title: "NO PURCHASE REQUIRED",
-    copy: "Joining is free. Age, location, published legal terms, competition availability, and approved partner-gym access still apply.",
+    copy: "Joining is free. Age, location, current competition availability, and active partner-poster access still apply.",
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
-    copy: `A workout stays pending until the submitted entry scan, exit scan, fresh location readings, and ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed.`,
+    copy: `Only one approved workout per regional calendar day counts. Entry and exit scans, fresh location readings, and the ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed first.`,
   },
   {
-    title: "CURRENT GYM STATUS",
-    copy: "A public partner-gym directory is not published. The member app is authoritative for active GoGymGo posters and current availability.",
+    title: "CHECK CURRENT GYM STATUS",
+    copy: "A public partner-gym directory is not available. Look for an active GoGymGo poster; the app confirms whether it currently qualifies.",
   },
 ] as const;
 
@@ -70,39 +84,36 @@ function SeptemberChallengePanel({ statusLabel }: { statusLabel: string }) {
         <span>SEPTEMBER 2026 BETA</span>
         <b>{statusLabel}</b>
       </div>
-      <div className="pilot-console__reward">
-        <span>ONE PUBLISHED REWARD</span>
-        <strong>{septemberCampaign.reward}</strong>
-        <p>Sponsored by {septemberCampaign.rewardSponsor}</p>
-      </div>
-      <div className="pilot-console__window">
-        <span>COMPETITION WINDOW</span>
-        <strong>{septemberCampaign.compactWindow}</strong>
-        <p>{septemberCampaign.timeWindow}</p>
+      <div className="pilot-console__summary">
+        <div className="pilot-console__reward">
+          <span>ONE REWARD</span>
+          <strong>{septemberCampaign.reward}</strong>
+          <p>Sponsored by {septemberCampaign.rewardSponsor}</p>
+        </div>
+        <div className="pilot-console__window">
+          <span>COMPETITION WINDOW</span>
+          <strong>{septemberCampaign.compactWindow}</strong>
+          <p>{septemberCampaign.scoringWeekCount} scoring weeks</p>
+        </div>
       </div>
       <dl className="pilot-console__facts">
         <div>
-          <dt>ELIGIBLE REGION</dt>
-          <dd>{septemberCampaign.regionName}</dd>
+          <dt>WEEKLY GOAL</dt>
+          <dd>{septemberCampaign.weeklyGoalRange}</dd>
         </div>
         <div>
           <dt>MINIMUM AGE</dt>
           <dd>{septemberCampaign.minimumAge}+</dd>
         </div>
         <div>
-          <dt>WEEKLY GOAL</dt>
-          <dd>{septemberCampaign.weeklyGoalRange}</dd>
-        </div>
-        <div>
-          <dt>VERIFIED SESSION</dt>
+          <dt>VERIFIED WORKOUT</dt>
           <dd>{septemberCampaign.minimumSessionMinutes}+ minutes</dd>
         </div>
+        <div>
+          <dt>PERFECT MONTH</dt>
+          <dd>{septemberCampaign.perfectMonthMultiplier}× eligible entries</dd>
+        </div>
       </dl>
-      <p className="pilot-console__note">
-        {septemberCampaign.registrationNote} The app also confirms location,
-        published legal documents, and partner-gym eligibility before
-        enrollment.
-      </p>
     </aside>
   );
 }
@@ -136,18 +147,43 @@ export default function Home() {
           <p className="hero-lede">
             {campaignState.phase === "ended" ? (
               <>
-                The September 2026 beta has ended. Review how the pilot worked
+                The September 2026 beta has ended. Review how the month worked
                 or request updates about future availability in your region.
               </>
             ) : (
               <>
-                Eligible gym-goers age {septemberCampaign.minimumAge}+ on{" "}
-                {septemberCampaign.regionName} can join the free September beta
-                and compete for one {septemberCampaign.reward} reward sponsored
-                by {septemberCampaign.rewardSponsor}.
+                Choose a Weekly Goal of {septemberCampaign.weeklyGoalRange} and
+                compete across {septemberCampaign.scoringWeekCount} September
+                scoring weeks. Every approved gym day builds Goal Score;
+                completed weekly goals bank Prize Draw Entries.
               </>
             )}
           </p>
+
+          <div className="scoring-explainer">
+            <h2 className="visually-hidden">How competition scoring works</h2>
+            <ol>
+              {scoringSteps.map((step) => (
+                <li key={step.number}>
+                  <span>{step.number}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.copy}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="scoring-explainer__note">
+              Miss a Weekly Goal and that week settles at zero Prize Draw
+              Entries. Entries improve relative odds but never guarantee the
+              reward. The published{" "}
+              <AppLink href={siteLinks.officialRules}>
+                Official Contest Rules
+              </AppLink>{" "}
+              control if a summary differs.
+            </p>
+          </div>
+
           <div className="hero-actions">
             {memberRegistrationAvailable ? (
               <AppLink
@@ -163,7 +199,7 @@ export default function Home() {
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
+                GET FUTURE-REGION UPDATES <span aria-hidden="true">→</span>
               </Link>
             )}
             {memberRegistrationAvailable ? (
@@ -172,7 +208,7 @@ export default function Home() {
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
+                GET FUTURE-REGION UPDATES <span aria-hidden="true">→</span>
               </Link>
             ) : (
               <Link className="button button-secondary" href={siteLinks.faq}>
@@ -187,8 +223,7 @@ export default function Home() {
           </p>
           <ul aria-label="Important eligibility notes" className="hero-qualifiers">
             <li>NO PURCHASE REQUIRED</li>
-            <li>APPROVED PARTNER GYM REQUIRED</li>
-            <li>REGIONAL RULES APPLY</li>
+            <li>ACTIVE GOGYMGO POSTER REQUIRED</li>
             <li>
               <AppLink href={siteLinks.officialRules}>
                 READ OFFICIAL RULES
@@ -199,45 +234,21 @@ export default function Home() {
         <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
       </section>
 
-      <section
-        aria-label="September beta at a glance"
-        className="proof-strip"
-      >
-        <div className="shell proof-grid">
-          <div>
-            <strong>19+</strong>
-            <span>MINIMUM ELIGIBLE AGE</span>
-          </div>
-          <div>
-            <strong>1–7</strong>
-            <span>WEEKLY GOAL DAYS</span>
-          </div>
-          <div>
-            <strong>{septemberCampaign.minimumSessionMinutes}+ MIN</strong>
-            <span>VERIFIED MINIMUM</span>
-          </div>
-          <div>
-            <strong>$0</strong>
-            <span>ENTRY COST</span>
-          </div>
-        </div>
-      </section>
-
       {campaignState.phase !== "ended" ? <EligibilityCheck /> : null}
 
       <section className="section shell" id="how-it-works">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">HOW GOGYMGO WORKS</p>
-            <h2>Three steps from eligibility to a verified workout.</h2>
+            <p className="eyebrow">JOINING &amp; VERIFICATION</p>
+            <h2>From eligibility to an approved gym day.</h2>
           </div>
           <p>
-            Registration and competition eligibility are confirmed in the app.
-            Joining the regional update list does not register you for the beta.
+            Registration happens in the app. The landing-page update list does
+            not create an account or competition entry.
           </p>
         </div>
         <div className="steps-grid landing-steps">
-          {steps.map((step) => (
+          {journeySteps.map((step) => (
             <article className="step-card" key={step.number}>
               <span className="step-number">{step.number}</span>
               <h3>{step.title}</h3>
@@ -251,16 +262,16 @@ export default function Home() {
         <div className="shell">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">PILOT TRANSPARENCY // PUBLISHED FACTS</p>
-              <h2>What is fixed—and what is confirmed in the app.</h2>
+              <p className="eyebrow">BEFORE YOU JOIN</p>
+              <h2>What to know before you start.</h2>
             </div>
             <p>
-              These are the public September facts. The published Official
-              Contest Rules control if a summary differs.
+              These summaries explain the public September basics. The
+              published Official Contest Rules control if a summary differs.
             </p>
           </div>
           <div className="transparency-grid">
-            {transparencyFacts.map((fact) => (
+            {readinessFacts.map((fact) => (
               <article className="transparency-card" key={fact.title}>
                 <h3>{fact.title}</h3>
                 <p>{fact.copy}</p>
@@ -283,33 +294,10 @@ export default function Home() {
 
       <ProductScreens />
 
-      <section className="section brand-section brand-teaser-section">
-        <div className="shell brand-teaser">
-          <div>
-            <p className="eyebrow eyebrow-pink">FOR FITNESS BRANDS</p>
-            <h2>Support the habit. Reward the effort.</h2>
-          </div>
-          <div className="brand-teaser__copy">
-            <p>
-              The September pilot reward is sponsored by GoGymGo. We are also
-              preparing future, approved regional campaigns with fitness brands
-              that can supply real product or coupon inventory.
-            </p>
-            <Link
-              className="button button-pink"
-              data-analytics-event="brand_partnership_click"
-              href={siteLinks.brands}
-            >
-              EXPLORE A FOUNDING PARTNERSHIP <span aria-hidden="true">→</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
       <section className="section shell final-cta">
         <div>
-          <p className="eyebrow">CHOOSE THE RIGHT NEXT STEP</p>
-          <h2>Eligible now, waiting for your region, or representing a brand?</h2>
+          <p className="eyebrow">CHOOSE YOUR NEXT STEP</p>
+          <h2>Choose your next step.</h2>
         </div>
         <div className="final-actions">
           {memberRegistrationAvailable ? (
@@ -330,14 +318,14 @@ export default function Home() {
             data-analytics-event="regional_updates_click"
             href={siteLinks.regionalUpdates}
           >
-            GET REGIONAL UPDATES <span aria-hidden="true">→</span>
+            GET FUTURE-REGION UPDATES <span aria-hidden="true">→</span>
           </Link>
           <Link
             className="button button-secondary"
             data-analytics-event="brand_partnership_click"
             href={siteLinks.brands}
           >
-            EXPLORE PARTNERSHIPS <span aria-hidden="true">→</span>
+            PARTNER WITH GOGYMGO <span aria-hidden="true">→</span>
           </Link>
         </div>
       </section>

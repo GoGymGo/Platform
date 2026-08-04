@@ -536,12 +536,12 @@ h3 {
 }
 
 .step-card {
-  min-height: 248px;
+  min-height: 220px;
 }
 
 .step-number {
   display: block;
-  margin-bottom: 42px;
+  margin-bottom: 32px;
   color: var(--cyan);
   font-family: "Orbitron", sans-serif;
   font-size: 21px;
@@ -553,70 +553,11 @@ h3 {
   font-size: 16px;
 }
 
-.proof-strip {
-  border-block: 1px solid rgba(52, 229, 232, 0.18);
-  background: rgba(11, 17, 24, 0.78);
-}
-
-.proof-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.proof-grid > div {
-  min-height: 112px;
-  display: grid;
-  align-content: center;
-  gap: 8px;
-  padding: 20px 28px;
-  border-right: 1px solid var(--line);
-}
-
-.proof-grid > div:last-child {
-  border-right: 0;
-}
-
-.proof-grid strong {
-  color: var(--cyan);
-  font-family: "Orbitron", sans-serif;
-  font-size: 25px;
-}
-
-.proof-grid span {
-  color: var(--dim);
-  font-family: "Share Tech Mono", monospace;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-
-.brand-section {
-  border-bottom: 1px solid rgba(255, 45, 155, 0.18);
-  background: radial-gradient(circle at 80% 35%, rgba(255, 45, 155, 0.08), transparent 30rem);
-}
-
-.brand-teaser {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 0.65fr);
-  align-items: center;
-  gap: 72px;
-}
-
-.brand-teaser__copy {
-  display: grid;
-  justify-items: start;
-  gap: 26px;
-}
-
-.brand-teaser__copy p {
-  color: var(--muted);
-  font-size: 18px;
-}
-
 .final-cta {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.85fr);
   align-items: center;
-  gap: 70px;
+  gap: 54px;
 }
 
 .final-cta h2 {
@@ -1461,7 +1402,6 @@ h3 {
     max-width: 760px;
   }
 
-  .brand-teaser,
   .final-cta,
   .info-cta,
   .feedback-panel {
@@ -1519,18 +1459,6 @@ h3 {
 
   .step-number {
     margin-bottom: 28px;
-  }
-
-  .proof-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .proof-grid > div:nth-child(2) {
-    border-right: 0;
-  }
-
-  .proof-grid > div:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--line);
   }
 
   .info-page {
@@ -1593,29 +1521,12 @@ h3 {
     width: 100%;
   }
 
-  .proof-grid > div {
-    min-height: 96px;
-    padding: 16px;
-  }
-
-  .proof-grid strong {
-    font-size: 22px;
-  }
-
-  .proof-grid span {
-    font-size: 11px;
-  }
-
   .step-card {
     padding: 24px;
   }
 
-  .brand-teaser {
-    gap: 42px;
-  }
-
   .final-cta {
-    gap: 34px;
+    gap: 28px;
   }
 
   .footer-grid {

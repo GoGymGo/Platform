@@ -8,6 +8,8 @@ export const septemberCampaign = {
   endDate: "October 1, 2026 at 12:00 a.m. PDT",
   minimumAge: 19,
   minimumSessionMinutes: 30,
+  goalScorePerVerifiedDay: 1,
+  perfectMonthMultiplier: 10,
   regionName: "Vancouver Island + Gulf Islands",
   registrationLabel: "REGISTRATION OPEN",
   registrationNote:
@@ -15,6 +17,7 @@ export const septemberCampaign = {
   reward: "$100 CAD",
   rewardSponsor: "GoGymGo",
   startDate: "September 1, 2026 at 12:00 a.m. PDT",
+  scoringWeekCount: 4,
   supportedIslands: [
     "Denman Island",
     "Ballenas-Winchelsea",

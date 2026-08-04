@@ -118,7 +118,7 @@ export function ProductScreens() {
             </div>
             <div className="product-screen-caption">
               <span>01 // VERIFY</span>
-              <h3>Follow the authoritative workout timer</h3>
+              <h3>Track your verified workout</h3>
             </div>
           </article>
 
@@ -128,7 +128,7 @@ export function ProductScreens() {
             </div>
             <div className="product-screen-caption">
               <span>02 // RESULTS</span>
-              <h3>Review published competition results</h3>
+              <h3>See final winners and prizes</h3>
             </div>
           </article>
         </div>

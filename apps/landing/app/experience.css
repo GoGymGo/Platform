@@ -1,33 +1,97 @@
 .landing-hero {
-  min-height: 760px;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(400px, 0.82fr);
-  align-items: center;
-  gap: 76px;
-  padding-block: 84px 92px;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.72fr);
+  align-items: start;
+  gap: 64px;
+  padding-block: 72px 76px;
 }
 
 .landing-hero .hero-copy {
-  max-width: 650px;
+  max-width: 720px;
 }
 
 .landing-hero h1 {
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .landing-hero .hero-lede {
-  max-width: 630px;
-  margin-top: 26px;
+  max-width: 690px;
+  margin-top: 20px;
   color: var(--muted);
-  font-size: 20px;
-  line-height: 1.55;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.scoring-explainer {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.scoring-explainer ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scoring-explainer li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(52, 229, 232, 0.2);
+  border-radius: 9px;
+  background: rgba(11, 17, 24, 0.62);
+}
+
+.scoring-explainer li > span {
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.scoring-explainer li div {
+  min-width: 0;
+}
+
+.scoring-explainer strong {
+  display: block;
+  color: var(--text);
+  font-family: "Orbitron", sans-serif;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.scoring-explainer li p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.48;
+}
+
+.scoring-explainer__note {
+  padding-left: 12px;
+  border-left: 2px solid var(--amber);
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.scoring-explainer__note a {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 30px;
+  margin-top: 24px;
 }
 
 .hero-action-note {
@@ -36,7 +100,7 @@
   padding-left: 13px;
   border-left: 2px solid var(--cyan);
   color: var(--dim);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -44,7 +108,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 18px 0 0;
+  margin: 14px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -88,28 +152,25 @@
   display: grid;
   grid-template-columns: minmax(0, 0.78fr) minmax(480px, 1fr);
   align-items: start;
-  gap: 72px;
+  gap: 56px;
 }
 
 .eligibility-intro {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .eligibility-intro h2 {
   margin-top: -8px;
 }
 
-.eligibility-intro > p:not(.eyebrow) {
-  color: var(--muted);
-  font-size: 17px;
-}
-
 .eligibility-availability-note {
-  padding: 18px;
+  padding: 18px 18px 18px 20px;
   border-left: 2px solid var(--amber);
   background: rgba(255, 224, 102, 0.045);
-  font-size: 14px !important;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 .eligibility-check {
@@ -124,28 +185,69 @@
 .eligibility-question {
   display: grid;
   gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.eligibility-question label {
+.eligibility-question legend {
+  padding: 0;
   color: var(--text);
   font-weight: 650;
   line-height: 1.45;
 }
 
-.eligibility-question select {
-  width: 100%;
-  height: 50px;
-  padding: 0 13px;
-  border: 1px solid rgba(52, 229, 232, 0.3);
-  border-radius: 8px;
-  outline: none;
-  color: var(--text);
-  background: rgba(7, 13, 18, 0.92);
+.eligibility-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.eligibility-question select:focus {
+.eligibility-options--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.eligibility-options label {
+  position: relative;
+  cursor: pointer;
+}
+
+.eligibility-options input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.eligibility-options span {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(52, 229, 232, 0.3);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(7, 13, 18, 0.92);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: center;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.eligibility-options input:focus-visible + span {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.eligibility-options input:checked + span {
   border-color: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(52, 229, 232, 0.13);
+  color: #04282a;
+  background: var(--cyan);
+  box-shadow: 0 0 18px rgba(52, 229, 232, 0.14);
 }
 
 .eligibility-result {
@@ -192,14 +294,14 @@
 
 .transparency-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 44px;
+  margin-top: 34px;
 }
 
 .transparency-card {
-  min-height: 176px;
-  padding: 24px;
+  min-height: 0;
+  padding: 22px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(11, 17, 24, 0.75);
@@ -232,6 +334,11 @@
   box-shadow: 0 0 42px rgba(52, 229, 232, 0.13), 0 30px 70px rgba(0, 0, 0, 0.36);
 }
 
+.pilot-console__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .pilot-console__header {
   display: flex;
   justify-content: space-between;
@@ -252,7 +359,8 @@
 .pilot-console__reward {
   display: grid;
   justify-items: center;
-  padding: 42px 24px 34px;
+  padding: 30px 18px;
+  border-right: 1px solid var(--line);
   text-align: center;
 }
 
@@ -267,7 +375,7 @@
   margin-top: 10px;
   color: var(--cyan);
   font-family: "Orbitron", sans-serif;
-  font-size: clamp(44px, 5vw, 64px);
+  font-size: clamp(34px, 3.7vw, 48px);
   line-height: 1;
   text-shadow: 0 0 22px rgba(52, 229, 232, 0.4);
 }
@@ -281,8 +389,8 @@
   display: grid;
   justify-items: center;
   gap: 5px;
-  padding: 20px 22px;
-  border-top: 1px solid var(--line);
+  align-content: center;
+  padding: 24px 16px;
   text-align: center;
 }
 
@@ -311,11 +419,11 @@
 }
 
 .pilot-console__facts > div {
-  min-height: 104px;
+  min-height: 82px;
   display: grid;
   align-content: center;
   gap: 6px;
-  padding: 18px 22px;
+  padding: 15px 18px;
 }
 
 .pilot-console__facts > div:nth-child(odd) {
@@ -338,12 +446,6 @@
   font-family: "Orbitron", sans-serif;
   font-size: 15px;
   line-height: 1.35;
-}
-
-.pilot-console__note {
-  padding: 20px 22px;
-  color: var(--muted);
-  font-size: 14px;
 }
 
 .product-showcase {
@@ -641,12 +743,16 @@
   font-size: 17px;
 }
 
+.landing-page .section {
+  padding-block: 84px;
+}
+
 @media (max-width: 980px) {
   .landing-hero {
     min-height: 0;
     grid-template-columns: 1fr;
-    gap: 48px;
-    padding-block: 72px 82px;
+    gap: 34px;
+    padding-block: 60px 68px;
   }
 
   .landing-hero .hero-copy {
@@ -654,12 +760,12 @@
   }
 
   .pilot-console {
-    width: min(100%, 680px);
+    width: 100%;
   }
 
   .eligibility-layout {
     grid-template-columns: 1fr;
-    gap: 38px;
+    gap: 28px;
   }
 
   .eligibility-intro {
@@ -700,12 +806,35 @@
 
 @media (max-width: 600px) {
   .landing-hero {
-    gap: 40px;
-    padding-block: 52px 62px;
+    gap: 28px;
+    padding-block: 40px 46px;
   }
 
   .landing-hero .hero-lede {
-    font-size: 18px;
+    font-size: 17px;
+  }
+
+  .landing-page .section {
+    padding-block: 52px;
+  }
+
+  .landing-page h2 {
+    font-size: clamp(28px, 8.4vw, 34px);
+  }
+
+  .scoring-explainer {
+    margin-top: 20px;
+  }
+
+  .scoring-explainer li {
+    grid-template-columns: 28px 1fr;
+    gap: 9px;
+    padding: 11px 12px;
+  }
+
+  .scoring-explainer li p,
+  .scoring-explainer__note {
+    font-size: 14px;
   }
 
   .hero-actions {
@@ -733,7 +862,7 @@
 
   .transparency-grid {
     grid-template-columns: 1fr;
-    margin-top: 32px;
+    margin-top: 26px;
   }
 
   .transparency-card {
@@ -746,16 +875,29 @@
   }
 
   .pilot-console__reward {
-    padding-block: 34px 28px;
+    padding: 22px 10px;
   }
 
   .pilot-console__reward strong {
-    font-size: 46px;
+    font-size: 30px;
+  }
+
+  .pilot-console__window {
+    padding: 20px 10px;
+  }
+
+  .pilot-console__window strong {
+    font-size: 15px;
+  }
+
+  .pilot-console__window p,
+  .pilot-console__reward p {
+    font-size: 12px;
   }
 
   .pilot-console__facts > div {
-    min-height: 96px;
-    padding: 15px;
+    min-height: 74px;
+    padding: 12px;
   }
 
   .pilot-console__facts dd {

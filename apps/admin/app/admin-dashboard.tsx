@@ -4,16 +4,20 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
   getAuth,
-  GoogleAuthProvider,
-  OAuthProvider,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type {
   AdminSection,
   AuditEvent,
@@ -37,20 +41,66 @@ type HttpMethod = "POST" | "PUT";
 
 type ConfirmAction = {
   actionLabel: string;
+  auditReason?: string;
   description: string;
   execute: (reason: string) => Promise<void>;
   tone?: "danger" | "primary";
 };
 
-const navigation: { id: AdminSection; label: string; short: string }[] = [
-  { id: "overview", label: "Overview", short: "OV" },
-  { id: "pilot", label: "QR Pilot", short: "QR" },
-  { id: "competitions", label: "Competitions", short: "CO" },
-  { id: "rewards", label: "Rewards", short: "RW" },
-  { id: "regions", label: "Regions", short: "RG" },
-  { id: "content", label: "Content + Legal", short: "CL" },
-  { id: "operations", label: "Operations", short: "OP" },
-  { id: "audit", label: "Audit history", short: "AU" },
+const navigation: {
+  description: string;
+  id: AdminSection;
+  label: string;
+  short: string;
+}[] = [
+  {
+    description: "Current launch readiness, workload and system health at a glance.",
+    id: "overview",
+    label: "Overview",
+    short: "OV",
+  },
+  {
+    description: "Manage pilot gyms, static QR posters, field sessions and intake.",
+    id: "pilot",
+    label: "QR Pilot",
+    short: "QR",
+  },
+  {
+    description: "Build, review and release regional competitions to players.",
+    id: "competitions",
+    label: "Competitions",
+    short: "CO",
+  },
+  {
+    description: "Control reward inventory, coupon readiness and publication status.",
+    id: "rewards",
+    label: "Rewards",
+    short: "RW",
+  },
+  {
+    description: "Review the geographic and age policies that determine eligibility.",
+    id: "regions",
+    label: "Regions",
+    short: "RG",
+  },
+  {
+    description: "Maintain creator workouts and authoritative legal document versions.",
+    id: "content",
+    label: "Content + Legal",
+    short: "CL",
+  },
+  {
+    description: "Monitor background processing and items awaiting human review.",
+    id: "operations",
+    label: "Operations",
+    short: "OP",
+  },
+  {
+    description: "Trace the latest administrative decisions, actors and reasons.",
+    id: "audit",
+    label: "Audit history",
+    short: "AU",
+  },
 ];
 
 const creatorFeaturesEnabled = false;
@@ -114,9 +164,7 @@ export function AdminDashboard({
     .filter(([key]) => key !== "measurementId")
     .every(([, value]) => Boolean(value));
   const [section, setSection] = useState<AdminSection>("overview");
-  const [authStage, setAuthStage] = useState<AuthStage>(
-    firebaseConfigured ? "checking" : "signed-out",
-  );
+  const [authStage, setAuthStage] = useState<AuthStage>("signed-out");
   const [user, setUser] = useState<User | null>(null);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
@@ -221,19 +269,30 @@ export function AdminDashboard({
 
   useEffect(() => {
     if (!firebaseConfigured) return;
-    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    void setPersistence(auth, browserLocalPersistence);
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setSnapshot(null);
-      if (nextUser) {
-        setAuthStage("checking");
-        void refresh(nextUser);
-      } else {
+    try {
+      const app =
+        getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      void setPersistence(auth, browserLocalPersistence).catch((error) => {
+        setLoadError(authErrorMessage(error));
+      });
+      return onAuthStateChanged(auth, (nextUser) => {
+        setUser(nextUser);
+        setSnapshot(null);
+        if (nextUser) {
+          setAuthStage("checking");
+          void refresh(nextUser);
+        } else {
+          setAuthStage("signed-out");
+        }
+      });
+    } catch (error) {
+      queueMicrotask(() => {
         setAuthStage("signed-out");
-      }
-    });
+        setLoadError(authErrorMessage(error));
+      });
+      return;
+    }
   }, [firebaseConfig, firebaseConfigured, refresh]);
 
   useEffect(() => {
@@ -272,25 +331,16 @@ export function AdminDashboard({
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     try {
-      const auth = getAuth();
+      if (!firebaseConfigured) {
+        throw new Error(
+          "Administrator sign-in is not configured for this deployment.",
+        );
+      }
+      const app =
+        getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+      const auth = getAuth(app);
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      setLoadError(authErrorMessage(error));
-    }
-  }
-
-  async function handleProviderSignIn(provider: "apple" | "google") {
-    setLoadError("");
-    try {
-      const auth = getAuth();
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(
-        auth,
-        provider === "google"
-          ? new GoogleAuthProvider()
-          : new OAuthProvider("apple.com"),
-      );
     } catch (error) {
       setLoadError(authErrorMessage(error));
     }
@@ -312,7 +362,6 @@ export function AdminDashboard({
         error={loadError}
         firebaseConfigured={firebaseConfigured}
         onEmailSignIn={handleEmailSignIn}
-        onProviderSignIn={handleProviderSignIn}
         onSignOut={user ? handleSignOut : undefined}
         signedInEmail={user?.email ?? undefined}
       />
@@ -344,6 +393,8 @@ export function AdminDashboard({
   const activeCompetition = snapshot.competitions.find((competition) =>
     ["registration", "active"].includes(competition.status),
   );
+  const activeNavigation =
+    navigation.find((item) => item.id === section) ?? navigation[0];
 
   return (
     <div className="admin-shell">
@@ -358,9 +409,12 @@ export function AdminDashboard({
         <nav aria-label="Admin sections">
           {navigation.map((item) => (
             <button
+              aria-current={section === item.id ? "page" : undefined}
+              aria-label={item.label}
               className={section === item.id ? "nav-item active" : "nav-item"}
               key={item.id}
               onClick={() => setSection(item.id)}
+              title={item.label}
               type="button"
             >
               <span className="nav-short">{item.short}</span>
@@ -382,18 +436,23 @@ export function AdminDashboard({
         </div>
       </aside>
 
-      <main>
+      <main aria-busy={busy}>
         <header className="topbar">
-          <div>
+          <div className="topbar-heading">
             <p className="eyebrow">SYSTEM // {section.toUpperCase()}</p>
-            <h1>{navigation.find((item) => item.id === section)?.label}</h1>
+            <h1>{activeNavigation.label}</h1>
+            <p className="page-context">{activeNavigation.description}</p>
           </div>
           <div className="topbar-actions">
-            <span className={`health-pill ${health?.worker.status ?? "stale"}`}>
-              <span />
+            <span
+              aria-label={`Operations worker status: ${health?.worker.status ?? "unknown"}`}
+              className={`health-pill ${health?.worker.status ?? "stale"}`}
+            >
+              <span aria-hidden="true" />
               WORKER {health?.worker.status.toUpperCase() ?? "UNKNOWN"}
             </span>
             <button
+              aria-label={busy ? "Refreshing dashboard data" : "Refresh dashboard data"}
               className="icon-button"
               disabled={busy}
               onClick={() => {
@@ -438,6 +497,10 @@ export function AdminDashboard({
                     action === "publish"
                       ? "Publish competition"
                       : "Cancel competition",
+                  auditReason:
+                    action === "publish"
+                      ? "Publish the approved competition after operator confirmation."
+                      : undefined,
                   description:
                     action === "publish"
                       ? `${competition.name} will become visible and joinable in the player app immediately.`
@@ -734,7 +797,6 @@ function SignInScreen({
   error,
   firebaseConfigured,
   onEmailSignIn,
-  onProviderSignIn,
   onSignOut,
   signedInEmail,
 }: {
@@ -742,7 +804,6 @@ function SignInScreen({
   error: string;
   firebaseConfigured: boolean;
   onEmailSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onProviderSignIn: (provider: "apple" | "google") => Promise<void>;
   onSignOut?: () => Promise<void>;
   signedInEmail?: string;
 }) {
@@ -769,9 +830,9 @@ function SignInScreen({
         <div className="security-list">
           <span>01</span>
           <p>
-            <strong>Database-authorized access</strong>
-            Firebase sign-in identifies you. The backend admin role decides
-            what you may change.
+            <strong>GoGymGo-issued accounts only</strong>
+            There is no public registration. GoGymGo provides credentials
+            directly to approved gym owners and regional directors.
           </p>
           <span>02</span>
           <p>
@@ -782,8 +843,8 @@ function SignInScreen({
         </div>
       </section>
       <section className="sign-in-panel">
-        <p className="eyebrow">ADMIN AUTHENTICATION</p>
-        <h2>{denied ? "Admin access required" : "Sign in to continue"}</h2>
+        <p className="eyebrow">INVITATION-ONLY OPERATOR ACCESS</p>
+        <h2>{denied ? "Operator access required" : "Sign in to continue"}</h2>
         {denied ? (
           <div className="alert error compact" role="alert">
             <span>!</span>
@@ -811,7 +872,7 @@ function SignInScreen({
           <>
             <form className="stacked-form" onSubmit={(event) => void onEmailSignIn(event)}>
               <label>
-                ADMIN EMAIL
+                GOGYMGO-ISSUED EMAIL
                 <input
                   autoComplete="username"
                   name="email"
@@ -835,31 +896,12 @@ function SignInScreen({
                 ENTER ADMIN CONTROL
               </button>
             </form>
-            <div className="divider">
-              <span>OR USE YOUR CONNECTED ACCOUNT</span>
-            </div>
-            <div className="provider-grid">
-              <button
-                className="secondary-button"
-                onClick={() => void onProviderSignIn("google")}
-                type="button"
-              >
-                GOOGLE
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() => void onProviderSignIn("apple")}
-                type="button"
-              >
-                APPLE
-              </button>
-            </div>
           </>
         )}
         <p className="fine-print">
-          Authentication never grants itself permission. Only active,
-          email-verified accounts with the authoritative database admin role
-          may enter.
+          A valid password does not grant access by itself. Only active,
+          email-verified accounts provisioned directly by GoGymGo and assigned
+          the authoritative database admin role may enter.
         </p>
       </section>
     </main>
@@ -1031,7 +1073,12 @@ function Metric({
   onClick: () => void;
 }) {
   return (
-    <button className="metric" onClick={onClick} type="button">
+    <button
+      aria-label={`${label}: ${value}. ${detail || "Open details"}`}
+      className="metric"
+      onClick={onClick}
+      type="button"
+    >
       <span>{label}</span>
       <strong>{String(value).padStart(2, "0")}</strong>
       <small>{detail || "Open details"} →</small>
@@ -1203,16 +1250,16 @@ function RewardsPanel({
           title="No brand rewards configured"
         />
       ) : (
-        <div className="table-wrap">
+        <div aria-label="Rewards table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
           <table>
             <thead>
               <tr>
-                <th>Reward</th>
-                <th>Competition</th>
-                <th>Type</th>
-                <th>Inventory</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
+                <th scope="col">Reward</th>
+                <th scope="col">Competition</th>
+                <th scope="col">Type</th>
+                <th scope="col">Inventory</th>
+                <th scope="col">Status</th>
+                <th aria-label="Actions" scope="col" />
               </tr>
             </thead>
             <tbody>
@@ -1314,42 +1361,49 @@ function RegionsPanel({
           + NEW REGION POLICY
         </button>
       </div>
-      <div className="card-list">
-        {regions.map((region) => (
-          <article className="region-card" key={region.id}>
-            <div className="region-code">{region.code}</div>
-            <div>
-              <span
-                className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
-              >
-                {region.competitionEnabled ? "competition enabled" : "disabled"}
-              </span>
-              <h3>{region.metroName}</h3>
-              <p>
-                {region.countryCode}-{region.subdivisionCode} · {region.timezone}
-              </p>
-            </div>
-            <dl>
+      {regions.length === 0 ? (
+        <EmptyState
+          body="Create the first time-bounded regional policy before configuring a competition."
+          title="No regional policies configured"
+        />
+      ) : (
+        <div className="card-list">
+          {regions.map((region) => (
+            <article className="region-card" key={region.id}>
+              <div className="region-code">{region.code}</div>
               <div>
-                <dt>POLICY</dt>
-                <dd>{region.policyVersion}</dd>
+                <span
+                  className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
+                >
+                  {region.competitionEnabled ? "competition enabled" : "disabled"}
+                </span>
+                <h3>{region.metroName}</h3>
+                <p>
+                  {region.countryCode}-{region.subdivisionCode} · {region.timezone}
+                </p>
               </div>
-              <div>
-                <dt>BOUNDARY</dt>
-                <dd>{region.boundaryVersion}</dd>
-              </div>
-              <div>
-                <dt>MINIMUM AGE</dt>
-                <dd>{region.minimumAge}</dd>
-              </div>
-              <div>
-                <dt>VALID FROM</dt>
-                <dd>{formatDate(region.validFrom)}</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
-      </div>
+              <dl>
+                <div>
+                  <dt>POLICY</dt>
+                  <dd>{region.policyVersion}</dd>
+                </div>
+                <div>
+                  <dt>BOUNDARY</dt>
+                  <dd>{region.boundaryVersion}</dd>
+                </div>
+                <div>
+                  <dt>MINIMUM AGE</dt>
+                  <dd>{region.minimumAge}</dd>
+                </div>
+                <div>
+                  <dt>VALID FROM</dt>
+                  <dd>{formatDate(region.validFrom)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -1383,6 +1437,7 @@ function ContentPanel({
           <div>
             <p className="eyebrow">CREATOR WORKOUT CATALOG</p>
             <h2>Workout content</h2>
+            <p>Review the approved workout catalog and control what members can access.</p>
           </div>
           <button
             className="primary-button"
@@ -1458,62 +1513,70 @@ function ContentPanel({
           <div>
             <p className="eyebrow">SERVER-AUTHORITATIVE LEGAL TEXT</p>
             <h2>Legal documents</h2>
+            <p>Publish approved, versioned policy text and withdraw superseded releases.</p>
           </div>
           <button className="primary-button" onClick={onCreateDocument} type="button">
             + PUBLISH VERSION
           </button>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Scope</th>
-                <th>Version</th>
-                <th>Effective</th>
-                <th>Owner approval</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((document) => (
-                <tr key={document.id}>
-                  <td>
-                    <strong>{document.title}</strong>
-                    <small>{document.documentKey}</small>
-                  </td>
-                  <td>
-                    {document.jurisdictionCode} · {document.locale}
-                  </td>
-                  <td>{document.version}</td>
-                  <td>{formatDate(document.effectiveAt)}</td>
-                  <td>
-                    <span className={`status-tag ${document.ownerApprovedAt ? "active" : "draft"}`}>
-                      {document.ownerApprovedAt ? "approved" : "not approved"}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`status-tag ${document.status}`}>
-                      {document.status}
-                    </span>
-                  </td>
-                  <td>
-                    {document.status !== "withdrawn" ? (
-                      <button
-                        className="text-button danger-text"
-                        onClick={() => onWithdrawDocument(document)}
-                        type="button"
-                      >
-                        Withdraw
-                      </button>
-                    ) : null}
-                  </td>
+        {documents.length === 0 ? (
+          <EmptyState
+            body="Publish the first owner-approved document version when the legal text is ready."
+            title="No legal documents published"
+          />
+        ) : (
+          <div aria-label="Legal documents table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Document</th>
+                  <th scope="col">Scope</th>
+                  <th scope="col">Version</th>
+                  <th scope="col">Effective</th>
+                  <th scope="col">Owner approval</th>
+                  <th scope="col">Status</th>
+                  <th aria-label="Actions" scope="col" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {documents.map((document) => (
+                  <tr key={document.id}>
+                    <td>
+                      <strong>{document.title}</strong>
+                      <small>{document.documentKey}</small>
+                    </td>
+                    <td>
+                      {document.jurisdictionCode} · {document.locale}
+                    </td>
+                    <td>{document.version}</td>
+                    <td>{formatDate(document.effectiveAt)}</td>
+                    <td>
+                      <span className={`status-tag ${document.ownerApprovedAt ? "active" : "draft"}`}>
+                        {document.ownerApprovedAt ? "approved" : "not approved"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status-tag ${document.status}`}>
+                        {document.status}
+                      </span>
+                    </td>
+                    <td>
+                      {document.status !== "withdrawn" ? (
+                        <button
+                          className="text-button danger-text"
+                          onClick={() => onWithdrawDocument(document)}
+                          type="button"
+                        >
+                          Withdraw
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -1545,6 +1608,7 @@ function OperationsPanel({
           <div>
             <p className="eyebrow">HUMAN REVIEW QUEUE</p>
             <h2>Items requiring attention</h2>
+            <p>Review flagged operational records in priority order.</p>
           </div>
         </div>
         {queue.length === 0 ? (
@@ -1597,24 +1661,31 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
           <p>The latest 100 administrative decisions, including who acted and why.</p>
         </div>
       </div>
-      <div className="timeline">
-        {events.map((event) => (
-          <article key={event.id}>
-            <div className="timeline-node" />
-            <div>
-              <div className="timeline-heading">
-                <strong>{event.action.replaceAll("_", " ")}</strong>
-                <time>{formatDateTime(event.createdAt)}</time>
+      {events.length === 0 ? (
+        <EmptyState
+          body="Administrative decisions will appear here after the first recorded change."
+          title="No audit events recorded"
+        />
+      ) : (
+        <div className="timeline">
+          {events.map((event) => (
+            <article key={event.id}>
+              <div aria-hidden="true" className="timeline-node" />
+              <div>
+                <div className="timeline-heading">
+                  <strong>{event.action.replaceAll("_", " ")}</strong>
+                  <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
+                </div>
+                <p>{event.reason}</p>
+                <small>
+                  {event.actorEmail || "SYSTEM"} · {event.entityType} ·{" "}
+                  {event.entityId.slice(0, 8)}
+                </small>
               </div>
-              <p>{event.reason}</p>
-              <small>
-                {event.actorEmail || "SYSTEM"} · {event.entityType} ·{" "}
-                {event.entityId.slice(0, 8)}
-              </small>
-            </div>
-          </article>
-        ))}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -2199,12 +2270,13 @@ function ConfirmationDialog({
   const [formError, setFormError] = useState("");
   async function confirm() {
     setFormError("");
-    if (reason.trim().length < 8) {
+    const auditReason = action.auditReason ?? reason.trim();
+    if (auditReason.length < 8) {
       setFormError("Add a clear audit reason of at least 8 characters.");
       return;
     }
     try {
-      await action.execute(reason.trim());
+      await action.execute(auditReason);
       onClose();
     } catch (error) {
       setFormError(errorMessage(error));
@@ -2213,22 +2285,29 @@ function ConfirmationDialog({
   return (
     <ModalShell onClose={onClose} title={action.actionLabel} compact>
       <p className="modal-copy">{action.description}</p>
-      <Field label="REQUIRED AUDIT REASON">
-        <textarea
-          autoFocus
-          minLength={8}
-          onChange={(event) => setReason(event.target.value)}
-          placeholder="Explain why this change is authorized."
-          rows={4}
-          value={reason}
-        />
-      </Field>
+      {action.auditReason ? (
+        <p className="modal-copy audit-note">
+          Your confirmation will be recorded automatically in the audit history.
+        </p>
+      ) : (
+        <Field label="REQUIRED AUDIT REASON">
+          <textarea
+            autoFocus
+            minLength={8}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Explain why this change is authorized."
+            rows={4}
+            value={reason}
+          />
+        </Field>
+      )}
       {formError ? <p className="form-error">{formError}</p> : null}
       <div className="form-actions">
         <button className="secondary-button" onClick={onClose} type="button">
           GO BACK
         </button>
         <button
+          autoFocus={Boolean(action.auditReason)}
           className={action.tone === "danger" ? "danger-button" : "primary-button"}
           disabled={submitting}
           onClick={() => void confirm()}
@@ -2252,18 +2331,46 @@ function ModalShell({
   onClose: () => void;
   title: string;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    dialogRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, []);
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section
-        aria-label={title}
+        aria-labelledby={titleId}
         aria-modal="true"
         className={compact ? "modal compact-modal" : "modal"}
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
         <header>
           <div>
             <p className="eyebrow">ADMINISTRATIVE ACTION</p>
-            <h2>{title}</h2>
+            <h2 id={titleId}>{title}</h2>
           </div>
           <button aria-label="Close" className="modal-close" onClick={onClose} type="button">
             ×
@@ -2328,7 +2435,7 @@ function FormActions({
 function EmptyState({ body, title }: { body: string; title: string }) {
   return (
     <div className="empty-state">
-      <span>＋</span>
+      <span aria-hidden="true">＋</span>
       <strong>{title}</strong>
       <p>{body}</p>
     </div>

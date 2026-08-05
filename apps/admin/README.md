@@ -6,12 +6,19 @@ history.
 
 ## Access model
 
-The dashboard signs users in through the existing GoGymGo Firebase project.
+The dashboard is invitation-only for approved gym owners and GoGymGo regional
+directors. There is no public registration or social-provider login on this
+surface. GoGymGo creates each operator's email/password account directly in the
+existing Firebase project and distributes the initial credentials through an
+approved private channel.
+
 Authentication alone does not grant access: every dashboard request is
 authorized again by the GoGymGo API, which requires an active, email-verified
-database user with the `admin` role. Administrative changes require a reason,
-an idempotency key, and server-side validation, and are recorded in the
-operator audit history.
+database user with the `admin` role and a Firebase token whose sign-in provider
+is `password`. A normal member or social-provider account therefore cannot
+enter the dashboard even if it has valid Firebase authentication.
+Administrative changes require a reason, an idempotency key, and server-side
+validation, and are recorded in the operator audit history.
 
 ## Local setup
 

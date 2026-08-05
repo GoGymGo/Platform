@@ -1,8 +1,13 @@
 # Member app QR-link deployment checklist
 
-This is the durable handoff for the gym-poster QR flow. Read it before publishing
-the browser member app at `app.gogymgo.com` or creating signed iOS and Android
-releases.
+This is the durable handoff for having gym-poster QR links open an installed iOS
+or Android app. Read it before generating native domain-association files or
+creating signed iOS and Android releases.
+
+The connected browser app at `app.gogymgo.com` is an independent release
+channel. It can be published without native signing identifiers by following
+[`member-web-deployment.md`](member-web-deployment.md). In that state, poster QR
+codes open the browser flow and the build omits the two native association files.
 
 ## What is already implemented
 
@@ -16,7 +21,7 @@ releases.
 - The server remains authoritative for the workout timer, gym assignment,
   geofence checks, and final verification.
 
-## Values required before production deployment
+## Values required before native-link production deployment
 
 Never guess or publish placeholders for these values:
 
@@ -30,7 +35,7 @@ Never guess or publish placeholders for these values:
 The iOS bundle ID and Android package must match the apps registered in Firebase,
 the signed native builds, and the values used to generate the association files.
 
-## Required order of operations
+## Required order for native QR handoff
 
 1. Finalize the Apple and Android app identifiers and register the native apps.
 2. Obtain the Apple Team ID and the SHA-256 fingerprint for each signing
@@ -50,8 +55,9 @@ the signed native builds, and the values used to generate the association files.
    apps/member-app/dist/.well-known/assetlinks.json
    ```
 
-6. Publish that exact validated web build to the provider serving
-   `app.gogymgo.com`.
+6. Publish that exact validated association-enabled web build to the provider
+   serving `app.gogymgo.com`. This updates native handoff metadata and is
+   separate from ordinary browser-only releases.
 7. Confirm both public URLs return HTTP 200, JSON content, and no authentication
    or redirect:
 
@@ -93,11 +99,12 @@ Location is checked when the player submits Start Workout and Finish Workout. Th
 app does not continuously track the player or automatically boot them out when
 they move outside the radius.
 
-## Current release blocker
+## Current native release blocker
 
 As of August 5, 2026, the code and build pipeline are prepared, but the final
 Apple Team ID, iOS bundle ID, Android package, and Android signing-certificate
-fingerprint have not been recorded in this repository. Native QR opening must not
-be described as live until those real values are configured, the association
-files are published, signed builds are installed, and the physical-device test
-passes.
+fingerprint have not been recorded in this repository. This blocks signed native
+releases and installed-app QR opening; it does not block a browser-only member
+release. Native QR opening must not be described as live until those real values
+are configured, the association files are published, signed builds are
+installed, and the physical-device test passes.

@@ -239,6 +239,8 @@ describe('gym service privacy-safe presentation helpers', () => {
     );
 
     expect(poster).toContain('aria-label="GoGymGo logo"');
+    expect(poster).toContain('<text x="500" y="124" text-anchor="middle"');
+    expect(poster).not.toContain('<svg x="72" y="52"');
     expect(poster).toContain(
       'Scan the QR code and sign up for the $100 September Challenge.',
     );

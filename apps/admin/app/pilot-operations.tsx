@@ -7,7 +7,8 @@ import type {
   OperatorReasonDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { parseCoordinate } from "./coordinate-input";
 import type {
   Competition,
   GymLocation,
@@ -52,31 +53,134 @@ const administrativeReason =
   "Configure the approved September 2026 static QR pilot.";
 
 export function PilotOperationsPanel(props: PilotOperationsProps) {
+  const createGymForm = useRef<HTMLFormElement>(null);
   const [poster, setPoster] = useState<GymQrCredential | null>(null);
+  const [createGymError, setCreateGymError] = useState("");
+  const [createGymSuccess, setCreateGymSuccess] = useState("");
+  const [locatingGym, setLocatingGym] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
+  const [assignGymError, setAssignGymError] = useState("");
+  const [assignGymSuccess, setAssignGymSuccess] = useState("");
 
   async function createGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await props.onCreateGym({
-      address: String(form.get("address") ?? "").trim(),
-      latitude: Number(form.get("latitude")),
-      longitude: Number(form.get("longitude")),
-      name: String(form.get("name") ?? "").trim(),
-      radiusMeters: Number(form.get("radiusMeters")),
-      reason: String(form.get("reason") ?? "").trim(),
-      regionPolicyId: String(form.get("regionPolicyId") ?? ""),
-    });
-    event.currentTarget.reset();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const name = String(form.get("name") ?? "").trim();
+    const address = String(form.get("address") ?? "").trim();
+    const regionPolicyId = String(form.get("regionPolicyId") ?? "");
+    const reason = String(form.get("reason") ?? "").trim();
+    const radiusMeters = Number(form.get("radiusMeters"));
+
+    setCreateGymError("");
+    setCreateGymSuccess("");
+
+    try {
+      if (name.length < 2) throw new Error("Gym name is required.");
+      if (
+        props.gyms.some(
+          (gym) => gym.name.trim().toLowerCase() === name.toLowerCase(),
+        )
+      ) {
+        throw new Error(
+          `${name} already exists. Select it in the assignment form below.`,
+        );
+      }
+      if (address.length < 5) {
+        throw new Error("Enter the gym's complete street address.");
+      }
+      if (!regionPolicyId) throw new Error("Choose the gym's region.");
+      if (!Number.isInteger(radiusMeters) || radiusMeters < 10 || radiusMeters > 500) {
+        throw new Error("Radius must be a whole number from 10 to 500 metres.");
+      }
+      if (reason.length < 8) {
+        throw new Error("Administrative reason must be at least 8 characters.");
+      }
+
+      await props.onCreateGym({
+        address,
+        latitude: parseCoordinate(String(form.get("latitude") ?? ""), "latitude"),
+        longitude: parseCoordinate(
+          String(form.get("longitude") ?? ""),
+          "longitude",
+        ),
+        name,
+        radiusMeters,
+        reason,
+        regionPolicyId,
+      });
+      formElement.reset();
+      setCreateGymSuccess(
+        `${name} was created and is now available in the assignment form below.`,
+      );
+    } catch (error) {
+      setCreateGymError(formErrorMessage(error));
+    }
+  }
+
+  function useCurrentLocation() {
+    setCreateGymError("");
+    setCreateGymSuccess("");
+    setLocationMessage("");
+
+    if (!navigator.geolocation) {
+      setCreateGymError(
+        "This browser cannot provide your location. Open the dashboard in Safari and try again.",
+      );
+      return;
+    }
+
+    setLocatingGym(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const form = createGymForm.current;
+        const latitude = form?.elements.namedItem("latitude");
+        const longitude = form?.elements.namedItem("longitude");
+        if (
+          !(latitude instanceof HTMLInputElement) ||
+          !(longitude instanceof HTMLInputElement)
+        ) {
+          setCreateGymError("The location fields could not be filled. Reload and try again.");
+          setLocatingGym(false);
+          return;
+        }
+
+        latitude.value = position.coords.latitude.toFixed(6);
+        longitude.value = position.coords.longitude.toFixed(6);
+        setLocationMessage(
+          `Location added automatically (accurate to about ${Math.round(position.coords.accuracy)} metres).`,
+        );
+        setLocatingGym(false);
+      },
+      (error) => {
+        setCreateGymError(locationErrorMessage(error));
+        setLocatingGym(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+    );
   }
 
   async function assignGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await props.onAssignGym(
-      String(form.get("competitionId") ?? ""),
-      String(form.get("gymId") ?? ""),
-      { reason: String(form.get("reason") ?? "").trim() },
-    );
+    const competitionId = String(form.get("competitionId") ?? "");
+    const gymId = String(form.get("gymId") ?? "");
+    const reason = String(form.get("reason") ?? "").trim();
+    setAssignGymError("");
+    setAssignGymSuccess("");
+
+    try {
+      if (!competitionId) throw new Error("Choose a competition.");
+      if (!gymId) throw new Error("Choose an active gym.");
+      if (reason.length < 8) {
+        throw new Error("Administrative reason must be at least 8 characters.");
+      }
+      await props.onAssignGym(competitionId, gymId, { reason });
+      const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
+      setAssignGymSuccess(`${gymName} is assigned to the September competition.`);
+    } catch (error) {
+      setAssignGymError(formErrorMessage(error));
+    }
   }
 
   async function recordCash(event: FormEvent<HTMLFormElement>) {
@@ -99,12 +203,17 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <p className="eyebrow">STATIC QR PILOT</p>
             <h2>Gym locations + posters</h2>
             <p>
-              Configure the exact geofence, issue one static poster and revoke it
-              immediately if the credential is exposed.
+              Configure the exact geofence, issue one static poster and revoke
+              it immediately if the credential is exposed.
             </p>
           </div>
         </div>
-        <form className="pilot-form" onSubmit={createGym}>
+        <form
+          className="pilot-form"
+          noValidate
+          onSubmit={createGym}
+          ref={createGymForm}
+        >
           <label>
             <span>GYM NAME</span>
             <input name="name" required />
@@ -126,23 +235,75 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </label>
           <label>
             <span>LATITUDE</span>
-            <input max="90" min="-90" name="latitude" required step="any" type="number" />
+            <input
+              aria-describedby="gym-coordinate-help"
+              inputMode="decimal"
+              name="latitude"
+              placeholder={'48.123456 or 48\u00b0 7\u2032 24\u2033 N'}
+              required
+              type="text"
+            />
           </label>
           <label>
             <span>LONGITUDE</span>
-            <input max="180" min="-180" name="longitude" required step="any" type="number" />
+            <input
+              aria-describedby="gym-coordinate-help"
+              inputMode="decimal"
+              name="longitude"
+              placeholder={'-123.123456 or 123\u00b0 7\u2032 24\u2033 W'}
+              required
+              type="text"
+            />
           </label>
           <label>
             <span>RADIUS (METRES)</span>
-            <input defaultValue="75" max="500" min="10" name="radiusMeters" required type="number" />
+            <input
+              defaultValue="75"
+              max="500"
+              min="10"
+              name="radiusMeters"
+              required
+              type="number"
+            />
           </label>
           <label className="pilot-form-wide">
             <span>ADMINISTRATIVE REASON</span>
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
-          <button className="primary-button" disabled={props.submitting} type="submit">
-            + CREATE GYM
+          <p className="pilot-form-help" id="gym-coordinate-help">
+            Stand near the centre of the gym and let your phone fill both
+            coordinates. You can still paste Compass coordinates if needed.
+          </p>
+          <button
+            className="secondary-button pilot-location-button"
+            disabled={props.submitting || locatingGym}
+            onClick={useCurrentLocation}
+            type="button"
+          >
+            {locatingGym ? "FINDING LOCATION..." : "USE MY CURRENT LOCATION"}
           </button>
+          {locationMessage ? (
+            <p aria-live="polite" className="pilot-form-message location-success">
+              {locationMessage}
+            </p>
+          ) : null}
+          <button
+            className="primary-button"
+            disabled={props.submitting}
+            type="submit"
+          >
+            {props.submitting ? "CREATING GYM..." : "+ CREATE GYM"}
+          </button>
+          {createGymError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {createGymError}
+            </p>
+          ) : null}
+          {createGymSuccess ? (
+            <p aria-live="polite" className="pilot-form-message form-success">
+              {createGymSuccess}
+            </p>
+          ) : null}
         </form>
 
         {props.gyms.length === 0 ? (
@@ -153,7 +314,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               <GymCard
                 gym={gym}
                 key={gym.id}
-                onIssue={async (input) => setPoster(await props.onIssueQr(gym.id, input))}
+                onIssue={async (input) =>
+                  setPoster(await props.onIssueQr(gym.id, input))
+                }
                 onRevoke={(input) => props.onRevokeQr(gym.id, input)}
                 onUpdate={(input) => props.onUpdateGym(gym.id, input)}
                 submitting={props.submitting}
@@ -162,7 +325,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </div>
         )}
 
-        {poster ? <PosterPreview credential={poster} onClose={() => setPoster(null)} /> : null}
+        {poster ? (
+          <PosterPreview credential={poster} onClose={() => setPoster(null)} />
+        ) : null}
       </section>
 
       <section className="panel">
@@ -170,9 +335,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">COMPETITION ELIGIBILITY</p>
             <h2>Assign a gym to September</h2>
+            <p>Link an active pilot gym to the competition members can join there.</p>
           </div>
         </div>
-        <form className="pilot-form" onSubmit={assignGym}>
+        <form className="pilot-form" noValidate onSubmit={assignGym}>
           <label>
             <span>COMPETITION</span>
             <select name="competitionId" required>
@@ -188,18 +354,36 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <span>GYM</span>
             <select name="gymId" required>
               <option value="">Choose gym</option>
-              {props.gyms.filter((gym) => gym.active).map((gym) => (
-                <option key={gym.id} value={gym.id}>{gym.name}</option>
-              ))}
+              {props.gyms
+                .filter((gym) => gym.active)
+                .map((gym) => (
+                  <option key={gym.id} value={gym.id}>
+                    {gym.name}
+                  </option>
+                ))}
             </select>
           </label>
           <label className="pilot-form-wide">
             <span>ADMINISTRATIVE REASON</span>
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
-          <button className="primary-button" disabled={props.submitting} type="submit">
-            ASSIGN GYM
+          <button
+            className="primary-button"
+            disabled={props.submitting}
+            type="submit"
+          >
+            {props.submitting ? "ASSIGNING GYM..." : "ASSIGN GYM"}
           </button>
+          {assignGymError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {assignGymError}
+            </p>
+          ) : null}
+          {assignGymSuccess ? (
+            <p aria-live="polite" className="pilot-form-message form-success">
+              {assignGymSuccess}
+            </p>
+          ) : null}
         </form>
       </section>
 
@@ -210,7 +394,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         rows={props.sessions.map((session) => [
           session.gymName,
           formatDateTime(session.startedAt),
-          session.completedAt ? formatDateTime(session.completedAt) : "Missing exit scan",
+          session.completedAt
+            ? formatDateTime(session.completedAt)
+            : "Missing exit scan",
           session.incomplete ? "incomplete" : session.status,
         ])}
         title="Sessions + incomplete visits"
@@ -262,7 +448,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">IN-PERSON CASH HANDOFF</p>
             <h2>Record fulfillment</h2>
-            <p>The draw must already be settled. This action is permanent and audited.</p>
+            <p>
+              The draw must already be settled. This action is permanent and
+              audited.
+            </p>
           </div>
         </div>
         <form className="pilot-form" onSubmit={recordCash}>
@@ -272,17 +461,37 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </label>
           <label>
             <span>AMOUNT (CENTS)</span>
-            <input defaultValue="10000" min="1" name="amountCents" required type="number" />
+            <input
+              defaultValue="10000"
+              min="1"
+              name="amountCents"
+              required
+              type="number"
+            />
           </label>
           <label>
             <span>CURRENCY</span>
-            <input defaultValue="CAD" maxLength={3} minLength={3} name="currency" required />
+            <input
+              defaultValue="CAD"
+              maxLength={3}
+              minLength={3}
+              name="currency"
+              required
+            />
           </label>
           <label className="pilot-form-wide">
             <span>FULFILLMENT NOTE + REASON</span>
-            <input name="reason" placeholder="Cash handed to winner in person by …" required />
+            <input
+              name="reason"
+              placeholder="Cash handed to winner in person by …"
+              required
+            />
           </label>
-          <button className="danger-button" disabled={props.submitting} type="submit">
+          <button
+            className="danger-button"
+            disabled={props.submitting}
+            type="submit"
+          >
             RECORD CASH HANDOFF
           </button>
         </form>
@@ -302,6 +511,20 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       />
     </div>
   );
+}
+
+function formErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "The request could not be completed.";
+}
+
+function locationErrorMessage(error: GeolocationPositionError) {
+  if (error.code === error.PERMISSION_DENIED) {
+    return "Location access was not allowed. Open this page in Safari, allow location access when prompted, then try again.";
+  }
+  if (error.code === error.TIMEOUT) {
+    return "Your phone could not get a location in time. Move near a window or outdoors briefly, then try again.";
+  }
+  return "Your phone could not determine its location. Check that Location Services are enabled and try again.";
 }
 
 function GymCard({
@@ -342,7 +565,8 @@ function GymCard({
         <h3>{gym.name}</h3>
         <p>{gym.address}</p>
         <small>
-          {gym.latitude.toFixed(6)}, {gym.longitude.toFixed(6)} · {gym.radiusMeters} m · QR v{gym.activeCredentialVersion || "—"}
+          {gym.latitude.toFixed(6)}, {gym.longitude.toFixed(6)} ·{" "}
+          {gym.radiusMeters} m · QR v{gym.activeCredentialVersion || "—"}
         </small>
       </div>
       <div className="inline-actions pilot-gym-actions">
@@ -357,7 +581,11 @@ function GymCard({
         <button
           className="danger-button"
           disabled={submitting || !gym.activeCredentialVersion}
-          onClick={() => void onRevoke({ reason: "Revoke the current static QR credential." })}
+          onClick={() =>
+            void onRevoke({
+              reason: "Revoke the current static QR credential.",
+            })
+          }
           type="button"
         >
           REVOKE QR
@@ -366,14 +594,64 @@ function GymCard({
       <details className="pilot-details">
         <summary>Edit gym + geofence</summary>
         <form className="pilot-form" onSubmit={update}>
-          <label><span>NAME</span><input defaultValue={gym.name} name="name" required /></label>
-          <label><span>ADDRESS</span><input defaultValue={gym.address} name="address" required /></label>
-          <label><span>LATITUDE</span><input defaultValue={gym.latitude} max="90" min="-90" name="latitude" required step="any" type="number" /></label>
-          <label><span>LONGITUDE</span><input defaultValue={gym.longitude} max="180" min="-180" name="longitude" required step="any" type="number" /></label>
-          <label><span>RADIUS</span><input defaultValue={gym.radiusMeters} max="500" min="10" name="radiusMeters" required type="number" /></label>
-          <label className="check-field"><input defaultChecked={gym.active} name="active" type="checkbox" /><span>ACTIVE</span></label>
-          <label className="pilot-form-wide"><span>REASON</span><input defaultValue={administrativeReason} name="reason" required /></label>
-          <button className="secondary-button" disabled={submitting} type="submit">SAVE GYM</button>
+          <label>
+            <span>NAME</span>
+            <input defaultValue={gym.name} name="name" required />
+          </label>
+          <label>
+            <span>ADDRESS</span>
+            <input defaultValue={gym.address} name="address" required />
+          </label>
+          <label>
+            <span>LATITUDE</span>
+            <input
+              defaultValue={gym.latitude}
+              max="90"
+              min="-90"
+              name="latitude"
+              required
+              step="any"
+              type="number"
+            />
+          </label>
+          <label>
+            <span>LONGITUDE</span>
+            <input
+              defaultValue={gym.longitude}
+              max="180"
+              min="-180"
+              name="longitude"
+              required
+              step="any"
+              type="number"
+            />
+          </label>
+          <label>
+            <span>RADIUS</span>
+            <input
+              defaultValue={gym.radiusMeters}
+              max="500"
+              min="10"
+              name="radiusMeters"
+              required
+              type="number"
+            />
+          </label>
+          <label className="check-field">
+            <input defaultChecked={gym.active} name="active" type="checkbox" />
+            <span>ACTIVE</span>
+          </label>
+          <label className="pilot-form-wide">
+            <span>REASON</span>
+            <input defaultValue={administrativeReason} name="reason" required />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={submitting}
+            type="submit"
+          >
+            SAVE GYM
+          </button>
         </form>
       </details>
     </article>
@@ -391,14 +669,22 @@ function PosterPreview({
   return (
     <div className="poster-preview">
       <div>
-        <strong>PRINTABLE QR POSTER · VERSION {credential.credentialVersion}</strong>
-        <button className="text-button" onClick={onClose} type="button">Close</button>
+        <strong>
+          PRINTABLE QR POSTER · VERSION {credential.credentialVersion}
+        </strong>
+        <button className="text-button" onClick={onClose} type="button">
+          Close
+        </button>
       </div>
       {/* The SVG is rendered as an image, never injected as executable markup. */}
       {/* Generated data URLs cannot use the Sites image optimizer. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img alt="Printable GoGymGo gym QR poster" src={source} />
-      <a className="primary-button" download={`gogymgo-gym-qr-v${credential.credentialVersion}.svg`} href={source}>
+      <a
+        className="primary-button"
+        download={`gogymgo-gym-qr-v${credential.credentialVersion}.svg`}
+        href={source}
+      >
         DOWNLOAD SVG FOR PRINTING
       </a>
     </div>
@@ -420,11 +706,42 @@ function PilotTable({
 }) {
   return (
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div></div>
-      {rows.length === 0 ? <p className="empty-copy">{empty}</p> : (
-        <div className="table-wrap"><table><thead><tr>{headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead>
-          <tbody>{rows.map((row, rowIndex) => <tr key={`${title}-${rowIndex}`}>{row.map((cell, cellIndex) => <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>)}</tr>)}</tbody>
-        </table></div>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2>{title}</h2>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="empty-copy">{empty}</p>
+      ) : (
+        <div
+          aria-label={`${title} table, scroll horizontally for more columns`}
+          className="table-wrap"
+          role="region"
+          tabIndex={0}
+        >
+          <table>
+            <thead>
+              <tr>
+                {headings.map((heading) => (
+                  <th key={heading} scope="col">
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`${title}-${rowIndex}`}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

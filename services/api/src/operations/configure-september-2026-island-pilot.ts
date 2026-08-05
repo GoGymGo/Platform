@@ -398,6 +398,7 @@ async function findAdministrator(
       emailVerified: true,
       firebaseUid: administrator.firebase_uid,
       roles: administrator.roles,
+      signInProvider: 'password',
       tokenIssuedAt: Math.floor(Date.now() / 1_000),
     };
   }
@@ -515,6 +516,7 @@ async function findAdministrator(
       emailVerified: updated.email_verified,
       firebaseUid: updated.firebase_uid,
       roles: updated.roles,
+      signInProvider: 'password',
       tokenIssuedAt: Math.floor(Date.now() / 1_000),
     };
   });

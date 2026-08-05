@@ -175,7 +175,11 @@ function reportNode(node, relativePath, message) {
 }
 
 function auditRouteReturnPaths(appDirectory) {
-  const entryRouteExemptions = new Set(['app/(onboarding)/welcome.tsx', 'app/index.tsx']);
+  const entryRouteExemptions = new Set([
+    'app/(onboarding)/welcome.tsx',
+    'app/index.tsx',
+    'app/scan.tsx'
+  ]);
   const returnPathPatterns = [
     /\bgoBackOrReplace\b/,
     /\brouter\.back\s*\(/,
@@ -259,7 +263,9 @@ function auditFlowReliability() {
       'getAppResumeTarget',
       'RecoverableError',
       'resume-started',
-      'resume-completed'
+      'resume-completed',
+      'OBJECTIVE',
+      'ACHIEVED THIS WEEK'
     ]],
     ['app/(tabs)/leaderboard/index.tsx', [
       'useScreenMemory',

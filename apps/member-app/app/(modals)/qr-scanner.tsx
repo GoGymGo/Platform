@@ -2,7 +2,7 @@ import type { GymScanResultDto } from '@gogymgo/contracts';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { randomUUID } from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 
 import {
@@ -18,19 +18,33 @@ import { RecoverableScreenError } from '@/components/reliability';
 import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { createGymScanRepository } from '@/data/gymScanRepository';
+import {
+  extractGymScanCredential,
+  getGymScanRemainingSeconds,
+  isGymScanCompletionReady
+} from '@/domain/gymScan';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
+import { getGymScanSetupRoute } from '@/navigation/gymScanFlow';
 import { ApiError } from '@/services/api/client';
 import { readGymScanLocation } from '@/services/gymScanLocation';
+import {
+  readPendingGymScan,
+  rememberGymScanCredential,
+  rememberGymScanResult,
+  type PendingGymScan
+} from '@/services/pendingGymScan';
 import { useApi } from '@/state/api';
 
 type ScanUiState = 'ready' | 'locating' | 'submitting' | 'result';
 
 export default function QrScannerModal() {
   const router = useRouter();
-  const { credential: linkedCredential } = useLocalSearchParams<{
+  const { credential: linkedCredential, posterScan } = useLocalSearchParams<{
     credential?: string;
+    posterScan?: string;
   }>();
+  const posterScanReady = posterScan === '1' || Boolean(linkedCredential);
   const { api, configured } = useApi();
   const repository = useMemo(
     () => (api ? createGymScanRepository(api) : null),
@@ -44,18 +58,77 @@ export default function QrScannerModal() {
     retrying: registrationRetrying,
     setupActionLabel,
     setupMessage,
-    setupRoute
+    setupStep
   } = useSessionRegistrationAccess();
   const [permission, requestPermission] = useCameraPermissions();
+  const [cameraRequested, setCameraRequested] = useState(false);
+  const [clockNow, setClockNow] = useState<number | null>(null);
+  const [pendingIntent, setPendingIntent] = useState<PendingGymScan | null>(null);
+  const [pendingIntentLoading, setPendingIntentLoading] = useState(true);
+  const [requirePhysicalRescan, setRequirePhysicalRescan] = useState(false);
   const [scanLocked, setScanLocked] = useState(false);
   const [state, setState] = useState<ScanUiState>('ready');
   const [result, setResult] = useState<GymScanResultDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const linkedCredentialValue = extractGymScanCredential(linkedCredential ?? '');
+  const effectiveCredential = linkedCredentialValue ?? pendingIntent?.credential ?? null;
+  const activeSession = pendingIntent?.activeSession ?? null;
+  const timerTarget =
+    result?.outcome === 'started' || result?.outcome === 'too_early'
+      ? result.minimumCompleteAt
+      : activeSession?.minimumCompleteAt;
+  const resultRemainingSeconds = result ? result.remainingSeconds : 0;
+  const displayRemainingSeconds = getGymScanRemainingSeconds(
+    timerTarget,
+    resultRemainingSeconds,
+    clockNow
+  );
+  const completionReady =
+    clockNow !== null &&
+    isGymScanCompletionReady(timerTarget, clockNow) &&
+    Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
+
+  useEffect(() => {
+    let active = true;
+
+    async function hydratePendingIntent() {
+      try {
+        const pending = linkedCredentialValue
+          ? await rememberGymScanCredential(linkedCredentialValue)
+          : await readPendingGymScan();
+        if (active) {
+          setPendingIntent(pending);
+        }
+      } finally {
+        if (active) {
+          setPendingIntentLoading(false);
+        }
+      }
+    }
+
+    void hydratePendingIntent();
+    return () => {
+      active = false;
+    };
+  }, [linkedCredentialValue]);
+
+  useEffect(() => {
+    if (!timerTarget) {
+      return;
+    }
+
+    const initialTick = setTimeout(() => setClockNow(Date.now()), 0);
+    const interval = setInterval(() => setClockNow(Date.now()), 1000);
+    return () => {
+      clearTimeout(initialTick);
+      clearInterval(interval);
+    };
+  }, [timerTarget]);
 
   const submitCredential = useCallback(
     async (rawPayload: string) => {
       if (!repository || scanLocked) return;
-      const credential = extractCredential(rawPayload);
+      const credential = extractGymScanCredential(rawPayload);
       if (!credential) {
         setScanLocked(true);
         setError('That code is not a valid GoGymGo gym QR. Check the poster and scan again.');
@@ -65,6 +138,11 @@ export default function QrScannerModal() {
       setError(null);
       setResult(null);
       setState('locating');
+      try {
+        setPendingIntent(await rememberGymScanCredential(credential));
+      } catch {
+        // A storage failure must not replace the authoritative scan result.
+      }
       const location = await readGymScanLocation();
       if (location.status !== 'location-read') {
         setState('result');
@@ -77,15 +155,24 @@ export default function QrScannerModal() {
       }
       setState('submitting');
       try {
-        setResult(
-          await repository.scan({
-            accuracyMeters: location.accuracyMeters,
-            credential,
-            eventId: randomUUID(),
-            latitude: location.latitude,
-            longitude: location.longitude
-          })
-        );
+        const scanResult = await repository.scan({
+          accuracyMeters: location.accuracyMeters,
+          credential,
+          eventId: randomUUID(),
+          latitude: location.latitude,
+          longitude: location.longitude
+        });
+        setResult(scanResult);
+        if (scanResult.outcome === 'started' || scanResult.outcome === 'too_early') {
+          setRequirePhysicalRescan(true);
+        } else if (scanResult.outcome === 'verified') {
+          setRequirePhysicalRescan(false);
+        }
+        try {
+          setPendingIntent(await rememberGymScanResult(credential, scanResult));
+        } catch {
+          // The server response remains authoritative if local continuity storage fails.
+        }
       } catch (scanError) {
         setError(getScanErrorMessage(scanError));
       } finally {
@@ -106,6 +193,18 @@ export default function QrScannerModal() {
     setError(null);
   }
 
+  function openFinishScanner() {
+    setCameraRequested(true);
+    setError(null);
+    setRequirePhysicalRescan(true);
+    setResult(null);
+    setScanLocked(false);
+    setState('ready');
+  }
+
+  if (pendingIntentLoading) {
+    return <ScreenLoadingState body="Preparing your gym workout." />;
+  }
   if (registrationChecking) {
     return <ScreenLoadingState body="Checking your competition registration." />;
   }
@@ -125,6 +224,7 @@ export default function QrScannerModal() {
         actionLabel={setupActionLabel}
         body={setupMessage}
         onAction={() => {
+          const setupRoute = getGymScanSetupRoute(setupStep);
           if (setupRoute) router.replace(setupRoute);
         }}
         title="FINISH SETUP"
@@ -143,7 +243,9 @@ export default function QrScannerModal() {
   }
 
   const busy = state === 'locating' || state === 'submitting';
-  const resultTone = result?.outcome === 'verified'
+  const resultTone = completionReady
+    ? 'green'
+    : result?.outcome === 'verified'
     ? 'green'
     : result?.outcome === 'started'
       ? 'cyan'
@@ -161,10 +263,14 @@ export default function QrScannerModal() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <TerminalText glow tone="cyan" variant="label">
-              STATIC GYM QR
+              VERIFIED GYM WORKOUT
             </TerminalText>
             <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              SCAN TO START OR FINISH
+              {completionReady
+                ? 'READY TO FINISH'
+                : activeSession || result?.outcome === 'started' || result?.outcome === 'too_early'
+                  ? 'WORKOUT IN PROGRESS'
+                : 'START OR FINISH YOUR WORKOUT'}
             </TerminalText>
           </View>
           <CyberButtonOutline
@@ -179,9 +285,9 @@ export default function QrScannerModal() {
             ONE POSTER // TWO SCANS
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Scan once while inside the gym to start the server timer. After 30
-            minutes, scan the same poster again to verify your workout day. Live
-            location is checked at both scans; raw coordinates are never saved.
+            Scan once at the gym, then choose Start Workout. After the server
+            timer reaches 00:00, scan the same poster again and choose Finish
+            Workout. Your location is checked only when you submit each scan.
           </TerminalText>
         </HUDBorderBox>
 
@@ -194,7 +300,11 @@ export default function QrScannerModal() {
         ) : result || error ? (
           <HUDBorderBox glow style={styles.stateCard} tone={error ? 'red' : resultTone}>
             <TerminalText glow tone={error ? 'red' : resultTone} variant="label">
-              {error ? 'SCAN NOT COMPLETED' : resultTitle(result!)}
+              {error
+                ? 'SCAN NOT COMPLETED'
+                : completionReady
+                  ? '30 MINUTES COMPLETE'
+                  : resultTitle(result!)}
             </TerminalText>
             <TerminalText
               live={error || result?.outcome === 'rejected' ? 'assertive' : 'polite'}
@@ -202,7 +312,9 @@ export default function QrScannerModal() {
               uppercase={false}
               variant="body"
             >
-              {error ?? resultMessage(result!)}
+              {error ?? (completionReady
+                ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
+                : resultMessage(result!))}
             </TerminalText>
             {result?.gymName ? (
               <TerminalText glow tone="cyan" variant="label">
@@ -211,7 +323,7 @@ export default function QrScannerModal() {
             ) : null}
             {result?.outcome === 'started' || result?.outcome === 'too_early' ? (
               <TerminalText glow style={styles.remaining} tone="pink" variant="display">
-                {formatRemaining(result.remainingSeconds)}
+                {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
               </TerminalText>
             ) : null}
             {error?.startsWith('Location access') ? (
@@ -227,20 +339,75 @@ export default function QrScannerModal() {
                 tone="amber"
               />
             ) : null}
-            <CyberButtonOutline label="SCAN AGAIN" onPress={scanAgain} />
+            {completionReady ? (
+              <CyberButtonPrimary
+                label="OPEN SCANNER TO FINISH ->"
+                onPress={openFinishScanner}
+              />
+            ) : null}
+            <CyberButtonOutline
+              label={
+                error
+                  ? 'TRY AGAIN'
+                  : result?.outcome === 'verified'
+                    ? 'BACK TO TRAINING'
+                    : 'CLOSE FOR NOW'
+              }
+              onPress={() => {
+                if (error) {
+                  scanAgain();
+                } else {
+                  goBackOrReplace(router, '/session');
+                }
+              }}
+            />
           </HUDBorderBox>
-        ) : linkedCredential && !scanLocked ? (
+        ) : posterScanReady && effectiveCredential && !scanLocked && !requirePhysicalRescan ? (
           <HUDBorderBox glow style={styles.stateCard} tone="cyan">
             <TerminalText glow tone="cyan" variant="label">
-              GYM POSTER LINK READY
+              {activeSession ? 'RETURN SCAN READY' : 'GYM CHECK-IN READY'}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Confirm to read your live location and submit this poster to the
-              secure scan endpoint.
+              {activeSession
+                ? 'Choose Finish Workout to check your location and complete this active gym session.'
+                : 'Choose Start Workout to check your location and begin the authoritative server timer.'}
+            </TerminalText>
+            {activeSession?.gymName ? (
+              <TerminalText glow tone="cyan" variant="label">
+                {activeSession.gymName}
+              </TerminalText>
+            ) : null}
+            {activeSession ? (
+              <TerminalText glow style={styles.remaining} tone="pink" variant="display">
+                {formatRemaining(displayRemainingSeconds)}
+              </TerminalText>
+            ) : null}
+            <CyberButtonPrimary
+              label={activeSession ? 'FINISH WORKOUT ->' : 'START WORKOUT ->'}
+              onPress={() => void submitCredential(effectiveCredential)}
+            />
+          </HUDBorderBox>
+        ) : activeSession && !cameraRequested ? (
+          <HUDBorderBox glow style={styles.stateCard} tone={completionReady ? 'green' : 'cyan'}>
+            <TerminalText glow tone={completionReady ? 'green' : 'cyan'} variant="label">
+              {completionReady ? '30 MINUTES COMPLETE' : 'WORKOUT TIMER ACTIVE'}
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              {completionReady
+                ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
+                : 'When the timer reaches 00:00, scan the same gym poster again to verify your workout day.'}
+            </TerminalText>
+            {activeSession.gymName ? (
+              <TerminalText glow tone="cyan" variant="label">
+                {activeSession.gymName}
+              </TerminalText>
+            ) : null}
+            <TerminalText glow style={styles.remaining} tone="pink" variant="display">
+              {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
             </TerminalText>
             <CyberButtonPrimary
-              label="VERIFY THIS POSTER ->"
-              onPress={() => void submitCredential(linkedCredential)}
+              label="SCAN POSTER TO FINISH ->"
+              onPress={() => setCameraRequested(true)}
             />
           </HUDBorderBox>
         ) : !permission ? (
@@ -280,25 +447,8 @@ export default function QrScannerModal() {
   );
 }
 
-function extractCredential(payload: string): string | null {
-  const trimmed = payload.trim();
-  if (trimmed.length >= 32 && trimmed.length <= 256 && !trimmed.includes('://')) {
-    return trimmed;
-  }
-  try {
-    const url = new URL(trimmed);
-    if (url.hostname !== 'app.gogymgo.com' || url.pathname !== '/scan') return null;
-    const credential = url.searchParams.get('credential')?.trim() ?? '';
-    return credential.length >= 32 && credential.length <= 256
-      ? credential
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function resultTitle(result: GymScanResultDto) {
-  if (result.outcome === 'started') return 'SESSION STARTED';
+  if (result.outcome === 'started') return 'WORKOUT STARTED';
   if (result.outcome === 'too_early') return 'KEEP GOING';
   if (result.outcome === 'verified') return 'WORKOUT DAY VERIFIED';
   return 'SCAN REJECTED';
@@ -306,7 +456,7 @@ function resultTitle(result: GymScanResultDto) {
 
 function resultMessage(result: GymScanResultDto) {
   if (result.outcome === 'started') {
-    return 'Your authoritative 30-minute server timer is running. Scan this same poster again after the minimum time.';
+    return 'Workout tracking is active on the server. Scan this same poster again after the minimum time.';
   }
   if (result.outcome === 'too_early') {
     return 'The session is active, but the 30-minute minimum has not been reached yet.';

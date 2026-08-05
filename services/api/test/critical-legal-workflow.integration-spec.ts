@@ -20,6 +20,7 @@ const adminPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-legal-admin',
   roles: ['admin'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 
@@ -28,6 +29,7 @@ const userPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-legal-user',
   roles: ['user'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 

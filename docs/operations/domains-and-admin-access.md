@@ -26,6 +26,9 @@ hosting provider reports the custom domain as verified and staging UAT passes.
    record without resolving its current owner.
 5. Wait for all three providers to show verified TLS certificates, then test
    HTTPS and redirects from a private browser session.
+6. In Firebase Authentication settings, add `admin.gogymgo.com` to the
+   production project's authorized domains so the existing email, Google and
+   Apple sign-in methods can complete from the admin origin.
 
 ## Cloudflare Access gate for admin
 
@@ -43,6 +46,12 @@ After `admin.gogymgo.com` resolves through Cloudflare:
 5. Confirm the approved owner must then pass Firebase authentication and the
    backend database-admin check. Cloudflare Access is an outer gate, not a
    replacement for either control.
+
+Only approved gym owners and GoGymGo regional directors receive admin-console
+credentials. Accounts are created directly by GoGymGo as Firebase
+email/password users; the console exposes no self-registration or social-login
+path. Keep the Cloudflare allow policy synchronized with the private operator
+access register whenever an account is issued or revoked.
 
 ## GitHub deployment environments
 
@@ -72,9 +81,10 @@ in AWS Secrets Manager or the hosting provider's encrypted environment storage.
 
 - `gogymgo.com` renders the public landing site and posts interest to the API.
 - `app.gogymgo.com/demo` works without Firebase, camera, location or API calls.
-- `app.gogymgo.com/join` uses the explicitly approved environment's Firebase
-  project and API. During beta this is staging; moving the hostname to production
-  is a separate DNS and release approval.
+- `app.gogymgo.com/` opens the member-app welcome screen; its Get Started and
+  Sign In actions use the explicitly approved environment's Firebase project
+  and API. During beta this is staging; moving the hostname to production is a
+  separate DNS and release approval.
 - `admin.gogymgo.com` rejects an unapproved email at Cloudflare, rejects a
   non-admin Firebase user at the API, and permits the bootstrapped owner.
 - CORS allows only the reviewed production origins.

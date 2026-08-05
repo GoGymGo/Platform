@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, type Href } from 'expo-router';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -168,18 +168,24 @@ export function AuthStatusNotice({
 
 export function AuthGate({
   allowUnverified = false,
-  children
-}: PropsWithChildren<{ allowUnverified?: boolean }>) {
+  children,
+  signedOutHref = '/sign-in',
+  unverifiedHref = '/verify-email'
+}: PropsWithChildren<{
+  allowUnverified?: boolean;
+  signedOutHref?: Href;
+  unverifiedHref?: Href;
+}>) {
   const { firebaseConfigured, loading, user } = useAuth();
 
   if (loading) {
     return <AuthLoadingScreen />;
   }
   if (!firebaseConfigured || !user) {
-    return <Redirect href="/sign-in" />;
+    return <Redirect href={signedOutHref} />;
   }
   if (!allowUnverified && !user.emailVerified) {
-    return <Redirect href="/verify-email" />;
+    return <Redirect href={unverifiedHref} />;
   }
 
   return children;

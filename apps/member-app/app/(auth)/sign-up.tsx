@@ -23,12 +23,22 @@ import {
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
+import {
+  getGymScanPostAuthRoute,
+  gymScanAuthNext,
+  gymScanSetupNext,
+  isGymScanContinuation
+} from '@/navigation/gymScanFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
 import { useAppData } from '@/data/appDataHooks';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { challengeInvite, next } = useLocalSearchParams<{
+    challengeInvite?: string;
+    next?: string;
+  }>();
+  const gymScanContinuation = isGymScanContinuation(next);
   const { social } = useAppData();
   const {
     appleSignInAvailable,
@@ -46,7 +56,13 @@ export default function SignUpScreen() {
     if (challengeInvite) {
       await social.redeemContactInvitation(challengeInvite);
     }
-    router.replace(result.isNewUser ? '/region' : '/home');
+    router.replace(
+      gymScanContinuation
+        ? getGymScanPostAuthRoute(result.isNewUser)
+        : result.isNewUser
+          ? '/region'
+          : '/home'
+    );
   };
   const {
     busyProvider,
@@ -75,7 +91,13 @@ export default function SignUpScreen() {
       await createAccount(email, password);
       router.replace({
         pathname: '/verify-email',
-        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'region' }
+        params: {
+          next: challengeInvite
+            ? `challenge:${challengeInvite}`
+            : gymScanContinuation
+              ? gymScanSetupNext
+              : 'region'
+        }
       });
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
@@ -86,10 +108,16 @@ export default function SignUpScreen() {
 
   return (
     <AuthScreenShell
-      description="Create one secure account for your Weekly Goal, verified workouts and brand rewards."
-      eyebrow="ACCOUNT SETUP"
-      onBack={() => router.replace('/join')}
-      title="CREATE YOUR ACCOUNT"
+      description={gymScanContinuation
+        ? 'Your gym scan is saved. Create your account, finish setup, and GoGymGo will return you to Start Workout.'
+        : 'Create one secure account for your Weekly Goal, verified workouts and brand rewards.'}
+      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT SETUP'}
+      onBack={() => router.replace(
+        gymScanContinuation
+          ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
+          : '/join'
+      )}
+      title={gymScanContinuation ? 'CREATE ACCOUNT TO CONTINUE' : 'CREATE YOUR ACCOUNT'}
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
 

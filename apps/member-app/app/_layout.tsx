@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { colors, goGymGoTheme } from '@/constants/theme';
 import { ScreenLoadingState } from '@/components/cyber';
+import { GymScanCompletionPrompt } from '@/components/GymScanCompletionPrompt';
 import { AppDataProvider } from '@/data/appDataHooks';
 import { DemoModeBanner } from '@/demo/DemoModeBanner';
 import { AuthProvider, useAuth } from '@/state/auth';
@@ -148,6 +149,7 @@ function ReadyAppNavigation({ reduceMotion }: { reduceMotion: boolean }) {
           />
         </Stack>
       </View>
+      <GymScanCompletionPrompt />
     </View>
   );
 }

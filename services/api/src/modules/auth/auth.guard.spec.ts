@@ -46,6 +46,7 @@ describe('authentication guard', () => {
       emailVerified: true,
       firebaseUid: 'firebase-uid',
       roles: ['user'],
+      signInProvider: 'password',
       tokenIssuedAt: 1,
     };
     const verifyIdToken = jest.fn().mockResolvedValue(principal);

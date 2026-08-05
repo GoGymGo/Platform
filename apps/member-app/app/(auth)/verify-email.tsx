@@ -15,6 +15,12 @@ import {
 } from '@/components/cyber';
 import { getAuthErrorMessage } from '@/domain/auth';
 import { spacing } from '@/constants/theme';
+import {
+  gymScanAuthNext,
+  gymScanSetupNext,
+  gymScanSource,
+  gymScanWorkoutRoute
+} from '@/navigation/gymScanFlow';
 import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 
@@ -38,6 +44,10 @@ export default function VerifyEmailScreen() {
     router.replace(
       challengeInvite
         ? { pathname: '/join', params: { challengeInvite } }
+        : next === gymScanSetupNext
+          ? `/region?source=${gymScanSource}`
+          : next === gymScanAuthNext
+            ? gymScanWorkoutRoute
         : next === 'region'
           ? '/region'
           : next === 'identity'
@@ -122,7 +132,11 @@ export default function VerifyEmailScreen() {
     setBusyAction('signout');
     try {
       await signOutUser();
-      router.replace('/sign-in');
+      router.replace(
+        next === gymScanAuthNext || next === gymScanSetupNext
+          ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
+          : '/sign-in'
+      );
     } finally {
       setBusyAction(null);
     }
@@ -132,8 +146,12 @@ export default function VerifyEmailScreen() {
     <AuthScreenShell
       description={appTourActive
         ? 'This preview simulates the email-verification step without sending a message.'
-        : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
-      eyebrow="ACCOUNT SECURITY"
+        : next === gymScanAuthNext || next === gymScanSetupNext
+          ? 'Your gym scan is saved. Verify your email and GoGymGo will continue your workout setup automatically.'
+          : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
+      eyebrow={next === gymScanAuthNext || next === gymScanSetupNext
+        ? 'GYM SCAN SAVED'
+        : 'ACCOUNT SECURITY'}
       title="CHECK YOUR EMAIL"
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
@@ -142,7 +160,14 @@ export default function VerifyEmailScreen() {
           <TerminalText tone="muted" uppercase={false} variant="body">
             Sign in first so GoGymGo can check the correct email account.
           </TerminalText>
-          <CyberButtonPrimary label="GO TO SIGN IN" onPress={() => router.replace('/sign-in')} />
+          <CyberButtonPrimary
+            label="GO TO SIGN IN"
+            onPress={() => router.replace(
+              next === gymScanAuthNext || next === gymScanSetupNext
+                ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
+                : '/sign-in'
+            )}
+          />
         </HUDBorderBox>
       ) : (
         <HUDBorderBox style={styles.panel} tone="cyan">

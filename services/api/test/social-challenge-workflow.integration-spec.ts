@@ -19,6 +19,7 @@ function principal(name: string): AuthenticatedPrincipal {
     emailVerified: true,
     firebaseUid: `social-${name}`,
     roles: ['user'],
+    signInProvider: 'password',
     tokenIssuedAt: 1,
   };
 }

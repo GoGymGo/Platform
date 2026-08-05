@@ -25,11 +25,20 @@ import {
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
 import { colors, spacing } from '@/constants/theme';
+import {
+  getGymScanPostAuthRoute,
+  gymScanAuthNext,
+  isGymScanContinuation
+} from '@/navigation/gymScanFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { challengeInvite, next } = useLocalSearchParams<{
+    challengeInvite?: string;
+    next?: string;
+  }>();
+  const gymScanContinuation = isGymScanContinuation(next);
   const { social } = useAppData();
   const {
     appleSignInAvailable,
@@ -48,7 +57,13 @@ export default function SignInScreen() {
     if (!result.user.emailVerified) {
       router.replace({
         pathname: '/verify-email',
-        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+        params: {
+          next: challengeInvite
+            ? `challenge:${challengeInvite}`
+            : gymScanContinuation
+              ? gymScanAuthNext
+              : 'home'
+        }
       });
       return;
     }
@@ -56,12 +71,19 @@ export default function SignInScreen() {
       await social.redeemContactInvitation(challengeInvite);
     }
     if (result.isNewUser) {
-      router.replace('/region');
+      router.replace(
+        gymScanContinuation ? getGymScanPostAuthRoute(true) : '/region'
+      );
       return;
     }
 
     if (challengeInvite) {
       router.replace('/squad/social');
+      return;
+    }
+
+    if (gymScanContinuation) {
+      router.replace(getGymScanPostAuthRoute(false));
       return;
     }
 
@@ -112,7 +134,13 @@ export default function SignInScreen() {
     if (!user.emailVerified) {
       router.replace({
         pathname: '/verify-email',
-        params: { next: challengeInvite ? `challenge:${challengeInvite}` : 'home' }
+        params: {
+          next: challengeInvite
+            ? `challenge:${challengeInvite}`
+            : gymScanContinuation
+              ? gymScanAuthNext
+              : 'home'
+        }
       });
       return;
     }
@@ -124,6 +152,10 @@ export default function SignInScreen() {
         router.replace('/squad/social');
         return;
       }
+      if (gymScanContinuation) {
+        router.replace(getGymScanPostAuthRoute(false));
+        return;
+      }
       router.replace('/home?resume=1');
     } finally {
       setSubmitting(false);
@@ -132,10 +164,12 @@ export default function SignInScreen() {
 
   return (
     <AuthScreenShell
-      description="Return to your Weekly Goal, verified workouts and prize draw entries."
-      eyebrow="SECURE ACCESS"
+      description={gymScanContinuation
+        ? 'Your gym scan is saved. Sign in and GoGymGo will take you directly to Start Workout.'
+        : 'Return to your Weekly Goal, verified workouts and prize draw entries.'}
+      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'SECURE ACCESS'}
       onBack={() => router.replace('/join')}
-      title="WELCOME BACK"
+      title={gymScanContinuation ? 'SIGN IN TO CONTINUE' : 'WELCOME BACK'}
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
 
@@ -233,14 +267,22 @@ export default function SignInScreen() {
             <CyberButtonOutline
               disabled={busy}
               label="RESET PASSWORD"
-              onPress={() => router.push('/forgot-password')}
+              onPress={() => router.push(
+                gymScanContinuation
+                  ? { pathname: '/forgot-password', params: { next: gymScanAuthNext } }
+                  : '/forgot-password'
+              )}
             />
           </HUDBorderBox>
 
           <CyberButtonOutline
             disabled={busy}
             label="CREATE A NEW ACCOUNT"
-            onPress={() => router.replace('/sign-up')}
+            onPress={() => router.replace(
+              gymScanContinuation
+                ? { pathname: '/sign-up', params: { next: gymScanAuthNext } }
+                : '/sign-up'
+            )}
           />
         </View>
       )}

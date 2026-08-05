@@ -139,9 +139,9 @@ export default function LeaderboardScreen() {
               value={currentRankLabel}
             />
             <OverviewMetric
-              label="WEEKLY GOAL"
+              label="ACHIEVED THIS WEEK"
               tone="green"
-              value={`${Math.min(currentWeekVerified, weeklyGoal)}/${weeklyGoal}`}
+              value={`${Math.min(currentWeekVerified, weeklyGoal)} OF ${weeklyGoal}`}
             />
             <OverviewMetric
               label="PRIZE DRAW ENTRIES"

@@ -31,6 +31,15 @@ type PendingGymScanDependencies = {
   storage?: PendingGymScanStorage;
 };
 
+type PendingGymScanListener = (pending: PendingGymScan | null) => void;
+
+const pendingGymScanListeners = new Set<PendingGymScanListener>();
+
+export function subscribePendingGymScan(listener: PendingGymScanListener) {
+  pendingGymScanListeners.add(listener);
+  return () => pendingGymScanListeners.delete(listener);
+}
+
 export async function readPendingGymScan(
   dependencies: PendingGymScanDependencies = {}
 ) {
@@ -72,6 +81,7 @@ export async function rememberGymScanCredential(
     credential
   };
   await storage.setItem(pendingGymScanStorageKey, JSON.stringify(pending));
+  notifyPendingGymScan(pending);
   return pending;
 }
 
@@ -83,6 +93,7 @@ export async function rememberGymScanResult(
   const storage = dependencies.storage ?? AsyncStorage;
   if (result.outcome === 'verified') {
     await storage.removeItem(pendingGymScanStorageKey);
+    notifyPendingGymScan(null);
     return null;
   }
 
@@ -99,6 +110,7 @@ export async function rememberGymScanResult(
         : null
   };
   await storage.setItem(pendingGymScanStorageKey, JSON.stringify(nextPending));
+  notifyPendingGymScan(nextPending);
   return nextPending;
 }
 
@@ -106,6 +118,13 @@ export async function clearPendingGymScan(
   dependencies: PendingGymScanDependencies = {}
 ) {
   await (dependencies.storage ?? AsyncStorage).removeItem(pendingGymScanStorageKey);
+  notifyPendingGymScan(null);
+}
+
+function notifyPendingGymScan(pending: PendingGymScan | null) {
+  for (const listener of pendingGymScanListeners) {
+    listener(pending);
+  }
 }
 
 function parsePendingGymScan(value: string | null): PendingGymScan | null {

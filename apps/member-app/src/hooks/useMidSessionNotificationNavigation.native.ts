@@ -5,11 +5,15 @@ import { useEffect } from 'react';
 export function useMidSessionNotificationNavigation() {
   const router = useRouter();
   const workoutRoutePrefix = ['', 'workout', ''].join('/');
+  const gymScannerRoute = ['', 'qr-scanner'].join('/');
 
   useEffect(() => {
     const openResponse = (response: Notifications.NotificationResponse | null) => {
       const route = response?.notification.request.content.data?.route;
-      if (typeof route === 'string' && route.startsWith(workoutRoutePrefix)) {
+      if (
+        typeof route === 'string' &&
+        (route.startsWith(workoutRoutePrefix) || route === gymScannerRoute)
+      ) {
         router.push(route as Href);
       }
     };
@@ -17,5 +21,5 @@ export function useMidSessionNotificationNavigation() {
     void Notifications.getLastNotificationResponseAsync().then(openResponse);
     const subscription = Notifications.addNotificationResponseReceivedListener(openResponse);
     return () => subscription.remove();
-  }, [router, workoutRoutePrefix]);
+  }, [gymScannerRoute, router, workoutRoutePrefix]);
 }

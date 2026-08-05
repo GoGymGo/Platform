@@ -37,7 +37,6 @@ import {
   getCompetitionRemainderDayCount,
   type RemainderDayCount
 } from '@/domain/commitmentProjection';
-import { getCompetitionDateRange } from '@/domain/competitionEnrollment';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useCompetitionRegistration } from '@/hooks/useCompetitionRegistration';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
@@ -107,9 +106,6 @@ export default function CommitmentScreen() {
       ? publishedGoalOptions
       : dayOptions;
   const maximumSelectableGoal = Math.max(...availableGoalOptions);
-  const competitionDateRange = getCompetitionDateRange(
-    upcomingCompetitionMonthKey
-  );
   const draftKey = `weekly-goal:${user?.uid ?? 'anonymous'}:${upcomingCompetitionMonthKey}`;
   const [days, setDays] = useScreenMemory(`${draftKey}:days`, () =>
     Math.min(weeklyGoal, maximumSelectableGoal)
@@ -253,10 +249,11 @@ export default function CommitmentScreen() {
 
         <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
           <TerminalText tone="cyan" variant="label">
-            PUBLISHED COMPETITION
+            SEPTEMBER COMPETITION
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="caption">
-            {`You may join this competition until it ends on ${competitionDateRange.endDateKey}. Your entries begin when enrollment is confirmed.`}
+            Registration is now open. Enrol by choosing how many workout days
+            you’ll commit to each week.
           </TerminalText>
         </HUDBorderBox>
 

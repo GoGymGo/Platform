@@ -10,6 +10,8 @@ const environment = loadEnvironment(['.env', '.env.local']);
 
 requireValue('GOGYMGO_IOS_BUNDLE_ID');
 requireValue('GOGYMGO_ANDROID_PACKAGE');
+requireValue('GOGYMGO_IOS_TEAM_ID');
+requireValue('GOGYMGO_ANDROID_CERT_SHA256');
 requireValue('EXPO_PUBLIC_API_URL');
 requirePublicHttpsUrl('GOGYMGO_PRIVACY_POLICY_URL');
 requirePublicHttpsUrl('GOGYMGO_ACCOUNT_DELETION_URL');
@@ -26,6 +28,13 @@ for (const name of [
 
 const iosBundleId = environment.GOGYMGO_IOS_BUNDLE_ID ?? '';
 const androidPackage = environment.GOGYMGO_ANDROID_PACKAGE ?? '';
+const iosTeamId = environment.GOGYMGO_IOS_TEAM_ID ?? '';
+const androidCertificateFingerprints = (
+  environment.GOGYMGO_ANDROID_CERT_SHA256 ?? ''
+)
+  .split(',')
+  .map((value) => value.trim().toUpperCase())
+  .filter(Boolean);
 const apiUrl = environment.EXPO_PUBLIC_API_URL ?? '';
 const browserTestPreviewEnabled =
   environment.EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW === 'true';
@@ -36,6 +45,17 @@ if (iosBundleId && !isProductionAppId(iosBundleId)) {
 }
 if (androidPackage && !isProductionAppId(androidPackage)) {
   issues.push('GOGYMGO_ANDROID_PACKAGE must be a final reverse-domain identifier without dev/test markers');
+}
+if (iosTeamId && !/^[A-Z0-9]{10}$/.test(iosTeamId)) {
+  issues.push('GOGYMGO_IOS_TEAM_ID must be the 10-character Apple Developer Team ID');
+}
+if (
+  androidCertificateFingerprints.length > 0 &&
+  androidCertificateFingerprints.some(
+    (value) => !/^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(value)
+  )
+) {
+  issues.push('GOGYMGO_ANDROID_CERT_SHA256 must contain colon-delimited SHA-256 fingerprints');
 }
 if (apiUrl && !/^https:\/\//i.test(apiUrl)) {
   issues.push('EXPO_PUBLIC_API_URL must use HTTPS for a store release');
@@ -77,6 +97,27 @@ if (!easJson.submit?.production) {
 const blockedPermissions = new Set(expo.android?.blockedPermissions ?? []);
 if (!blockedPermissions.has('android.permission.RECORD_AUDIO')) {
   issues.push('Android RECORD_AUDIO must be blocked because GoGymGo does not record audio');
+}
+
+const associatedDomains = new Set(expo.ios?.associatedDomains ?? []);
+if (!associatedDomains.has('applinks:app.gogymgo.com')) {
+  issues.push('iOS must associate app.gogymgo.com so poster scans can open the installed app');
+}
+const gymScanIntentFilter = (expo.android?.intentFilters ?? []).find(
+  (intentFilter) =>
+    intentFilter.action === 'VIEW' &&
+    intentFilter.autoVerify === true &&
+    intentFilter.category?.includes('BROWSABLE') &&
+    intentFilter.category?.includes('DEFAULT') &&
+    intentFilter.data?.some(
+      (entry) =>
+        entry.scheme === 'https' &&
+        entry.host === 'app.gogymgo.com' &&
+        entry.pathPrefix === '/scan'
+    )
+);
+if (!gymScanIntentFilter) {
+  issues.push('Android must register a verified App Link for https://app.gogymgo.com/scan');
 }
 
 const plugins = new Map(

@@ -3,6 +3,7 @@ import { Stack, useSegments } from 'expo-router';
 import { AuthGate } from '@/components/auth';
 import { colors } from '@/constants/theme';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
+import { gymScanAuthNext } from '@/navigation/gymScanFlow';
 
 export default function ModalLayout() {
   const reduceMotion = useReducedMotionPreference();
@@ -29,5 +30,12 @@ export default function ModalLayout() {
     </Stack>
   );
 
-  return activeRoute === 'qr-scanner' ? <AuthGate>{stack}</AuthGate> : stack;
+  return activeRoute === 'qr-scanner' ? (
+    <AuthGate
+      signedOutHref={{ pathname: '/sign-in', params: { next: gymScanAuthNext } }}
+      unverifiedHref={{ pathname: '/verify-email', params: { next: gymScanAuthNext } }}
+    >
+      {stack}
+    </AuthGate>
+  ) : stack;
 }

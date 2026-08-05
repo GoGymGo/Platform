@@ -108,14 +108,16 @@ export default function SignUpScreen() {
 
   return (
     <AuthScreenShell
-      description="Create one secure account for your Weekly Goal, verified workouts and brand rewards."
-      eyebrow="ACCOUNT SETUP"
+      description={gymScanContinuation
+        ? 'Your gym scan is saved. Create your account, finish setup, and GoGymGo will return you to Start Workout.'
+        : 'Create one secure account for your Weekly Goal, verified workouts and brand rewards.'}
+      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT SETUP'}
       onBack={() => router.replace(
         gymScanContinuation
           ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
           : '/join'
       )}
-      title="CREATE YOUR ACCOUNT"
+      title={gymScanContinuation ? 'CREATE ACCOUNT TO CONTINUE' : 'CREATE YOUR ACCOUNT'}
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
 

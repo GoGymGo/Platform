@@ -49,8 +49,10 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthScreenShell
-      description="Enter your account email and we will send a secure password-reset link."
-      eyebrow="ACCOUNT RECOVERY"
+      description={gymScanContinuation
+        ? 'Your gym scan is saved. Reset your password, then sign in to continue to Start Workout.'
+        : 'Enter your account email and we will send a secure password-reset link.'}
+      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT RECOVERY'}
       footer={(
         <CyberButtonOutline
           label="BACK TO SIGN IN"

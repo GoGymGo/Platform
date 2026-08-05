@@ -6,7 +6,16 @@ export function extractGymScanCredential(payload: string) {
 
   try {
     const url = new URL(trimmed);
-    if (url.hostname !== 'app.gogymgo.com' || url.pathname !== '/scan') {
+    const isProductionWebLink =
+      url.protocol === 'https:' &&
+      url.hostname === 'app.gogymgo.com' &&
+      url.pathname === '/scan';
+    const isNativeSchemeLink =
+      url.protocol === 'gogymgo:' &&
+      ((url.hostname === 'scan' && (url.pathname === '' || url.pathname === '/')) ||
+        (url.hostname === '' && url.pathname === '/scan'));
+
+    if (!isProductionWebLink && !isNativeSchemeLink) {
       return null;
     }
 

@@ -146,8 +146,12 @@ export default function VerifyEmailScreen() {
     <AuthScreenShell
       description={appTourActive
         ? 'This preview simulates the email-verification step without sending a message.'
-        : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
-      eyebrow="ACCOUNT SECURITY"
+        : next === gymScanAuthNext || next === gymScanSetupNext
+          ? 'Your gym scan is saved. Verify your email and GoGymGo will continue your workout setup automatically.'
+          : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
+      eyebrow={next === gymScanAuthNext || next === gymScanSetupNext
+        ? 'GYM SCAN SAVED'
+        : 'ACCOUNT SECURITY'}
       title="CHECK YOUR EMAIL"
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}

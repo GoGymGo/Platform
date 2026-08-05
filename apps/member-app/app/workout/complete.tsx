@@ -219,7 +219,7 @@ export default function WorkoutCompleteScreen() {
                 : `WEEK ${currentWeekIndex ?? 1} PROGRESS`}
             </TerminalText>
             <TerminalText glow tone="cyan" variant="label">
-              {currentWeekVerified} / {weeklyGoal}
+              {currentWeekVerified} OF {weeklyGoal} {weeklyGoal === 1 ? 'DAY' : 'DAYS'}
             </TerminalText>
           </View>
           <View style={styles.progressBars}>

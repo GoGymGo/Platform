@@ -21,6 +21,7 @@ const principal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'admin-firebase-uid',
   roles: ['admin'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 const idempotencyKey = 'operator-request-0001';

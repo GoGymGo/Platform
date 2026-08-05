@@ -23,6 +23,7 @@ const userPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-session-user',
   roles: ['user'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 
@@ -31,6 +32,7 @@ const unverifiedPrincipal: AuthenticatedPrincipal = {
   emailVerified: false,
   firebaseUid: 'unverified-critical-session-user',
   roles: ['user'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 
@@ -39,6 +41,7 @@ const operatorPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-session-operator',
   roles: ['operator'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 
@@ -51,6 +54,7 @@ const cappedUserPrincipals: readonly [
     emailVerified: true,
     firebaseUid: 'capped-enrollment-user-a',
     roles: ['user'],
+    signInProvider: 'password',
     tokenIssuedAt: 1,
   },
   {
@@ -58,6 +62,7 @@ const cappedUserPrincipals: readonly [
     emailVerified: true,
     firebaseUid: 'capped-enrollment-user-b',
     roles: ['user'],
+    signInProvider: 'password',
     tokenIssuedAt: 1,
   },
 ];

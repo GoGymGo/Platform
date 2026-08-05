@@ -15,6 +15,7 @@ const principal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'shared-browser-mobile-profile',
   roles: ['user'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 

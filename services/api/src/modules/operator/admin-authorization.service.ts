@@ -12,6 +12,13 @@ export class AdminAuthorizationService {
     principal: AuthenticatedPrincipal,
     transaction: Transaction<Database>,
   ) {
+    if (principal.signInProvider !== 'password') {
+      throw new ForbiddenException({
+        code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
+        message:
+          'Use the email and password credentials issued directly by GoGymGo.',
+      });
+    }
     const user = await this.profiles.ensureUser(principal, transaction);
     this.profiles.requireVerifiedEmail(user);
     if (!user.roles.includes('admin')) {

@@ -151,9 +151,9 @@ export default function CalendarScreen() {
 
         <View style={styles.statRow}>
           <StatCard
-            label={competitionNotStarted ? 'PRE-COMP VERIFIED' : 'THIS WEEK'}
+            label={competitionNotStarted ? 'VERIFIED BEFORE START' : 'ACHIEVED THIS WEEK'}
             tone="cyan"
-            value={`${Math.min(currentWeekVerified, weeklyGoal)}/${weeklyGoal}`}
+            value={`${Math.min(currentWeekVerified, weeklyGoal)} OF ${weeklyGoal}`}
           />
           <StatCard label="PERSONAL STREAK" tone="green" value={String(currentStreak)} />
         </View>

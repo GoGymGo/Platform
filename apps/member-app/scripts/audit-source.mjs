@@ -263,7 +263,9 @@ function auditFlowReliability() {
       'getAppResumeTarget',
       'RecoverableError',
       'resume-started',
-      'resume-completed'
+      'resume-completed',
+      'OBJECTIVE',
+      'ACHIEVED THIS WEEK'
     ]],
     ['app/(tabs)/leaderboard/index.tsx', [
       'useScreenMemory',

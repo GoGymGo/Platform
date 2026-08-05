@@ -13,6 +13,7 @@ describe('PrivacyService download actions', () => {
     emailVerified: true,
     firebaseUid: 'firebase-user',
     roles: ['user'],
+    signInProvider: 'password',
     tokenIssuedAt: 1,
   };
 

@@ -95,6 +95,13 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /recorded automatically in the audit history/);
   assert.match(dashboard, /action\.auditReason \?\?/);
   assert.match(dashboard, /idempotency-key/);
+  assert.match(dashboard, /aria-current=\{section === item\.id \? "page"/);
+  assert.match(dashboard, /className="page-context"/);
+  assert.match(dashboard, /aria-labelledby=\{titleId\}/);
+  assert.match(dashboard, /event\.key === "Escape"/);
+  assert.match(dashboard, /No regional policies configured/);
+  assert.match(dashboard, /No legal documents published/);
+  assert.match(dashboard, /No audit events recorded/);
   assert.match(dashboard, /operator\/gym-locations/);
   assert.match(dashboard, /operator\/gym-sessions/);
   assert.match(dashboard, /operator\/region-waitlist/);
@@ -111,6 +118,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /DOWNLOAD SVG FOR PRINTING/);
   assert.match(pilot, /Sessions \+ incomplete visits/);
   assert.match(pilot, /owner|cash handoff/i);
+  assert.match(pilot, /scope="col"/);
+  assert.match(pilot, /scroll horizontally for more columns/);
   assert.doesNotMatch(pilot, /dangerouslySetInnerHTML/);
 
   assert.match(proxy, /path\[0\]\s*!==\s*"operator"/);
@@ -128,6 +137,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(authorization, /OPERATOR_PASSWORD_SIGN_IN_REQUIRED/);
   assert.match(styles, /\.sign-in-panel \.stacked-form input,[\s\S]*min-height: 48px/);
   assert.match(styles, /\.sign-in-panel \{[\s\S]*order: -1/);
+  assert.match(styles, /--body: Inter, ui-sans-serif/);
+  assert.match(styles, /--muted: #a0b6bd/);
+  assert.match(styles, /grid-template-columns: repeat\(8, minmax\(40px, 1fr\)\)/);
+  assert.match(styles, /\.table-wrap:focus-visible/);
 
   assert.match(layout, /GoGymGo Admin/);
   assert.match(layout, /new URL\("\/og\.png", origin\)/);

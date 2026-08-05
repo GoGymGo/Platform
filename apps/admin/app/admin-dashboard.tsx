@@ -10,7 +10,14 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type {
   AdminSection,
   AuditEvent,
@@ -40,15 +47,60 @@ type ConfirmAction = {
   tone?: "danger" | "primary";
 };
 
-const navigation: { id: AdminSection; label: string; short: string }[] = [
-  { id: "overview", label: "Overview", short: "OV" },
-  { id: "pilot", label: "QR Pilot", short: "QR" },
-  { id: "competitions", label: "Competitions", short: "CO" },
-  { id: "rewards", label: "Rewards", short: "RW" },
-  { id: "regions", label: "Regions", short: "RG" },
-  { id: "content", label: "Content + Legal", short: "CL" },
-  { id: "operations", label: "Operations", short: "OP" },
-  { id: "audit", label: "Audit history", short: "AU" },
+const navigation: {
+  description: string;
+  id: AdminSection;
+  label: string;
+  short: string;
+}[] = [
+  {
+    description: "Current launch readiness, workload and system health at a glance.",
+    id: "overview",
+    label: "Overview",
+    short: "OV",
+  },
+  {
+    description: "Manage pilot gyms, static QR posters, field sessions and intake.",
+    id: "pilot",
+    label: "QR Pilot",
+    short: "QR",
+  },
+  {
+    description: "Build, review and release regional competitions to players.",
+    id: "competitions",
+    label: "Competitions",
+    short: "CO",
+  },
+  {
+    description: "Control reward inventory, coupon readiness and publication status.",
+    id: "rewards",
+    label: "Rewards",
+    short: "RW",
+  },
+  {
+    description: "Review the geographic and age policies that determine eligibility.",
+    id: "regions",
+    label: "Regions",
+    short: "RG",
+  },
+  {
+    description: "Maintain creator workouts and authoritative legal document versions.",
+    id: "content",
+    label: "Content + Legal",
+    short: "CL",
+  },
+  {
+    description: "Monitor background processing and items awaiting human review.",
+    id: "operations",
+    label: "Operations",
+    short: "OP",
+  },
+  {
+    description: "Trace the latest administrative decisions, actors and reasons.",
+    id: "audit",
+    label: "Audit history",
+    short: "AU",
+  },
 ];
 
 const creatorFeaturesEnabled = false;
@@ -341,6 +393,8 @@ export function AdminDashboard({
   const activeCompetition = snapshot.competitions.find((competition) =>
     ["registration", "active"].includes(competition.status),
   );
+  const activeNavigation =
+    navigation.find((item) => item.id === section) ?? navigation[0];
 
   return (
     <div className="admin-shell">
@@ -355,9 +409,12 @@ export function AdminDashboard({
         <nav aria-label="Admin sections">
           {navigation.map((item) => (
             <button
+              aria-current={section === item.id ? "page" : undefined}
+              aria-label={item.label}
               className={section === item.id ? "nav-item active" : "nav-item"}
               key={item.id}
               onClick={() => setSection(item.id)}
+              title={item.label}
               type="button"
             >
               <span className="nav-short">{item.short}</span>
@@ -379,18 +436,23 @@ export function AdminDashboard({
         </div>
       </aside>
 
-      <main>
+      <main aria-busy={busy}>
         <header className="topbar">
-          <div>
+          <div className="topbar-heading">
             <p className="eyebrow">SYSTEM // {section.toUpperCase()}</p>
-            <h1>{navigation.find((item) => item.id === section)?.label}</h1>
+            <h1>{activeNavigation.label}</h1>
+            <p className="page-context">{activeNavigation.description}</p>
           </div>
           <div className="topbar-actions">
-            <span className={`health-pill ${health?.worker.status ?? "stale"}`}>
-              <span />
+            <span
+              aria-label={`Operations worker status: ${health?.worker.status ?? "unknown"}`}
+              className={`health-pill ${health?.worker.status ?? "stale"}`}
+            >
+              <span aria-hidden="true" />
               WORKER {health?.worker.status.toUpperCase() ?? "UNKNOWN"}
             </span>
             <button
+              aria-label={busy ? "Refreshing dashboard data" : "Refresh dashboard data"}
               className="icon-button"
               disabled={busy}
               onClick={() => {
@@ -1011,7 +1073,12 @@ function Metric({
   onClick: () => void;
 }) {
   return (
-    <button className="metric" onClick={onClick} type="button">
+    <button
+      aria-label={`${label}: ${value}. ${detail || "Open details"}`}
+      className="metric"
+      onClick={onClick}
+      type="button"
+    >
       <span>{label}</span>
       <strong>{String(value).padStart(2, "0")}</strong>
       <small>{detail || "Open details"} →</small>
@@ -1183,16 +1250,16 @@ function RewardsPanel({
           title="No brand rewards configured"
         />
       ) : (
-        <div className="table-wrap">
+        <div aria-label="Rewards table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
           <table>
             <thead>
               <tr>
-                <th>Reward</th>
-                <th>Competition</th>
-                <th>Type</th>
-                <th>Inventory</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
+                <th scope="col">Reward</th>
+                <th scope="col">Competition</th>
+                <th scope="col">Type</th>
+                <th scope="col">Inventory</th>
+                <th scope="col">Status</th>
+                <th aria-label="Actions" scope="col" />
               </tr>
             </thead>
             <tbody>
@@ -1294,42 +1361,49 @@ function RegionsPanel({
           + NEW REGION POLICY
         </button>
       </div>
-      <div className="card-list">
-        {regions.map((region) => (
-          <article className="region-card" key={region.id}>
-            <div className="region-code">{region.code}</div>
-            <div>
-              <span
-                className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
-              >
-                {region.competitionEnabled ? "competition enabled" : "disabled"}
-              </span>
-              <h3>{region.metroName}</h3>
-              <p>
-                {region.countryCode}-{region.subdivisionCode} · {region.timezone}
-              </p>
-            </div>
-            <dl>
+      {regions.length === 0 ? (
+        <EmptyState
+          body="Create the first time-bounded regional policy before configuring a competition."
+          title="No regional policies configured"
+        />
+      ) : (
+        <div className="card-list">
+          {regions.map((region) => (
+            <article className="region-card" key={region.id}>
+              <div className="region-code">{region.code}</div>
               <div>
-                <dt>POLICY</dt>
-                <dd>{region.policyVersion}</dd>
+                <span
+                  className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
+                >
+                  {region.competitionEnabled ? "competition enabled" : "disabled"}
+                </span>
+                <h3>{region.metroName}</h3>
+                <p>
+                  {region.countryCode}-{region.subdivisionCode} · {region.timezone}
+                </p>
               </div>
-              <div>
-                <dt>BOUNDARY</dt>
-                <dd>{region.boundaryVersion}</dd>
-              </div>
-              <div>
-                <dt>MINIMUM AGE</dt>
-                <dd>{region.minimumAge}</dd>
-              </div>
-              <div>
-                <dt>VALID FROM</dt>
-                <dd>{formatDate(region.validFrom)}</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
-      </div>
+              <dl>
+                <div>
+                  <dt>POLICY</dt>
+                  <dd>{region.policyVersion}</dd>
+                </div>
+                <div>
+                  <dt>BOUNDARY</dt>
+                  <dd>{region.boundaryVersion}</dd>
+                </div>
+                <div>
+                  <dt>MINIMUM AGE</dt>
+                  <dd>{region.minimumAge}</dd>
+                </div>
+                <div>
+                  <dt>VALID FROM</dt>
+                  <dd>{formatDate(region.validFrom)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -1363,6 +1437,7 @@ function ContentPanel({
           <div>
             <p className="eyebrow">CREATOR WORKOUT CATALOG</p>
             <h2>Workout content</h2>
+            <p>Review the approved workout catalog and control what members can access.</p>
           </div>
           <button
             className="primary-button"
@@ -1438,62 +1513,70 @@ function ContentPanel({
           <div>
             <p className="eyebrow">SERVER-AUTHORITATIVE LEGAL TEXT</p>
             <h2>Legal documents</h2>
+            <p>Publish approved, versioned policy text and withdraw superseded releases.</p>
           </div>
           <button className="primary-button" onClick={onCreateDocument} type="button">
             + PUBLISH VERSION
           </button>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Scope</th>
-                <th>Version</th>
-                <th>Effective</th>
-                <th>Owner approval</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((document) => (
-                <tr key={document.id}>
-                  <td>
-                    <strong>{document.title}</strong>
-                    <small>{document.documentKey}</small>
-                  </td>
-                  <td>
-                    {document.jurisdictionCode} · {document.locale}
-                  </td>
-                  <td>{document.version}</td>
-                  <td>{formatDate(document.effectiveAt)}</td>
-                  <td>
-                    <span className={`status-tag ${document.ownerApprovedAt ? "active" : "draft"}`}>
-                      {document.ownerApprovedAt ? "approved" : "not approved"}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`status-tag ${document.status}`}>
-                      {document.status}
-                    </span>
-                  </td>
-                  <td>
-                    {document.status !== "withdrawn" ? (
-                      <button
-                        className="text-button danger-text"
-                        onClick={() => onWithdrawDocument(document)}
-                        type="button"
-                      >
-                        Withdraw
-                      </button>
-                    ) : null}
-                  </td>
+        {documents.length === 0 ? (
+          <EmptyState
+            body="Publish the first owner-approved document version when the legal text is ready."
+            title="No legal documents published"
+          />
+        ) : (
+          <div aria-label="Legal documents table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Document</th>
+                  <th scope="col">Scope</th>
+                  <th scope="col">Version</th>
+                  <th scope="col">Effective</th>
+                  <th scope="col">Owner approval</th>
+                  <th scope="col">Status</th>
+                  <th aria-label="Actions" scope="col" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {documents.map((document) => (
+                  <tr key={document.id}>
+                    <td>
+                      <strong>{document.title}</strong>
+                      <small>{document.documentKey}</small>
+                    </td>
+                    <td>
+                      {document.jurisdictionCode} · {document.locale}
+                    </td>
+                    <td>{document.version}</td>
+                    <td>{formatDate(document.effectiveAt)}</td>
+                    <td>
+                      <span className={`status-tag ${document.ownerApprovedAt ? "active" : "draft"}`}>
+                        {document.ownerApprovedAt ? "approved" : "not approved"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status-tag ${document.status}`}>
+                        {document.status}
+                      </span>
+                    </td>
+                    <td>
+                      {document.status !== "withdrawn" ? (
+                        <button
+                          className="text-button danger-text"
+                          onClick={() => onWithdrawDocument(document)}
+                          type="button"
+                        >
+                          Withdraw
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -1525,6 +1608,7 @@ function OperationsPanel({
           <div>
             <p className="eyebrow">HUMAN REVIEW QUEUE</p>
             <h2>Items requiring attention</h2>
+            <p>Review flagged operational records in priority order.</p>
           </div>
         </div>
         {queue.length === 0 ? (
@@ -1577,24 +1661,31 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
           <p>The latest 100 administrative decisions, including who acted and why.</p>
         </div>
       </div>
-      <div className="timeline">
-        {events.map((event) => (
-          <article key={event.id}>
-            <div className="timeline-node" />
-            <div>
-              <div className="timeline-heading">
-                <strong>{event.action.replaceAll("_", " ")}</strong>
-                <time>{formatDateTime(event.createdAt)}</time>
+      {events.length === 0 ? (
+        <EmptyState
+          body="Administrative decisions will appear here after the first recorded change."
+          title="No audit events recorded"
+        />
+      ) : (
+        <div className="timeline">
+          {events.map((event) => (
+            <article key={event.id}>
+              <div aria-hidden="true" className="timeline-node" />
+              <div>
+                <div className="timeline-heading">
+                  <strong>{event.action.replaceAll("_", " ")}</strong>
+                  <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
+                </div>
+                <p>{event.reason}</p>
+                <small>
+                  {event.actorEmail || "SYSTEM"} · {event.entityType} ·{" "}
+                  {event.entityId.slice(0, 8)}
+                </small>
               </div>
-              <p>{event.reason}</p>
-              <small>
-                {event.actorEmail || "SYSTEM"} · {event.entityType} ·{" "}
-                {event.entityId.slice(0, 8)}
-              </small>
-            </div>
-          </article>
-        ))}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -2240,18 +2331,46 @@ function ModalShell({
   onClose: () => void;
   title: string;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    dialogRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, []);
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section
-        aria-label={title}
+        aria-labelledby={titleId}
         aria-modal="true"
         className={compact ? "modal compact-modal" : "modal"}
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
         <header>
           <div>
             <p className="eyebrow">ADMINISTRATIVE ACTION</p>
-            <h2>{title}</h2>
+            <h2 id={titleId}>{title}</h2>
           </div>
           <button aria-label="Close" className="modal-close" onClick={onClose} type="button">
             ×
@@ -2316,7 +2435,7 @@ function FormActions({
 function EmptyState({ body, title }: { body: string; title: string }) {
   return (
     <div className="empty-state">
-      <span>＋</span>
+      <span aria-hidden="true">＋</span>
       <strong>{title}</strong>
       <p>{body}</p>
     </div>

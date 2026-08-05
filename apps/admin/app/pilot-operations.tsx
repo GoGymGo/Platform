@@ -335,6 +335,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">COMPETITION ELIGIBILITY</p>
             <h2>Assign a gym to September</h2>
+            <p>Link an active pilot gym to the competition members can join there.</p>
           </div>
         </div>
         <form className="pilot-form" noValidate onSubmit={assignGym}>
@@ -714,12 +715,19 @@ function PilotTable({
       {rows.length === 0 ? (
         <p className="empty-copy">{empty}</p>
       ) : (
-        <div className="table-wrap">
+        <div
+          aria-label={`${title} table, scroll horizontally for more columns`}
+          className="table-wrap"
+          role="region"
+          tabIndex={0}
+        >
           <table>
             <thead>
               <tr>
                 {headings.map((heading) => (
-                  <th key={heading}>{heading}</th>
+                  <th key={heading} scope="col">
+                    {heading}
+                  </th>
                 ))}
               </tr>
             </thead>

@@ -18,7 +18,11 @@ import { RecoverableScreenError } from '@/components/reliability';
 import { SessionUnavailable } from '@/components/session';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { createGymScanRepository } from '@/data/gymScanRepository';
-import { extractGymScanCredential } from '@/domain/gymScan';
+import {
+  extractGymScanCredential,
+  getGymScanRemainingSeconds,
+  isGymScanCompletionReady
+} from '@/domain/gymScan';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { getGymScanSetupRoute } from '@/navigation/gymScanFlow';
@@ -61,6 +65,7 @@ export default function QrScannerModal() {
   const [clockNow, setClockNow] = useState<number | null>(null);
   const [pendingIntent, setPendingIntent] = useState<PendingGymScan | null>(null);
   const [pendingIntentLoading, setPendingIntentLoading] = useState(true);
+  const [requirePhysicalRescan, setRequirePhysicalRescan] = useState(false);
   const [scanLocked, setScanLocked] = useState(false);
   const [state, setState] = useState<ScanUiState>('ready');
   const [result, setResult] = useState<GymScanResultDto | null>(null);
@@ -73,11 +78,15 @@ export default function QrScannerModal() {
       ? result.minimumCompleteAt
       : activeSession?.minimumCompleteAt;
   const resultRemainingSeconds = result ? result.remainingSeconds : 0;
-  const displayRemainingSeconds = getRemainingSeconds(
+  const displayRemainingSeconds = getGymScanRemainingSeconds(
     timerTarget,
     resultRemainingSeconds,
     clockNow
   );
+  const completionReady =
+    clockNow !== null &&
+    isGymScanCompletionReady(timerTarget, clockNow) &&
+    Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
 
   useEffect(() => {
     let active = true;
@@ -154,6 +163,11 @@ export default function QrScannerModal() {
           longitude: location.longitude
         });
         setResult(scanResult);
+        if (scanResult.outcome === 'started' || scanResult.outcome === 'too_early') {
+          setRequirePhysicalRescan(true);
+        } else if (scanResult.outcome === 'verified') {
+          setRequirePhysicalRescan(false);
+        }
         try {
           setPendingIntent(await rememberGymScanResult(credential, scanResult));
         } catch {
@@ -177,6 +191,15 @@ export default function QrScannerModal() {
     setState('ready');
     setResult(null);
     setError(null);
+  }
+
+  function openFinishScanner() {
+    setCameraRequested(true);
+    setError(null);
+    setRequirePhysicalRescan(true);
+    setResult(null);
+    setScanLocked(false);
+    setState('ready');
   }
 
   if (pendingIntentLoading) {
@@ -220,7 +243,9 @@ export default function QrScannerModal() {
   }
 
   const busy = state === 'locating' || state === 'submitting';
-  const resultTone = result?.outcome === 'verified'
+  const resultTone = completionReady
+    ? 'green'
+    : result?.outcome === 'verified'
     ? 'green'
     : result?.outcome === 'started'
       ? 'cyan'
@@ -241,8 +266,10 @@ export default function QrScannerModal() {
               VERIFIED GYM WORKOUT
             </TerminalText>
             <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              {activeSession || result?.outcome === 'started' || result?.outcome === 'too_early'
-                ? 'WORKOUT IN PROGRESS'
+              {completionReady
+                ? 'READY TO FINISH'
+                : activeSession || result?.outcome === 'started' || result?.outcome === 'too_early'
+                  ? 'WORKOUT IN PROGRESS'
                 : 'START OR FINISH YOUR WORKOUT'}
             </TerminalText>
           </View>
@@ -273,7 +300,11 @@ export default function QrScannerModal() {
         ) : result || error ? (
           <HUDBorderBox glow style={styles.stateCard} tone={error ? 'red' : resultTone}>
             <TerminalText glow tone={error ? 'red' : resultTone} variant="label">
-              {error ? 'SCAN NOT COMPLETED' : resultTitle(result!)}
+              {error
+                ? 'SCAN NOT COMPLETED'
+                : completionReady
+                  ? '30 MINUTES COMPLETE'
+                  : resultTitle(result!)}
             </TerminalText>
             <TerminalText
               live={error || result?.outcome === 'rejected' ? 'assertive' : 'polite'}
@@ -281,7 +312,9 @@ export default function QrScannerModal() {
               uppercase={false}
               variant="body"
             >
-              {error ?? resultMessage(result!)}
+              {error ?? (completionReady
+                ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
+                : resultMessage(result!))}
             </TerminalText>
             {result?.gymName ? (
               <TerminalText glow tone="cyan" variant="label">
@@ -290,7 +323,7 @@ export default function QrScannerModal() {
             ) : null}
             {result?.outcome === 'started' || result?.outcome === 'too_early' ? (
               <TerminalText glow style={styles.remaining} tone="pink" variant="display">
-                {formatRemaining(displayRemainingSeconds)}
+                {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
               </TerminalText>
             ) : null}
             {error?.startsWith('Location access') ? (
@@ -304,6 +337,12 @@ export default function QrScannerModal() {
                   }
                 }}
                 tone="amber"
+              />
+            ) : null}
+            {completionReady ? (
+              <CyberButtonPrimary
+                label="OPEN SCANNER TO FINISH ->"
+                onPress={openFinishScanner}
               />
             ) : null}
             <CyberButtonOutline
@@ -323,7 +362,7 @@ export default function QrScannerModal() {
               }}
             />
           </HUDBorderBox>
-        ) : posterScanReady && effectiveCredential && !scanLocked ? (
+        ) : posterScanReady && effectiveCredential && !scanLocked && !requirePhysicalRescan ? (
           <HUDBorderBox glow style={styles.stateCard} tone="cyan">
             <TerminalText glow tone="cyan" variant="label">
               {activeSession ? 'RETURN SCAN READY' : 'GYM CHECK-IN READY'}
@@ -349,13 +388,14 @@ export default function QrScannerModal() {
             />
           </HUDBorderBox>
         ) : activeSession && !cameraRequested ? (
-          <HUDBorderBox glow style={styles.stateCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
-              WORKOUT TIMER ACTIVE
+          <HUDBorderBox glow style={styles.stateCard} tone={completionReady ? 'green' : 'cyan'}>
+            <TerminalText glow tone={completionReady ? 'green' : 'cyan'} variant="label">
+              {completionReady ? '30 MINUTES COMPLETE' : 'WORKOUT TIMER ACTIVE'}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              When the timer reaches 00:00, scan the same gym poster again to
-              verify your workout day.
+              {completionReady
+                ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
+                : 'When the timer reaches 00:00, scan the same gym poster again to verify your workout day.'}
             </TerminalText>
             {activeSession.gymName ? (
               <TerminalText glow tone="cyan" variant="label">
@@ -363,7 +403,7 @@ export default function QrScannerModal() {
               </TerminalText>
             ) : null}
             <TerminalText glow style={styles.remaining} tone="pink" variant="display">
-              {formatRemaining(displayRemainingSeconds)}
+              {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
             </TerminalText>
             <CyberButtonPrimary
               label="SCAN POSTER TO FINISH ->"
@@ -446,21 +486,6 @@ function formatRemaining(totalSeconds: number) {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
   const seconds = String(totalSeconds % 60).padStart(2, '0');
   return `${minutes}:${seconds}`;
-}
-
-function getRemainingSeconds(
-  minimumCompleteAt: string | null | undefined,
-  fallbackSeconds: number,
-  now: number | null
-) {
-  if (!minimumCompleteAt || now === null) {
-    return Math.max(0, fallbackSeconds);
-  }
-
-  const target = Date.parse(minimumCompleteAt);
-  return Number.isFinite(target)
-    ? Math.max(0, Math.ceil((target - now) / 1000))
-    : Math.max(0, fallbackSeconds);
 }
 
 function getScanErrorMessage(error: unknown) {

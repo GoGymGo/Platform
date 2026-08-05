@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { extractGymScanCredential } from './gymScan';
+import {
+  extractGymScanCredential,
+  getGymScanRemainingSeconds,
+  isGymScanCompletionReady
+} from './gymScan';
 
 describe('gym scan credentials', () => {
   const credential = 'a'.repeat(32);
@@ -36,5 +40,46 @@ describe('gym scan credentials', () => {
       extractGymScanCredential(`gogymgo://profile?credential=${credential}`),
       null
     );
+  });
+});
+
+describe('gym scan completion reminder', () => {
+  const minimumCompleteAt = '2026-09-01T17:30:00.000Z';
+
+  it('counts down to the server completion time', () => {
+    assert.equal(
+      getGymScanRemainingSeconds(
+        minimumCompleteAt,
+        1800,
+        Date.parse('2026-09-01T17:29:30.000Z')
+      ),
+      30
+    );
+    assert.equal(
+      getGymScanRemainingSeconds(
+        minimumCompleteAt,
+        1800,
+        Date.parse('2026-09-01T17:30:01.000Z')
+      ),
+      0
+    );
+  });
+
+  it('becomes ready only when the authoritative time has elapsed', () => {
+    assert.equal(
+      isGymScanCompletionReady(
+        minimumCompleteAt,
+        Date.parse('2026-09-01T17:29:59.999Z')
+      ),
+      false
+    );
+    assert.equal(
+      isGymScanCompletionReady(
+        minimumCompleteAt,
+        Date.parse('2026-09-01T17:30:00.000Z')
+      ),
+      true
+    );
+    assert.equal(isGymScanCompletionReady(null, Date.now()), false);
   });
 });

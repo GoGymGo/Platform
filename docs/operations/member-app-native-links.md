@@ -82,6 +82,12 @@ Test all of these before announcing the QR flow:
    Workout.
 5. A scan submitted outside the configured gym radius is rejected by the server.
 6. The browser fallback still works when no native app is installed.
+7. With native notification permission enabled, the installed app sends a local
+   reminder when the server's 30-minute minimum is reached and opens the scanner
+   when the reminder is tapped.
+8. The browser build shows the completion banner while open and immediately when
+   reopened. Do not claim that a fully closed browser tab will notify the player;
+   that requires a separately deployed web-push service.
 
 Location is checked when the player submits Start Workout and Finish Workout. The
 app does not continuously track the player or automatically boot them out when

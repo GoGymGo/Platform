@@ -14,6 +14,28 @@ Public identity and verified-region hydration read the backend first and keep
 user-scoped device storage only as a resilience cache. Both providers refresh
 from the backend when the app becomes active again.
 
+## UI/UX and release contract
+
+An unqualified request to change the app UI/UX applies to the shared member app
+on browser, iOS and Android. Keep copy, information hierarchy, visual language
+and core task flows aligned. Adapt only the platform mechanics that genuinely
+differ, such as camera and location permissions, notification delivery, safe
+areas, keyboard behavior and navigation conventions. Record intentional
+differences in the relevant implementation or operations documentation.
+
+The browser build is GoGymGo's real-world pilot and testing release. It may be
+built and published independently of signed iOS and Android releases. A
+browser-only release requires the protected web-hosting, API and Firebase values
+listed below; it does not require Apple Team, iOS bundle, Android package,
+Android signing-certificate or EAS identifiers.
+
+When native signing identifiers are not configured, the web build deliberately
+omits `.well-known/apple-app-site-association` and
+`.well-known/assetlinks.json`. Poster QR codes still open the HTTPS browser flow,
+but the team must not claim that scanning opens an installed native app. Native
+handoff becomes a separate release milestone governed by
+[`member-app-native-links.md`](member-app-native-links.md).
+
 ## Free connected preview
 
 From the repository root:
@@ -77,6 +99,9 @@ For a permanent release:
    40-character source commit;
 7. verify sign-in, profile/region restoration, enrollment, reads and a
    non-destructive write with a staging Firebase account.
+
+This browser deployment does not authorize or imply an iOS App Store, Google
+Play or native QR-link release.
 
 The protected workflow forces a clean Expo export, rejects public sample data and
 production markers, verifies the compiled API origin, assumes a separate

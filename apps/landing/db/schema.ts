@@ -1,4 +1,10 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const interestSubmissions = sqliteTable(
   "interest_submissions",
@@ -24,5 +30,63 @@ export const interestSubmissions = sqliteTable(
       table.audience,
       table.email,
     ),
+  ],
+);
+
+export const publicSiteFeedback = sqliteTable(
+  "public_site_feedback",
+  {
+    id: text("id").primaryKey(),
+    category: text("category", {
+      enum: [
+        "accessibility",
+        "broken_link",
+        "form_problem",
+        "readability",
+        "other",
+      ],
+    }).notNull(),
+    email: text("email").notNull(),
+    page: text("page").notNull(),
+    message: text("message").notNull(),
+    consent: integer("consent", { mode: "boolean" }).notNull(),
+    status: text("status", {
+      enum: ["new", "reviewed", "resolved"],
+    })
+      .notNull()
+      .default("new"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_public_site_feedback_status_created").on(
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const publicSiteEvents = sqliteTable(
+  "public_site_events",
+  {
+    id: text("id").primaryKey(),
+    eventName: text("event_name", {
+      enum: [
+        "member_app_click",
+        "regional_updates_click",
+        "brand_partnership_click",
+        "demo_click",
+        "faq_open",
+        "gym_form_start",
+        "brand_form_start",
+        "feedback_form_start",
+        "eligibility_check_completed",
+      ],
+    }).notNull(),
+    path: text("path").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("idx_public_site_events_created").on(table.createdAt),
   ],
 );

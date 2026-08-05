@@ -1,206 +1,85 @@
-import Link from "next/link";
-
-function ScreenHeader({
-  label,
-  step,
-}: {
-  label: string;
-  step: string;
-}) {
-  return (
-    <div className="app-screen-header">
-      <span className="app-screen-back" aria-hidden="true">
-        &lt;
-      </span>
-      <span className="app-screen-step">{step}</span>
-      <strong>{label}</strong>
-    </div>
-  );
-}
-
-function PhoneShell({
-  children,
-  label,
-  step,
-  title,
-}: {
-  children: React.ReactNode;
-  label: string;
-  step: string;
-  title: string;
-}) {
-  return (
-    <article className="product-screen-card">
-      <div className="product-phone" aria-label={label}>
-        <div className="product-phone-content">{children}</div>
-        <div className="product-phone-homebar" aria-hidden="true" />
-      </div>
-      <div className="product-screen-caption">
-        <span>{step}</span>
-        <h3>{title}</h3>
-      </div>
-    </article>
-  );
-}
-
-function GoalScreen() {
-  return (
-    <PhoneShell
-      label="GoGymGo Weekly Goal and four-week entry calculation screen"
-      step="01 // COMMIT"
-      title="Choose a goal you can repeat"
-    >
-      <ScreenHeader label="WEEKLY GOAL" step="SETUP // 2 OF 2" />
-      <div className="app-screen-progress">
-        <span style={{ width: "100%" }} />
-      </div>
-      <h4>CHOOSE YOUR WEEKLY GOAL</h4>
-      <p className="app-screen-copy">
-        Choose a realistic number of workout days you can repeat each week.
-      </p>
-      <div className="app-day-picker" aria-label="Four-day Weekly Goal selected">
-        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-          <span className={day === 4 ? "is-selected" : ""} key={day}>
-            <strong>{day}</strong>
-            <small>{day === 1 ? "DAY" : "DAYS"}</small>
-          </span>
-        ))}
-      </div>
-      <div className="app-hud app-goal-summary">
-        <div>
-          <strong>4</strong>
-          <span>DAYS / WEEK</span>
-        </div>
-        <div>
-          <strong>4</strong>
-          <span>ENTRIES / HIT WEEK</span>
-        </div>
-        <div>
-          <strong>16</strong>
-          <span>FOUR-WEEK BASE</span>
-        </div>
-        <p>Earn more through consistency, teamwork and competition.</p>
-        <span className="app-compact-action">VIEW BONUS DETAILS</span>
-      </div>
-    </PhoneShell>
-  );
-}
-
-function TimerScreen() {
-  return (
-    <PhoneShell
-      label="GoGymGo active verified workout timer screen"
-      step="02 // VERIFY"
-      title="Follow one clear live session"
-    >
-      <div className="app-session-heading">
-        <span>
-          <i />
-          SESSION ACTIVE
-        </span>
-        <strong>GYM QR</strong>
-      </div>
-      <div className="app-hud app-live-panel">
-        <div className="app-live-metrics">
-          <div>
-            <span>ELAPSED TIME</span>
-            <strong>18:42</strong>
-            <small>30:00 MINIMUM</small>
-          </div>
-          <div>
-            <span>SERVER TIMER</span>
-            <strong>11:18</strong>
-            <small>REMAINING // ON TRACK</small>
-          </div>
-        </div>
-        <div className="app-workout-progress">
-          <span style={{ width: "62%" }} />
-        </div>
-        <div className="app-workout-labels">
-          <span>START</span>
-          <span>CHECK</span>
-          <span>END</span>
-        </div>
-      </div>
-      <div className="app-hud app-verification-card">
-        <div>
-          <span>VERIFICATION</span>
-          <strong>STATIC QR SESSION</strong>
-        </div>
-        <b>IN PROGRESS</b>
-        <p>
-          Scan the same poster again after 30 minutes. GoGymGo rechecks live
-          proximity and completes the session using server time.
-        </p>
-      </div>
-      <div className="app-disabled-action">FINISH UNLOCKS AT 30:00</div>
-    </PhoneShell>
-  );
-}
-
-const rewardRows = [
+const winnerRows = [
   {
-    alias: "CORE_FOUR",
+    badge: "+4",
+    name: "Chris_Mohan",
+    partner: "Northline Wellness",
+    prize: "Recovery Pack",
     rank: "01",
-    reward: "PACIFIC MOTION TRAINING KIT",
-    state: "READY TO CLAIM",
   },
   {
-    alias: "NEON_4",
+    badge: "+3",
+    name: "JennyS",
+    partner: "Northline Wellness",
+    prize: "Training Credit",
     rank: "02",
-    reward: "VOLT 25% DIGITAL REWARD",
-    state: "CLAIMED",
-  },
-  {
-    alias: "KODA_FIT",
-    rank: "03",
-    reward: "NOVA SHAKER",
-    state: "READY TO CLAIM",
   },
 ] as const;
 
-function RewardsLeaderboardScreen() {
+function WinnersCirclePreview() {
   return (
-    <PhoneShell
-      label="GoGymGo competition results with player and brand reward details"
-      step="03 // COMPETE"
-      title="See who won and what they can claim"
+    <div
+      aria-label="GoGymGo Winners Circle preview showing Chris_Mohan and JennyS as prize winners"
+      className="winners-preview"
+      role="img"
     >
-      <div className="app-results-heading">
-        <span>SAMPLE RESULTS // VANCOUVER</span>
-        <h4>WINNERS CIRCLE</h4>
-        <p>JULY COMPETITION</p>
+      <div aria-hidden="true" className="winners-preview__nav">
+        <span>Overview</span>
+        <span>Challenge</span>
+        <span className="is-active">Winners</span>
+        <span>Rewards</span>
       </div>
-      <div className="app-hud app-results-summary">
+
+      <p className="winners-preview__eyebrow">
+        Monthly results // Vancouver Island + Gulf Islands
+      </p>
+      <p className="winners-preview__title">Winners Circle</p>
+      <p className="winners-preview__month">July 2026</p>
+      <p className="winners-preview__summary">
+        Celebrate the seven Weekly Goal champions and the players selected for
+        prizes in the regional draw.
+      </p>
+
+      <div className="winners-preview__stats">
         <div>
-          <strong>3</strong>
-          <span>GOAL-GROUP LEADERS</span>
+          <strong>7</strong>
+          <span>Goal champions</span>
         </div>
         <div>
-          <strong>3</strong>
-          <span>REWARD WINNERS</span>
+          <strong>2</strong>
+          <span>Prize winners</span>
         </div>
       </div>
-      <div className="app-results-label">
-        <strong>PLAYER + BRAND REWARD</strong>
-        <span>STATUS</span>
+
+      <div aria-hidden="true" className="winners-preview__tabs">
+        <span>Goal champions</span>
+        <span className="is-active">Prize draw winners</span>
       </div>
-      <div className="app-results-list">
-        {rewardRows.map((row) => (
-          <div className="app-result-row" key={row.rank}>
-            <span>{row.rank}</span>
-            <div>
-              <strong>{row.alias}</strong>
-              <small>{row.reward}</small>
+
+      <p className="winners-preview__section-label">Prize draw winners</p>
+      <p className="winners-preview__section-copy">
+        Every selected player receives the prize shown.
+      </p>
+
+      <div className="winners-preview__list">
+        {winnerRows.map((winner) => (
+          <div className="winners-preview__row" key={winner.rank}>
+            <span className="winners-preview__rank">{winner.rank}</span>
+            <div className="winners-preview__identity">
+              <strong>
+                {winner.name}
+                <span aria-hidden="true">{winner.badge}</span>
+              </strong>
+              <small>Prize winner</small>
             </div>
-            <b>{row.state}</b>
+            <div className="winners-preview__prize">
+              <strong>{winner.prize}</strong>
+              <small>{winner.partner}</small>
+            </div>
           </div>
         ))}
+        <p>Showing 2 of 2 prize winners.</p>
       </div>
-      <p className="app-results-note">
-        Illustrative demo results. No real reward or claim is created.
-      </p>
-    </PhoneShell>
+    </div>
   );
 }
 
@@ -210,24 +89,48 @@ export function ProductScreens() {
       <div className="shell">
         <div className="section-heading product-showcase-heading">
           <div>
-            <p className="eyebrow">THE CORE APP FLOW</p>
-            <h2>Three screens. One clear reason to keep going.</h2>
+            <p className="eyebrow">INSIDE THE MEMBER APP</p>
+            <h2>From verified workout to published result.</h2>
           </div>
-          <div>
-            <p>
-              The website now uses the same interface language as the app:
-              focused panels, one primary action, and clear status at every
-              step.
-            </p>
-            <Link className="text-link" href="https://app.gogymgo.com/demo">
-              WALK THROUGH THE REAL FLOW <span aria-hidden="true">→</span>
-            </Link>
-          </div>
+          <p>
+            The app keeps live verification separate from final competition
+            results, so pending activity is never presented as approved credit.
+          </p>
         </div>
-        <div className="product-screen-grid">
-          <GoalScreen />
-          <TimerScreen />
-          <RewardsLeaderboardScreen />
+        <p className="product-swipe-hint">SWIPE TO PREVIEW BOTH APP SCREENS →</p>
+        <div
+          aria-label="Member app screen previews"
+          className="product-screen-grid"
+          tabIndex={0}
+        >
+          <article className="product-screen-card">
+            <div className="product-phone product-phone--capture">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt="GoGymGo active workout screen showing elapsed server time and live verification status"
+                className="product-screen-capture"
+                decoding="async"
+                height={800}
+                loading="lazy"
+                src="/app/active-workout.webp"
+                width={540}
+              />
+            </div>
+            <div className="product-screen-caption">
+              <span>01 // VERIFY</span>
+              <h3>Track your verified workout</h3>
+            </div>
+          </article>
+
+          <article className="product-screen-card">
+            <div className="product-phone product-phone--preview">
+              <WinnersCirclePreview />
+            </div>
+            <div className="product-screen-caption">
+              <span>02 // RESULTS</span>
+              <h3>See final winners and prizes</h3>
+            </div>
+          </article>
         </div>
       </div>
     </section>

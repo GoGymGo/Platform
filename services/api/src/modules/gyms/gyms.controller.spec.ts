@@ -21,6 +21,7 @@ const principal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'admin-firebase-uid',
   roles: ['admin'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 const idempotencyKey = 'operator-request-0001';
@@ -110,7 +111,7 @@ describe('gym controllers', () => {
     } satisfies OperatorReasonDto;
     const assignment = reason satisfies AssignCompetitionGymDto;
     const cash = {
-      amountCents: 5_000,
+      amountCents: 10_000,
       currency: 'CAD',
       reason: 'Cash handed to the winner in person.',
       rewardAwardId: '10000000-0000-4000-8000-000000000003',

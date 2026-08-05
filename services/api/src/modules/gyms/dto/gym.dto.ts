@@ -353,7 +353,7 @@ export class CashFulfillmentRequestDto extends OperatorReasonDto {
   @IsUUID()
   rewardAwardId!: string;
 
-  @ApiProperty({ example: 5000, minimum: 1, type: Number })
+  @ApiProperty({ example: 10000, minimum: 1, type: Number })
   @Type(() => Number)
   @IsInt()
   @Min(1)

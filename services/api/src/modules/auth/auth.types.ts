@@ -3,6 +3,7 @@ export interface AuthenticatedPrincipal {
   emailVerified: boolean;
   firebaseUid: string;
   roles: string[];
+  signInProvider: string | null;
   tokenIssuedAt: number;
 }
 

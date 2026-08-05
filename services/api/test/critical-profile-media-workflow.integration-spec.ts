@@ -24,6 +24,7 @@ const userPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-profile-media-user',
   roles: ['user'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 
@@ -32,6 +33,7 @@ const operatorPrincipal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'critical-profile-media-operator',
   roles: ['operator'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 

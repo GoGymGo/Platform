@@ -40,6 +40,31 @@ documents are not returned by the member legal API.
 
 After the first bootstrap, role administration should be implemented as a separate, dual-approval security workflow before additional administrators are delegated. Do not broaden the configuration endpoints to grant roles.
 
+## Issuing operator logins
+
+Dashboard logins are issued directly by GoGymGo only to approved gym owners and
+GoGymGo regional directors. The admin surface has no registration flow and does
+not accept Google or Apple sign-in. The API also rejects operator requests when
+the Firebase token's sign-in provider is anything other than `password`.
+
+For each approved operator, a production owner must:
+
+1. Record the approval, operator type, intended access, and accountable
+   GoGymGo sponsor in the private access register.
+2. Create an email/password user in the production Firebase console with a
+   verified operator email. Do not reuse a member or shared team account.
+3. Deliver the initial credentials through an approved private channel and
+   require the operator to sign in once so the database identity is created.
+4. Grant the database `admin` role only through the audited infrastructure
+   workflow. Never add a public role-grant endpoint or trust Firebase token
+   claims as the authorization source.
+5. Confirm a normal member account receives `ADMIN_REQUIRED`, while the new
+   operator can enter, and retain that evidence with the access approval.
+
+The current console is a full-administration surface. Do not issue a login to
+someone who is authorized for only one gym or one region until scoped operator
+permissions are implemented and reviewed.
+
 ## Deployment checks
 
 1. Apply migrations before deploying API or worker code.

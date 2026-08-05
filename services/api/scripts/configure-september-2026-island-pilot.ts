@@ -363,6 +363,7 @@ async function findAdministrator(
     emailVerified: true,
     firebaseUid: administrator.firebase_uid,
     roles: administrator.roles,
+    signInProvider: 'password',
     tokenIssuedAt: Math.floor(Date.now() / 1_000),
   };
 }
@@ -562,27 +563,34 @@ async function configurePilotReward(
   principal: AuthenticatedPrincipal,
   competitionId: string,
 ): Promise<string> {
-  const title = 'GoGymGo $50 CAD Cash Reward';
+  const title = 'GoGymGo $100 CAD Cash Reward';
+  const legacyTitle = 'GoGymGo $50 CAD Cash Reward';
   const existing = await database.connection
     .selectFrom('reward_catalog_items')
     .select(['id', 'status', 'version'])
     .where('competition_id', '=', competitionId)
     .where('title', '=', title)
     .executeTakeFirst();
-  const reward =
+  const legacyReward = await database.connection
+    .selectFrom('reward_catalog_items')
+    .select(['id', 'status', 'version'])
+    .where('competition_id', '=', competitionId)
+    .where('title', '=', legacyTitle)
+    .executeTakeFirst();
+  let reward =
     existing ??
     (await service.create(
       principal,
-      'configure-september-2026-cash-reward-v1',
+      'configure-september-2026-cash-reward-v2',
       {
         availableFrom: '2026-09-01T07:00:00.000Z',
         availableUntil: '2026-10-02T07:00:00.000Z',
         competitionId,
         description:
-          'One $50 CAD cash prize sponsored by GoGymGo and fulfilled by an audited in-person handoff.',
+          'One $100 CAD cash prize sponsored by GoGymGo and fulfilled by an audited in-person handoff.',
         displayOrder: 1,
         fulfillmentInstructions:
-          'Administrator records the in-person $50 CAD handoff, timestamp and fulfillment note in GoGymGo admin.',
+          'Administrator records the in-person $100 CAD handoff, timestamp and fulfillment note in GoGymGo admin.',
         inventoryTotal: 1,
         reason:
           'Configure the single GoGymGo-sponsored cash reward for the September 2026 pilot.',
@@ -592,15 +600,28 @@ async function configurePilotReward(
       },
     ));
   if (reward.status === 'draft') {
-    await service.changeStatus(
+    reward = await service.changeStatus(
       principal,
       reward.id,
-      'publish-september-2026-cash-reward-v1',
+      'publish-september-2026-cash-reward-v2',
       {
         action: RewardCatalogStatusAction.PUBLISH,
         expectedVersion: reward.version,
         reason:
-          'Publish the single funded $50 CAD pilot reward before competition publication.',
+          'Publish the single funded $100 CAD pilot reward before competition publication.',
+      },
+    );
+  }
+  if (legacyReward?.status === 'published') {
+    await service.changeStatus(
+      principal,
+      legacyReward.id,
+      'archive-september-2026-cash-reward-v1-for-v2',
+      {
+        action: RewardCatalogStatusAction.ARCHIVE,
+        expectedVersion: legacyReward.version,
+        reason:
+          'Replace the former $50 CAD pilot reward with the funded $100 CAD reward.',
       },
     );
   }

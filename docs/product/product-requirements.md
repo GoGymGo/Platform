@@ -24,7 +24,7 @@ V1 must prove that:
 - brands value privacy-safe verified-participation reporting; and
 - physical and coupon fulfillment can operate without consumer payment rails.
 
-No purchase is required. The pilot has one administrator-recorded $50 CAD cash
+No purchase is required. The pilot has one administrator-recorded $100 CAD cash
 reward and no wallet, bank-account, payee, payment-processor, transfer,
 stored-value, or tax-form flow.
 
@@ -45,18 +45,18 @@ stored-value, or tax-form flow.
 These terms are mandatory in user-visible copy. Internal database and API names
 may remain stable when their mapping is documented.
 
-| Product term | Meaning | Avoid in visible copy | Internal mapping |
-| --- | --- | --- | --- |
-| Alias | A player's unique public name | Screen name, callsign | `screenName`, `screen_name` |
-| Weekly Goal | The locked number of verified days required each scoring week | Commitment after registration | enrollment `goalDays` |
-| Weekly Challenge | A one-week head-to-head comparison with a selected eligible friend | Period Match, Match | competition match and period records |
-| Challenge | A friend-created or regional activity goal | Match | social challenge |
-| Verified workout | A workout approved by server evidence review | Check-in when referring to the full workout | session, evidence events, review |
-| Challenge check-in | A completion recorded inside a social Challenge | Verified workout | challenge check-in |
-| Prize draw entry | A non-cash chance in a sponsor-funded draw | Ticket, point, payout | ledger entry |
-| Reward | The published pilot cash reward or a future approved sponsor reward | Payout | reward catalog and award |
-| Partner gym | A gym supporting entry and exit QR verification | Partner when the gym meaning is unclear | gym application and QR evidence |
-| Creator workout | Approved workout guidance that can be added to a calendar | Verified workout | creator catalog and plan |
+| Product term       | Meaning                                                             | Avoid in visible copy                       | Internal mapping                     |
+| ------------------ | ------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ |
+| Alias              | A player's unique public name                                       | Screen name, callsign                       | `screenName`, `screen_name`          |
+| Weekly Goal        | The locked number of verified days required each scoring week       | Commitment after registration               | enrollment `goalDays`                |
+| Weekly Challenge   | A one-week head-to-head comparison with a selected eligible friend  | Period Match, Match                         | competition match and period records |
+| Challenge          | A friend-created or regional activity goal                          | Match                                       | social challenge                     |
+| Verified workout   | A workout approved by server evidence review                        | Check-in when referring to the full workout | session, evidence events, review     |
+| Challenge check-in | A completion recorded inside a social Challenge                     | Verified workout                            | challenge check-in                   |
+| Prize draw entry   | A non-cash chance in a sponsor-funded draw                          | Ticket, point, payout                       | ledger entry                         |
+| Reward             | The published pilot cash reward or a future approved sponsor reward | Payout                                      | reward catalog and award             |
+| Partner gym        | A gym supporting entry and exit QR verification                     | Partner when the gym meaning is unclear     | gym application and QR evidence      |
+| Creator workout    | Approved workout guidance that can be added to a calendar           | Verified workout                            | creator catalog and plan             |
 
 The UI term **Alias** maps to the API field `screenName`. Alias validation is
 3-24 letters, numbers, or underscores and is case-insensitively unique.

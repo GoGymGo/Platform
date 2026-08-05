@@ -107,6 +107,9 @@ export default function HomeScreen() {
   const currentPeriod = competition.currentPeriod;
   const completedSessions = Math.min(currentWeekVerified, weeklyGoal);
   const remainingSessions = Math.max(weeklyGoal - completedSessions, 0);
+  const weeklyGoalUnit = weeklyGoal === 1 ? 'DAY' : 'DAYS';
+  const weeklyObjectiveLabel = `${weeklyGoal} ${weeklyGoalUnit} / WEEK`;
+  const weeklyAchievementLabel = `${completedSessions} OF ${weeklyGoal} ${weeklyGoalUnit}`;
   const isBonusDayPhase = competition.phase === 'bonus-days';
   const competitionNotStarted = competition.phase === 'before-month';
   const competitionStartLabel = formatCampaignDate(`${competition.competitionMonthKey}-01`);
@@ -152,8 +155,8 @@ export default function HomeScreen() {
       tone: 'pink'
     },
     {
-      value: `${completedSessions}/${weeklyGoal}`,
-      label: competitionNotStarted ? 'PRE-COMP VERIFIED' : 'YOUR DAYS',
+      value: `${completedSessions} OF ${weeklyGoal}`,
+      label: competitionNotStarted ? 'VERIFIED BEFORE START' : 'ACHIEVED THIS WEEK',
       tone: 'cyan'
     },
     {
@@ -427,6 +430,41 @@ export default function HomeScreen() {
               </TerminalText>
             </View>
           </View>
+
+          {!setupRequired ? (
+            <View
+              accessible
+              accessibilityLabel={
+                isBonusDayPhase
+                  ? `Weekly goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Weekly scoring is complete.`
+                  : `Weekly goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Achieved: ${completedSessions} of ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} this week.`
+              }
+              style={styles.goalProgressSummary}
+            >
+              <View style={styles.goalProgressMetric}>
+                <TerminalText tone="muted" variant="micro">
+                  OBJECTIVE
+                </TerminalText>
+                <TerminalText glow style={styles.goalProgressValue} tone="cyan" variant="label">
+                  {weeklyObjectiveLabel}
+                </TerminalText>
+              </View>
+              <View style={styles.goalProgressDivider} />
+              <View style={styles.goalProgressMetric}>
+                <TerminalText tone="muted" variant="micro">
+                  {isBonusDayPhase ? 'WEEKLY SCORING' : 'ACHIEVED THIS WEEK'}
+                </TerminalText>
+                <TerminalText
+                  glow={!isBonusDayPhase && completedSessions >= weeklyGoal}
+                  style={styles.goalProgressValue}
+                  tone={!isBonusDayPhase && completedSessions >= weeklyGoal ? 'green' : 'text'}
+                  variant="label"
+                >
+                  {isBonusDayPhase ? '4 WEEKS COMPLETE' : weeklyAchievementLabel}
+                </TerminalText>
+              </View>
+            </View>
+          ) : null}
 
           {!setupRequired ? <View style={styles.weekDots}>
             {Array.from({ length: weeklyGoal }, (_, index) => (
@@ -822,6 +860,32 @@ const styles = StyleSheet.create({
   },
   multiplier: {
     fontFamily: fontFamilies.display
+  },
+  goalProgressSummary: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderCyanQuiet,
+    borderRadius: radii.md,
+    backgroundColor: colors.panelSoft
+  },
+  goalProgressMetric: {
+    minWidth: 0,
+    flex: 1,
+    gap: spacing.xs
+  },
+  goalProgressDivider: {
+    width: 1,
+    backgroundColor: colors.borderCyanQuiet
+  },
+  goalProgressValue: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.titleSmall,
+    lineHeight: 24
   },
   weekDots: {
     flexDirection: 'row',

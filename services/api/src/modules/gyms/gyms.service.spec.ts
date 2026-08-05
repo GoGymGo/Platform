@@ -210,7 +210,7 @@ describe('gym service privacy-safe presentation helpers', () => {
     });
     expect(
       service.mapFulfillment({
-        amount_cents: 5_000,
+        amount_cents: 10_000,
         competition_id: 'competition-1',
         currency: 'CAD',
         fulfilled_at: updatedAt,
@@ -220,7 +220,7 @@ describe('gym service privacy-safe presentation helpers', () => {
         winner_user_id: 'winner-1',
       }),
     ).toEqual({
-      amountCents: 5_000,
+      amountCents: 10_000,
       competitionId: 'competition-1',
       currency: 'CAD',
       fulfilledAt: updatedAt.toISOString(),
@@ -239,6 +239,10 @@ describe('gym service privacy-safe presentation helpers', () => {
     );
 
     expect(poster).toContain('aria-label="GoGymGo logo"');
+    expect(poster).toContain(
+      '<text x="500" y="124" text-anchor="middle"',
+    );
+    expect(poster).not.toContain('<svg x="72" y="52"');
     expect(poster).toContain(
       'Scan the QR code and sign up for the $100 September Challenge.',
     );

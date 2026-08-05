@@ -22,6 +22,7 @@ export class FirebaseTokenVerifier implements TokenVerifier {
       emailVerified: decodedToken.email_verified === true,
       firebaseUid: decodedToken.uid,
       roles: roles.length > 0 ? roles : ['user'],
+      signInProvider: decodedToken.firebase.sign_in_provider ?? null,
       tokenIssuedAt: decodedToken.iat,
     };
   }

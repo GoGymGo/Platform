@@ -9,11 +9,33 @@ const principal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'firebase-user',
   roles: ['admin'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 
 describe('AdminAuthorizationService', () => {
   const transaction = {} as Transaction<Database>;
+
+  it('rejects social-provider sessions for the operator console', async () => {
+    const ensureUser = jest.fn();
+    const profiles = {
+      ensureUser,
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.requireAdmin(
+        { ...principal, signInProvider: 'google.com' },
+        transaction,
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
+      },
+    });
+    expect(ensureUser).not.toHaveBeenCalled();
+  });
 
   it('uses the authoritative database role rather than token claims', async () => {
     const profiles = {

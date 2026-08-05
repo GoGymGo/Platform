@@ -17,6 +17,7 @@ const principal: AuthenticatedPrincipal = {
   emailVerified: true,
   firebaseUid: 'authoritative-region-user',
   roles: ['user'],
+  signInProvider: 'password',
   tokenIssuedAt: 1,
 };
 

@@ -9,7 +9,7 @@
 - Minimum session: 30 minutes using server time
 - Session expiry: four hours
 - Minimum entrants: two
-- Reward: one $50 CAD cash reward sponsored by GoGymGo
+- Reward: one $100 CAD cash reward sponsored by GoGymGo
 - Daily limit: one verified competition day per local calendar date
 
 Run the idempotent configuration command only against the intended environment:
@@ -35,7 +35,7 @@ npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 8. Use two real accounts to complete email, location, legal, age, goal and join.
 9. At the condo, complete one 30-minute entry/exit scan and verify a missing-exit
    test earns no credit.
-10. Rehearse draw settlement and the audited $50 cash handoff record.
+10. Rehearse draw settlement and the audited $100 cash handoff record.
 11. Only after the legal, gym, reward and UAT gates pass, rerun the command with
     `PUBLISH_PILOT_COMPETITION=yes` to open registration.
 

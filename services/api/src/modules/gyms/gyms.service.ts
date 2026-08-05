@@ -1268,13 +1268,18 @@ export class GymsService {
     const qr = await QRCode.toString(qrPayload, {
       color: { dark: '#05090b', light: '#ffffff' },
       errorCorrectionLevel: 'H',
-      margin: 2,
+      margin: 4,
       type: 'svg',
-      width: 760,
+      width: 620,
     });
-    const positionedQr = qr
-      .replace(/<\?xml[^>]*>/, '')
-      .replace('<svg ', '<svg x="120" y="270" width="760" height="760" ');
+    const qrViewBox = qr.match(/\bviewBox="([^"]+)"/)?.[1];
+    const qrBody = qr
+      .replace(/<\?xml[^>]*>\s*/, '')
+      .replace(/^<svg[^>]*>/, '')
+      .replace(/<\/svg>\s*$/, '');
+    if (!qrViewBox) {
+      throw new Error('The QR renderer did not return an SVG viewBox.');
+    }
     const safeName = gymName
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
@@ -1282,14 +1287,38 @@ export class GymsService {
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&apos;');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="GoGymGo QR poster for ${safeName}">
+  <title>GoGymGo $100 September Challenge at ${safeName}</title>
+  <desc>Scan the QR code and sign up for the $100 September Challenge. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
   <rect width="1000" height="1400" fill="#05090b"/>
-  <text x="500" y="115" text-anchor="middle" fill="#32F6FF" font-family="Orbitron, sans-serif" font-size="72" font-weight="700">GOGYMGO</text>
-  <text x="500" y="180" text-anchor="middle" fill="#FF2D9B" font-family="Orbitron, sans-serif" font-size="34">SCAN IN. TRAIN. SCAN OUT.</text>
-  <rect x="100" y="250" width="800" height="800" rx="32" fill="#fff"/>
-  ${positionedQr}
-  <text x="500" y="1140" text-anchor="middle" fill="#fff" font-family="Orbitron, sans-serif" font-size="42">${safeName}</text>
-  <text x="500" y="1210" text-anchor="middle" fill="#32F6FF" font-family="sans-serif" font-size="28">1. Allow location  2. Scan to enter  3. Train 30 min  4. Scan to exit</text>
-  <text x="500" y="1270" text-anchor="middle" fill="#9AB7C8" font-family="monospace" font-size="20">Static credential version ${credentialVersion}</text>
+  <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
+
+  <!-- Canonical GoGymGo mark and cyan/pink/cyan wordmark lockup. -->
+  <g role="img" aria-label="GoGymGo logo">
+    <svg x="72" y="52" width="96" height="96" viewBox="0 0 100 100" aria-hidden="true">
+      <path fill="#34E5E8" d="M74 88H26q-3.3 0-6.05-1.6t-4.35-4.35Q14 79.3 14 76V28q0-3.3 1.6-6.05t4.35-4.35Q22.7 16 26 16h48q3.3 0 6.05 1.6t4.35 4.35Q86 24.7 86 28v2.9h-8.1V28q0-1.6-1.15-2.75T74 24.1H26q-1.6 0-2.75 1.15T22.1 28v48q0 1.6 1.15 2.75T26 79.9h48q1.6 0 2.75-1.15T77.9 76V58.2H60.1V50H86v26q0 3.3-1.6 6.05t-4.35 4.35Q77.3 88 74 88Z"/>
+    </svg>
+    <text x="190" y="124" font-family="Orbitron, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="2"><tspan fill="#34E5E8">GO</tspan><tspan fill="#FF2D9B">GYM</tspan><tspan fill="#34E5E8">GO</tspan></text>
+  </g>
+
+  <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">SEPTEMBER 2026 - VANCOUVER ISLAND + GULF ISLANDS</text>
+  <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE AND SIGN UP FOR THE</text>
+  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="53" font-weight="700">$100 SEPTEMBER CHALLENGE.</text>
+
+  <rect x="160" y="345" width="680" height="680" rx="34" fill="#fff"/>
+  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open the GoGymGo challenge">
+    ${qrBody}
+  </svg>
+
+  <text x="500" y="1084" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="38" font-weight="700">${safeName}</text>
+  <text x="500" y="1130" text-anchor="middle" fill="#34E5E8" font-family="Share Tech Mono, monospace" font-size="25" letter-spacing="2">SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT</text>
+  <line x1="100" y1="1165" x2="900" y2="1165" stroke="#173A46" stroke-width="2"/>
+
+  <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION OPENS AUGUST 1  |  CHALLENGE SEPTEMBER 1-30, 2026</text>
+  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">ONE $100 CAD REWARD  |  FREE TO ENTER  |  NO PURCHASE REQUIRED  |  AGE 19+</text>
+  <text x="500" y="1288" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">Choose a 1-7 day weekly goal. Complete it to earn Prize Draw Entries.</text>
+  <text x="500" y="1324" text-anchor="middle" fill="#96AAB0" font-family="Share Tech Mono, monospace" font-size="16">Location access is required. Entries improve odds but do not guarantee the reward.</text>
+  <text x="500" y="1358" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="16">Official Rules and eligibility apply - GOGYMGO.COM</text>
+  <text x="950" y="1358" text-anchor="end" fill="#607781" font-family="monospace" font-size="11">POSTER V${credentialVersion}</text>
 </svg>`;
   }
 }

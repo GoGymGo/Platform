@@ -238,10 +238,23 @@ describe('gym service privacy-safe presentation helpers', () => {
       7,
     );
 
-    expect(poster).toContain('GOGYMGO');
+    expect(poster).toContain('aria-label="GoGymGo logo"');
+    expect(poster).toContain(
+      'Scan the QR code and sign up for the $100 September Challenge.',
+    );
+    expect(poster).toContain('$100 SEPTEMBER CHALLENGE.');
+    expect(poster).toContain('SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT');
+    expect(poster).toContain('REGISTRATION OPENS AUGUST 1');
+    expect(poster).toContain('NO PURCHASE REQUIRED');
     expect(poster).toContain('Harbour &amp; &lt;script&gt; &quot;Gym&quot;');
-    expect(poster).toContain('Static credential version 7');
-    expect(poster).toContain('<svg x="120" y="270" width="760" height="760"');
+    expect(poster).toContain('POSTER V7');
+    expect(poster).toContain('<svg x="190" y="375" width="620" height="620"');
+    const positionedQrTag = poster.match(
+      /<svg x="190" y="375"[^>]*aria-label="Scan to open the GoGymGo challenge">/,
+    )?.[0];
+    expect(positionedQrTag).toBeDefined();
+    expect(positionedQrTag?.match(/\bwidth=/g)).toHaveLength(1);
+    expect(positionedQrTag?.match(/\bheight=/g)).toHaveLength(1);
     expect(poster).not.toContain('<script>');
   });
 });

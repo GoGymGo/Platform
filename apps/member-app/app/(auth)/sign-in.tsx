@@ -164,10 +164,12 @@ export default function SignInScreen() {
 
   return (
     <AuthScreenShell
-      description="Return to your Weekly Goal, verified workouts and prize draw entries."
-      eyebrow="SECURE ACCESS"
+      description={gymScanContinuation
+        ? 'Your gym scan is saved. Sign in and GoGymGo will take you directly to Start Workout.'
+        : 'Return to your Weekly Goal, verified workouts and prize draw entries.'}
+      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'SECURE ACCESS'}
       onBack={() => router.replace('/join')}
-      title="WELCOME BACK"
+      title={gymScanContinuation ? 'SIGN IN TO CONTINUE' : 'WELCOME BACK'}
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
 

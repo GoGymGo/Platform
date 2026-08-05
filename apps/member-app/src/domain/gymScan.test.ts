@@ -6,10 +6,18 @@ import { extractGymScanCredential } from './gymScan';
 describe('gym scan credentials', () => {
   const credential = 'a'.repeat(32);
 
-  it('accepts a raw credential and the production poster URL', () => {
+  it('accepts raw, production HTTPS, and native-scheme credentials', () => {
     assert.equal(extractGymScanCredential(credential), credential);
     assert.equal(
       extractGymScanCredential(`https://app.gogymgo.com/scan?credential=${credential}`),
+      credential
+    );
+    assert.equal(
+      extractGymScanCredential(`gogymgo://scan?credential=${credential}`),
+      credential
+    );
+    assert.equal(
+      extractGymScanCredential(`gogymgo:///scan?credential=${credential}`),
       credential
     );
   });
@@ -18,6 +26,14 @@ describe('gym scan credentials', () => {
     assert.equal(extractGymScanCredential('too-short'), null);
     assert.equal(
       extractGymScanCredential(`https://example.com/scan?credential=${credential}`),
+      null
+    );
+    assert.equal(
+      extractGymScanCredential(`http://app.gogymgo.com/scan?credential=${credential}`),
+      null
+    );
+    assert.equal(
+      extractGymScanCredential(`gogymgo://profile?credential=${credential}`),
       null
     );
   });

@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": false,
       "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:app.gogymgo.com"
+      ],
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
@@ -146,6 +149,23 @@
     "android": {
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.gogymgo.com",
+              "pathPrefix": "/scan"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ],
       "adaptiveIcon": {
         "backgroundColor": "#080B0E",

@@ -1292,12 +1292,9 @@ export class GymsService {
   <rect width="1000" height="1400" fill="#05090b"/>
   <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
 
-  <!-- Canonical GoGymGo mark and cyan/pink/cyan wordmark lockup. -->
+  <!-- Centered cyan/pink/cyan GoGymGo wordmark. -->
   <g role="img" aria-label="GoGymGo logo">
-    <svg x="72" y="52" width="96" height="96" viewBox="0 0 100 100" aria-hidden="true">
-      <path fill="#34E5E8" d="M74 88H26q-3.3 0-6.05-1.6t-4.35-4.35Q14 79.3 14 76V28q0-3.3 1.6-6.05t4.35-4.35Q22.7 16 26 16h48q3.3 0 6.05 1.6t4.35 4.35Q86 24.7 86 28v2.9h-8.1V28q0-1.6-1.15-2.75T74 24.1H26q-1.6 0-2.75 1.15T22.1 28v48q0 1.6 1.15 2.75T26 79.9h48q1.6 0 2.75-1.15T77.9 76V58.2H60.1V50H86v26q0 3.3-1.6 6.05t-4.35 4.35Q77.3 88 74 88Z"/>
-    </svg>
-    <text x="190" y="124" font-family="Orbitron, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="2"><tspan fill="#34E5E8">GO</tspan><tspan fill="#FF2D9B">GYM</tspan><tspan fill="#34E5E8">GO</tspan></text>
+    <text x="500" y="124" text-anchor="middle" font-family="Orbitron, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="2"><tspan fill="#34E5E8">GO</tspan><tspan fill="#FF2D9B">GYM</tspan><tspan fill="#34E5E8">GO</tspan></text>
   </g>
 
   <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">SEPTEMBER 2026 - VANCOUVER ISLAND + GULF ISLANDS</text>

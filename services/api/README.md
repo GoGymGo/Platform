@@ -81,7 +81,7 @@ Server-authoritative Terms and Privacy publication, receipt, withdrawal, and enr
 
 The privacy-minimized manual workout review boundary and device controls required for production contests are documented in [session evidence review](../../docs/architecture/session-evidence-review.md).
 
-The production topology and risk decisions are recorded in [the API architecture](../../docs/architecture/api.md). Reward operations are detailed in [brand rewards marketplace](../../docs/product/brand-rewards-marketplace.md). Provisioning lives in [the Terraform foundation](../../infrastructure/gcp/terraform/README.md), and ordered release, rollback, reward-incident, and privacy controls live in [the deployment runbook](../../docs/operations/api-deployment.md).
+The production topology and risk decisions are recorded in [the API architecture](../../docs/architecture/api.md). Reward operations are detailed in [brand rewards marketplace](../../docs/product/brand-rewards-marketplace.md). Provisioning lives in [the AWS Terraform foundation](../../infrastructure/aws/terraform/README.md), and ordered release, rollback, reward-incident, and privacy controls live in [the deployment runbook](../../docs/operations/api-deployment.md).
 
 ## Module build order
 

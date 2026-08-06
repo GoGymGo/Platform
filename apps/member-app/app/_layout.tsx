@@ -1,5 +1,3 @@
-import { Rajdhani_500Medium } from '@expo-google-fonts/rajdhani/500Medium';
-import { Rajdhani_600SemiBold } from '@expo-google-fonts/rajdhani/600SemiBold';
 import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
@@ -37,8 +35,6 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const reduceMotion = useReducedMotionPreference();
   const [loaded, error] = useFonts({
-    [brandFonts.body]: Rajdhani_500Medium,
-    [brandFonts.bodyStrong]: Rajdhani_600SemiBold,
     [brandFonts.display]: require('../assets/fonts/Orbitron-Bold.ttf'),
     [brandFonts.mono]: require('../assets/fonts/ShareTechMono-Regular.ttf')
   });

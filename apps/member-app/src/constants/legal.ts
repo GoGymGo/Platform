@@ -1,3 +1,5 @@
+import publicLegalConfiguration from '../../../../services/api/config/legal/public-ca-bc-en.json';
+
 export type LegalSection = {
   body?: string;
   bullets?: readonly string[];
@@ -11,36 +13,42 @@ export type LegalDocument = {
   title: string;
 };
 
-const unavailableSection: LegalSection = {
-  heading: 'DOCUMENT UNAVAILABLE',
-  body: 'This document has not been published for your region. Please try again later. You cannot complete registration until the current document is available for review and acceptance.'
+type ConfiguredLegalDocument = {
+  content: {
+    intro: string;
+    sections: LegalSection[];
+  };
+  documentKey: string;
+  effectiveAt: string;
+  title: string;
 };
 
-export const privacyPolicy: LegalDocument = {
-  title: 'PRIVACY POLICY',
-  effectiveDate: 'NOT PUBLISHED',
-  intro: 'The current Privacy Policy is temporarily unavailable.',
-  sections: [unavailableSection]
-};
+function configuredDocument(documentKey: string): LegalDocument {
+  const document = (publicLegalConfiguration.documents as ConfiguredLegalDocument[]).find(
+    (candidate) => candidate.documentKey === documentKey
+  );
+  if (!document) {
+    throw new Error(`Missing public legal document: ${documentKey}`);
+  }
 
-export const termsOfService: LegalDocument = {
-  title: 'TERMS OF SERVICE',
-  effectiveDate: 'NOT PUBLISHED',
-  intro: 'The current Terms of Service are temporarily unavailable.',
-  sections: [unavailableSection]
-};
+  return {
+    effectiveDate: new Intl.DateTimeFormat('en-CA', {
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+      year: 'numeric'
+    })
+      .format(new Date(document.effectiveAt))
+      .toUpperCase(),
+    intro: document.content.intro,
+    sections: document.content.sections,
+    title: document.title
+  };
+}
 
-export const officialContestRules: LegalDocument = {
-  title: 'OFFICIAL CONTEST RULES',
-  effectiveDate: 'NOT PUBLISHED',
-  intro: 'No GoGymGo competition is open unless its current official rules are published in the app.',
-  sections: [
-    {
-      heading: 'BEFORE YOU JOIN',
-      body: 'Review the published eligibility, dates, entry method, prize, odds, verification requirements and winner process. Registration remains unavailable until those rules are published.'
-    }
-  ]
-};
+export const privacyPolicy = configuredDocument('privacy_policy');
+export const termsOfService = configuredDocument('terms_of_service');
+export const officialContestRules = configuredDocument('official_contest_rules');
 
 export const biometricCameraConsent: LegalDocument = {
   title: 'DEVICE PRESENCE / QR CAMERA NOTICE',

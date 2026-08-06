@@ -129,7 +129,7 @@ export default function GymRegistrationScreen() {
             error={errors.region}
             label="CITY / REGION"
             onChangeText={setRegion}
-            placeholder="Toronto"
+            placeholder="Nanaimo"
             value={region}
           />
           {submissionError ? (

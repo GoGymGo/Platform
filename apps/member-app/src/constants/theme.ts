@@ -153,12 +153,26 @@ export const colorRoles = {
   }
 } as const;
 
+const nativeBodyFont =
+  Platform.select({
+    android: 'sans-serif',
+    ios: 'System',
+    web: brandFonts.body
+  }) ?? 'System';
+
+const nativeBodyStrongFont =
+  Platform.select({
+    android: 'sans-serif-medium',
+    ios: 'System',
+    web: brandFonts.bodyStrong
+  }) ?? 'System';
+
 export const fontFamilies = {
-  body: brandFonts.body,
-  bodyStrong: brandFonts.bodyStrong,
+  body: nativeBodyFont,
+  bodyStrong: nativeBodyStrongFont,
   display: brandFonts.display,
   terminal: brandFonts.mono,
-  ui: brandFonts.body
+  ui: nativeBodyFont
 } as const;
 
 export const fontSizes = {
@@ -254,6 +268,7 @@ export const typography = {
   },
   button: {
     fontFamily: fontFamilies.bodyStrong,
+    fontWeight: '600',
     fontSize: fontSizes.button,
     letterSpacing: letterSpacings.button,
     lineHeight: lineHeights.button

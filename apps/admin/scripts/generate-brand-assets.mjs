@@ -1,11 +1,17 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { readFile } from "node:fs/promises";
+import { copyFile, readFile } from "node:fs/promises";
 import sharp from "sharp";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const adminDirectory = resolve(scriptDirectory, "..");
 const workspaceDirectory = resolve(adminDirectory, "..", "..");
+const landingPublicDirectory = resolve(
+  workspaceDirectory,
+  "apps",
+  "landing",
+  "public",
+);
 const mobileImagesDirectory = resolve(
   workspaceDirectory,
   "apps",
@@ -19,28 +25,29 @@ const markSource = resolve(
   "brand",
   "assets",
   "logos",
+  "mark.png",
+);
+const markVectorSource = resolve(
+  workspaceDirectory,
+  "packages",
+  "brand",
+  "assets",
+  "logos",
   "mark.svg",
 );
-const markSvg = await readFile(markSource, "utf8");
+const [markPng, markSvg] = await Promise.all([
+  readFile(markSource),
+  readFile(markVectorSource, "utf8"),
+]);
 
 async function renderMark(size) {
-  return sharp(Buffer.from(markSvg)).resize(size, size).png().toBuffer();
+  return sharp(markPng).resize(size, size).png().toBuffer();
 }
 
 async function renderSquareIcon(output, background) {
-  const markSize = 860;
-  const mark = await renderMark(markSize);
-  const inset = Math.round((1024 - markSize) / 2);
-
-  await sharp({
-    create: {
-      width: 1024,
-      height: 1024,
-      channels: 3,
-      background,
-    },
-  })
-    .composite([{ input: mark, left: inset, top: inset }])
+  await sharp(markPng)
+    .resize(1024, 1024)
+    .flatten({ background })
     .removeAlpha()
     .png()
     .toFile(output);
@@ -65,7 +72,11 @@ async function renderTransparentMark(output, markSize) {
 
 async function renderNotificationIcon(output) {
   const notificationSvg = Buffer.from(
-    markSvg.replace("#34E5E8", "#FFFFFF"),
+    markSvg
+      .replace(/<rect id="brand-mark-background"[^>]*\/>/, "")
+      .replaceAll("#34E5E8", "#FFFFFF")
+      .replaceAll("#FF2D9B", "#FFFFFF")
+      .replace(/\sfilter="url\(#[^)]+\)"/g, ""),
   );
 
   await sharp(notificationSvg).resize(96, 96).png().toFile(output);
@@ -85,6 +96,8 @@ await Promise.all([
   renderNotificationIcon(
     resolve(mobileImagesDirectory, "notification-icon.png"),
   ),
+  copyFile(markSource, resolve(adminDirectory, "public", "brand-mark.png")),
+  copyFile(markSource, resolve(landingPublicDirectory, "mark.png")),
 ]);
 
-console.log("Generated GoGymGo application assets from packages/brand/assets/logos/mark.svg.");
+console.log("Generated GoGymGo application assets from the canonical compact mark.");

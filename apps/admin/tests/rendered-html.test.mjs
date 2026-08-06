@@ -46,6 +46,7 @@ test("server-renders the GoGymGo administrator entry screen", async () => {
 test("keeps authorization and mutation safeguards in the implementation", async () => {
   const [
     dashboard,
+    dashboardUtils,
     pilot,
     proxy,
     layout,
@@ -55,6 +56,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     styles,
   ] = await Promise.all([
     readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin-dashboard-utils.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../app/pilot-operations.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/api/gogymgo/[...path]/route.ts", import.meta.url),
@@ -73,8 +78,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(dashboard, /getIdToken\(\)/);
-  assert.match(dashboard, /authorization:\s*`Bearer \$\{token\}`/);
+  assert.match(dashboardUtils, /getIdToken\(\)/);
+  assert.match(dashboardUtils, /authorization:\s*`Bearer \$\{token\}`/);
   assert.match(dashboard, /Only active,/);
   assert.match(dashboard, /email-verified accounts/);
   assert.match(dashboard, /GoGymGo-issued accounts only/);
@@ -94,7 +99,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   );
   assert.match(dashboard, /recorded automatically in the audit history/);
   assert.match(dashboard, /action\.auditReason \?\?/);
-  assert.match(dashboard, /idempotency-key/);
+  assert.match(dashboardUtils, /idempotency-key/);
   assert.match(dashboard, /aria-current=\{section === item\.id \? "page"/);
   assert.match(dashboard, /className="page-context"/);
   assert.match(dashboard, /aria-labelledby=\{titleId\}/);
@@ -117,7 +122,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /className="column-menu"/);
   assert.match(dashboard, /className="pagination"/);
   assert.match(dashboard, /className="audit-diff"/);
-  assert.match(dashboard, /event\.before \|\| event\.after/);
+  assert.match(dashboardUtils, /event\.before \|\| event\.after/);
   assert.match(dashboard, /No regional policies configured/);
   assert.match(dashboard, /No legal documents published/);
   assert.match(dashboard, /No audit events recorded/);
@@ -144,6 +149,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(proxy, /path\[0\]\s*!==\s*"operator"/);
   assert.match(proxy, /This administrative route is not available/);
   assert.match(proxy, /GOGYMGO_API_URL/);
+  assert.match(proxy, /buildUpstreamUrl\(baseUrl, path, request\.nextUrl\.search\)/);
   assert.doesNotMatch(proxy, /firebase.*private|serviceAccount/i);
 
   assert.match(environmentExample, /GOGYMGO_API_URL=/);
@@ -156,8 +162,9 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(authorization, /OPERATOR_PASSWORD_SIGN_IN_REQUIRED/);
   assert.match(styles, /\.sign-in-panel \.stacked-form input,[\s\S]*min-height: 48px/);
   assert.match(styles, /\.sign-in-panel \{[\s\S]*order: -1/);
-  assert.match(styles, /--body: Inter, ui-sans-serif/);
-  assert.match(styles, /--muted: #a0b6bd/);
+  assert.match(styles, /@gogymgo\/brand\/web\.css/);
+  assert.match(styles, /--body: var\(--gogymgo-font-body\)/);
+  assert.match(styles, /--muted: var\(--gogymgo-muted\)/);
   assert.match(styles, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.table-wrap th:last-child,[\s\S]*?position: sticky/);
   assert.match(styles, /\.urgency-tag\.urgent/);
@@ -176,10 +183,22 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     /dynamic = "force-dynamic"/,
   );
   await access(new URL("../public/icon.png", import.meta.url));
+  await access(new URL("../public/brand-mark.png", import.meta.url));
   await access(new URL("../public/fonts/Orbitron-Bold.ttf", import.meta.url));
   await access(
     new URL("../public/fonts/ShareTechMono-Regular.ttf", import.meta.url),
   );
   await access(new URL("../public/og.png", import.meta.url));
   await access(new URL("../.openai/hosting.json", import.meta.url));
+});
+
+test("uses the canonical traced mark for compact admin branding", async () => {
+  const [dashboard, styles] = await Promise.all([
+    readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(dashboard, /src="\/brand-mark\.png"/);
+  assert.doesNotMatch(dashboard, /brand-mark-letter/);
+  assert.match(styles, /\.brand-mark img/);
 });

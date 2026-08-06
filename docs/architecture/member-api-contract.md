@@ -5,7 +5,7 @@ Status: current frontend decision record, July 2026
 ## Decision
 
 Use a NestJS modular monolith, Firebase Authentication, PostgreSQL/PostGIS, a
-database-backed operations worker, and Cloud Storage. The Expo app is an
+database-backed operations worker, and private object storage. The Expo app is an
 untrusted client. Regional contests award sponsor-funded physical products and
 coupon codes through a server-authoritative rewards marketplace.
 
@@ -37,31 +37,31 @@ flowchart LR
 
 ## Stack
 
-| Layer | Choice | Purpose |
-| --- | --- | --- |
-| Mobile | Expo, React Native, Expo Router, TypeScript | Shared iOS, Android, and preview UI |
-| Identity | Firebase Authentication | Email, Apple, and Google identity |
-| API | NestJS on Cloud Run | Modules, guards, validation, OpenAPI |
-| Data | PostgreSQL/PostGIS through Kysely | Transactions, constraints, regional policy |
-| Migrations | node-pg-migrate | Reviewable forward schema history |
-| Jobs | PostgreSQL leases | Retryable lifecycle, push, media, and privacy work |
-| Media | Private Cloud Storage | Signed avatar/media operations |
-| Rewards | PostgreSQL plus AES-256-GCM | Regional catalog, inventory, awards, coupon secrecy |
+| Layer      | Choice                                      | Purpose                                             |
+| ---------- | ------------------------------------------- | --------------------------------------------------- |
+| Mobile     | Expo, React Native, Expo Router, TypeScript | Shared iOS, Android, and preview UI                 |
+| Identity   | Firebase Authentication                     | Email, Apple, and Google identity                   |
+| API        | NestJS on ECS Fargate                       | Modules, guards, validation, OpenAPI                |
+| Data       | PostgreSQL/PostGIS through Kysely           | Transactions, constraints, regional policy          |
+| Migrations | node-pg-migrate                             | Reviewable forward schema history                   |
+| Jobs       | PostgreSQL leases                           | Retryable lifecycle, push, media, and privacy work  |
+| Media      | Private Amazon S3                           | Signed avatar/media operations                      |
+| Rewards    | PostgreSQL plus AES-256-GCM                 | Regional catalog, inventory, awards, coupon secrecy |
 
 ## Module ownership
 
-| Module | Owns |
-| --- | --- |
-| Auth and profiles | Firebase guard, account status, public identity |
-| Regions | Versioned service areas and eligibility evidence |
-| Competitions | Definitions, brackets, enrollment, rules versions, Weekly Challenge partner requests |
-| Sessions and ledger | Evidence, review snapshots, append-only entries |
-| Leaderboards and draws | Read models, locked entrant snapshot, selection |
-| Rewards | Catalog, inventory, awards, claims, encrypted coupon codes |
-| Social | Screen-name search, friend requests, challenges, hashed contact invitations |
-| Creator workouts | Public catalog, rights-attested submissions, calendar plans |
-| Notifications | Preferences, templates, delivery attempts |
-| Operator/privacy | Configuration, audit, export, erasure, support queues |
+| Module                 | Owns                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| Auth and profiles      | Firebase guard, account status, public identity                                      |
+| Regions                | Versioned service areas and eligibility evidence                                     |
+| Competitions           | Definitions, brackets, enrollment, rules versions, Weekly Challenge partner requests |
+| Sessions and ledger    | Evidence, review snapshots, append-only entries                                      |
+| Leaderboards and draws | Read models, locked entrant snapshot, selection                                      |
+| Rewards                | Catalog, inventory, awards, claims, encrypted coupon codes                           |
+| Social                 | Screen-name search, friend requests, challenges, hashed contact invitations          |
+| Creator workouts       | Public catalog, rights-attested submissions, calendar plans                          |
+| Notifications          | Preferences, templates, delivery attempts                                            |
+| Operator/privacy       | Configuration, audit, export, erasure, support queues                                |
 
 ## Frontend connection readiness
 
@@ -69,26 +69,26 @@ The mobile app has two explicit data modes: `api` for server data and
 `unavailable` for honest empty/error states when the API is not configured.
 There is no local data source that can imitate production records.
 
-| Product flow | Mobile adapter | Server contract | Current status |
-| --- | --- | --- | --- |
-| Firebase account access | `state/auth.tsx` | Firebase ID token guard | Connected |
-| Alias and friend discovery | `data/socialRepository.ts` | `GET/PATCH /v1/me`, social routes | Connected; UI term is **alias**, API field remains `screenName` |
-| Friends and social challenges | `data/socialRepository.ts` | `/v1/social/*` | Connected |
-| Leaderboards, results, streaks, and rewards | `data/appData.ts` | leaderboards, results, streaks, rewards | Connected |
-| Creator catalog, planning, and submission | `data/appData.ts` | `/v1/creator-workouts/*` | Connected |
-| Profile image | `data/accountSettingsRepository.ts`, `state/profile.tsx` | `/v1/me/avatar*` | Connected through exact-size signed upload, moderation state, private read URL, and removal |
-| Legal documents and receipts | `data/accountReadinessRepository.ts` | `/v1/legal-documents/current`, `/v1/me/legal-receipts*` | Connected; exact current bundle is displayed and receipted during registration |
-| Region eligibility | `data/accountReadinessRepository.ts` plus `state/competitionRegion.tsx` | `/v1/regions`, `/v1/me/region-verifications*` | Connected; pending reviews cannot be presented as approved |
-| Competition enrollment | `hooks/useCompetitionRegistration.ts` | `/v1/competitions/current*`, enrollment command | Connected; confirmation requires legal receipt and approved region evidence |
-| September verified gym session | `data/gymScanRepository.ts`, `app/(modals)/qr-scanner.tsx` | `POST /v1/gym-scans` | Connected; one authenticated scan command starts, reports early, verifies or rejects the static-QR session using server time and live location |
-| Competition reminders | notification and push-registration services | `/v1/me/push-devices*` | Connected; local schedules and the authenticated Expo push device are enabled/disabled together |
-| Privacy export/deletion | `data/accountSettingsRepository.ts`, `/account-data` | `/v1/me/privacy-requests*` | Connected with request history, guarded deletion, and short-lived export download actions |
+| Product flow                                | Mobile adapter                                                          | Server contract                                         | Current status                                                                                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Firebase account access                     | `state/auth.tsx`                                                        | Firebase ID token guard                                 | Connected                                                                                                                                      |
+| Alias and friend discovery                  | `data/socialRepository.ts`                                              | `GET/PATCH /v1/me`, social routes                       | Connected; UI term is **alias**, API field remains `screenName`                                                                                |
+| Friends and social challenges               | `data/socialRepository.ts`                                              | `/v1/social/*`                                          | Connected                                                                                                                                      |
+| Leaderboards, results, streaks, and rewards | `data/appData.ts`                                                       | leaderboards, results, streaks, rewards                 | Connected                                                                                                                                      |
+| Creator catalog, planning, and submission   | `data/appData.ts`                                                       | `/v1/creator-workouts/*`                                | Connected                                                                                                                                      |
+| Profile image                               | `data/accountSettingsRepository.ts`, `state/profile.tsx`                | `/v1/me/avatar*`                                        | Connected through exact-size signed upload, moderation state, private read URL, and removal                                                    |
+| Legal documents and receipts                | `data/accountReadinessRepository.ts`                                    | `/v1/legal-documents/current`, `/v1/me/legal-receipts*` | Connected; exact current bundle is displayed and receipted during registration                                                                 |
+| Region eligibility                          | `data/accountReadinessRepository.ts` plus `state/competitionRegion.tsx` | `/v1/regions`, `/v1/me/region-verifications*`           | Connected; pending reviews cannot be presented as approved                                                                                     |
+| Competition enrollment                      | `hooks/useCompetitionRegistration.ts`                                   | `/v1/competitions/current*`, enrollment command         | Connected; confirmation requires legal receipt and approved region evidence                                                                    |
+| September verified gym session              | `data/gymScanRepository.ts`, `app/(modals)/qr-scanner.tsx`              | `POST /v1/gym-scans`                                    | Connected; one authenticated scan command starts, reports early, verifies or rejects the static-QR session using server time and live location |
+| Competition reminders                       | notification and push-registration services                             | `/v1/me/push-devices*`                                  | Connected; local schedules and the authenticated Expo push device are enabled/disabled together                                                |
+| Privacy export/deletion                     | `data/accountSettingsRepository.ts`, `/account-data`                    | `/v1/me/privacy-requests*`                              | Connected with request history, guarded deletion, and short-lived export download actions                                                      |
 
 ### Integration order
 
 1. Run the generated OpenAPI audit and real-device loading, empty, error, retry,
    permission-denied, and expired-session scenarios before enabling API mode.
-2. Configure GCS upload CORS for the signed avatar headers and set the EAS
+2. Configure S3 upload CORS for the signed avatar headers and set the EAS
    project ID used to mint Expo push tokens in release builds.
 3. Confirm the session-review worker refresh cadence against the mobile
    `/v1/me/progress` query and notification expectations.
@@ -124,8 +124,9 @@ reason, idempotency key, and optimistic version where applicable.
 
 ## Handoff sequence
 
-1. Provision isolated Firebase/GCP environments, Cloud SQL/PostGIS, workload
-   identity, secret manager, buckets, backups, and monitoring.
+1. Provision isolated staging and production AWS member accounts, Firebase
+   projects, private RDS/PostGIS, GitHub OIDC, Secrets Manager, S3, backups, and
+   monitoring.
 2. Populate `DATABASE_URL` and a random 32-byte base64
    `REWARD_CODE_ENCRYPTION_KEY` outside Terraform state.
 3. Run the committed OpenAPI and mobile contract checks.

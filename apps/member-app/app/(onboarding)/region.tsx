@@ -5,6 +5,7 @@ import { Linking, Platform, StyleSheet, View } from 'react-native';
 import { AccountLegalAgreement } from '@/components/accountLegalAgreement';
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
 import {
+  CyberButtonOutline,
   HUDBorderBox,
   ScreenScrollView,
   TerminalText
@@ -236,6 +237,10 @@ export default function RegionScreen() {
               the supported Gulf Islands. We will not place you in Toronto or
               show another region&apos;s sample competition.
             </TerminalText>
+            <CyberButtonOutline
+              label="TRY LOCATION AGAIN"
+              onPress={() => void checkDeviceLocation()}
+            />
             {waitlistJoined ? (
               <TerminalText live="polite" tone="green" variant="label">
                 REGIONAL WAITLIST CONFIRMED
@@ -249,7 +254,7 @@ export default function RegionScreen() {
                     setRequestedRegion(value);
                     setWaitlistError(null);
                   }}
-                  placeholder="Example: Vancouver, BC"
+                  placeholder="Example: Nanaimo, BC"
                   value={requestedRegion}
                 />
                 {waitlistError ? (

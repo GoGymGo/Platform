@@ -20,7 +20,8 @@ locals {
       CORS_ORIGINS                     = join(",", var.cors_origins)
       DATABASE_POOL_MAX                = "10"
       FIREBASE_PROJECT_ID              = var.project_id
-      GCP_STORAGE_BUCKET               = google_storage_bucket.user_content.name
+      PRIVATE_CONTENT_BUCKET           = google_storage_bucket.user_content.name
+      PRIVATE_OBJECT_STORAGE_PROVIDER  = "google-cloud"
       LOG_LEVEL                        = var.log_level
       NODE_ENV                         = "production"
       OPENAPI_ENABLED                  = "false"

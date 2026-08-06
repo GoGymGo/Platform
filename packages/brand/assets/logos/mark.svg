@@ -1,4 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="brand-mark-title">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="brand-mark-title brand-mark-description">
   <title id="brand-mark-title">GoGymGo</title>
-  <path fill="#34E5E8" d="M74 88H26q-3.3 0-6.05-1.6t-4.35-4.35Q14 79.3 14 76V28q0-3.3 1.6-6.05t4.35-4.35Q22.7 16 26 16h48q3.3 0 6.05 1.6t4.35 4.35Q86 24.7 86 28v2.9h-8.1V28q0-1.6-1.15-2.75T74 24.1H26q-1.6 0-2.75 1.15T22.1 28v48q0 1.6 1.15 2.75T26 79.9h48q1.6 0 2.75-1.15T77.9 76V58.2H60.1V50H86v26q0 3.3-1.6 6.05t-4.35 4.35Q77.3 88 74 88Z"/>
+  <desc id="brand-mark-description">A cyan rounded-square mark with a cyan G traced through its centre in pink.</desc>
+  <defs>
+    <filter id="brand-cyan-glow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur"/>
+      <feFlood flood-color="#34E5E8" flood-opacity="0.42" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="brand-pink-glow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.55" result="blur"/>
+      <feFlood flood-color="#FF2D9B" flood-opacity="0.28" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect id="brand-mark-background" width="100" height="100" rx="4" fill="#080B0E"/>
+  <rect
+    id="brand-mark-frame"
+    x="10"
+    y="7.5"
+    width="80"
+    height="80"
+    rx="20"
+    fill="none"
+    stroke="#34E5E8"
+    stroke-width="1.25"
+    filter="url(#brand-cyan-glow)"
+  />
+  <path
+    id="brand-mark-g"
+    d="M65 35c0-1.9-1.5-3.4-3.4-3.4H38.4C36.5 31.6 35 33.1 35 35v24c0 1.9 1.5 3.4 3.4 3.4h23.2c1.9 0 3.4-1.5 3.4-3.4V47.8H54.4"
+    fill="none"
+    stroke="#34E5E8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="7.2"
+    filter="url(#brand-cyan-glow)"
+  />
+  <path
+    id="brand-mark-trace"
+    d="M65 35c0-1.9-1.5-3.4-3.4-3.4H38.4C36.5 31.6 35 33.1 35 35v24c0 1.9 1.5 3.4 3.4 3.4h23.2c1.9 0 3.4-1.5 3.4-3.4V47.8H54.4"
+    fill="none"
+    stroke="#FF2D9B"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="1.15"
+    filter="url(#brand-pink-glow)"
+  />
 </svg>

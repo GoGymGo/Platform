@@ -14,6 +14,28 @@ Public identity and verified-region hydration read the backend first and keep
 user-scoped device storage only as a resilience cache. Both providers refresh
 from the backend when the app becomes active again.
 
+## UI/UX and release contract
+
+An unqualified request to change the app UI/UX applies to the shared member app
+on browser, iOS and Android. Keep copy, information hierarchy, visual language
+and core task flows aligned. Adapt only the platform mechanics that genuinely
+differ, such as camera and location permissions, notification delivery, safe
+areas, keyboard behavior and navigation conventions. Record intentional
+differences in the relevant implementation or operations documentation.
+
+The browser build is GoGymGo's real-world pilot and testing release. It may be
+built and published independently of signed iOS and Android releases. A
+browser-only release requires the protected web-hosting, API and Firebase values
+listed below; it does not require Apple Team, iOS bundle, Android package,
+Android signing-certificate or EAS identifiers.
+
+When native signing identifiers are not configured, the web build deliberately
+omits `.well-known/apple-app-site-association` and
+`.well-known/assetlinks.json`. Poster QR codes still open the HTTPS browser flow,
+but the team must not claim that scanning opens an installed native app. Native
+handoff becomes a separate release milestone governed by
+[`member-app-native-links.md`](member-app-native-links.md).
+
 ## Free connected preview
 
 From the repository root:
@@ -57,11 +79,14 @@ npx.cmd firebase-tools@15.25.0 hosting:channel:deploy connected-browser `
 The hosted origin must be added to the API's exact `CORS_ORIGINS` list before
 authenticated requests will succeed.
 
-## Permanent user deployment
+## Permanent AWS user deployment
 
-Firebase Hosting can provide the stable HTTPS frontend. A permanent launch also
-requires an always-on HTTPS API and PostgreSQL/PostGIS service. Do not promote a
-bundle containing a Quick Tunnel API URL to the live Hosting channel.
+The stable browser app is served by CloudFront from a private, public-access-
+blocked S3 bucket in the same isolated GoGymGo AWS account as its API. The S3
+origin is reachable only through CloudFront Origin Access Control. A CloudFront
+Function sends extensionless Expo Router paths such as `/sign-up` and `/join` to
+the SPA entrypoint. Do not promote a bundle containing a Quick Tunnel or local
+API URL.
 
 For a permanent release:
 
@@ -70,9 +95,23 @@ For a permanent release:
 3. configure exact frontend CORS origins and production secrets;
 4. build Expo web with the permanent `EXPO_PUBLIC_API_URL`;
 5. run the frontend, backend, contract and production-bundle gates;
-6. deploy Firebase Hosting with `firebase deploy --only hosting`;
+6. dispatch `Member Web Deployment` with the protected environment and exact
+   40-character source commit;
 7. verify sign-in, profile/region restoration, enrollment, reads and a
    non-destructive write with a staging Firebase account.
+
+This browser deployment does not authorize or imply an iOS App Store, Google
+Play or native QR-link release.
+
+The protected workflow forces a clean Expo export, rejects public sample data and
+production markers, verifies the compiled API origin, assumes a separate
+least-privilege AWS OIDC role, synchronizes the private S3 origin, invalidates
+CloudFront and checks both public routes. The staging environment must define:
+
+- `MEMBER_WEB_BUCKET`, `MEMBER_WEB_DISTRIBUTION_ID`,
+  `MEMBER_WEB_DEPLOY_ROLE_ARN`, and `MEMBER_WEB_URL` from Terraform output;
+- `API_URL`, `AWS_ACCOUNT_ID`, and `AWS_REGION`;
+- the public `EXPO_PUBLIC_FIREBASE_*` browser configuration.
 
 Device permissions, notification registrations, unfinished form drafts and
 active hardware evidence collection remain device-specific by design. Their
@@ -98,13 +137,14 @@ The preview build sets `EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW=true` only for
 that export command. Store and permanent connected builds must leave the flag
 false so Metro replaces every sample-data module with its production stub.
 
-The exported preview also replaces the unfinished release legal documents with
-short, clearly labeled browser-preview notices. `audit:web-test-preview` rejects
-internal-draft wording and engineering fixture names. The separate store-release
-audit intentionally remains blocked until the real operator, contact, privacy,
-terms and contest-rule documents replace the source placeholders.
+The exported preview replaces the public release legal documents with short,
+clearly labeled browser-preview notices. `audit:web-test-preview` rejects
+internal-only wording and engineering fixture names. Release builds use the
+owner-approved Privacy Policy, Terms of Service and Official Contest Rules from
+`services/api/config/legal/public-ca-bc-en.json`; the protected configuration
+operation publishes that same source and the member app bundles it as fallback.
 
-For a time-limited Firebase Hosting link:
+For an optional time-limited Firebase Hosting link:
 
 ```powershell
 npx.cmd firebase-tools@15.25.0 hosting:channel:deploy browser-testing `

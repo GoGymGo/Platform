@@ -126,7 +126,7 @@ export function createAppTourDataSource(): AppDataSource {
         durationMinutes: 30,
         id: 'app-tour-workout',
         name: 'Full Body Circuit',
-        regionCodes: ['toronto-on'],
+        regionCodes: ['vancouver-island-gulf-islands-bc'],
         reward: 'Completion badge',
         sponsorName: 'Northline Wellness',
         thumbnailUrl: null,
@@ -155,7 +155,7 @@ export function createAppTourDataSource(): AppDataSource {
     getMyStreaks: async () => ({
       asOfDate: todayKey(),
       streaks: fixedStreaks,
-      timezone: 'America/Toronto'
+      timezone: 'America/Vancouver'
     }),
     getRewardCatalog: async (region, monthKey = currentMonthKey()) => [
       {
@@ -167,7 +167,7 @@ export function createAppTourDataSource(): AppDataSource {
         inventoryRemaining: 12,
         inventoryTotal: 20,
         monthKey,
-        regionCode: 'toronto-on',
+        regionCode: 'vancouver-island-gulf-islands-bc',
         regionName: region,
         rewardType: 'coupon',
         sponsorName: 'Northline Wellness',
@@ -269,7 +269,10 @@ AccountReadinessRepository {
       return enrollment;
     },
     getCurrentCompetition: async (expectedMonthKey) =>
-      createCurrentCompetition(expectedMonthKey ?? nowIso().slice(0, 7), 'TORONTO'),
+      createCurrentCompetition(
+        expectedMonthKey ?? nowIso().slice(0, 7),
+        'VANCOUVER ISLAND + GULF ISLANDS'
+      ),
     getCurrentEnrollment: async () => enrollment,
     getCurrentRegionVerification: async () => regionVerification,
     getCurrentLegalDocuments: async (jurisdictionCode = 'GLOBAL', locale = 'en') =>
@@ -560,7 +563,7 @@ function createCurrentCompetition(
     minimumEntrants: 100,
     monthKey,
     name: `${regionName} Monthly Competition`,
-    regionCode: 'toronto-on',
+    regionCode: 'vancouver-island-gulf-islands-bc',
     regionName,
     registrationClosesAt: end,
     registrationOpensAt: start,
@@ -589,15 +592,15 @@ function createRegionVerification(): RegionVerification {
     createdAt: nowIso(),
     expiresAt: '2099-01-01T00:00:00.000Z',
     id: appTourRegionVerificationId,
-    jurisdictionCode: 'CA-ON',
+    jurisdictionCode: 'CA-BC',
     method: 'device_location',
     policyVersion: 'app-tour',
-    regionCode: 'toronto-on',
-    regionName: 'TORONTO',
+    regionCode: 'vancouver-island-gulf-islands-bc',
+    regionName: 'VANCOUVER ISLAND + GULF ISLANDS',
     regionPolicyId: appTourRegionPolicyId,
     reviewedAt: nowIso(),
     status: 'approved',
-    timezone: 'America/Toronto'
+    timezone: 'America/Vancouver'
   };
 }
 
@@ -843,14 +846,14 @@ function createSocialChallenge(
     ownerUserId: appTourUserId,
     participantCount: 1,
     participantLimit: input?.participantLimit ?? null,
-    regionCode: input?.regionCode ?? 'toronto-on',
-    regionName: 'TORONTO',
+    regionCode: input?.regionCode ?? 'vancouver-island-gulf-islands-bc',
+    regionName: 'VANCOUVER ISLAND + GULF ISLANDS',
     scheduledDays: input?.scheduledDays ?? [1, 3, 5],
     scheduledTime: input?.scheduledTime ?? '18:00',
     startDate: input?.startDate ?? month.start.slice(0, 10),
     targetCount,
     targetPeriod: input?.targetPeriod ?? 'weekly',
-    timezone: 'America/Toronto'
+    timezone: 'America/Vancouver'
   };
 }
 

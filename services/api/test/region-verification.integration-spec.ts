@@ -129,6 +129,41 @@ describeWithDatabase('authoritative region verification', () => {
     await expect(countVerifications()).resolves.toBe(before);
   });
 
+  it('reports an unavailable service when no competition region is active', async () => {
+    const unavailablePrincipal: AuthenticatedPrincipal = {
+      ...principal,
+      firebaseUid: 'region-unavailable-user',
+    };
+    await database.connection
+      .updateTable('region_policies')
+      .set({ competition_enabled: false })
+      .execute();
+
+    try {
+      await expect(
+        regions.createVerification(
+          unavailablePrincipal,
+          'region-verification-unavailable',
+          {
+            latitude: 49.1659,
+            longitude: -123.9401,
+            method: 'device_location',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'REGION_VERIFICATION_UNAVAILABLE',
+        }),
+        status: 503,
+      });
+    } finally {
+      await database.connection
+        .updateTable('region_policies')
+        .set({ competition_enabled: true })
+        .execute();
+    }
+  });
+
   it('fails closed when active competition boundaries overlap', async () => {
     await migrated.pool.query(`
       INSERT INTO region_policies

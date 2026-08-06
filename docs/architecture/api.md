@@ -9,14 +9,14 @@ relationships, privacy operations, and operator authorization.
 
 ```mermaid
 flowchart LR
-  Mobile[Expo React Native app] -->|Firebase ID token and HTTPS| API[Cloud Run API]
-  API --> DB[(Private Cloud SQL PostgreSQL and PostGIS)]
-  API --> Buckets[Private Cloud Storage]
-  Worker[Cloud Run operations worker pool] --> DB
+  Mobile[Expo React Native app] -->|Firebase ID token and HTTPS| API[ECS Fargate API]
+  API --> DB[(Private RDS PostgreSQL and PostGIS)]
+  API --> Buckets[Private S3 buckets]
+  Worker[ECS Fargate operations worker] --> DB
   Worker --> Expo[Expo push API]
   Worker --> Buckets
-  Migration[Cloud Run migration job] --> DB
-  Secrets[Secret Manager] --> API
+  Migration[One-shot ECS migration task] --> DB
+  Secrets[AWS Secrets Manager] --> API
   Secrets --> Worker
   Secrets --> Migration
   API --> Telemetry[Structured logs and OTLP]
@@ -30,14 +30,15 @@ justifies the additional failure modes.
 
 ## Runtime split
 
-| Workload | Platform | Responsibility | Public network |
-| --- | --- | --- | --- |
-| API | Cloud Run service | Authenticated HTTP, public catalog reads, user/operator commands | Yes; application auth remains mandatory |
-| Operations worker | Cloud Run worker pool | Contest lifecycle, notifications, media cleanup, privacy work | No endpoint |
-| Migration | Cloud Run job | Forward-only schema migrations before a release | No endpoint |
+| Workload          | Platform                          | Responsibility                                                   | Public network                               |
+| ----------------- | --------------------------------- | ---------------------------------------------------------------- | -------------------------------------------- |
+| API               | ECS Fargate service behind an ALB | Authenticated HTTP, public catalog reads, user/operator commands | ALB only; application auth remains mandatory |
+| Operations worker | ECS Fargate service               | Contest lifecycle, notifications, media cleanup, privacy work    | No inbound rule or endpoint                  |
+| Migration         | One-shot ECS Fargate task         | Forward-only schema migrations before a release                  | No inbound rule or endpoint                  |
 
 All workloads use one digest-pinned image. Release order is migration, worker,
-then a zero-traffic API candidate. Traffic moves only after readiness succeeds.
+then an ECS rolling API deployment protected by load-balancer health checks and
+circuit-breaker rollback. Readiness must succeed before the release completes.
 
 ## Data and concurrency
 
@@ -67,7 +68,7 @@ See [brand rewards marketplace](brand-rewards-marketplace.md).
 
 - Firebase verifies account identity. Operator/admin rights come from audited
   database roles, not client claims.
-- API, worker, and migration use separate service accounts. The coupon-code key
+- API, worker, and migration use separate IAM roles. The coupon-code key
   is mounted only into the API; privacy and notification secrets remain
   worker-only.
 - Terraform creates secret containers only. Secret versions are populated out
@@ -90,7 +91,7 @@ See [brand rewards marketplace](brand-rewards-marketplace.md).
 
 Code completion does not replace these staging approvals:
 
-1. isolated Cloud/Firebase projects, remote Terraform state, workload identity,
+1. isolated AWS member accounts and Firebase projects, remote Terraform state, GitHub OIDC,
    DNS, backups, restore rehearsal, and notification channels;
 2. least-privilege database credentials and secret versions, including a random
    32-byte coupon encryption key;
@@ -102,5 +103,6 @@ Code completion does not replace these staging approvals:
    locale, plus operator, export, erasure, and incident rehearsals;
 6. load tests confirming API, worker, and database connection budgets.
 
-Provisioning is in [Terraform](../../infrastructure/gcp/terraform/README.md); ordered release and
-incident procedures are in the [deployment runbook](deployment-runbook.md).
+Provisioning is in [Terraform](../../infrastructure/aws/terraform/README.md);
+ordered release and incident procedures are in the
+[deployment runbook](../operations/api-deployment.md).

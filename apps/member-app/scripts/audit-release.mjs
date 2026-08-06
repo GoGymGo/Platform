@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const projectRoot = process.cwd();
+const require = createRequire(import.meta.url);
 const issues = [];
 const appJson = readJson('app.json');
 const easJson = readJson('eas.json');
@@ -219,7 +221,11 @@ for (const permission of [
     issues.push(`the iOS production permission cleanup does not remove ${permission}`);
   }
 }
-const reactNativeVersions = readText('node_modules/react-native/gradle/libs.versions.toml');
+const reactNativeRoot = path.dirname(require.resolve('react-native/package.json'));
+const reactNativeVersions = fs.readFileSync(
+  path.join(reactNativeRoot, 'gradle', 'libs.versions.toml'),
+  'utf8'
+);
 const androidTargetSdk = Number(
   reactNativeVersions.match(/^targetSdk\s*=\s*"(\d+)"/m)?.[1] ?? 0
 );
@@ -261,10 +267,14 @@ if (
   !metroConfig.includes('context.dev') ||
   !metroConfig.includes("platform === 'web'") ||
   !metroConfig.includes('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW') ||
+  !metroConfig.includes('publicWebDemoModules') ||
+  !metroConfig.includes('keepPublicWebDemo') ||
+  !metroConfig.includes('@/state/appTour') ||
   !metroConfig.includes('@/testing/appTourData') ||
+  !metroConfig.includes('@/testing/appTourRegion') ||
   !metroConfig.includes('@/testing/AppTourScreen')
 ) {
-  issues.push('production Metro builds must replace development App Tour data and UI with release stubs');
+  issues.push('production Metro builds must retain the isolated web Demo data while replacing internal test-tour UI and native fixtures with release stubs');
 }
 
 if (issues.length > 0) {

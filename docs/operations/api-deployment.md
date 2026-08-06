@@ -2,10 +2,10 @@
 
 The same immutable image supplies three workloads:
 
-1. migration job: `node node_modules/node-pg-migrate/bin/node-pg-migrate.js up
-   --migrations-dir dist/migrations --database-url-var DATABASE_URL`;
-2. operations worker: `node --require ./dist/observability/instrumentation.js dist/worker.js`;
-3. API: `node dist/main.js`.
+1. one-shot ECS migration task: `node node_modules/node-pg-migrate/bin/node-pg-migrate.js up
+--migrations-dir dist/migrations --database-url-var DATABASE_URL`;
+2. ECS operations worker: `node --require ./dist/observability/instrumentation.js dist/worker.js`;
+3. ECS API service: `node dist/main.js`.
 
 Run migrations before the worker and before moving traffic to the API revision.
 Never run down migrations in production.
@@ -13,10 +13,8 @@ Never run down migrations in production.
 ## Preproduction baseline
 
 The migration history was cleaned before the first production deployment. At
-the July 30, 2026 audit, the target Google Cloud project had neither Cloud Run
-nor Cloud SQL APIs enabled, so there was no deployed production database to
-upgrade. A fresh database never creates the retired demo-verification or
-payment schema.
+the July 30, 2026 audit, there was no deployed production database to upgrade.
+A fresh database never creates the retired demo-verification or payment schema.
 
 Any local or staging database created from the earlier preproduction migration
 set must be rebuilt from an empty database before using this baseline. Do not
@@ -24,12 +22,16 @@ apply the rewritten baseline over an existing production migration ledger.
 
 ## Required resources and secrets
 
-- private PostgreSQL 17/PostGIS with backups and point-in-time recovery;
-- Cloud Run API, private worker pool, and one-shot migration job;
-- Firebase applications and workload identity;
-- private user-content and privacy-export buckets;
-- Secret Manager versions for `DATABASE_URL`, a random 32-byte base64
+- dedicated staging and production AWS member accounts with separate state;
+- private RDS PostgreSQL 17/PostGIS with backups and point-in-time recovery;
+- ECS Fargate API, worker service, and one-shot migration task;
+- environment-specific Firebase applications and GitHub OIDC;
+- private KMS-encrypted user-content and privacy-export S3 buckets;
+- AWS Secrets Manager values for `DATABASE_URL`, the Firebase AWS
+  external-account configuration, a random 32-byte base64
   `REWARD_CODE_ENCRYPTION_KEY`, and optional enabled-feature secrets;
+- a `DATABASE_URL` that uses `sslmode=verify-full` with the image's
+  checksum-pinned Amazon RDS root CA bundle;
 - TLS domain, monitoring channels, and allowlisted origins.
 
 Coupon encryption keys are API-only. Never place them in `.env` files committed
@@ -37,21 +39,35 @@ to Git, Expo variables, Terraform state, container images, or logs.
 
 ## Release order
 
-1. Build and scan `services/api/Dockerfile` from the repository root; record the image digest.
+1. Record the full 40-character Git commit SHA approved for the release.
 2. Run Backend CI, Terraform validation, and the PostGIS integration suite.
 3. Confirm a fresh backup and validate that the target migration ledger matches
    the clean release baseline.
-4. Execute the migration job with the new digest and wait for success.
-5. Update the private worker pool with the same digest.
-6. Deploy an API candidate at zero traffic.
-7. Verify `/v1/health`, `/v1/health/ready`, reward catalog reads, coupon secrecy,
+4. Manually dispatch the protected deployment workflow. It checks out that exact
+   commit, builds and scans the image, pushes it to the environment's immutable
+   ECR repository, and records its digest.
+5. Execute the migration task with the new digest and wait for success.
+6. Update the worker service with the same digest.
+7. Deploy the API with ECS circuit-breaker rollback and ALB health checks.
+8. Verify `/v1/health`, `/v1/health/ready`, reward catalog reads, coupon secrecy,
    operator authorization, and a staging claim.
-8. Shift traffic gradually while monitoring API failures, worker heartbeat,
+9. Complete the rolling replacement while monitoring API failures, worker heartbeat,
    database saturation, reward-claim failures, notifications, and privacy work.
 
-The protected GitHub workflow enforces migration, worker, candidate, readiness,
-and promotion order. Terraform ignores image-only drift so an infrastructure
-apply cannot bypass it.
+## Staging pilot configuration
+
+After deploying the exact reviewed API commit, dispatch `Platform Deployment`
+with scope `pilot-configuration`, environment `staging`, and the same full
+source commit. The job refuses production, verifies the isolated AWS account and
+the immutable deployed image, then runs the idempotent Vancouver Island pilot
+configuration from the API task definition on the isolated migration network.
+It does not publish the draft competition.
+The final gate requires the active `2026-09-pilot-v1` policy to appear through
+`GET /v1/regions`.
+
+The protected GitHub workflow enforces migration, worker, rolling API, and
+readiness order. Terraform ignores image-only drift so an infrastructure apply
+cannot bypass it.
 
 ## Reward incident rule
 

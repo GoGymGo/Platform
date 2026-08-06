@@ -117,7 +117,7 @@ export default function SponsorApplicationScreen() {
             error={errors.targetRegion}
             label="TARGET REGION"
             onChangeText={setTargetRegion}
-            placeholder="Toronto"
+            placeholder="Nanaimo"
             value={targetRegion}
           />
           {submissionError ? (

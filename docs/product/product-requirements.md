@@ -390,10 +390,10 @@ decision outside the V1 user application.
 ### Stack
 
 - Expo SDK 57, React Native, Expo Router, TypeScript, and TanStack Query.
-- NestJS modular monolith on Cloud Run.
+- NestJS modular monolith on ECS Fargate.
 - Firebase Authentication.
 - PostgreSQL/PostGIS with Kysely and node-pg-migrate.
-- Database-leased operations worker and private Cloud Storage.
+- Database-leased operations worker and private Amazon S3.
 - OpenAPI contract audit, structured redacted logs, and optional OTLP.
 
 ### Mobile data modes

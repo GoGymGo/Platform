@@ -8,15 +8,17 @@ hosting provider reports the custom domain as verified and staging UAT passes.
 - Cloudflare account authoritative for `gogymgo.com`
 - GoGymGo Sites workspace containing the preserved landing and admin projects
 - Firebase console access to the production project
-- Google Cloud billing and project-owner access for `gogymgo-prod-8cb8b`
+- Administrator access to the dedicated `GoGymGo-Production` AWS member account
 - GitHub environment administration for the private `GoGymGo/Platform` repo
 
 ## Domain mapping order
 
 1. In the landing Sites project, add `gogymgo.com` and copy the verification
    and routing records supplied by Sites.
-2. In production Firebase Hosting, add `app.gogymgo.com` and copy the exact
-   verification and routing records supplied by Firebase.
+2. Request the member-app ACM certificate in `us-east-1`, add only its exact
+   DNS validation CNAME, and wait for ACM to report `ISSUED`. Supply that ARN to
+   the environment Terraform root, then point `app.gogymgo.com` at the resulting
+   CloudFront distribution with a DNS-only Cloudflare CNAME.
 3. In the admin Sites project, add `admin.gogymgo.com` and copy the exact
    verification and routing records supplied by Sites.
 4. Add those records in Cloudflare DNS. Preserve unrelated mail and
@@ -57,16 +59,23 @@ Create separate `staging` and `production` environments. Production deployment
 remains manual. Configure environment-scoped values without placing secret
 payloads in repository variables:
 
-- `GCP_PROJECT_ID`
-- `GCP_REGION` (`northamerica-northeast1`)
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`
-- `GCP_DEPLOY_SERVICE_ACCOUNT`
-- `BACKEND_NAME_PREFIX` when the default is not used
+- `AWS_ACCOUNT_ID`
+- `AWS_REGION` (`ca-central-1`)
+- `AWS_DEPLOY_ROLE_ARN`
+- `ECR_REPOSITORY`
+- `ECS_CLUSTER`
+- `ECS_API_SERVICE` and `ECS_API_TASK_DEFINITION`
+- `ECS_WORKER_SERVICE` and `ECS_WORKER_TASK_DEFINITION`
+- `ECS_MIGRATION_TASK_DEFINITION`, `ECS_MIGRATION_SUBNETS`, and
+  `ECS_MIGRATION_SECURITY_GROUPS`
+- `API_URL`
+- `MEMBER_WEB_BUCKET`, `MEMBER_WEB_DISTRIBUTION_ID`,
+  `MEMBER_WEB_DEPLOY_ROLE_ARN`, and `MEMBER_WEB_URL`
 - public API and Firebase configuration required by each frontend
 
-Use distinct deployment identities, Firebase projects, databases, secrets and
-URLs for staging and production. Keep secret values in Google Secret Manager or
-the hosting provider's encrypted environment storage.
+Use distinct AWS accounts, deployment identities, Firebase projects, databases,
+secrets, Terraform state and URLs for staging and production. Keep secret values
+in AWS Secrets Manager or the hosting provider's encrypted environment storage.
 
 ## Verification
 

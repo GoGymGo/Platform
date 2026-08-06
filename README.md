@@ -4,14 +4,14 @@ Private monorepo for the GoGymGo member application, public landing site, admini
 
 ## Applications and services
 
-| Path | Package | Purpose |
-| --- | --- | --- |
-| `apps/member-app` | `@gogymgo/member-app` | Expo application for iOS, Android and mobile web |
-| `apps/admin` | `@gogymgo/admin` | Private operations dashboard |
-| `apps/landing` | `@gogymgo/landing` | Public marketing, waitlist and partner site |
-| `services/api` | `@gogymgo/api` | NestJS API, worker and database migrations |
-| `packages/brand` | `@gogymgo/brand` | Canonical logos, fonts and colour tokens |
-| `packages/contracts` | `@gogymgo/contracts` | TypeScript contracts generated from OpenAPI |
+| Path                 | Package               | Purpose                                          |
+| -------------------- | --------------------- | ------------------------------------------------ |
+| `apps/member-app`    | `@gogymgo/member-app` | Expo application for iOS, Android and mobile web |
+| `apps/admin`         | `@gogymgo/admin`      | Private operations dashboard                     |
+| `apps/landing`       | `@gogymgo/landing`    | Public marketing, waitlist and partner site      |
+| `services/api`       | `@gogymgo/api`        | NestJS API, worker and database migrations       |
+| `packages/brand`     | `@gogymgo/brand`      | Canonical logos, fonts and colour tokens         |
+| `packages/contracts` | `@gogymgo/contracts`  | TypeScript contracts generated from OpenAPI      |
 
 Cloud and local infrastructure live under `infrastructure/`. Product, architecture, operations and compliance documentation lives under `docs/`. Start, stop, audit and release helpers live under `tooling/scripts/`.
 
@@ -21,7 +21,8 @@ Cloud and local infrastructure live under `infrastructure/`. Product, architectu
 - npm 11 or newer
 - Docker Desktop for the local PostgreSQL/PostGIS stack
 - Terraform 1.15.8 for cloud infrastructure validation
-- Firebase and Google Cloud credentials only for connected local or cloud work
+- Firebase credentials and access to the dedicated GoGymGo AWS member accounts
+  only for connected cloud work
 
 ## Root commands
 
@@ -67,9 +68,13 @@ The helper starts PostGIS, migrations, the API, worker, Expo web app and optiona
 - `gogymgo.com`: landing Sites project
 - `app.gogymgo.com`: Expo web on Firebase Hosting
 - `admin.gogymgo.com`: private admin Sites project
-- API and worker: Google Cloud Run
-- PostgreSQL/PostGIS: private Cloud SQL
+- API and worker: ECS on AWS Fargate in Canada Central
+- PostgreSQL/PostGIS: private Amazon RDS
 
-Staging and production use separate Firebase, Google Cloud, database, secret, deployment-identity and URL configuration. Production deployment is manual through the protected `Platform Deployment` GitHub Actions workflow.
+Staging and production use separate AWS accounts, Firebase projects, databases,
+S3 buckets, secrets, deployment identities, Terraform state and URLs. Production
+deployment is manual through the protected `Platform Deployment` GitHub Actions
+workflow. The retired GCP foundation remains temporarily for migration history;
+new environments use [the AWS foundation](infrastructure/aws/terraform/README.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [product requirements](docs/product/product-requirements.md), [QR verification architecture](docs/architecture/session-evidence-review.md), [September pilot runbook](docs/operations/september-qr-pilot.md), [member-app QR-link deployment](docs/operations/member-app-native-links.md), [production domains and admin access](docs/operations/domains-and-admin-access.md), and [API deployment](docs/operations/api-deployment.md).

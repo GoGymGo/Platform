@@ -25,7 +25,7 @@ describe('PrivacyOperationsService', () => {
     } = {},
   ) {
     const values: Record<string, unknown> = {
-      GCP_STORAGE_BUCKET: options.contentBucket,
+      PRIVATE_CONTENT_BUCKET: options.contentBucket,
       PRIVACY_EXPORT_BUCKET: 'private-exports',
       PRIVACY_EXPORT_RETENTION_DAYS: 7,
       PRIVACY_JOB_LEASE_SECONDS: 600,

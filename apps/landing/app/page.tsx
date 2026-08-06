@@ -4,7 +4,7 @@ import { AppLink } from "./components/AppLink";
 import { ProductScreens } from "./components/ProductScreens";
 import { siteLinks } from "./site-links";
 
-const steps = [
+const journeySteps = [
   {
     number: "01",
     title: "Choose your weekly goal",
@@ -21,6 +21,21 @@ const steps = [
     copy: "Approved sessions count toward your goal and published competition results—without presenting pending activity as credit.",
   },
 ];
+
+const readinessFacts = [
+  {
+    title: "NO PURCHASE REQUIRED",
+    copy: "Joining is free. Age, location, current competition availability, and active partner-poster access still apply.",
+  },
+  {
+    title: "VERIFICATION BEFORE CREDIT",
+    copy: `Entry and exit scans, fresh location readings, and the ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed before a workout counts.`,
+  },
+  {
+    title: "CHECK CURRENT GYM STATUS",
+    copy: "A public partner-gym directory is not available. The member app confirms whether a GoGymGo poster currently qualifies.",
+  },
+] as const;
 
 const transparencyFacts = [
   {
@@ -143,6 +158,7 @@ export default function Home() {
               </>
             )}
           </p>
+
           <div className="hero-actions">
             {memberRegistrationAvailable ? (
               <AppLink
@@ -184,7 +200,7 @@ export default function Home() {
         <SeptemberChallengePanel />
       </section>
 
-      <section className="section shell" id="how-it-works">
+      <section className="section shell" id="joining-and-verification">
         <div className="section-heading">
           <div>
             <p className="eyebrow">HOW GOGYMGO WORKS</p>
@@ -196,13 +212,38 @@ export default function Home() {
           </p>
         </div>
         <div className="steps-grid landing-steps">
-          {steps.map((step) => (
+          {journeySteps.map((step) => (
             <article className="step-card" key={step.number}>
               <span className="step-number">{step.number}</span>
               <h3>{step.title}</h3>
               <p>{step.copy}</p>
             </article>
           ))}
+        </div>
+        <div className="joining-readiness" id="before-you-join">
+          <div className="joining-readiness__heading">
+            <p className="eyebrow">BEFORE YOU JOIN</p>
+            <h3>Three things to know before you start.</h3>
+          </div>
+          <div className="joining-readiness__grid">
+            {readinessFacts.map((fact) => (
+              <article key={fact.title}>
+                <strong>{fact.title}</strong>
+                <p>{fact.copy}</p>
+              </article>
+            ))}
+          </div>
+          <div className="transparency-actions">
+            <AppLink
+              className="button button-secondary"
+              href={siteLinks.officialRules}
+            >
+              READ OFFICIAL CONTEST RULES
+            </AppLink>
+            <AppLink className="text-link" href={siteLinks.privacy}>
+              REVIEW THE PRIVACY POLICY
+            </AppLink>
+          </div>
         </div>
       </section>
 

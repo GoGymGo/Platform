@@ -150,6 +150,7 @@ const styles = StyleSheet.create({
   },
   directoryButton: {
     minWidth: 0,
+    minHeight: 44,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',

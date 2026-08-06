@@ -255,7 +255,7 @@ export default function CommitmentScreen() {
 
         <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
           <TerminalText tone="cyan" variant="label">
-            PUBLISHED COMPETITION
+            SEPTEMBER COMPETITION
           </TerminalText>
           <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
             {`You may join this competition until it ends on ${competitionDateRange.endDateKey}. Your entries begin when enrollment is confirmed.`}

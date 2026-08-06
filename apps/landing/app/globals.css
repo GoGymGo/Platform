@@ -1,29 +1,20 @@
-@font-face {
-  font-family: "Orbitron";
-  src: url("/fonts/Orbitron-Bold.ttf") format("truetype");
-  font-display: swap;
-  font-weight: 700;
-}
-
-@font-face {
-  font-family: "Share Tech Mono";
-  src: url("/fonts/ShareTechMono-Regular.ttf") format("truetype");
-  font-display: swap;
-  font-weight: 400;
-}
+@import "@gogymgo/brand/web.css";
 
 :root {
-  --background: #080b0e;
-  --panel: #0b1118;
-  --panel-soft: #0f1720;
-  --text: #e9f7f8;
-  --muted: #a9bdc1;
+  --background: var(--gogymgo-background);
+  --panel: var(--gogymgo-panel);
+  --panel-soft: var(--gogymgo-panel-soft);
+  --text: var(--gogymgo-text);
+  --muted: var(--gogymgo-muted);
   --dim: #7e9ba3;
-  --cyan: #34e5e8;
-  --cyan-soft: #9ff3f5;
-  --pink: #ff2d9b;
-  --green: #4dff88;
-  --amber: #ffe066;
+  --cyan: var(--gogymgo-cyan);
+  --cyan-soft: var(--gogymgo-cyan-soft);
+  --pink: var(--gogymgo-pink);
+  --green: var(--gogymgo-green);
+  --amber: var(--gogymgo-amber);
+  --body: var(--gogymgo-font-body);
+  --display: var(--gogymgo-font-display);
+  --mono: var(--gogymgo-font-mono);
   --line: rgba(52, 229, 232, 0.2);
   --line-strong: rgba(52, 229, 232, 0.48);
   --pink-line: rgba(255, 45, 155, 0.42);
@@ -47,7 +38,7 @@ body {
     radial-gradient(circle at 74% 8%, rgba(52, 229, 232, 0.08), transparent 24rem),
     radial-gradient(circle at 18% 28%, rgba(255, 45, 155, 0.04), transparent 28rem),
     var(--background);
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: var(--body);
   font-size: 17px;
   font-weight: 400;
   line-height: 1.6;
@@ -85,7 +76,7 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-family: "Orbitron", "Segoe UI", sans-serif;
+  font-family: var(--display);
   line-height: 1.12;
 }
 
@@ -1602,7 +1593,17 @@ h3 {
   }
 
   .footer-grid > div:first-child {
-    grid-column: auto;
+    grid-column: 1 / -1;
+  }
+
+  .footer-grid > div:last-child {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 18px;
+  }
+
+  .footer-grid > div:last-child .footer-label {
+    grid-column: 1 / -1;
   }
 
   .footer-bottom {
@@ -1611,6 +1612,10 @@ h3 {
     align-items: flex-start;
     justify-content: center;
     gap: 8px;
+  }
+
+  .step-number {
+    margin-bottom: 18px;
   }
 
   .audience-page {

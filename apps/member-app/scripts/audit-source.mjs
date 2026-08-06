@@ -74,9 +74,13 @@ for (const filePath of sourceFiles) {
     }
   }
 
+  if (/Rajdhani/i.test(sourceText)) {
+    issues.push(`${relativePath}: retired Rajdhani font reference`);
+  }
+
   if (relativePath !== 'app/_layout.tsx') {
     const fontMatch = sourceText.match(
-      /\b(?:Orbitron-Bold|Rajdhani-Medium|Rajdhani-SemiBold|ShareTechMono-Regular)\b/
+      /\b(?:Orbitron-Bold|ShareTechMono-Regular)\b/
     );
     if (fontMatch) {
       issues.push(`${relativePath}: raw brand font registration ${fontMatch[0]}`);
@@ -475,8 +479,22 @@ function auditAppTourProductionBoundary() {
   if (!stateSource.includes('browserTestPreviewEnabled &&')) {
     issues.push('src/state/appTour.tsx: test preview activation must use the shared availability guard');
   }
-  if (!stateSource.includes('if (!browserTestPreviewEnabled)')) {
+  if (
+    !stateSource.includes(
+      'if (!browserTestPreviewEnabled && !publicDemoRequested)'
+    )
+  ) {
     issues.push('src/state/appTour.tsx: enterTour must reject unavailable preview activation');
+  }
+  for (const marker of [
+    'isDemoPath(pathname)',
+    'isDemoSearch(firstParam(params.demo))',
+    'publicDemoRequested',
+    'publicDemo: effectivePublicDemo'
+  ]) {
+    if (!stateSource.includes(marker)) {
+      issues.push(`src/state/appTour.tsx: public Demo activation is missing ${marker}`);
+    }
   }
   if (!routeSource.includes('if (!__DEV__)')) {
     issues.push('app/app-tour.tsx: production builds must redirect away from the App Tour');
@@ -508,6 +526,12 @@ function auditAppTourProductionBoundary() {
   }
   if (!metroSource.includes('context.dev')) {
     issues.push('metro.config.js: production module aliases must be selected from the Metro development flag');
+  }
+  if (
+    !metroSource.includes('publicDemoWebModules') ||
+    !metroSource.includes('keepPublicWebDemo')
+  ) {
+    issues.push('metro.config.js: public Demo data must remain available only to production web exports');
   }
   if (
     !metroSource.includes("platform === 'web'") ||

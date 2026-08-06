@@ -13,8 +13,8 @@ export const brandColors = Object.freeze({
 });
 
 export const brandFonts = Object.freeze({
-  body: 'Rajdhani-Medium',
-  bodyStrong: 'Rajdhani-SemiBold',
+  body: '"Segoe UI", Arial, sans-serif',
+  bodyStrong: '"Segoe UI", Arial, sans-serif',
   display: 'Orbitron-Bold',
   mono: 'ShareTechMono-Regular'
 });

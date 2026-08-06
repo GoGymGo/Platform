@@ -1,0 +1,39 @@
+account_id = "111122223333"
+environment = "staging"
+
+github_repository          = "GoGymGo/Platform"
+github_repository_owner_id = "275516911"
+github_repository_id       = "1294409363"
+
+container_image    = "111122223333.dkr.ecr.ca-central-1.amazonaws.com/gogymgo-staging-backend/api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+firebase_project_id = "replace-with-isolated-firebase-project-id"
+
+cors_origins = [
+  "https://staging.gogymgo.com",
+]
+
+# Leave null until the ACM validation record has been approved in Cloudflare
+# and the certificate is issued. Without it, no HTTPS listener is created.
+api_certificate_arn = null
+api_domain          = "api-staging.gogymgo.com"
+
+# CloudFront certificates must be issued in us-east-1. Until the certificate is
+# validated, the distribution remains reachable only through its AWS hostname.
+member_web_certificate_arn = null
+member_web_domain          = "app.gogymgo.com"
+
+# Cost-controlled pilot defaults. Production should begin with db.t4g.small,
+# a $150 budget, and deletion protection. Multi-AZ remains a separate HA gate.
+database_instance_class = "db.t4g.micro"
+database_multi_az       = false
+database_storage_gb     = 20
+api_desired_count       = 0
+worker_desired_count    = 0
+monthly_budget_usd      = 40
+budget_notification_email = null
+deletion_protection       = false
+
+# Optional features stay off until their secret, IAM, and UAT gates pass.
+privacy_operations_enabled  = false
+profile_media_enabled       = false
+push_notifications_enabled  = false

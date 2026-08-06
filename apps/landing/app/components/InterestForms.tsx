@@ -6,6 +6,21 @@ import { AppLink } from "./AppLink";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
+function readErrorMessage(error: unknown, fallbackError: string) {
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallbackError;
+}
+
 async function submitInterest(
   form: HTMLFormElement,
   fallbackError: string,
@@ -146,9 +161,10 @@ export function GymGoerForm() {
       setState("success");
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "We couldn’t save your information. Please try again.",
+        readErrorMessage(
+          cause,
+          "We couldn’t save your information. Please try again.",
+        ),
       );
       setState("error");
     }
@@ -232,7 +248,7 @@ export function GymGoerForm() {
   );
 }
 
-export function BrandForm() {
+export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }) {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -255,9 +271,10 @@ export function BrandForm() {
       setState("success");
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "We couldn’t save your partnership request. Please try again.",
+        readErrorMessage(
+          cause,
+          "We couldn’t save your partnership request. Please try again.",
+        ),
       );
       setState("error");
     }
@@ -292,13 +309,13 @@ export function BrandForm() {
           />
         </div>
         <div className="field">
-          <label htmlFor="companyName">COMPANY *</label>
+          <label htmlFor="companyName">GYM OR COMPANY *</label>
           <input
             autoComplete="organization"
             id="companyName"
             maxLength={140}
             name="companyName"
-            placeholder="Company name"
+            placeholder="Gym or company name"
             required
           />
         </div>
@@ -349,7 +366,7 @@ export function BrandForm() {
           <div className="field">
             <label htmlFor="partnershipInterest">PARTNERSHIP INTEREST *</label>
             <select
-              defaultValue=""
+              defaultValue={defaultInterest}
               id="partnershipInterest"
               name="partnershipInterest"
               required

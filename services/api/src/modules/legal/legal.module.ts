@@ -19,7 +19,11 @@ import { VerificationConsentsService } from './verification-consents.service';
     OperatorLegalDocumentsController,
     VerificationConsentsController,
   ],
-  exports: [LegalDocumentsService, VerificationConsentsService],
+  exports: [
+    AdminLegalDocumentsService,
+    LegalDocumentsService,
+    VerificationConsentsService,
+  ],
   imports: [AdminAuthorizationModule, IdempotencyModule, ProfilesModule],
   providers: [
     AdminLegalDocumentsService,

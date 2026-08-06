@@ -87,7 +87,7 @@ for (const [relativePath, serviceName] of [
     !source.includes('assertLiveServicesAllowed') ||
     !source.includes(`assertLiveServicesAllowed('${serviceName}')`)
   ) {
-    issues.push(`${relativePath} is missing the public-demo runtime guard.`);
+    issues.push(`${relativePath} is missing the public-Demo runtime guard.`);
   }
 }
 

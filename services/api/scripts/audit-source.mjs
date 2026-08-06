@@ -182,6 +182,10 @@ const workloadsTerraform = await readFile(
   join(platformRoot, 'infrastructure/gcp/terraform/workloads.tf'),
   'utf8',
 );
+const awsWorkloadsTerraform = await readFile(
+  join(platformRoot, 'infrastructure/aws/terraform/workloads.tf'),
+  'utf8',
+);
 
 if (!createRegionDto || createRegionDto.includes('regionPolicyId')) {
   violations.push(
@@ -284,11 +288,25 @@ for (const marker of [
 if (
   dockerfile.includes('rm -f /usr/local/bin/npm') &&
   (workloadsTerraform.includes('command = ["npm"]') ||
+    awsWorkloadsTerraform.includes('"command":["npm"') ||
     /migrate:[\s\S]{0,200}command:\s*\[['"]npm['"]/.test(compose))
 ) {
   violations.push(
     'the migration workload cannot invoke npm because the runtime image removes it',
   );
+}
+for (const marker of [
+  'command = [',
+  '"node"',
+  '"node_modules/node-pg-migrate/bin/node-pg-migrate.js"',
+  '"--migrations-dir"',
+  '"dist/migrations"',
+]) {
+  if (!awsWorkloadsTerraform.includes(marker)) {
+    violations.push(
+      `the AWS migration workload is missing executable marker ${marker}`,
+    );
+  }
 }
 for (const marker of [
   'DATABASE_URL must not use a loopback host in production.',

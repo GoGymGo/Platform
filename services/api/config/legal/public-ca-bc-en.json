@@ -1,0 +1,330 @@
+{
+  "documents": [
+    {
+      "documentKey": "privacy_policy",
+      "jurisdictionCode": "GLOBAL",
+      "locale": "en",
+      "version": "2026-08-03-public-beta-v1",
+      "title": "PRIVACY POLICY",
+      "receiptRequirement": "acknowledge",
+      "effectiveAt": "2026-08-03T07:00:00.000Z",
+      "content": {
+        "intro": "This Privacy Policy explains how GoGymGo collects, uses, discloses, safeguards, retains, and provides choices about personal information when you use the GoGymGo app, website, competitions, partner-gym features, and support services.",
+        "sections": [
+          {
+            "heading": "WHO IS RESPONSIBLE AND HOW TO CONTACT US",
+            "body": "GoGymGo is the operator responsible for personal information under its control. GoGymGo operates from Vancouver Island, British Columbia, Canada. The GoGymGo Privacy Officer oversees privacy compliance. To ask a privacy question, request access or correction, withdraw an optional consent, or make a complaint, use Account Data in the app or the contact channel at https://gogymgo.com."
+          },
+          {
+            "heading": "SCOPE",
+            "body": "This Policy applies to the GoGymGo mobile and web apps, account and competition services, partner-gym verification, social and creator features, applications, rewards, support, and related communications. A separate notice may explain a feature at the time information is requested."
+          },
+          {
+            "heading": "ACCOUNT AND PROFILE INFORMATION",
+            "bullets": [
+              "We collect your account identifier, email address, email-verification status, sign-in provider, account status, roles, settings, private callsign, and any optional Alias, approved name mode, avatar, or profile information you choose to provide.",
+              "Apple and Google may process sign-in information under their own terms and privacy policies. GoGymGo receives the account information and authentication result needed to create or secure your player account.",
+              "We collect support communications and the information you submit in a creator, sponsor, partner, or gym application, including relevant links, contact details, gym address, rights attestations, disclosures, and review information."
+            ]
+          },
+          {
+            "heading": "REGION AND LOCATION INFORMATION",
+            "body": "When you select Use My Location, the app requests a foreground location reading and sends one latitude and longitude pair to the server to test whether you are inside an active competition boundary. GoGymGo records the approved or rejected region result, region and boundary versions, verification method, and time. The latitude and longitude pair is used for that transaction and is not stored in the region-verification record. Partner-gym workout verification may use a fresh location reading to confirm that a QR scan occurs within the gym's approved radius."
+          },
+          {
+            "heading": "WORKOUT, FITNESS, AND COMPETITION INFORMATION",
+            "bullets": [
+              "We collect your Weekly Goal, competition enrollment, workout plan, session start and end times, duration, eligible date, verified days, streaks, category score, prize-draw entries, rank, and reward status.",
+              "Where an enabled verification method requires it, we may collect heart-rate samples or summary evidence, gym QR results, session identifiers, device-integrity signals, checkpoint results, and fraud-review outcomes.",
+              "We collect legal-document and competition-rule receipts, age-eligibility attestations, draw and winner records, reward claims, fulfillment records, and evidence needed to audit competition results or resolve a dispute."
+            ]
+          },
+          {
+            "heading": "SOCIAL, CREATOR, AND USER CONTENT",
+            "bullets": [
+              "We collect friend requests, blocks, Weekly Challenge invitations and results, challenge names, descriptions, schedules, membership, check-ins, and masked or hashed contact-invitation destinations.",
+              "Creator submissions may include profile or channel links, hosted-video links, workout details, media, rights attestations, sponsorship disclosures, and AI-use disclosures.",
+              "Content you choose to make public may be visible to other players as described below. Private messages, blocked relationships, and private application material are not public profile fields."
+            ]
+          },
+          {
+            "heading": "TECHNICAL AND SECURITY INFORMATION",
+            "body": "We process device and app information reasonably needed to operate and secure the service, such as request identifiers, push-notification tokens, supported device-integrity signals, security and moderation events, error details, idempotency digests, access logs, and fraud indicators. We use this information to deliver requested features, prevent abuse, diagnose failures, and protect accounts and competitions."
+          },
+          {
+            "heading": "INFORMATION WE DO NOT COLLECT IN THE CURRENT SERVICE",
+            "bullets": [
+              "GoGymGo does not receive or store Face ID, Touch ID, fingerprint templates, faceprints, face geometry, device passcodes, raw QR camera frames, camera video, voice, or microphone audio.",
+              "Local device authentication is handled by your phone's operating system. GoGymGo receives only the pass or fail result needed for a checkpoint.",
+              "The current service does not collect payment-card, bank-account, wallet, or tax-payment information and does not charge an entry fee for the September 2026 competition.",
+              "GoGymGo does not use advertising identifiers or collect information to track you across unrelated apps or websites for advertising."
+            ]
+          },
+          {
+            "heading": "WHY WE USE PERSONAL INFORMATION",
+            "bullets": [
+              "Create, authenticate, secure, support, and delete accounts; provide privacy exports; and remember settings and choices.",
+              "Verify regional and age eligibility, enroll players, verify workouts, calculate progress and entries, operate draws, confirm winners, fulfill rewards, prevent abuse, settle results, and audit disputes.",
+              "Provide friends, challenges, creator workouts, applications, moderation, reminders, notifications, support, and other features you request.",
+              "Comply with law, enforce the Terms and Official Contest Rules, protect people and the service, investigate suspected fraud, and establish or defend legal claims.",
+              "Improve reliability and understand aggregate service performance without using personal information for unrelated advertising."
+            ]
+          },
+          {
+            "heading": "CONSENT AND YOUR CHOICES",
+            "body": "GoGymGo identifies the purposes for collecting personal information at or before collection and seeks meaningful consent where required. Account, region, legal-receipt, competition, and required workout evidence is needed to provide the features you request. Optional Alias, avatar, social, creator, partner, and reminder features may be declined. You may withdraw consent to optional processing on reasonable notice, subject to legal or contractual restrictions and reasonable competition-integrity requirements; the related feature may then be unavailable. A device permission by itself is not consent to an undisclosed use."
+          },
+          {
+            "heading": "WHEN WE SHARE INFORMATION",
+            "bullets": [
+              "Service providers may process the minimum information needed to host, authenticate, store, secure, notify, moderate, or support the service. These may include Amazon Web Services, Google Firebase and Google Cloud, Apple or Google sign-in and device services, Expo notification services, and approved hosted-video providers.",
+              "An approved gym, sponsor, or fulfillment partner may receive the minimum information needed to verify a gym session or fulfill a specific reward. They do not receive heart-rate evidence, biometric material, exact region-verification coordinates, private social content, or unrelated account information.",
+              "We may disclose information when required or permitted by law, to protect rights or safety, to investigate fraud, or in a business transaction subject to appropriate confidentiality and use restrictions.",
+              "We do not sell personal information and do not disclose it for cross-context behavioural advertising."
+            ]
+          },
+          {
+            "heading": "PUBLIC COMPETITION INFORMATION",
+            "body": "Depending on your profile choices, public competition screens may display your permitted Alias, approved name mode, or private callsign; approved avatar; Weekly Goal group; verified progress; streak badges; rank; category-champion status; and reward title or type. Your email, precise location evidence, heart-rate evidence, legal receipts, support records, private claim instructions, and any reward code are not public."
+          },
+          {
+            "heading": "PROCESSING OUTSIDE BRITISH COLUMBIA",
+            "body": "GoGymGo uses service providers that may process information in Canada, the United States, or other locations where they operate. Information in another location may be subject to that location's laws and lawful access authorities. GoGymGo remains responsible for personal information under its control and uses contractual, technical, and organizational safeguards appropriate to the sensitivity and purpose of the information."
+          },
+          {
+            "heading": "RETENTION, EXPORT, AND DELETION",
+            "body": "We retain personal information only as long as reasonably necessary for the identified purpose, account and service security, competition integrity, reward fulfillment, dispute resolution, and legal obligations. A completed privacy export is available only through a short-lived download action and its export file is deleted after seven days. An approved account-deletion request removes or de-identifies active account, profile, media, notification, and social data after applicable operational holds. Pseudonymized legal receipts, competition enrollments, workout evidence, entry ledgers, draws, rewards, fraud records, and operator audits may be retained where reasonably necessary to preserve contest integrity, resolve disputes, prevent repeat abuse, or comply with law."
+          },
+          {
+            "heading": "SAFEGUARDS AND INCIDENTS",
+            "body": "GoGymGo uses measures appropriate to the information, including authentication, role-based access, encryption in transit, controlled private storage, secret management, audit records, data minimization, and append-only evidence where appropriate. No system is completely secure. We investigate suspected privacy or security incidents and provide notice when applicable law requires it."
+          },
+          {
+            "heading": "ACCESS, CORRECTION, AND COMPLAINTS",
+            "body": "Subject to applicable law, you may request access to personal information under GoGymGo's control, information about its use and disclosure, or correction of an error or omission. Use Account Data in the app or the contact channel at https://gogymgo.com. We may need to verify identity and may withhold information where law requires or permits. If a British Columbia privacy concern is not resolved, you may contact the Office of the Information and Privacy Commissioner for British Columbia at https://www.oipc.bc.ca."
+          },
+          {
+            "heading": "COMMUNICATIONS",
+            "body": "We may send service, security, competition, claim, and account messages needed to provide the service you requested. Promotional email or text messages will use a valid consent or other lawful basis, identify the sender, provide contact information, and include a working unsubscribe method. You can disable app reminders in settings and through device permissions."
+          },
+          {
+            "heading": "ADULT SERVICE",
+            "body": "The current British Columbia competition is intended only for people who are at least 19 years old. GoGymGo does not knowingly offer that competition to minors. Contact the Privacy Officer through https://gogymgo.com if you believe a minor provided personal information."
+          },
+          {
+            "heading": "CHANGES TO THIS POLICY",
+            "body": "We may update this Policy as the service or law changes. The current version and effective date will be published in the app. A material change will be presented for a new acknowledgment or other consent when required. Continued use does not replace a consent that applicable law requires us to obtain."
+          }
+        ]
+      }
+    },
+    {
+      "documentKey": "terms_of_service",
+      "jurisdictionCode": "GLOBAL",
+      "locale": "en",
+      "version": "2026-08-03-public-beta-v1",
+      "title": "TERMS OF SERVICE",
+      "receiptRequirement": "accept",
+      "effectiveAt": "2026-08-03T07:00:00.000Z",
+      "content": {
+        "intro": "These Terms of Service govern your access to and use of GoGymGo. They are a binding agreement between you and GoGymGo when you create an account, select Agree, or use the service.",
+        "sections": [
+          {
+            "heading": "AGREEMENT AND OPERATOR",
+            "body": "GoGymGo operates the GoGymGo mobile and web apps and related services from Vancouver Island, British Columbia, Canada. By creating or using an account and selecting Agree, you accept these Terms and acknowledge the current Privacy Policy. If you do not accept them, do not use the service. The Official Contest Rules for a particular competition also apply; if those Rules conflict with these Terms about that competition, the Rules control. Contact GoGymGo through https://gogymgo.com or the support tools in the app."
+          },
+          {
+            "heading": "ELIGIBILITY AND YOUR ACCOUNT",
+            "bullets": [
+              "You must be legally able to enter this agreement. A competition may have additional age, location, and eligibility rules. The September 2026 British Columbia competition requires players to be at least 19 years old.",
+              "Provide accurate account, eligibility, region, workout, application, and reward-claim information and keep your sign-in credentials secure.",
+              "Use only your own account. Do not sell, transfer, share, automate, or create accounts to manipulate eligibility, ranks, entries, rewards, or social features.",
+              "Email verification, current legal receipts, region verification, an age attestation, Official Rules acceptance, and a valid Weekly Goal may be required before competition features are available."
+            ]
+          },
+          {
+            "heading": "FREE SERVICE AND NO PURCHASE",
+            "body": "The current player service has no subscription, entry fee, bank, wallet, cash-balance, or stored-value feature. No purchase is necessary to enter an eligible GoGymGo competition or win. A purchase or commercial interaction does not improve a player's chance of winning. Internet access, a compatible device, and access to an approved partner gym may still be needed to use particular features."
+          },
+          {
+            "heading": "FITNESS SAFETY AND NO MEDICAL ADVICE",
+            "bullets": [
+              "GoGymGo provides fitness tracking, workout guidance, and competition features for general information and recreational use. It does not provide medical advice, diagnosis, treatment, emergency monitoring, or a substitute for a qualified health professional.",
+              "Physical activity involves risks such as strain, falls, collision, illness, serious injury, or death. Consider your health, experience, surroundings, equipment, and instructions; use appropriate modifications; stop if you experience concerning symptoms; and seek medical or emergency help when appropriate.",
+              "Heart-rate, timer, device, QR, streak, score, and entry information may be delayed, incomplete, or inaccurate and must not be used for medical or safety-critical decisions.",
+              "You choose whether and how to participate. Nothing in these Terms excludes a right or responsibility that cannot lawfully be excluded."
+            ]
+          },
+          {
+            "heading": "REGION AND WORKOUT VERIFICATION",
+            "bullets": [
+              "A verified workout may require the published minimum duration, a fresh eligible location reading, partner-gym entry and exit QR scans, heart-rate evidence, or a local device-presence check, depending on the competition configuration shown to you.",
+              "Your phone's operating system handles Face ID, Touch ID, fingerprint, or passcode authentication. GoGymGo receives the result, not the biometric template or passcode. QR camera frames are processed locally and are not stored; a validated QR result may be submitted.",
+              "Do not spoof location, heart rate, time, QR, device, or attestation signals; share or publish gym QR codes; use another person or device to complete a check; tamper with evidence; or interfere with a review.",
+              "GoGymGo may reject or review a session, score, entry, enrollment, or claim when evidence is missing, inconsistent, late, duplicated, unsupported, or reasonably suspected of manipulation."
+            ]
+          },
+          {
+            "heading": "COMPETITIONS, ENTRIES, AND REWARDS",
+            "bullets": [
+              "Each competition is governed by its current Official Rules, which state the eligible area, dates, entry method, number and approximate value of prizes, material facts affecting chances, selection method, claim process, and other conditions.",
+              "Prize-draw entries affect relative chances but never guarantee a reward. Odds depend on the number of eligible entries received, the entries earned by each eligible player, and the number of available prizes.",
+              "A potential winner is not confirmed until eligibility, evidence, rule compliance, and any required mathematical skill-testing question are completed. A rank, notification, or award-pending state is not final confirmation.",
+              "Sponsor terms, inventory, expiry, substitution, delivery area, and claim instructions may apply. GoGymGo will not substitute a prize except as permitted by the Official Rules and applicable law."
+            ]
+          },
+          {
+            "heading": "SOCIAL FEATURES AND PUBLIC RESULTS",
+            "body": "Friend requests, Weekly Challenges, and social Challenges require the applicable invitation or acceptance. Do not harass, threaten, impersonate, discriminate, spam, dox, or share another person's private information. Permitted public competition information may include your Alias, approved name mode, or private callsign; approved avatar; streak badges; Weekly Goal group; rank; verified progress; category-champion status; and reward title or type."
+          },
+          {
+            "heading": "CREATOR AND USER CONTENT",
+            "body": "You retain ownership of content you own. When you submit creator or user content, you grant GoGymGo the license stated at submission to host, reproduce, display, format, caption, translate, moderate, and distribute it for the submitted feature. You must hold all necessary video, music, likeness, location, trademark, and other rights and make required sponsorship or AI-use disclosures. GoGymGo may review, decline, pause, remove, or report content for safety, rights, disclosure, legal, or brand-fit reasons."
+          },
+          {
+            "heading": "ACCEPTABLE USE",
+            "body": "Do not break the law; infringe rights; introduce malware; access another account; scrape, reverse engineer, overload, or bypass security except where law expressly permits; misuse GoGymGo, sponsor, or gym marks; manipulate entries or results; make unsafe or deceptive fitness claims; or use GoGymGo to send unlawful commercial messages."
+          },
+          {
+            "heading": "THIRD-PARTY SERVICES",
+            "body": "Apple, Google, Firebase, Amazon Web Services, Expo, hosted-video providers, gyms, creators, sponsors, and reward-fulfillment providers may have their own terms and privacy practices. GoGymGo is not responsible for a third party's independent service, content, availability, or conduct, subject to rights and remedies that applicable law does not allow to be limited."
+          },
+          {
+            "heading": "PRIVACY",
+            "body": "The current Privacy Policy explains how GoGymGo handles personal information and is part of these Terms. Feature-specific notices and consent choices also apply. If you request account deletion, GoGymGo may retain pseudonymized evidence and records reasonably required for competition integrity, disputes, fraud prevention, or law, as described in the Privacy Policy."
+          },
+          {
+            "heading": "SUSPENSION, REVIEW, AND TERMINATION",
+            "body": "You may stop using the service and request account deletion through Account Data. GoGymGo may restrict, suspend, or terminate access; invalidate affected evidence or entries; or refer a matter for review when reasonably necessary for safety, security, fraud prevention, legal compliance, or a material breach. Where appropriate, GoGymGo will provide notice and a reasonable support or review channel."
+          },
+          {
+            "heading": "INTELLECTUAL PROPERTY",
+            "body": "GoGymGo and its licensors own the service, software, visual design, trademarks, and content they provide, except for user content and third-party materials. These Terms give you a personal, limited, revocable, non-transferable right to use the service for its intended purpose. They do not transfer ownership of GoGymGo intellectual property."
+          },
+          {
+            "heading": "SERVICE AVAILABILITY",
+            "body": "The beta service is provided as available and may be changed, maintained, paused, or discontinued. To the maximum extent permitted by law, GoGymGo does not promise uninterrupted or error-free operation, compatibility with every device or provider, continuous partner-gym or reward availability, or that fitness content is suitable for every person. Statutory, consumer, privacy, and other rights that cannot lawfully be waived remain unaffected."
+          },
+          {
+            "heading": "RESPONSIBILITY AND LIABILITY",
+            "body": "Each party remains responsible for loss or harm to the extent required by applicable law. To the maximum extent permitted by law, GoGymGo is not responsible for indirect, incidental, special, or consequential loss arising from unavailable service, lost data, third-party conduct, or participation decisions that are outside GoGymGo's reasonable control. This section does not limit liability for fraud, wilful misconduct, gross negligence, breach of privacy obligations, personal injury caused by negligence where liability cannot be excluded, or any consumer right or remedy that law does not permit the parties to waive."
+          },
+          {
+            "heading": "CHANGES TO THE SERVICE OR TERMS",
+            "body": "GoGymGo may update the service and these Terms. The current version and effective date will be published in the app. A material change will be presented for acceptance when required. Changes to a live competition are governed by its Official Rules and applicable law and will not be used to materially mislead or unfairly disadvantage entrants."
+          },
+          {
+            "heading": "BRITISH COLUMBIA LAW AND DISPUTES",
+            "body": "These Terms are governed by the laws of British Columbia and the federal laws of Canada that apply there, without regard to conflict-of-law principles. Subject to any mandatory consumer right to proceed elsewhere, disputes may be brought before the courts of British Columbia. Nothing requires private arbitration, prevents a lawful court proceeding, or waives a right that applicable law makes non-waivable. If part of these Terms is unenforceable, the remaining parts continue to apply to the extent legally possible."
+          },
+          {
+            "heading": "CONTACT",
+            "body": "For support or questions about these Terms, use the in-app support and Account Data tools or the contact channel at https://gogymgo.com."
+          }
+        ]
+      }
+    },
+    {
+      "documentKey": "official_contest_rules",
+      "jurisdictionCode": "GLOBAL",
+      "locale": "en",
+      "version": "2026-08-03-public-beta-v1",
+      "title": "OFFICIAL CONTEST RULES",
+      "receiptRequirement": "none",
+      "effectiveAt": "2026-08-03T07:00:00.000Z",
+      "content": {
+        "intro": "These Official Contest Rules govern the GoGymGo September 2026 Vancouver Island and Gulf Islands Challenge. No purchase is necessary. One $100 CAD cash prize is available. Participation means you agree to these Rules.",
+        "sections": [
+          {
+            "heading": "CONTEST OPERATOR AND CONTACT",
+            "body": "The contest is sponsored and administered by GoGymGo, operating from Vancouver Island, British Columbia, Canada. Questions about the contest or winner process may be sent through the in-app support tools or the contact channel at https://gogymgo.com."
+          },
+          {
+            "heading": "NO PURCHASE NECESSARY",
+            "body": "No purchase, payment, subscription, or entry fee is necessary to enter or win. A purchase or commercial interaction does not improve the chance of winning. Normal internet, mobile-device, and transportation costs are the entrant's responsibility. Access to an approved partner gym may be required to complete a verified workout."
+          },
+          {
+            "heading": "ELIGIBILITY",
+            "bullets": [
+              "You must be at least 19 years old when you enter and legally able to participate.",
+              "You must have a verified GoGymGo player account and be physically located within the active Vancouver Island and included Gulf Islands competition boundary when region verification occurs.",
+              "You must complete email verification, the current account agreements, age attestation, these Rules, region verification, and a Weekly Goal of one to seven verified days before enrollment is confirmed.",
+              "GoGymGo personnel, contractors, and household members directly involved in designing, administering, auditing, or judging this contest are not eligible.",
+              "One person may enter using one account. Automated, shared, transferred, duplicate, or false accounts are prohibited."
+            ]
+          },
+          {
+            "heading": "REGISTRATION AND CONTEST PERIOD",
+            "body": "Registration opens when the contest is published and remains available until 11:59:59 p.m. Pacific Daylight Time on September 30, 2026, unless the contest reaches a published entrant cap or is cancelled under these Rules. Verified contest activity runs from 12:00:00 a.m. Pacific Daylight Time on September 1, 2026 through 11:59:59 p.m. Pacific Daylight Time on September 30, 2026. GoGymGo's server time and the America/Vancouver time zone control."
+          },
+          {
+            "heading": "HOW TO ENTER",
+            "bullets": [
+              "Create or sign in to a player account, verify your email and eligible region, review the account agreements and these Rules, attest that you are at least 19, select a Weekly Goal, and join the contest in the app.",
+              "Confirmed enrollment provides one prize-draw entry.",
+              "After the contest starts, earn verified workout days by completing the current verification flow. For the September pilot, a session requires an entry scan and exit scan of the same approved partner-gym QR code, a fresh eligible gym-location check, and at least 30 minutes measured by server time.",
+              "At most one verified competition day counts per local calendar date. Activity completed before enrollment, outside the contest period, after session expiry, without the required exit scan, or without valid evidence does not count."
+            ]
+          },
+          {
+            "heading": "WEEKLY GOALS AND ENTRIES",
+            "bullets": [
+              "Your selected Weekly Goal is one to seven verified days and cannot be changed after enrollment.",
+              "Each verified competition day initially earns one category point and one prize-draw entry.",
+              "For each of the first four contest weeks, meeting your Weekly Goal produces entries based on your goal days. If you and your matched Weekly Challenge opponent both meet the goal, those weekly entries use a 2x multiplier. If the opponent does not meet the goal and you exceed your goal, or the goal equals all days available to you that week, those weekly entries use a 3x recovery multiplier. Otherwise the multiplier is 1x. Missing the goal produces no weekly-goal entries for that week, although entries already earned for verified days remain subject to final settlement adjustments.",
+              "At final settlement, the first-, second-, and third-ranked player in each Weekly Goal category receives a 3x, 2x, or 1.5x multiplier, respectively, on eligible first-four-week entries. Fractional results are rounded down to a whole entry.",
+              "Verified days from September 29 and 30 are bonus days. Each bonus day is worth a number of entries equal to your selected Weekly Goal.",
+              "Meeting your Weekly Goal in all four weekly periods applies a 10x perfect-month multiplier to the eligible entry subtotal after weekly, category, and bonus adjustments."
+            ]
+          },
+          {
+            "heading": "MATERIAL FACTORS AFFECTING ODDS",
+            "body": "The chance of winning depends on the total number of eligible entries held by all entrants at the time the draw is locked and the number of entries held by the entrant. Entry totals vary with enrollment, verified workout days, Weekly Goal, Weekly Challenge results, category placement, bonus days, the perfect-month multiplier, disqualifications, and evidence adjustments. There is one prize. No entry level guarantees a prize."
+          },
+          {
+            "heading": "PRIZE",
+            "body": "One prize is available: $100 CAD in cash, with an approximate retail value of $100 CAD. The prize is sponsored by GoGymGo and will be fulfilled through an audited in-person handoff recorded by an authorized GoGymGo administrator. The prize is not transferable or assignable. No substitution is permitted except where GoGymGo reasonably must provide an equal or greater cash value and applicable law permits it."
+          },
+          {
+            "heading": "DRAW AND POTENTIAL WINNER",
+            "body": "After the contest ends and eligible evidence and entry totals are finalized, GoGymGo will conduct an auditable computer-generated weighted random draw from all eligible entries. Each entry has an equal chance of selection, and an entrant's total chance is proportional to the number of eligible entries held. GoGymGo will attempt to notify the selected entrant through the verified account contact information and in-app status."
+          },
+          {
+            "heading": "WINNER CONFIRMATION AND CLAIM",
+            "bullets": [
+              "The selected entrant is a potential winner until GoGymGo verifies age, account ownership, regional eligibility, workout evidence, entry calculations, and compliance with these Rules.",
+              "Before being confirmed, the potential winner must correctly answer, without assistance, a time-limited mathematical skill-testing question administered by GoGymGo.",
+              "The potential winner must respond to GoGymGo and complete required claim and identity-verification steps within seven calendar days after the first notification attempt.",
+              "If the potential winner cannot be contacted, does not respond in time, does not answer the skill-testing question correctly, declines the prize, or is ineligible, GoGymGo may select an alternate potential winner from the remaining eligible entries using the same weighted random method.",
+              "GoGymGo will arrange the audited $100 CAD in-person handoff promptly after confirmation and will not unduly delay award of the prize."
+            ]
+          },
+          {
+            "heading": "VERIFICATION, REVIEW, AND DISQUALIFICATION",
+            "body": "GoGymGo may review or reject accounts, workouts, entries, results, or claims when evidence is missing, duplicated, inconsistent, altered, late, unsupported, or reasonably suspected of manipulation. Prohibited conduct includes location, time, QR, heart-rate, device, or identity spoofing; sharing or publishing gym QR codes; using another person or device to complete a check; interfering with the service or draw; harassment; and providing false eligibility or claim information. A decision will be based on the available records and may be raised through the support channel for reasonable review."
+          },
+          {
+            "heading": "MINIMUM ENTRANTS, INTERRUPTION, OR CANCELLATION",
+            "body": "At least two eligible entrants are required. GoGymGo may cancel, suspend, postpone, or modify the contest where fraud, security failure, technical failure, legal restriction, natural event, partner-gym unavailability, or another circumstance outside reasonable control materially affects fair operation. Any change will be limited to what is reasonably necessary, communicated in the app or at https://gogymgo.com, and administered consistently with applicable law. If a fair draw remains possible, GoGymGo may draw from eligible entries received before the interruption."
+          },
+          {
+            "heading": "PRIVACY AND PUBLIC RESULTS",
+            "body": "GoGymGo uses personal information to administer eligibility, verification, scoring, the draw, winner confirmation, fulfillment, fraud review, and required records under the Privacy Policy. Public results may show the confirmed winner's permitted Alias, approved name mode, or private callsign; category; and prize. Email, exact location evidence, health evidence, legal receipts, and private claim information are not public. Any additional use of a winner's name, image, or statement for promotion requires separate permission unless law permits otherwise."
+          },
+          {
+            "heading": "RELEASE AND MANDATORY RIGHTS",
+            "body": "Entrants are responsible for choosing activities appropriate to their health and circumstances. To the maximum extent permitted by law, GoGymGo is not responsible for loss caused by third-party services, entrant misconduct, or events outside its reasonable control. Nothing in these Rules excludes liability for fraud, wilful misconduct, gross negligence, breach of privacy obligations, personal injury caused by negligence where liability cannot be excluded, or any consumer, contest, privacy, or other right that applicable law makes non-waivable."
+          },
+          {
+            "heading": "DECISIONS, LAW, AND SEVERABILITY",
+            "body": "GoGymGo's administration decisions are final only to the extent permitted by law and must be made reasonably and consistently with these Rules. The contest and these Rules are governed by the laws of British Columbia and the federal laws of Canada that apply there. Subject to mandatory rights, disputes may be brought before the courts of British Columbia. If one provision is unenforceable, the remaining provisions continue to apply to the extent legally possible."
+          },
+          {
+            "heading": "RULES AVAILABILITY",
+            "body": "The current Rules are available in the GoGymGo app and through https://gogymgo.com. A material change will be identified with a new version and effective date. GoGymGo will not use a change to materially mislead or unfairly disadvantage entrants."
+          }
+        ]
+      }
+    }
+  ]
+}

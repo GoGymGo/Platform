@@ -31,8 +31,10 @@ for (const token of [
   '--gogymgo-muted: #96aab0',
   '--gogymgo-cyan: #34e5e8',
   '--gogymgo-font-body: "Segoe UI", Arial, sans-serif',
-  '--gogymgo-font-display: "GoGymGo Display"',
-  '--gogymgo-font-mono: "GoGymGo Mono"'
+  'font-family: "Orbitron"',
+  'font-family: "Share Tech Mono"',
+  '--gogymgo-font-display: "Orbitron"',
+  '--gogymgo-font-mono: "Share Tech Mono"'
 ]) {
   if (!webTokens.includes(token)) {
     throw new Error(`Canonical web token is missing: ${token}`);

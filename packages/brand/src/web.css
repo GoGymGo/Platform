@@ -1,12 +1,12 @@
 @font-face {
-  font-family: "GoGymGo Display";
+  font-family: "Orbitron";
   src: url("/fonts/Orbitron-Bold.ttf") format("truetype");
   font-display: swap;
   font-weight: 700;
 }
 
 @font-face {
-  font-family: "GoGymGo Mono";
+  font-family: "Share Tech Mono";
   src: url("/fonts/ShareTechMono-Regular.ttf") format("truetype");
   font-display: swap;
   font-weight: 400;
@@ -25,6 +25,6 @@
   --gogymgo-amber: #ffe066;
   --gogymgo-error: #ff0000;
   --gogymgo-font-body: "Segoe UI", Arial, sans-serif;
-  --gogymgo-font-display: "GoGymGo Display", "Segoe UI", Arial, sans-serif;
-  --gogymgo-font-mono: "GoGymGo Mono", "Courier New", monospace;
+  --gogymgo-font-display: "Orbitron", "Segoe UI", Arial, sans-serif;
+  --gogymgo-font-mono: "Share Tech Mono", "Courier New", monospace;
 }

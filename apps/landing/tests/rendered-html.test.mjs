@@ -74,11 +74,16 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(productScreens, /PUBLISHED ONLY/);
   assert.match(productScreens, /product-screen-callout/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS/);
+  assert.match(productScreens, /DEMO MODE \/\/ ISOLATED SAMPLE DATA/);
+  assert.match(productScreens, /analyticsEvent="demo_click"/);
+  assert.match(productScreens, /href=\{siteLinks\.demo\}/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS →/);
   assert.doesNotMatch(productScreens, /â†’/);
   assert.match(productScreens, /tabIndex=\{0\}/);
   assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 2);
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
+  assert.match(links, /NEXT_PUBLIC_MEMBER_APP_ORIGIN/);
+  assert.match(links, /memberApp: `\$\{memberAppOrigin\}\/join`/);
   assert.match(layout, /href=\{siteLinks\.regionalUpdates\}[\s\S]*?Regional launch updates/);
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
@@ -398,7 +403,7 @@ test("optimized product images and wide social preview are valid assets", async 
 test("the retired landing demo still redirects to the canonical member demo", async () => {
   const demoPage = await read("app/demo/page.tsx");
 
-  assert.match(demoPage, /redirect\("https:\/\/app\.gogymgo\.com\/demo"\)/);
+  assert.match(demoPage, /redirect\(siteLinks\.demo\)/);
 });
 
 test("historical interest export remains disabled, owner-restricted and read-only", async () => {

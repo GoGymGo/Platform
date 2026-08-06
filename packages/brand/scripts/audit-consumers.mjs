@@ -13,6 +13,8 @@ const consumers = [
       '@import "@gogymgo/brand/web.css"',
       '--bg: var(--gogymgo-background)',
       '--muted: var(--gogymgo-muted)',
+      '--display: var(--gogymgo-font-display)',
+      '--mono: var(--gogymgo-font-mono)',
       '--body: var(--gogymgo-font-body)'
     ]
   },
@@ -23,6 +25,8 @@ const consumers = [
       '@import "@gogymgo/brand/web.css"',
       '--background: var(--gogymgo-background)',
       '--muted: var(--gogymgo-muted)',
+      '--display: var(--gogymgo-font-display)',
+      '--mono: var(--gogymgo-font-mono)',
       '--body: var(--gogymgo-font-body)'
     ]
   }

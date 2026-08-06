@@ -1,21 +1,27 @@
+const configuredMemberAppOrigin =
+  process.env.NEXT_PUBLIC_MEMBER_APP_ORIGIN?.trim();
+const memberAppOrigin = (
+  configuredMemberAppOrigin || "https://app.gogymgo.com"
+).replace(/\/+$/, "");
+
 export const siteLinks = {
   accessibility: "/accessibility",
   brandPartnerApplication: "/partners?interest=brand#partner-form",
   brands: "/brands",
   contact: "/contact",
-  demo: "https://app.gogymgo.com/demo",
+  demo: `${memberAppOrigin}/demo`,
   faq: "/faq",
   gymPartnerApplication: "/partners?interest=gym#partner-form",
   gymGoers: "/gym-goers",
   home: "/",
-  memberApp: "https://app.gogymgo.com/",
-  officialRules: "https://app.gogymgo.com/official-rules",
+  memberApp: `${memberAppOrigin}/join`,
+  officialRules: `${memberAppOrigin}/official-rules`,
   partnerApplication: "/partners#partner-form",
   partners: "/partners",
-  privacy: "https://app.gogymgo.com/privacy-policy",
+  privacy: `${memberAppOrigin}/privacy-policy`,
   publicSiteHelp: "/contact#public-site-help",
   regionalUpdates: "/gym-goers#gym-form",
-  terms: "https://app.gogymgo.com/terms-of-service",
+  terms: `${memberAppOrigin}/terms-of-service`,
 } as const;
 
 export const primaryNavigationItems = [

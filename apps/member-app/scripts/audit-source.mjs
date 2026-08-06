@@ -118,6 +118,7 @@ for (const route of literalRoutes) {
 
 auditRouteReturnPaths(path.join(projectRoot, 'app'));
 auditAppTourCoverage(path.join(projectRoot, 'app'));
+auditDesignSystemCoverage(path.join(projectRoot, 'app'));
 auditAppTourProductionBoundary();
 auditFlowReliability();
 auditAuthoritativeRegionBoundary();
@@ -254,6 +255,34 @@ function auditAppTourCoverage(appDirectory) {
     const configuredRoute = dynamicRouteExamples.get(route) ?? route;
     if (!configuredRoutes.has(configuredRoute)) {
       issues.push(`${route}: screen is missing from the App Tour route directory`);
+    }
+  }
+}
+
+function auditDesignSystemCoverage(appDirectory) {
+  const designSystemMarkers = [
+    "@/constants/theme",
+    "@/components/auth",
+    "@/components/connectedLegalDocumentScreen",
+    "@/components/creatorApplicationScreen",
+    "@/components/cyber",
+    "@/components/firstRun",
+    "@/components/legal",
+    "@/components/onboarding",
+    "@/components/screenLayout",
+    "@/demo/PublicDemoScreen",
+    "@/testing/AppTourScreen",
+    "./(onboarding)/welcome"
+  ];
+
+  for (const { filePath, route } of collectRouteEntries(appDirectory)) {
+    if (isRedirectOnlyRoute(filePath)) {
+      continue;
+    }
+
+    const sourceText = fs.readFileSync(filePath, 'utf8');
+    if (!designSystemMarkers.some((marker) => sourceText.includes(marker))) {
+      issues.push(`${route}: screen bypasses the shared GoGymGo design system`);
     }
   }
 }

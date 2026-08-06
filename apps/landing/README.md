@@ -25,6 +25,8 @@ before removing that binding. Do not write new submissions to D1.
 User journeys belong to the canonical member application:
 
 - **Try Demo** -> `https://app.gogymgo.com/demo`
-- **Join Beta** -> `https://app.gogymgo.com/` (the member-app welcome screen)
+- **Join Beta** -> `https://app.gogymgo.com/join` (the live member-app account flow)
 
 Do not add a second demo implementation or account database to this app.
+For local cross-application testing, set `NEXT_PUBLIC_MEMBER_APP_ORIGIN` to the
+local member-app origin. Production falls back to `https://app.gogymgo.com`.

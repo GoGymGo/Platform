@@ -1,3 +1,6 @@
+import { siteLinks } from "../site-links";
+import { AppLink } from "./AppLink";
+
 const productScreens = [
   {
     alt: "GoGymGo active workout screen showing elapsed server time and live verification status",
@@ -36,6 +39,22 @@ export function ProductScreens() {
             The app keeps live verification separate from final competition
             results, so pending activity is never presented as approved credit.
           </p>
+        </div>
+        <div className="product-demo-entry">
+          <div>
+            <strong>DEMO MODE // ISOLATED SAMPLE DATA</strong>
+            <p>
+              Explore the real browser, iPhone, and Android interface without
+              creating an account or contacting live GoGymGo services.
+            </p>
+          </div>
+          <AppLink
+            analyticsEvent="demo_click"
+            className="button button-secondary"
+            href={siteLinks.demo}
+          >
+            OPEN THE INTERACTIVE DEMO
+          </AppLink>
         </div>
         <p className="product-swipe-hint">SWIPE TO PREVIEW BOTH APP SCREENS →</p>
         <div

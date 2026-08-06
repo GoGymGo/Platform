@@ -74,7 +74,7 @@ const structuredData = [
   {
     "@context": "https://schema.org",
     "@type": "Organization",
-    logo: "https://gogymgo.com/mark.svg",
+    logo: "https://gogymgo.com/mark.png",
     name: "GoGymGo",
     url: "https://gogymgo.com",
   },

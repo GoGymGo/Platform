@@ -73,7 +73,7 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: "/",
     },
     icons: {
-      icon: "/mark.svg",
+      icon: "/mark.png",
     },
     manifest: "/manifest.webmanifest",
   };

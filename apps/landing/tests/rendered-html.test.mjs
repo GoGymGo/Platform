@@ -446,7 +446,7 @@ test("optimized product images and wide social preview are valid assets", async 
       readFile(new URL("public/app/winners-circle.webp", root)),
       readFile(new URL("public/og.png", root)),
       stat(new URL("public/og.png", root)),
-      read("public/mark.svg"),
+      readFile(new URL("public/mark.png", root)),
     ]);
 
   for (const image of [activeWorkout, winnersCircle]) {
@@ -460,7 +460,9 @@ test("optimized product images and wide social preview are valid assets", async 
   assert.equal(socialImage.readUInt32BE(16), 1200);
   assert.equal(socialImage.readUInt32BE(20), 630);
   assert.ok(socialStat.size < 600_000);
-  assert.match(mark, /viewBox="0 0 100 100"/);
+  assert.deepEqual([...mark.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(mark.readUInt32BE(16), 510);
+  assert.equal(mark.readUInt32BE(20), 510);
 
   for (const removed of [
     "public/fonts/Rajdhani-Medium.ttf",

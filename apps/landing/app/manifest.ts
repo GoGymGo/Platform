@@ -13,9 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     icons: [
       {
-        sizes: "any",
-        src: "/mark.svg",
-        type: "image/svg+xml",
+        sizes: "510x510",
+        src: "/mark.png",
+        type: "image/png",
       },
     ],
     name: "GoGymGo",

@@ -117,9 +117,7 @@ const emptyPilotData: PilotData = {
 function BrandMark() {
   return (
     <span aria-label="GoGymGo" className="brand-mark" role="img">
-      <span aria-hidden="true" className="brand-mark-letter">
-        G
-      </span>
+      <img alt="" aria-hidden="true" src="/brand-mark.png" />
     </span>
   );
 }

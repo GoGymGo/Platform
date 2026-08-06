@@ -150,10 +150,22 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     /dynamic = "force-dynamic"/,
   );
   await access(new URL("../public/icon.png", import.meta.url));
+  await access(new URL("../public/brand-mark.png", import.meta.url));
   await access(new URL("../public/fonts/Orbitron-Bold.ttf", import.meta.url));
   await access(
     new URL("../public/fonts/ShareTechMono-Regular.ttf", import.meta.url),
   );
   await access(new URL("../public/og.png", import.meta.url));
   await access(new URL("../.openai/hosting.json", import.meta.url));
+});
+
+test("uses the canonical traced mark for compact admin branding", async () => {
+  const [dashboard, styles] = await Promise.all([
+    readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(dashboard, /src="\/brand-mark\.png"/);
+  assert.doesNotMatch(dashboard, /brand-mark-letter/);
+  assert.match(styles, /\.brand-mark img/);
 });

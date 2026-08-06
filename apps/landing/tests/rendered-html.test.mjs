@@ -84,10 +84,14 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
   assert.match(links, /NEXT_PUBLIC_MEMBER_APP_ORIGIN/);
   assert.match(links, /memberApp: `\$\{memberAppOrigin\}\/join`/);
+  assert.match(links, /NEXT_PUBLIC_ADMIN_DASHBOARD_ORIGIN/);
+  assert.match(links, /adminDashboard: adminDashboardOrigin/);
   assert.match(layout, /href=\{siteLinks\.regionalUpdates\}[\s\S]*?Regional launch updates/);
+  assert.match(layout, /href=\{siteLinks\.adminDashboard\}[\s\S]*?Admin dashboard/);
+  assert.match(layout, /destinationLabel="opens the GoGymGo admin dashboard"/);
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
-  assert.doesNotMatch(layout, /Administrator sign-in|admin-control/);
+  assert.doesNotMatch(layout, /Administrator sign-in/);
 });
 
 test("local preview and hosted deployment use compatible runtime settings", async () => {

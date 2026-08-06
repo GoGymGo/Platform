@@ -188,6 +188,12 @@ export default function RootLayout({
                 Official Contest Rules
               </AppLink>
               <Link href={siteLinks.accessibility}>Accessibility</Link>
+              <AppLink
+                destinationLabel="opens the GoGymGo admin dashboard"
+                href={siteLinks.adminDashboard}
+              >
+                Admin dashboard
+              </AppLink>
             </div>
           </div>
           <div className="shell footer-bottom">

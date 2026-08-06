@@ -3,9 +3,16 @@ const configuredMemberAppOrigin =
 const memberAppOrigin = (
   configuredMemberAppOrigin || "https://app.gogymgo.com"
 ).replace(/\/+$/, "");
+const configuredAdminDashboardOrigin =
+  process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_ORIGIN?.trim();
+const adminDashboardOrigin = (
+  configuredAdminDashboardOrigin ||
+  "https://gogymgo-admin-control.wilson-1212.chatgpt.site"
+).replace(/\/+$/, "");
 
 export const siteLinks = {
   accessibility: "/accessibility",
+  adminDashboard: adminDashboardOrigin,
   brandPartnerApplication: "/partners?interest=brand#partner-form",
   brands: "/brands",
   contact: "/contact",

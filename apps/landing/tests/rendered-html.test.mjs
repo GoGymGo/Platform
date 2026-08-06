@@ -330,9 +330,13 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(experience, /\.hero-qualifiers li \{/);
   assert.match(experience, /\.hero-fallback-link \{[\s\S]*?min-height: 54px/);
   assert.match(experience, /\.hero-trust-signal \{/);
+  assert.match(experience, /min-height: min\(760px, calc\(100svh - 76px\)\)/);
+  assert.match(experience, /\.landing-hero h1 \{[\s\S]*?font-size: clamp\(48px, 4\.5vw, 64px\)/);
+  assert.match(experience, /\.pilot-console__facts > div \{[\s\S]*?min-height: 82px/);
+  assert.match(experience, /@media \(max-width: 980px\)[\s\S]*?\.landing-hero \{[\s\S]*?min-height: 0/);
   assert.match(experience, /aspect-ratio: 540 \/ 680/);
   assert.match(experience, /\.campaign-details summary \{[\s\S]*?min-height: 72px/);
-  assert.match(globals, /\.landing-page > \.section \{[\s\S]*?padding-block: 84px/);
+  assert.match(globals, /\.landing-page > \.section \{[\s\S]*?padding-block: 72px/);
   assert.match(globals, /\.conversion-grid \{/);
   assert.match(experience, /grid-template-columns: repeat\(2, minmax\(min\(82vw, 360px\), 1fr\)\)/);
 });

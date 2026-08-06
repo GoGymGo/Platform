@@ -1,10 +1,10 @@
 .landing-hero {
-  min-height: 690px;
+  min-height: min(760px, calc(100svh - 76px));
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(400px, 0.82fr);
   align-items: center;
-  gap: 60px;
-  padding-block: 72px 78px;
+  gap: clamp(36px, 3.5vw, 56px);
+  padding-block: clamp(28px, 4vh, 42px);
 }
 
 .landing-hero .hero-copy {
@@ -12,40 +12,42 @@
 }
 
 .landing-hero h1 {
-  margin-top: 18px;
+  margin-top: 12px;
+  font-size: clamp(48px, 4.5vw, 64px);
+  line-height: 1.05;
 }
 
 .landing-hero .hero-lede {
   max-width: 630px;
-  margin-top: 26px;
+  margin-top: 18px;
   color: var(--muted);
-  font-size: 20px;
-  line-height: 1.55;
+  font-size: 18px;
+  line-height: 1.45;
 }
 
 .hero-campaign-note {
   max-width: 620px;
-  margin-top: 16px;
+  margin-top: 10px;
   color: var(--dim);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 30px;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 .hero-fallback-link {
   min-height: 54px;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 10px 8px;
+  gap: 7px;
+  padding: 8px 4px;
   color: var(--cyan-soft);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 650;
   text-decoration: underline;
   text-decoration-color: rgba(52, 229, 232, 0.46);
@@ -65,12 +67,12 @@
 
 .hero-action-note {
   max-width: 620px;
-  margin-top: 14px;
+  margin-top: 10px;
   padding-left: 13px;
   border-left: 2px solid var(--cyan);
   color: var(--dim);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .hero-trust-signal {
@@ -78,7 +80,7 @@
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   gap: 2px 10px;
-  margin-top: 16px;
+  margin-top: 10px;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
@@ -107,13 +109,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .hero-qualifiers li {
-  min-height: 38px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   padding: 6px 10px;
@@ -349,7 +351,7 @@
 .pilot-console {
   overflow: hidden;
   border: 1px solid rgba(52, 229, 232, 0.52);
-  border-radius: 22px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(52, 229, 232, 0.04), transparent 34%),
     rgba(8, 13, 18, 0.96);
@@ -360,7 +362,7 @@
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  padding: 20px 22px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
   color: var(--cyan);
   font-family: "Share Tech Mono", monospace;
@@ -376,7 +378,7 @@
 .pilot-console__reward {
   display: grid;
   justify-items: center;
-  padding: 42px 24px 34px;
+  padding: 24px 20px 20px;
   text-align: center;
 }
 
@@ -388,24 +390,25 @@
 }
 
 .pilot-console__reward strong {
-  margin-top: 10px;
+  margin-top: 8px;
   color: var(--cyan);
   font-family: "Orbitron", sans-serif;
-  font-size: clamp(44px, 5vw, 64px);
+  font-size: clamp(38px, 4vw, 52px);
   line-height: 1;
   text-shadow: 0 0 22px rgba(52, 229, 232, 0.4);
 }
 
 .pilot-console__reward p {
-  margin-top: 10px;
+  margin-top: 8px;
   color: var(--muted);
+  font-size: 15px;
 }
 
 .pilot-console__window {
   display: grid;
   justify-items: center;
   gap: 5px;
-  padding: 20px 22px;
+  padding: 14px 18px;
   border-top: 1px solid var(--line);
   text-align: center;
 }
@@ -420,12 +423,12 @@
 .pilot-console__window strong {
   color: var(--text);
   font-family: "Orbitron", sans-serif;
-  font-size: 19px;
+  font-size: 18px;
 }
 
 .pilot-console__window p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .pilot-console__facts {
@@ -435,11 +438,11 @@
 }
 
 .pilot-console__facts > div {
-  min-height: 104px;
+  min-height: 82px;
   display: grid;
   align-content: center;
   gap: 6px;
-  padding: 18px 22px;
+  padding: 12px 16px;
 }
 
 .pilot-console__facts > div:nth-child(odd) {
@@ -465,9 +468,10 @@
 }
 
 .pilot-console__note {
-  padding: 20px 22px;
+  padding: 14px 18px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .product-showcase {

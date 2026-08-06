@@ -519,7 +519,7 @@ h3 {
 .steps-grid {
   display: grid;
   gap: 16px;
-  margin-top: 48px;
+  margin-top: 36px;
 }
 
 .landing-steps {
@@ -554,7 +554,7 @@ h3 {
 }
 
 .landing-page > .section {
-  padding-block: 84px;
+  padding-block: 72px;
 }
 
 .conversion-section {
@@ -1514,7 +1514,7 @@ h3 {
   }
 
   .landing-page > .section {
-    padding-block: 70px;
+    padding-block: 64px;
   }
 
   .info-page {
@@ -1587,7 +1587,7 @@ h3 {
   }
 
   .landing-page > .section {
-    padding-block: 58px;
+    padding-block: 56px;
   }
 
   .footer-grid {

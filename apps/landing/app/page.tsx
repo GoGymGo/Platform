@@ -59,15 +59,14 @@ const structuredData = [
   },
 ];
 
-function SeptemberChallengePanel({ statusLabel }: { statusLabel: string }) {
+function SeptemberChallengePanel() {
   return (
     <aside
       aria-label="September 2026 beta challenge details"
       className="pilot-console"
     >
       <div className="pilot-console__header">
-        <span>SEPTEMBER 2026 BETA</span>
-        <b>{statusLabel}</b>
+        <span>CHALLENGE SNAPSHOT</span>
       </div>
       <div className="pilot-console__reward">
         <span>ONE PUBLISHED REWARD</span>
@@ -98,9 +97,8 @@ function SeptemberChallengePanel({ statusLabel }: { statusLabel: string }) {
         </div>
       </dl>
       <p className="pilot-console__note">
-        {septemberCampaign.registrationNote} The app also confirms location,
-        published legal documents, and partner-gym eligibility before
-        enrollment.
+        Live availability, eligibility, and partner-gym status are confirmed in
+        the app before enrollment.
       </p>
     </aside>
   );
@@ -135,25 +133,16 @@ export default function Home() {
           <p className="hero-lede">
             {campaignState.phase === "ended" ? (
               <>
-                Set a weekly gym goal, verify real workouts, and turn
-                consistency into competition progress. The September 2026 beta
-                has ended, but regional updates remain open.
+                Build verified competition progress from weekly workouts. The
+                September 2026 beta has ended, but regional updates remain open.
               </>
             ) : (
               <>
-                Set a weekly gym goal, verify real workouts at partner gyms, and
-                turn consistency into competition progress.
+                Set a weekly goal, verify partner-gym workouts, and build
+                competition progress.
               </>
             )}
           </p>
-          {campaignState.phase !== "ended" ? (
-            <p className="hero-campaign-note">
-              The free September beta is open to eligible gym-goers age{" "}
-              {septemberCampaign.minimumAge}+ on {septemberCampaign.regionName},
-              with one {septemberCampaign.reward} reward sponsored by{" "}
-              {septemberCampaign.rewardSponsor}.
-            </p>
-          ) : null}
           <div className="hero-actions">
             {memberRegistrationAvailable ? (
               <AppLink
@@ -178,8 +167,7 @@ export default function Home() {
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                OUTSIDE THE PILOT REGION? GET REGIONAL UPDATES{" "}
-                <span aria-hidden="true">→</span>
+                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
               </Link>
             ) : (
               <Link className="button button-secondary" href={siteLinks.faq}>
@@ -187,24 +175,13 @@ export default function Home() {
               </Link>
             )}
           </div>
-          <p className="hero-action-note">
-            {memberRegistrationAvailable
-              ? "Registration and final eligibility checks happen in the member app. Regional updates do not create an account or competition entry."
-              : "Regional updates do not create an app account or competition entry."}
-          </p>
           <p className="hero-trust-signal">
             <span aria-hidden="true">✓</span>
             <strong>VERIFIED BEFORE CREDIT</strong>
-            Workouts are checked at eligible partner gyms. Pending activity
-            never appears as approved competition progress.
+            Partner-gym workouts count only after review.
           </p>
-          <ul aria-label="September beta essentials" className="hero-qualifiers">
-            <li>FREE TO JOIN</li>
-            <li>{septemberCampaign.minimumAge}+ PILOT</li>
-            <li>{septemberCampaign.minimumSessionMinutes}+ MIN VERIFIED</li>
-          </ul>
         </div>
-        <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
+        <SeptemberChallengePanel />
       </section>
 
       <section className="section shell" id="how-it-works">

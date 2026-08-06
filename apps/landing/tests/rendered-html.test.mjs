@@ -45,25 +45,26 @@ test("home offers direct next steps without repeating long feature sections", as
     read("app/site-links.ts"),
   ]);
 
-  assert.match(page, /with one \{septemberCampaign\.reward\} reward sponsored by/);
+  assert.match(page, /<strong>\{septemberCampaign\.reward\}<\/strong>/);
+  assert.match(page, /Sponsored by \{septemberCampaign\.rewardSponsor\}/);
   assert.match(page, /\{campaignState\.primaryLabel\}/);
   assert.match(page, /campaignState\.phase === "ended"/);
   assert.match(page, /siteLinks\.regionalUpdates/);
   assert.match(page, /siteLinks\.officialRules/);
   assert.match(page, /className="eyebrow campaign-status"/);
-  assert.match(page, /Registration and final eligibility checks happen in the member app/);
-  assert.match(page, /Regional updates do not create an account or competition entry/);
-  assert.match(page, /aria-label="September beta essentials" className="hero-qualifiers"/);
+  assert.match(page, /Set a weekly goal, verify partner-gym workouts/);
+  assert.doesNotMatch(page, /hero-campaign-note|hero-action-note|hero-qualifiers/);
   assert.equal(
     (page.match(/OUTSIDE THE PILOT REGION\? GET REGIONAL UPDATES/g) ?? []).length,
-    2,
+    1,
   );
   assert.match(page, /className="hero-trust-signal"/);
-  assert.match(page, /Pending activity\s+never appears as approved competition progress/);
+  assert.match(page, /Partner-gym workouts count only after review/);
+  assert.match(page, /Live availability, eligibility, and partner-gym status are confirmed/);
   assert.match(page, /className="section conversion-section"/);
   assert.doesNotMatch(page, /proof-strip|proof-grid|brand-teaser-section|final-cta/);
   assert.match(page, /<details className="campaign-details">/);
-  assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ MIN/);
+  assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ minutes/);
   assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
   assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
@@ -141,7 +142,8 @@ test("the retired eligibility checker stays local-only and the homepage sends de
   ]);
 
   assert.doesNotMatch(page, /<EligibilityCheck \/>/);
-  assert.match(page, /Registration and final eligibility checks happen in the member app/);
+  assert.match(page, /analyticsEvent="member_app_click"/);
+  assert.match(page, /href=\{siteLinks\.memberApp\}/);
   assert.match(checker, /private on-page check is not saved/);
   assert.match(checker, /has not published a public partner-gym directory/);
   assert.match(checker, /name="age"/);
@@ -326,8 +328,7 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(globals, /\.contact-grid \{[\s\S]*?repeat\(2/);
   assert.match(globals, /\.faq-item summary \{/);
   assert.match(experience, /scroll-snap-type: x mandatory/);
-  assert.match(experience, /\.hero-qualifiers \{/);
-  assert.match(experience, /\.hero-qualifiers li \{/);
+  assert.doesNotMatch(experience, /hero-campaign-note|hero-action-note|hero-qualifiers/);
   assert.match(experience, /\.hero-fallback-link \{[\s\S]*?min-height: 54px/);
   assert.match(experience, /\.hero-trust-signal \{/);
   assert.match(experience, /min-height: min\(760px, calc\(100svh - 76px\)\)/);

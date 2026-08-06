@@ -45,15 +45,17 @@ test("home offers direct next steps without repeating long feature sections", as
     read("app/site-links.ts"),
   ]);
 
-  assert.match(page, /compete for one \{septemberCampaign\.reward\} reward/);
+  assert.match(page, /with one \{septemberCampaign\.reward\} reward sponsored by/);
   assert.match(page, /\{campaignState\.primaryLabel\}/);
   assert.match(page, /campaignState\.phase === "ended"/);
   assert.match(page, /siteLinks\.regionalUpdates/);
   assert.match(page, /siteLinks\.officialRules/);
   assert.match(page, /className="eyebrow campaign-status"/);
-  assert.match(page, /Registration and competition entry continue in the member app/);
-  assert.match(page, /Regional updates do not create an app account/);
-  assert.match(page, /aria-label="Important eligibility notes" className="hero-qualifiers"/);
+  assert.match(page, /Registration and final eligibility checks happen in the member app/);
+  assert.match(page, /Regional updates do not create an account or competition entry/);
+  assert.match(page, /aria-label="September beta essentials" className="hero-qualifiers"/);
+  assert.match(page, /OUTSIDE THE PILOT REGION\? GET UPDATES/);
+  assert.match(page, /<details className="campaign-details">/);
   assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ MIN/);
   assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
@@ -121,15 +123,15 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(layout, /tabIndex=\{-1\}/);
 });
 
-test("eligibility guidance is local-only, honest about gym availability, and app-confirmed", async () => {
+test("the retired eligibility checker stays local-only and the homepage sends decisions to the app", async () => {
   const [page, checker, appLink] = await Promise.all([
     read("app/page.tsx"),
     read("app/components/EligibilityCheck.tsx"),
     read("app/components/AppLink.tsx"),
   ]);
 
-  assert.match(page, /<EligibilityCheck \/>/);
-  assert.match(page, /campaignState\.phase !== "ended"/);
+  assert.doesNotMatch(page, /<EligibilityCheck \/>/);
+  assert.match(page, /Registration and final eligibility checks happen in the member app/);
   assert.match(checker, /private on-page check is not saved/);
   assert.match(checker, /has not published a public partner-gym directory/);
   assert.match(checker, /name="age"/);
@@ -316,7 +318,8 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(experience, /scroll-snap-type: x mandatory/);
   assert.match(experience, /\.hero-qualifiers \{/);
   assert.match(experience, /\.hero-qualifiers li \{/);
-  assert.match(experience, /\.hero-qualifiers a \{[\s\S]*?min-height: 44px/);
+  assert.match(experience, /\.hero-fallback-link \{[\s\S]*?min-height: 54px/);
+  assert.match(experience, /\.campaign-details summary \{[\s\S]*?min-height: 72px/);
   assert.match(experience, /grid-template-columns: repeat\(2, minmax\(min\(82vw, 360px\), 1fr\)\)/);
 });
 

@@ -98,7 +98,14 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /aria-current=\{section === item\.id \? "page"/);
   assert.match(dashboard, /className="page-context"/);
   assert.match(dashboard, /aria-labelledby=\{titleId\}/);
-  assert.match(dashboard, /event\.key === "Escape"/);
+  assert.match(dashboard, /<dialog/);
+  assert.match(dashboard, /showModal\(\)/);
+  assert.match(dashboard, /onCancel=/);
+  assert.match(dashboard, /PUBLISH BLOCKED/);
+  assert.match(dashboard, /Filter competitions/);
+  assert.match(dashboard, /Filter rewards/);
+  assert.match(dashboard, /Filter work queue/);
+  assert.match(dashboard, /Filter audit history/);
   assert.match(dashboard, /No regional policies configured/);
   assert.match(dashboard, /No legal documents published/);
   assert.match(dashboard, /No audit events recorded/);
@@ -139,7 +146,9 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(styles, /\.sign-in-panel \{[\s\S]*order: -1/);
   assert.match(styles, /--body: Inter, ui-sans-serif/);
   assert.match(styles, /--muted: #a0b6bd/);
-  assert.match(styles, /grid-template-columns: repeat\(8, minmax\(40px, 1fr\)\)/);
+  assert.match(styles, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.table-wrap th:last-child,[\s\S]*?position: sticky/);
+  assert.match(styles, /\.primary-button,[\s\S]*?min-height: 44px/);
   assert.match(styles, /\.table-wrap:focus-visible/);
 
   assert.match(layout, /GoGymGo Admin/);

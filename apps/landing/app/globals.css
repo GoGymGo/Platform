@@ -594,6 +594,11 @@ h3 {
   background: radial-gradient(circle at 80% 35%, rgba(255, 45, 155, 0.08), transparent 30rem);
 }
 
+.brand-teaser-section,
+.final-cta {
+  padding-block: 82px;
+}
+
 .brand-teaser {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(360px, 0.65fr);
@@ -1611,11 +1616,16 @@ h3 {
   }
 
   .brand-teaser {
-    gap: 42px;
+    gap: 30px;
   }
 
   .final-cta {
-    gap: 34px;
+    gap: 28px;
+  }
+
+  .brand-teaser-section,
+  .final-cta {
+    padding-block: 58px;
   }
 
   .footer-grid {

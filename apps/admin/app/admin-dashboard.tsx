@@ -103,6 +103,13 @@ const navigation: {
   },
 ];
 
+const mobilePrimarySections = new Set<AdminSection>([
+  "overview",
+  "pilot",
+  "competitions",
+  "operations",
+]);
+
 const creatorFeaturesEnabled = false;
 
 const emptyPilotData: PilotData = {
@@ -140,6 +147,106 @@ function BrandWordmark() {
   );
 }
 
+function MobileAdminNavigation({
+  onNavigate,
+  section,
+}: {
+  onNavigate: (section: AdminSection) => void;
+  section: AdminSection;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const primaryItems = navigation.filter((item) =>
+    mobilePrimarySections.has(item.id),
+  );
+  const secondaryItems = navigation.filter(
+    (item) => !mobilePrimarySections.has(item.id),
+  );
+  const secondaryActive = secondaryItems.some((item) => item.id === section);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (moreOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!moreOpen && dialog.open) {
+      dialog.close();
+      moreButtonRef.current?.focus();
+    }
+  }, [moreOpen]);
+
+  function navigate(nextSection: AdminSection) {
+    onNavigate(nextSection);
+    setMoreOpen(false);
+  }
+
+  return (
+    <nav aria-label="Primary admin sections" className="mobile-admin-navigation">
+      {primaryItems.map((item) => (
+        <button
+          aria-current={section === item.id ? "page" : undefined}
+          className={section === item.id ? "mobile-nav-item active" : "mobile-nav-item"}
+          key={item.id}
+          onClick={() => navigate(item.id)}
+          type="button"
+        >
+          <span>{item.short}</span>
+          <small>{item.label}</small>
+        </button>
+      ))}
+      <button
+        aria-expanded={moreOpen}
+        className={secondaryActive ? "mobile-nav-item active" : "mobile-nav-item"}
+        onClick={() => setMoreOpen(true)}
+        ref={moreButtonRef}
+        type="button"
+      >
+        <span>••</span>
+        <small>More</small>
+      </button>
+      <dialog
+        aria-labelledby="mobile-admin-more-title"
+        className="mobile-admin-more"
+        onCancel={(event) => {
+          event.preventDefault();
+          setMoreOpen(false);
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setMoreOpen(false);
+        }}
+        ref={dialogRef}
+      >
+        <div>
+          <header>
+            <span id="mobile-admin-more-title">MORE ADMIN SECTIONS</span>
+            <button
+              aria-label="Close more admin sections"
+              onClick={() => setMoreOpen(false)}
+              type="button"
+            >
+              ×
+            </button>
+          </header>
+          {secondaryItems.map((item) => (
+            <button
+              aria-current={section === item.id ? "page" : undefined}
+              className={section === item.id ? "active" : undefined}
+              key={item.id}
+              onClick={() => navigate(item.id)}
+              type="button"
+            >
+              <span>{item.short}</span>
+              <strong>{item.label}</strong>
+              <small>{item.description}</small>
+            </button>
+          ))}
+        </div>
+      </dialog>
+    </nav>
+  );
+}
+
 const defaultCompetitionRules = {
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
   minHeartRateSamples: 10,
@@ -170,6 +277,7 @@ export function AdminDashboard({
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [queue, setQueue] = useState<WorkQueueItem[]>([]);
   const [pilotData, setPilotData] = useState<PilotData>(emptyPilotData);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [loadError, setLoadError] = useState(
     firebaseConfigured
       ? ""
@@ -254,6 +362,7 @@ export function AdminDashboard({
         sessions,
         waitlist,
       });
+      setLastRefreshedAt(new Date());
       setAuthStage("ready");
     } catch (error) {
       const status =
@@ -352,6 +461,7 @@ export function AdminDashboard({
     setHealth(null);
     setQueue([]);
     setPilotData(emptyPilotData);
+    setLastRefreshedAt(null);
     setAuthStage("signed-out");
   }
 
@@ -406,7 +516,7 @@ export function AdminDashboard({
             <small>ADMIN CONTROL</small>
           </span>
         </div>
-        <nav aria-label="Admin sections">
+        <nav aria-label="Admin sections" className="desktop-admin-navigation">
           {navigation.map((item) => (
             <button
               aria-current={section === item.id ? "page" : undefined}
@@ -422,6 +532,7 @@ export function AdminDashboard({
             </button>
           ))}
         </nav>
+        <MobileAdminNavigation onNavigate={setSection} section={section} />
         <div className="sidebar-footer">
           <div className="admin-identity">
             <span className="presence-dot" />
@@ -450,18 +561,39 @@ export function AdminDashboard({
             >
               <span aria-hidden="true" />
               WORKER {health?.worker.status.toUpperCase() ?? "UNKNOWN"}
+              {health?.worker.heartbeatAgeSeconds === null ||
+              health?.worker.heartbeatAgeSeconds === undefined
+                ? ""
+                : ` · ${health.worker.heartbeatAgeSeconds}s`}
             </span>
-            <button
-              aria-label={busy ? "Refreshing dashboard data" : "Refresh dashboard data"}
-              className="icon-button"
-              disabled={busy}
-              onClick={() => {
-                if (user) void refresh(user);
-              }}
-              type="button"
-            >
-              {busy ? "SYNCING" : "REFRESH"}
-            </button>
+            <div className="refresh-control">
+              <span aria-live="polite" className="refresh-time">
+                {lastRefreshedAt ? (
+                  <>
+                    UPDATED{" "}
+                    <time dateTime={lastRefreshedAt.toISOString()}>
+                      {lastRefreshedAt.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </>
+                ) : (
+                  "NOT YET SYNCED"
+                )}
+              </span>
+              <button
+                aria-label={busy ? "Refreshing dashboard data" : "Refresh dashboard data"}
+                className="icon-button"
+                disabled={busy}
+                onClick={() => {
+                  if (user) void refresh(user);
+                }}
+                type="button"
+              >
+                {busy ? "SYNCING" : "REFRESH"}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -660,7 +792,11 @@ export function AdminDashboard({
             />
           ) : null}
           {section === "operations" ? (
-            <OperationsPanel health={health} queue={queue} />
+            <OperationsPanel
+              health={health}
+              onNavigate={setSection}
+              queue={queue}
+            />
           ) : null}
           {section === "audit" ? (
             <AuditPanel events={snapshot.auditEvents} />
@@ -854,11 +990,12 @@ function SignInScreen({
             </p>
           </div>
         ) : null}
-        {error ? <p className="form-error">{error}</p> : null}
+        {error && firebaseConfigured ? <p className="form-error">{error}</p> : null}
         {!firebaseConfigured ? (
-          <p className="configuration-note">
-            This build needs the existing GoGymGo Firebase web configuration
-            before administrator sign-in can start.
+          <p className="configuration-note" role="status">
+            Firebase sign-in has not been configured for this dashboard build.
+            Add the existing GoGymGo Firebase web configuration before
+            administrator sign-in can start.
           </p>
         ) : denied && onSignOut ? (
           <button
@@ -926,29 +1063,69 @@ function Overview({
   const draftRewards = snapshot.rewards.filter(
     (reward) => reward.status === "draft",
   ).length;
+  const healthNeedsAttention =
+    health?.database !== "ok" ||
+    (health?.worker.status !== "healthy" && health?.worker.status !== "starting");
+  const attentionCount = queue.length + (healthNeedsAttention ? 1 : 0);
   return (
     <>
-      <section className="hero-panel">
+      <section
+        className={attentionCount > 0 ? "hero-panel attention" : "hero-panel"}
+      >
         <div>
-          <p className="eyebrow">GO GYM GO // CONTROL DECK</p>
+          <p className="eyebrow">
+            {attentionCount > 0 ? "OPERATOR PRIORITY" : "LAUNCH STATUS"}
+          </p>
           <h2>
-            {activeCompetition
+            {queue.length > 0
+              ? `${queue.length} review item${queue.length === 1 ? "" : "s"} need attention.`
+              : healthNeedsAttention
+                ? "System health needs review."
+                : activeCompetition
               ? "A competition is live."
               : publishReady.length > 0
                 ? "Ready for a controlled launch."
                 : "Build the next competition."}
           </h2>
           <p>
-            {activeCompetition
+            {queue.length > 0
+              ? "Open the human review queue first, then return to launch and publication work."
+              : healthNeedsAttention
+                ? "Check the worker heartbeat and queue health before making publication changes."
+                : activeCompetition
               ? `${activeCompetition.name} is ${activeCompetition.status} with ${activeCompetition.enrollmentCount} enrolled players.`
               : publishReady.length > 0
                 ? `${publishReady[0].name} has a published reward and can be released after your final review.`
                 : "No competition is currently public. Add and publish a real reward before releasing a draft to players."}
           </p>
+          <div className="hero-panel-actions">
+            {queue.length > 0 || healthNeedsAttention ? (
+              <button
+                className="primary-button"
+                onClick={() => onNavigate("operations")}
+                type="button"
+              >
+                REVIEW OPERATIONS
+              </button>
+            ) : null}
+            <button
+              className="secondary-button"
+              onClick={() => onNavigate("competitions")}
+              type="button"
+            >
+              OPEN COMPETITIONS
+            </button>
+          </div>
         </div>
         <div className="hero-signal">
-          <span>{activeCompetition ? "LIVE" : "SAFE"}</span>
-          <small>{activeCompetition ? "PUBLIC STATE" : "NO PUBLIC CONTEST"}</small>
+          <span>{attentionCount > 0 ? String(attentionCount).padStart(2, "0") : activeCompetition ? "LIVE" : "SAFE"}</span>
+          <small>
+            {attentionCount > 0
+              ? "ATTENTION ITEMS"
+              : activeCompetition
+                ? "PUBLIC STATE"
+                : "NO PUBLIC CONTEST"}
+          </small>
         </div>
       </section>
       <section className="metric-grid">
@@ -1100,6 +1277,23 @@ function CompetitionsPanel({
     action: "cancel" | "publish",
   ) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredCompetitions = competitions.filter((competition) => {
+    const matchesStatus =
+      statusFilter === "all" || competition.status === statusFilter;
+    const matchesQuery =
+      !normalizedQuery ||
+      [competition.name, competition.regionName, competition.monthKey]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    return matchesStatus && matchesQuery;
+  });
+  const statusOptions = Array.from(
+    new Set(competitions.map((competition) => competition.status)),
+  );
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -1112,19 +1306,57 @@ function CompetitionsPanel({
           + NEW COMPETITION
         </button>
       </div>
+      {competitions.length > 0 ? (
+        <div aria-label="Filter competitions" className="panel-toolbar" role="search">
+          <label className="filter-field">
+            <span>SEARCH</span>
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Name, region or month"
+              type="search"
+              value={query}
+            />
+          </label>
+          <label className="filter-field compact">
+            <span>STATUS</span>
+            <select
+              onChange={(event) => setStatusFilter(event.target.value)}
+              value={statusFilter}
+            >
+              <option value="all">All statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
       {competitions.length === 0 ? (
         <EmptyState
           body="Start with a region, schedule, rules and weekly goal options."
           title="No competitions yet"
         />
+      ) : filteredCompetitions.length === 0 ? (
+        <EmptyState
+          body="Try a different search term or status filter."
+          title="No competitions match"
+        />
       ) : (
         <div className="card-list">
-          {competitions.map((competition) => {
+          {filteredCompetitions.map((competition) => {
             const ended = new Date(competition.endsAt) <= new Date();
             const canPublish =
               competition.status === "draft" &&
               !ended &&
               competition.publishedRewardCount > 0;
+            const publishGateId = `competition-${competition.id}-publish-gate`;
+            const publishBlocker = ended
+              ? "The player window has ended."
+              : competition.publishedRewardCount === 0
+                ? "Publish at least one eligible reward first."
+                : "Complete the remaining launch review.";
             return (
               <article className="competition-card" key={competition.id}>
                 <div className="card-title-row">
@@ -1175,6 +1407,12 @@ function CompetitionsPanel({
                     </strong>
                   </div>
                 </div>
+                {competition.status === "draft" && !canPublish ? (
+                  <p className="action-guidance" id={publishGateId}>
+                    <strong>PUBLISH BLOCKED</strong>
+                    {publishBlocker}
+                  </p>
+                ) : null}
                 <div className="card-actions">
                   {competition.status === "draft" ? (
                     <button
@@ -1188,13 +1426,9 @@ function CompetitionsPanel({
                   {competition.status === "draft" ? (
                     <button
                       className="primary-button"
+                      aria-describedby={!canPublish ? publishGateId : undefined}
                       disabled={!canPublish}
                       onClick={() => onStatus(competition, "publish")}
-                      title={
-                        canPublish
-                          ? "Publish this competition"
-                          : "At least one eligible published reward is required"
-                      }
                       type="button"
                     >
                       PUBLISH
@@ -1232,6 +1466,21 @@ function RewardsPanel({
   onStatus: (reward: Reward, action: "archive" | "publish") => void;
   rewards: Reward[];
 }) {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRewards = rewards.filter((reward) => {
+    const matchesStatus =
+      statusFilter === "all" || reward.status === statusFilter;
+    const matchesQuery =
+      !normalizedQuery ||
+      [reward.title, reward.sponsorName, reward.competitionName]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    return matchesStatus && matchesQuery;
+  });
+  const statusOptions = Array.from(new Set(rewards.map((reward) => reward.status)));
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -1244,10 +1493,42 @@ function RewardsPanel({
           + NEW REWARD
         </button>
       </div>
+      {rewards.length > 0 ? (
+        <div aria-label="Filter rewards" className="panel-toolbar" role="search">
+          <label className="filter-field">
+            <span>SEARCH</span>
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Reward, sponsor or competition"
+              type="search"
+              value={query}
+            />
+          </label>
+          <label className="filter-field compact">
+            <span>STATUS</span>
+            <select
+              onChange={(event) => setStatusFilter(event.target.value)}
+              value={statusFilter}
+            >
+              <option value="all">All statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
       {rewards.length === 0 ? (
         <EmptyState
           body="Create the first verified brand reward, then publish it before releasing a competition."
           title="No brand rewards configured"
+        />
+      ) : filteredRewards.length === 0 ? (
+        <EmptyState
+          body="Try a different search term or status filter."
+          title="No rewards match"
         />
       ) : (
         <div aria-label="Rewards table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
@@ -1263,9 +1544,10 @@ function RewardsPanel({
               </tr>
             </thead>
             <tbody>
-              {rewards.map((reward) => {
+              {filteredRewards.map((reward) => {
                 const couponReady =
                   reward.rewardType !== "coupon" || reward.couponCodeCount > 0;
+                const publishGateId = `reward-${reward.id}-publish-gate`;
                 return (
                   <tr key={reward.id}>
                     <td>
@@ -1306,19 +1588,22 @@ function RewardsPanel({
                           </button>
                         ) : null}
                         {reward.status === "draft" ? (
-                          <button
-                            className="text-button accent"
-                            disabled={!couponReady}
-                            onClick={() => onStatus(reward, "publish")}
-                            title={
-                              couponReady
-                                ? "Publish reward"
-                                : "Coupon codes are required before publication"
-                            }
-                            type="button"
-                          >
-                            Publish
-                          </button>
+                          <>
+                            {!couponReady ? (
+                              <span className="action-guidance compact" id={publishGateId}>
+                                Add coupon codes before publishing.
+                              </span>
+                            ) : null}
+                            <button
+                              aria-describedby={!couponReady ? publishGateId : undefined}
+                              className="text-button accent"
+                              disabled={!couponReady}
+                              onClick={() => onStatus(reward, "publish")}
+                              type="button"
+                            >
+                              Publish
+                            </button>
+                          </>
                         ) : null}
                         {reward.status === "published" ? (
                           <button
@@ -1584,11 +1869,23 @@ function ContentPanel({
 
 function OperationsPanel({
   health,
+  onNavigate,
   queue,
 }: {
   health: SystemHealth | null;
+  onNavigate: (section: AdminSection) => void;
   queue: WorkQueueItem[];
 }) {
+  const [kindFilter, setKindFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const kindOptions = Array.from(new Set(queue.map((item) => item.kind)));
+  const filteredQueue = queue.filter(
+    (item) => kindFilter === "all" || item.kind === kindFilter,
+  );
+  const selectedItem = queue.find((item) => item.id === selectedId) ?? null;
+  const selectedDestination = selectedItem
+    ? queueDestination(selectedItem.kind)
+    : null;
   return (
     <div className="section-stack">
       <section className="metric-grid">
@@ -1608,31 +1905,131 @@ function OperationsPanel({
           <div>
             <p className="eyebrow">HUMAN REVIEW QUEUE</p>
             <h2>Items requiring attention</h2>
-            <p>Review flagged operational records in priority order.</p>
+            <p>Select a record to see its routing details and next step.</p>
           </div>
         </div>
+        {queue.length > 0 ? (
+          <div aria-label="Filter work queue" className="panel-toolbar compact" role="search">
+            <label className="filter-field compact">
+              <span>ITEM TYPE</span>
+              <select
+                onChange={(event) => setKindFilter(event.target.value)}
+                value={kindFilter}
+              >
+                <option value="all">All review types</option>
+                {kindOptions.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
         {queue.length === 0 ? (
           <EmptyState body="Nothing is waiting for operator review." title="Queue clear" />
+        ) : filteredQueue.length === 0 ? (
+          <EmptyState
+            body="Choose another review type to see queued records."
+            title="No items match"
+          />
         ) : (
-          <div className="compact-list">
-            {queue.map((item) => (
-              <div className="compact-row" key={`${item.kind}-${item.id}`}>
-                <div>
-                  <span className={`status-dot ${item.status}`} />
-                  <strong>{item.kind.replaceAll("_", " ")}</strong>
-                  <small>
-                    {item.regionCode ? `${item.regionCode} · ` : ""}
-                    {formatDateTime(item.createdAt)}
-                  </small>
+          <div className="queue-workspace">
+            <div className="compact-list">
+              {filteredQueue.map((item) => (
+                <button
+                  aria-pressed={selectedId === item.id}
+                  className={
+                    selectedId === item.id
+                      ? "compact-row queue-row selected"
+                      : "compact-row queue-row"
+                  }
+                  key={`${item.kind}-${item.id}`}
+                  onClick={() => setSelectedId(item.id)}
+                  type="button"
+                >
+                  <div>
+                    <span className={`status-dot ${item.status}`} />
+                    <strong>{item.kind.replaceAll("_", " ")}</strong>
+                    <small>
+                      {item.regionCode ? `${item.regionCode} · ` : ""}
+                      {formatDateTime(item.createdAt)}
+                    </small>
+                  </div>
+                  <span>
+                    <span className={`status-tag ${item.status}`}>{item.status}</span>
+                    <small className="queue-row-action">REVIEW →</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <aside aria-live="polite" className="queue-review-panel">
+              {selectedItem ? (
+                <>
+                  <p className="eyebrow">SELECTED REVIEW ITEM</p>
+                  <h3>{selectedItem.kind.replaceAll("_", " ")}</h3>
+                  <dl>
+                    <div>
+                      <dt>STATUS</dt>
+                      <dd>{selectedItem.status.replaceAll("_", " ")}</dd>
+                    </div>
+                    <div>
+                      <dt>CREATED</dt>
+                      <dd>{formatDateTime(selectedItem.createdAt)}</dd>
+                    </div>
+                    {selectedItem.regionCode ? (
+                      <div>
+                        <dt>REGION</dt>
+                        <dd>{selectedItem.regionCode}</dd>
+                      </div>
+                    ) : null}
+                    {selectedItem.verificationMethod ? (
+                      <div>
+                        <dt>VERIFICATION</dt>
+                        <dd>{selectedItem.verificationMethod.replaceAll("_", " ")}</dd>
+                      </div>
+                    ) : null}
+                    <div className="wide">
+                      <dt>RECORD ID</dt>
+                      <dd className="record-id">{selectedItem.id}</dd>
+                    </div>
+                  </dl>
+                  {selectedDestination ? (
+                    <button
+                      className="primary-button full"
+                      onClick={() => onNavigate(selectedDestination)}
+                      type="button"
+                    >
+                      OPEN {navigation.find((item) => item.id === selectedDestination)?.label.toUpperCase()}
+                    </button>
+                  ) : (
+                    <p className="queue-review-note">
+                      Keep this record ID visible while completing the authorized
+                      review action, then refresh the queue.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="queue-review-empty">
+                  <span>→</span>
+                  <strong>Select a queue item</strong>
+                  <p>Its status, routing details, and record ID will appear here.</p>
                 </div>
-                <span className={`status-tag ${item.status}`}>{item.status}</span>
-              </div>
-            ))}
+              )}
+            </aside>
           </div>
         )}
       </section>
     </div>
   );
+}
+
+function queueDestination(kind: string): AdminSection | null {
+  if (kind === "workout_session" || kind === "partner_application") {
+    return "pilot";
+  }
+  if (kind === "region_verification") return "regions";
+  return null;
 }
 
 function MetricCard({
@@ -1652,6 +2049,23 @@ function MetricCard({
 }
 
 function AuditPanel({ events }: { events: AuditEvent[] }) {
+  const [query, setQuery] = useState("");
+  const [actorFilter, setActorFilter] = useState("all");
+  const normalizedQuery = query.trim().toLowerCase();
+  const actorOptions = Array.from(
+    new Set(events.map((event) => event.actorEmail || "SYSTEM")),
+  );
+  const filteredEvents = events.filter((event) => {
+    const actor = event.actorEmail || "SYSTEM";
+    const matchesActor = actorFilter === "all" || actor === actorFilter;
+    const matchesQuery =
+      !normalizedQuery ||
+      [event.action, event.reason, event.entityType, event.entityId, actor]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    return matchesActor && matchesQuery;
+  });
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -1661,14 +2075,46 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
           <p>The latest 100 administrative decisions, including who acted and why.</p>
         </div>
       </div>
+      {events.length > 0 ? (
+        <div aria-label="Filter audit history" className="panel-toolbar" role="search">
+          <label className="filter-field">
+            <span>SEARCH</span>
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Action, reason, entity or record ID"
+              type="search"
+              value={query}
+            />
+          </label>
+          <label className="filter-field compact">
+            <span>ACTOR</span>
+            <select
+              onChange={(event) => setActorFilter(event.target.value)}
+              value={actorFilter}
+            >
+              <option value="all">All actors</option>
+              {actorOptions.map((actor) => (
+                <option key={actor} value={actor}>
+                  {actor}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
       {events.length === 0 ? (
         <EmptyState
           body="Administrative decisions will appear here after the first recorded change."
           title="No audit events recorded"
         />
+      ) : filteredEvents.length === 0 ? (
+        <EmptyState
+          body="Try a different search term or actor filter."
+          title="No audit events match"
+        />
       ) : (
         <div className="timeline">
-          {events.map((event) => (
+          {filteredEvents.map((event) => (
             <article key={event.id}>
               <div aria-hidden="true" className="timeline-node" />
               <div>
@@ -2331,41 +2777,35 @@ function ModalShell({
   onClose: () => void;
   title: string;
 }) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const onCloseRef = useRef(onClose);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
   useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCloseRef.current();
-    };
-
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleKeyDown);
-    dialogRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
+      if (dialog?.open) dialog.close();
       previouslyFocused?.focus();
     };
   }, []);
 
   return (
-    <div className="modal-backdrop" role="presentation">
+    <dialog
+      aria-labelledby={titleId}
+      className="modal-backdrop"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      ref={dialogRef}
+    >
       <section
-        aria-labelledby={titleId}
-        aria-modal="true"
         className={compact ? "modal compact-modal" : "modal"}
-        ref={dialogRef}
-        role="dialog"
-        tabIndex={-1}
       >
         <header>
           <div>
@@ -2378,7 +2818,7 @@ function ModalShell({
         </header>
         {children}
       </section>
-    </div>
+    </dialog>
   );
 }
 

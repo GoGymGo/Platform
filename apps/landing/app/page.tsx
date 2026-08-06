@@ -1,25 +1,24 @@
 import Link from "next/link";
 import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
 import { AppLink } from "./components/AppLink";
-import { EligibilityCheck } from "./components/EligibilityCheck";
 import { ProductScreens } from "./components/ProductScreens";
 import { siteLinks } from "./site-links";
 
 const steps = [
   {
     number: "01",
-    title: "Confirm you are eligible",
-    copy: `The September beta is for gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}. The app confirms region and current rules before enrollment.`,
+    title: "Choose your weekly goal",
+    copy: `Commit to ${septemberCampaign.weeklyGoalRange} per scoring week so every verified workout has a clear purpose.`,
   },
   {
     number: "02",
-    title: "Choose a Weekly Goal",
-    copy: `Commit to ${septemberCampaign.weeklyGoalRange} per scoring week. Your choice is locked for the September competition.`,
+    title: "Verify the workout",
+    copy: `Scan an active partner-gym poster when you arrive and again after at least ${septemberCampaign.minimumSessionMinutes} minutes.`,
   },
   {
     number: "03",
-    title: "Verify each workout",
-    copy: `At an approved partner gym, scan the same poster on entry and after at least ${septemberCampaign.minimumSessionMinutes} minutes with a fresh location reading.`,
+    title: "Build competition progress",
+    copy: "Approved sessions count toward your goal and published competition results—without presenting pending activity as credit.",
   },
 ];
 
@@ -136,18 +135,25 @@ export default function Home() {
           <p className="hero-lede">
             {campaignState.phase === "ended" ? (
               <>
-                The September 2026 beta has ended. Review how the pilot worked
-                or request updates about future availability in your region.
+                Set a weekly gym goal, verify real workouts, and turn
+                consistency into competition progress. The September 2026 beta
+                has ended, but regional updates remain open.
               </>
             ) : (
               <>
-                Eligible gym-goers age {septemberCampaign.minimumAge}+ on{" "}
-                {septemberCampaign.regionName} can join the free September beta
-                and compete for one {septemberCampaign.reward} reward sponsored
-                by {septemberCampaign.rewardSponsor}.
+                Set a weekly gym goal, verify real workouts at partner gyms, and
+                turn consistency into competition progress.
               </>
             )}
           </p>
+          {campaignState.phase !== "ended" ? (
+            <p className="hero-campaign-note">
+              The free September beta is open to eligible gym-goers age{" "}
+              {septemberCampaign.minimumAge}+ on {septemberCampaign.regionName},
+              with one {septemberCampaign.reward} reward sponsored by{" "}
+              {septemberCampaign.rewardSponsor}.
+            </p>
+          ) : null}
           <div className="hero-actions">
             {memberRegistrationAvailable ? (
               <AppLink
@@ -168,11 +174,12 @@ export default function Home() {
             )}
             {memberRegistrationAvailable ? (
               <Link
-                className="button button-secondary"
+                className="hero-fallback-link"
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                GET REGIONAL UPDATES <span aria-hidden="true">→</span>
+                OUTSIDE THE PILOT REGION? GET UPDATES{" "}
+                <span aria-hidden="true">→</span>
               </Link>
             ) : (
               <Link className="button button-secondary" href={siteLinks.faq}>
@@ -182,18 +189,13 @@ export default function Home() {
           </div>
           <p className="hero-action-note">
             {memberRegistrationAvailable
-              ? "Registration and competition entry continue in the member app. Regional updates do not create an app account."
+              ? "Registration and final eligibility checks happen in the member app. Regional updates do not create an account or competition entry."
               : "Regional updates do not create an app account or competition entry."}
           </p>
-          <ul aria-label="Important eligibility notes" className="hero-qualifiers">
-            <li>NO PURCHASE REQUIRED</li>
-            <li>APPROVED PARTNER GYM REQUIRED</li>
-            <li>REGIONAL RULES APPLY</li>
-            <li>
-              <AppLink href={siteLinks.officialRules}>
-                READ OFFICIAL RULES
-              </AppLink>
-            </li>
+          <ul aria-label="September beta essentials" className="hero-qualifiers">
+            <li>FREE TO JOIN</li>
+            <li>{septemberCampaign.minimumAge}+ PILOT</li>
+            <li>{septemberCampaign.minimumSessionMinutes}+ MIN VERIFIED</li>
           </ul>
         </div>
         <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
@@ -223,17 +225,15 @@ export default function Home() {
         </div>
       </section>
 
-      {campaignState.phase !== "ended" ? <EligibilityCheck /> : null}
-
       <section className="section shell" id="how-it-works">
         <div className="section-heading">
           <div>
             <p className="eyebrow">HOW GOGYMGO WORKS</p>
-            <h2>Three steps from eligibility to a verified workout.</h2>
+            <h2>Three steps from intention to verified progress.</h2>
           </div>
           <p>
-            Registration and competition eligibility are confirmed in the app.
-            Joining the regional update list does not register you for the beta.
+            The member app keeps your goal, session verification, and published
+            results in one clear flow.
           </p>
         </div>
         <div className="steps-grid landing-steps">
@@ -247,41 +247,47 @@ export default function Home() {
         </div>
       </section>
 
+      <ProductScreens />
+
       <section className="section transparency-section" id="pilot-transparency">
         <div className="shell">
           <div className="section-heading">
             <div>
               <p className="eyebrow">PILOT TRANSPARENCY // PUBLISHED FACTS</p>
-              <h2>What is fixed—and what is confirmed in the app.</h2>
+              <h2>Clear rules without crowding the experience.</h2>
             </div>
             <p>
-              These are the public September facts. The published Official
-              Contest Rules control if a summary differs.
+              Review the published pilot facts when you need them. The member
+              app remains authoritative for live availability and eligibility.
             </p>
           </div>
-          <div className="transparency-grid">
-            {transparencyFacts.map((fact) => (
-              <article className="transparency-card" key={fact.title}>
-                <h3>{fact.title}</h3>
-                <p>{fact.copy}</p>
-              </article>
-            ))}
-          </div>
-          <div className="transparency-actions">
-            <AppLink
-              className="button button-secondary"
-              href={siteLinks.officialRules}
-            >
-              READ OFFICIAL CONTEST RULES
-            </AppLink>
-            <AppLink className="text-link" href={siteLinks.privacy}>
-              REVIEW THE PRIVACY POLICY
-            </AppLink>
-          </div>
+          <details className="campaign-details">
+            <summary>
+              <span>REVIEW SEPTEMBER PILOT FACTS</span>
+              <b>4 FACTS + OFFICIAL LINKS</b>
+            </summary>
+            <div className="transparency-grid">
+              {transparencyFacts.map((fact) => (
+                <article className="transparency-card" key={fact.title}>
+                  <h3>{fact.title}</h3>
+                  <p>{fact.copy}</p>
+                </article>
+              ))}
+            </div>
+            <div className="transparency-actions">
+              <AppLink
+                className="button button-secondary"
+                href={siteLinks.officialRules}
+              >
+                READ OFFICIAL CONTEST RULES
+              </AppLink>
+              <AppLink className="text-link" href={siteLinks.privacy}>
+                REVIEW THE PRIVACY POLICY
+              </AppLink>
+            </div>
+          </details>
         </div>
       </section>
-
-      <ProductScreens />
 
       <section className="section brand-section brand-teaser-section">
         <div className="shell brand-teaser">
@@ -308,8 +314,8 @@ export default function Home() {
 
       <section className="section shell final-cta">
         <div>
-          <p className="eyebrow">CHOOSE THE RIGHT NEXT STEP</p>
-          <h2>Eligible now, waiting for your region, or representing a brand?</h2>
+          <p className="eyebrow">YOUR NEXT WORKOUT CAN COUNT</p>
+          <h2>Ready to turn consistency into verified progress?</h2>
         </div>
         <div className="final-actions">
           {memberRegistrationAvailable ? (
@@ -330,14 +336,8 @@ export default function Home() {
             data-analytics-event="regional_updates_click"
             href={siteLinks.regionalUpdates}
           >
-            GET REGIONAL UPDATES <span aria-hidden="true">→</span>
-          </Link>
-          <Link
-            className="button button-secondary"
-            data-analytics-event="brand_partnership_click"
-            href={siteLinks.brands}
-          >
-            EXPLORE PARTNERSHIPS <span aria-hidden="true">→</span>
+            OUTSIDE THE PILOT? GET REGIONAL UPDATES{" "}
+            <span aria-hidden="true">→</span>
           </Link>
         </div>
       </section>

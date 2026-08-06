@@ -54,7 +54,14 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(page, /Registration and final eligibility checks happen in the member app/);
   assert.match(page, /Regional updates do not create an account or competition entry/);
   assert.match(page, /aria-label="September beta essentials" className="hero-qualifiers"/);
-  assert.match(page, /OUTSIDE THE PILOT REGION\? GET UPDATES/);
+  assert.equal(
+    (page.match(/OUTSIDE THE PILOT REGION\? GET REGIONAL UPDATES/g) ?? []).length,
+    2,
+  );
+  assert.match(page, /className="hero-trust-signal"/);
+  assert.match(page, /Pending activity\s+never appears as approved competition progress/);
+  assert.match(page, /className="section conversion-section"/);
+  assert.doesNotMatch(page, /proof-strip|proof-grid|brand-teaser-section|final-cta/);
   assert.match(page, /<details className="campaign-details">/);
   assert.match(page, /\{septemberCampaign\.minimumSessionMinutes\}\+ MIN/);
   assert.doesNotMatch(page, />30:00</);
@@ -62,6 +69,9 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
   assert.match(productScreens, /active-workout\.webp/);
   assert.match(productScreens, /winners-circle\.webp/);
+  assert.match(productScreens, /LIVE VERIFICATION/);
+  assert.match(productScreens, /PUBLISHED ONLY/);
+  assert.match(productScreens, /product-screen-callout/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS/);
   assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS →/);
   assert.doesNotMatch(productScreens, /â†’/);
@@ -319,7 +329,11 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(experience, /\.hero-qualifiers \{/);
   assert.match(experience, /\.hero-qualifiers li \{/);
   assert.match(experience, /\.hero-fallback-link \{[\s\S]*?min-height: 54px/);
+  assert.match(experience, /\.hero-trust-signal \{/);
+  assert.match(experience, /aspect-ratio: 540 \/ 680/);
   assert.match(experience, /\.campaign-details summary \{[\s\S]*?min-height: 72px/);
+  assert.match(globals, /\.landing-page > \.section \{[\s\S]*?padding-block: 84px/);
+  assert.match(globals, /\.conversion-grid \{/);
   assert.match(experience, /grid-template-columns: repeat\(2, minmax\(min\(82vw, 360px\), 1fr\)\)/);
 });
 

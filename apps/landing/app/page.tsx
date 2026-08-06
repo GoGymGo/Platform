@@ -178,7 +178,7 @@ export default function Home() {
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                OUTSIDE THE PILOT REGION? GET UPDATES{" "}
+                OUTSIDE THE PILOT REGION? GET REGIONAL UPDATES{" "}
                 <span aria-hidden="true">→</span>
               </Link>
             ) : (
@@ -192,6 +192,12 @@ export default function Home() {
               ? "Registration and final eligibility checks happen in the member app. Regional updates do not create an account or competition entry."
               : "Regional updates do not create an app account or competition entry."}
           </p>
+          <p className="hero-trust-signal">
+            <span aria-hidden="true">✓</span>
+            <strong>VERIFIED BEFORE CREDIT</strong>
+            Workouts are checked at eligible partner gyms. Pending activity
+            never appears as approved competition progress.
+          </p>
           <ul aria-label="September beta essentials" className="hero-qualifiers">
             <li>FREE TO JOIN</li>
             <li>{septemberCampaign.minimumAge}+ PILOT</li>
@@ -199,30 +205,6 @@ export default function Home() {
           </ul>
         </div>
         <SeptemberChallengePanel statusLabel={campaignState.statusLabel} />
-      </section>
-
-      <section
-        aria-label="September beta at a glance"
-        className="proof-strip"
-      >
-        <div className="shell proof-grid">
-          <div>
-            <strong>19+</strong>
-            <span>MINIMUM ELIGIBLE AGE</span>
-          </div>
-          <div>
-            <strong>1–7</strong>
-            <span>WEEKLY GOAL DAYS</span>
-          </div>
-          <div>
-            <strong>{septemberCampaign.minimumSessionMinutes}+ MIN</strong>
-            <span>VERIFIED MINIMUM</span>
-          </div>
-          <div>
-            <strong>$0</strong>
-            <span>ENTRY COST</span>
-          </div>
-        </div>
       </section>
 
       <section className="section shell" id="how-it-works">
@@ -289,56 +271,56 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section brand-section brand-teaser-section">
-        <div className="shell brand-teaser">
-          <div>
-            <p className="eyebrow eyebrow-pink">FOR FITNESS BRANDS</p>
-            <h2>Support the habit. Reward the effort.</h2>
+      <section className="section conversion-section">
+        <div className="shell conversion-grid">
+          <div className="conversion-primary">
+            <div>
+              <p className="eyebrow">YOUR NEXT WORKOUT CAN COUNT</p>
+              <h2>Ready to turn consistency into verified progress?</h2>
+              <p>
+                Join in the member app, or get regional updates if the current
+                pilot is not available where you train.
+              </p>
+            </div>
+            <div className="final-actions">
+              {memberRegistrationAvailable ? (
+                <AppLink
+                  analyticsEvent="member_app_click"
+                  className="button button-primary"
+                  href={siteLinks.memberApp}
+                >
+                  {campaignState.primaryLabel}
+                </AppLink>
+              ) : null}
+              <Link
+                className={
+                  memberRegistrationAvailable
+                    ? "button button-secondary"
+                    : "button button-primary"
+                }
+                data-analytics-event="regional_updates_click"
+                href={siteLinks.regionalUpdates}
+              >
+                OUTSIDE THE PILOT REGION? GET REGIONAL UPDATES{" "}
+                <span aria-hidden="true">→</span>
+              </Link>
+            </div>
           </div>
-          <div className="brand-teaser__copy">
+          <aside className="conversion-partner">
+            <p className="eyebrow eyebrow-pink">FOR FITNESS BRANDS</p>
+            <h3>Support the habit. Reward the effort.</h3>
             <p>
-              The September pilot reward is sponsored by GoGymGo. We are also
-              preparing future, approved regional campaigns with fitness brands
-              that can supply real product or coupon inventory.
+              Help fund future approved regional campaigns with real product or
+              coupon inventory after operator review.
             </p>
             <Link
-              className="button button-pink"
+              className="text-link text-link-pink"
               data-analytics-event="brand_partnership_click"
               href={siteLinks.brands}
             >
               EXPLORE A FOUNDING PARTNERSHIP <span aria-hidden="true">→</span>
             </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="section shell final-cta">
-        <div>
-          <p className="eyebrow">YOUR NEXT WORKOUT CAN COUNT</p>
-          <h2>Ready to turn consistency into verified progress?</h2>
-        </div>
-        <div className="final-actions">
-          {memberRegistrationAvailable ? (
-            <AppLink
-              analyticsEvent="member_app_click"
-              className="button button-primary"
-              href={siteLinks.memberApp}
-            >
-              {campaignState.primaryLabel}
-            </AppLink>
-          ) : null}
-          <Link
-            className={
-              memberRegistrationAvailable
-                ? "button button-secondary"
-                : "button button-primary"
-            }
-            data-analytics-event="regional_updates_click"
-            href={siteLinks.regionalUpdates}
-          >
-            OUTSIDE THE PILOT? GET REGIONAL UPDATES{" "}
-            <span aria-hidden="true">→</span>
-          </Link>
+          </aside>
         </div>
       </section>
     </main>

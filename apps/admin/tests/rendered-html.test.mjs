@@ -106,6 +106,18 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /Filter rewards/);
   assert.match(dashboard, /Filter work queue/);
   assert.match(dashboard, /Filter audit history/);
+  assert.match(dashboard, /useStoredPreference/);
+  assert.match(dashboard, /Saved on this device/);
+  assert.match(dashboard, /className="nav-count"/);
+  assert.match(dashboard, /getQueueUrgency/);
+  assert.match(dashboard, /NEXT DEADLINE/);
+  assert.match(dashboard, /RESOLVE IN REWARDS/);
+  assert.match(dashboard, /RELATED AUDIT EVIDENCE/);
+  assert.match(dashboard, /Table density/);
+  assert.match(dashboard, /className="column-menu"/);
+  assert.match(dashboard, /className="pagination"/);
+  assert.match(dashboard, /className="audit-diff"/);
+  assert.match(dashboard, /event\.before \|\| event\.after/);
   assert.match(dashboard, /No regional policies configured/);
   assert.match(dashboard, /No legal documents published/);
   assert.match(dashboard, /No audit events recorded/);
@@ -148,6 +160,11 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(styles, /--muted: #a0b6bd/);
   assert.match(styles, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.table-wrap th:last-child,[\s\S]*?position: sticky/);
+  assert.match(styles, /\.urgency-tag\.urgent/);
+  assert.match(styles, /\.filter-chips/);
+  assert.match(styles, /\.data-view-controls/);
+  assert.match(styles, /\.sticky-action-column/);
+  assert.match(styles, /\.audit-diff/);
   assert.match(styles, /\.primary-button,[\s\S]*?min-height: 44px/);
   assert.match(styles, /\.table-wrap:focus-visible/);
 

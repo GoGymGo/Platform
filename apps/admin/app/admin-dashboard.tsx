@@ -47,6 +47,13 @@ type ConfirmAction = {
   tone?: "danger" | "primary";
 };
 
+type NavigationCounts = Partial<Record<AdminSection, number>>;
+
+type ActiveFilter = {
+  label: string;
+  onClear: () => void;
+};
+
 const navigation: {
   description: string;
   id: AdminSection;
@@ -121,6 +128,32 @@ const emptyPilotData: PilotData = {
   waitlist: [],
 };
 
+function useStoredPreference<T>(key: string, fallback: T) {
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === "undefined") return fallback;
+    try {
+      const stored = window.localStorage.getItem(key);
+      return stored === null ? fallback : (JSON.parse(stored) as T);
+    } catch {
+      return fallback;
+    }
+  });
+
+  const updateValue = useCallback(
+    (nextValue: T) => {
+      setValue(nextValue);
+      try {
+        window.localStorage.setItem(key, JSON.stringify(nextValue));
+      } catch {
+        // Device preferences are optional; the dashboard remains usable without storage.
+      }
+    },
+    [key],
+  );
+
+  return [value, updateValue] as const;
+}
+
 function BrandMark() {
   return (
     <span aria-label="GoGymGo" className="brand-mark" role="img">
@@ -148,9 +181,11 @@ function BrandWordmark() {
 }
 
 function MobileAdminNavigation({
+  counts,
   onNavigate,
   section,
 }: {
+  counts: NavigationCounts;
   onNavigate: (section: AdminSection) => void;
   section: AdminSection;
 }) {
@@ -193,6 +228,11 @@ function MobileAdminNavigation({
         >
           <span>{item.short}</span>
           <small>{item.label}</small>
+          {counts[item.id] ? (
+            <b aria-label={`${counts[item.id]} items need attention`} className="nav-count">
+              {counts[item.id]}
+            </b>
+          ) : null}
         </button>
       ))}
       <button
@@ -239,6 +279,11 @@ function MobileAdminNavigation({
               <span>{item.short}</span>
               <strong>{item.label}</strong>
               <small>{item.description}</small>
+              {counts[item.id] ? (
+                <b aria-label={`${counts[item.id]} items need attention`} className="nav-count">
+                  {counts[item.id]}
+                </b>
+              ) : null}
             </button>
           ))}
         </div>
@@ -505,6 +550,21 @@ export function AdminDashboard({
   );
   const activeNavigation =
     navigation.find((item) => item.id === section) ?? navigation[0];
+  const navigationCounts: NavigationCounts = {
+    competitions: snapshot.competitions.filter(
+      (competition) =>
+        competition.status === "draft" && competition.publishedRewardCount === 0,
+    ).length,
+    operations: queue.length,
+    pilot: pilotData.partnerApplications.filter((application) =>
+      ["submitted", "in_review"].includes(application.status),
+    ).length,
+    rewards: snapshot.rewards.filter(
+      (reward) =>
+        reward.status === "draft" ||
+        (reward.rewardType === "coupon" && reward.couponCodeCount === 0),
+    ).length,
+  };
 
   return (
     <div className="admin-shell">
@@ -529,10 +589,22 @@ export function AdminDashboard({
             >
               <span className="nav-short">{item.short}</span>
               <span>{item.label}</span>
+              {navigationCounts[item.id] ? (
+                <b
+                  aria-label={`${navigationCounts[item.id]} items need attention`}
+                  className="nav-count"
+                >
+                  {navigationCounts[item.id]}
+                </b>
+              ) : null}
             </button>
           ))}
         </nav>
-        <MobileAdminNavigation onNavigate={setSection} section={section} />
+        <MobileAdminNavigation
+          counts={navigationCounts}
+          onNavigate={setSection}
+          section={section}
+        />
         <div className="sidebar-footer">
           <div className="admin-identity">
             <span className="presence-dot" />
@@ -623,6 +695,7 @@ export function AdminDashboard({
               competitions={snapshot.competitions}
               onCreate={() => setCompetitionEditor("new")}
               onEdit={setCompetitionEditor}
+              onNavigate={setSection}
               onStatus={(competition, action) =>
                 setConfirmAction({
                   actionLabel:
@@ -793,6 +866,7 @@ export function AdminDashboard({
           ) : null}
           {section === "operations" ? (
             <OperationsPanel
+              events={snapshot.auditEvents}
               health={health}
               onNavigate={setSection}
               queue={queue}
@@ -1067,6 +1141,13 @@ function Overview({
     health?.database !== "ok" ||
     (health?.worker.status !== "healthy" && health?.worker.status !== "starting");
   const attentionCount = queue.length + (healthNeedsAttention ? 1 : 0);
+  const oldestQueueItem = [...queue].sort(
+    (left, right) =>
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+  )[0];
+  const oldestUrgency = oldestQueueItem
+    ? getQueueUrgency(oldestQueueItem)
+    : null;
   return (
     <>
       <section
@@ -1098,6 +1179,17 @@ function Overview({
                 ? `${publishReady[0].name} has a published reward and can be released after your final review.`
                 : "No competition is currently public. Add and publish a real reward before releasing a draft to players."}
           </p>
+          {oldestQueueItem && oldestUrgency ? (
+            <div className="priority-context">
+              <span className={`urgency-tag ${oldestUrgency.tone}`}>
+                {oldestUrgency.label}
+              </span>
+              <p>
+                Oldest review: {oldestQueueItem.kind.replaceAll("_", " ")} ·{" "}
+                {formatQueueAge(oldestQueueItem.createdAt)} in queue
+              </p>
+            </div>
+          ) : null}
           <div className="hero-panel-actions">
             {queue.length > 0 || healthNeedsAttention ? (
               <button
@@ -1267,18 +1359,26 @@ function CompetitionsPanel({
   competitions,
   onCreate,
   onEdit,
+  onNavigate,
   onStatus,
 }: {
   competitions: Competition[];
   onCreate: () => void;
   onEdit: (competition: Competition) => void;
+  onNavigate: (section: AdminSection) => void;
   onStatus: (
     competition: Competition,
     action: "cancel" | "publish",
   ) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [query, setQuery] = useStoredPreference(
+    "gogymgo.admin.competitions.query",
+    "",
+  );
+  const [statusFilter, setStatusFilter] = useStoredPreference(
+    "gogymgo.admin.competitions.status",
+    "all",
+  );
   const normalizedQuery = query.trim().toLowerCase();
   const filteredCompetitions = competitions.filter((competition) => {
     const matchesStatus =
@@ -1294,6 +1394,19 @@ function CompetitionsPanel({
   const statusOptions = Array.from(
     new Set(competitions.map((competition) => competition.status)),
   );
+  const activeFilters: ActiveFilter[] = [
+    ...(query
+      ? [{ label: `Search: ${query}`, onClear: () => setQuery("") }]
+      : []),
+    ...(statusFilter !== "all"
+      ? [
+          {
+            label: `Status: ${statusFilter.replaceAll("_", " ")}`,
+            onClear: () => setStatusFilter("all"),
+          },
+        ]
+      : []),
+  ];
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -1333,6 +1446,7 @@ function CompetitionsPanel({
           </label>
         </div>
       ) : null}
+      <FilterChips filters={activeFilters} />
       {competitions.length === 0 ? (
         <EmptyState
           body="Start with a region, schedule, rules and weekly goal options."
@@ -1347,6 +1461,7 @@ function CompetitionsPanel({
         <div className="card-list">
           {filteredCompetitions.map((competition) => {
             const ended = new Date(competition.endsAt) <= new Date();
+            const deadline = getCompetitionDeadline(competition);
             const canPublish =
               competition.status === "draft" &&
               !ended &&
@@ -1406,12 +1521,32 @@ function CompetitionsPanel({
                         : "REWARD REQUIRED"}
                     </strong>
                   </div>
+                  <div>
+                    <small>NEXT DEADLINE</small>
+                    <div className="deadline-stack">
+                      <span className={`deadline-tag ${deadline.tone}`}>
+                        {deadline.label}
+                      </span>
+                      <small>{deadline.detail}</small>
+                    </div>
+                  </div>
                 </div>
                 {competition.status === "draft" && !canPublish ? (
-                  <p className="action-guidance" id={publishGateId}>
-                    <strong>PUBLISH BLOCKED</strong>
-                    {publishBlocker}
-                  </p>
+                  <div className="action-guidance" id={publishGateId}>
+                    <span>
+                      <strong>PUBLISH BLOCKED</strong>
+                      {publishBlocker}
+                    </span>
+                    {competition.publishedRewardCount === 0 ? (
+                      <button
+                        className="resolution-link"
+                        onClick={() => onNavigate("rewards")}
+                        type="button"
+                      >
+                        RESOLVE IN REWARDS →
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
                 <div className="card-actions">
                   {competition.status === "draft" ? (
@@ -1466,8 +1601,23 @@ function RewardsPanel({
   onStatus: (reward: Reward, action: "archive" | "publish") => void;
   rewards: Reward[];
 }) {
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [query, setQuery] = useStoredPreference(
+    "gogymgo.admin.rewards.query",
+    "",
+  );
+  const [statusFilter, setStatusFilter] = useStoredPreference(
+    "gogymgo.admin.rewards.status",
+    "all",
+  );
+  const [density, setDensity] = useStoredPreference<"comfortable" | "compact">(
+    "gogymgo.admin.rewards.density",
+    "comfortable",
+  );
+  const [visibleColumns, setVisibleColumns] = useStoredPreference<string[]>(
+    "gogymgo.admin.rewards.columns",
+    ["competition", "type", "inventory"],
+  );
+  const [page, setPage] = useState(1);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredRewards = rewards.filter((reward) => {
     const matchesStatus =
@@ -1481,6 +1631,34 @@ function RewardsPanel({
     return matchesStatus && matchesQuery;
   });
   const statusOptions = Array.from(new Set(rewards.map((reward) => reward.status)));
+  const visibleColumnSet = new Set(visibleColumns);
+  const pageSize = density === "compact" ? 12 : 8;
+  const pageCount = Math.max(1, Math.ceil(filteredRewards.length / pageSize));
+  const visiblePage = Math.min(page, pageCount);
+  const pagedRewards = filteredRewards.slice(
+    (visiblePage - 1) * pageSize,
+    visiblePage * pageSize,
+  );
+  const activeFilters: ActiveFilter[] = [
+    ...(query
+      ? [{ label: `Search: ${query}`, onClear: () => setQuery("") }]
+      : []),
+    ...(statusFilter !== "all"
+      ? [
+          {
+            label: `Status: ${statusFilter.replaceAll("_", " ")}`,
+            onClear: () => setStatusFilter("all"),
+          },
+        ]
+      : []),
+  ];
+  function toggleColumn(column: string) {
+    setVisibleColumns(
+      visibleColumnSet.has(column)
+        ? visibleColumns.filter((item) => item !== column)
+        : [...visibleColumns, column],
+    );
+  }
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -1520,6 +1698,7 @@ function RewardsPanel({
           </label>
         </div>
       ) : null}
+      <FilterChips filters={activeFilters} />
       {rewards.length === 0 ? (
         <EmptyState
           body="Create the first verified brand reward, then publish it before releasing a competition."
@@ -1531,20 +1710,59 @@ function RewardsPanel({
           title="No rewards match"
         />
       ) : (
-        <div aria-label="Rewards table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
+        <>
+          <div className="data-view-controls">
+            <div aria-label="Table density" className="density-control" role="group">
+              <button
+                aria-pressed={density === "comfortable"}
+                onClick={() => setDensity("comfortable")}
+                type="button"
+              >
+                COMFORTABLE
+              </button>
+              <button
+                aria-pressed={density === "compact"}
+                onClick={() => setDensity("compact")}
+                type="button"
+              >
+                COMPACT
+              </button>
+            </div>
+            <details className="column-menu">
+              <summary>COLUMNS</summary>
+              <div>
+                {[
+                  ["competition", "Competition"],
+                  ["type", "Type"],
+                  ["inventory", "Inventory"],
+                ].map(([value, label]) => (
+                  <label key={value}>
+                    <input
+                      checked={visibleColumnSet.has(value)}
+                      onChange={() => toggleColumn(value)}
+                      type="checkbox"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </details>
+            <span>{filteredRewards.length} RESULTS</span>
+          </div>
+          <div aria-label="Rewards table, scroll horizontally for more columns" className={`table-wrap ${density}`} role="region" tabIndex={0}>
           <table>
             <thead>
               <tr>
                 <th scope="col">Reward</th>
-                <th scope="col">Competition</th>
-                <th scope="col">Type</th>
-                <th scope="col">Inventory</th>
+                {visibleColumnSet.has("competition") ? <th scope="col">Competition</th> : null}
+                {visibleColumnSet.has("type") ? <th scope="col">Type</th> : null}
+                {visibleColumnSet.has("inventory") ? <th scope="col">Inventory</th> : null}
                 <th scope="col">Status</th>
-                <th aria-label="Actions" scope="col" />
+                <th aria-label="Frozen actions" className="sticky-action-column" scope="col" />
               </tr>
             </thead>
             <tbody>
-              {filteredRewards.map((reward) => {
+              {pagedRewards.map((reward) => {
                 const couponReady =
                   reward.rewardType !== "coupon" || reward.couponCodeCount > 0;
                 const publishGateId = `reward-${reward.id}-publish-gate`;
@@ -1554,14 +1772,14 @@ function RewardsPanel({
                       <strong>{reward.title}</strong>
                       <small>{reward.sponsorName}</small>
                     </td>
-                    <td>{reward.competitionName}</td>
-                    <td>{reward.rewardType}</td>
-                    <td>
+                    {visibleColumnSet.has("competition") ? <td>{reward.competitionName}</td> : null}
+                    {visibleColumnSet.has("type") ? <td>{reward.rewardType}</td> : null}
+                    {visibleColumnSet.has("inventory") ? <td>
                       {reward.rewardType === "coupon"
                         ? `${reward.couponCodeCount} / ${reward.inventoryTotal} codes`
                         : `${reward.inventoryTotal} units`}
-                    </td>
-                    <td>
+                    </td> : null}
+                    <td className="sticky-action-column">
                       <span className={`status-tag ${reward.status}`}>
                         {reward.status}
                       </span>
@@ -1584,7 +1802,7 @@ function RewardsPanel({
                             onClick={() => onCouponCodes(reward)}
                             type="button"
                           >
-                            Add codes
+                            Resolve: add codes
                           </button>
                         ) : null}
                         {reward.status === "draft" ? (
@@ -1621,7 +1839,14 @@ function RewardsPanel({
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+          <Pagination
+            onNext={() => setPage(Math.min(pageCount, visiblePage + 1))}
+            onPrevious={() => setPage(Math.max(1, visiblePage - 1))}
+            page={visiblePage}
+            pageCount={pageCount}
+          />
+        </>
       )}
     </section>
   );
@@ -1715,6 +1940,29 @@ function ContentPanel({
   ) => void;
   workouts: CreatorWorkout[];
 }) {
+  const [legalDensity, setLegalDensity] = useStoredPreference<
+    "comfortable" | "compact"
+  >("gogymgo.admin.legal.density", "comfortable");
+  const [legalColumns, setLegalColumns] = useStoredPreference<string[]>(
+    "gogymgo.admin.legal.columns",
+    ["scope", "effective", "approval"],
+  );
+  const [legalPage, setLegalPage] = useState(1);
+  const legalColumnSet = new Set(legalColumns);
+  const legalPageSize = legalDensity === "compact" ? 12 : 8;
+  const legalPageCount = Math.max(1, Math.ceil(documents.length / legalPageSize));
+  const visibleLegalPage = Math.min(legalPage, legalPageCount);
+  const pagedDocuments = documents.slice(
+    (visibleLegalPage - 1) * legalPageSize,
+    visibleLegalPage * legalPageSize,
+  );
+  function toggleLegalColumn(column: string) {
+    setLegalColumns(
+      legalColumnSet.has(column)
+        ? legalColumns.filter((item) => item !== column)
+        : [...legalColumns, column],
+    );
+  }
   return (
     <div className="section-stack">
       <section className="panel">
@@ -1810,37 +2058,76 @@ function ContentPanel({
             title="No legal documents published"
           />
         ) : (
-          <div aria-label="Legal documents table, scroll horizontally for more columns" className="table-wrap" role="region" tabIndex={0}>
+          <>
+          <div className="data-view-controls">
+            <div aria-label="Table density" className="density-control" role="group">
+              <button
+                aria-pressed={legalDensity === "comfortable"}
+                onClick={() => setLegalDensity("comfortable")}
+                type="button"
+              >
+                COMFORTABLE
+              </button>
+              <button
+                aria-pressed={legalDensity === "compact"}
+                onClick={() => setLegalDensity("compact")}
+                type="button"
+              >
+                COMPACT
+              </button>
+            </div>
+            <details className="column-menu">
+              <summary>COLUMNS</summary>
+              <div>
+                {[
+                  ["scope", "Scope"],
+                  ["effective", "Effective"],
+                  ["approval", "Owner approval"],
+                ].map(([value, label]) => (
+                  <label key={value}>
+                    <input
+                      checked={legalColumnSet.has(value)}
+                      onChange={() => toggleLegalColumn(value)}
+                      type="checkbox"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </details>
+            <span>{documents.length} RESULTS</span>
+          </div>
+          <div aria-label="Legal documents table, scroll horizontally for more columns" className={`table-wrap ${legalDensity}`} role="region" tabIndex={0}>
             <table>
               <thead>
                 <tr>
                   <th scope="col">Document</th>
-                  <th scope="col">Scope</th>
+                  {legalColumnSet.has("scope") ? <th scope="col">Scope</th> : null}
                   <th scope="col">Version</th>
-                  <th scope="col">Effective</th>
-                  <th scope="col">Owner approval</th>
+                  {legalColumnSet.has("effective") ? <th scope="col">Effective</th> : null}
+                  {legalColumnSet.has("approval") ? <th scope="col">Owner approval</th> : null}
                   <th scope="col">Status</th>
-                  <th aria-label="Actions" scope="col" />
+                  <th aria-label="Frozen actions" className="sticky-action-column" scope="col" />
                 </tr>
               </thead>
               <tbody>
-                {documents.map((document) => (
+                {pagedDocuments.map((document) => (
                   <tr key={document.id}>
                     <td>
                       <strong>{document.title}</strong>
                       <small>{document.documentKey}</small>
                     </td>
-                    <td>
+                    {legalColumnSet.has("scope") ? <td>
                       {document.jurisdictionCode} · {document.locale}
-                    </td>
+                    </td> : null}
                     <td>{document.version}</td>
-                    <td>{formatDate(document.effectiveAt)}</td>
-                    <td>
+                    {legalColumnSet.has("effective") ? <td>{formatDate(document.effectiveAt)}</td> : null}
+                    {legalColumnSet.has("approval") ? <td>
                       <span className={`status-tag ${document.ownerApprovedAt ? "active" : "draft"}`}>
                         {document.ownerApprovedAt ? "approved" : "not approved"}
                       </span>
-                    </td>
-                    <td>
+                    </td> : null}
+                    <td className="sticky-action-column">
                       <span className={`status-tag ${document.status}`}>
                         {document.status}
                       </span>
@@ -1861,6 +2148,13 @@ function ContentPanel({
               </tbody>
             </table>
           </div>
+          <Pagination
+            onNext={() => setLegalPage(Math.min(legalPageCount, visibleLegalPage + 1))}
+            onPrevious={() => setLegalPage(Math.max(1, visibleLegalPage - 1))}
+            page={visibleLegalPage}
+            pageCount={legalPageCount}
+          />
+          </>
         )}
       </section>
     </div>
@@ -1868,15 +2162,20 @@ function ContentPanel({
 }
 
 function OperationsPanel({
+  events,
   health,
   onNavigate,
   queue,
 }: {
+  events: AuditEvent[];
   health: SystemHealth | null;
   onNavigate: (section: AdminSection) => void;
   queue: WorkQueueItem[];
 }) {
-  const [kindFilter, setKindFilter] = useState("all");
+  const [kindFilter, setKindFilter] = useStoredPreference(
+    "gogymgo.admin.operations.kind",
+    "all",
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const kindOptions = Array.from(new Set(queue.map((item) => item.kind)));
   const filteredQueue = queue.filter(
@@ -1886,6 +2185,25 @@ function OperationsPanel({
   const selectedDestination = selectedItem
     ? queueDestination(selectedItem.kind)
     : null;
+  const selectedUrgency = selectedItem ? getQueueUrgency(selectedItem) : null;
+  const selectedHistory = selectedItem
+    ? events
+        .filter(
+          (event) =>
+            event.entityId === selectedItem.id ||
+            event.reason.toLowerCase().includes(selectedItem.id.toLowerCase()),
+        )
+        .slice(0, 3)
+    : [];
+  const activeFilters: ActiveFilter[] =
+    kindFilter === "all"
+      ? []
+      : [
+          {
+            label: `Type: ${kindFilter.replaceAll("_", " ")}`,
+            onClear: () => setKindFilter("all"),
+          },
+        ];
   return (
     <div className="section-stack">
       <section className="metric-grid">
@@ -1926,6 +2244,7 @@ function OperationsPanel({
             </label>
           </div>
         ) : null}
+        <FilterChips filters={activeFilters} />
         {queue.length === 0 ? (
           <EmptyState body="Nothing is waiting for operator review." title="Queue clear" />
         ) : filteredQueue.length === 0 ? (
@@ -1957,7 +2276,16 @@ function OperationsPanel({
                     </small>
                   </div>
                   <span>
+                    {(() => {
+                      const urgency = getQueueUrgency(item);
+                      return (
+                        <span className={`urgency-tag ${urgency.tone}`}>
+                          {urgency.label}
+                        </span>
+                      );
+                    })()}
                     <span className={`status-tag ${item.status}`}>{item.status}</span>
+                    <small>{formatQueueAge(item.createdAt)} waiting</small>
                     <small className="queue-row-action">REVIEW →</small>
                   </span>
                 </button>
@@ -1967,7 +2295,14 @@ function OperationsPanel({
               {selectedItem ? (
                 <>
                   <p className="eyebrow">SELECTED REVIEW ITEM</p>
-                  <h3>{selectedItem.kind.replaceAll("_", " ")}</h3>
+                  <div className="queue-review-title">
+                    <h3>{selectedItem.kind.replaceAll("_", " ")}</h3>
+                    {selectedUrgency ? (
+                      <span className={`urgency-tag ${selectedUrgency.tone}`}>
+                        {selectedUrgency.label}
+                      </span>
+                    ) : null}
+                  </div>
                   <dl>
                     <div>
                       <dt>STATUS</dt>
@@ -1975,7 +2310,10 @@ function OperationsPanel({
                     </div>
                     <div>
                       <dt>CREATED</dt>
-                      <dd>{formatDateTime(selectedItem.createdAt)}</dd>
+                      <dd>
+                        {formatDateTime(selectedItem.createdAt)} ·{" "}
+                        {formatQueueAge(selectedItem.createdAt)} ago
+                      </dd>
                     </div>
                     {selectedItem.regionCode ? (
                       <div>
@@ -1994,6 +2332,26 @@ function OperationsPanel({
                       <dd className="record-id">{selectedItem.id}</dd>
                     </div>
                   </dl>
+                  <section className="queue-review-history">
+                    <span>RELATED AUDIT EVIDENCE</span>
+                    {selectedHistory.length > 0 ? (
+                      selectedHistory.map((event) => (
+                        <div key={event.id}>
+                          <strong>{event.action.replaceAll("_", " ")}</strong>
+                          <small>
+                            {formatDateTime(event.createdAt)} ·{" "}
+                            {event.actorEmail || "SYSTEM"}
+                          </small>
+                          <p>{event.reason}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p>
+                        No related ledger event is available yet. Use the record
+                        ID above while completing the review.
+                      </p>
+                    )}
+                  </section>
                   {selectedDestination ? (
                     <button
                       className="primary-button full"
@@ -2049,8 +2407,15 @@ function MetricCard({
 }
 
 function AuditPanel({ events }: { events: AuditEvent[] }) {
-  const [query, setQuery] = useState("");
-  const [actorFilter, setActorFilter] = useState("all");
+  const [query, setQuery] = useStoredPreference(
+    "gogymgo.admin.audit.query",
+    "",
+  );
+  const [actorFilter, setActorFilter] = useStoredPreference(
+    "gogymgo.admin.audit.actor",
+    "all",
+  );
+  const [page, setPage] = useState(1);
   const normalizedQuery = query.trim().toLowerCase();
   const actorOptions = Array.from(
     new Set(events.map((event) => event.actorEmail || "SYSTEM")),
@@ -2066,6 +2431,26 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
         .includes(normalizedQuery);
     return matchesActor && matchesQuery;
   });
+  const pageSize = 12;
+  const pageCount = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
+  const visiblePage = Math.min(page, pageCount);
+  const pagedEvents = filteredEvents.slice(
+    (visiblePage - 1) * pageSize,
+    visiblePage * pageSize,
+  );
+  const activeFilters: ActiveFilter[] = [
+    ...(query
+      ? [{ label: `Search: ${query}`, onClear: () => setQuery("") }]
+      : []),
+    ...(actorFilter !== "all"
+      ? [
+          {
+            label: `Actor: ${actorFilter}`,
+            onClear: () => setActorFilter("all"),
+          },
+        ]
+      : []),
+  ];
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -2102,6 +2487,7 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
           </label>
         </div>
       ) : null}
+      <FilterChips filters={activeFilters} />
       {events.length === 0 ? (
         <EmptyState
           body="Administrative decisions will appear here after the first recorded change."
@@ -2113,8 +2499,9 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
           title="No audit events match"
         />
       ) : (
-        <div className="timeline">
-          {filteredEvents.map((event) => (
+        <>
+          <div className="timeline">
+          {pagedEvents.map((event) => (
             <article key={event.id}>
               <div aria-hidden="true" className="timeline-node" />
               <div>
@@ -2123,6 +2510,7 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
                   <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
                 </div>
                 <p>{event.reason}</p>
+                <AuditDiff event={event} />
                 <small>
                   {event.actorEmail || "SYSTEM"} · {event.entityType} ·{" "}
                   {event.entityId.slice(0, 8)}
@@ -2130,9 +2518,74 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
               </div>
             </article>
           ))}
-        </div>
+          </div>
+          <Pagination
+            onNext={() => setPage(Math.min(pageCount, visiblePage + 1))}
+            onPrevious={() => setPage(Math.max(1, visiblePage - 1))}
+            page={visiblePage}
+            pageCount={pageCount}
+          />
+        </>
       )}
     </section>
+  );
+}
+
+function FilterChips({ filters }: { filters: ActiveFilter[] }) {
+  if (filters.length === 0) return null;
+  return (
+    <div aria-label="Active filters" className="filter-chips">
+      {filters.map((filter) => (
+        <button key={filter.label} onClick={filter.onClear} type="button">
+          {filter.label} <span aria-hidden="true">×</span>
+        </button>
+      ))}
+      <span>Saved on this device</span>
+    </div>
+  );
+}
+
+function Pagination({
+  onNext,
+  onPrevious,
+  page,
+  pageCount,
+}: {
+  onNext: () => void;
+  onPrevious: () => void;
+  page: number;
+  pageCount: number;
+}) {
+  if (pageCount <= 1) return null;
+  return (
+    <nav aria-label="Table pages" className="pagination">
+      <button disabled={page <= 1} onClick={onPrevious} type="button">
+        ← PREVIOUS
+      </button>
+      <span>
+        PAGE {page} OF {pageCount}
+      </span>
+      <button disabled={page >= pageCount} onClick={onNext} type="button">
+        NEXT →
+      </button>
+    </nav>
+  );
+}
+
+function AuditDiff({ event }: { event: AuditEvent }) {
+  const change = getAuditChange(event);
+  return (
+    <div aria-label="Recorded state change" className="audit-diff">
+      <div>
+        <span>BEFORE</span>
+        <strong>{change.before}</strong>
+      </div>
+      <b aria-hidden="true">→</b>
+      <div>
+        <span>AFTER</span>
+        <strong>{change.after}</strong>
+      </div>
+    </div>
   );
 }
 
@@ -2880,6 +3333,98 @@ function EmptyState({ body, title }: { body: string; title: string }) {
       <p>{body}</p>
     </div>
   );
+}
+
+function getQueueUrgency(item: WorkQueueItem) {
+  const ageHours = Math.max(
+    0,
+    (Date.now() - new Date(item.createdAt).getTime()) / 3_600_000,
+  );
+  const normalized = `${item.kind} ${item.status}`.toLowerCase();
+  if (
+    ageHours >= 24 ||
+    normalized.includes("failed") ||
+    normalized.includes("rejected") ||
+    normalized.includes("privacy")
+  ) {
+    return { label: "URGENT", tone: "urgent" } as const;
+  }
+  if (ageHours >= 8 || normalized.includes("pending_review")) {
+    return { label: "DUE SOON", tone: "warning" } as const;
+  }
+  return { label: "ROUTINE", tone: "routine" } as const;
+}
+
+function formatQueueAge(value: string) {
+  const ageMinutes = Math.max(
+    0,
+    Math.round((Date.now() - new Date(value).getTime()) / 60_000),
+  );
+  if (ageMinutes < 60) return `${ageMinutes}m`;
+  const ageHours = Math.round(ageMinutes / 60);
+  if (ageHours < 48) return `${ageHours}h`;
+  return `${Math.round(ageHours / 24)}d`;
+}
+
+function getCompetitionDeadline(competition: Competition) {
+  const now = Date.now();
+  const stages =
+    competition.status === "draft"
+      ? [
+          [competition.registrationOpensAt, "Registration opens"],
+          [competition.startsAt, "Competition starts"],
+        ]
+      : competition.status === "registration"
+        ? [
+            [competition.registrationClosesAt, "Registration closes"],
+            [competition.startsAt, "Competition starts"],
+          ]
+        : [[competition.endsAt, "Competition ends"]];
+  const next = stages.find(([value]) => new Date(value).getTime() > now);
+  if (!next) {
+    return { detail: "No future player deadline", label: "COMPLETE", tone: "routine" };
+  }
+  const hours = Math.max(0, (new Date(next[0]).getTime() - now) / 3_600_000);
+  const label =
+    hours < 24 ? `${Math.max(1, Math.ceil(hours))}H` : `${Math.ceil(hours / 24)}D`;
+  return {
+    detail: next[1],
+    label,
+    tone: hours <= 48 ? "urgent" : hours <= 168 ? "warning" : "routine",
+  };
+}
+
+function getAuditChange(event: AuditEvent) {
+  if (event.before || event.after) {
+    return {
+      after: summarizeAuditState(event.after) || "No resulting state recorded",
+      before: summarizeAuditState(event.before) || "No previous state recorded",
+    };
+  }
+  const action = event.action.toLowerCase();
+  const transitions: Array<[string, string, string]> = [
+    ["publish", "draft", "published"],
+    ["archive", "published", "archived"],
+    ["cancel", "scheduled or open", "cancelled"],
+    ["withdraw", "effective or scheduled", "withdrawn"],
+    ["revoke", "active", "revoked"],
+    ["approve", "pending review", "approved"],
+    ["reject", "pending review", "rejected"],
+    ["create", "not present", "created"],
+    ["update", "previous version", "updated version"],
+  ];
+  const transition = transitions.find(([token]) => action.includes(token));
+  return transition
+    ? { after: transition[2], before: transition[1] }
+    : { after: event.action.replaceAll("_", " "), before: "existing record" };
+}
+
+function summarizeAuditState(value?: Record<string, unknown> | null) {
+  if (!value) return "";
+  return Object.entries(value)
+    .slice(0, 3)
+    .map(([key, entry]) => `${key}: ${String(entry)}`)
+    .join(" · ");
 }
 
 function formatDate(value: string) {

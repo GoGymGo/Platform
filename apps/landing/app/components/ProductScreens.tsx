@@ -2,6 +2,9 @@ const productScreens = [
   {
     alt: "GoGymGo active workout screen showing elapsed server time and live verification status",
     height: 800,
+    proof: "LIVE VERIFICATION",
+    proofCopy:
+      "Server-timed progress with entry, exit, and fresh-location checks.",
     src: "/app/active-workout.webp",
     step: "01 // VERIFY",
     title: "Follow the authoritative workout timer",
@@ -10,6 +13,9 @@ const productScreens = [
   {
     alt: "GoGymGo Winners Circle screen showing published competition results",
     height: 800,
+    proof: "PUBLISHED ONLY",
+    proofCopy:
+      "Final standings appear only after submitted activity is reviewed.",
     src: "/app/winners-circle.webp",
     step: "02 // RESULTS",
     title: "Review published competition results",
@@ -54,6 +60,10 @@ export function ProductScreens() {
               <div className="product-screen-caption">
                 <span>{screen.step}</span>
                 <h3>{screen.title}</h3>
+                <p className="product-screen-callout">
+                  <strong>{screen.proof}</strong>
+                  {screen.proofCopy}
+                </p>
               </div>
             </article>
           ))}

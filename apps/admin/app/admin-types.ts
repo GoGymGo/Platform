@@ -109,6 +109,8 @@ export type LegalDocument = {
 export type AuditEvent = {
   action: string;
   actorEmail: string | null;
+  after?: Record<string, unknown> | null;
+  before?: Record<string, unknown> | null;
   createdAt: string;
   entityId: string;
   entityType: string;

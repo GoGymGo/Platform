@@ -344,7 +344,7 @@ export default function AppTourScreen() {
                       tone={visitedRoutes.has(route.route) ? 'green' : 'cyan'}
                       variant={visitedRoutes.has(route.route) ? 'micro' : 'button'}
                     >
-                      {visitedRoutes.has(route.route) ? 'DONE ✓' : '->'}
+                      {visitedRoutes.has(route.route) ? 'DONE ✓' : '→'}
                     </TerminalText>
                   </Pressable>
                 ))}

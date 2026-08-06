@@ -10,6 +10,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -86,7 +87,7 @@ export default function HowItWorksScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={brandScreenStyles.content}
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
@@ -95,12 +96,11 @@ export default function HowItWorksScreen() {
           step="COMPETITION GUIDE"
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          HOW THE COMPETITION WORKS
-        </TerminalText>
-        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          A quick reference for competition scoring, winning odds and brand rewards.
-        </TerminalText>
+        <BrandScreenHeader
+          description="A quick reference for competition scoring, winning odds and brand rewards."
+          eyebrow="COMPETITION GUIDE"
+          title="HOW THE COMPETITION WORKS"
+        />
 
         <HUDBorderBox style={styles.flowSummary} tone="cyan">
           <TerminalText tone="cyan" uppercase={false} variant="caption">
@@ -144,11 +144,11 @@ export default function HowItWorksScreen() {
           ))}
         </View>
 
-        {showBonusDetails ? <HUDBorderBox glow style={styles.bonusPanel} tone="cyan">
-          <TerminalText glow style={styles.panelHeading} tone="cyan" variant="label">
+        {showBonusDetails ? <HUDBorderBox style={styles.bonusPanel} tone="cyan">
+          <TerminalText style={styles.panelHeading} tone="cyan" variant="label">
             SCORING ORDER
           </TerminalText>
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             01 // WEEKLY CHALLENGE BONUSES
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
@@ -157,7 +157,7 @@ export default function HowItWorksScreen() {
             every available day, 3X is automatic if they miss. Add the four settled
             weekly results.
           </TerminalText>
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             02 // TOP THREE GOAL-GROUP FINISHERS
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
@@ -175,7 +175,7 @@ export default function HowItWorksScreen() {
               {`${index + 1}${index === 0 ? 'st' : index === 1 ? 'nd' : 'rd'} place: ${multiplier}X your Weekly Challenge subtotal`}
             </TerminalText>
           ))}
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
               03 // BONUS DAYS 29-31
           </TerminalText>
           <TerminalText
@@ -186,7 +186,7 @@ export default function HowItWorksScreen() {
           >
             {`When the month has days 29-31, each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}.`}
           </TerminalText>
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             04 // PERFECT MONTH // FINAL 10X
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
@@ -195,7 +195,7 @@ export default function HowItWorksScreen() {
             bonus and any Bonus Day entries.
           </TerminalText>
           <View style={styles.exampleBlock}>
-            <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+            <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
               EXAMPLE // 4-DAY GOAL
             </TerminalText>
             <TerminalText style={styles.exampleIntro} tone="muted" uppercase={false} variant="body">
@@ -230,28 +230,6 @@ export default function HowItWorksScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  title: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34,
-    textAlign: 'center'
-  },
-  body: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.control,
-    lineHeight: 23,
-    paddingHorizontal: spacing.sm,
-    textAlign: 'center'
-  },
   loopList: {
     marginTop: spacing.xl,
     gap: spacing.sm

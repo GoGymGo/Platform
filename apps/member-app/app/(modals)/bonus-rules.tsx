@@ -3,12 +3,13 @@ import { StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -81,14 +82,11 @@ export default function BonusRulesModal() {
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-          BONUS RULES
-        </TerminalText>
-        <CyberButtonOutline
-          label="CLOSE"
-          onPress={() => goBackOrReplace(router, '/how-it-works')}
-          style={styles.closeButton}
+      <View style={styles.nav}>
+        <OnboardingHeader
+          label="BONUS RULES"
+          onBack={() => goBackOrReplace(router, '/how-it-works')}
+          step="COMPETITION"
         />
       </View>
 
@@ -97,15 +95,11 @@ export default function BonusRulesModal() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            HOW ENTRIES{'\n'}MULTIPLY.
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Verified workouts earn entries. Consistency, Weekly Challenge
-            teamwork and a Perfect Month can multiply them.
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Verified workouts earn entries. Consistency, Weekly Challenge teamwork and a Perfect Month can multiply them."
+          eyebrow="SCORING GUIDE"
+          title="HOW ENTRIES MULTIPLY"
+        />
 
         <View style={styles.rulesList}>
           {rulesWithCategoryWinners.map((rule) => (
@@ -113,8 +107,8 @@ export default function BonusRulesModal() {
           ))}
         </View>
 
-        <HUDBorderBox glow style={styles.callout} tone="cyan">
-          <TerminalText glow style={styles.calloutLabel} tone="cyan" variant="label">
+        <HUDBorderBox style={styles.callout} tone="cyan">
+          <TerminalText style={styles.calloutLabel} tone="cyan" variant="label">
             WEEKLY CHALLENGE BONUS
           </TerminalText>
           <TerminalText style={styles.calloutCopy} tone="muted" uppercase={false} variant="body">
@@ -125,7 +119,7 @@ export default function BonusRulesModal() {
         </HUDBorderBox>
 
         <CyberButtonPrimary
-          label="GOT IT ->"
+          label="GOT IT"
           onPress={() => goBackOrReplace(router, '/how-it-works')}
         />
       </ScreenScrollView>
@@ -135,14 +129,14 @@ export default function BonusRulesModal() {
 
 function RuleCard({ rule }: { rule: BonusRule }) {
   return (
-    <HUDBorderBox glow={rule.tone === 'pink'} style={styles.ruleCard} tone={rule.tone}>
+    <HUDBorderBox style={styles.ruleCard} tone={rule.tone}>
       <View style={styles.ruleValueBox}>
-        <TerminalText glow style={styles.ruleValue} tone={rule.tone} variant="title">
+        <TerminalText style={styles.ruleValue} tone={rule.tone} variant="title">
           {rule.value}
         </TerminalText>
       </View>
       <View style={styles.ruleCopy}>
-        <TerminalText glow style={styles.ruleLabel} tone={rule.tone} variant="label">
+        <TerminalText style={styles.ruleLabel} tone={rule.tone} variant="label">
           {rule.label}
         </TerminalText>
         <TerminalText style={styles.ruleDescription} tone="muted" uppercase={false} variant="body">
@@ -156,46 +150,13 @@ function RuleCard({ rule }: { rule: BonusRule }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+  nav: {
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceCyanActive
+    paddingTop: spacing.sm
   },
-  headerLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal
-  },
-  closeButton: {
-    width: 104,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
-  content: {
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl
-  },
-  hero: {
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
-  },
+  content: brandScreenStyles.content,
   rulesList: {
     gap: spacing.md,
     marginBottom: spacing.lg

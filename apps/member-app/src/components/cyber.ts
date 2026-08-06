@@ -15,7 +15,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, cyberGlow, radii, spacing, textGlow, typography } from '@/constants/theme';
+import {
+  colors,
+  cyberGlow,
+  fontFamilies,
+  radii,
+  spacing,
+  textGlow,
+  typography
+} from '@/constants/theme';
 
 export { ScreenScrollView } from './screenScrollView';
 
@@ -42,6 +50,7 @@ type TerminalTextProps = {
   children?: ReactNode;
   glow?: boolean;
   live?: 'polite' | 'assertive';
+  numberOfLines?: number;
   style?: StyleProp<TextStyle>;
   tone?: TerminalTone;
   uppercase?: boolean;
@@ -119,25 +128,41 @@ const hudToneStyles: Record<HUDTone, ViewStyle> = {
 
 const primaryToneStyles: Record<CyberButtonTone, ViewStyle> = {
   cyan: {
-    borderColor: colors.borderCyanGlow,
-    backgroundColor: colors.surfaceCyanActive
+    borderColor: colors.cyan,
+    backgroundColor: colors.cyan
   },
   pink: {
-    borderColor: colors.borderPinkGlow,
-    backgroundColor: colors.surfacePinkActive
+    borderColor: colors.pink,
+    backgroundColor: colors.pink
   },
   green: {
-    borderColor: colors.borderSuccessGlow,
-    backgroundColor: colors.surfaceSuccessActive
+    borderColor: colors.green,
+    backgroundColor: colors.green
   },
   amber: {
-    borderColor: colors.borderWarningGlow,
-    backgroundColor: colors.surfaceWarningActive
+    borderColor: colors.amber,
+    backgroundColor: colors.amber
   },
   red: {
-    borderColor: colors.borderErrorGlow,
-    backgroundColor: colors.surfaceErrorActive
+    borderColor: colors.statusError,
+    backgroundColor: colors.statusError
   }
+};
+
+const primaryTextToneStyles: Record<CyberButtonTone, TextStyle> = {
+  cyan: { color: colors.textOnPrimary },
+  pink: { color: colors.textOnPink },
+  green: { color: colors.textOnGreen },
+  amber: { color: colors.textOnAmber },
+  red: { color: colors.text }
+};
+
+const outlineTextToneStyles: Record<CyberButtonTone, TextStyle> = {
+  cyan: { color: colors.cyanSoft },
+  pink: { color: colors.pinkSoft },
+  green: { color: colors.green },
+  amber: { color: colors.amber },
+  red: { color: colors.statusError }
 };
 
 const outlineToneStyles: Record<CyberButtonTone, ViewStyle> = {
@@ -179,6 +204,12 @@ export function ScreenContainer({
     createElement(
       View,
       { style: [cyberStyles.frame, frameStyle] },
+      createElement(
+        View,
+        { pointerEvents: 'none', style: cyberStyles.backdrop },
+        createElement(View, { style: cyberStyles.cyanSignal }),
+        createElement(View, { style: cyberStyles.topRule })
+      ),
       createElement(View, { style: [cyberStyles.content, contentStyle] }, children)
     )
   );
@@ -189,6 +220,7 @@ export function TerminalText({
   children,
   glow = false,
   live,
+  numberOfLines,
   style,
   tone = 'text',
   uppercase,
@@ -205,6 +237,7 @@ export function TerminalText({
       allowFontScaling: true,
       maxFontSizeMultiplier:
         variant === 'display' || variant === 'value' ? 1.5 : 2,
+      numberOfLines,
       style: [
         cyberStyles.terminalBase,
         cyberStyles[variant],
@@ -292,7 +325,7 @@ export function CyberButtonPrimary({
         style
       ]
     },
-    createElement(ButtonContent, { label, tone })
+    createElement(ButtonContent, { disabled, filled: true, label, tone })
   );
 }
 
@@ -320,45 +353,54 @@ export function CyberButtonOutline({
         style
       ]
     },
-    createElement(ButtonContent, { label, tone })
+    createElement(ButtonContent, { disabled, filled: false, label, tone })
   );
 }
 
 function ButtonContent({
+  disabled,
+  filled,
   label,
   tone
 }: {
+  disabled: boolean;
+  filled: boolean;
   label: string;
   tone: CyberButtonTone;
 }) {
   const hasTrailingArrow = /\s*->$/.test(label);
   const visibleLabel = hasTrailingArrow ? label.replace(/\s*->$/, '') : label;
+  const textTone = filled ? primaryTextToneStyles[tone] : outlineTextToneStyles[tone];
 
   return createElement(
     View,
     { style: cyberStyles.buttonContent },
     createElement(
-      TerminalText,
+      Text,
       {
-        glow: true,
-        style: cyberStyles.buttonLabel,
-        tone,
-        uppercase: false,
-        variant: 'button'
+        allowFontScaling: true,
+        maxFontSizeMultiplier: 1.5,
+        style: [
+          cyberStyles.buttonLabel,
+          textTone,
+          disabled ? cyberStyles.buttonLabelDisabled : null
+        ]
       },
       visibleLabel
     ),
     hasTrailingArrow
       ? createElement(
-          TerminalText,
+          Text,
           {
-            glow: true,
-            style: cyberStyles.buttonArrow,
-            tone,
-            uppercase: false,
-            variant: 'button'
+            allowFontScaling: true,
+            maxFontSizeMultiplier: 1.5,
+            style: [
+              cyberStyles.buttonArrow,
+              textTone,
+              disabled ? cyberStyles.buttonLabelDisabled : null
+            ]
           },
-          '->'
+          '→'
         )
       : null
   );
@@ -374,14 +416,37 @@ const cyberStyles = StyleSheet.create({
   frame: {
     flex: 1,
     width: '100%',
-    maxWidth: 430,
+    maxWidth: 480,
     overflow: 'hidden',
     alignSelf: 'center',
     backgroundColor: colors.background
   },
+  backdrop: {
+    ...StyleSheet.absoluteFill,
+    overflow: 'hidden'
+  },
+  cyanSignal: {
+    position: 'absolute',
+    top: -170,
+    right: -170,
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: colors.surfaceCyanSoft,
+    opacity: 0.34
+  },
+  topRule: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    height: 1,
+    backgroundColor: colors.cyan,
+    opacity: 0.32
+  },
   content: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   terminalBase: {
     color: colors.text
@@ -427,7 +492,7 @@ const cyberStyles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     ...webFocusOutline
   },
   buttonContent: {
@@ -440,13 +505,21 @@ const cyberStyles = StyleSheet.create({
   buttonLabel: {
     minWidth: 0,
     flexShrink: 1,
+    ...typography.button,
     textAlign: 'center'
   },
   buttonArrow: {
-    flexShrink: 0
+    flexShrink: 0,
+    fontFamily: fontFamilies.ui,
+    fontSize: 18,
+    lineHeight: 18
+  },
+  buttonLabelDisabled: {
+    color: colors.muted
   },
   pressed: {
-    opacity: 0.72
+    opacity: 0.82,
+    transform: [{ translateY: 1 }]
   },
   disabled: {
     opacity: 0.42,

@@ -1,13 +1,15 @@
 import { Rajdhani_500Medium } from '@expo-google-fonts/rajdhani/500Medium';
 import { Rajdhani_600SemiBold } from '@expo-google-fonts/rajdhani/600SemiBold';
 import { useFonts } from 'expo-font';
-import { SplashScreen, Stack, usePathname } from 'expo-router';
+import { SplashScreen, Stack } from 'expo-router';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { brandFonts } from '@gogymgo/brand';
 
 import { colors, goGymGoTheme } from '@/constants/theme';
 import { ScreenLoadingState } from '@/components/cyber';
@@ -35,10 +37,10 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const reduceMotion = useReducedMotionPreference();
   const [loaded, error] = useFonts({
-    'Rajdhani-Medium': Rajdhani_500Medium,
-    'Rajdhani-SemiBold': Rajdhani_600SemiBold,
-    'Orbitron-Bold': require('../assets/fonts/Orbitron-Bold.ttf'),
-    'ShareTechMono-Regular': require('../assets/fonts/ShareTechMono-Regular.ttf')
+    [brandFonts.body]: Rajdhani_500Medium,
+    [brandFonts.bodyStrong]: Rajdhani_600SemiBold,
+    [brandFonts.display]: require('../assets/fonts/Orbitron-Bold.ttf'),
+    [brandFonts.mono]: require('../assets/fonts/ShareTechMono-Regular.ttf')
   });
 
   useEffect(() => {
@@ -79,34 +81,12 @@ export default function RootLayout() {
 }
 
 function AppRuntime({ reduceMotion }: { reduceMotion: boolean }) {
-  const pathname = usePathname();
   const { active } = useAppTour();
-
-  if (pathname === '/demo') {
-    return <DemoNavigation reduceMotion={reduceMotion} />;
-  }
 
   return (
     <AuthProvider key={active ? 'tour' : 'app'}>
       <AuthenticatedApp reduceMotion={reduceMotion} />
     </AuthProvider>
-  );
-}
-
-function DemoNavigation({ reduceMotion }: { reduceMotion: boolean }) {
-  return (
-    <View style={styles.navigationRoot}>
-      <StatusBar style="light" />
-      <Stack
-        initialRouteName="demo"
-        screenOptions={{
-          ...screenOptions,
-          animation: reduceMotion ? 'none' : 'fade'
-        }}
-      >
-        <Stack.Screen name="demo" />
-      </Stack>
-    </View>
   );
 }
 

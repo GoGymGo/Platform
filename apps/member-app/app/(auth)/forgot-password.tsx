@@ -8,7 +8,8 @@ import {
   AuthStatusNotice,
   AuthTextField
 } from '@/components/auth';
-import { CyberButtonOutline, CyberButtonPrimary, HUDBorderBox } from '@/components/cyber';
+import { HUDBorderBox } from '@/components/cyber';
+import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { getAuthErrorMessage, validateEmail } from '@/domain/auth';
 import { spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -54,7 +55,7 @@ export default function ForgotPasswordScreen() {
         : 'Enter your account email and we will send a secure password-reset link.'}
       eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT RECOVERY'}
       footer={(
-        <CyberButtonOutline
+        <FirstRunSecondaryButton
           label="BACK TO SIGN IN"
           onPress={() => goBackOrReplace(
             router,
@@ -78,7 +79,7 @@ export default function ForgotPasswordScreen() {
           value={email}
         />
         {message ? <AuthStatusNotice message={message} tone={messageTone} /> : null}
-        <CyberButtonPrimary
+        <FirstRunPrimaryButton
           disabled={submitting || !firebaseConfigured}
           label={submitting ? 'SENDING RESET...' : 'SEND RESET EMAIL ->'}
           onPress={submitReset}

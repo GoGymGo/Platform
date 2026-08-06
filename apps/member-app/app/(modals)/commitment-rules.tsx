@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -124,14 +125,11 @@ export default function CommitmentRulesModal() {
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-          WEEKLY GOAL RULES
-        </TerminalText>
-        <CyberButtonOutline
-          label="CLOSE"
-          onPress={() => goBackOrReplace(router, '/commitment')}
-          style={styles.closeButton}
+      <View style={styles.nav}>
+        <OnboardingHeader
+          label="WEEKLY GOAL RULES"
+          onBack={() => goBackOrReplace(router, '/commitment')}
+          step="COMPETITION"
         />
       </View>
 
@@ -140,20 +138,14 @@ export default function CommitmentRulesModal() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            LOCK YOUR{'\n'}MONTH CLEARLY.
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Choose any published Weekly Goal. If the competition has already
-            started, your eligible scoring begins when enrollment is confirmed.
-            Registration remains available until the competition ends, reaches
-            its entrant cap, or is cancelled.
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Choose any published Weekly Goal. Your eligible scoring begins when enrollment is confirmed."
+          eyebrow="MONTHLY COMMITMENT"
+          title="LOCK YOUR MONTH CLEARLY"
+        />
 
         <HUDBorderBox style={styles.atGlanceCard} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             RULES AT A GLANCE
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -178,11 +170,11 @@ export default function CommitmentRulesModal() {
           ))}
         </View>
 
-        <HUDBorderBox glow style={styles.summaryCard} tone="cyan">
+        <HUDBorderBox style={styles.summaryCard} tone="cyan">
           <TerminalText style={styles.summaryLabel} tone="muted" variant="label">
             REGIONAL LAUNCH
           </TerminalText>
-          <TerminalText glow style={styles.summaryValue} tone="cyan" variant="title">
+          <TerminalText style={styles.summaryValue} tone="cyan" variant="title">
             {currentCompetition
               ? `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS REQUIRED`
               : 'REGIONAL MINIMUM PENDING'}
@@ -196,7 +188,7 @@ export default function CommitmentRulesModal() {
         </HUDBorderBox>
 
         <CyberButtonPrimary
-          label="BACK TO WEEKLY GOAL ->"
+          label="BACK TO WEEKLY GOAL"
           onPress={() => goBackOrReplace(router, '/commitment')}
         />
       </ScreenScrollView>
@@ -220,18 +212,18 @@ function RuleRow({
       onPress={onToggle}
       style={({ pressed }) => pressed ? styles.rulePressed : null}
     >
-      <HUDBorderBox glow={expanded && rule.tone === 'pink'} style={styles.ruleRow} tone={rule.tone}>
+      <HUDBorderBox style={styles.ruleRow} tone={rule.tone}>
         <View style={styles.ruleIndexBox}>
-          <TerminalText glow tone={rule.tone} variant="label">
+          <TerminalText tone={rule.tone} variant="label">
             {rule.index}
           </TerminalText>
         </View>
         <View style={styles.ruleCopy}>
           <View style={styles.ruleTitleRow}>
-            <TerminalText glow style={styles.ruleTitle} tone={rule.tone} variant="label">
+            <TerminalText style={styles.ruleTitle} tone={rule.tone} variant="label">
               {rule.title}
             </TerminalText>
-            <TerminalText glow tone={rule.tone} variant="button">
+            <TerminalText tone={rule.tone} variant="button">
               {expanded ? '-' : '+'}
             </TerminalText>
           </View>
@@ -249,46 +241,13 @@ function RuleRow({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+  nav: {
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderCyanSubtle
+    paddingTop: spacing.sm
   },
-  headerLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal
-  },
-  closeButton: {
-    width: 104,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
-  content: {
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl
-  },
-  hero: {
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
-  },
+  content: brandScreenStyles.content,
   rulesList: {
     gap: spacing.md,
     marginBottom: spacing.lg

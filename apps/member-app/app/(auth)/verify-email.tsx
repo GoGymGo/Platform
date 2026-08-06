@@ -8,13 +8,12 @@ import {
   AuthStatusNotice
 } from '@/components/auth';
 import {
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { getAuthErrorMessage } from '@/domain/auth';
-import { spacing } from '@/constants/theme';
+import { fontFamilies, spacing } from '@/constants/theme';
 import {
   gymScanAuthNext,
   gymScanSetupNext,
@@ -157,10 +156,10 @@ export default function VerifyEmailScreen() {
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
       {!user ? (
         <HUDBorderBox style={styles.panel} tone="amber">
-          <TerminalText tone="muted" uppercase={false} variant="body">
+          <TerminalText style={styles.panelBody} tone="muted" uppercase={false} variant="body">
             Sign in first so GoGymGo can check the correct email account.
           </TerminalText>
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             label="GO TO SIGN IN"
             onPress={() => router.replace(
               next === gymScanAuthNext || next === gymScanSetupNext
@@ -171,19 +170,19 @@ export default function VerifyEmailScreen() {
         </HUDBorderBox>
       ) : (
         <HUDBorderBox style={styles.panel} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             VERIFICATION SENT TO
           </TerminalText>
-          <TerminalText tone="text" uppercase={false} variant="body">
+          <TerminalText style={styles.panelBody} tone="text" uppercase={false} variant="body">
             {user.email ?? 'YOUR ACCOUNT EMAIL'}
           </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
+          <TerminalText style={styles.panelBody} tone="muted" uppercase={false} variant="body">
             {appTourActive
               ? 'Choose Continue Demo to confirm the sample account and proceed to region setup.'
               : 'Open the verification email and confirm the address. This screen continues automatically when verification is complete.'}
           </TerminalText>
           {message ? <AuthStatusNotice message={message} tone={messageTone} /> : null}
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             disabled={Boolean(busyAction)}
             label={busyAction === 'check'
               ? 'CHECKING...'
@@ -193,13 +192,13 @@ export default function VerifyEmailScreen() {
             onPress={checkVerification}
           />
           {!appTourActive ? (
-            <CyberButtonOutline
+            <FirstRunSecondaryButton
               disabled={Boolean(busyAction)}
               label={busyAction === 'resend' ? 'SENDING...' : 'RESEND EMAIL'}
               onPress={resendVerification}
             />
           ) : null}
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             disabled={Boolean(busyAction)}
             label={busyAction === 'signout' ? 'SIGNING OUT...' : 'USE ANOTHER ACCOUNT'}
             onPress={exitAccount}
@@ -215,5 +214,10 @@ const styles = StyleSheet.create({
   panel: {
     gap: spacing.md,
     padding: spacing.lg
+  },
+  panelBody: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
   }
 });

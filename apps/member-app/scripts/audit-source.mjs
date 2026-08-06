@@ -74,6 +74,15 @@ for (const filePath of sourceFiles) {
     }
   }
 
+  if (relativePath !== 'app/_layout.tsx') {
+    const fontMatch = sourceText.match(
+      /\b(?:Orbitron-Bold|Rajdhani-Medium|Rajdhani-SemiBold|ShareTechMono-Regular)\b/
+    );
+    if (fontMatch) {
+      issues.push(`${relativePath}: raw brand font registration ${fontMatch[0]}`);
+    }
+  }
+
   if (
     relativePath !== 'src/navigation/goBack.ts' &&
     /\brouter\.back\s*\(/.test(sourceText)
@@ -177,6 +186,7 @@ function reportNode(node, relativePath, message) {
 function auditRouteReturnPaths(appDirectory) {
   const entryRouteExemptions = new Set([
     'app/(onboarding)/welcome.tsx',
+    'app/demo.tsx',
     'app/index.tsx',
     'app/scan.tsx'
   ]);
@@ -205,8 +215,8 @@ function auditRouteReturnPaths(appDirectory) {
       issues.push(`${relativePath}: route has no detected in-app return path`);
     }
 
-    if (relativePath === 'app/(tabs)/calendar.tsx' && !sourceText.includes('ScreenBackButton')) {
-      issues.push(`${relativePath}: calendar requires the shared screen back control`);
+    if (relativePath === 'app/(tabs)/calendar.tsx' && !sourceText.includes('OnboardingHeader')) {
+      issues.push(`${relativePath}: calendar requires the shared compact screen header`);
     }
   }
 }
@@ -232,8 +242,8 @@ function auditAppTourCoverage(appDirectory) {
     ['/workouts/[workoutId]', '/workouts/app-tour-workout']
   ]);
 
-  for (const route of collectRouteNames(appDirectory)) {
-    if (routeExemptions.has(route)) {
+  for (const { filePath, route } of collectRouteEntries(appDirectory)) {
+    if (routeExemptions.has(route) || isRedirectOnlyRoute(filePath)) {
       continue;
     }
 
@@ -344,13 +354,22 @@ function auditFlowReliability() {
       'allowFontScaling: true',
       'minHeight: 54'
     ]],
+    ['src/components/firstRun.tsx', [
+      'CyberButtonPrimary',
+      'CyberButtonOutline'
+    ]],
+    ['src/components/auth.tsx', ['ScreenBackButton']],
     ['src/components/clarity.tsx', ['GUIDE', 'minWidth: 72']],
     ['src/components/competitionHubNav.tsx', [
       'aria-selected={selected}',
       'accessibilityState={{ selected }}',
       'if (!selected)'
     ]],
-    ['src/components/onboarding.tsx', ['minHeight: 44']],
+    ['src/components/onboarding.tsx', [
+      'minHeight: 44',
+      'useWindowDimensions',
+      'numberOfLines={1}'
+    ]],
     ['src/components/socialChallenges.tsx', [
       'ChallengeBuilderStep',
       'STEP {builderStepIndex + 1} OF',
@@ -682,6 +701,10 @@ function collectRoutePatterns(appDirectory) {
 }
 
 function collectRouteNames(appDirectory) {
+  return collectRouteEntries(appDirectory).map(({ route }) => route);
+}
+
+function collectRouteEntries(appDirectory) {
   return collectSourceFiles(appDirectory)
     .filter((filePath) => {
       const fileName = path.basename(filePath);
@@ -696,8 +719,33 @@ function collectRouteNames(appDirectory) {
         .split('/')
         .filter((segment) => !/^\(.+\)$/.test(segment))
         .filter((segment) => segment !== 'index');
-      return `/${segments.join('/')}`.replace(/\/$/, '') || '/';
+      return {
+        filePath,
+        route: `/${segments.join('/')}`.replace(/\/$/, '') || '/'
+      };
     });
+}
+
+function isRedirectOnlyRoute(filePath) {
+  const sourceText = fs.readFileSync(filePath, 'utf8');
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const jsxTags = new Set();
+
+  function collectJsxTags(node) {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      jsxTags.add(node.tagName.getText(sourceFile));
+    }
+    ts.forEachChild(node, collectJsxTags);
+  }
+
+  collectJsxTags(sourceFile);
+  return jsxTags.size === 1 && jsxTags.has('Redirect');
 }
 
 function normalizeRoute(route) {

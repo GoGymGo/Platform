@@ -5,13 +5,15 @@ import { Linking, Platform, StyleSheet, View } from 'react-native';
 import { AccountLegalAgreement } from '@/components/accountLegalAgreement';
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
 import {
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
-  ScreenContainer,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import {
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
 import { OnboardingHeader } from '@/components/onboarding';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
@@ -133,7 +135,7 @@ export default function RegionScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -150,7 +152,7 @@ export default function RegionScreen() {
           step={isProfileSource ? 'PROFILE' : 'SETUP // 1 OF 2'}
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           {isProfileSource
             ? 'REVERIFY YOUR REGION'
             : approvedRegionReady
@@ -173,7 +175,7 @@ export default function RegionScreen() {
             <TerminalText tone="cyan" variant="label">
               ONE-TIME LOCATION CHECK
             </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
+            <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
               GoGymGo sends your location once for a secure region check. We
               save the approved region—not your coordinates—and never track you
               in the background.
@@ -188,7 +190,7 @@ export default function RegionScreen() {
                 <TerminalText tone="dim" variant="label">
                   CURRENT VERIFIED REGION
                 </TerminalText>
-                <TerminalText tone="text" variant="body">
+                <TerminalText style={styles.bodyCopy} tone="text" variant="body">
                   {competitionRegion.label}
                 </TerminalText>
               </View>
@@ -200,7 +202,7 @@ export default function RegionScreen() {
         ) : null}
 
         {!approvedRegionReady || isProfileSource ? (
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             disabled={verificationState === 'checking'}
             label={
               verificationState === 'checking'
@@ -225,17 +227,17 @@ export default function RegionScreen() {
           />
         ) : null}
         {verificationState === 'unsupported-region' ? (
-          <HUDBorderBox glow style={styles.waitlistCard} tone="amber">
-            <TerminalText glow tone="amber" variant="label">
+          <HUDBorderBox style={styles.waitlistCard} tone="amber">
+            <TerminalText tone="amber" variant="label">
               OUTSIDE THE SEPTEMBER PILOT REGION
             </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
+            <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
               The September pilot is available only on Vancouver Island and
               the supported Gulf Islands. We will not place you in Toronto or
               show another region&apos;s sample competition.
             </TerminalText>
             {waitlistJoined ? (
-              <TerminalText live="polite" glow tone="green" variant="label">
+              <TerminalText live="polite" tone="green" variant="label">
                 REGIONAL WAITLIST CONFIRMED
               </TerminalText>
             ) : (
@@ -253,7 +255,7 @@ export default function RegionScreen() {
                 {waitlistError ? (
                   <AuthStatusNotice message={waitlistError} tone="red" />
                 ) : null}
-                <CyberButtonPrimary
+                <FirstRunPrimaryButton
                   disabled={waitlistBusy}
                   label={waitlistBusy ? 'JOINING WAITLIST...' : 'JOIN REGIONAL WAITLIST ->'}
                   onPress={() => void joinRegionWaitlist()}
@@ -271,7 +273,7 @@ export default function RegionScreen() {
         ) : null}
 
         {verificationState === 'permission-denied' ? (
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             label={Platform.OS === 'web' ? 'RETRY AFTER ALLOWING' : 'OPEN DEVICE SETTINGS'}
             onPress={() => {
               if (Platform.OS === 'web') {
@@ -284,21 +286,21 @@ export default function RegionScreen() {
         ) : null}
 
         {approvedRegionReady ? (
-          <HUDBorderBox glow style={styles.verifiedCard} tone="green">
+          <HUDBorderBox style={styles.verifiedCard} tone="green">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
                 <TerminalText tone="green" variant="label">
                   VERIFIED REGION
                 </TerminalText>
-                <TerminalText glow tone="cyan" variant="title">
+                <TerminalText tone="cyan" variant="title">
                   {competitionRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText glow tone="green" variant="label">
+              <TerminalText tone="green" variant="label">
                 VERIFIED
               </TerminalText>
             </View>
-            <TerminalText tone="muted" uppercase={false} variant="caption">
+            <TerminalText style={styles.captionCopy} tone="muted" uppercase={false} variant="caption">
               You will compete in {competitionRegion.label} and see rewards
               available for this region.
             </TerminalText>
@@ -306,7 +308,7 @@ export default function RegionScreen() {
         ) : null}
 
         {approvedRegionReady && !isProfileSource ? (
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             disabled={verificationState === 'checking'}
             label={
               verificationState === 'checking'
@@ -330,7 +332,7 @@ export default function RegionScreen() {
           />
         ) : null}
       </ScreenScrollView>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
@@ -356,20 +358,35 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     gap: spacing.md,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   title: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.screenTitle,
     lineHeight: 34,
-    textAlign: 'center'
+    paddingLeft: 14,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   body: {
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
+    marginBottom: spacing.sm,
+    paddingLeft: 16,
+    fontFamily: fontFamilies.ui,
+    fontSize: 16,
+    lineHeight: 24
+  },
+  bodyCopy: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
+  },
+  captionCopy: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   privacyCard: {
     gap: spacing.sm,

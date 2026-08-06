@@ -11,6 +11,7 @@ import {
 } from '@/components/cyber';
 import { FirstVisitTip, InlineHelpButton } from '@/components/clarity';
 import { CompetitionHubNav } from '@/components/competitionHubNav';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import {
@@ -145,20 +146,16 @@ export default function SquadScreen() {
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]}
       >
-        <View style={styles.header}>
-          <View style={styles.headerTopLine}>
-            <TerminalText glow tone="cyan" variant="label">
-              {challengeState}
-            </TerminalText>
+        <BrandScreenHeader
+          accessory={(
             <InlineHelpButton
               label="Open competition guide"
               onPress={() => router.push('/how-it-works?from=challenge')}
             />
-          </View>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            {activePeriod ? `WEEK ${activePeriod.index} CHALLENGE` : 'WEEKLY CHALLENGE'}
-          </TerminalText>
-        </View>
+          )}
+          eyebrow={challengeState}
+          title={activePeriod ? `WEEK ${activePeriod.index} CHALLENGE` : 'WEEKLY CHALLENGE'}
+        />
 
         <CompetitionHubNav active="challenge" style={styles.hubNav} />
 
@@ -198,8 +195,8 @@ export default function SquadScreen() {
         ) : null}
 
         {!pairingDataError && !pairingDataLoading && incomingRequest && pairingActionRequired ? (
-          <HUDBorderBox glow style={styles.partnerRequestCard} tone="amber">
-            <TerminalText glow tone="amber" variant="label">
+          <HUDBorderBox style={styles.partnerRequestCard} tone="amber">
+            <TerminalText tone="amber" variant="label">
               RESPOND TO INVITE
             </TerminalText>
             <View style={styles.partnerIdentity}>
@@ -292,7 +289,7 @@ export default function SquadScreen() {
         />
 
         {activePeriod ? (
-          <HUDBorderBox glow style={styles.pactCard} tone="cyan">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
             <View style={styles.matchupRow}>
               <PlayerBlock
                 initials={getPublicInitials(publicName)}
@@ -340,8 +337,8 @@ export default function SquadScreen() {
             </View>
           </HUDBorderBox>
         ) : isRemainderDayPhase ? (
-          <HUDBorderBox glow style={styles.pactCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
               DAYS 29-{bonusEndDay}
             </TerminalText>
             <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
@@ -350,8 +347,8 @@ export default function SquadScreen() {
             </TerminalText>
           </HUDBorderBox>
         ) : (
-          <HUDBorderBox glow style={styles.pactCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
               {acceptedPartnerAlias ? 'PARTNER READY' : 'FIRST ELIGIBLE WEEK'}
             </TerminalText>
             <TerminalText style={styles.pendingDate} tone="text" variant="title">
@@ -663,17 +660,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    marginBottom: spacing.lg
-  },
-  headerTopLine: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md
+    backgroundColor: colors.transparent
   },
   hubNav: {
     marginBottom: spacing.lg
@@ -683,10 +670,6 @@ const styles = StyleSheet.create({
   },
   firstVisitTip: {
     marginBottom: spacing.lg
-  },
-  title: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.display
   },
   pactCard: {
     marginBottom: spacing.lg,

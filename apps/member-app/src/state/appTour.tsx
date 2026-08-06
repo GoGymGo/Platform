@@ -12,6 +12,7 @@ import {
   browserTestPreviewBuildEnabled,
   browserTestPreviewEnabled
 } from '@/config/browserTestPreview';
+import { isDemoPath, isDemoSearch } from '@/config/demoMode';
 
 export type AppTourScenario =
   | 'new-player'
@@ -24,6 +25,7 @@ type AppTourContextValue = {
   active: boolean;
   enterTour: (scenario?: AppTourScenario) => void;
   exitTour: () => void;
+  publicDemo: boolean;
   scenario: AppTourScenario;
 };
 
@@ -33,37 +35,49 @@ export function AppTourProvider({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const params = useGlobalSearchParams<{
     appTour?: string | string[];
+    demo?: string | string[];
     tourScenario?: string | string[];
   }>();
   const requestedScenario = parseScenario(firstParam(params.tourScenario));
+  const publicDemoRequested =
+    isDemoPath(pathname) || isDemoSearch(firstParam(params.demo));
   const browserPreviewLanding =
     browserTestPreviewBuildEnabled && pathname === '/';
   const tourRequested =
-    browserTestPreviewEnabled &&
+    publicDemoRequested ||
     (
-      pathname === '/app-tour' ||
-      pathname === '/test-preview' ||
-      browserPreviewLanding ||
-      firstParam(params.appTour) === '1'
+      browserTestPreviewEnabled &&
+      (
+        pathname === '/app-tour' ||
+        pathname === '/test-preview' ||
+        browserPreviewLanding ||
+        firstParam(params.appTour) === '1'
+      )
     );
   const [active, setActive] = useState(tourRequested);
+  const [publicDemoActive, setPublicDemoActive] = useState(publicDemoRequested);
   const [scenario, setScenario] = useState<AppTourScenario>(
     requestedScenario ?? (browserPreviewLanding ? 'new-player' : 'ready')
   );
-  const effectiveActive = active || tourRequested;
+  const effectivePublicDemo = publicDemoActive || publicDemoRequested;
+  const effectiveActive = active || tourRequested || effectivePublicDemo;
   const effectiveScenario = requestedScenario ?? scenario;
 
   const enterTour = useCallback((nextScenario: AppTourScenario = 'ready') => {
-    if (!browserTestPreviewEnabled) {
+    if (!browserTestPreviewEnabled && !publicDemoRequested) {
       return;
     }
 
+    if (publicDemoRequested) {
+      setPublicDemoActive(true);
+    }
     setScenario(nextScenario);
     setActive(true);
-  }, []);
+  }, [publicDemoRequested]);
 
   const exitTour = useCallback(() => {
     setActive(false);
+    setPublicDemoActive(false);
     setScenario('ready');
   }, []);
 
@@ -72,9 +86,10 @@ export function AppTourProvider({ children }: PropsWithChildren) {
       active: effectiveActive,
       enterTour,
       exitTour,
+      publicDemo: effectivePublicDemo,
       scenario: effectiveScenario
     }),
-    [effectiveActive, effectiveScenario, enterTour, exitTour]
+    [effectiveActive, effectivePublicDemo, effectiveScenario, enterTour, exitTour]
   );
 
   return (

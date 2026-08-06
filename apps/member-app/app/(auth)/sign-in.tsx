@@ -9,11 +9,10 @@ import {
   AuthTextField
 } from '@/components/auth';
 import {
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { SocialAuthButtons } from '@/components/socialAuthButtons';
 import { LegalDocumentLinks } from '@/components/legal';
 import { useAppData } from '@/data/appDataHooks';
@@ -24,7 +23,7 @@ import {
   type AuthFormErrors
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
-import { colors, spacing } from '@/constants/theme';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   getGymScanPostAuthRoute,
   gymScanAuthNext,
@@ -175,17 +174,17 @@ export default function SignInScreen() {
 
       {user ? (
         <HUDBorderBox style={styles.activeSession} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             ACCOUNT SESSION ACTIVE
           </TerminalText>
-          <TerminalText tone="text" uppercase={false} variant="body">
+          <TerminalText style={styles.editorialBody} tone="text" uppercase={false} variant="body">
             {user.email ?? 'SIGNED-IN ACCOUNT'}
           </TerminalText>
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             label="CONTINUE TO GOGYMGO ->"
             onPress={continueActiveSession}
           />
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             disabled={submitting}
             label={submitting ? 'SIGNING OUT...' : 'USE A DIFFERENT ACCOUNT'}
             onPress={clearSession}
@@ -204,7 +203,7 @@ export default function SignInScreen() {
                 onApplePress={continueWithApple}
                 onGooglePress={continueWithGoogle}
               />
-              <TerminalText tone="muted" uppercase={false} variant="caption">
+              <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
                 Continuing with Google or Apple creates an account when one does not
                 exist. New players review the account agreements during setup.
               </TerminalText>
@@ -255,16 +254,16 @@ export default function SignInScreen() {
             {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
             {!emailSignInReady ? (
-              <TerminalText tone="dim" uppercase={false} variant="caption">
+              <TerminalText style={styles.editorialCaption} tone="dim" uppercase={false} variant="caption">
                 Enter your email and password to continue.
               </TerminalText>
             ) : null}
-            <CyberButtonPrimary
+            <FirstRunPrimaryButton
               disabled={busy || !firebaseConfigured || !emailSignInReady}
               label={submitting ? 'SIGNING IN...' : 'SIGN IN ->'}
               onPress={submitEmailSignIn}
             />
-            <CyberButtonOutline
+            <FirstRunSecondaryButton
               disabled={busy}
               label="RESET PASSWORD"
               onPress={() => router.push(
@@ -275,7 +274,7 @@ export default function SignInScreen() {
             />
           </HUDBorderBox>
 
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             disabled={busy}
             label="CREATE A NEW ACCOUNT"
             onPress={() => router.replace(
@@ -311,5 +310,15 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
     backgroundColor: colors.borderMuted
+  },
+  editorialBody: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
+  },
+  editorialCaption: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   }
 });

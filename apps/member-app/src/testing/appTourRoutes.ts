@@ -37,7 +37,6 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
     title: 'OPTIONAL SETUP',
     routes: [
       { label: 'Public Alias', route: '/identity' },
-      { label: 'Workout Device', route: '/verification?source=workout' },
       { label: 'Competition Guide', route: '/how-it-works' }
     ]
   },
@@ -123,11 +122,32 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
 
 export const appTourRoutes = appTourRouteGroups.flatMap(({ routes }) => routes);
 
-export function buildAppTourHref(route: AppTourRoute): Href {
+const publicDemoRouteNames = new Set([
+  '/home',
+  '/calendar',
+  '/session',
+  '/leaderboard',
+  '/winners-circle',
+  '/leaderboard/rewards',
+  '/rewards/awards',
+  '/squad',
+  '/squad/social',
+  '/profile'
+]);
+
+export const publicDemoRoutes = appTourRoutes.filter(({ route }) =>
+  publicDemoRouteNames.has(route)
+);
+
+export function buildAppTourHref(
+  route: AppTourRoute,
+  mode: 'demo' | 'review' = 'review'
+): Href {
   const scenario = route.scenario ?? 'ready';
   const join = route.route.includes('?') ? '&' : '?';
+  const modeParam = mode === 'demo' ? 'demo=1' : 'appTour=1';
 
-  return `${route.route}${join}appTour=1&tourScenario=${scenario}` as Href;
+  return `${route.route}${join}${modeParam}&tourScenario=${scenario}` as Href;
 }
 
 export function findAppTourRouteIndex(pathname: string) {

@@ -115,7 +115,7 @@ export function StreakRewards({ isLoading = false, style, summary }: StreakRewar
     <HUDBorderBox style={[styles.panel, style]} tone="muted">
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             GYM STREAK REWARDS
           </TerminalText>
           <TerminalText style={styles.description} tone="muted" uppercase={false} variant="body">
@@ -266,7 +266,7 @@ function StreakBadge({ badge, count }: { badge: BadgeDefinition; count: number }
             size={30}
           />
           {active ? (
-            <TerminalText glow style={styles.count} tone={badge.tone} variant="micro">
+            <TerminalText style={styles.count} tone={badge.tone} variant="micro">
               X{count}
             </TerminalText>
           ) : null}

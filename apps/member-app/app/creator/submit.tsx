@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AuthTextField } from '@/components/auth';
 import { DataCollectionNotice } from '@/components/legal';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import {
   CyberButtonOutline,
   CyberButtonPrimary,
@@ -50,19 +52,21 @@ export default function CreatorVideoSubmissionScreen() {
       <ScreenContainer>
         <ScreenScrollView
           bounces={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[brandScreenStyles.content, styles.content]}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <TerminalText glow tone="pink" variant="label">
-              CREATOR STUDIO // {competitionRegion.label}
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="pink" variant="title">
-              SUBMIT A WORKOUT VIDEO
-            </TerminalText>
-          </View>
-          <HUDBorderBox glow style={styles.notice} tone="amber">
-            <TerminalText glow tone="amber" variant="label">
+          <OnboardingHeader
+            label="CREATOR STUDIO"
+            onBack={() => goBackOrReplace(router, '/workouts')}
+            step="WORKOUT SUBMISSION"
+          />
+          <BrandScreenHeader
+            accent="pink"
+            eyebrow={competitionRegion.label}
+            title="SUBMIT A WORKOUT VIDEO"
+          />
+          <HUDBorderBox style={styles.notice} tone="amber">
+            <TerminalText tone="amber" variant="label">
               {creatorFeatureStatusLabel}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
@@ -120,22 +124,21 @@ export default function CreatorVideoSubmissionScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[brandScreenStyles.content, styles.content]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <TerminalText glow tone="pink" variant="label">
-            CREATOR STUDIO // {competitionRegion.label}
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="pink" variant="title">
-            SUBMIT A WORKOUT VIDEO
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Submit a hosted follow-along video for catalog review. This is a creator-content
-            submission, not a verified workout.
-          </TerminalText>
-        </View>
+        <OnboardingHeader
+          label="CREATOR STUDIO"
+          onBack={() => goBackOrReplace(router, '/workouts')}
+          step="WORKOUT SUBMISSION"
+        />
+        <BrandScreenHeader
+          accent="pink"
+          description="Submit a hosted follow-along video for catalog review. This is a creator-content submission, not a verified workout."
+          eyebrow={competitionRegion.label}
+          title="SUBMIT A WORKOUT VIDEO"
+        />
 
         <HUDBorderBox style={styles.form} tone="muted">
           <AuthTextField
@@ -198,12 +201,8 @@ export default function CreatorVideoSubmissionScreen() {
           <DataCollectionNotice message="We use the hosted-video link, workout details, disclosures and review notes to moderate the submission, administer the creator catalog and preserve the submitted rights receipt." />
         </HUDBorderBox>
 
-        <HUDBorderBox
-          glow={rightsAccepted}
-          style={styles.rightsCard}
-          tone={rightsAccepted ? 'pink' : 'amber'}
-        >
-          <TerminalText glow tone={rightsAccepted ? 'pink' : 'amber'} variant="label">
+        <HUDBorderBox style={styles.rightsCard} tone={rightsAccepted ? 'pink' : 'amber'}>
+          <TerminalText tone={rightsAccepted ? 'pink' : 'amber'} variant="label">
             CREATOR VIDEO RIGHTS + ADAPTATION TERMS
           </TerminalText>
           {creatorRightsTerms.map((term, index) => (
@@ -237,7 +236,7 @@ export default function CreatorVideoSubmissionScreen() {
         ) : null}
         {submitted ? (
           <HUDBorderBox style={styles.notice} tone="green">
-            <TerminalText live="polite" glow tone="green" variant="label">
+            <TerminalText live="polite" tone="green" variant="label">
               VIDEO SUBMITTED FOR REVIEW
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
@@ -301,16 +300,8 @@ function ToggleRow({
 
 const styles = StyleSheet.create({
   content: {
-    flexGrow: 1,
-    gap: spacing.lg,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
   },
-  header: { gap: spacing.sm },
-  title: { fontFamily: fontFamilies.display },
-  body: { fontFamily: fontFamilies.body },
   form: { gap: spacing.md, padding: spacing.lg },
   twoColumns: { flexDirection: 'row', gap: spacing.sm },
   flexField: { minWidth: 0, flex: 1 },

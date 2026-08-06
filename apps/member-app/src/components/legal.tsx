@@ -3,13 +3,15 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunSecondaryButton } from '@/components/firstRun';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { biometricConsentCopy, type LegalDocument } from '@/constants/legal';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 type LegalTone = 'cyan' | 'pink';
@@ -82,7 +84,7 @@ export function LegalConsentCheckbox({
       onPress={onToggle}
       style={style}
     >
-      <HUDBorderBox glow={checked} style={styles.checkboxRow} tone={activeTone}>
+      <HUDBorderBox style={styles.checkboxRow} tone={activeTone}>
         <View
           style={[
             styles.checkboxMark,
@@ -90,13 +92,13 @@ export function LegalConsentCheckbox({
           ]}
         >
           {checked ? (
-            <TerminalText glow tone={tone} variant="micro">
+            <TerminalText tone={tone} variant="micro">
               OK
             </TerminalText>
           ) : null}
         </View>
         <View style={styles.checkboxCopy}>
-          <TerminalText glow={checked} style={styles.checkboxLabel} tone={textTone} variant="body">
+          <TerminalText style={styles.checkboxLabel} tone={textTone} variant="body">
             {label}
           </TerminalText>
           {helper ? (
@@ -131,7 +133,7 @@ export function LegalDocumentLinks({
           onPress={() => openDocument('/privacy-policy')}
           style={({ pressed }) => [styles.compactLink, pressed ? styles.pressed : null]}
         >
-          <TerminalText glow tone="cyan" variant="micro">
+          <TerminalText tone="cyan" variant="micro">
             PRIVACY POLICY
           </TerminalText>
         </Pressable>
@@ -143,7 +145,7 @@ export function LegalDocumentLinks({
           onPress={() => openDocument('/terms-of-service')}
           style={({ pressed }) => [styles.compactLink, pressed ? styles.pressed : null]}
         >
-          <TerminalText glow tone="cyan" variant="micro">
+          <TerminalText tone="cyan" variant="micro">
             TERMS
           </TerminalText>
         </Pressable>
@@ -153,12 +155,12 @@ export function LegalDocumentLinks({
 
   return (
     <View style={[styles.linkRow, style]}>
-      <CyberButtonOutline
+      <FirstRunSecondaryButton
         label="PRIVACY POLICY"
         onPress={() => openDocument('/privacy-policy')}
         style={styles.linkButton}
       />
-      <CyberButtonOutline
+      <FirstRunSecondaryButton
         label="TERMS"
         onPress={() => openDocument('/terms-of-service')}
         style={styles.linkButton}
@@ -252,40 +254,38 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
 
   return (
     <ScreenContainer>
-      <View style={styles.documentHeader}>
-        <View style={styles.documentTitleGroup}>
-          <TerminalText glow tone="cyan" variant="label">
-            LEGAL DOCUMENT
-          </TerminalText>
-          <TerminalText style={styles.documentTitle} tone="text" variant="title">
-            {document.title}
-          </TerminalText>
-        </View>
-        <CyberButtonOutline
-          label="CLOSE"
-          onPress={() => goBackOrReplace(router, '/')}
-          style={styles.closeButton}
+      <View style={styles.documentNav}>
+        <OnboardingHeader
+          label="LEGAL DOCUMENT"
+          onBack={() => goBackOrReplace(router, '/')}
+          step="GOGYMGO"
         />
       </View>
 
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.documentContent}
+        contentContainerStyle={[brandScreenStyles.content, styles.documentContent]}
         showsVerticalScrollIndicator={false}
       >
-        <HUDBorderBox glow style={styles.documentIntro} tone="cyan">
+        <BrandScreenHeader
+          description={formatReadableLegalCopy(document.intro)}
+          eyebrow={`EFFECTIVE // ${document.effectiveDate}`}
+          title={document.title}
+        />
+
+        <HUDBorderBox style={styles.documentIntro} tone="cyan">
           <TerminalText tone="dim" variant="micro">
-            EFFECTIVE // {document.effectiveDate}
+            PLAIN-LANGUAGE SUMMARY
           </TerminalText>
-          <TerminalText style={styles.documentIntroCopy} tone="cyan" variant="body">
-            {formatReadableLegalCopy(document.intro)}
+          <TerminalText style={styles.documentIntroCopy} tone="muted" variant="body">
+            Read the sections below for the complete published terms.
           </TerminalText>
         </HUDBorderBox>
 
         <View style={styles.sectionList}>
           {document.sections.map((section) => (
             <HUDBorderBox key={section.heading} style={styles.legalSection} tone="muted">
-              <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+              <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
                 {section.heading}
               </TerminalText>
               {section.body ? (
@@ -335,8 +335,7 @@ const styles = StyleSheet.create({
   },
   checkboxMarkActive: {
     borderColor: colors.borderCyanGlow,
-    backgroundColor: colors.surfaceCyanSelected,
-    ...cyberGlow.cyan
+    backgroundColor: colors.surfaceCyanSelected
   },
   checkboxMarkIdle: {
     borderColor: colors.borderMuted,
@@ -346,11 +345,15 @@ const styles = StyleSheet.create({
     flex: 1
   },
   checkboxLabel: {
-    fontFamily: fontFamilies.body
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 22
   },
   checkboxHelper: {
     marginTop: spacing.xs,
-    fontFamily: fontFamilies.body
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   linkRow: {
     flexDirection: 'row',
@@ -418,35 +421,12 @@ const styles = StyleSheet.create({
   bannerCheckbox: {
     marginTop: spacing.xs
   },
-  documentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+  documentNav: {
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.whiteAlpha07,
-    backgroundColor: colors.background
-  },
-  documentTitleGroup: {
-    flex: 1
-  },
-  documentTitle: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.display
-  },
-  closeButton: {
-    width: 104,
-    minHeight: 44,
-    paddingVertical: spacing.sm
+    paddingTop: spacing.sm
   },
   documentContent: {
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    paddingTop: 0
   },
   documentIntro: {
     marginBottom: spacing.lg
@@ -482,8 +462,7 @@ const styles = StyleSheet.create({
     height: 6,
     marginTop: 7,
     borderRadius: 3,
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.cyan
   },
   bulletText: {
     flex: 1,

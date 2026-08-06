@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import path from 'node:path';
+import { createRequire } from 'node:module';
 
 const projectRoot = process.cwd();
-const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
+const require = createRequire(import.meta.url);
+const expoCli = require.resolve('expo/bin/cli', { paths: [projectRoot] });
 const result = spawnSync(
   process.execPath,
   [expoCli, 'export', '--platform', 'web', '--output-dir', 'dist'],

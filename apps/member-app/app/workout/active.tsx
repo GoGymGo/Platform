@@ -205,7 +205,7 @@ export default function ActiveWorkoutScreen() {
       <View style={styles.header}>
         <View style={styles.sessionHeading}>
           <View style={styles.recordingDot} />
-          <TerminalText glow tone="cyan" variant="micro">
+          <TerminalText tone="cyan" variant="micro">
             SESSION ACTIVE
           </TerminalText>
         </View>
@@ -275,7 +275,7 @@ export default function ActiveWorkoutScreen() {
 
       {activeSession.verificationMethod === 'heartRate' && !session.telemetryAvailable ? (
         <HUDBorderBox style={styles.telemetryNotice} tone="amber">
-          <TerminalText glow tone="amber" variant="label">
+          <TerminalText tone="amber" variant="label">
             LIVE HEART-RATE SOURCE NOT CONNECTED
           </TerminalText>
           <TerminalText style={styles.telemetryNoticeCopy} tone="muted" uppercase={false} variant="body">
@@ -290,7 +290,7 @@ export default function ActiveWorkoutScreen() {
             <TerminalText tone="dim" variant="micro">
               VERIFICATION
             </TerminalText>
-            <TerminalText glow tone={session.ready ? 'green' : 'cyan'} variant="label">
+            <TerminalText tone={session.ready ? 'green' : 'cyan'} variant="label">
               {isHeartRateVerification ? 'HEART RATE SESSION' : 'PARTNER GYM CHECK-IN'}
             </TerminalText>
           </View>
@@ -482,7 +482,7 @@ function SessionStatusCell({
       <TerminalText tone="dim" variant="micro">
         {label}
       </TerminalText>
-      <TerminalText glow tone={tone} variant="label">
+      <TerminalText tone={tone} variant="label">
         {value}
       </TerminalText>
     </View>
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: 26,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   header: {
     flexDirection: 'row',
@@ -517,8 +517,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.cyan
   },
   headerLabel: {
     flex: 1,

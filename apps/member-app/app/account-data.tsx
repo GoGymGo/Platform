@@ -10,7 +10,9 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
+import { spacing } from '@/constants/theme';
 import { useAppData } from '@/data/appDataHooks';
 import type { PrivacyRequest } from '@/domain/accountSettings';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -64,28 +66,19 @@ export default function AccountDataScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/profile')}
-            style={styles.backButton}
-          />
-          <TerminalText glow tone="cyan" variant="label">
-            ACCOUNT DATA
-          </TerminalText>
-        </View>
-
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          PRIVACY REQUESTS
-        </TerminalText>
-        <TerminalText style={styles.intro} tone="muted" uppercase={false} variant="body">
-          Request a portable copy of your GoGymGo account data or ask us to
-          delete the account. Requests are processed by the server and remain
-          visible here until complete.
-        </TerminalText>
+        <OnboardingHeader
+          label="ACCOUNT DATA"
+          onBack={() => goBackOrReplace(router, '/profile')}
+          step="PRIVACY"
+        />
+        <BrandScreenHeader
+          description="Request a portable copy of your GoGymGo account data or ask us to delete the account. Requests remain visible here until complete."
+          eyebrow="YOUR DATA"
+          title="PRIVACY REQUESTS"
+        />
 
         <HUDBorderBox style={styles.actionCard} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             EXPORT MY DATA
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -94,13 +87,13 @@ export default function AccountDataScreen() {
           </TerminalText>
           <CyberButtonOutline
             disabled={busyAction !== null}
-            label={busyAction === 'export' ? 'REQUESTING...' : 'REQUEST DATA EXPORT ->'}
+            label={busyAction === 'export' ? 'REQUESTING...' : 'REQUEST DATA EXPORT'}
             onPress={() => void createRequest('export')}
           />
         </HUDBorderBox>
 
         <HUDBorderBox style={styles.actionCard} tone="red">
-          <TerminalText glow tone="red" variant="label">
+          <TerminalText tone="red" variant="label">
             DELETE MY ACCOUNT
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -182,7 +175,7 @@ export default function AccountDataScreen() {
             </TerminalText>
             {request.downloadAvailable ? (
               <CyberButtonOutline
-                label="OPEN PRIVATE DOWNLOAD ->"
+                label="OPEN PRIVATE DOWNLOAD"
                 onPress={() => void downloadExport(request.id)}
               />
             ) : null}
@@ -200,31 +193,7 @@ function getErrorMessage(error: unknown) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md
-  },
-  backButton: {
-    width: 100,
-    minHeight: 44
-  },
-  title: {
-    marginTop: spacing.xl,
-    fontFamily: fontFamilies.display
-  },
-  intro: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.xl,
-    fontFamily: fontFamilies.body
-  },
+  screen: brandScreenStyles.content,
   actionCard: {
     gap: spacing.md,
     marginBottom: spacing.md,

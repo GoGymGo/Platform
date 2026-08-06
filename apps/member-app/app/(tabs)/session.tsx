@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import {
   CyberButtonPrimary,
@@ -9,7 +9,8 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableScreenError } from '@/components/reliability';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { BrandScreenHeader } from '@/components/screenLayout';
+import { colors, spacing } from '@/constants/theme';
 import { getWorkoutAccessMode } from '@/domain/workoutAccess';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
@@ -47,23 +48,16 @@ export default function SessionTabRoute() {
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <TerminalText glow tone="cyan" variant="label">
-          SEPTEMBER QR PILOT
-        </TerminalText>
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          VERIFY A GYM VISIT
-        </TerminalText>
-        <TerminalText style={styles.helper} tone="muted" uppercase={false} variant="body">
-          Scan the same static GoGymGo poster when you enter and after at least
-          30 minutes. Server time and a live 75-metre location check determine
-          whether the workout day is verified.
-        </TerminalText>
-      </View>
+      <BrandScreenHeader
+        description="Scan the same static GoGymGo poster when you enter and after at least 30 minutes. Server time and a live 75-metre location check determine whether the workout day is verified."
+        eyebrow="SEPTEMBER QR PILOT"
+        style={styles.header}
+        title="VERIFY A GYM VISIT"
+      />
 
       {!setupReady ? (
-        <HUDBorderBox glow style={styles.notice} tone="amber">
-          <TerminalText glow tone="amber" variant="label">
+        <HUDBorderBox style={styles.notice} tone="amber">
+          <TerminalText tone="amber" variant="label">
             FINISH SETUP
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -78,7 +72,7 @@ export default function SessionTabRoute() {
         </HUDBorderBox>
       ) : verifiedWorkoutUnavailable ? (
         <HUDBorderBox style={styles.notice} tone="muted">
-          <TerminalText glow tone="amber" variant="label">
+          <TerminalText tone="amber" variant="label">
             COMPETITION NOT STARTED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -86,8 +80,8 @@ export default function SessionTabRoute() {
           </TerminalText>
         </HUDBorderBox>
       ) : (
-        <HUDBorderBox glow style={styles.notice} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+        <HUDBorderBox style={styles.notice} tone="cyan">
+          <TerminalText tone="cyan" variant="label">
             STATIC QR READY
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -107,26 +101,12 @@ export default function SessionTabRoute() {
 const styles = StyleSheet.create({
   screen: {
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.xxl,
+    paddingTop: spacing.sm,
     paddingBottom: 78,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   header: {
-    alignItems: 'center',
     marginBottom: spacing.xxl
-  },
-  title: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34,
-    textAlign: 'center'
-  },
-  helper: {
-    maxWidth: 410,
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   },
   notice: {
     gap: spacing.md,

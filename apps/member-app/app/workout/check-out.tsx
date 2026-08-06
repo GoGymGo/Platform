@@ -2,7 +2,6 @@ import { type Href, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
@@ -10,6 +9,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
@@ -121,6 +121,11 @@ export default function CheckOutScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
+      <OnboardingHeader
+        label="WORKOUT CHECK-OUT"
+        onBack={() => goBackOrReplace(router, '/workout/active')}
+        step="FINISH"
+      />
       <WorkoutFlowProgress stage="complete" style={styles.workoutProgress} />
 
       <View style={styles.centerContent}>
@@ -132,14 +137,14 @@ export default function CheckOutScreen() {
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
           {formatClock(activeSession.minimumSessionSeconds)} COMPLETE
         </TerminalText>
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           VERIFY + FINISH
         </TerminalText>
 
         <View style={styles.metricRow}>
           {metrics.map((metric) => (
             <HUDBorderBox key={metric.label} style={styles.metricCard} tone="cyan">
-              <TerminalText glow style={styles.metricValue} tone="cyan" variant="body">
+              <TerminalText style={styles.metricValue} tone="cyan" variant="body">
                 {metric.value}
               </TerminalText>
               <TerminalText style={styles.metricLabel} tone="muted" variant="micro">
@@ -177,11 +182,6 @@ export default function CheckOutScreen() {
         </TerminalText>
       ) : null}
 
-      <CyberButtonOutline
-        label="BACK"
-        onPress={() => goBackOrReplace(router, '/workout/active')}
-        style={styles.backButton}
-      />
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.lg

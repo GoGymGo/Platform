@@ -4,7 +4,6 @@ import { StyleSheet, View } from 'react-native';
 import {
   ScreenLoadingState,
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
@@ -15,10 +14,12 @@ import {
   useAccessibilityAnnouncement
 } from '@/components/reliability';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
-import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -115,17 +116,17 @@ export default function CheckInScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/session')}
-            style={styles.backButton}
-          />
-          <TerminalText glow tone="cyan" variant="label">
-            WORKOUT CHECK-IN
-          </TerminalText>
-        </View>
+        <OnboardingHeader
+          label="WORKOUT CHECK-IN"
+          onBack={() => goBackOrReplace(router, '/session')}
+          step="START"
+        />
         <WorkoutFlowProgress stage="start" style={styles.workoutProgress} />
+        <BrandScreenHeader
+          description="Use your phone's secure prompt. GoGymGo receives only pass or fail."
+          eyebrow="LOCAL PRESENCE CHECK"
+          title="VERIFY IT'S YOU TO START"
+        />
 
         {deviceSaved === '1' ? (
           <HUDBorderBox style={styles.savedDeviceNotice} tone="green">
@@ -139,20 +140,11 @@ export default function CheckInScreen() {
         ) : null}
 
         <View style={styles.centerContent}>
-          <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
-            <TerminalText glow style={styles.scanIcon} tone="cyan" variant="value">
+          <HUDBorderBox style={styles.scanFrame} tone="cyan">
+            <TerminalText style={styles.scanIcon} tone="cyan" variant="value">
               ID
             </TerminalText>
           </HUDBorderBox>
-          <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
-            LOCAL PRESENCE CHECK
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            {"VERIFY IT'S YOU TO START"}
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Use your phone&apos;s secure prompt. GoGymGo receives only pass or fail.
-          </TerminalText>
         </View>
 
         <BiometricCameraConsentBanner
@@ -187,25 +179,7 @@ export default function CheckInScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.md
-  },
-  backButton: {
-    width: 96,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
+  screen: brandScreenStyles.content,
   workoutProgress: {
     marginBottom: spacing.sm
   },
@@ -227,26 +201,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 0,
     borderRadius: 20,
-    marginBottom: spacing.md,
-    ...cyberGlow.cyan
+    marginBottom: spacing.md
   },
   scanIcon: {
     fontFamily: fontFamilies.display
-  },
-  eyebrow: {
-    marginBottom: 10,
-    fontFamily: fontFamilies.terminal
-  },
-  title: {
-    maxWidth: 300,
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    maxWidth: 290,
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   },
   cameraConsent: {
     marginBottom: spacing.md

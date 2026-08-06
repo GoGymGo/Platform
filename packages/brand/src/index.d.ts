@@ -13,8 +13,10 @@ export declare const brandColors: Readonly<{
 }>;
 
 export declare const brandFonts: Readonly<{
-  display: 'Orbitron';
-  mono: 'Share Tech Mono';
+  body: 'Rajdhani-Medium';
+  bodyStrong: 'Rajdhani-SemiBold';
+  display: 'Orbitron-Bold';
+  mono: 'ShareTechMono-Regular';
 }>;
 
 export declare const brandAssets: Readonly<{

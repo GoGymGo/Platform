@@ -14,13 +14,15 @@ import {
 
 import { AuthStatusNotice } from '@/components/auth';
 import {
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
-  ScreenContainer,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import {
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
 import { LegalConsentCheckbox } from '@/components/legal';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
@@ -222,7 +224,7 @@ export default function CommitmentScreen() {
   const registrationRequirementsAccepted = ageEligibilityAttested && competitionRulesAccepted;
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -244,7 +246,7 @@ export default function CommitmentScreen() {
           step="SETUP // 2 OF 2"
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           CHOOSE YOUR WEEKLY GOAL
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
@@ -255,7 +257,7 @@ export default function CommitmentScreen() {
           <TerminalText tone="cyan" variant="label">
             PUBLISHED COMPETITION
           </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="caption">
+          <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
             {`You may join this competition until it ends on ${competitionDateRange.endDateKey}. Your entries begin when enrollment is confirmed.`}
           </TerminalText>
         </HUDBorderBox>
@@ -310,7 +312,7 @@ export default function CommitmentScreen() {
         {goalSelected ? (
           <HUDBorderBox style={styles.goalSummary} tone="cyan">
             <View style={styles.goalSummaryItem}>
-              <TerminalText glow style={styles.goalSummaryValue} tone="cyan" variant="title">
+              <TerminalText style={styles.goalSummaryValue} tone="cyan" variant="title">
                 {days}
               </TerminalText>
               <TerminalText tone="dim" variant="micro">
@@ -319,7 +321,7 @@ export default function CommitmentScreen() {
             </View>
             <View style={styles.goalSummaryDivider} />
             <View style={styles.goalSummaryItem}>
-              <TerminalText glow style={styles.goalSummaryValue} tone="green" variant="title">
+              <TerminalText style={styles.goalSummaryValue} tone="green" variant="title">
                 {days}
               </TerminalText>
               <TerminalText tone="dim" variant="micro">
@@ -328,7 +330,7 @@ export default function CommitmentScreen() {
             </View>
             <View style={styles.goalSummaryDivider} />
             <View style={styles.goalSummaryItem}>
-              <TerminalText glow style={styles.goalSummaryValue} tone="pink" variant="title">
+              <TerminalText style={styles.goalSummaryValue} tone="pink" variant="title">
                 {baseMonthEntries}
               </TerminalText>
               <TerminalText tone="dim" variant="micro">
@@ -336,7 +338,7 @@ export default function CommitmentScreen() {
               </TerminalText>
             </View>
             <View style={styles.bonusSummary}>
-              <TerminalText tone="muted" uppercase={false} variant="caption">
+              <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
                 Earn more through consistency, teamwork and competition.
               </TerminalText>
               <CompactTextButton
@@ -351,10 +353,10 @@ export default function CommitmentScreen() {
         {goalSelected ? (
           <>
             <HUDBorderBox style={styles.registrationConsent} tone="muted">
-              <TerminalText glow tone="cyan" variant="label">
+              <TerminalText tone="cyan" variant="label">
                 CONFIRM YOUR {days}-DAY GOAL
               </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="body">
+              <TerminalText style={styles.editorialBody} tone="muted" uppercase={false} variant="body">
                 Accept the rules and lock this goal for the month.
               </TerminalText>
               <CompactTextButton
@@ -376,7 +378,7 @@ export default function CommitmentScreen() {
               ) : null}
             </HUDBorderBox>
 
-            <CyberButtonPrimary
+            <FirstRunPrimaryButton
               disabled={!registrationRequirementsAccepted || registration.busy}
               label={registration.busy ? 'CHECKING REGISTRATION...' : 'CONFIRM + REGISTER ->'}
               onPress={() => void confirmWeeklyGoal()}
@@ -393,7 +395,7 @@ export default function CommitmentScreen() {
             Select your weekly goal to review and confirm the competition agreement.
           </TerminalText>
         )}
-      </ScreenScrollView>
+        </ScreenScrollView>
 
       <Modal
         animationType={reduceMotion ? 'none' : 'fade'}
@@ -416,7 +418,7 @@ export default function CommitmentScreen() {
         visible={showCalculator}
       >
         <View style={styles.calculatorModalOverlay}>
-          <HUDBorderBox glow style={styles.calculatorModalDialog} tone="cyan">
+          <HUDBorderBox style={styles.calculatorModalDialog} tone="cyan">
             <View
               accessibilityLabel="Scoring calculator"
               accessibilityViewIsModal
@@ -425,10 +427,10 @@ export default function CommitmentScreen() {
               tabIndex={-1}
             >
               <View style={styles.calculatorModalHeader}>
-                <TerminalText glow tone="cyan" variant="label">
+                <TerminalText tone="cyan" variant="label">
                   SCORING CALCULATOR
                 </TerminalText>
-                <CyberButtonOutline
+                <FirstRunSecondaryButton
                   label="EXIT"
                   onPress={closeCalculator}
                   style={styles.calculatorExitButton}
@@ -447,7 +449,6 @@ export default function CommitmentScreen() {
                     </TerminalText>
                     <TerminalText
                       accessibilityRole="text"
-                      glow
                       style={styles.baseProjectionValue}
                       tone="cyan"
                       variant="title"
@@ -461,8 +462,8 @@ export default function CommitmentScreen() {
                   </TerminalText>
                 </HUDBorderBox>
 
-                <HUDBorderBox glow style={styles.calculationPanel} tone="cyan">
-                  <TerminalText glow tone="cyan" variant="label">
+                <HUDBorderBox style={styles.calculationPanel} tone="cyan">
+                  <TerminalText tone="cyan" variant="label">
                     HOW SCORING WORKS
                   </TerminalText>
                   <TerminalText
@@ -503,7 +504,7 @@ export default function CommitmentScreen() {
 
                   <View style={styles.toggleRow}>
                     <View style={styles.toggleCopy}>
-                      <TerminalText glow tone="cyan" variant="label">
+                      <TerminalText tone="cyan" variant="label">
                         4 // PERFECT MONTH
                       </TerminalText>
                       <TerminalText tone="muted" variant="caption">
@@ -535,7 +536,7 @@ export default function CommitmentScreen() {
                     <TerminalText tone="muted" variant="label">
                       PROJECTED TOTAL
                     </TerminalText>
-                    <TerminalText glow style={styles.resultValue} tone="pink" variant="display">
+                    <TerminalText style={styles.resultValue} tone="pink" variant="display">
                       {projection.drawWeight.toLocaleString()}
                     </TerminalText>
                     <TerminalText tone="dim" variant="micro">
@@ -548,7 +549,7 @@ export default function CommitmentScreen() {
           </HUDBorderBox>
         </View>
       </Modal>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
@@ -563,7 +564,7 @@ function WeeklyMatchControl({
 }) {
   return (
     <View style={styles.controlGroup}>
-      <TerminalText glow tone="cyan" variant="label">
+      <TerminalText tone="cyan" variant="label">
         1 // WEEKLY CHALLENGE RESULTS
       </TerminalText>
       <TerminalText tone="dim" uppercase={false} variant="caption">
@@ -677,7 +678,7 @@ function ChoiceControl({
 }) {
   return (
     <View style={styles.controlGroup}>
-      <TerminalText glow tone="cyan" variant="label">
+      <TerminalText tone="cyan" variant="label">
         {label}
       </TerminalText>
       <View accessibilityRole="radiogroup" style={styles.segmentedControl}>
@@ -728,22 +729,37 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   title: {
     marginTop: spacing.sm,
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.titleXl,
     lineHeight: 31,
-    textAlign: 'center'
+    paddingLeft: 14,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   body: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
+    marginBottom: spacing.sm,
+    paddingLeft: 16,
+    fontFamily: fontFamilies.ui,
+    fontSize: 16,
+    lineHeight: 24
+  },
+  editorialBody: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
+  },
+  editorialCaption: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   registrationConsent: {
     gap: spacing.sm,
@@ -799,6 +815,7 @@ const styles = StyleSheet.create({
   selectionHelper: {
     marginTop: spacing.md,
     paddingHorizontal: spacing.md,
+    fontFamily: fontFamilies.ui,
     textAlign: 'center'
   },
   topConfirmButton: {
@@ -882,7 +899,7 @@ const styles = StyleSheet.create({
   },
   calculatorIntro: {
     marginBottom: spacing.xs,
-    fontFamily: fontFamilies.body
+    fontFamily: fontFamilies.ui
   },
   controlGroup: {
     gap: spacing.xs,

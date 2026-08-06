@@ -9,10 +9,10 @@ import {
   AuthTextField
 } from '@/components/auth';
 import {
-  CyberButtonPrimary,
   HUDBorderBox,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunPrimaryButton } from '@/components/firstRun';
 import { LegalDocumentLinks } from '@/components/legal';
 import { SocialAuthButtons } from '@/components/socialAuthButtons';
 import {
@@ -22,7 +22,7 @@ import {
   type AuthFormErrors
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
-import { colors, spacing } from '@/constants/theme';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   getGymScanPostAuthRoute,
   gymScanAuthNext,
@@ -193,11 +193,11 @@ export default function SignUpScreen() {
             {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
             {!emailAccountReady ? (
-              <TerminalText tone="dim" uppercase={false} variant="caption">
+              <TerminalText style={styles.editorialCaption} tone="dim" uppercase={false} variant="caption">
                 Complete your email and both password fields to continue.
               </TerminalText>
             ) : null}
-            <CyberButtonPrimary
+            <FirstRunPrimaryButton
               disabled={busy || !firebaseConfigured || !emailAccountReady}
               label={submitting ? 'CREATING ACCOUNT...' : 'CREATE SECURE ACCOUNT ->'}
               onPress={submitEmailAccount}
@@ -234,7 +234,15 @@ const styles = StyleSheet.create({
     gap: spacing.xs
   },
   legalNotice: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center'
+  },
+  editorialCaption: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   divider: {
     flexDirection: 'row',

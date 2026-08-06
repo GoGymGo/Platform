@@ -10,6 +10,7 @@ import {
   appTourRoutes,
   buildAppTourHref,
   findAppTourRouteIndex,
+  publicDemoRoutes,
   type AppTourRoute
 } from '@/testing/appTourRoutes';
 import { recordAppTourVisit } from '@/testing/appTourReview';
@@ -17,32 +18,39 @@ import { recordAppTourVisit } from '@/testing/appTourReview';
 export function AppTourModeBanner() {
   const pathname = usePathname();
   const router = useRouter();
-  const { active, enterTour } = useAppTour();
-  const routeIndex = findAppTourRouteIndex(pathname);
-  const currentRoute = routeIndex >= 0 ? appTourRoutes[routeIndex] : null;
-  const previousRoute = routeIndex > 0 ? appTourRoutes[routeIndex - 1] : null;
+  const { active, enterTour, publicDemo } = useAppTour();
+  const reviewRouteIndex = findAppTourRouteIndex(pathname);
+  const routes = publicDemo ? publicDemoRoutes : appTourRoutes;
+  const routeIndex = publicDemo
+    ? routes.findIndex(({ route }) => route.split('?', 1)[0] === pathname)
+    : reviewRouteIndex;
+  const currentRoute = routeIndex >= 0 ? routes[routeIndex] : null;
+  const previousRoute = routeIndex > 0 ? routes[routeIndex - 1] : null;
   const nextRoute =
-    routeIndex >= 0 && routeIndex < appTourRoutes.length - 1
-      ? appTourRoutes[routeIndex + 1]
+    routeIndex >= 0 && routeIndex < routes.length - 1
+      ? routes[routeIndex + 1]
       : null;
 
   useEffect(() => {
-    if (active && currentRoute) {
+    if (active && currentRoute && !publicDemo) {
       void recordAppTourVisit(currentRoute.route);
     }
-  }, [active, currentRoute]);
+  }, [active, currentRoute, publicDemo]);
 
   if (
     !active ||
     pathname === '/app-tour' ||
-    pathname === '/test-preview'
+    pathname === '/test-preview' ||
+    pathname === '/demo'
   ) {
     return null;
   }
 
   function openRoute(route: AppTourRoute) {
-    void recordAppTourVisit(route.route);
-    router.replace(buildAppTourHref(route));
+    if (!publicDemo) {
+      void recordAppTourVisit(route.route);
+    }
+    router.replace(buildAppTourHref(route, publicDemo ? 'demo' : 'review'));
   }
 
   return (
@@ -59,15 +67,17 @@ export function AppTourModeBanner() {
       />
       <Pressable
         accessibilityHint="Open the browser test screen directory"
-        accessibilityLabel="Testing mode is active. Open App Tour."
+        accessibilityLabel={publicDemo
+          ? 'Demo mode is active. Open the screen menu.'
+          : 'Testing mode is active. Open App Tour.'}
         accessibilityRole="button"
         onPress={() => {
           enterTour('ready');
-          router.replace(
-            browserTestPreviewBuildEnabled
+          router.replace(publicDemo
+            ? '/demo'
+            : browserTestPreviewBuildEnabled
               ? '/test-preview?appTour=1'
-              : '/app-tour?appTour=1'
-          );
+              : '/app-tour?appTour=1');
         }}
         style={({ pressed }) => [
           styles.directoryButton,
@@ -77,11 +87,11 @@ export function AppTourModeBanner() {
         <View style={styles.copy}>
           <View style={styles.statusDot} />
           <Text allowFontScaling maxFontSizeMultiplier={1.5} style={styles.statusLabel}>
-            TEST MODE // {routeIndex >= 0 ? `${routeIndex + 1} OF ${appTourRoutes.length}` : 'SCREEN REVIEW'}
+            {`${publicDemo ? 'DEMO' : 'TEST MODE'} // ${routeIndex >= 0 ? `${routeIndex + 1} OF ${routes.length}` : 'SCREEN REVIEW'}`}
           </Text>
         </View>
         <Text allowFontScaling maxFontSizeMultiplier={1.5} style={styles.actionLabel}>
-          Screen directory
+          {publicDemo ? 'Screen menu' : 'Screen directory'}
         </Text>
       </Pressable>
       <TourStepButton

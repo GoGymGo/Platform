@@ -13,6 +13,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
@@ -180,25 +181,16 @@ export default function WinnersCircleScreen() {
         >
           <CompetitionHubNav active="winners" style={styles.hubNav} />
 
-          <View style={styles.header}>
-            <TerminalText glow tone="pink" variant="label">
-              {`MONTHLY RESULTS // ${competitionRegion.label}`}
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="pink" variant="title">
-              WINNERS CIRCLE
-            </TerminalText>
-            <TerminalText style={styles.month} tone="text" variant="body">
-              {formatCompetitionMonth(completedMonthKey)}
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              Celebrate the seven Weekly Goal champions and the players
-              selected for physical prizes and coupon codes in the regional draw.
-            </TerminalText>
-          </View>
+          <BrandScreenHeader
+            accent="pink"
+            description={`${formatCompetitionMonth(completedMonthKey)}. Celebrate the seven Weekly Goal champions and the players selected for physical prizes and coupon codes in the regional draw.`}
+            eyebrow={`MONTHLY RESULTS // ${competitionRegion.label}`}
+            title="WINNERS CIRCLE"
+          />
 
-          <HUDBorderBox glow style={styles.summaryCard} tone="pink">
+          <HUDBorderBox style={styles.summaryCard} tone="pink">
             <View style={styles.summaryMetric}>
-              <TerminalText glow tone="pink" variant="value">
+              <TerminalText tone="pink" variant="value">
                 {categoryChampions.length}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
@@ -207,7 +199,7 @@ export default function WinnersCircleScreen() {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryMetric}>
-              <TerminalText glow tone="pink" variant="value">
+              <TerminalText tone="pink" variant="value">
                 {settledCompetition.rewardCount.toLocaleString()}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
@@ -232,7 +224,7 @@ export default function WinnersCircleScreen() {
           {selectedResults === 'categories' ? (
             <>
               <View style={styles.sectionHeader}>
-                <TerminalText glow tone="cyan" variant="label">
+                <TerminalText tone="cyan" variant="label">
                   GOAL CHAMPIONS
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
@@ -250,7 +242,7 @@ export default function WinnersCircleScreen() {
                     ]}
                   >
                     <View style={styles.goalBadge}>
-                      <TerminalText glow tone="cyan" variant="body">
+                      <TerminalText tone="cyan" variant="body">
                         {goal}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
@@ -268,7 +260,7 @@ export default function WinnersCircleScreen() {
                       </TerminalText>
                     </View>
                     <View style={styles.scoreBlock}>
-                      <TerminalText glow tone="cyan" variant="body">
+                      <TerminalText tone="cyan" variant="body">
                         {winner.categoryEntries}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
@@ -287,7 +279,7 @@ export default function WinnersCircleScreen() {
           ) : (
             <>
               <View style={styles.sectionHeader}>
-                <TerminalText glow tone="pink" variant="label">
+                <TerminalText tone="pink" variant="label">
                   PRIZE DRAW WINNERS
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
@@ -295,7 +287,7 @@ export default function WinnersCircleScreen() {
                 </TerminalText>
               </View>
 
-              <HUDBorderBox glow style={styles.resultsPanel} tone="pink">
+              <HUDBorderBox style={styles.resultsPanel} tone="pink">
                 {rewardWinners.map((winner, index) => (
                   <View
                     key={`${winner.awardRank}:${winner.alias}`}
@@ -323,7 +315,7 @@ export default function WinnersCircleScreen() {
                       </TerminalText>
                     </View>
                     <View style={styles.rewardName}>
-                      <TerminalText glow tone="pink" variant="body">
+                      <TerminalText tone="pink" variant="body">
                         {winner.rewardTitle}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
@@ -375,7 +367,7 @@ function ResultTab({
         pressed ? styles.pressed : null
       ]}
     >
-      <TerminalText glow={selected} tone={selected ? 'cyan' : 'muted'} variant="micro">
+      <TerminalText tone={selected ? 'cyan' : 'muted'} variant="micro">
         {label}
       </TerminalText>
     </Pressable>
@@ -387,7 +379,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.screenX,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   unavailableCard: {
     gap: spacing.md,
@@ -399,25 +391,9 @@ const styles = StyleSheet.create({
   unavailableCopy: {
     fontFamily: fontFamilies.body
   },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
+  content: brandScreenStyles.content,
   hubNav: {
     marginBottom: spacing.lg
-  },
-  header: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg
-  },
-  title: {
-    fontFamily: fontFamilies.display
-  },
-  month: {
-    fontFamily: fontFamilies.display
   },
   summaryCard: {
     flexDirection: 'row',

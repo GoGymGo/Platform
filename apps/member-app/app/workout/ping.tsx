@@ -115,7 +115,7 @@ export default function PingScreen() {
         </View>
       </HUDBorderBox>
 
-      <TerminalText glow style={styles.title} tone="amber" variant="title">
+      <TerminalText style={styles.title} tone="text" variant="title">
         VERIFY NOW TO KEEP IT VALID
       </TerminalText>
       <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.xl

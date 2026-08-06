@@ -13,6 +13,8 @@ export const brandColors = Object.freeze({
 });
 
 export const brandFonts = Object.freeze({
-  display: 'Orbitron',
-  mono: 'Share Tech Mono'
+  body: 'Rajdhani-Medium',
+  bodyStrong: 'Rajdhani-SemiBold',
+  display: 'Orbitron-Bold',
+  mono: 'ShareTechMono-Regular'
 });

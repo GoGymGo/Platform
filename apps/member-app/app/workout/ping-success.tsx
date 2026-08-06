@@ -52,7 +52,7 @@ export default function PingSuccessScreen() {
       </TerminalText>
 
       <CyberButtonPrimary
-        label="BACK TO SESSION ->"
+        label="BACK TO SESSION"
         onPress={() => router.replace('/workout/active')}
       />
     </ScreenContainer>
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.xxl

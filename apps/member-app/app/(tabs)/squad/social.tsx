@@ -16,6 +16,8 @@ import {
   ActionFeedback,
   RecoverableError
 } from '@/components/reliability';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { ChallengeHub } from '@/components/socialChallenges';
 import { UserAlias } from '@/components/streakRewards';
 import {
@@ -239,28 +241,16 @@ export default function SocialChallengesScreen() {
           memoryKey="social-challenges"
           showsVerticalScrollIndicator={false}
         >
-        <Pressable
-          accessibilityLabel="Back to Squad"
-          accessibilityRole="button"
-          onPress={() => goBackOrReplace(router, '/squad')}
-          style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-        >
-          <TerminalText glow tone="cyan" variant="button">
-            {'<'} SQUAD
-          </TerminalText>
-        </Pressable>
-
-        <View style={styles.header}>
-          <TerminalText glow tone="pink" variant="label">
-            FRIENDS + LOCAL ACTIVITIES
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            CHALLENGE YOUR CREW
-          </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
-            Challenge a friend to a monthly goal, or join a scheduled activity challenge in your region.
-          </TerminalText>
-        </View>
+        <OnboardingHeader
+          label="FRIENDS + CHALLENGES"
+          onBack={() => goBackOrReplace(router, '/squad')}
+          step="SOCIAL"
+        />
+        <BrandScreenHeader
+          description="Challenge a friend to a monthly goal, or join a scheduled activity challenge in your region."
+          eyebrow="FRIENDS + LOCAL ACTIVITIES"
+          title="CHALLENGE YOUR CREW"
+        />
 
         {mode === 'unavailable' ? (
           <StatusCard
@@ -667,29 +657,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   sponsorRail: {
     marginBottom: spacing.lg
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyanButton,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surfaceCyanGhost
-  },
-  header: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle
   },
   statusCard: {
     marginBottom: spacing.lg,

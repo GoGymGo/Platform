@@ -11,20 +11,21 @@ const tabScreenOptions = {
   tabBarInactiveTintColor: colors.dim,
   tabBarStyle: {
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 430 : undefined,
+    maxWidth: Platform.OS === 'web' ? 480 : undefined,
     alignSelf: 'center',
     height: 78,
     paddingTop: 8,
     paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceCyanActive,
-    backgroundColor: colors.background
+    backgroundColor: colors.panel
   },
   tabBarLabelStyle: {
     width: '100%',
     fontFamily: fontFamilies.terminal,
-    fontSize: 9,
-    letterSpacing: 0.2,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 0.1,
     textAlign: 'center',
     textTransform: 'uppercase'
   },

@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 
 import { TerminalText } from '@/components/cyber';
-import { colors, cyberGlow, fontFamilies } from '@/constants/theme';
+import { colors, fontFamilies } from '@/constants/theme';
 
 type ProfileAvatarProps = {
   imageUri: string | null;
@@ -37,7 +37,7 @@ export function ProfileAvatar({
             style={styles.image}
           />
         ) : (
-          <TerminalText glow style={styles.initials} tone="cyan" variant="value">
+          <TerminalText style={styles.initials} tone="cyan" variant="value">
             {initials}
           </TerminalText>
         )}
@@ -58,8 +58,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.borderCyanStrong,
-    backgroundColor: colors.surfaceCyanProgress,
-    ...cyberGlow.cyan
+    backgroundColor: colors.surfaceCyanProgress
   },
   image: {
     width: '100%',

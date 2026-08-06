@@ -12,6 +12,7 @@ import {
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
 import { DataCollectionNotice } from '@/components/legal';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -67,7 +68,7 @@ export default function SponsorApplicationScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={brandScreenStyles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -78,12 +79,12 @@ export default function SponsorApplicationScreen() {
           step="REGIONAL CAMPAIGN"
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          SPONSOR A REGION
-        </TerminalText>
-        <TerminalText tone="muted" uppercase={false} variant="body">
-          Support a regional GoGymGo competition through approved prizes and participant rewards.
-        </TerminalText>
+        <BrandScreenHeader
+          accent="pink"
+          description="Support a regional GoGymGo competition through approved prizes and participant rewards."
+          eyebrow="REGIONAL CAMPAIGN"
+          title="SPONSOR A REGION"
+        />
 
         <View style={styles.valueList}>
           <SponsorValue label="TARGETED REACH" value="REGION + COMPETITION COMMUNITY" />
@@ -159,17 +160,6 @@ function SponsorValue({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    gap: spacing.lg,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  title: {
-    fontFamily: fontFamilies.display
-  },
   valueList: {
     borderTopWidth: 1,
     borderColor: colors.borderCyanSubtle

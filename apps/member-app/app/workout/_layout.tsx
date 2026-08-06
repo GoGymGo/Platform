@@ -1,5 +1,18 @@
-import { Redirect } from 'expo-router';
+import { Stack } from 'expo-router';
 
-export default function RetiredWorkoutFlowRedirect() {
-  return <Redirect href="/session" />;
+import { colors } from '@/constants/theme';
+import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
+
+export default function WorkoutFlowLayout() {
+  const reduceMotion = useReducedMotionPreference();
+
+  return (
+    <Stack
+      screenOptions={{
+        animation: reduceMotion ? 'none' : 'slide_from_right',
+        contentStyle: { backgroundColor: colors.background },
+        headerShown: false
+      }}
+    />
+  );
 }

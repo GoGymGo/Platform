@@ -5,49 +5,75 @@ const projectRoot = process.cwd();
 const read = (relativePath) =>
   fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
 const issues = [];
-const demo = read('app/demo.tsx');
+const demoRoute = read('app/demo.tsx');
+const demoScreen = read('src/demo/PublicDemoScreen.tsx');
 const rootLayout = read('app/_layout.tsx');
+const appTourState = read('src/state/appTour.tsx');
+const apiState = read('src/state/api.tsx');
+const authState = read('src/state/auth.tsx');
+const metro = read('metro.config.js');
 
-for (const pattern of [
-  /firebase/i,
-  /expo-camera/,
-  /expo-location/,
-  /useApi\b/,
-  /useAuth\b/,
-  /\bfetch\s*\(/
+for (const [relativePath, source] of [
+  ['app/demo.tsx', demoRoute],
+  ['src/demo/PublicDemoScreen.tsx', demoScreen]
 ]) {
-  if (pattern.test(demo)) {
-    issues.push(`app/demo.tsx imports or invokes a prohibited live service: ${pattern}`);
+  for (const pattern of [
+    /(?:from|import\()\s*['"][^'"]*firebase/i,
+    /(?:from|import\()\s*['"]expo-camera/,
+    /(?:from|import\()\s*['"]expo-location/,
+    /useApi\b/,
+    /useAuth\b/,
+    /\bfetch\s*\(/
+  ]) {
+    if (pattern.test(source)) {
+      issues.push(`${relativePath} imports or invokes a prohibited live service: ${pattern}`);
+    }
   }
 }
 
 for (const required of [
-  'DEMO // SAMPLE DATA // NO ACCOUNT OR BACKEND',
-  'MAIN APP SCREEN TOUR',
-  'NEXT SCREEN ->',
-  "id: 'home'",
-  "id: 'calendar'",
-  "id: 'train'",
-  "id: 'leaderboard'",
-  "id: 'winners-circle'",
-  "id: 'rewards'",
-  "id: 'awards'",
-  "id: 'weekly-challenge'",
-  "id: 'social'",
-  "id: 'challenge-gym'",
-  "id: 'profile'",
-  "id: 'account-data'"
+  'PublicDemoScreen',
+  'THE REAL APP UI // READ-ONLY SHOWCASE',
+  'SCREEN DIRECTORY',
+  'SAFE SHOWCASE MODE',
+  'buildAppTourHref(route, \'demo\')',
+  'publicDemoRoutes'
 ]) {
-  if (!demo.includes(required)) {
-    issues.push(`app/demo.tsx is missing required isolated-demo copy: ${required}`);
+  if (!demoRoute.includes(required) && !demoScreen.includes(required)) {
+    issues.push(`public demo is missing required isolated-demo behavior: ${required}`);
   }
 }
 
+if (rootLayout.includes('DemoNavigation')) {
+  issues.push('app/_layout.tsx still uses the obsolete parallel demo navigator.');
+}
+if (!rootLayout.includes("<AuthProvider key={active ? 'tour' : 'app'}>")) {
+  issues.push('app/_layout.tsx does not route demo screens through the shared app providers.');
+}
 if (
-  !rootLayout.includes("pathname === '/demo'") ||
-  !rootLayout.includes('return <DemoNavigation')
+  !appTourState.includes('publicDemoRequested') ||
+  !appTourState.includes('isDemoSearch(firstParam(params.demo))')
 ) {
-  issues.push('app/_layout.tsx does not bypass authenticated providers for /demo.');
+  issues.push('src/state/appTour.tsx does not keep public demo mode active across real app routes.');
+}
+if (!apiState.includes('!appTourActive && isApiConfigured')) {
+  issues.push('src/state/api.tsx does not disable API access while the public demo is active.');
+}
+if (!authState.includes('? <AppTourAuthProvider>')) {
+  issues.push('src/state/auth.tsx does not replace Firebase auth while the public demo is active.');
+}
+for (const moduleName of [
+  '@/demo/PublicDemoScreen',
+  '@/state/appTour',
+  '@/testing/appTourData',
+  '@/testing/appTourRegion',
+  '@/testing/appTourRoutes',
+  '@/testing/AppTourModeBanner',
+  '@/testing/AppTourQrSimulator'
+]) {
+  if (!metro.includes(`'${moduleName}'`)) {
+    issues.push(`metro.config.js does not retain ${moduleName} for the web-only public demo.`);
+  }
 }
 
 for (const [relativePath, serviceName] of [
@@ -71,6 +97,6 @@ if (issues.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    'Demo isolation audit passed: no account, Firebase, camera, location or API path is reachable from /demo.'
+    'Demo isolation audit passed: the public tour reuses real app routes while account, Firebase, camera, location and API services remain disabled.'
   );
 }

@@ -15,7 +15,10 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableScreenError } from '@/components/reliability';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { SessionUnavailable } from '@/components/session';
+import { AppTourQrSimulator } from '@/testing/AppTourQrSimulator';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { createGymScanRepository } from '@/data/gymScanRepository';
 import {
@@ -35,11 +38,13 @@ import {
   type PendingGymScan
 } from '@/services/pendingGymScan';
 import { useApi } from '@/state/api';
+import { useAppTour } from '@/state/appTour';
 
 type ScanUiState = 'ready' | 'locating' | 'submitting' | 'result';
 
 export default function QrScannerModal() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const { credential: linkedCredential, posterScan } = useLocalSearchParams<{
     credential?: string;
     posterScan?: string;
@@ -231,7 +236,7 @@ export default function QrScannerModal() {
       />
     );
   }
-  if (!configured || !repository) {
+  if ((!configured || !repository) && !appTourActive) {
     return (
       <SessionUnavailable
         actionLabel="BACK TO TRAINING"
@@ -260,25 +265,20 @@ export default function QrScannerModal() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <TerminalText glow tone="cyan" variant="label">
-              VERIFIED GYM WORKOUT
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              {completionReady
-                ? 'READY TO FINISH'
-                : activeSession || result?.outcome === 'started' || result?.outcome === 'too_early'
-                  ? 'WORKOUT IN PROGRESS'
-                : 'START OR FINISH YOUR WORKOUT'}
-            </TerminalText>
-          </View>
-          <CyberButtonOutline
-            label="CLOSE"
-            onPress={() => goBackOrReplace(router, '/session')}
-            style={styles.closeButton}
-          />
-        </View>
+        <OnboardingHeader
+          label="PARTNER GYM QR"
+          onBack={() => goBackOrReplace(router, '/session')}
+          step="VERIFICATION"
+        />
+        <BrandScreenHeader
+          description="Scan the gym poster once to start, then scan the same poster after the server timer to finish."
+          eyebrow="VERIFIED GYM WORKOUT"
+          title={completionReady
+            ? 'READY TO FINISH'
+            : activeSession || result?.outcome === 'started' || result?.outcome === 'too_early'
+              ? 'WORKOUT IN PROGRESS'
+              : 'START OR FINISH YOUR WORKOUT'}
+        />
 
         <HUDBorderBox style={styles.instructions} tone="cyan">
           <TerminalText tone="cyan" variant="label">
@@ -341,7 +341,7 @@ export default function QrScannerModal() {
             ) : null}
             {completionReady ? (
               <CyberButtonPrimary
-                label="OPEN SCANNER TO FINISH ->"
+                label="OPEN SCANNER TO FINISH"
                 onPress={openFinishScanner}
               />
             ) : null}
@@ -383,7 +383,7 @@ export default function QrScannerModal() {
               </TerminalText>
             ) : null}
             <CyberButtonPrimary
-              label={activeSession ? 'FINISH WORKOUT ->' : 'START WORKOUT ->'}
+              label={activeSession ? 'FINISH WORKOUT' : 'START WORKOUT'}
               onPress={() => void submitCredential(effectiveCredential)}
             />
           </HUDBorderBox>
@@ -406,10 +406,17 @@ export default function QrScannerModal() {
               {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
             </TerminalText>
             <CyberButtonPrimary
-              label="SCAN POSTER TO FINISH ->"
+              label="SCAN POSTER TO FINISH"
               onPress={() => setCameraRequested(true)}
             />
           </HUDBorderBox>
+        ) : appTourActive ? (
+          <AppTourQrSimulator
+            onConfirm={(payload) => void submitCredential(payload)}
+            scanLocked={scanLocked}
+            scanMode={activeSession ? 'exit' : 'entry'}
+            style={styles.stateCard}
+          />
         ) : !permission ? (
           <HUDBorderBox style={styles.stateCard} tone="muted">
             <TerminalText live="polite" tone="muted" variant="label">
@@ -498,31 +505,7 @@ function getScanErrorMessage(error: unknown) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flexGrow: 1,
-    gap: spacing.lg,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md
-  },
-  headerCopy: {
-    flex: 1,
-    gap: spacing.xs
-  },
-  title: {
-    fontFamily: fontFamilies.display
-  },
-  closeButton: {
-    width: 96,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
+  screen: brandScreenStyles.content,
   instructions: {
     gap: spacing.sm,
     padding: spacing.lg

@@ -12,11 +12,13 @@ import { useState, type PropsWithChildren, type ReactNode } from 'react';
 
 import {
   HUDBorderBox,
-  ScreenContainer,
   ScreenLoadingState,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunBrandRail, FirstRunScreen } from '@/components/firstRun';
+import { ScreenBackButton } from '@/components/onboarding';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { colors, fontFamilies, fontSizes, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/state/auth';
 
@@ -44,7 +46,7 @@ export function AuthScreenShell({
   title
 }: AuthScreenShellProps) {
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
@@ -55,34 +57,24 @@ export function AuthScreenShell({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <FirstRunBrandRail />
           {onBack ? (
-            <Pressable
-              accessibilityLabel="Back"
-              accessibilityRole="button"
+            <ScreenBackButton
               onPress={onBack}
-              style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-            >
-              <TerminalText glow tone="cyan" variant="button">
-                {'<'}
-              </TerminalText>
-            </Pressable>
+              style={styles.backButtonSpacing}
+            />
           ) : null}
-          <View style={styles.header}>
-            <TerminalText glow tone="cyan" variant="label">
-              {eyebrow}
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              {title}
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              {description}
-            </TerminalText>
-          </View>
+          <BrandScreenHeader
+            description={description}
+            eyebrow={eyebrow}
+            style={styles.header}
+            title={title}
+          />
           {children}
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </ScreenScrollView>
       </KeyboardAvoidingView>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
@@ -95,24 +87,38 @@ export function AuthTextField({
   ...inputProps
 }: AuthTextFieldProps) {
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const { onBlur, onFocus, ...restInputProps } = inputProps;
 
   return (
     <View style={styles.fieldShell}>
       <TerminalText tone={error ? 'red' : 'dim'} variant="micro">
         {label}
       </TerminalText>
-      <View style={[styles.inputShell, error ? styles.inputError : null]}>
+      <View style={[
+        styles.inputShell,
+        focused ? styles.inputFocused : null,
+        error ? styles.inputError : null
+      ]}>
         <TextInput
           accessibilityLabel={label}
           allowFontScaling
           maxFontSizeMultiplier={2}
+          onBlur={(event) => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
           onChangeText={onChangeText}
+          onFocus={(event) => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
           placeholderTextColor={colors.dim}
           secureTextEntry={secureTextEntry && !passwordVisible}
           selectionColor={colors.cyan}
           style={styles.input}
           value={value}
-          {...inputProps}
+          {...restInputProps}
         />
         {secureTextEntry ? (
           <Pressable
@@ -121,7 +127,7 @@ export function AuthTextField({
             onPress={() => setPasswordVisible((visible) => !visible)}
             style={({ pressed }) => [styles.visibilityButton, pressed ? styles.pressed : null]}
           >
-            <TerminalText glow tone="cyan" variant="micro">
+            <TerminalText tone="cyan" variant="micro">
               {passwordVisible ? 'HIDE' : 'SHOW'}
             </TerminalText>
           </Pressable>
@@ -139,10 +145,10 @@ export function AuthTextField({
 export function AuthConfigurationNotice() {
   return (
     <HUDBorderBox style={styles.notice} tone="amber">
-      <TerminalText glow tone="amber" variant="label">
+      <TerminalText tone="amber" variant="label">
         ACCOUNT SERVICE OFFLINE
       </TerminalText>
-      <TerminalText tone="muted" uppercase={false} variant="body">
+      <TerminalText style={styles.noticeBody} tone="muted" uppercase={false} variant="body">
         Account creation and sign-in are temporarily unavailable while the secure
         account service is being connected.
       </TerminalText>
@@ -159,7 +165,13 @@ export function AuthStatusNotice({
 }) {
   return (
     <HUDBorderBox style={styles.notice} tone={tone}>
-      <TerminalText live={tone === 'red' ? 'assertive' : 'polite'} tone={tone} uppercase={false} variant="body">
+      <TerminalText
+        live={tone === 'red' ? 'assertive' : 'polite'}
+        style={styles.noticeBody}
+        tone={tone}
+        uppercase={false}
+        variant="body"
+      >
         {message}
       </TerminalText>
     </HUDBorderBox>
@@ -201,35 +213,22 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   sponsorRail: {
     marginBottom: spacing.lg
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  backButtonSpacing: {
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderCyanButton,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surfaceCyanGhost
   },
   pressed: {
     opacity: 0.7
   },
   header: {
-    gap: spacing.sm,
     marginBottom: spacing.xl
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle
   },
   fieldShell: {
     gap: spacing.xs
@@ -239,9 +238,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.borderCyanMedium,
+    borderColor: colors.borderCyanSoft,
     borderRadius: radii.sm,
-    backgroundColor: colors.panelAlpha70
+    backgroundColor: colors.panel
+  },
+  inputFocused: {
+    borderColor: colors.cyan,
+    backgroundColor: colors.surfaceCyanWhisper
   },
   input: {
     minWidth: 0,
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     color: colors.text,
-    fontFamily: fontFamilies.body,
+    fontFamily: fontFamilies.ui,
     fontSize: fontSizes.control
   },
   inputError: {
@@ -265,7 +268,13 @@ const styles = StyleSheet.create({
   },
   notice: {
     gap: spacing.sm,
-    padding: spacing.lg
+    padding: spacing.lg,
+    borderRadius: radii.md
+  },
+  noticeBody: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
   },
   footer: {
     marginTop: 'auto',

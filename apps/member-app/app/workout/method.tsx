@@ -4,16 +4,16 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { CompactTextButton } from '@/components/onboarding';
+import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
 import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
-import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
@@ -96,15 +96,17 @@ export default function WorkoutMethodScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <OnboardingHeader
+          label="WORKOUT SETUP"
+          onBack={() => goBackOrReplace(router, '/session' as Href)}
+          step="VERIFICATION"
+        />
         <WorkoutFlowProgress stage="device" style={styles.workoutProgress} />
-        <View style={styles.header}>
-          <TerminalText glow tone="cyan" variant="label">
-            WORKOUT VERIFICATION
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            HOW WILL YOU CHECK IN?
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Choose the verification method you will use to start, check, and finish this session."
+          eyebrow="WORKOUT VERIFICATION"
+          title="HOW WILL YOU CHECK IN?"
+        />
 
         <View style={styles.optionList}>
           {orderedOptions.map((option) => {
@@ -122,19 +124,14 @@ export default function WorkoutMethodScreen() {
                   pressed ? styles.pressed : null
                 ]}
               >
-                <HUDBorderBox
-                  glow={available}
-                  style={styles.optionCard}
-                  tone={available ? 'cyan' : 'muted'}
-                >
+                <HUDBorderBox style={styles.optionCard} tone={available ? 'cyan' : 'muted'}>
                   <View style={styles.optionCopy}>
                     {option.method === preferredMethod ? (
-                      <TerminalText glow tone="green" variant="micro">
+                      <TerminalText tone="green" variant="micro">
                         {`${available ? 'YOUR DEFAULT' : 'SAVED PREFERENCE'} // ${preferredSourceLabel}`}
                       </TerminalText>
                     ) : null}
                     <TerminalText
-                      glow={available}
                       style={styles.optionTitle}
                       tone={available ? 'cyan' : 'dim'}
                       variant="body"
@@ -151,11 +148,10 @@ export default function WorkoutMethodScreen() {
                     </TerminalText>
                   </View>
                   <TerminalText
-                    glow={available}
                     tone={available ? 'cyan' : 'dim'}
                     variant="button"
                   >
-                    {available ? '->' : 'Unavailable'}
+                    {available ? '→' : 'Unavailable'}
                   </TerminalText>
                 </HUDBorderBox>
               </Pressable>
@@ -176,37 +172,15 @@ export default function WorkoutMethodScreen() {
           </HUDBorderBox>
         ) : null}
 
-        <CyberButtonOutline
-          label="BACK"
-          onPress={() => goBackOrReplace(router, '/session' as Href)}
-          style={styles.backButton}
-        />
       </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.screenX,
-    paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  },
+  content: brandScreenStyles.content,
   workoutProgress: {
     marginBottom: spacing.xl
-  },
-  title: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34,
-    textAlign: 'center'
   },
   optionList: {
     gap: spacing.md

@@ -11,6 +11,7 @@ const inactiveAppTour = {
   active: false,
   enterTour: (_scenario: AppTourScenario = 'ready') => undefined,
   exitTour: () => undefined,
+  publicDemo: false,
   scenario: 'ready' as AppTourScenario
 };
 

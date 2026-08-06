@@ -160,20 +160,21 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileHeader}>
-          <ProfileAvatar
-            imageUri={profileImageUri}
-            initials={publicInitials}
-            showStatus={Boolean(user?.emailVerified)}
-          />
-          <UserAlias
-            alias={publicName}
-            glow
-            streaks={streakSummary?.streaks}
-            style={styles.profileAlias}
-            textStyle={styles.profileName}
-            tone="cyan"
-            variant="title"
-          />
+          <View style={styles.profileIdentityRow}>
+            <UserAlias
+              alias={publicName}
+              streaks={streakSummary?.streaks}
+              style={styles.profileAlias}
+              textStyle={styles.profileName}
+              tone="text"
+              variant="title"
+            />
+            <ProfileAvatar
+              imageUri={profileImageUri}
+              initials={publicInitials}
+              showStatus={Boolean(user?.emailVerified)}
+            />
+          </View>
           <CyberButtonOutline
             label={showProfileEditor ? 'DONE EDITING' : 'EDIT PROFILE'}
             onPress={() => setShowProfileEditor((current) => !current)}
@@ -465,21 +466,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   sectionToggle: {
     marginBottom: spacing.md
   },
   profileHeader: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     marginBottom: 22
+  },
+  profileIdentityRow: {
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingLeft: 14,
+    paddingVertical: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   profileName: {
     fontFamily: fontFamilies.display
   },
   profileAlias: {
-    justifyContent: 'center',
-    marginTop: spacing.md
+    minWidth: 0,
+    flex: 1,
+    justifyContent: 'center'
   },
   editProfileButton: {
     width: '100%',

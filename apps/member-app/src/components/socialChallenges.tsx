@@ -146,7 +146,7 @@ export function ChallengeHub({
         <View style={styles.cardList}>
           <View style={styles.listHeader}>
             <View style={styles.listHeaderCopy}>
-              <TerminalText glow tone="pink" variant="label">
+              <TerminalText tone="pink" variant="label">
                 NEAR YOU
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
@@ -188,7 +188,7 @@ export function ChallengeHub({
         <View style={styles.cardList}>
           <View style={styles.listHeader}>
             <View style={styles.listHeaderCopy}>
-              <TerminalText glow tone="cyan" variant="label">
+              <TerminalText tone="cyan" variant="label">
                 YOUR CHALLENGES
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
@@ -335,11 +335,11 @@ function ChallengeBuilder({
   };
 
   return (
-    <HUDBorderBox glow style={styles.builder} tone="pink">
+    <HUDBorderBox style={styles.builder} tone="pink">
       <TerminalText tone="pink" variant="micro">
         NEW MONTHLY MISSION
       </TerminalText>
-      <TerminalText glow style={styles.builderTitle} tone="text" variant="title">
+      <TerminalText style={styles.builderTitle} tone="text" variant="title">
         CREATE A CHALLENGE
       </TerminalText>
       <TerminalText tone="muted" uppercase={false} variant="body">
@@ -783,7 +783,7 @@ function ChallengeCard({
               ? `${challenge.regionCode ?? 'LOCAL'} REGIONAL`
               : 'FRIEND CHALLENGE'}
           </TerminalText>
-          <TerminalText glow style={styles.challengeName} tone="text" variant="title">
+          <TerminalText style={styles.challengeName} tone="text" variant="title">
             {challenge.name}
           </TerminalText>
         </View>
@@ -943,7 +943,7 @@ function ProgressPanel({ challenge }: { challenge: SocialChallenge }) {
             </TerminalText>
           </TerminalText>
         </View>
-        <TerminalText glow tone="green" variant="label">
+        <TerminalText tone="green" variant="label">
           {challenge.myProgress.completionPercent}%
         </TerminalText>
       </View>
@@ -1123,7 +1123,7 @@ function Counter({
           label={`Decrease ${label.toLowerCase()}`}
           onPress={() => onChange(Math.max(minimum, value - step))}
         />
-        <TerminalText glow style={styles.counterValue} tone="cyan" variant="value">
+        <TerminalText style={styles.counterValue} tone="cyan" variant="value">
           {value}
         </TerminalText>
         <IconButton

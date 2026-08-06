@@ -312,7 +312,7 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <TerminalText glow tone="cyan" variant="label">
+            <TerminalText tone="cyan" variant="label">
               {setupRequired
                 ? 'SETUP INCOMPLETE'
                 : 'ACCOUNT READY // ' + competitionRegion}
@@ -320,10 +320,9 @@ export default function HomeScreen() {
             <UserAlias
               accessibilityRole="text"
               alias={publicName}
-              glow
               streaks={streakSummary?.streaks}
               textStyle={styles.username}
-              tone="cyan"
+              tone="text"
               variant="title"
             />
           </View>
@@ -331,9 +330,9 @@ export default function HomeScreen() {
         </View>
 
         {registered === '1' ? (
-          <HUDBorderBox glow style={styles.registrationSuccess} tone="green">
+          <HUDBorderBox style={styles.registrationSuccess} tone="green">
             <View style={styles.registrationSuccessCopy}>
-              <TerminalText glow tone="green" variant="label">
+              <TerminalText tone="green" variant="label">
                 WEEKLY GOAL SET // {successGoal} {successGoal === 1 ? 'DAY' : 'DAYS'}
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
@@ -363,15 +362,10 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        <HUDBorderBox
-          glow
-          style={styles.commitmentCard}
-          tone={setupRequired ? 'amber' : 'cyan'}
-        >
+        <HUDBorderBox style={styles.commitmentCard} tone={setupRequired ? 'amber' : 'cyan'}>
           <View style={styles.commitmentHeader}>
             <View style={styles.commitmentTitleBlock}>
               <TerminalText
-                glow
                 tone={setupRequired ? 'amber' : 'cyan'}
                 variant="label"
               >
@@ -748,13 +742,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    paddingLeft: 14,
+    paddingVertical: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   headerCopy: {
     flex: 1,

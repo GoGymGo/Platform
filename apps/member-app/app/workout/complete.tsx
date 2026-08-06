@@ -190,7 +190,7 @@ export default function WorkoutCompleteScreen() {
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
           COMPLETE
         </TerminalText>
-        <TerminalText glow style={styles.title} tone={entriesAwarded > 0 ? 'pink' : 'green'} variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           {completionResult === 'completed'
             ? entriesAwarded > 0
               ? `+${entriesAwarded} BONUS DAY PRIZE DRAW ${entriesAwarded === 1 ? 'ENTRY' : 'ENTRIES'}`
@@ -218,7 +218,7 @@ export default function WorkoutCompleteScreen() {
                   ? 'PRE-COMP VERIFIED'
                 : `WEEK ${currentWeekIndex ?? 1} PROGRESS`}
             </TerminalText>
-            <TerminalText glow tone="cyan" variant="label">
+            <TerminalText tone="cyan" variant="label">
               {currentWeekVerified} OF {weeklyGoal} {weeklyGoal === 1 ? 'DAY' : 'DAYS'}
             </TerminalText>
           </View>
@@ -243,7 +243,7 @@ export default function WorkoutCompleteScreen() {
 
         <View style={styles.statsRow}>
           <HUDBorderBox style={styles.statCard} tone="cyan">
-            <TerminalText glow style={styles.statValue} tone="cyan" variant="body">
+            <TerminalText style={styles.statValue} tone="cyan" variant="body">
               {currentStreak}
             </TerminalText>
             <TerminalText style={styles.statLabel} tone="muted" variant="micro">
@@ -251,7 +251,7 @@ export default function WorkoutCompleteScreen() {
             </TerminalText>
           </HUDBorderBox>
           <HUDBorderBox style={styles.statCard} tone="cyan">
-            <TerminalText glow style={styles.statValue} tone="cyan" variant="body">
+            <TerminalText style={styles.statValue} tone="cyan" variant="body">
               {totalEntries}
             </TerminalText>
             <TerminalText style={styles.statLabel} tone="muted" variant="micro">
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.screenX,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   screen: {
     flexGrow: 1,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.xl
@@ -341,8 +341,7 @@ const styles = StyleSheet.create({
     borderRadius: 4
   },
   progressBarDone: {
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.cyan
   },
   progressBarOpen: {
     backgroundColor: colors.whiteAlpha08

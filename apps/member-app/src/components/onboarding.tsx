@@ -1,7 +1,15 @@
-import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type StyleProp,
+  type ViewStyle
+} from 'react-native';
 
 import { TerminalText } from '@/components/cyber';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 
 type OnboardingHeaderProps = {
   label: string;
@@ -20,6 +28,7 @@ type CompactTextButtonProps = {
 
 type ScreenBackButtonProps = {
   onPress: () => void;
+  style?: StyleProp<ViewStyle>;
 };
 
 const webFocusOutline = Platform.select({
@@ -34,25 +43,39 @@ export function OnboardingHeader({
   step,
   style
 }: OnboardingHeaderProps) {
+  const { width } = useWindowDimensions();
+  const compact = width <= 400;
   const progressWidth =
     progress === undefined
       ? null
       : (`${Math.max(0, Math.min(100, progress))}%` as `${number}%`);
 
   return (
-    <View style={style}>
+    <View style={[styles.headerShell, style]}>
       <View style={styles.headerRow}>
         {onBack ? (
           <ScreenBackButton onPress={onBack} />
         ) : (
           <View style={styles.backPlaceholder} />
         )}
-        <TerminalText style={styles.stepText} tone="dim" variant="label">
-          {step}
-        </TerminalText>
-        <TerminalText glow style={styles.labelText} tone="cyan" variant="label">
-          {label}
-        </TerminalText>
+        <View style={[styles.headerCopy, compact ? styles.headerCopyCompact : null]}>
+          <TerminalText
+            numberOfLines={1}
+            style={[styles.stepText, compact ? styles.headerTextCompact : null]}
+            tone="dim"
+            variant="label"
+          >
+            {step}
+          </TerminalText>
+          <TerminalText
+            numberOfLines={1}
+            style={[styles.labelText, compact ? styles.headerTextCompact : null]}
+            tone="cyan"
+            variant="label"
+          >
+            {label}
+          </TerminalText>
+        </View>
       </View>
       {progressWidth ? (
         <View style={styles.progressTrack}>
@@ -63,16 +86,20 @@ export function OnboardingHeader({
   );
 }
 
-export function ScreenBackButton({ onPress }: ScreenBackButtonProps) {
+export function ScreenBackButton({ onPress, style }: ScreenBackButtonProps) {
   return (
     <Pressable
       accessibilityLabel="Back"
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.backButton,
+        style,
+        pressed ? styles.pressed : null
+      ]}
     >
-      <TerminalText glow tone="cyan" variant="button">
-        {'<'}
+      <TerminalText tone="cyan" uppercase={false} variant="button">
+        {'←'}
       </TerminalText>
     </Pressable>
   );
@@ -99,7 +126,6 @@ export function CompactTextButton({
       ]}
     >
       <TerminalText
-        glow={tone !== 'muted'}
         tone={textTone}
         uppercase={false}
         variant="button"
@@ -111,11 +137,31 @@ export function CompactTextButton({
 }
 
 const styles = StyleSheet.create({
+  headerShell: {
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderColor: colors.borderCyanSubtle,
+    backgroundColor: colors.transparent
+  },
   headerRow: {
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm
+  },
+  headerCopy: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
+  headerCopyCompact: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    gap: 0
   },
   backButton: {
     width: 44,
@@ -123,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderCyanButton,
+    borderColor: colors.borderCyanMedium,
     borderRadius: radii.sm,
     backgroundColor: colors.surfaceCyanGhost,
     ...webFocusOutline
@@ -132,25 +178,33 @@ const styles = StyleSheet.create({
     width: 44
   },
   stepText: {
+    minWidth: 0,
     flex: 1,
     fontFamily: fontFamilies.terminal
   },
   labelText: {
+    minWidth: 0,
+    flexShrink: 1,
     fontFamily: fontFamilies.terminal,
     textAlign: 'right'
   },
+  headerTextCompact: {
+    width: '100%',
+    flex: 0,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'right'
+  },
   progressTrack: {
-    height: 3,
+    height: 4,
     overflow: 'hidden',
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
     borderRadius: 2,
     backgroundColor: colors.whiteAlpha06
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.cyan
   },
   textButton: {
     minHeight: 44,

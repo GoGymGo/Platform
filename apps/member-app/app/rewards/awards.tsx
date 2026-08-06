@@ -15,6 +15,8 @@ import {
   RecoverableError,
   useAccessibilityAnnouncement
 } from '@/components/reliability';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useClaimReward, useMyRewardAwards } from '@/data/appDataHooks';
 import type { ClaimedReward, RewardAward } from '@/domain/rewards';
@@ -70,23 +72,17 @@ export default function MyRewardsScreen() {
           memoryKey="my-rewards"
           showsVerticalScrollIndicator={false}
         >
-          <CyberButtonOutline
-            label="BACK TO MARKETPLACE"
-            onPress={() => goBackOrReplace(router, '/leaderboard/rewards')}
-            style={styles.backButton}
+          <OnboardingHeader
+            label="REWARDS"
+            onBack={() => goBackOrReplace(router, '/leaderboard/rewards')}
+            step="MY ACCOUNT"
           />
-          <View style={styles.header}>
-            <TerminalText glow tone="pink" variant="label">
-              CONTEST REWARDS
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              MY REWARDS
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              Claim physical-prize instructions or securely reveal an awarded coupon
-              code. GoGymGo will never ask for banking information.
-            </TerminalText>
-          </View>
+          <BrandScreenHeader
+            accent="pink"
+            description="Claim physical-prize instructions or securely reveal an awarded coupon code. GoGymGo will never ask for banking information."
+            eyebrow="CONTEST REWARDS"
+            title="MY REWARDS"
+          />
 
           {claimedReward ? <ClaimResult reward={claimedReward} /> : null}
 
@@ -156,8 +152,8 @@ function AwardCard({
 }) {
   const claimable = award.status === 'awarded' || award.status === 'claimed';
   return (
-    <HUDBorderBox glow style={styles.awardCard} tone="pink">
-      <TerminalText glow tone="pink" variant="micro">
+    <HUDBorderBox style={styles.awardCard} tone="pink">
+      <TerminalText tone="pink" variant="micro">
         #{award.awardRank} {' // '}
         {award.rewardType === 'coupon' ? 'COUPON CODE' : 'PHYSICAL PRIZE'}
       </TerminalText>
@@ -237,15 +233,7 @@ function ClaimResult({ reward }: { reward: ClaimedReward }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    padding: spacing.xl,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  backButton: { alignSelf: 'flex-start', minHeight: 44, marginBottom: spacing.xl },
-  header: { gap: spacing.sm, marginBottom: spacing.xl },
-  title: { fontFamily: fontFamilies.display },
+  content: brandScreenStyles.content,
   awards: { gap: spacing.lg },
   awardCard: { gap: spacing.sm, padding: spacing.lg },
   awardTitle: { fontFamily: fontFamilies.display },

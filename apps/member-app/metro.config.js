@@ -13,6 +13,10 @@ const browserPreviewAliases = new Map([
 ]);
 const productionAliases = new Map([
   [
+    '@/demo/PublicDemoScreen',
+    path.join(projectRoot, 'src/production-stubs/PublicDemoScreen.tsx')
+  ],
+  [
     '@/state/appTour',
     path.join(projectRoot, 'src/production-stubs/appTourState.tsx')
   ],
@@ -45,13 +49,26 @@ const productionAliases = new Map([
     path.join(projectRoot, 'src/production-stubs/AppTourQrSimulator.tsx')
   ]
 ]);
+const publicDemoWebModules = new Set([
+  '@/demo/PublicDemoScreen',
+  '@/state/appTour',
+  '@/testing/appTourData',
+  '@/testing/appTourRegion',
+  '@/testing/appTourRoutes',
+  '@/testing/AppTourModeBanner',
+  '@/testing/AppTourQrSimulator'
+]);
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const keepBrowserTestPreview =
     !context.dev &&
     platform === 'web' &&
     browserTestPreviewBuildEnabled;
-  const productionModule = context.dev || keepBrowserTestPreview
+  const keepPublicWebDemo =
+    !context.dev &&
+    platform === 'web' &&
+    publicDemoWebModules.has(moduleName);
+  const productionModule = context.dev || keepBrowserTestPreview || keepPublicWebDemo
     ? undefined
     : productionAliases.get(moduleName);
   const browserPreviewModule = keepBrowserTestPreview

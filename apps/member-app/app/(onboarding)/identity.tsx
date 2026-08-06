@@ -10,11 +10,13 @@ import {
 import { AuthTextField } from '@/components/auth';
 import {
   ScreenScrollView,
-  CyberButtonOutline,
-  CyberButtonPrimary,
-  ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import {
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
@@ -34,13 +36,13 @@ export default function IdentityScreen() {
 
   if (!profileReady) {
     return (
-      <ScreenContainer>
+      <FirstRunScreen>
         <View style={styles.loading}>
-          <TerminalText glow live="polite" tone="cyan" variant="label">
+          <TerminalText live="polite" tone="cyan" variant="label">
             LOADING PUBLIC IDENTITY
           </TerminalText>
         </View>
-      </ScreenContainer>
+      </FirstRunScreen>
     );
   }
 
@@ -108,7 +110,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
   };
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
@@ -130,7 +132,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             step="PROFILE"
           />
 
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
+          <TerminalText style={styles.title} tone="text" variant="title">
             HOW SHOULD OTHERS SEE YOU?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
@@ -166,7 +168,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
                 Add a picture or keep your initials avatar.
               </TerminalText>
             </View>
-            <CyberButtonOutline
+            <FirstRunSecondaryButton
               disabled={isPickingImage}
               label={isPickingImage
                 ? 'PREPARING PICTURE...'
@@ -190,7 +192,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             ) : null}
           </View>
 
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             disabled={!identityIsValid || saving}
             label={saving
               ? 'SAVING ALIAS...'
@@ -200,7 +202,7 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
           />
         </ScreenScrollView>
       </KeyboardAvoidingView>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
@@ -215,22 +217,26 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   title: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.screenTitle,
     lineHeight: 34,
-    textAlign: 'center'
+    paddingLeft: 14,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   body: {
     marginTop: spacing.sm,
     marginBottom: spacing.md,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
+    paddingLeft: 16,
+    fontFamily: fontFamilies.ui,
+    fontSize: 16,
+    lineHeight: 24
   },
   pictureSection: {
     alignItems: 'center',
@@ -242,7 +248,7 @@ const styles = StyleSheet.create({
     gap: 2
   },
   pictureHelper: {
-    fontFamily: fontFamilies.body,
+    fontFamily: fontFamilies.ui,
     textAlign: 'center'
   },
   pictureButton: {
@@ -250,7 +256,7 @@ const styles = StyleSheet.create({
     minHeight: 46
   },
   pictureMessage: {
-    fontFamily: fontFamilies.body,
+    fontFamily: fontFamilies.ui,
     textAlign: 'center'
   },
   primaryButton: {

@@ -15,8 +15,12 @@ export type AppTourRouteGroup = {
 
 export const appTourRouteGroups: readonly AppTourRouteGroup[] = [];
 export const appTourRoutes: readonly AppTourRoute[] = [];
+export const publicDemoRoutes: readonly AppTourRoute[] = [];
 
-export function buildAppTourHref(_route: AppTourRoute): Href {
+export function buildAppTourHref(
+  _route: AppTourRoute,
+  _mode: 'demo' | 'review' = 'review'
+): Href {
   return '/' as Href;
 }
 

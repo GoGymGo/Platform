@@ -87,107 +87,6 @@
   letter-spacing: 0.08em;
 }
 
-.eligibility-section {
-  border-block: 1px solid rgba(52, 229, 232, 0.16);
-  background:
-    radial-gradient(circle at 12% 18%, rgba(52, 229, 232, 0.08), transparent 24rem),
-    rgba(11, 17, 24, 0.48);
-}
-
-.eligibility-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(480px, 1fr);
-  align-items: start;
-  gap: 72px;
-}
-
-.eligibility-intro {
-  display: grid;
-  gap: 20px;
-}
-
-.eligibility-intro h2 {
-  margin-top: -8px;
-}
-
-.eligibility-intro > p:not(.eyebrow) {
-  color: var(--muted);
-  font-size: 17px;
-}
-
-.eligibility-availability-note {
-  padding: 18px;
-  border-left: 2px solid var(--amber);
-  background: rgba(255, 224, 102, 0.045);
-  font-size: 14px !important;
-}
-
-.eligibility-check {
-  display: grid;
-  gap: 16px;
-  padding: 28px;
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: rgba(7, 13, 18, 0.82);
-}
-
-.eligibility-question {
-  display: grid;
-  gap: 8px;
-}
-
-.eligibility-question label {
-  color: var(--text);
-  font-weight: 650;
-  line-height: 1.45;
-}
-
-.eligibility-question select {
-  width: 100%;
-  height: 50px;
-  padding: 0 13px;
-  border: 1px solid rgba(52, 229, 232, 0.3);
-  border-radius: 8px;
-  outline: none;
-  color: var(--text);
-  background: rgba(7, 13, 18, 0.92);
-}
-
-.eligibility-question select:focus {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(52, 229, 232, 0.13);
-}
-
-.eligibility-result {
-  display: grid;
-  gap: 12px;
-  margin-top: 6px;
-  padding: 20px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: rgba(52, 229, 232, 0.05);
-}
-
-.eligibility-result--not-eligible {
-  border-color: rgba(255, 224, 102, 0.5);
-  background: rgba(255, 224, 102, 0.05);
-}
-
-.eligibility-result h3 {
-  font-size: 17px;
-}
-
-.eligibility-result p {
-  color: var(--muted);
-  font-size: 15px;
-}
-
-.eligibility-result .button {
-  justify-self: start;
-  margin-top: 4px;
-}
-
-.eligibility-result__actions,
 .transparency-actions {
   display: flex;
   flex-wrap: wrap;
@@ -550,14 +449,6 @@
     width: min(100%, 680px);
   }
 
-  .eligibility-layout {
-    grid-template-columns: 1fr;
-    gap: 38px;
-  }
-
-  .eligibility-intro {
-    max-width: 760px;
-  }
 }
 
 @media (max-width: 720px) {
@@ -621,17 +512,10 @@
     text-align: center;
   }
 
-  .eligibility-check {
-    padding: 22px 18px;
-  }
-
-  .eligibility-result .button,
-  .eligibility-result__actions,
   .transparency-actions {
     width: 100%;
   }
 
-  .eligibility-result__actions,
   .transparency-actions {
     display: grid;
   }

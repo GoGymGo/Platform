@@ -33,8 +33,6 @@ export const septemberCampaign = {
   weeklyGoalRange: "1–7 days",
 } as const;
 
-export type SeptemberCampaignPhase = "registration" | "active" | "ended";
-
 export function getSeptemberCampaignState(now = new Date()) {
   const currentTime = now.getTime();
   const startTime = Date.parse(septemberCampaign.competitionStartAt);

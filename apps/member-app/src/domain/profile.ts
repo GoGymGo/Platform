@@ -19,12 +19,6 @@ export type UpdateAccountProfileInput = {
   screenName?: string;
 };
 
-export const defaultPublicIdentity: PublicIdentity = {
-  callsign: '',
-  displayName: '',
-  mode: 'private'
-};
-
 export function createPrivateIdentity(userId: string | null | undefined): PublicIdentity {
   const suffix = (userId ?? '')
     .replace(/[^a-z0-9]/gi, '')

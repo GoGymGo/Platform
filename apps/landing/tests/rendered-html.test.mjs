@@ -143,23 +143,15 @@ test("mobile navigation uses native modal semantics and current-page state", asy
   assert.match(layout, /tabIndex=\{-1\}/);
 });
 
-test("the retired eligibility checker stays local-only and the homepage sends decisions to the app", async () => {
-  const [page, checker, appLink] = await Promise.all([
+test("the homepage sends eligibility decisions to the app", async () => {
+  const [page, appLink] = await Promise.all([
     read("app/page.tsx"),
-    read("app/components/EligibilityCheck.tsx"),
     read("app/components/AppLink.tsx"),
   ]);
 
   assert.doesNotMatch(page, /<EligibilityCheck \/>/);
   assert.match(page, /analyticsEvent="member_app_click"/);
   assert.match(page, /href=\{siteLinks\.memberApp\}/);
-  assert.match(checker, /private on-page check is not saved/);
-  assert.match(checker, /has not published a public partner-gym directory/);
-  assert.match(checker, /name="age"/);
-  assert.match(checker, /name="region"/);
-  assert.match(checker, /name="partnerGym"/);
-  assert.match(checker, /recordPublicSiteEvent\("eligibility_check_completed"\)/);
-  assert.doesNotMatch(checker, /fetch\(|localStorage|sessionStorage|document\.cookie/);
   assert.match(appLink, /opens the GoGymGo app/);
   assert.match(appLink, /aria-hidden="true" className="app-link-cue">\s+↗/);
 });

@@ -135,24 +135,6 @@ export const colors = {
   gridLine: 'rgba(52, 229, 232, 0.08)'
 } as const;
 
-export const colorRoles = {
-  primary: colors.cyan,
-  secondary: colors.pink,
-  accent: colors.pink,
-  background: colors.background,
-  surface: colors.panel,
-  surfaceRaised: colors.panelSoft,
-  textPrimary: colors.text,
-  textSecondary: colors.muted,
-  textTertiary: colors.dim,
-  status: {
-    success: colors.statusSuccess,
-    error: colors.statusError,
-    warning: colors.statusWarning,
-    info: colors.statusInfo
-  }
-} as const;
-
 const nativeBodyFont =
   Platform.select({
     android: 'sans-serif',

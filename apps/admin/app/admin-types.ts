@@ -170,7 +170,6 @@ export type AdminSection =
   | "operations"
   | "audit";
 import type {
-  CashFulfillmentRecordDto,
   GymLocationResponseDto,
   GymQrCredentialResponseDto,
   OperatorAuditHistoryDto,
@@ -180,7 +179,6 @@ import type {
   RegionWaitlistEntryDto,
 } from "@gogymgo/contracts";
 
-export type CashFulfillment = CashFulfillmentRecordDto;
 export type GymLocation = GymLocationResponseDto;
 export type GymQrCredential = GymQrCredentialResponseDto;
 export type GymSession = OperatorGymSessionDto;

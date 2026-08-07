@@ -12,30 +12,21 @@
     "packages/*"
   ],
   "overrides": {
-    "@nestjs/swagger": {
-      "js-yaml": "5.2.3"
+    "@gogymgo/admin": {
+      "miniflare": {
+        "undici": "7.29.0"
+      }
     },
-    "gaxios": {
-      "uuid": "11.1.1"
+    "@gogymgo/api": {
+      "@nestjs/swagger": {
+        "js-yaml": "5.2.3"
+      }
     },
-    "next": {
-      "postcss": "8.5.25",
-      "sharp": "0.35.3"
-    },
-    "postcss": "8.5.25",
-    "sharp": "0.35.3",
-    "teeny-request": {
-      "uuid": "11.1.1"
-    },
-    "uuid": "11.1.1",
-    "ws": "8.21.1",
-    "xcode": {
-      "uuid": "11.1.1"
+    "@gogymgo/landing": {
+      "miniflare": {
+        "undici": "7.29.0"
+      }
     }
-  },
-  "devDependencies": {
-    "uuid": "11.1.1",
-    "ws": "8.21.1"
   },
   "scripts": {
     "build": "npm run contracts:generate && npm run build --workspace @gogymgo/brand && npm run build --workspace @gogymgo/contracts && npm run build --workspace @gogymgo/api && npm run build --workspace @gogymgo/admin && npm run build --workspace @gogymgo/landing && npm run build --workspace @gogymgo/member-app",

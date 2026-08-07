@@ -6,18 +6,6 @@ export const gymScanPolicy = {
   sessionExpiryMilliseconds: 4 * 60 * 60 * 1_000,
 } as const;
 
-export type GymScanRejectionReason =
-  | 'competition_unavailable'
-  | 'daily_limit_reached'
-  | 'gym_inactive'
-  | 'inaccurate_location'
-  | 'invalid_or_revoked_credential'
-  | 'outside_geofence'
-  | 'replayed_event'
-  | 'session_credential_mismatch'
-  | 'session_expired'
-  | 'session_gym_mismatch';
-
 export function hashOpaqueValue(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }

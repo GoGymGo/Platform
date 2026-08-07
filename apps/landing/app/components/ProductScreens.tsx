@@ -4,25 +4,25 @@ import { AppLink } from "./AppLink";
 const productScreens = [
   {
     alt: "GoGymGo active workout screen showing elapsed server time and live verification status",
-    height: 800,
+    height: 1600,
     proof: "LIVE VERIFICATION",
     proofCopy:
-      "Server-timed progress with entry, exit, and fresh-location checks.",
+      "Server-timed progress with live heart-rate verification and automatic session saving.",
     src: "/app/active-workout.webp",
     step: "01 // VERIFY",
     title: "Follow the authoritative workout timer",
-    width: 540,
+    width: 960,
   },
   {
     alt: "GoGymGo Winners Circle screen showing published competition results",
-    height: 800,
+    height: 1600,
     proof: "PUBLISHED ONLY",
     proofCopy:
       "Final standings appear only after submitted activity is reviewed.",
     src: "/app/winners-circle.webp",
     step: "02 // RESULTS",
     title: "Review published competition results",
-    width: 540,
+    width: 960,
   },
 ] as const;
 

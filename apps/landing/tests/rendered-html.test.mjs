@@ -8,6 +8,16 @@ async function read(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
+function readVp8Dimensions(image) {
+  assert.equal(image.subarray(12, 16).toString("ascii"), "VP8 ");
+  assert.deepEqual([...image.subarray(23, 26)], [157, 1, 42]);
+
+  return {
+    height: image.readUInt16LE(28) & 0x3fff,
+    width: image.readUInt16LE(26) & 0x3fff,
+  };
+}
+
 test("campaign facts have one landing-owned source of truth", async () => {
   const [campaign, page, gymPage, faq] = await Promise.all([
     read("app/campaign.ts"),
@@ -70,6 +80,8 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
   assert.match(productScreens, /active-workout\.webp/);
   assert.match(productScreens, /winners-circle\.webp/);
+  assert.equal((productScreens.match(/height: 1600/g) ?? []).length, 2);
+  assert.equal((productScreens.match(/width: 960/g) ?? []).length, 2);
   assert.match(productScreens, /LIVE VERIFICATION/);
   assert.match(productScreens, /PUBLISHED ONLY/);
   assert.match(productScreens, /product-screen-callout/);
@@ -344,7 +356,8 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(experience, /\.landing-hero h1 \{[\s\S]*?font-size: clamp\(48px, 4\.5vw, 64px\)/);
   assert.match(experience, /\.pilot-console__facts > div \{[\s\S]*?min-height: 82px/);
   assert.match(experience, /@media \(max-width: 980px\)[\s\S]*?\.landing-hero \{[\s\S]*?min-height: 0/);
-  assert.match(experience, /aspect-ratio: 540 \/ 680/);
+  assert.match(experience, /aspect-ratio: 3 \/ 5/);
+  assert.match(experience, /image-rendering: auto/);
   assert.match(experience, /\.campaign-details summary \{[\s\S]*?min-height: 72px/);
   assert.match(globals, /\.landing-page > \.section \{[\s\S]*?padding-block: 72px/);
   assert.match(globals, /\.conversion-grid \{/);
@@ -384,8 +397,9 @@ test("optimized product images and wide social preview are valid assets", async 
   for (const image of [activeWorkout, winnersCircle]) {
     assert.equal(image.subarray(0, 4).toString("ascii"), "RIFF");
     assert.equal(image.subarray(8, 12).toString("ascii"), "WEBP");
-    assert.ok(image.length > 10_000);
-    assert.ok(image.length < 100_000);
+    assert.deepEqual(readVp8Dimensions(image), { height: 1600, width: 960 });
+    assert.ok(image.length > 50_000);
+    assert.ok(image.length < 150_000);
   }
 
   assert.deepEqual([...socialImage.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);

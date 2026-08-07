@@ -384,7 +384,7 @@
 }
 
 .product-phone.product-phone--capture {
-  aspect-ratio: 540 / 680;
+  aspect-ratio: 3 / 5;
   padding: 8px;
 }
 
@@ -395,6 +395,7 @@
   border-radius: 18px;
   object-fit: cover;
   object-position: top;
+  image-rendering: auto;
 }
 
 .product-screen-caption {

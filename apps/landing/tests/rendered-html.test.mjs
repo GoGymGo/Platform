@@ -268,12 +268,14 @@ test("public-site feedback is accessible, validated, stored and owner-exportable
 });
 
 test("FAQ, contact and public information pages are scannable and discoverable", async () => {
-  const [notFound, faq, contact, accessibilityPage, robots, sitemap, manifest] =
+  const [notFound, faq, contact, accessibilityPage, deletionPage, layout, robots, sitemap, manifest] =
     await Promise.all([
       read("app/not-found.tsx"),
       read("app/faq/page.tsx"),
       read("app/contact/page.tsx"),
       read("app/accessibility/page.tsx"),
+      read("app/account-deletion/page.tsx"),
+      read("app/layout.tsx"),
       read("app/robots.ts"),
       read("app/sitemap.ts"),
       read("app/manifest.ts"),
@@ -296,8 +298,14 @@ test("FAQ, contact and public information pages are scannable and discoverable",
   assert.match(contact, /Existing member support/);
   assert.match(contact, /Public-site feedback/);
   assert.match(accessibilityPage, /keyboards, screen readers, browser zoom, reduced motion/);
+  assert.match(deletionPage, /Request account deletion from any browser/);
+  assert.match(deletionPage, /href=\{siteLinks\.accountData\}/);
+  assert.match(deletionPage, /href=\{siteLinks\.forgotPassword\}/);
+  assert.match(deletionPage, /Limited pseudonymous records/);
+  assert.match(layout, /href=\{siteLinks\.accountDeletion\}>Account deletion/);
   assert.match(robots, /sitemap: "https:\/\/gogymgo\.com\/sitemap\.xml"/);
   assert.match(sitemap, /"\/accessibility"/);
+  assert.match(sitemap, /"\/account-deletion"/);
   assert.match(manifest, /theme_color: "#080b0e"/);
 });
 

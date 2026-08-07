@@ -11,6 +11,8 @@ const adminDashboardOrigin = (
 ).replace(/\/+$/, "");
 
 export const siteLinks = {
+  accountData: `${memberAppOrigin}/account-data`,
+  accountDeletion: "/account-deletion",
   accessibility: "/accessibility",
   adminDashboard: adminDashboardOrigin,
   brandPartnerApplication: "/partners?interest=brand#partner-form",
@@ -18,6 +20,7 @@ export const siteLinks = {
   contact: "/contact",
   demo: `${memberAppOrigin}/demo`,
   faq: "/faq",
+  forgotPassword: `${memberAppOrigin}/forgot-password`,
   gymPartnerApplication: "/partners?interest=gym#partner-form",
   gymGoers: "/gym-goers",
   home: "/",

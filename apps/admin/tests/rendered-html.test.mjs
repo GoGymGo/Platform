@@ -23,7 +23,7 @@ async function render(pathname = "/") {
   );
 }
 
-test("server-renders the GoGymGo administrator entry screen", async () => {
+test("server-renders the role-aware GoGymGo operator entry screen", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -31,8 +31,9 @@ test("server-renders the GoGymGo administrator entry screen", async () => {
   const html = await response.text();
   assert.match(html, /<title>GoGymGo Admin<\/title>/i);
   assert.match(html, /GoGymGo/);
-  assert.match(html, /ADMIN CONTROL/);
+  assert.match(html, /OPERATOR PORTAL/);
   assert.match(html, /INVITATION-ONLY OPERATOR ACCESS/);
+  assert.match(html, /Role-based workspaces/);
   assert.match(html, /Sign in to continue/);
   assert.match(html, /Firebase sign-in has not been configured/);
   assert.doesNotMatch(html, /CONTROL DECK ONLINE|SYSTEM OVERVIEW/);
@@ -80,13 +81,16 @@ test("keeps authorization and mutation safeguards in the implementation", async 
 
   assert.match(dashboardUtils, /getIdToken\(\)/);
   assert.match(dashboardUtils, /authorization:\s*`Bearer \$\{token\}`/);
-  assert.match(dashboard, /Only active,/);
-  assert.match(dashboard, /email-verified accounts/);
-  assert.match(dashboard, /GoGymGo-issued accounts only/);
-  assert.match(dashboard, /approved gym owners and regional directors/);
-  assert.match(dashboard, /GOGYMGO-ISSUED EMAIL/);
-  assert.match(dashboard, /authoritative database admin role/);
-  assert.match(dashboard, /useState<AuthStage>\("signed-out"\)/);
+  assert.match(dashboard, /Role-based workspaces/);
+  assert.match(dashboard, /GOGYMGO TEAM EMAIL/);
+  assert.match(dashboard, /PARTNER EMAIL/);
+  assert.match(dashboard, /browserSessionPersistence/);
+  assert.match(dashboard, /Keep me signed in on this device/);
+  assert.match(dashboard, /CHECKING YOUR SESSION/);
+  assert.match(dashboard, /operator\/access/);
+  assert.match(dashboard, /operator\/partner-dashboard/);
+  assert.match(dashboard, /Your gyms, without the platform-wide controls/);
+  assert.match(dashboard, /AWAITING GOGYMGO REVIEW/);
   assert.doesNotMatch(
     dashboard,
     /GoogleAuthProvider|OAuthProvider|signInWithPopup|CONNECTED ACCOUNT/,
@@ -149,7 +153,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(proxy, /path\[0\]\s*!==\s*"operator"/);
   assert.match(proxy, /This administrative route is not available/);
   assert.match(proxy, /GOGYMGO_API_URL/);
-  assert.match(proxy, /buildUpstreamUrl\(baseUrl, path, request\.nextUrl\.search\)/);
+  assert.match(
+    proxy,
+    /buildUpstreamUrl\(baseUrl, path, request\.nextUrl\.search\)/,
+  );
   assert.doesNotMatch(proxy, /firebase.*private|serviceAccount/i);
 
   assert.match(environmentExample, /GOGYMGO_API_URL=/);
@@ -160,7 +167,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
 
   assert.match(authorization, /signInProvider\s*!==\s*'password'/);
   assert.match(authorization, /OPERATOR_PASSWORD_SIGN_IN_REQUIRED/);
-  assert.match(styles, /\.sign-in-panel \.stacked-form input,[\s\S]*min-height: 48px/);
+  assert.match(authorization, /PARTNER_GYM_ASSIGNMENT_REQUIRED/);
+  assert.match(authorization, /GYM_SCOPE_FORBIDDEN/);
+  assert.match(
+    styles,
+    /\.sign-in-panel \.stacked-form input,[\s\S]*min-height: 48px/,
+  );
   assert.match(styles, /\.sign-in-panel \{[\s\S]*order: -1/);
   assert.match(styles, /@gogymgo\/brand\/web\.css/);
   assert.match(styles, /--body: var\(--gogymgo-font-body\)/);

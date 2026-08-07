@@ -948,6 +948,48 @@
         "tags": ["operator"]
       }
     },
+    "/v1/operator/access": {
+      "get": {
+        "operationId": "getAccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorPortalAccessDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Resolve the server-authoritative operator portal",
+        "tags": ["operator portal"]
+      }
+    },
+    "/v1/operator/partner-dashboard": {
+      "get": {
+        "operationId": "getPartnerDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerDashboardSnapshotDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return a gym-scoped partner workspace snapshot",
+        "tags": ["operator portal"]
+      }
+    },
     "/v1/competitions/current": {
       "get": {
         "operationId": "getCurrent",
@@ -4181,6 +4223,7 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "gymLocationId": { "type": "string", "format": "uuid" },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
@@ -4225,6 +4268,7 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "gymLocationId": { "type": "string", "format": "uuid" },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
@@ -4648,6 +4692,179 @@
           "decision": { "type": "string", "enum": ["approved", "rejected"] }
         },
         "required": ["reason", "decision"]
+      },
+      "OperatorPortalAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "accessLevel": { "type": "string", "enum": ["admin", "staff"] },
+          "gymLocationId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["accessLevel", "gymLocationId"]
+      },
+      "OperatorPortalAccessDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "portal": { "type": "string", "enum": ["gogymgo", "partner"] },
+          "roles": { "type": "array", "items": { "type": "string" } },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorPortalAssignmentDto"
+            }
+          }
+        },
+        "required": ["id", "email", "portal", "roles", "assignments"]
+      },
+      "PartnerGymDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "regionCode": { "type": "string" },
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "radiusMeters": { "type": "number" },
+          "active": { "type": "boolean" },
+          "activeCredentialVersion": { "type": "number", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "accessLevel": { "type": "string", "enum": ["admin", "staff"] }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "regionCode",
+          "name",
+          "address",
+          "latitude",
+          "longitude",
+          "radiusMeters",
+          "active",
+          "activeCredentialVersion",
+          "createdAt",
+          "updatedAt",
+          "accessLevel"
+        ]
+      },
+      "OperatorGymSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "gymLocationId": { "type": "string", "format": "uuid" },
+          "gymName": { "type": "string" },
+          "status": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "incomplete": { "type": "boolean" }
+        },
+        "required": [
+          "id",
+          "gymLocationId",
+          "gymName",
+          "status",
+          "startedAt",
+          "completedAt",
+          "incomplete"
+        ]
+      },
+      "PartnerCompetitionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 },
+          "rulesVersion": { "type": "string" },
+          "rules": { "type": "object" },
+          "minimumEntrants": { "type": "number" },
+          "entrantCap": { "type": "number", "nullable": true },
+          "enrollmentCount": { "type": "number" },
+          "rewardCount": { "type": "number" },
+          "publishedRewardCount": { "type": "number" },
+          "goalBrackets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardGoalBracketDto"
+            }
+          },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" },
+          "gymLocationId": { "type": "string", "format": "uuid" },
+          "gymName": { "type": "string" },
+          "proposedByUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "regionCode",
+          "regionName",
+          "monthKey",
+          "name",
+          "status",
+          "version",
+          "rulesVersion",
+          "rules",
+          "minimumEntrants",
+          "entrantCap",
+          "enrollmentCount",
+          "rewardCount",
+          "publishedRewardCount",
+          "goalBrackets",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt",
+          "gymLocationId",
+          "gymName",
+          "proposedByUserId"
+        ]
+      },
+      "PartnerDashboardSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/AdminDashboardIdentityDto"
+          },
+          "gyms": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PartnerGymDto" }
+          },
+          "sessions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OperatorGymSessionDto" }
+          },
+          "competitions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PartnerCompetitionDto" }
+          },
+          "regions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminDashboardRegionDto" }
+          },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "operator",
+          "gyms",
+          "sessions",
+          "competitions",
+          "regions",
+          "generatedAt"
+        ]
       },
       "CategoryPodiumMultipliersResponseDto": {
         "type": "object",
@@ -5692,31 +5909,6 @@
           "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
         },
         "required": ["reason"]
-      },
-      "OperatorGymSessionDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "gymLocationId": { "type": "string", "format": "uuid" },
-          "gymName": { "type": "string" },
-          "status": { "type": "string" },
-          "startedAt": { "type": "string", "format": "date-time" },
-          "completedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "incomplete": { "type": "boolean" }
-        },
-        "required": [
-          "id",
-          "gymLocationId",
-          "gymName",
-          "status",
-          "startedAt",
-          "completedAt",
-          "incomplete"
-        ]
       },
       "RegionWaitlistEntryDto": {
         "type": "object",

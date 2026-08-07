@@ -267,7 +267,7 @@ if (
   !metroConfig.includes('context.dev') ||
   !metroConfig.includes("platform === 'web'") ||
   !metroConfig.includes('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW') ||
-  !metroConfig.includes('publicWebDemoModules') ||
+  !metroConfig.includes('publicDemoWebModules') ||
   !metroConfig.includes('keepPublicWebDemo') ||
   !metroConfig.includes('@/state/appTour') ||
   !metroConfig.includes('@/testing/appTourData') ||

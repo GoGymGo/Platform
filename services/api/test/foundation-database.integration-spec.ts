@@ -44,6 +44,7 @@ describeWithDatabase('database migrations', () => {
         'friend_requests',
         'friendships',
         'gym_locations',
+        'gym_partner_assignments',
         'gym_qr_credentials',
         'gym_scan_events',
         'idempotency_keys',
@@ -53,6 +54,7 @@ describeWithDatabase('database migrations', () => {
         'notification_deliveries',
         'operator_audit_events',
         'partner_applications',
+        'partner_competition_proposals',
         'profile_media',
         'profiles',
         'privacy_request_events',
@@ -115,6 +117,31 @@ describeWithDatabase('database migrations', () => {
          AND column_name = 'pilot_onboarding_reset_at'`,
     );
     expect(userReset.rows).toEqual([{ data_type: 'timestamp with time zone' }]);
+  });
+
+  it('installs tenant-scoped gym partner access and proposal constraints', async () => {
+    const constraints = await pool.query<{ conname: string }>(
+      `SELECT conname
+       FROM pg_constraint
+       WHERE conname IN (
+         'competitions_region_month_unique',
+         'gym_partner_assignments_access_level',
+         'gym_partner_assignments_pk',
+         'partner_competition_proposals_gym_month_unique',
+         'partner_competition_proposals_month_key_format'
+       )`,
+    );
+    const names = constraints.rows.map((row) => row.conname);
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'gym_partner_assignments_access_level',
+        'gym_partner_assignments_pk',
+        'partner_competition_proposals_gym_month_unique',
+        'partner_competition_proposals_month_key_format',
+      ]),
+    );
+    expect(names).not.toContain('competitions_region_month_unique');
   });
 
   it('keeps obsolete demo and payment schema out of the release baseline', async () => {

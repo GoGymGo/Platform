@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -33,6 +34,21 @@ interface AdminEntityJson extends JsonObject {
   version: number;
 }
 
+const partnerCompetitionRules = parseAdminCompetitionRules({
+  categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
+  minHeartRateSamples: 10,
+  minSessionMinutes: 30,
+  perfectMonthMultiplier: 10,
+  requireDeviceAttestation: false,
+  requireGymQr: true,
+  requirePresenceCheck: false,
+  signupPrizeDrawEntries: 1,
+  verifiedSessionCategoryScore: 10,
+  verifiedSessionPrizeDrawEntries: 2,
+  weeklyChallengeBothHitMultiplier: 2,
+  weeklyChallengeRecoveryMultiplier: 3,
+});
+
 @Injectable()
 export class AdminCompetitionConfigurationService {
   constructor(
@@ -57,28 +73,25 @@ export class AdminCompetitionConfigurationService {
         scope: 'admin-competitions:create',
       },
       async (transaction) => {
-        const admin = await this.authorization.requireAdmin(
+        const actor = await this.resolveCreateActor(
           principal,
           transaction,
+          input,
         );
-        await this.lockRegionMonth(
+        this.assertPartnerLimits(input, actor.proposalGymId);
+        await this.lockCompetitionSlot(
           transaction,
           input.regionPolicyId,
           input.monthKey,
+          actor.proposalGymId,
         );
         await this.assertRegionExists(transaction, input.regionPolicyId);
-        const duplicate = await transaction
-          .selectFrom('competitions')
-          .select('id')
-          .where('region_policy_id', '=', input.regionPolicyId)
-          .where('month_key', '=', input.monthKey)
-          .executeTakeFirst();
-        if (duplicate) {
-          throw new ConflictException({
-            code: 'COMPETITION_REGION_MONTH_EXISTS',
-            message: 'A competition already exists for this region and month.',
-          });
-        }
+        await this.assertCompetitionSlotAvailable(
+          transaction,
+          input.regionPolicyId,
+          input.monthKey,
+          actor.proposalGymId,
+        );
 
         const now = new Date();
         const competition = await transaction
@@ -92,8 +105,12 @@ export class AdminCompetitionConfigurationService {
             region_policy_id: input.regionPolicyId,
             registration_closes_at: validated.schedule.registrationClosesAt,
             registration_opens_at: validated.schedule.registrationOpensAt,
-            rules: validated.rules as unknown as JsonObject,
-            rules_version: input.rulesVersion,
+            rules: (actor.proposalGymId
+              ? partnerCompetitionRules
+              : validated.rules) as unknown as JsonObject,
+            rules_version: actor.proposalGymId
+              ? 'partner-proposal-v1'
+              : input.rulesVersion,
             starts_at: validated.schedule.startsAt,
             status: 'draft',
             created_at: now,
@@ -112,12 +129,41 @@ export class AdminCompetitionConfigurationService {
             })),
           )
           .execute();
+        if (actor.proposalGymId) {
+          await transaction
+            .insertInto('competition_gym_locations')
+            .values({
+              competition_id: competition.id,
+              created_at: now,
+              gym_location_id: actor.proposalGymId,
+            })
+            .executeTakeFirstOrThrow();
+          await transaction
+            .insertInto('partner_competition_proposals')
+            .values({
+              competition_id: competition.id,
+              created_at: now,
+              gym_location_id: actor.proposalGymId,
+              month_key: input.monthKey,
+              proposed_by_user_id: actor.user.id,
+              updated_at: now,
+            })
+            .executeTakeFirstOrThrow();
+        }
         await this.authorization.audit(transaction, {
-          action: 'competition.created',
-          actorUserId: admin.id,
+          action: actor.proposalGymId
+            ? 'competition.partner_draft_created'
+            : 'competition.created',
+          actorUserId: actor.user.id,
           entityId: competition.id,
           entityType: 'competitions',
-          nextState: this.competitionAuditState(input, 'draft', 1),
+          nextState: this.competitionAuditState(
+            actor.proposalGymId
+              ? { ...input, rulesVersion: 'partner-proposal-v1' }
+              : input,
+            'draft',
+            1,
+          ),
           previousState: null,
           reason: input.reason,
           requestId: idempotencyKey,
@@ -147,10 +193,6 @@ export class AdminCompetitionConfigurationService {
         scope: `admin-competitions:${competitionId}:update`,
       },
       async (transaction) => {
-        const admin = await this.authorization.requireAdmin(
-          principal,
-          transaction,
-        );
         const current = await transaction
           .selectFrom('competitions')
           .selectAll()
@@ -169,29 +211,31 @@ export class AdminCompetitionConfigurationService {
             message: 'Only draft competitions can be reconfigured.',
           });
         }
+        const actor = await this.resolveUpdateActor(
+          principal,
+          transaction,
+          competitionId,
+          input,
+        );
+        this.assertPartnerLimits(input, actor.proposalGymId);
         this.assertExpectedVersion(
           current.configuration_version,
           input.expectedVersion,
         );
-        await this.lockRegionMonth(
+        await this.lockCompetitionSlot(
           transaction,
           input.regionPolicyId,
           input.monthKey,
+          actor.proposalGymId,
         );
         await this.assertRegionExists(transaction, input.regionPolicyId);
-        const duplicate = await transaction
-          .selectFrom('competitions')
-          .select('id')
-          .where('region_policy_id', '=', input.regionPolicyId)
-          .where('month_key', '=', input.monthKey)
-          .where('id', '!=', competitionId)
-          .executeTakeFirst();
-        if (duplicate) {
-          throw new ConflictException({
-            code: 'COMPETITION_REGION_MONTH_EXISTS',
-            message: 'A competition already exists for this region and month.',
-          });
-        }
+        await this.assertCompetitionSlotAvailable(
+          transaction,
+          input.regionPolicyId,
+          input.monthKey,
+          actor.proposalGymId,
+          competitionId,
+        );
 
         const now = new Date();
         const updated = await transaction
@@ -206,8 +250,12 @@ export class AdminCompetitionConfigurationService {
             region_policy_id: input.regionPolicyId,
             registration_closes_at: validated.schedule.registrationClosesAt,
             registration_opens_at: validated.schedule.registrationOpensAt,
-            rules: validated.rules as unknown as JsonObject,
-            rules_version: input.rulesVersion,
+            rules: (actor.proposalGymId
+              ? partnerCompetitionRules
+              : validated.rules) as unknown as JsonObject,
+            rules_version: actor.proposalGymId
+              ? 'partner-proposal-v1'
+              : input.rulesVersion,
             starts_at: validated.schedule.startsAt,
             updated_at: now,
           })
@@ -233,13 +281,24 @@ export class AdminCompetitionConfigurationService {
             })),
           )
           .execute();
+        if (actor.proposalGymId) {
+          await transaction
+            .updateTable('partner_competition_proposals')
+            .set({ month_key: input.monthKey, updated_at: now })
+            .where('competition_id', '=', competitionId)
+            .executeTakeFirstOrThrow();
+        }
         await this.authorization.audit(transaction, {
-          action: 'competition.updated',
-          actorUserId: admin.id,
+          action: actor.proposalGymId
+            ? 'competition.partner_draft_updated'
+            : 'competition.updated',
+          actorUserId: actor.user.id,
           entityId: competitionId,
           entityType: 'competitions',
           nextState: this.competitionAuditState(
-            input,
+            actor.proposalGymId
+              ? { ...input, rulesVersion: 'partner-proposal-v1' }
+              : input,
             updated.status,
             updated.configuration_version,
           ),
@@ -383,6 +442,144 @@ export class AdminCompetitionConfigurationService {
     return { rules, schedule };
   }
 
+  private async resolveCreateActor(
+    principal: AuthenticatedPrincipal,
+    transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
+    input: CreateCompetitionDraftDto,
+  ) {
+    const access = await this.authorization.resolvePortalAccess(
+      principal,
+      transaction,
+    );
+    if (access.kind === 'platform_admin') {
+      return { proposalGymId: null, user: access.user };
+    }
+    if (!input.gymLocationId) {
+      throw new BadRequestException({
+        code: 'PARTNER_COMPETITION_GYM_REQUIRED',
+        message: 'Choose an assigned gym for the competition proposal.',
+      });
+    }
+    const assignment = access.assignments.find(
+      (candidate) => candidate.gymLocationId === input.gymLocationId,
+    );
+    if (!assignment || assignment.accessLevel !== 'admin') {
+      throw new ForbiddenException({
+        code: 'PARTNER_COMPETITION_ADMIN_REQUIRED',
+        message:
+          'Gym administrator access is required to propose a competition.',
+      });
+    }
+    await this.assertPartnerGymRegion(
+      transaction,
+      input.gymLocationId,
+      input.regionPolicyId,
+    );
+    return { proposalGymId: input.gymLocationId, user: access.user };
+  }
+
+  private assertPartnerLimits(
+    input: CreateCompetitionDraftDto,
+    proposalGymId: string | null,
+  ): void {
+    if (!proposalGymId) return;
+    if (input.minimumEntrants > 500) {
+      throw new BadRequestException({
+        code: 'PARTNER_COMPETITION_MINIMUM_TOO_HIGH',
+        message: 'Partner competition minimum entrants cannot exceed 500.',
+      });
+    }
+    if (input.entrantCap !== undefined && input.entrantCap !== null) {
+      if (input.entrantCap > 5_000) {
+        throw new BadRequestException({
+          code: 'PARTNER_COMPETITION_CAP_TOO_HIGH',
+          message: 'Partner competition entrant cap cannot exceed 5,000.',
+        });
+      }
+    }
+  }
+
+  private async resolveUpdateActor(
+    principal: AuthenticatedPrincipal,
+    transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
+    competitionId: string,
+    input: UpdateCompetitionDraftDto,
+  ) {
+    const [access, proposal] = await Promise.all([
+      this.authorization.resolvePortalAccess(principal, transaction),
+      transaction
+        .selectFrom('partner_competition_proposals')
+        .select('gym_location_id')
+        .where('competition_id', '=', competitionId)
+        .executeTakeFirst(),
+    ]);
+    if (access.kind === 'gym_partner') {
+      if (!proposal) {
+        throw new ForbiddenException({
+          code: 'PARTNER_COMPETITION_SCOPE_FORBIDDEN',
+          message: 'Partners can edit only gym-owned competition proposals.',
+        });
+      }
+      const assignment = access.assignments.find(
+        (candidate) => candidate.gymLocationId === proposal.gym_location_id,
+      );
+      if (!assignment || assignment.accessLevel !== 'admin') {
+        throw new ForbiddenException({
+          code: 'PARTNER_COMPETITION_ADMIN_REQUIRED',
+          message:
+            'Gym administrator access is required to edit this competition proposal.',
+        });
+      }
+    }
+    if (
+      proposal &&
+      input.gymLocationId &&
+      input.gymLocationId !== proposal.gym_location_id
+    ) {
+      throw new BadRequestException({
+        code: 'PARTNER_COMPETITION_GYM_IMMUTABLE',
+        message:
+          'A gym-owned competition proposal cannot be moved to another gym.',
+      });
+    }
+    if (proposal) {
+      await this.assertPartnerGymRegion(
+        transaction,
+        proposal.gym_location_id,
+        input.regionPolicyId,
+      );
+    }
+    return {
+      proposalGymId: proposal?.gym_location_id ?? null,
+      user: access.user,
+    };
+  }
+
+  private async assertPartnerGymRegion(
+    transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
+    gymLocationId: string,
+    regionPolicyId: string,
+  ): Promise<void> {
+    const gym = await transaction
+      .selectFrom('gym_locations')
+      .select(['id', 'region_policy_id'])
+      .where('id', '=', gymLocationId)
+      .where('active', '=', true)
+      .executeTakeFirst();
+    if (!gym) {
+      throw new NotFoundException({
+        code: 'GYM_LOCATION_NOT_FOUND',
+        message: 'The assigned gym was not found or is inactive.',
+      });
+    }
+    if (gym.region_policy_id !== regionPolicyId) {
+      throw new BadRequestException({
+        code: 'PARTNER_COMPETITION_REGION_MISMATCH',
+        message: 'The competition must use the assigned gym region.',
+      });
+    }
+  }
+
   private async assertRegionExists(
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
     regionPolicyId: string,
@@ -400,14 +597,62 @@ export class AdminCompetitionConfigurationService {
     }
   }
 
-  private async lockRegionMonth(
+  private async lockCompetitionSlot(
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
     regionPolicyId: string,
     monthKey: string,
+    proposalGymId: string | null,
   ): Promise<void> {
-    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${regionPolicyId}:${monthKey}`}, 0))`.execute(
+    const slot = proposalGymId
+      ? `partner:${proposalGymId}:${monthKey}`
+      : `platform:${regionPolicyId}:${monthKey}`;
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${slot}, 0))`.execute(
       transaction,
     );
+  }
+
+  private async assertCompetitionSlotAvailable(
+    transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
+    regionPolicyId: string,
+    monthKey: string,
+    proposalGymId: string | null,
+    excludingCompetitionId?: string,
+  ): Promise<void> {
+    const duplicate = proposalGymId
+      ? await transaction
+          .selectFrom('partner_competition_proposals')
+          .select('competition_id')
+          .where('gym_location_id', '=', proposalGymId)
+          .where('month_key', '=', monthKey)
+          .$if(Boolean(excludingCompetitionId), (query) =>
+            query.where('competition_id', '!=', excludingCompetitionId!),
+          )
+          .executeTakeFirst()
+      : await transaction
+          .selectFrom('competitions as competition')
+          .leftJoin(
+            'partner_competition_proposals as proposal',
+            'proposal.competition_id',
+            'competition.id',
+          )
+          .select('competition.id')
+          .where('competition.region_policy_id', '=', regionPolicyId)
+          .where('competition.month_key', '=', monthKey)
+          .where('proposal.competition_id', 'is', null)
+          .$if(Boolean(excludingCompetitionId), (query) =>
+            query.where('competition.id', '!=', excludingCompetitionId!),
+          )
+          .executeTakeFirst();
+    if (duplicate) {
+      throw new ConflictException({
+        code: proposalGymId
+          ? 'PARTNER_COMPETITION_GYM_MONTH_EXISTS'
+          : 'COMPETITION_REGION_MONTH_EXISTS',
+        message: proposalGymId
+          ? 'This gym already has a competition proposal for that month.'
+          : 'A GoGymGo competition already exists for this region and month.',
+      });
+    }
   }
 
   private async assertPublishable(

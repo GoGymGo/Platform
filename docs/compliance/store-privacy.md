@@ -63,7 +63,11 @@ Set these release environment values to final public HTTPS pages:
 
 The deletion page must explain how to request deletion without reinstalling the
 app. The in-app **Account Data** screen already exposes authenticated deletion
-and export requests.
+and export requests. The landing application now provides the public
+`/account-deletion` route, which sends an account owner to the same Account Data
+workflow in the browser and provides browser password-reset recovery. Production
+submission remains gated on publishing that route at the final HTTPS domain and
+approving its wording.
 
 ## Submission verification
 

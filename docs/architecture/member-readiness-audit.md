@@ -101,7 +101,8 @@ blocked until the release owner supplies or approves:
 1. final iOS bundle ID and Android package ID;
 2. the EAS owner and initialized EAS project ID;
 3. a public HTTPS production API deployment;
-4. public privacy-policy and account-deletion URLs with approved wording;
+4. public deployment and approval of the privacy-policy and implemented
+   `/account-deletion` pages;
 5. the real condo gym and issued static QR credential; and
 6. physical-device validation for QR camera, location, push token,
    notification permission, and signed avatar upload states.

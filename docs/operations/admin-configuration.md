@@ -42,10 +42,10 @@ After the first bootstrap, role administration should be implemented as a separa
 
 ## Issuing operator logins
 
-Dashboard logins are issued directly by GoGymGo only to approved gym owners and
-GoGymGo regional directors. The admin surface has no registration flow and does
-not accept Google or Apple sign-in. The API also rejects operator requests when
-the Firebase token's sign-in provider is anything other than `password`.
+Operator logins are issued directly by GoGymGo only to approved gym owners and
+GoGymGo staff. The portal has no registration flow and does not accept Google or
+Apple sign-in. The API also rejects portal requests when the Firebase token's
+sign-in provider is anything other than `password`.
 
 For each approved operator, a production owner must:
 
@@ -55,15 +55,34 @@ For each approved operator, a production owner must:
    verified operator email. Do not reuse a member or shared team account.
 3. Deliver the initial credentials through an approved private channel and
    require the operator to sign in once so the database identity is created.
-4. Grant the database `admin` role only through the audited infrastructure
-   workflow. Never add a public role-grant endpoint or trust Firebase token
-   claims as the authorization source.
-5. Confirm a normal member account receives `ADMIN_REQUIRED`, while the new
-   operator can enter, and retain that evidence with the access approval.
+4. For GoGymGo staff, grant the database `admin` role only through the audited
+   infrastructure workflow. For a partner, run the scoped assignment command
+   below and never grant `admin`. Never add a public role-grant endpoint or
+   trust Firebase token claims as the authorization source.
+5. Confirm a normal member account is denied, a partner can retrieve only its
+   assigned gyms, and a GoGymGo administrator can enter the full console. Retain
+   that evidence with the access approval.
 
-The current console is a full-administration surface. Do not issue a login to
-someone who is authorized for only one gym or one region until scoped operator
-permissions are implemented and reviewed.
+The `admin` role always opens the full-administration surface and must never be
+used for a gym-scoped operator. Gym partners use `gym_partner_admin` or
+`gym_partner_staff` plus an active per-gym assignment. Provision or revoke that
+assignment from a trusted administrative environment:
+
+```powershell
+$env:PARTNER_OPERATOR_EMAIL='<verified partner email>'
+$env:PARTNER_GYM_LOCATION_ID='<assigned gym UUID>'
+$env:PARTNER_ACCESS_LEVEL='admin' # or staff
+$env:PARTNER_ACCESS_ACTION='grant' # or revoke
+$env:PARTNER_ACCESS_REASON='<approved access-ticket reason>'
+$env:CONFIRM_PARTNER_ACCESS='yes'
+npm.cmd run partner:access --workspace @gogymgo/api
+```
+
+The partner must first sign in once with the GoGymGo-issued Firebase password
+account so the database identity exists. The command is transactional, updates
+the authoritative database roles, and records the assignment change in the
+append-only operator audit ledger. Partner competition proposals are always gym
+scoped and remain drafts until a GoGymGo administrator publishes them.
 
 ## Deployment checks
 

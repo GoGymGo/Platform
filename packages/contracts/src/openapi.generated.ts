@@ -44,7 +44,7 @@ export interface components {
     CompleteSessionDto: { clientCompletedAt?: string };
     CreateAvatarUploadDto: { contentLength: number; contentType: "image/jpeg" | "image/png" | "image/webp" };
     CreateAvatarUploadResponseDto: { contentLength: number; contentType: string; expiresAt: string; id: string; status: "pending_upload"; upload: components['schemas']["AvatarUploadActionDto"] };
-    CreateCompetitionDraftDto: { endsAt: string; entrantCap?: number | null; goalBrackets: Array<components['schemas']["GoalBracketDto"]>; minimumEntrants: number; monthKey: string; name: string; reason: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rules: Record<string, unknown>; rulesVersion: string; startsAt: string };
+    CreateCompetitionDraftDto: { endsAt: string; entrantCap?: number | null; goalBrackets: Array<components['schemas']["GoalBracketDto"]>; gymLocationId?: string; minimumEntrants: number; monthKey: string; name: string; reason: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rules: Record<string, unknown>; rulesVersion: string; startsAt: string };
     CreateCreatorVideoSubmissionDto: { durationMinutes: number; notes?: string; regionCode: string; rightsAccepted: true; sponsorDisclosure?: string; syntheticMediaDisclosed: boolean; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
     CreateCreatorWorkoutDto: { creatorName: string; creatorUserId?: string; durationMinutes: number; reason: string; regionCodes: Array<string>; sponsorName?: string; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
     CreateCreatorWorkoutPlanDto: { note?: string; plannedDate: string };
@@ -101,12 +101,17 @@ export interface components {
     OperatorGymSessionDto: { completedAt: string | null; gymLocationId: string; gymName: string; id: string; incomplete: boolean; startedAt: string; status: string };
     OperatorInterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string | null; email: string; fullName: string; goalDays?: number | null; id: string; partnershipInterest?: string | null; region: string; submittedAt: string; workoutStyle?: string | null };
     OperatorPartnerApplicationDto: { applicationType: "creator" | "gym" | "sponsor"; contactEmail?: string | null; id: string; payload: Record<string, unknown>; region: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
+    OperatorPortalAccessDto: { assignments: Array<components['schemas']["OperatorPortalAssignmentDto"]>; email: string; id: string; portal: "gogymgo" | "partner"; roles: Array<string> };
+    OperatorPortalAssignmentDto: { accessLevel: "admin" | "staff"; gymLocationId: string };
     OperatorQueueDepthsDto: { competitionStartsDue: number; notificationsPending: number; privacyOperationsPending: number; profileMediaCleanupPending: number };
     OperatorReasonDto: { reason: string };
     OperatorSystemHealthResponseDto: { checkedAt: string; database: "ok"; queues: components['schemas']["OperatorQueueDepthsDto"]; worker: components['schemas']["OperatorWorkerHealthDto"] };
     OperatorWorkQueueItemDto: { createdAt: string; id: string; kind: "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "workout_session"; regionCode?: string; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code" };
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
     PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
+    PartnerCompetitionDto: { endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
+    PartnerDashboardSnapshotDto: { competitions: Array<components['schemas']["PartnerCompetitionDto"]>; generatedAt: string; gyms: Array<components['schemas']["PartnerGymDto"]>; operator: components['schemas']["AdminDashboardIdentityDto"]; regions: Array<components['schemas']["AdminDashboardRegionDto"]>; sessions: Array<components['schemas']["OperatorGymSessionDto"]> };
+    PartnerGymDto: { accessLevel: "admin" | "staff"; active: boolean; activeCredentialVersion: number | null; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
     PrivacyDownloadActionDto: { expiresAt: string; url: string };
     PrivacyRequestResponseDto: { completedAt: string | null; downloadAvailable: boolean; exportExpiresAt: string | null; failureCode: string | null; id: string; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested" };
     PrivacySettingsDto: { showRegion: boolean; showStats: boolean };
@@ -149,7 +154,7 @@ export interface components {
     StartedSessionResponseDto: { competitionId: string; completedAt: string | null; eligibleDate: string; id: string; policyVersion: string; requirements: components['schemas']["SessionRequirementsResponseDto"]; startedAt: string; status: "active" | "pending_review" | "verified" | "rejected" | "cancelled" };
     StreakCountsDto: { daily: number; monthly: number; weekly: number; yearly: number };
     StreakSummaryResponseDto: { asOfDate: string; streaks: components['schemas']["StreakCountsDto"]; timezone: string };
-    UpdateCompetitionDraftDto: { endsAt: string; entrantCap?: number | null; expectedVersion: number; goalBrackets: Array<components['schemas']["GoalBracketDto"]>; minimumEntrants: number; monthKey: string; name: string; reason: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rules: Record<string, unknown>; rulesVersion: string; startsAt: string };
+    UpdateCompetitionDraftDto: { endsAt: string; entrantCap?: number | null; expectedVersion: number; goalBrackets: Array<components['schemas']["GoalBracketDto"]>; gymLocationId?: string; minimumEntrants: number; monthKey: string; name: string; reason: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rules: Record<string, unknown>; rulesVersion: string; startsAt: string };
     UpdateCreatorWorkoutDto: { creatorName: string; creatorUserId?: string; durationMinutes: number; expectedVersion: number; reason: string; regionCodes: Array<string>; sponsorName?: string; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
     UpdateGymLocationDto: { active: boolean; address: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     UpdateMeDto: { privacySettings?: components['schemas']["UpdatePrivacySettingsDto"]; publicIdentityMode?: "private" | "alias" | "real_name"; publicName?: string | null; screenName?: string };
@@ -446,6 +451,14 @@ export interface operations {
       "201": components['schemas']["EnrollmentResponseDto"];
     };
   };
+  getAccess: {
+    method: "GET";
+    path: "/v1/operator/access";
+    parameters: Record<string, never>;
+    responses: {
+      "200": components['schemas']["OperatorPortalAccessDto"];
+    };
+  };
   getAvatar: {
     method: "GET";
     path: "/v1/me/avatar";
@@ -564,6 +577,14 @@ export interface operations {
     parameters: Record<string, never>;
     responses: {
       "200": components['schemas']["StreakSummaryResponseDto"];
+    };
+  };
+  getPartnerDashboard: {
+    method: "GET";
+    path: "/v1/operator/partner-dashboard";
+    parameters: Record<string, never>;
+    responses: {
+      "200": components['schemas']["PartnerDashboardSnapshotDto"];
     };
   };
   getProfileMediaReviewAction: {
@@ -1176,6 +1197,9 @@ export interface paths {
     get: operations["getStatus_get_v1_me_verification_consents_device_presence"];
     put: operations["setStatus"];
   };
+  "/v1/operator/access": {
+    get: operations["getAccess"];
+  };
   "/v1/operator/audit-history": {
     get: operations["listAuditHistory"];
   };
@@ -1257,6 +1281,9 @@ export interface paths {
   };
   "/v1/operator/partner-applications/{applicationId}/decision": {
     post: operations["decidePartner"];
+  };
+  "/v1/operator/partner-dashboard": {
+    get: operations["getPartnerDashboard"];
   };
   "/v1/operator/privacy-requests/{privacyRequestId}/decision": {
     post: operations["decidePrivacy"];
@@ -1474,12 +1501,17 @@ export type OperatorAuditHistoryDto = components['schemas']["OperatorAuditHistor
 export type OperatorGymSessionDto = components['schemas']["OperatorGymSessionDto"];
 export type OperatorInterestSubmissionDto = components['schemas']["OperatorInterestSubmissionDto"];
 export type OperatorPartnerApplicationDto = components['schemas']["OperatorPartnerApplicationDto"];
+export type OperatorPortalAccessDto = components['schemas']["OperatorPortalAccessDto"];
+export type OperatorPortalAssignmentDto = components['schemas']["OperatorPortalAssignmentDto"];
 export type OperatorQueueDepthsDto = components['schemas']["OperatorQueueDepthsDto"];
 export type OperatorReasonDto = components['schemas']["OperatorReasonDto"];
 export type OperatorSystemHealthResponseDto = components['schemas']["OperatorSystemHealthResponseDto"];
 export type OperatorWorkQueueItemDto = components['schemas']["OperatorWorkQueueItemDto"];
 export type OperatorWorkerHealthDto = components['schemas']["OperatorWorkerHealthDto"];
 export type PartnerApplicationResponseDto = components['schemas']["PartnerApplicationResponseDto"];
+export type PartnerCompetitionDto = components['schemas']["PartnerCompetitionDto"];
+export type PartnerDashboardSnapshotDto = components['schemas']["PartnerDashboardSnapshotDto"];
+export type PartnerGymDto = components['schemas']["PartnerGymDto"];
 export type PrivacyDownloadActionDto = components['schemas']["PrivacyDownloadActionDto"];
 export type PrivacyRequestResponseDto = components['schemas']["PrivacyRequestResponseDto"];
 export type PrivacySettingsDto = components['schemas']["PrivacySettingsDto"];

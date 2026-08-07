@@ -108,6 +108,11 @@ export class GoalBracketDto {
 }
 
 export class CreateCompetitionDraftDto extends OperatorReasonDto {
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  gymLocationId?: string;
+
   @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
   regionPolicyId!: string;

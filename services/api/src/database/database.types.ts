@@ -459,6 +459,27 @@ export interface GymLocationsTable {
   updated_at: Timestamp;
 }
 
+export type GymPartnerAccessLevel = 'admin' | 'staff';
+
+export interface GymPartnerAssignmentsTable {
+  user_id: string;
+  gym_location_id: string;
+  access_level: GymPartnerAccessLevel;
+  active: boolean;
+  assigned_by_user_id: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface PartnerCompetitionProposalsTable {
+  competition_id: string;
+  gym_location_id: string;
+  month_key: string;
+  proposed_by_user_id: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface GymQrCredentialsTable {
   id: Generated<string>;
   gym_location_id: string;
@@ -793,6 +814,7 @@ export interface Database {
   entry_ledger: EntryLedgerTable;
   friend_requests: FriendRequestsTable;
   friendships: FriendshipsTable;
+  gym_partner_assignments: GymPartnerAssignmentsTable;
   gym_locations: GymLocationsTable;
   gym_qr_credentials: GymQrCredentialsTable;
   gym_scan_events: GymScanEventsTable;
@@ -807,6 +829,7 @@ export interface Database {
   operator_audit_events: OperatorAuditEventsTable;
   notification_deliveries: NotificationDeliveriesTable;
   partner_applications: PartnerApplicationsTable;
+  partner_competition_proposals: PartnerCompetitionProposalsTable;
   privacy_request_events: PrivacyRequestEventsTable;
   privacy_requests: PrivacyRequestsTable;
   profile_media: ProfileMediaTable;

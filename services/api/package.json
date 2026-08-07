@@ -34,6 +34,7 @@
     "audit:contract": "node scripts/audit-frontend-contract.mjs",
     "audit:deps": "npm audit --omit=dev --audit-level=high",
     "admin:bootstrap": "ts-node --project tsconfig.json scripts/bootstrap-admin.ts",
+    "partner:access": "ts-node --project tsconfig.json scripts/configure-gym-partner-access.ts",
     "pilot:reset-onboarding": "ts-node --project tsconfig.json scripts/reset-pilot-onboarding.ts",
     "pilot:import-landing-d1": "ts-node --project tsconfig.json scripts/import-landing-d1.ts",
     "configure:september-2026-island-pilot": "ts-node --project tsconfig.json src/operations/configure-september-2026-island-pilot.ts",

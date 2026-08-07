@@ -133,6 +133,17 @@ export type DashboardSnapshot = {
   rewards: Reward[];
 };
 
+export type OperatorPortalAccess = {
+  assignments: {
+    accessLevel: "admin" | "staff";
+    gymLocationId: string;
+  }[];
+  email: string;
+  id: string;
+  portal: "gogymgo" | "partner";
+  roles: string[];
+};
+
 export type WorkQueueItem = {
   createdAt: string;
   id: string;
@@ -186,3 +197,22 @@ export type InterestSubmission = OperatorInterestSubmissionDto;
 export type PartnerApplication = OperatorPartnerApplicationDto;
 export type PilotAuditEvent = OperatorAuditHistoryDto;
 export type RegionWaitlistEntry = RegionWaitlistEntryDto;
+
+export type PartnerGym = GymLocation & {
+  accessLevel: "admin" | "staff";
+};
+
+export type PartnerCompetition = Competition & {
+  gymLocationId: string;
+  gymName: string;
+  proposedByUserId: string;
+};
+
+export type PartnerDashboardSnapshot = {
+  competitions: PartnerCompetition[];
+  generatedAt: string;
+  gyms: PartnerGym[];
+  operator: DashboardSnapshot["admin"];
+  regions: RegionPolicy[];
+  sessions: GymSession[];
+};

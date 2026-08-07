@@ -42,7 +42,7 @@ const verificationOptions: readonly VerificationOption[] = [
   },
   {
     available: verifiedPartnerGymCatalogAvailable,
-    body: 'Available after verified partner gyms and signed QR credentials are published.',
+    body: 'Scan the approved gym poster at entry and exit. The server verifies the credential, location and session time.',
     method: 'partnerGymQr',
     route: '/qr-scanner',
     title: 'PARTNER GYM QR'

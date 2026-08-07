@@ -399,8 +399,19 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        await this.adminAuthorization.requireAdmin(principal, transaction);
-        const gyms = await this.gymLocationQuery(transaction).execute();
+        const access = await this.adminAuthorization.resolvePortalAccess(
+          principal,
+          transaction,
+        );
+        let query = this.gymLocationQuery(transaction);
+        if (access.kind === 'gym_partner') {
+          query = query.where(
+            'gym.id',
+            'in',
+            access.assignments.map((assignment) => assignment.gymLocationId),
+          );
+        }
+        const gyms = await query.execute();
         return gyms.map((gym) => this.mapGymLocation(gym));
       });
   }
@@ -504,9 +515,11 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        const admin = await this.adminAuthorization.requireAdmin(
+        const operator = await this.adminAuthorization.requireGymAccess(
           principal,
           transaction,
+          gymId,
+          'admin',
         );
         const gym = await transaction
           .selectFrom('gym_locations')
@@ -532,7 +545,7 @@ export class GymsService {
           .set({
             revocation_reason: 'Superseded by a newly issued QR poster.',
             revoked_at: now,
-            revoked_by_user_id: admin.id,
+            revoked_by_user_id: operator.user.id,
             status: 'revoked',
           })
           .where('gym_location_id', '=', gym.id)
@@ -553,7 +566,7 @@ export class GymsService {
             credential_version: credentialVersion,
             gym_location_id: gym.id,
             issued_at: now,
-            issued_by_user_id: admin.id,
+            issued_by_user_id: operator.user.id,
             status: 'active',
             token_hash: hashOpaqueValue(token),
           })
@@ -561,7 +574,7 @@ export class GymsService {
           .executeTakeFirstOrThrow();
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_qr_credential.issued',
-          actorUserId: admin.id,
+          actorUserId: operator.user.id,
           entityId: credential.id,
           entityType: 'gym_qr_credentials',
           nextState: { credentialVersion, gymLocationId: gym.id },
@@ -594,9 +607,11 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        const admin = await this.adminAuthorization.requireAdmin(
+        const operator = await this.adminAuthorization.requireGymAccess(
           principal,
           transaction,
+          gymId,
+          'admin',
         );
         const now = new Date();
         const credential = await transaction
@@ -604,7 +619,7 @@ export class GymsService {
           .set({
             revocation_reason: reason.trim(),
             revoked_at: now,
-            revoked_by_user_id: admin.id,
+            revoked_by_user_id: operator.user.id,
             status: 'revoked',
           })
           .where('gym_location_id', '=', gymId)
@@ -619,7 +634,7 @@ export class GymsService {
         }
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_qr_credential.revoked',
-          actorUserId: admin.id,
+          actorUserId: operator.user.id,
           entityId: credential.id,
           entityType: 'gym_qr_credentials',
           nextState: { status: 'revoked' },
@@ -837,9 +852,12 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        await this.adminAuthorization.requireAdmin(principal, transaction);
+        const access = await this.adminAuthorization.resolvePortalAccess(
+          principal,
+          transaction,
+        );
         const now = new Date();
-        const sessions = await transaction
+        let query = transaction
           .selectFrom('workout_sessions as session')
           .innerJoin(
             'gym_locations as gym',
@@ -856,9 +874,15 @@ export class GymsService {
             'session.status',
           ])
           .where('session.verification_mode', '=', 'static_qr')
-          .orderBy('session.started_at', 'desc')
-          .limit(500)
-          .execute();
+          .orderBy('session.started_at', 'desc');
+        if (access.kind === 'gym_partner') {
+          query = query.where(
+            'gym.id',
+            'in',
+            access.assignments.map((assignment) => assignment.gymLocationId),
+          );
+        }
+        const sessions = await query.limit(500).execute();
         return sessions.map((session) => ({
           completedAt: session.completed_at?.toISOString() ?? null,
           gymLocationId: session.gym_id,

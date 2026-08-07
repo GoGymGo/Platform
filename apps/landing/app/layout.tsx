@@ -183,6 +183,7 @@ export default function RootLayout({
             <div>
               <p className="footer-label">LEGAL & ACCESS</p>
               <AppLink href={siteLinks.privacy}>Privacy Policy</AppLink>
+              <Link href={siteLinks.accountDeletion}>Account deletion</Link>
               <AppLink href={siteLinks.terms}>Terms of Service</AppLink>
               <AppLink href={siteLinks.officialRules}>
                 Official Contest Rules

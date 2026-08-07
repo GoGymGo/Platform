@@ -36,11 +36,19 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 76% -20%, rgba(53, 226, 228, 0.08), transparent 34rem),
+    radial-gradient(
+      circle at 76% -20%,
+      rgba(53, 226, 228, 0.08),
+      transparent 34rem
+    ),
     linear-gradient(rgba(53, 226, 228, 0.018) 1px, transparent 1px),
     linear-gradient(90deg, rgba(53, 226, 228, 0.018) 1px, transparent 1px),
     var(--bg);
-  background-size: auto, 42px 42px, 42px 42px, auto;
+  background-size:
+    auto,
+    42px 42px,
+    42px 42px,
+    auto;
   color: var(--text);
   font-family: var(--body);
   font-size: 15px;
@@ -1136,7 +1144,11 @@ main {
 
 .primary-button {
   border: 1px solid var(--cyan);
-  background: linear-gradient(145deg, rgba(53, 226, 228, 0.2), rgba(53, 226, 228, 0.04));
+  background: linear-gradient(
+    145deg,
+    rgba(53, 226, 228, 0.2),
+    rgba(53, 226, 228, 0.04)
+  );
   box-shadow: inset 0 0 18px rgba(53, 226, 228, 0.04);
   color: var(--cyan-soft);
 }
@@ -1827,8 +1839,7 @@ td small {
   border: 1px solid var(--line-bright);
   border-radius: 12px 2px 12px 2px;
   background:
-    linear-gradient(140deg, rgba(53, 226, 228, 0.04), transparent 32%),
-    #081015;
+    linear-gradient(140deg, rgba(53, 226, 228, 0.04), transparent 32%), #081015;
   box-shadow: 0 32px 90px rgba(0, 0, 0, 0.6);
   padding: clamp(22px, 4vw, 36px);
 }
@@ -2106,6 +2117,45 @@ td small {
   font-size: 30px;
 }
 
+.portal-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.portal-selector button {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px 2px 7px 2px;
+  background: rgba(5, 9, 12, 0.58);
+  padding: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.portal-selector button:hover,
+.portal-selector button.active {
+  border-color: rgba(53, 226, 228, 0.5);
+  background: rgba(53, 226, 228, 0.07);
+}
+
+.portal-selector strong,
+.portal-selector span {
+  display: block;
+}
+
+.portal-selector strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.portal-selector span {
+  font-size: 11px;
+}
+
 .stacked-form {
   display: grid;
   gap: 15px;
@@ -2118,6 +2168,59 @@ td small {
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.1em;
+}
+
+.stacked-form .remember-session {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+.sign-in-panel .stacked-form .remember-session input {
+  width: 17px;
+  min-height: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  padding: 0;
+  accent-color: var(--cyan);
+}
+
+.partner-mobile-navigation {
+  display: none;
+}
+
+.partner-gym-list {
+  margin-top: 18px;
+}
+
+.partner-gym-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.partner-gym-details > span {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(5, 9, 12, 0.38);
+  padding: 10px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.partner-gym-details strong {
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .stacked-form .primary-button {
@@ -2213,6 +2316,39 @@ td small {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 3px;
     scrollbar-width: thin;
+  }
+
+  .partner-mobile-navigation {
+    display: grid;
+    height: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .partner-mobile-navigation button {
+    display: grid;
+    min-width: 0;
+    place-content: center;
+    justify-items: center;
+    gap: 3px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 9px;
+  }
+
+  .partner-mobile-navigation button.active {
+    border-color: rgba(53, 226, 228, 0.28);
+    background: rgba(53, 226, 228, 0.08);
+    color: var(--cyan-soft);
+  }
+
+  .partner-mobile-navigation span {
+    color: var(--cyan);
+    font-family: var(--mono);
+    font-size: 11px;
   }
 
   .mobile-nav-item {
@@ -2347,6 +2483,11 @@ td small {
 
   .metric > strong {
     font-size: 28px;
+  }
+
+  .portal-selector,
+  .partner-gym-details {
+    grid-template-columns: 1fr;
   }
 
   .panel-heading {

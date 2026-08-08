@@ -42,14 +42,14 @@ export function getCompetitionDeadline(competition: Competition) {
     competition.status === "draft"
       ? [
           [competition.registrationOpensAt, "Registration opens"],
-          [competition.startsAt, "Competition starts"],
+          [competition.startsAt, "Contest starts"],
         ]
       : competition.status === "registration"
         ? [
             [competition.registrationClosesAt, "Registration closes"],
-            [competition.startsAt, "Competition starts"],
+            [competition.startsAt, "Contest starts"],
           ]
-        : [[competition.endsAt, "Competition ends"]];
+        : [[competition.endsAt, "Contest ends"]];
   const next = stages.find(([value]) => new Date(value).getTime() > now);
   if (!next) {
     return { detail: "No future player deadline", label: "COMPLETE", tone: "routine" };

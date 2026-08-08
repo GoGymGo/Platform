@@ -99,7 +99,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /ADMINISTRATIVE ACTION/);
   assert.match(
     dashboard,
-    /Publish the approved competition after operator confirmation/,
+    /Publish the approved contest after operator confirmation/,
   );
   assert.match(dashboard, /recorded automatically in the audit history/);
   assert.match(dashboard, /action\.auditReason \?\?/);
@@ -111,7 +111,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /showModal\(\)/);
   assert.match(dashboard, /onCancel=/);
   assert.match(dashboard, /PUBLISH BLOCKED/);
-  assert.match(dashboard, /Filter competitions/);
+  assert.match(dashboard, /Filter contests/);
   assert.match(dashboard, /Filter rewards/);
   assert.match(dashboard, /Filter work queue/);
   assert.match(dashboard, /Filter audit history/);

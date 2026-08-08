@@ -227,7 +227,7 @@ export default function CreatorApplicationScreen() {
               tone="green"
             />
           ) : null}
-          <DataCollectionNotice message="We use the region, profile and sample-workout links to review this creator request, prevent misuse and contact the signed-in applicant about the review. They are not used to award competition credit." />
+          <DataCollectionNotice message="We use the region, profile and sample-workout links to review this creator request, prevent misuse and contact the signed-in applicant about the review. They are not used to award contest credit." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
             label={

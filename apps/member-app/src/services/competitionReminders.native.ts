@@ -32,7 +32,7 @@ export async function syncCompetitionReminders(
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(channelId, {
       importance: Notifications.AndroidImportance.DEFAULT,
-      name: 'Competition reminders'
+      name: 'Contest reminders'
     });
   }
 

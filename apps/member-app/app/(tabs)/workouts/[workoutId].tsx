@@ -113,7 +113,7 @@ export default function WorkoutDetailScreen() {
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before starting this workout."
+        body="Your contest setup could not be checked. Retry before starting this workout."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"

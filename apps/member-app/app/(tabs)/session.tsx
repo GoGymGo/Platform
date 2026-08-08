@@ -33,12 +33,12 @@ export default function SessionTabRoute() {
   } = useSessionRegistrationAccess();
 
   if (setupChecking) {
-    return <ScreenLoadingState body="Checking your competition setup." />;
+    return <ScreenLoadingState body="Checking your contest setup." />;
   }
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before scanning a gym poster."
+        body="Your contest setup could not be checked. Retry before scanning a gym poster."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"
@@ -73,10 +73,10 @@ export default function SessionTabRoute() {
       ) : verifiedWorkoutUnavailable ? (
         <HUDBorderBox style={styles.notice} tone="muted">
           <TerminalText tone="amber" variant="label">
-            COMPETITION NOT STARTED
+            CONTEST NOT STARTED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Verified workouts unlock when the September Competition begins.
+            Verified workouts unlock when the September Contest begins.
           </TerminalText>
         </HUDBorderBox>
       ) : (
@@ -85,7 +85,7 @@ export default function SessionTabRoute() {
             STATIC QR READY
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Missing the exit scan earns no competition credit. A gym poster may
+            Missing the exit scan earns no contest credit. A gym poster may
             be replaced by an administrator; revoked posters are rejected.
           </TerminalText>
           <CyberButtonPrimary

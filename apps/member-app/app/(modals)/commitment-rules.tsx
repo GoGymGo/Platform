@@ -30,13 +30,13 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '01',
     title: 'JOIN WHILE PUBLISHED',
-    body: 'Once a regional competition is published, eligible players may join before it starts or at any time while it is active. Enrollment closes when the competition ends, reaches its entrant cap, or is cancelled.',
+    body: 'Once a regional contest is published, eligible players may join before it starts or at any time while it is active. Enrollment closes when the contest ends, reaches its entrant cap, or is cancelled.',
     tone: 'cyan'
   },
   {
     index: '02',
     title: 'REGIONAL MINIMUM TO LAUNCH',
-    body: 'The regional competition launches only after its published minimum number of eligible players registers.',
+    body: 'The regional contest launches only after its published minimum number of eligible players registers.',
     tone: 'cyan'
   },
   {
@@ -107,7 +107,7 @@ export default function CommitmentRulesModal() {
     rule.index === '02' && currentCompetition
       ? {
           ...rule,
-          body: `At least ${currentCompetition.minimumEntrants.toLocaleString()} eligible players across the region must register before this competition can launch.`,
+          body: `At least ${currentCompetition.minimumEntrants.toLocaleString()} eligible players across the region must register before this contest can launch.`,
           title: `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS TO LAUNCH`
         }
       : rule.index === '09'
@@ -118,7 +118,7 @@ export default function CommitmentRulesModal() {
       : rule.index === '10'
         ? {
             ...rule,
-            body: `This competition offers only the Bonus Days that exist after day 28. Each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}, equal to your selected Weekly Goal, before the Perfect Month 10x.`
+            body: `This contest offers only the Bonus Days that exist after day 28. Each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}, equal to your selected Weekly Goal, before the Perfect Month 10x.`
           }
         : rule
   );
@@ -129,7 +129,7 @@ export default function CommitmentRulesModal() {
         <OnboardingHeader
           label="WEEKLY GOAL RULES"
           onBack={() => goBackOrReplace(router, '/commitment')}
-          step="COMPETITION"
+          step="CONTEST"
         />
       </View>
 
@@ -180,7 +180,7 @@ export default function CommitmentRulesModal() {
               : 'REGIONAL MINIMUM PENDING'}
           </TerminalText>
           <TerminalText style={styles.summaryCopy} tone="muted" uppercase={false} variant="body">
-            Registration remains open until the published competition ends
+            Registration remains open until the published contest ends
             {currentCompetition?.entrantCap == null
               ? '.'
               : ` or until the ${currentCompetition.entrantCap.toLocaleString()}-player cap is reached.`}

@@ -241,7 +241,7 @@ export function GymGoerForm() {
         {state === "submitting" ? "SAVING…" : "GET REGIONAL UPDATES →"}
       </button>
       <p className="fine-print" id="gym-form-note">
-        This free update list does not create an app account or competition
+        This free update list does not create an app account or contest
         entry, and it does not guarantee launch availability in your region.
       </p>
     </form>

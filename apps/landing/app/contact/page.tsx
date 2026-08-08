@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const contactPaths = [
   {
     analyticsEvent: "regional_updates_click",
-    copy: "Join the free regional update list for launch and availability news. This does not register you for a competition.",
+    copy: "Join the free regional update list for launch and availability news. This does not register you for a contest.",
     href: `${siteLinks.gymGoers}#gym-form`,
     label: "OPEN REGIONAL UPDATE FORM",
     title: "Gym-goer updates",
@@ -29,7 +29,7 @@ const contactPaths = [
   {
     analyticsEvent: "member_app_click",
     appBound: true,
-    copy: "Account, eligibility, legal-document, workout, or competition support belongs inside the member experience where the relevant state is available.",
+    copy: "Account, eligibility, legal-document, workout, or contest support belongs inside the member experience where the relevant state is available.",
     href: siteLinks.memberApp,
     label: "OPEN THE MEMBER APP",
     title: "Existing member support",
@@ -94,7 +94,7 @@ export default function ContactPage() {
             <p>
               Use this form for the public website only. Include the affected
               page and enough detail to reproduce the issue. Account,
-              competition, and workout support remains inside the member app.
+              contest, and workout support remains inside the member app.
             </p>
           </div>
           <PublicSiteFeedbackForm />

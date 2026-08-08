@@ -179,7 +179,7 @@ export function PublicSiteFeedbackForm() {
       <p className="fine-print" id="public-site-feedback-note">
         Do not include passwords, authentication codes, health information, or
         precise workout-location evidence. This form is for the public website,
-        not competition or account support.
+        not contest or account support.
       </p>
     </form>
   );

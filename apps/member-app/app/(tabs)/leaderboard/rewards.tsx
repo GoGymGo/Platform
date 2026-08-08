@@ -103,7 +103,7 @@ export default function RewardMarketplaceScreen() {
               REWARDS PUBLISHING SOON
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Brand Rewards for this regional Competition have not been published yet.
+              Brand Rewards for this regional Contest have not been published yet.
             </TerminalText>
           </HUDBorderBox>
         ) : (

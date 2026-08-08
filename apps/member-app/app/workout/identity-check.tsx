@@ -87,13 +87,13 @@ function DevicePresenceCheckScreen() {
   }
 
   if (registrationChecking) {
-    return <ScreenLoadingState body="Checking your competition registration." />;
+    return <ScreenLoadingState body="Checking your contest registration." />;
   }
 
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your Competition setup could not be checked. Retry before confirming the Partner gym entry."
+        body="Your Contest setup could not be checked. Retry before confirming the Partner gym entry."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"

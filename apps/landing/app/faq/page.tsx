@@ -17,7 +17,7 @@ const questions = [
       <p>
         Eligible gym-goers must be age {septemberCampaign.minimumAge}+ and
         located within {septemberCampaign.regionName}. The app confirms location,
-        current legal documents, competition availability, and other enrollment
+        current legal documents, contest availability, and other enrollment
         requirements before registration succeeds.
       </p>
     ),
@@ -43,9 +43,9 @@ const questions = [
   {
     answer: (
       <p>
-        The competition runs from {septemberCampaign.competitionWindow}.
-        Registration opens when the competition is published and can remain
-        available until the competition ends, reaches an entrant cap, or is
+        The contest runs from {septemberCampaign.competitionWindow}.
+        Registration opens when the contest is published and can remain
+        available until the contest ends, reaches an entrant cap, or is
         cancelled. The app shows the authoritative current status.
       </p>
     ),
@@ -55,7 +55,7 @@ const questions = [
     answer: (
       <p>
         No. The regional update list only gives GoGymGo permission to email you
-        about availability. September competition registration happens inside
+        about availability. September contest registration happens inside
         the member app.
       </p>
     ),
@@ -65,7 +65,7 @@ const questions = [
     answer: (
       <p>
         Joining is free and no purchase is required. Eligibility, regional
-        rules, published Competition terms, and approved Partner gym access
+        rules, published Contest terms, and approved Partner gym access
         still apply. Read the{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
         before joining.

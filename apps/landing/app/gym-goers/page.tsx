@@ -8,7 +8,7 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/gym-goers" },
   description:
-    "Register for the eligible September GoGymGo beta or request Regional updates about future Verified workout Competitions.",
+    "Register for the eligible September GoGymGo beta or request Regional updates about future Verified workout Contests.",
   title: "Gym-goer registration and Regional updates",
 };
 
@@ -70,7 +70,7 @@ export default function GymGoersPage() {
           </p>
           <dl className="audience-summary">
             <div>
-              <dt>COMPETITION WINDOW</dt>
+              <dt>CONTEST WINDOW</dt>
               <dd>{septemberCampaign.displayWindow}</dd>
             </div>
             <div>

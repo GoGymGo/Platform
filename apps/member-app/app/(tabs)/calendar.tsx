@@ -227,8 +227,8 @@ export default function CalendarScreen() {
             </Pressable>
             <TerminalText style={styles.calendarStatus} tone="dim" uppercase={false} variant="micro">
               {competitionNotStarted
-                ? 'Verified workouts build your history until Competition scoring opens.'
-                : 'Verified workouts can earn Competition credit.'}
+                ? 'Verified workouts build your history until Contest scoring opens.'
+                : 'Verified workouts can earn Contest credit.'}
             </TerminalText>
           </View>
 
@@ -332,7 +332,7 @@ export default function CalendarScreen() {
               : 'Return on this day to start your own Verified workout.'
             : selectedDateIsPast
               ? 'Add a personal log for this day, or return to today to start a Verified workout.'
-              : 'Personal logs track your history only. Start a Verified workout below for Competition credit.'}
+              : 'Personal logs track your history only. Start a Verified workout below for Contest credit.'}
         </TerminalText>
         <CyberButtonOutline
           disabled={selectedDateIsFuture}

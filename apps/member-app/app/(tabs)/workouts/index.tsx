@@ -52,7 +52,7 @@ export default function WorkoutsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <BrandScreenHeader
-            description="Follow-along sessions become competition progress only after a verified gym workout."
+            description="Follow-along sessions become contest progress only after a verified gym workout."
             eyebrow={`FOLLOW ALONG // ${competitionRegion.label}`}
             title="CREATOR WORKOUTS"
           />

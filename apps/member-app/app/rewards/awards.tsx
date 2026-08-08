@@ -82,7 +82,7 @@ export default function MyAwardsScreen() {
           <BrandScreenHeader
             accent="pink"
             description="Claim an Award to reveal physical-prize instructions or an awarded coupon code. GoGymGo will never ask for banking information."
-            eyebrow="COMPETITION AWARDS"
+            eyebrow="CONTEST AWARDS"
             title="MY AWARDS"
           />
 

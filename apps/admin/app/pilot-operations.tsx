@@ -171,14 +171,14 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setAssignGymSuccess("");
 
     try {
-      if (!competitionId) throw new AdminUserFacingError("Choose a Competition.");
+      if (!competitionId) throw new AdminUserFacingError("Choose a Contest.");
       if (!gymId) throw new AdminUserFacingError("Choose an active Partner gym.");
       if (reason.length < 8) {
         throw new AdminUserFacingError("Administrative reason must be at least 8 characters.");
       }
       await props.onAssignGym(competitionId, gymId, { reason });
       const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
-      setAssignGymSuccess(`${gymName} is assigned to the September competition.`);
+      setAssignGymSuccess(`${gymName} is assigned to the September contest.`);
     } catch (error) {
       setAssignGymError(formErrorMessage(error));
     }
@@ -335,16 +335,16 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">COMPETITION ELIGIBILITY</p>
+            <p className="eyebrow">CONTEST ELIGIBILITY</p>
             <h2>Assign a Partner gym to September</h2>
-            <p>Link an active pilot Partner gym to the Competition members can join there.</p>
+            <p>Link an active pilot Partner gym to the Contest members can join there.</p>
           </div>
         </div>
         <form className="pilot-form" noValidate onSubmit={assignGym}>
           <label>
-            <span>COMPETITION</span>
+            <span>CONTEST</span>
             <select name="competitionId" required>
-              <option value="">Choose competition</option>
+              <option value="">Choose contest</option>
               {props.competitions.map((competition) => (
                 <option key={competition.id} value={competition.id}>
                   {competition.name} ({competition.status})

@@ -303,7 +303,7 @@ export default function HomeScreen() {
     registrationChecking ||
     !verificationPreferenceReady
   ) {
-    return <ScreenLoadingState body="Checking your profile and competition registration." />;
+    return <ScreenLoadingState body="Checking your profile and contest registration." />;
   }
 
   if (resumeRequested && resumeLoading) {
@@ -382,7 +382,7 @@ export default function HomeScreen() {
                   : isBonusDayPhase
                   ? 'BONUS DAYS 29-31'
                   : competitionNotStarted
-                    ? 'UPCOMING COMPETITION'
+                    ? 'UPCOMING CONTEST'
                     : `WEEK ${currentWeekIndex ?? 1} // ${completedSessions > 0 ? 'IN MOTION' : 'READY'}`}
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
@@ -507,7 +507,7 @@ export default function HomeScreen() {
             </TerminalText>
           ) : workoutUnavailable ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              Verified competition workouts open when scoring begins on {competitionStartLabel}.
+              Verified contest workouts open when scoring begins on {competitionStartLabel}.
             </TerminalText>
           ) : null}
           {!activeSession && !setupRequired ? (
@@ -540,7 +540,7 @@ export default function HomeScreen() {
               </View>
               <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
                 {launchConfirmed
-                  ? 'Competition launch confirmed.'
+                  ? 'Contest launch confirmed.'
                   : entrantsNeeded === null
                     ? 'The registration total could not be loaded. Check again later.'
                     : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
@@ -595,7 +595,7 @@ export default function HomeScreen() {
                     QUICK REFERENCE
                   </TerminalText>
                   <TerminalText tone="text" uppercase={false} variant="body">
-                    How the Competition works
+                    How the Contest works
                   </TerminalText>
                   <TerminalText tone="muted" uppercase={false} variant="caption">
                     Weekly Goal, Verified workouts, Prize Draw Entries, rankings and Rewards.
@@ -697,7 +697,7 @@ export default function HomeScreen() {
             <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
               {prizeDrawEligible
                 ? competitionNotStarted
-                  ? 'Your free Prize Draw Entry is secured now. Verified workouts begin earning Competition credit when scoring opens.'
+                  ? 'Your free Prize Draw Entry is secured now. Verified workouts begin earning Contest credit when scoring opens.'
                   : `Your free Prize Draw Entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
                 : 'Your free Prize Draw Entry is secured and will carry into the next eligible regional draw.'}
             </TerminalText>

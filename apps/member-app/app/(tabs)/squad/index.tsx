@@ -149,7 +149,7 @@ export default function SquadScreen() {
         <BrandScreenHeader
           accessory={(
             <InlineHelpButton
-              label="Open competition guide"
+              label="Open contest guide"
               onPress={() => router.push('/how-it-works?from=challenge')}
             />
           )}
@@ -486,7 +486,7 @@ function PairingMoreOptions({
           />
           {showRules ? (
             <TerminalText style={styles.partnerRequestCopy} tone="muted" uppercase={false} variant="caption">
-              Partners must be in the same regional competition with the same Weekly Goal.
+              Partners must be in the same regional contest with the same Weekly Goal.
               An invite becomes active only after it is accepted.
             </TerminalText>
           ) : null}

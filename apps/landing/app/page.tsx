@@ -17,15 +17,15 @@ const journeySteps = [
   },
   {
     number: "03",
-    title: "Build competition progress",
-    copy: "Verified workouts count toward your Weekly Goal and published Competition results—without presenting pending activity as credit.",
+    title: "Build contest progress",
+    copy: "Verified workouts count toward your Weekly Goal and published Contest results—without presenting pending activity as credit.",
   },
 ];
 
 const readinessFacts = [
   {
     title: "NO PURCHASE REQUIRED",
-    copy: "Joining is free. Age, location, current competition availability, and access to an active poster at a Partner gym still apply.",
+    copy: "Joining is free. Age, location, current contest availability, and access to an active poster at a Partner gym still apply.",
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
@@ -44,7 +44,7 @@ const transparencyFacts = [
   },
   {
     title: "NO PURCHASE REQUIRED",
-    copy: "Joining is free. Age, location, published legal terms, Competition availability, and approved Partner gym access still apply.",
+    copy: "Joining is free. Age, location, published legal terms, Contest availability, and approved Partner gym access still apply.",
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
@@ -77,11 +77,11 @@ const structuredData = [
 function SeptemberCompetitionPanel() {
   return (
     <aside
-      aria-label="September 2026 beta competition details"
+      aria-label="September 2026 beta contest details"
       className="pilot-console"
     >
       <div className="pilot-console__header">
-        <span>COMPETITION SNAPSHOT</span>
+        <span>CONTEST SNAPSHOT</span>
       </div>
       <div className="pilot-console__reward">
         <span>ONE PUBLISHED REWARD</span>
@@ -89,7 +89,7 @@ function SeptemberCompetitionPanel() {
         <p>Sponsored by {septemberCampaign.rewardSponsor}</p>
       </div>
       <div className="pilot-console__window">
-        <span>COMPETITION WINDOW</span>
+        <span>CONTEST WINDOW</span>
         <strong>{septemberCampaign.compactWindow}</strong>
         <p>{septemberCampaign.timeWindow}</p>
       </div>
@@ -148,13 +148,13 @@ export default function Home() {
           <p className="hero-lede">
             {campaignState.phase === "ended" ? (
               <>
-                Build verified competition progress from weekly workouts. The
+                Build verified contest progress from weekly workouts. The
                 September 2026 beta has ended, but Regional updates remain open.
               </>
             ) : (
               <>
                 Set a Weekly Goal, verify workouts at a Partner gym, and build
-                competition progress.
+                contest progress.
               </>
             )}
           </p>

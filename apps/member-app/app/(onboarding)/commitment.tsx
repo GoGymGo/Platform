@@ -163,10 +163,10 @@ export default function CommitmentScreen() {
   const competitionDayCount = 28 + maximumRemainderDays;
   const remainderHelper =
     maximumRemainderDays === 0
-      ? 'This Competition has no Bonus Days after the four scoring weeks.'
+      ? 'This Contest has no Bonus Days after the four scoring weeks.'
       : selectedBonusDays > 0
         ? `${selectedBonusDays} selected x your ${days}-day goal = ${remainderDayEntries} ${remainderDayEntries === 1 ? 'entry' : 'entries'}. A Perfect Month multiplies these Bonus Day entries by 10.`
-        : `This ${competitionDayCount}-day Competition has ${maximumRemainderDays} Bonus ${maximumRemainderDays === 1 ? 'Day' : 'Days'} after day 28. Each verified Bonus Day is worth your ${days}-day Weekly Goal before 10x.`;
+        : `This ${competitionDayCount}-day Contest has ${maximumRemainderDays} Bonus ${maximumRemainderDays === 1 ? 'Day' : 'Days'} after day 28. Each verified Bonus Day is worth your ${days}-day Weekly Goal before 10x.`;
 
   useEffect(() => {
     void recordFlowMetric(user?.uid, 'weekly-goal-viewed', 'weekly-goal');
@@ -188,7 +188,7 @@ export default function CommitmentScreen() {
   async function confirmWeeklyGoal() {
     setConfirmationError(null);
     if (!goalSelected || !ageEligibilityAttested || !competitionRulesAccepted) {
-      setConfirmationError('Review and accept the Competition agreement.');
+      setConfirmationError('Review and accept the Contest agreement.');
       return;
     }
 
@@ -257,10 +257,10 @@ export default function CommitmentScreen() {
 
         <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
           <TerminalText tone="cyan" variant="label">
-            SEPTEMBER COMPETITION
+            SEPTEMBER CONTEST
           </TerminalText>
           <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
-            {`You may join this Competition until it ends on ${competitionDateRange.endDateKey}. Your Prize Draw Entries begin when enrollment is confirmed.`}
+            {`You may join this Contest until it ends on ${competitionDateRange.endDateKey}. Your Prize Draw Entries begin when enrollment is confirmed.`}
           </TerminalText>
         </HUDBorderBox>
 
@@ -341,7 +341,7 @@ export default function CommitmentScreen() {
             </View>
             <View style={styles.bonusSummary}>
               <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
-                Earn more through consistency, teamwork and Competition.
+                Earn more through consistency, teamwork and the Contest.
               </TerminalText>
               <CompactTextButton
                 label="VIEW BONUS DETAILS"
@@ -367,7 +367,7 @@ export default function CommitmentScreen() {
               />
               <LegalConsentCheckbox
                 checked={competitionRulesAccepted}
-                label={`I accept the Competition rules and lock my ${days}-day Weekly Goal.`}
+                label={`I accept the Contest rules and lock my ${days}-day Weekly Goal.`}
                 onToggle={() => setCompetitionRulesAccepted((current) => !current)}
               />
               <LegalConsentCheckbox
@@ -394,7 +394,7 @@ export default function CommitmentScreen() {
             uppercase={false}
             variant="caption"
           >
-            Select your Weekly Goal to review and confirm the Competition agreement.
+            Select your Weekly Goal to review and confirm the Contest agreement.
           </TerminalText>
         )}
         </ScreenScrollView>

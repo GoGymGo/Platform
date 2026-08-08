@@ -71,7 +71,7 @@ export default function PublicDemoScreen() {
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="caption">
               See weekly progress, the next Verified workout action and the
-              competition snapshot in the updated interface.
+              contest snapshot in the updated interface.
             </TerminalText>
           </View>
           <CyberButtonPrimary

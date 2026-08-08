@@ -45,7 +45,7 @@ function getSettingsRows(): SettingsGroups {
   return {
     preferences: [
       {
-        title: 'HOW THE COMPETITION WORKS',
+        title: 'HOW THE CONTEST WORKS',
         subtitle: 'GOALS, ENTRIES, RANKINGS AND REWARDS',
         tone: 'muted',
         route: '/how-it-works?from=profile' as Href
@@ -287,7 +287,7 @@ export default function ProfileScreen() {
             <HUDBorderBox style={styles.regionCard} tone="cyan">
               <View style={styles.regionCopy}>
                 <TerminalText tone="dim" variant="label">
-                  COMPETITION REGION
+                  CONTEST REGION
                 </TerminalText>
                 <TerminalText glow tone="cyan" variant="body">
                   {competitionRegion.label}
@@ -323,7 +323,7 @@ export default function ProfileScreen() {
               aria-checked={remindersEnabled}
               aria-disabled={notificationBusy}
               accessibilityHint="Turn Weekly Goal, Weekly Challenge and Bonus Day alerts on or off"
-              accessibilityLabel="Competition reminders"
+              accessibilityLabel="Contest reminders"
               accessibilityRole="switch"
               accessibilityState={{
                 checked: remindersEnabled,
@@ -344,7 +344,7 @@ export default function ProfileScreen() {
                     tone={remindersEnabled ? 'cyan' : 'text'}
                     variant="body"
                   >
-                    COMPETITION REMINDERS
+                    CONTEST REMINDERS
                   </TerminalText>
                   <TerminalText tone="muted" variant="caption">
                     WEEKLY GOAL, WEEKLY CHALLENGE AND BONUS DAY ALERTS

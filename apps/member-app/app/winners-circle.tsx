@@ -160,7 +160,7 @@ export default function WinnersCircleScreen() {
               Weekly Goal champions and brand reward winners will appear here after results are audited.
             </TerminalText>
             <CyberButtonPrimary
-              label={isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'VIEW COMPETITION'}
+              label={isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'VIEW CONTEST'}
               onPress={() => router.replace(isAutomaticLoginView ? '/home' : '/leaderboard')}
               style={styles.closeButton}
             />

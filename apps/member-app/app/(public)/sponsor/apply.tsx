@@ -81,16 +81,16 @@ export default function SponsorApplicationScreen() {
 
         <BrandScreenHeader
           accent="pink"
-          description="Support a regional GoGymGo competition through approved prizes and participant rewards."
+          description="Support a regional GoGymGo contest through approved prizes and participant rewards."
           eyebrow="REGIONAL CAMPAIGN"
           title="SPONSOR A REGION"
         />
 
         <View style={styles.valueList}>
-          <SponsorValue label="TARGETED REACH" value="REGION + COMPETITION COMMUNITY" />
+          <SponsorValue label="TARGETED REACH" value="REGION + CONTEST COMMUNITY" />
           <SponsorValue
             label="PARTNERSHIP OPTIONS"
-            value="COMPETITION REWARDS"
+            value="CONTEST REWARDS"
           />
           <SponsorValue label="REWARD FORMAT" value="PHYSICAL PRIZES + COUPON CODES" />
         </View>

@@ -14,14 +14,14 @@ const productScreens = [
     width: 960,
   },
   {
-    alt: "GoGymGo Winners Circle screen showing published competition results",
+    alt: "GoGymGo Winners Circle screen showing published contest results",
     height: 1600,
     proof: "PUBLISHED ONLY",
     proofCopy:
       "Final standings appear only after submitted activity is reviewed.",
     src: "/app/winners-circle.webp",
     step: "02 // RESULTS",
-    title: "Review published competition results",
+    title: "Review published contest results",
     width: 960,
   },
 ] as const;
@@ -36,7 +36,7 @@ export function ProductScreens() {
             <h2>From Verified workout to published result.</h2>
           </div>
           <p>
-            The app keeps live verification separate from final competition
+            The app keeps live verification separate from final contest
             results, so pending activity is never presented as approved credit.
           </p>
         </div>

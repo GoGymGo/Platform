@@ -461,7 +461,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         const enrollment = await account.getCurrentEnrollment();
         if (!competition) {
           throw new Error(
-            'Join the current monthly Competition before starting a Verified workout.'
+            'Join the current monthly Contest before starting a Verified workout.'
           );
         }
         const hasCompetitionAccess = hasSessionCompetitionAccess({
@@ -470,24 +470,24 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         });
         if (!hasCompetitionAccess) {
           throw new Error(
-            'Join the current monthly Competition before starting a Verified workout.'
+            'Join the current monthly Contest before starting a Verified workout.'
           );
         }
         if (mode === 'api' && competition.status !== 'active') {
-          throw new Error('The monthly competition is not accepting workouts right now.');
+          throw new Error('The monthly contest is not accepting workouts right now.');
         }
         if (!competition.rules) {
           throw new Error(
-            'Competition verification requirements are temporarily unavailable. Try again later.'
+            'Contest verification requirements are temporarily unavailable. Try again later.'
           );
         }
         if (competition.rules.requireDeviceAttestation) {
           throw new Error(
-            'This competition requires device attestation that this app version cannot submit yet.'
+            'This contest requires device attestation that this app version cannot submit yet.'
           );
         }
         if (competition.rules.requireGymQr && verificationMethod !== 'partnerGymQr') {
-          throw new Error('This Competition requires Partner gym entry and exit QR scans.');
+          throw new Error('This Contest requires Partner gym entry and exit QR scans.');
         }
         if (
           competition.rules.minHeartRateSamples > 0 &&
@@ -495,8 +495,8 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         ) {
           throw new Error(
             competition.rules.requireGymQr
-              ? 'This competition requires combined QR and heart-rate evidence that this app version cannot submit yet.'
-              : 'This competition requires heart-rate evidence. Choose the heart-rate method.'
+              ? 'This contest requires combined QR and heart-rate evidence that this app version cannot submit yet.'
+              : 'This contest requires heart-rate evidence. Choose the heart-rate method.'
           );
         }
         if (verificationMethod === 'partnerGymQr' && !entryQrPayload) {

@@ -39,10 +39,10 @@ export function useCompetitionRegistration({
     }
 
     if (!competition) {
-      throw new Error('No published regional competition is available to join.');
+      throw new Error('No published regional contest is available to join.');
     }
     if (!competition.goalDays.includes(goalDays)) {
-      throw new Error('That Weekly Goal is not available in this competition.');
+      throw new Error('That Weekly Goal is not available in this contest.');
     }
     if (appTourActive) {
       return enrollInCompetition.mutateAsync({
@@ -60,7 +60,7 @@ export function useCompetitionRegistration({
     }
     const receipt = legalReceipt.data;
     if (!receipt?.complete || !receipt.receiptBundleId) {
-      throw new Error('Review and accept Privacy & Permissions before competition registration.');
+      throw new Error('Review and accept Privacy & Permissions before contest registration.');
     }
 
     return enrollInCompetition.mutateAsync({

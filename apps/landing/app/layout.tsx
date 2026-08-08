@@ -44,7 +44,7 @@ export async function generateMetadata(): Promise<Metadata> {
       "fitness challenges",
       "verified workouts",
       "gym rewards",
-      "fitness competition",
+      "fitness contest",
     ],
     openGraph: {
       title: "GoGymGo — Make consistency count",

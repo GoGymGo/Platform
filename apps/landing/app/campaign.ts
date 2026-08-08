@@ -11,7 +11,7 @@ export const septemberCampaign = {
   regionName: "Vancouver Island + Gulf Islands",
   registrationLabel: "REGISTRATION OPEN",
   registrationNote:
-    "The app confirms current availability. Registration can close when the Competition ends, reaches an entrant cap, or is cancelled.",
+    "The app confirms current availability. Registration can close when the Contest ends, reaches an entrant cap, or is cancelled.",
   reward: "$100 CAD",
   rewardSponsor: "GoGymGo",
   startDate: "September 1, 2026 at 12:00 a.m. PDT",
@@ -43,7 +43,7 @@ export function getSeptemberCampaignState(now = new Date()) {
       phase: "ended" as const,
       primaryAction: "regionalUpdates" as const,
       primaryLabel: "GET REGIONAL UPDATES",
-      statusLabel: "COMPETITION ENDED",
+      statusLabel: "CONTEST ENDED",
     };
   }
 
@@ -52,7 +52,7 @@ export function getSeptemberCampaignState(now = new Date()) {
       phase: "active" as const,
       primaryAction: "memberApp" as const,
       primaryLabel: "CHECK CURRENT AVAILABILITY",
-      statusLabel: "COMPETITION ACTIVE",
+      statusLabel: "CONTEST ACTIVE",
     };
   }
 

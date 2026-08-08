@@ -81,7 +81,7 @@ export default function TabsLayout() {
             name="leaderboard"
             options={{
               title: 'Compete',
-              tabBarAccessibilityLabel: 'Competition tab',
+              tabBarAccessibilityLabel: 'Contest tab',
               tabBarIcon: ({ color, focused, size }) => (
                 <Ionicons color={color} name={focused ? 'trophy' : 'trophy-outline'} size={size} />
               )

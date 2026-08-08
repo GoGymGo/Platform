@@ -61,11 +61,11 @@ export default function AccountDeletionPage() {
               An approved request removes or de-identifies the active account,
               profile, media, notification, and social information covered by
               the current GoGymGo Privacy Policy. Limited pseudonymous records
-              may be retained when required for competition integrity, fraud
+              may be retained when required for contest integrity, fraud
               prevention, reward disputes, legal receipts, or applicable law.
             </p>
             <p>
-              An active competition, unresolved reward claim, legal hold, or
+              An active contest, unresolved reward claim, legal hold, or
               identity-verification problem may delay processing. The request
               status remains available in Account Data while the account can
               still be accessed.

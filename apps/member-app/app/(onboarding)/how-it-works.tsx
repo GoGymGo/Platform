@@ -22,7 +22,7 @@ const loopSteps = [
   ['VERIFY', 'Scan the approved Partner gym QR on entry and again after 30 minutes.'],
   [
     'BUILD ODDS',
-    'Earn Prize Draw Entries through consistency, teamwork and Competition'
+    'Earn Prize Draw Entries through consistency, teamwork and the Contest'
   ],
   [
     'CLAIM AWARD',
@@ -52,7 +52,7 @@ export default function HowItWorksScreen() {
       : from === 'commitment'
         ? 'Back to Weekly Goal ->'
         : from === 'leaderboard'
-          ? 'Back to Competition ->'
+          ? 'Back to Contest ->'
           : from === 'challenge'
             ? 'Back to Weekly Challenge ->'
             : from === 'home'
@@ -93,13 +93,13 @@ export default function HowItWorksScreen() {
         <OnboardingHeader
           label="REFERENCE"
           onBack={returnToSource}
-          step="COMPETITION GUIDE"
+          step="CONTEST GUIDE"
         />
 
         <BrandScreenHeader
-          description="A quick reference for Competition scoring, winning odds and brand Rewards."
-          eyebrow="COMPETITION GUIDE"
-          title="HOW THE COMPETITION WORKS"
+          description="A quick reference for Contest scoring, winning odds and brand Rewards."
+          eyebrow="CONTEST GUIDE"
+          title="HOW THE CONTEST WORKS"
         />
 
         <HUDBorderBox style={styles.flowSummary} tone="cyan">

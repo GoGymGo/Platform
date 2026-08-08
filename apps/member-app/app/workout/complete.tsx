@@ -84,7 +84,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="START A WORKOUT"
-        body="A workout must pass the server-set timer and evidence requirements before competition credit can be awarded."
+        body="A workout must pass the server-set timer and evidence requirements before contest credit can be awarded."
         onAction={() => router.replace('/session' as Href)}
         title="WORKOUT NOT STARTED"
       />
@@ -122,7 +122,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="GO TO HOME"
-        body="Your workout and evidence were submitted successfully. Competition credit and entries will appear only after server review approves the workout."
+        body="Your workout and evidence were submitted successfully. Contest credit and entries will appear only after server review approves the workout."
         onAction={() => router.replace('/home')}
         title="IN REVIEW"
       />
@@ -133,7 +133,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="GO TO HOME"
-        body="The submitted workout did not meet the competition's server-side duration or evidence requirements, so no credit or entries were awarded."
+        body="The submitted workout did not meet the contest's server-side duration or evidence requirements, so no credit or entries were awarded."
         onAction={() => router.replace('/home')}
         title="NOT ELIGIBLE"
       />
@@ -185,7 +185,7 @@ export default function WorkoutCompleteScreen() {
             ? entriesAwarded > 0
               ? `Today is a Bonus Day. This Verified workout adds ${entriesAwarded} Prize Draw ${entriesAwarded === 1 ? 'Entry' : 'Entries'}, equal to your Weekly Goal.`
               : competitionNotStarted
-                ? 'Today is checked off in your Workout Calendar. Competition scoring has not opened yet, so this workout does not add competition credit.'
+                ? 'Today is checked off in your Workout Calendar. Contest scoring has not opened yet, so this workout does not add contest credit.'
                 : 'Today is checked off. This Verified workout counts toward your current scoring week; entries settle when the week closes.'
             : 'Today remains checked off, but a second Verified workout on the same day does not create another verified day or entry award.'}
         </TerminalText>
@@ -215,7 +215,7 @@ export default function WorkoutCompleteScreen() {
             {competition.phase === 'bonus-days'
               ? `Each verified Bonus Day workout adds ${weeklyGoal} ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before a Perfect Month 10x.`
               : competitionNotStarted
-                ? 'This workout builds your personal workout history only. Competition credit begins when scoring opens.'
+                ? 'This workout builds your personal workout history only. Contest credit begins when scoring opens.'
               : remainingSessions > 0
                 ? `Complete ${remainingSessions} more Verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal.`
                 : 'Weekly Goal hit. Your Weekly Challenge multiplier is ready to settle.'}

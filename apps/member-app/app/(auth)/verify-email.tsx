@@ -147,7 +147,7 @@ export default function VerifyEmailScreen() {
         ? 'This preview simulates the email-verification step without sending a message.'
         : next === gymScanAuthNext || next === gymScanSetupNext
           ? 'Your gym scan is saved. Verify your email and GoGymGo will continue your workout setup automatically.'
-          : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
+          : 'Verify the email attached to your GoGymGo account before entering contest flows.'}
       eyebrow={next === gymScanAuthNext || next === gymScanSetupNext
         ? 'GYM SCAN SAVED'
         : 'ACCOUNT SECURITY'}

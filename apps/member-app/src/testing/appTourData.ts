@@ -160,7 +160,7 @@ export function createAppTourDataSource(): AppDataSource {
     getRewardCatalog: async (region, monthKey = currentMonthKey()) => [
       {
         competitionId: appTourCompetitionId,
-        competitionName: 'Monthly GoGymGo Competition',
+        competitionName: 'Monthly GoGymGo Contest',
         description: 'A recovery-focused coupon reward for active GoGymGo players.',
         id: 'app-tour-reward',
         imageUrl: null,
@@ -194,7 +194,7 @@ export function createAppTourDataSource(): AppDataSource {
       }
     ],
     getSettledCompetition: async () => ({
-      competitionName: 'Previous GoGymGo Competition',
+      competitionName: 'Previous GoGymGo Contest',
       monthKey: previousMonthKey(),
       rewardCount: 2
     }),
@@ -562,7 +562,7 @@ function createCurrentCompetition(
     id: appTourCompetitionId,
     minimumEntrants: 100,
     monthKey,
-    name: `${regionName} Monthly Competition`,
+    name: `${regionName} Monthly Contest`,
     regionCode: 'vancouver-island-gulf-islands-bc',
     regionName,
     registrationClosesAt: end,
@@ -617,7 +617,7 @@ function createLegalBundle(
           intro: 'This sample notice explains how the browser preview behaves.',
           sections: [
             {
-              body: 'Preview agreements stay in this browser and do not create real competition entries.',
+              body: 'Preview agreements stay in this browser and do not create real contest entries.',
               heading: 'Browser preview'
             }
           ]
@@ -637,7 +637,7 @@ function createLegalBundle(
           intro: 'These sample terms support the browser preview experience.',
           sections: [
             {
-              body: 'Preview actions are local and are not real competition entries.',
+              body: 'Preview actions are local and are not real contest entries.',
               heading: 'Browser preview'
             }
           ]

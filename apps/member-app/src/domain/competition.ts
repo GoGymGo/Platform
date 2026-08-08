@@ -488,13 +488,13 @@ function formatMonthDay(monthKey: string, day: number) {
 
 function parseMonthKey(monthKey: string) {
   if (!/^\d{4}-\d{2}$/.test(monthKey)) {
-    throw new Error(`Invalid competition month key: ${monthKey}`);
+    throw new Error(`Invalid contest month key: ${monthKey}`);
   }
 
   const [year, month] = monthKey.split('-').map(Number);
 
   if (month < 1 || month > 12) {
-    throw new Error(`Invalid competition month key: ${monthKey}`);
+    throw new Error(`Invalid contest month key: ${monthKey}`);
   }
 
   return { month, year };

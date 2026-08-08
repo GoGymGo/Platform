@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 
 const description =
-  "Secure operations control for GoGymGo competitions, rewards, regions and content.";
+  "Secure operations control for GoGymGo contests, rewards, regions and content.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: new URL("/og.png", origin).toString(),
-          alt: "GoGymGo Admin — Secure competition control",
+          alt: "GoGymGo Admin — Secure contest control",
         },
       ],
     },

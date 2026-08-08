@@ -99,13 +99,13 @@ export default function LeaderboardScreen() {
         <BrandScreenHeader
           accessory={(
             <InlineHelpButton
-              label="Open competition guide"
+              label="Open contest guide"
               onPress={() => router.push('/how-it-works?from=leaderboard')}
             />
           )}
           description="Track your standing, Prize Draw Entries and Weekly Challenge."
-          eyebrow={`${competitionRegion.label} // MONTHLY COMPETITION`}
-          title="REGIONAL COMPETITION"
+          eyebrow={`${competitionRegion.label} // MONTHLY CONTEST`}
+          title="REGIONAL CONTEST"
         />
 
         <CompetitionHubNav active="rankings" style={styles.hubNav} />
@@ -164,7 +164,7 @@ export default function LeaderboardScreen() {
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Goal Score includes each settled week&apos;s 1x, 2x or 3x Weekly
                 Challenge result. Equal scores are resolved by verified
-                competition days, then the published audited tie-break.
+                contest days, then the published audited tie-break.
               </TerminalText>
             </View>
           ) : null}
@@ -269,7 +269,7 @@ export default function LeaderboardScreen() {
                   STANDINGS NOT AVAILABLE YET
                 </TerminalText>
                 <TerminalText style={styles.emptyStandingsCopy} tone="muted" uppercase={false} variant="body">
-                  Live results will appear when this month&apos;s competition data is ready.
+                  Live results will appear when this month&apos;s contest data is ready.
                 </TerminalText>
               </HUDBorderBox>
             ) : null}

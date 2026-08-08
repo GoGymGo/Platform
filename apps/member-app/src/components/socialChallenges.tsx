@@ -599,7 +599,7 @@ function ChallengeBuilder({
                   {formatRegion(regionCode)}
                 </TerminalText>
                 <TerminalText tone="dim" uppercase={false} variant="micro">
-                  Uses your active competition region
+              Uses your active contest region
                 </TerminalText>
               </View>
               <Ionicons color={colors.green} name="checkmark-circle" size={18} />

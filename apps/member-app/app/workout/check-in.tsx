@@ -88,13 +88,13 @@ function HeartRateCheckInScreen() {
   }
 
   if (registrationChecking) {
-    return <ScreenLoadingState body="Checking your competition registration." />;
+    return <ScreenLoadingState body="Checking your contest registration." />;
   }
 
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your Competition setup could not be checked. Retry before starting a Verified workout."
+        body="Your Contest setup could not be checked. Retry before starting a Verified workout."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"

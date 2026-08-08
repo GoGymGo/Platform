@@ -86,7 +86,7 @@ export default function BonusRulesModal() {
         <OnboardingHeader
           label="BONUS RULES"
           onBack={() => goBackOrReplace(router, '/how-it-works')}
-          step="COMPETITION"
+          step="CONTEST"
         />
       </View>
 

@@ -25,14 +25,14 @@ export default function GymCompetitionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label="GYM COMPETITION"
+          label="GYM CONTEST"
           onBack={() => goBackOrReplace(router, '/squad')}
           step="PARTNER GYM"
         />
         <BrandScreenHeader
-          description="Partner gym Competitions and QR-verified workouts will appear here when participating Partner gyms are ready."
+          description="Partner gym Contests and QR-verified workouts will appear here when participating Partner gyms are ready."
           eyebrow="PARTNER GYM"
-          title="GYM COMPETITION"
+          title="GYM CONTEST"
         />
 
         <HUDBorderBox style={styles.unavailableCard} tone="muted">

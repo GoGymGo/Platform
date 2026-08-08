@@ -29,7 +29,7 @@ test("campaign facts have one landing-owned source of truth", async () => {
   assert.match(campaign, /September 1, 2026 at 12:00 a\.m\. PDT/);
   assert.match(campaign, /October 1, 2026 at 12:00 a\.m\. PDT/);
   assert.match(campaign, /REGISTRATION OPEN/);
-  assert.match(campaign, /can close when the Competition ends, reaches an entrant cap, or is cancelled/);
+  assert.match(campaign, /can close when the Contest ends, reaches an entrant cap, or is cancelled/);
   assert.match(campaign, /Denman/);
   assert.match(campaign, /South Pender/);
   assert.match(campaign, /Thetis/);

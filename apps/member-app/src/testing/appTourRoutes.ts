@@ -43,7 +43,7 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
     title: 'OPTIONAL SETUP',
     routes: [
       { label: 'Public Alias', route: '/identity' },
-      { label: 'Competition Guide', route: '/how-it-works' }
+      { label: 'Contest Guide', route: '/how-it-works' }
     ]
   },
   {
@@ -127,7 +127,7 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
   {
     title: 'RULES + PRIVACY',
     routes: [
-      { label: 'Competition Rules', route: '/commitment-rules' },
+      { label: 'Contest Rules', route: '/commitment-rules' },
       { label: 'Official Contest Rules', route: '/official-rules' },
       { label: 'Bonus Rules', route: '/bonus-rules' },
       { label: 'Privacy Policy', route: '/privacy-policy' },

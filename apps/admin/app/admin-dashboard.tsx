@@ -95,9 +95,9 @@ const navigation: {
     short: "QR",
   },
   {
-    description: "Build, review and release regional competitions to players.",
+    description: "Build, review and release regional contests to players.",
     id: "competitions",
-    label: "Competitions",
+    label: "Contests",
     short: "CO",
   },
   {
@@ -809,11 +809,11 @@ export function AdminDashboard({
                 setConfirmAction({
                   actionLabel:
                     action === "publish"
-                      ? "Publish competition"
-                      : "Cancel competition",
+                      ? "Publish contest"
+                      : "Cancel contest",
                   auditReason:
                     action === "publish"
-                      ? "Publish the approved competition after operator confirmation."
+                      ? "Publish the approved contest after operator confirmation."
                       : undefined,
                   description:
                     action === "publish"
@@ -822,8 +822,8 @@ export function AdminDashboard({
                   execute: (reason) =>
                     mutate(
                       action === "publish"
-                        ? "Competition published."
-                        : "Competition cancelled.",
+                        ? "Contest published."
+                        : "Contest cancelled.",
                       `operator/configuration/competitions/${competition.id}/status-action`,
                       "POST",
                       {
@@ -843,7 +843,7 @@ export function AdminDashboard({
               competitions={snapshot.competitions}
               onAssignGym={async (competitionId, gymId, body) => {
                 await mutate(
-                  "Gym assigned to competition.",
+                  "Gym assigned to contest.",
                   `operator/competitions/${competitionId}/gym-locations/${gymId}`,
                   "POST",
                   body,
@@ -904,7 +904,7 @@ export function AdminDashboard({
                     action === "publish" ? "Publish reward" : "Archive reward",
                   description:
                     action === "publish"
-                      ? `${reward.title} will become part of the public competition reward catalog.`
+                      ? `${reward.title} will become part of the public contest reward catalog.`
                       : `${reward.title} will be removed from the public reward catalog.`,
                   execute: (reason) =>
                     mutate(
@@ -996,8 +996,8 @@ export function AdminDashboard({
           onSubmit={async (body, editing) => {
             await mutate(
               editing
-                ? "Competition draft updated."
-                : "Competition draft created.",
+                ? "Contest draft updated."
+                : "Contest draft created.",
               editing
                 ? `operator/configuration/competitions/${editing.id}`
                 : "operator/configuration/competitions",
@@ -1146,7 +1146,7 @@ function SignInScreen({
         </h1>
         <p className="sign-in-lede">
           GoGymGo runs the platform. Partner gyms manage only their own
-          locations, visits, QR posters and competition proposals.
+          locations, visits, QR posters and contest proposals.
         </p>
         <div className="security-list">
           <span>01</span>
@@ -1287,7 +1287,7 @@ const partnerNavigation: {
   {
     description: "Create local drafts for GoGymGo review and publication.",
     id: "competitions",
-    label: "Competitions",
+    label: "Contests",
     short: "CO",
   },
   {
@@ -1480,7 +1480,7 @@ function PartnerWorkspace({
                   <p className="eyebrow">GYM PARTNER WORKSPACE</p>
                   <h2>Your gyms, without the platform-wide controls.</h2>
                   <p>
-                    You can see only assigned locations and visits. Competition
+                    You can see only assigned locations and visits. Contest
                     proposals remain drafts until GoGymGo reviews and publishes
                     them.
                   </p>
@@ -1606,8 +1606,8 @@ function PartnerWorkspace({
             <section className="panel">
               <div className="panel-heading">
                 <div>
-                  <p className="eyebrow">LOCAL COMPETITION PROPOSALS</p>
-                  <h2>Competitions</h2>
+                  <p className="eyebrow">LOCAL CONTEST PROPOSALS</p>
+                  <h2>Contests</h2>
                   <p>
                     Partner drafts are limited to an assigned gym. GoGymGo
                     controls rewards, publication, cancellation and settlement.
@@ -1625,8 +1625,8 @@ function PartnerWorkspace({
               </div>
               {snapshot.competitions.length === 0 ? (
                 <EmptyState
-                  body="Gym administrators can submit the first local competition proposal for GoGymGo review."
-                  title="No competition proposals yet"
+                  body="Gym administrators can submit the first local contest proposal for GoGymGo review."
+                  title="No contest proposals yet"
                 />
               ) : (
                 <div className="card-list">
@@ -1762,8 +1762,8 @@ function PartnerWorkspace({
           onSubmit={async (body, editing) => {
             await onMutate(
               editing
-                ? "Competition proposal updated."
-                : "Competition proposal submitted.",
+                ? "Contest proposal updated."
+                : "Contest proposal submitted.",
               editing
                 ? `operator/configuration/competitions/${editing.id}`
                 : "operator/configuration/competitions",
@@ -1833,10 +1833,10 @@ function Overview({
               : healthNeedsAttention
                 ? "System health needs review."
                 : activeCompetition
-                  ? "A competition is live."
+                  ? "A contest is live."
                   : publishReady.length > 0
                     ? "Ready for a controlled launch."
-                    : "Build the next competition."}
+                    : "Build the next contest."}
           </h2>
           <p>
             {queue.length > 0
@@ -1847,7 +1847,7 @@ function Overview({
                   ? `${activeCompetition.name} is ${activeCompetition.status} with ${activeCompetition.enrollmentCount} enrolled players.`
                   : publishReady.length > 0
                     ? `${publishReady[0].name} has a published reward and can be released after your final review.`
-                    : "No competition is currently public. Add and publish a real reward before releasing a draft to players."}
+                    : "No contest is currently public. Add and publish a real reward before releasing a draft to players."}
           </p>
           {oldestQueueItem && oldestUrgency ? (
             <div className="priority-context">
@@ -1875,7 +1875,7 @@ function Overview({
               onClick={() => onNavigate("competitions")}
               type="button"
             >
-              OPEN COMPETITIONS
+              OPEN CONTESTS
             </button>
           </div>
         </div>
@@ -1892,13 +1892,13 @@ function Overview({
               ? "ATTENTION ITEMS"
               : activeCompetition
                 ? "PUBLIC STATE"
-                : "NO PUBLIC COMPETITION"}
+                : "NO PUBLIC CONTEST"}
           </small>
         </div>
       </section>
       <section className="metric-grid">
         <Metric
-          label="COMPETITIONS"
+          label="CONTESTS"
           onClick={() => onNavigate("competitions")}
           value={snapshot.competitions.length}
         />
@@ -1926,7 +1926,7 @@ function Overview({
           <div className="panel-heading">
             <div>
               <p className="eyebrow">PUBLICATION READINESS</p>
-              <h3>Competition launch gates</h3>
+              <h3>Contest launch gates</h3>
             </div>
             <button
               className="text-button"
@@ -1938,8 +1938,8 @@ function Overview({
           </div>
           {snapshot.competitions.length === 0 ? (
             <EmptyState
-              body="Create a regional competition draft to begin."
-              title="No competitions configured"
+              body="Create a regional contest draft to begin."
+              title="No contests configured"
             />
           ) : (
             <div className="readiness-list">
@@ -2084,20 +2084,20 @@ function CompetitionsPanel({
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">REGIONAL COMPETITION CONTROL</p>
-          <h2>Competitions</h2>
+          <p className="eyebrow">REGIONAL CONTEST CONTROL</p>
+          <h2>Contests</h2>
           <p>
             Create drafts, confirm reward readiness and publish to every player
             surface.
           </p>
         </div>
         <button className="primary-button" onClick={onCreate} type="button">
-          + NEW COMPETITION
+          + NEW CONTEST
         </button>
       </div>
       {competitions.length > 0 ? (
         <div
-          aria-label="Filter competitions"
+          aria-label="Filter contests"
           className="panel-toolbar"
           role="search"
         >
@@ -2130,12 +2130,12 @@ function CompetitionsPanel({
       {competitions.length === 0 ? (
         <EmptyState
           body="Start with a region, schedule, rules and Weekly Goal options."
-          title="No competitions yet"
+          title="No contests yet"
         />
       ) : filteredCompetitions.length === 0 ? (
         <EmptyState
           body="Try a different search term or status filter."
-          title="No competitions match"
+          title="No contests match"
         />
       ) : (
         <div className="card-list">
@@ -2348,7 +2348,7 @@ function RewardsPanel({
           <p className="eyebrow">BRAND REWARD CATALOG</p>
           <h2>Rewards</h2>
           <p>
-            Only real, in-stock published rewards can unlock a competition
+            Only real, in-stock published rewards can unlock a contest
             launch.
           </p>
         </div>
@@ -2366,7 +2366,7 @@ function RewardsPanel({
             <span>SEARCH</span>
             <input
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Reward, sponsor or competition"
+              placeholder="Reward, sponsor or contest"
               type="search"
               value={query}
             />
@@ -2390,7 +2390,7 @@ function RewardsPanel({
       <FilterChips filters={activeFilters} />
       {rewards.length === 0 ? (
         <EmptyState
-          body="Create the first verified brand reward, then publish it before releasing a competition."
+          body="Create the first verified brand reward, then publish it before releasing a contest."
           title="No brand rewards configured"
         />
       ) : filteredRewards.length === 0 ? (
@@ -2425,7 +2425,7 @@ function RewardsPanel({
               <summary>COLUMNS</summary>
               <div>
                 {[
-                  ["competition", "Competition"],
+                  ["competition", "Contest"],
                   ["type", "Type"],
                   ["inventory", "Inventory"],
                 ].map(([value, label]) => (
@@ -2453,7 +2453,7 @@ function RewardsPanel({
                 <tr>
                   <th scope="col">Reward</th>
                   {visibleColumnSet.has("competition") ? (
-                    <th scope="col">Competition</th>
+                    <th scope="col">Contest</th>
                   ) : null}
                   {visibleColumnSet.has("type") ? (
                     <th scope="col">Type</th>
@@ -2586,7 +2586,7 @@ function RegionsPanel({
           <p className="eyebrow">AUTHORITATIVE LOCATION BOUNDARIES</p>
           <h2>Regional policies</h2>
           <p>
-            Immutable, time-bounded geographic rules decide which competitions a
+            Immutable, time-bounded geographic rules decide which contests a
             player may enter.
           </p>
         </div>
@@ -2596,7 +2596,7 @@ function RegionsPanel({
       </div>
       {regions.length === 0 ? (
         <EmptyState
-          body="Create the first time-bounded regional policy before configuring a competition."
+          body="Create the first time-bounded regional policy before configuring a contest."
           title="No regional policies configured"
         />
       ) : (
@@ -2609,7 +2609,7 @@ function RegionsPanel({
                   className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
                 >
                   {region.competitionEnabled
-                    ? "competition enabled"
+                    ? "contest enabled"
                     : "disabled"}
                 </span>
                 <h3>{region.metroName}</h3>
@@ -3475,11 +3475,11 @@ export function CompetitionForm({
       title={
         partnerMode
           ? competition
-            ? "Edit competition proposal"
-            : "New competition proposal"
+            ? "Edit contest proposal"
+            : "New contest proposal"
           : competition
-            ? "Edit competition draft"
-            : "New competition draft"
+            ? "Edit contest draft"
+            : "New contest draft"
       }
     >
       <form className="editor-form" onSubmit={(event) => void submit(event)}>
@@ -3518,7 +3518,7 @@ export function CompetitionForm({
               ))}
             </select>
           </Field>
-          <Field label="COMPETITION MONTH">
+          <Field label="CONTEST MONTH">
             <input
               defaultValue={competition?.monthKey ?? dates.monthKey}
               name="monthKey"
@@ -3588,7 +3588,7 @@ export function CompetitionForm({
               type="datetime-local"
             />
           </Field>
-          <Field label="COMPETITION STARTS">
+          <Field label="CONTEST STARTS">
             <input
               defaultValue={toLocalDateTime(
                 competition?.startsAt ?? dates.startsAt,
@@ -3598,7 +3598,7 @@ export function CompetitionForm({
               type="datetime-local"
             />
           </Field>
-          <Field label="COMPETITION ENDS">
+          <Field label="CONTEST ENDS">
             <input
               defaultValue={toLocalDateTime(
                 competition?.endsAt ?? dates.endsAt,
@@ -3626,11 +3626,11 @@ export function CompetitionForm({
             defaultValue={
               partnerMode
                 ? competition
-                  ? "Update this gym competition proposal for GoGymGo review."
-                  : "Submit a gym competition proposal for GoGymGo review."
+                  ? "Update this gym contest proposal for GoGymGo review."
+                  : "Submit a gym contest proposal for GoGymGo review."
                 : competition
-                  ? "Update the competition configuration after administrative review."
-                  : "Create a new competition draft for administrative review."
+                  ? "Update the contest configuration after administrative review."
+                  : "Create a new contest draft for administrative review."
             }
           />
         </FormGrid>
@@ -3703,13 +3703,13 @@ function RewardForm({
     >
       <form className="editor-form" onSubmit={(event) => void submit(event)}>
         <FormGrid>
-          <Field label="COMPETITION" wide>
+          <Field label="CONTEST" wide>
             <select
               defaultValue={reward?.competitionId}
               name="competitionId"
               required
             >
-              <option value="">Select a competition</option>
+              <option value="">Select a contest</option>
               {competitions.map((competition) => (
                 <option key={competition.id} value={competition.id}>
                   {competition.name}
@@ -3958,10 +3958,10 @@ function RegionForm({
               rows={10}
             />
           </Field>
-          <Field label="COMPETITION OPERATIONS" wide>
+          <Field label="CONTEST OPERATIONS" wide>
             <label className="check-row">
               <input name="competitionEnabled" type="checkbox" />
-              Enable competitions within this approved boundary
+              Enable contests within this approved boundary
             </label>
           </Field>
           <ReasonField defaultValue="Create an approved regional policy for GoGymGo operations." />

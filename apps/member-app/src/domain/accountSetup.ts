@@ -50,7 +50,7 @@ export function getAccountSetupActionLabel(step: AccountSetupStep) {
 
 export function getAccountSetupMessage(step: AccountSetupStep) {
   if (step === 'region') {
-    return 'Verify your location once to join the correct regional competition.';
+      return 'Verify your location once to join the correct regional contest.';
   }
   if (step === 'agreements') {
     return 'Review and accept the account agreements for your verified region.';
@@ -58,5 +58,5 @@ export function getAccountSetupMessage(step: AccountSetupStep) {
   if (step === 'weekly-goal') {
     return 'Choose the number of Verified workout days you can complete each week.';
   }
-  return 'Your competition setup is complete.';
+  return 'Your contest setup is complete.';
 }

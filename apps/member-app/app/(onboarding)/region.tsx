@@ -144,7 +144,7 @@ export default function RegionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label={isProfileSource ? 'COMPETITION REGION' : 'REGION + AGREEMENTS'}
+          label={isProfileSource ? 'CONTEST REGION' : 'REGION + AGREEMENTS'}
           onBack={() => goBackOrReplace(
             router,
             isProfileSource ? '/profile' : isHomeSource ? '/home' : '/join'
@@ -167,8 +167,8 @@ export default function RegionScreen() {
           variant="body"
         >
           {approvedRegionReady && !isProfileSource
-            ? `${competitionRegion.label} sets your competition, available rewards and local scoring time.`
-            : 'Your verified location sets your regional competition, available rewards and local scoring time.'}
+            ? `${competitionRegion.label} sets your contest, available rewards and local scoring time.`
+            : 'Your verified location sets your regional contest, available rewards and local scoring time.'}
         </TerminalText>
 
         {!approvedRegionReady || isProfileSource ? (
@@ -235,7 +235,7 @@ export default function RegionScreen() {
             <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
               The September pilot is available only on Vancouver Island and
               the supported Gulf Islands. We will not place you in Toronto or
-              show another region&apos;s sample competition.
+              show another region&apos;s sample contest.
             </TerminalText>
             <CyberButtonOutline
               label="TRY LOCATION AGAIN"

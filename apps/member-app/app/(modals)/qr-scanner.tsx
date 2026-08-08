@@ -214,12 +214,12 @@ export default function QrScannerModal() {
     return <ScreenLoadingState body="Preparing your gym workout." />;
   }
   if (registrationChecking) {
-    return <ScreenLoadingState body="Checking your competition registration." />;
+    return <ScreenLoadingState body="Checking your contest registration." />;
   }
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before scanning the gym poster."
+        body="Your contest setup could not be checked. Retry before scanning the gym poster."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"
@@ -243,7 +243,7 @@ export default function QrScannerModal() {
     return (
       <SessionUnavailable
         actionLabel="BACK TO TRAINING"
-        body="The secure scan service is temporarily unavailable. Your account and competition data are safe."
+        body="The secure scan service is temporarily unavailable. Your account and contest data are safe."
         onAction={() => router.replace('/session')}
         title="QR SERVICE OFFLINE"
       />
@@ -472,16 +472,16 @@ function resultMessage(result: GymScanResultDto) {
     return 'The session is active, but the 30-minute minimum has not been reached yet.';
   }
   if (result.outcome === 'verified') {
-    return 'Entry and exit were verified. This is your one eligible competition day for today.';
+    return 'Entry and exit were verified. This is your one eligible contest day for today.';
   }
   return rejectionMessage(result.rejectionReason ?? null);
 }
 
 function rejectionMessage(reason: string | null) {
   const messages: Record<string, string> = {
-    competition_unavailable: 'Join the active competition before scanning a gym poster.',
-    daily_limit_reached: 'You already earned one verified competition day today.',
-    gym_inactive: 'This gym is not active for the current competition.',
+    competition_unavailable: 'Join the active contest before scanning a gym poster.',
+    daily_limit_reached: 'You already earned one verified contest day today.',
+    gym_inactive: 'This gym is not active for the current contest.',
     inaccurate_location: 'Location accuracy is too low. Move near a window and try again.',
     invalid_or_revoked_credential: 'This poster is invalid or has been replaced by the gym.',
     outside_geofence: 'You must be within 75 metres of the configured gym to scan.',

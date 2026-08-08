@@ -370,7 +370,7 @@ function auditFlowReliability() {
       "day === 1 ? 'day' : 'days'} per week"
     ]],
     ['app/(onboarding)/how-it-works.tsx', [
-      'A quick reference for Competition scoring',
+      'A quick reference for Contest scoring',
       'No bank account is needed.'
     ]],
     ['app/(onboarding)/identity.tsx', [

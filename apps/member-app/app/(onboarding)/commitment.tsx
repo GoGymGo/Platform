@@ -420,9 +420,10 @@ export default function CommitmentScreen() {
               <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
                 Earn more through consistency, teamwork and the Contest.
               </TerminalText>
-              <CompactTextButton
-                label="SEE HOW TO EARN MAXIMUM ENTRIES"
+              <FirstRunSecondaryButton
+                label="SEE HOW TO EARN MAXIMUM ENTRIES →"
                 onPress={() => setShowCalculator(true)}
+                style={styles.bonusDetailsCta}
                 tone="amber"
               />
             </View>
@@ -995,6 +996,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.borderCyanSubtle
+  },
+  bonusDetailsCta: {
+    width: '100%',
+    marginTop: spacing.xs
   },
   selectionHelper: {
     marginTop: spacing.md,

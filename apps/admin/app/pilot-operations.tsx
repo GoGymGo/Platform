@@ -53,6 +53,75 @@ type PilotOperationsProps = PilotData & {
 
 const administrativeReason =
   "Configure the approved September 2026 static QR pilot.";
+const posterStorageKey = "gogymgo.admin.pilot.active-poster";
+
+function isGymQrCredential(value: unknown): value is GymQrCredential {
+  if (!value || typeof value !== "object") return false;
+  const credential = value as Record<string, unknown>;
+  return (
+    Number.isInteger(credential.credentialVersion) &&
+    Number(credential.credentialVersion) > 0 &&
+    typeof credential.gymLocationId === "string" &&
+    typeof credential.id === "string" &&
+    typeof credential.issuedAt === "string" &&
+    typeof credential.printablePosterSvg === "string" &&
+    typeof credential.qrPayload === "string"
+  );
+}
+
+function forgetStoredPoster(gymLocationId?: string) {
+  if (typeof window === "undefined") return;
+  try {
+    if (gymLocationId) {
+      const stored = JSON.parse(
+        window.sessionStorage.getItem(posterStorageKey) ?? "null",
+      ) as unknown;
+      if (
+        isGymQrCredential(stored) &&
+        stored.gymLocationId !== gymLocationId
+      ) {
+        return;
+      }
+    }
+    window.sessionStorage.removeItem(posterStorageKey);
+  } catch {
+    // The poster preview remains usable even if browser storage is unavailable.
+  }
+}
+
+function readStoredPoster(gyms: GymLocation[]): GymQrCredential | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = JSON.parse(
+      window.sessionStorage.getItem(posterStorageKey) ?? "null",
+    ) as unknown;
+    if (!isGymQrCredential(stored)) {
+      forgetStoredPoster();
+      return null;
+    }
+    const gym = gyms.find((candidate) => candidate.id === stored.gymLocationId);
+    if (
+      !gym?.active ||
+      gym.activeCredentialVersion !== stored.credentialVersion
+    ) {
+      forgetStoredPoster();
+      return null;
+    }
+    return stored;
+  } catch {
+    forgetStoredPoster();
+    return null;
+  }
+}
+
+function rememberPoster(credential: GymQrCredential) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(posterStorageKey, JSON.stringify(credential));
+  } catch {
+    // The newly issued poster still renders from component state.
+  }
+}
 
 export function PilotOperationsPanel(props: PilotOperationsProps) {
   const createGymForm = useRef<HTMLFormElement>(null);
@@ -63,6 +132,14 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   const [locationMessage, setLocationMessage] = useState("");
   const [assignGymError, setAssignGymError] = useState("");
   const [assignGymSuccess, setAssignGymSuccess] = useState("");
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      const storedPoster = readStoredPoster(props.gyms);
+      if (storedPoster) setPoster(storedPoster);
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, [props.gyms]);
 
   async function createGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -317,10 +394,18 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               <GymCard
                 gym={gym}
                 key={gym.id}
-                onIssue={async (input) =>
-                  setPoster(await props.onIssueQr(gym.id, input))
-                }
-                onRevoke={(input) => props.onRevokeQr(gym.id, input)}
+                onIssue={async (input) => {
+                  const credential = await props.onIssueQr(gym.id, input);
+                  rememberPoster(credential);
+                  setPoster(credential);
+                }}
+                onRevoke={async (input) => {
+                  await props.onRevokeQr(gym.id, input);
+                  forgetStoredPoster(gym.id);
+                  setPoster((current) =>
+                    current?.gymLocationId === gym.id ? null : current,
+                  );
+                }}
                 onUpdate={(input) => props.onUpdateGym(gym.id, input)}
                 submitting={props.submitting}
               />

@@ -49,6 +49,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     dashboard,
     dashboardUtils,
     pilot,
+    posterJpeg,
     proxy,
     layout,
     packageJson,
@@ -62,6 +63,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
       "utf8",
     ),
     readFile(new URL("../app/pilot-operations.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/poster-jpeg.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../app/api/gogymgo/[...path]/route.ts", import.meta.url),
       "utf8",
@@ -146,7 +148,15 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /Location access was not allowed/);
   assert.match(pilot, /available in the assignment form below/);
   assert.match(pilot, /formErrorMessage/);
-  assert.match(pilot, /DOWNLOAD SVG FOR PRINTING/);
+  assert.match(pilot, /DOWNLOAD JPEG FOR PRINTING/);
+  assert.match(pilot, /\.jpg`/);
+  assert.match(dashboard, /downloadPosterJpeg/);
+  assert.match(posterJpeg, /canvas\.toBlob/);
+  assert.match(posterJpeg, /"image\/jpeg"/);
+  assert.match(posterJpeg, /new Path2D/);
+  assert.match(posterJpeg, /#34E5E8/);
+  assert.match(posterJpeg, /#FF2D9B/);
+  assert.doesNotMatch(pilot, /DOWNLOAD SVG FOR PRINTING/);
   assert.match(pilot, /Sessions \+ incomplete visits/);
   assert.match(pilot, /owner|cash handoff/i);
   assert.match(pilot, /scope="col"/);

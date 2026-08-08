@@ -7,9 +7,10 @@ import type {
   OperatorReasonDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { parseCoordinate } from "./coordinate-input";
 import { AdminUserFacingError, errorMessage } from "./admin-dashboard-utils";
+import { posterSvgToJpegBlob } from "./poster-jpeg";
 import type {
   Competition,
   GymLocation,
@@ -328,7 +329,11 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         )}
 
         {poster ? (
-          <PosterPreview credential={poster} onClose={() => setPoster(null)} />
+          <PosterPreview
+            credential={poster}
+            key={poster.id}
+            onClose={() => setPoster(null)}
+          />
         ) : null}
       </section>
 
@@ -667,7 +672,36 @@ function PosterPreview({
   credential: GymQrCredential;
   onClose: () => void;
 }) {
-  const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(credential.printablePosterSvg)}`;
+  const [source, setSource] = useState<string | null>(null);
+  const [conversionError, setConversionError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+
+    void posterSvgToJpegBlob(credential.printablePosterSvg)
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (active) {
+          setSource(objectUrl);
+        } else {
+          URL.revokeObjectURL(objectUrl);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setConversionError(
+            "The poster was issued, but this browser could not prepare its JPEG preview. Try again in a current browser.",
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [credential.printablePosterSvg]);
+
   return (
     <div className="poster-preview">
       <div>
@@ -678,17 +712,28 @@ function PosterPreview({
           Close
         </button>
       </div>
-      {/* The SVG is rendered as an image, never injected as executable markup. */}
-      {/* Generated data URLs cannot use the Sites image optimizer. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img alt="Printable GoGymGo gym QR poster" src={source} />
-      <a
-        className="primary-button"
-        download={`gogymgo-gym-qr-v${credential.credentialVersion}.svg`}
-        href={source}
-      >
-        DOWNLOAD SVG FOR PRINTING
-      </a>
+      {source ? (
+        <>
+          {/* Generated object URLs cannot use the Sites image optimizer. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="Printable GoGymGo gym QR poster" src={source} />
+          <a
+            className="primary-button"
+            download={`gogymgo-gym-qr-v${credential.credentialVersion}.jpg`}
+            href={source}
+          >
+            DOWNLOAD JPEG FOR PRINTING
+          </a>
+        </>
+      ) : conversionError ? (
+        <p className="poster-preview-status error-message" role="alert">
+          {conversionError}
+        </p>
+      ) : (
+        <p className="poster-preview-status" role="status">
+          PREPARING JPEG PREVIEW...
+        </p>
+      )}
     </div>
   );
 }

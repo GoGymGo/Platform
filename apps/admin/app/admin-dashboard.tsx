@@ -58,6 +58,7 @@ import {
   type HttpMethod,
 } from "./admin-dashboard-utils";
 import { PilotOperationsPanel, type PilotData } from "./pilot-operations";
+import { downloadPosterJpeg } from "./poster-jpeg";
 
 type AuthStage = "checking" | "denied" | "ready" | "signed-out";
 type ConfirmAction = {
@@ -1369,15 +1370,10 @@ function PartnerWorkspace({
       "POST",
       { reason: "Issue a gym QR poster from the scoped partner workspace." },
     );
-    const blob = new Blob([credential.printablePosterSvg], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.download = `${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-gogymgo-poster.svg`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
+    await downloadPosterJpeg(
+      credential.printablePosterSvg,
+      `${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-gogymgo-poster.jpg`,
+    );
   }
 
   async function revokeQr(gymId: string, gymName: string) {

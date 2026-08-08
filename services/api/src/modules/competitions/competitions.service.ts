@@ -13,6 +13,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import {
   hashOpaqueValue,
   isAcceptableLocationAccuracy,
+  isWithinGymGeofence,
 } from '../gyms/gym-scan-policy';
 import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
@@ -344,11 +345,10 @@ export class CompetitionsService {
             sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
               'presence_radius_meters',
             ),
-            sql<boolean>`ST_DWithin(
+            sql<number>`ST_Distance(
               ${sql.ref('gym.coordinates')},
-              ST_SetSRID(ST_MakePoint(${request.gymPresence.longitude}, ${request.gymPresence.latitude}), 4326)::geography,
-              LEAST(${sql.ref('gym.radius_meters')}, 75)
-            )`.as('within_geofence'),
+              ST_SetSRID(ST_MakePoint(${request.gymPresence.longitude}, ${request.gymPresence.latitude}), 4326)::geography
+            )`.as('distance_meters'),
           ])
           .where(
             'credential.token_hash',
@@ -376,7 +376,13 @@ export class CompetitionsService {
               'Your location is not accurate enough to confirm gym presence. Move closer to the poster or a window, then try again.',
           });
         }
-        if (!gymPresence.within_geofence) {
+        if (
+          !isWithinGymGeofence(
+            gymPresence.distance_meters,
+            gymPresence.presence_radius_meters,
+            request.gymPresence.accuracyMeters,
+          )
+        ) {
           throw new UnprocessableEntityException({
             code: 'OUTSIDE_GYM_GEOFENCE',
             message: `You must be within ${gymPresence.presence_radius_meters} metres of ${gymPresence.gym_name} to enroll.`,

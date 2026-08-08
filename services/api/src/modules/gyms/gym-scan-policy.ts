@@ -21,12 +21,17 @@ export function isAcceptableLocationAccuracy(accuracyMeters: number): boolean {
 export function isWithinGymGeofence(
   distanceMeters: number,
   radiusMeters: number,
+  accuracyMeters = 0,
 ): boolean {
   return (
     Number.isFinite(distanceMeters) &&
     Number.isFinite(radiusMeters) &&
+    Number.isFinite(accuracyMeters) &&
     distanceMeters >= 0 &&
-    distanceMeters <= radiusMeters
+    radiusMeters >= 0 &&
+    accuracyMeters >= 0 &&
+    accuracyMeters <= gymScanPolicy.maximumAccuracyMeters &&
+    distanceMeters <= radiusMeters + accuracyMeters
   );
 }
 

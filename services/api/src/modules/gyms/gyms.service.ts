@@ -38,6 +38,7 @@ import {
   hashOpaqueValue,
   isAcceptableLocationAccuracy,
   isMatchingSessionCredential,
+  isWithinGymGeofence,
   resolveActiveSessionScan,
 } from './gym-scan-policy';
 
@@ -114,11 +115,10 @@ export class GymsService {
             'gym.name as gym_name',
             'gym.radius_meters',
             'region.timezone',
-            sql<boolean>`ST_DWithin(
+            sql<number>`ST_Distance(
               ${sql.ref('gym.coordinates')},
-              ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography,
-              ${sql.ref('gym.radius_meters')}
-            )`.as('within_geofence'),
+              ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography
+            )`.as('distance_meters'),
           ])
           .where('credential.token_hash', '=', tokenHash)
           .executeTakeFirst();
@@ -132,7 +132,13 @@ export class GymsService {
         if (!isAcceptableLocationAccuracy(request.accuracyMeters)) {
           return this.rejected(now, 'inaccurate_location', credential);
         }
-        if (!credential.within_geofence) {
+        if (
+          !isWithinGymGeofence(
+            credential.distance_meters,
+            credential.radius_meters,
+            request.accuracyMeters,
+          )
+        ) {
           return this.rejected(now, 'outside_geofence', credential);
         }
 

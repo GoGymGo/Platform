@@ -147,8 +147,8 @@ describeWithDatabase('connected static QR pilot', () => {
     });
   });
 
-  it('accepts the 75 m boundary and rejects a point just outside it', async () => {
-    const point = await projectedPoint(75);
+  it('uses reported accuracy at the 75 m geofence boundary', async () => {
+    const point = await projectedPoint(85);
     await expect(
       gyms.scan(
         principal,
@@ -159,7 +159,7 @@ describeWithDatabase('connected static QR pilot', () => {
 
     await database.connection.deleteFrom('gym_scan_events').execute();
     await database.connection.deleteFrom('workout_sessions').execute();
-    const outside = await projectedPoint(75.5);
+    const outside = await projectedPoint(85.5);
     await expect(
       gyms.scan(
         principal,

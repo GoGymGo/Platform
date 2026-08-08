@@ -46,7 +46,7 @@ jobs:
         working-directory: .
       - run: npm run check
       - run: npx expo install --check
-      - run: npm audit --omit=dev
+      - run: npm run audit:dependencies
       - run: npx expo export --platform all --output-dir .expo-ci-export
         env:
           CI: "1"

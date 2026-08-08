@@ -1,0 +1,18 @@
+{
+  "exceptions": [
+    {
+      "advisoryId": 1138808,
+      "expiresOn": "2026-09-08",
+      "package": "image-size",
+      "reason": "Expo 57's Metro build tooling depends on image-size, and no patched image-size release is available. Downgrading Expo to SDK 53 would be a breaking release change.",
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr"
+    },
+    {
+      "advisoryId": 1138809,
+      "expiresOn": "2026-09-08",
+      "package": "image-size",
+      "reason": "Expo 57's Metro build tooling depends on image-size, and no patched image-size release is available. Downgrading Expo to SDK 53 would be a breaking release change.",
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq"
+    }
+  ]
+}

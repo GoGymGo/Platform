@@ -16,6 +16,7 @@
     "audit:api-routes": "node scripts/audit-api-routes.mjs",
     "audit:app-links": "node scripts/audit-app-links.mjs",
     "audit:demo-isolation": "node scripts/audit-demo-isolation.mjs",
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "audit:production-bundle": "node scripts/audit-production-bundle.mjs",
     "audit:web-test-preview": "node scripts/audit-browser-test-preview.mjs dist",
     "audit:release": "node scripts/audit-release.mjs",

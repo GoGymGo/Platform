@@ -2,16 +2,9 @@ import * as Location from 'expo-location';
 
 import { assertLiveServicesAllowed } from '@/config/demoMode';
 import { normalizeGymScanAccuracyMeters } from '@/domain/gymScan';
+import type { GymScanLocationResult } from '@/services/gymScanLocationSampling';
 
-export type GymScanLocationResult =
-  | {
-      accuracyMeters: number;
-      latitude: number;
-      longitude: number;
-      status: 'location-read';
-    }
-  | { status: 'permission-denied' }
-  | { status: 'location-unavailable' };
+export type { GymScanLocationResult } from '@/services/gymScanLocationSampling';
 
 export async function readGymScanLocation(): Promise<GymScanLocationResult> {
   assertLiveServicesAllowed('Device location');

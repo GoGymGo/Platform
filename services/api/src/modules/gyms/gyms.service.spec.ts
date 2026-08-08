@@ -242,9 +242,9 @@ describe('gym service privacy-safe presentation helpers', () => {
     expect(poster).toContain('<text x="500" y="124" text-anchor="middle"');
     expect(poster).not.toContain('<svg x="72" y="52"');
     expect(poster).toContain(
-      'Scan the QR code and sign up for the $100 September Challenge.',
+      'Scan the QR code and sign up for the $100 September Contest.',
     );
-    expect(poster).toContain('$100 SEPTEMBER CHALLENGE.');
+    expect(poster).toContain('$100 SEPTEMBER CONTEST.');
     expect(poster).toContain('SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT');
     expect(poster).toContain('REGISTRATION OPENS AUGUST 1');
     expect(poster).toContain('NO PURCHASE REQUIRED');
@@ -252,7 +252,7 @@ describe('gym service privacy-safe presentation helpers', () => {
     expect(poster).toContain('POSTER V7');
     expect(poster).toContain('<svg x="190" y="375" width="620" height="620"');
     const positionedQrTag = poster.match(
-      /<svg x="190" y="375"[^>]*aria-label="Scan to open the GoGymGo challenge">/,
+      /<svg x="190" y="375"[^>]*aria-label="Scan to open the GoGymGo contest">/,
     )?.[0];
     expect(positionedQrTag).toBeDefined();
     expect(positionedQrTag?.match(/\bwidth=/g)).toHaveLength(1);

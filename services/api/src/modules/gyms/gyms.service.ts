@@ -1311,8 +1311,8 @@ export class GymsService {
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&apos;');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="GoGymGo QR poster for ${safeName}">
-  <title>GoGymGo $100 September Challenge at ${safeName}</title>
-  <desc>Scan the QR code and sign up for the $100 September Challenge. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
+  <title>GoGymGo $100 September Contest at ${safeName}</title>
+  <desc>Scan the QR code and sign up for the $100 September Contest. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
   <rect width="1000" height="1400" fill="#05090b"/>
   <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
 
@@ -1323,10 +1323,10 @@ export class GymsService {
 
   <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">SEPTEMBER 2026 - VANCOUVER ISLAND + GULF ISLANDS</text>
   <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE AND SIGN UP FOR THE</text>
-  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="53" font-weight="700">$100 SEPTEMBER CHALLENGE.</text>
+  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="53" font-weight="700">$100 SEPTEMBER CONTEST.</text>
 
   <rect x="160" y="345" width="680" height="680" rx="34" fill="#fff"/>
-  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open the GoGymGo challenge">
+  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open the GoGymGo contest">
     ${qrBody}
   </svg>
 

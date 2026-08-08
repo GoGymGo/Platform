@@ -42,7 +42,6 @@ import {
   getCompetitionRemainderDayCount,
   type RemainderDayCount
 } from '@/domain/commitmentProjection';
-import { getCompetitionDateRange } from '@/domain/competitionEnrollment';
 import type { CreateCompetitionEnrollmentInput } from '@/domain/accountReadiness';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useCompetitionRegistration } from '@/hooks/useCompetitionRegistration';
@@ -118,9 +117,6 @@ export default function CommitmentScreen() {
       ? publishedGoalOptions
       : dayOptions;
   const maximumSelectableGoal = Math.max(...availableGoalOptions);
-  const competitionDateRange = getCompetitionDateRange(
-    upcomingCompetitionMonthKey
-  );
   const draftKey = `weekly-goal:${user?.uid ?? 'anonymous'}:${upcomingCompetitionMonthKey}`;
   const [days, setDays] = useScreenMemory(`${draftKey}:days`, () =>
     Math.min(weeklyGoal, maximumSelectableGoal)
@@ -340,10 +336,10 @@ export default function CommitmentScreen() {
 
         <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
           <TerminalText tone="cyan" variant="label">
-            SEPTEMBER CONTEST
+            SEPTEMBER CONTEST REGISTRATION OPEN
           </TerminalText>
           <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
-            {`You may join this Contest until it ends on ${competitionDateRange.endDateKey}. Your Prize Draw Entries begin when enrollment is confirmed.`}
+            Contest runs from September 1st to September 30th.
           </TerminalText>
         </HUDBorderBox>
 

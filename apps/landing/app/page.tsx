@@ -233,7 +233,7 @@ export default function Home() {
               </article>
             ))}
           </div>
-          <div className="transparency-actions">
+          <div className="joining-readiness__actions">
             <AppLink
               className="button button-secondary"
               href={siteLinks.officialRules}

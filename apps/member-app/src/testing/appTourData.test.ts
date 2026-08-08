@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createAppTourAccountReadinessRepository } from './appTourData';
+import { extractGymScanCredential } from '@/domain/gymScan';
+
+import {
+  createAppTourAccountReadinessRepository,
+  createAppTourGymQrPayload
+} from './appTourData';
+
+test('App Tour QR payloads pass through the production scanner contract', () => {
+  for (const mode of ['entry', 'exit'] as const) {
+    const payload = createAppTourGymQrPayload(mode);
+    assert.equal(extractGymScanCredential(payload), payload);
+  }
+});
 
 test('new-player App Tour starts onboarding without completed setup', async () => {
   const account = createAppTourAccountReadinessRepository('new-player');

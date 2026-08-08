@@ -83,7 +83,7 @@ export const appTourUser: AuthenticatedUser = {
 export type AppTourQrMode = 'entry' | 'exit';
 
 export function createAppTourGymQrPayload(mode: AppTourQrMode) {
-  return `gogymgo:gym:${mode}:app-tour`;
+  return `app-tour-gym-${mode}-credential-000000000001`;
 }
 
 export function isAppTourGymQrPayload(

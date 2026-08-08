@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Camera } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -28,6 +29,7 @@ import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { getUserFacingErrorMessage } from '@/components/reliability';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { gymLocationAccuracyWarning } from '@/constants/gymScan';
 import {
   calculateWeeklyMatchEntries,
   type WeeklyMatchMultiplier
@@ -140,6 +142,7 @@ export default function CommitmentScreen() {
   const [ageEligibilityAttested, setAgeEligibilityAttested] = useState(false);
   const [competitionRulesAccepted, setCompetitionRulesAccepted] = useState(false);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [cameraPermissionBusy, setCameraPermissionBusy] = useState(false);
   const [gymPresenceStatus, setGymPresenceStatus] = useState<'checking' | 'missing' | 'ready'>(
     'checking'
   );
@@ -185,7 +188,7 @@ export default function CommitmentScreen() {
   useEffect(() => {
     let active = true;
 
-    if (appTourActive || registration.alreadyEnrolled) {
+    if (registration.alreadyEnrolled) {
       return () => {
         active = false;
       };
@@ -215,6 +218,26 @@ export default function CommitmentScreen() {
 
   function closeCalculator() {
     setShowCalculator(false);
+  }
+
+  async function openGymScanner() {
+    if (cameraPermissionBusy) return;
+    setConfirmationError(null);
+    setCameraPermissionBusy(true);
+
+    try {
+      if (!appTourActive) {
+        const permission = await Camera.getCameraPermissionsAsync();
+        if (!permission.granted && permission.canAskAgain) {
+          await Camera.requestCameraPermissionsAsync();
+        }
+      }
+    } catch {
+      // The scanner has the full permission recovery UI if the native prompt fails.
+    } finally {
+      setCameraPermissionBusy(false);
+      router.push('/qr-scanner?enrollment=1');
+    }
   }
 
   async function confirmWeeklyGoal() {
@@ -281,8 +304,7 @@ export default function CommitmentScreen() {
     }
   }
 
-  const gymPresenceReady =
-    appTourActive || registration.alreadyEnrolled || gymPresenceStatus === 'ready';
+  const gymPresenceReady = registration.alreadyEnrolled || gymPresenceStatus === 'ready';
   const registrationRequirementsAccepted =
     ageEligibilityAttested && competitionRulesAccepted && gymPresenceReady;
 
@@ -420,7 +442,9 @@ export default function CommitmentScreen() {
                 CONFIRM YOUR {days}-DAY GOAL
               </TerminalText>
               <TerminalText style={styles.editorialBody} tone="muted" uppercase={false} variant="body">
-                Accept the rules and lock this goal for the month.
+                {gymPresenceReady
+                  ? 'Accept the rules and lock this goal for the month.'
+                  : 'Scan the Partner gym QR to continue to the acceptance checks.'}
               </TerminalText>
               <CompactTextButton
                 label="VIEW OFFICIAL CONTEST RULES"
@@ -438,41 +462,64 @@ export default function CommitmentScreen() {
                     ? 'Partner gym QR scanned. When you confirm, GoGymGo will use a fresh location reading to check that you are still within 75 metres of this gym.'
                     : 'At a Partner gym, scan its active GoGymGo QR poster. Keep location access on—you must be within 75 metres when you confirm.'}
                 </TerminalText>
-                {!registration.alreadyEnrolled && !appTourActive ? (
-                  <CompactTextButton
-                    label={gymPresenceReady ? 'RESCAN PARTNER GYM QR' : 'SCAN PARTNER GYM QR'}
-                    onPress={() => router.push('/qr-scanner?enrollment=1')}
-                    tone={gymPresenceReady ? 'cyan' : 'amber'}
-                  />
+                {!registration.alreadyEnrolled ? (
+                  gymPresenceReady ? (
+                    <FirstRunSecondaryButton
+                      disabled={cameraPermissionBusy}
+                      label={cameraPermissionBusy ? 'OPENING CAMERA...' : 'RESCAN PARTNER GYM QR'}
+                      onPress={() => void openGymScanner()}
+                      style={styles.scanCta}
+                      tone="cyan"
+                    />
+                  ) : (
+                    <FirstRunPrimaryButton
+                      accessibilityHint="Requests camera access and opens the Partner gym QR scanner."
+                      disabled={cameraPermissionBusy}
+                      label={
+                        cameraPermissionBusy
+                          ? 'OPENING CAMERA...'
+                          : 'SCAN PARTNER GYM QR TO CONTINUE ->'
+                      }
+                      onPress={() => void openGymScanner()}
+                      style={styles.scanCta}
+                      tone="amber"
+                    />
+                  )
                 ) : null}
               </HUDBorderBox>
-              <LegalConsentCheckbox
-                checked={competitionRulesAccepted}
-                label={`I accept the Contest rules and lock my ${days}-day Weekly Goal.`}
-                onToggle={() => setCompetitionRulesAccepted((current) => !current)}
-              />
-              <LegalConsentCheckbox
-                checked={ageEligibilityAttested}
-                label="I meet the minimum age for my verified region."
-                onToggle={() => setAgeEligibilityAttested((current) => !current)}
-              />
+              {gymPresenceReady ? (
+                <>
+                  <LegalConsentCheckbox
+                    checked={competitionRulesAccepted}
+                    label={`I accept the Contest rules and lock my ${days}-day Weekly Goal.`}
+                    onToggle={() => setCompetitionRulesAccepted((current) => !current)}
+                  />
+                  <LegalConsentCheckbox
+                    checked={ageEligibilityAttested}
+                    label="I meet the minimum age for my verified region."
+                    onToggle={() => setAgeEligibilityAttested((current) => !current)}
+                  />
+                </>
+              ) : null}
               {confirmationError ? (
                 <AuthStatusNotice message={confirmationError} tone="red" />
               ) : null}
             </HUDBorderBox>
 
-            <FirstRunPrimaryButton
-              disabled={!registrationRequirementsAccepted || registration.busy || gymPresenceBusy}
-              label={
-                gymPresenceBusy
-                  ? 'CHECKING GYM LOCATION...'
-                  : registration.busy
-                    ? 'CHECKING REGISTRATION...'
-                    : 'CONFIRM + REGISTER ->'
-              }
-              onPress={() => void confirmWeeklyGoal()}
-              style={styles.topConfirmButton}
-            />
+            {gymPresenceReady ? (
+              <FirstRunPrimaryButton
+                disabled={!registrationRequirementsAccepted || registration.busy || gymPresenceBusy}
+                label={
+                  gymPresenceBusy
+                    ? 'CHECKING GYM LOCATION...'
+                    : registration.busy
+                      ? 'CHECKING REGISTRATION...'
+                      : 'CONFIRM + REGISTER ->'
+                }
+                onPress={() => void confirmWeeklyGoal()}
+                style={styles.topConfirmButton}
+              />
+            ) : null}
           </>
         ) : (
           <TerminalText
@@ -818,8 +865,7 @@ function getRegistrationErrorMessage(error: unknown) {
     const messages: Record<string, string> = {
       GYM_INACTIVE:
         'This Partner gym is not currently active. Ask the gym or try another participating location.',
-      GYM_LOCATION_INACCURATE:
-        'Your location is not accurate enough. Move closer to the poster or a window, then try again.',
+      GYM_LOCATION_INACCURATE: gymLocationAccuracyWarning,
       GYM_NOT_ELIGIBLE_FOR_COMPETITION:
         'This Partner gym is not participating in the current regional Contest.',
       GYM_QR_INVALID:
@@ -828,6 +874,9 @@ function getRegistrationErrorMessage(error: unknown) {
         'You must be within 75 metres of the Partner gym whose QR poster you scanned. Return to that gym and try again.'
     };
     if (code && messages[code]) return messages[code];
+    if (/location.+not accurate enough/i.test(error.message)) {
+      return gymLocationAccuracyWarning;
+    }
     if (error.status === 401) {
       return 'Your account session expired. Sign in again, then confirm registration.';
     }
@@ -899,6 +948,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginVertical: spacing.xs,
     padding: spacing.md
+  },
+  scanCta: {
+    marginTop: spacing.sm
   },
   joinWindowNotice: {
     gap: spacing.xs,

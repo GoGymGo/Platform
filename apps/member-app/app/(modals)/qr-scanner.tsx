@@ -23,6 +23,7 @@ import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout'
 import { SessionUnavailable } from '@/components/session';
 import { AppTourQrSimulator } from '@/testing/AppTourQrSimulator';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { gymLocationAccuracyWarning } from '@/constants/gymScan';
 import { createGymScanRepository } from '@/data/gymScanRepository';
 import {
   extractGymScanCredential,
@@ -522,7 +523,7 @@ function rejectionMessage(reason: string | null) {
     competition_unavailable: 'Join the active contest before scanning a gym poster.',
     daily_limit_reached: 'You already earned one verified contest day today.',
     gym_inactive: 'This gym is not active for the current contest.',
-    inaccurate_location: 'Location accuracy is too low. Move near a window and try again.',
+    inaccurate_location: gymLocationAccuracyWarning,
     invalid_or_revoked_credential: 'This poster is invalid or has been replaced by the gym.',
     outside_geofence: 'You must be within 75 metres of the configured gym to scan.',
     replayed_event: 'This scan was already processed. Scan the poster again.',

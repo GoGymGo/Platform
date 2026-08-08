@@ -68,8 +68,8 @@ test("home offers direct next steps without repeating long feature sections", as
     (page.match(/OUTSIDE THE PILOT REGION\? GET REGIONAL UPDATES/g) ?? []).length,
     1,
   );
-  assert.match(page, /className="hero-trust-signal"/);
-  assert.match(page, /Verified workouts at Partner gyms count only after review/);
+  assert.doesNotMatch(page, /hero-trust-signal/);
+  assert.doesNotMatch(page, /Verified workouts at Partner gyms count only after review/);
   assert.match(page, /Live availability, eligibility, and Partner gym status are confirmed/);
   assert.match(page, /className="section conversion-section"/);
   assert.doesNotMatch(page, /proof-strip|proof-grid|brand-teaser-section|final-cta/);
@@ -355,7 +355,7 @@ test("responsive styles prevent short-viewport trapping and mobile overflow", as
   assert.match(experience, /scroll-snap-type: x mandatory/);
   assert.doesNotMatch(experience, /hero-campaign-note|hero-action-note|hero-qualifiers/);
   assert.match(experience, /\.hero-fallback-link \{[\s\S]*?min-height: 54px/);
-  assert.match(experience, /\.hero-trust-signal \{/);
+  assert.doesNotMatch(experience, /\.hero-trust-signal/);
   assert.match(experience, /min-height: min\(760px, calc\(100svh - 76px\)\)/);
   assert.match(experience, /\.landing-hero h1 \{[\s\S]*?font-size: clamp\(48px, 4\.5vw, 64px\)/);
   assert.match(experience, /\.pilot-console__facts > div \{[\s\S]*?min-height: 82px/);

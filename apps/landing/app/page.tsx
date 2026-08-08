@@ -191,11 +191,6 @@ export default function Home() {
               </Link>
             )}
           </div>
-          <p className="hero-trust-signal">
-            <span aria-hidden="true">✓</span>
-            <strong>VERIFIED BEFORE CREDIT</strong>
-            Verified workouts at Partner gyms count only after review.
-          </p>
         </div>
             <SeptemberCompetitionPanel />
       </section>

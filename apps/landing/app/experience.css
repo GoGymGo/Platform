@@ -57,36 +57,6 @@
   outline-offset: 3px;
 }
 
-.hero-trust-signal {
-  max-width: 620px;
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 2px 10px;
-  margin-top: 14px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.hero-trust-signal > span {
-  grid-row: 1 / span 2;
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border: 1px solid rgba(87, 255, 133, 0.42);
-  border-radius: 50%;
-  color: var(--green);
-  font-size: 12px;
-}
-
-.hero-trust-signal strong {
-  color: var(--cyan-soft);
-  font-family: "Share Tech Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-}
-
 .joining-readiness {
   position: relative;
   overflow: hidden;

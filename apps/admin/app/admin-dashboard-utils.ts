@@ -130,6 +130,12 @@ export function errorMessage(error: unknown) {
     : "The request could not be completed. Try again.";
 }
 
+export function adminRequestStatus(error: unknown) {
+  return typeof error === "object" && error && "status" in error
+    ? Number(error.status)
+    : 0;
+}
+
 export function authErrorMessage(error: unknown) {
   const code =
     typeof error === "object" && error && "code" in error

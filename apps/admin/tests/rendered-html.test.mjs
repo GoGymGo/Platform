@@ -89,6 +89,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /CHECKING YOUR SESSION/);
   assert.match(dashboard, /operator\/access/);
   assert.match(dashboard, /operator\/partner-dashboard/);
+  assert.match(dashboard, /adminRequestStatus\(error\) !== 404/);
+  assert.match(dashboard, /portal: "gogymgo"/);
   assert.match(dashboard, /Your gyms, without the platform-wide controls/);
   assert.match(dashboard, /AWAITING GOGYMGO REVIEW/);
   assert.doesNotMatch(
@@ -211,6 +213,7 @@ test("uses the canonical traced mark for compact admin branding", async () => {
   ]);
 
   assert.match(dashboard, /src="\/brand-mark\.png"/);
+  assert.match(dashboard, /unoptimized/);
   assert.doesNotMatch(dashboard, /brand-mark-letter/);
   assert.match(styles, /\.brand-mark img/);
 });

@@ -38,6 +38,7 @@ import type {
 } from "./admin-types";
 import {
   AdminUserFacingError,
+  adminRequestStatus,
   adminRequest,
   authErrorMessage,
   compactObject,
@@ -189,6 +190,7 @@ export function BrandMark() {
         aria-hidden
         height={100}
         src="/brand-mark.png"
+        unoptimized
         width={100}
       />
     </span>
@@ -415,10 +417,26 @@ export function AdminDashboard({
     setBusy(true);
     setLoadError("");
     try {
-      const access = await adminRequest<OperatorPortalAccess>(
-        activeUser,
-        "operator/access",
-      );
+      let access: OperatorPortalAccess;
+      try {
+        access = await adminRequest<OperatorPortalAccess>(
+          activeUser,
+          "operator/access",
+        );
+      } catch (error) {
+        if (adminRequestStatus(error) !== 404) throw error;
+
+        // Older API releases predate role-aware partner workspaces. Continue
+        // through the platform-admin contract; its protected endpoints still
+        // enforce the administrator role on the server.
+        access = {
+          assignments: [],
+          email: activeUser.email ?? "",
+          id: activeUser.uid,
+          portal: "gogymgo",
+          roles: [],
+        };
+      }
       setPortalAccess(access);
       if (access.portal === "partner") {
         const partnerResult = await adminRequest<PartnerDashboardSnapshot>(
@@ -488,10 +506,7 @@ export function AdminDashboard({
       setLastRefreshedAt(new Date());
       setAuthStage("ready");
     } catch (error) {
-      const status =
-        typeof error === "object" && error && "status" in error
-          ? Number(error.status)
-          : 0;
+      const status = adminRequestStatus(error);
       if (status === 401 || status === 403) setAuthStage("denied");
       setLoadError(errorMessage(error));
     } finally {

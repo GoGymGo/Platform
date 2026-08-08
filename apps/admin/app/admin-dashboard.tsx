@@ -422,6 +422,7 @@ export function AdminDashboard({
         access = await adminRequest<OperatorPortalAccess>(
           activeUser,
           "operator/access",
+          { expectedStatuses: [404] },
         );
       } catch (error) {
         if (adminRequestStatus(error) !== 404) throw error;

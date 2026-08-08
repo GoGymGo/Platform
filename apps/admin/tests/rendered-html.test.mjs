@@ -106,6 +106,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /recorded automatically in the audit history/);
   assert.match(dashboard, /action\.auditReason \?\?/);
   assert.match(dashboardUtils, /idempotency-key/);
+  assert.match(dashboardUtils, /expectedStatuses\?\.includes\(response\.status\)/);
   assert.match(dashboard, /aria-current=\{section === item\.id \? "page"/);
   assert.match(dashboard, /className="page-context"/);
   assert.match(dashboard, /aria-labelledby=\{titleId\}/);

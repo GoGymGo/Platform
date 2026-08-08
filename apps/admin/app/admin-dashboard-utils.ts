@@ -222,7 +222,11 @@ export function defaultCompetitionDates() {
 export async function adminRequest<T>(
   activeUser: User,
   path: string,
-  options: { body?: unknown; method?: HttpMethod } = {},
+  options: {
+    body?: unknown;
+    expectedStatuses?: number[];
+    method?: HttpMethod;
+  } = {},
 ): Promise<T> {
   let token: string;
   try {
@@ -261,11 +265,13 @@ export async function adminRequest<T>(
             }
           ).error
         : undefined;
-    console.error("GoGymGo admin request failed", {
-      code: apiError?.code,
-      path,
-      status: response.status,
-    });
+    if (!options.expectedStatuses?.includes(response.status)) {
+      console.error("GoGymGo admin request failed", {
+        code: apiError?.code,
+        path,
+        status: response.status,
+      });
+    }
     const error = new AdminRequestError(adminRequestErrorMessage(response.status));
     Object.assign(error, {
       code: apiError?.code,

@@ -52,7 +52,7 @@ export default function RewardMarketplaceScreen() {
         <CompetitionHubNav active="rewards" style={styles.hubNav} />
         <View style={styles.myRewardsRow}>
           <CompactTextButton
-            label="MY REWARDS ->"
+            label="MY AWARDS ->"
             onPress={() => router.push('/rewards/awards')}
             tone="pink"
           />
@@ -74,12 +74,12 @@ export default function RewardMarketplaceScreen() {
 
         {showWinnerDetails ? <HUDBorderBox style={styles.entryNote} tone="cyan">
           <TerminalText tone="cyan" variant="label">
-            HOW WINNERS ARE MATCHED
+            HOW REWARDS ARE AWARDED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
             At settlement, the verified draw selects one winner for each available
-            reward unit. Every selected player receives the exact item shown in their
-            reward award.
+            Reward unit. Every selected player receives the exact item shown in their
+            Award.
           </TerminalText>
         </HUDBorderBox> : null}
 
@@ -103,7 +103,7 @@ export default function RewardMarketplaceScreen() {
               REWARDS PUBLISHING SOON
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Brand rewards for this regional contest have not been published yet.
+              Brand Rewards for this regional Competition have not been published yet.
             </TerminalText>
           </HUDBorderBox>
         ) : (

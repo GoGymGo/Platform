@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -13,6 +13,7 @@ import { BiometricCameraConsentBanner } from '@/components/legal';
 import { CompactTextButton } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { midSessionPresenceVerificationAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { getMidSessionGraceSecondsRemaining } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
@@ -26,6 +27,14 @@ function formatGrace(secondsRemaining: number) {
 }
 
 export default function PingScreen() {
+  if (!midSessionPresenceVerificationAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <MidSessionPresenceScreen />;
+}
+
+function MidSessionPresenceScreen() {
   const router = useRouter();
   const {
     activeSession,
@@ -72,7 +81,7 @@ export default function PingScreen() {
   if (!activeSession) {
     return (
       <SessionUnavailable
-        body="Start a verified session before opening a mid-session presence check."
+        body="Start a Verified workout before opening a mid-workout presence check."
         onAction={() => router.replace('/session' as Href)}
       />
     );

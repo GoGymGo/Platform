@@ -28,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
       : `Join the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`;
   const socialDescription =
     campaignState.phase === "ended"
-      ? "The September 2026 beta has ended. Review the pilot and request future regional updates."
-      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`;
+      ? "The September 2026 beta has ended. Review the pilot and request future Regional updates."
+      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. One ${septemberCampaign.reward} Reward.`;
 
   return {
     metadataBase,

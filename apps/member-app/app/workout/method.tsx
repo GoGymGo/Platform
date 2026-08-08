@@ -15,7 +15,6 @@ import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
 import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
@@ -51,15 +50,14 @@ const verificationOptions: readonly VerificationOption[] = [
 
 export default function WorkoutMethodScreen() {
   const router = useRouter();
-  const { active: appTourActive } = useAppTour();
   const { user } = useAuth();
   const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
-  const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('heartRate');
-  const [preferredSourceLabel, setPreferredSourceLabel] = useState('HEART-RATE DEVICE');
+  const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('partnerGymQr');
+  const [preferredSourceLabel, setPreferredSourceLabel] = useState('PARTNER GYM QR');
   const [showVerificationRules, setShowVerificationRules] = useState(false);
   const orderedOptions = useMemo(
     () =>
-      [...verificationOptions].sort(
+      verificationOptions.filter(({ available }) => available).sort(
         (left, right) =>
           Number(right.method === preferredMethod) - Number(left.method === preferredMethod)
       ),
@@ -103,14 +101,14 @@ export default function WorkoutMethodScreen() {
         />
         <WorkoutFlowProgress stage="device" style={styles.workoutProgress} />
         <BrandScreenHeader
-          description="Choose the verification method you will use to start, check, and finish this session."
+          description="Use the approved Partner gym poster and a fresh location reading to start and finish your Verified workout."
           eyebrow="WORKOUT VERIFICATION"
-          title="HOW WILL YOU CHECK IN?"
+          title="VERIFY YOUR WORKOUT"
         />
 
         <View style={styles.optionList}>
           {orderedOptions.map((option) => {
-            const available = option.available || appTourActive;
+            const available = option.available;
             return (
               <Pressable
                 accessibilityRole="button"
@@ -160,14 +158,14 @@ export default function WorkoutMethodScreen() {
         </View>
 
         <CompactTextButton
-          label={showVerificationRules ? 'Hide check-in details' : 'Why is this required?'}
+          label={showVerificationRules ? 'Hide verification details' : 'Why is this required?'}
           onPress={() => setShowVerificationRules((current) => !current)}
           tone={showVerificationRules ? 'muted' : 'cyan'}
         />
         {showVerificationRules ? (
           <HUDBorderBox style={styles.noteCard} tone="muted">
             <TerminalText style={styles.noteCopy} tone="muted" uppercase={false} variant="body">
-              Every workout includes a start check, mid-workout verification and completion check.
+              Scan the same approved Partner gym poster at entry and exit. GoGymGo checks a fresh location reading and the server timer before awarding a Verified workout.
             </TerminalText>
           </HUDBorderBox>
         ) : null}

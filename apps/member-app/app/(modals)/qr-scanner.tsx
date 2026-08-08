@@ -14,7 +14,10 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import { RecoverableScreenError } from '@/components/reliability';
+import {
+  getUserFacingErrorMessage,
+  RecoverableScreenError
+} from '@/components/reliability';
 import { OnboardingHeader } from '@/components/onboarding';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { SessionUnavailable } from '@/components/session';
@@ -365,7 +368,7 @@ export default function QrScannerModal() {
         ) : posterScanReady && effectiveCredential && !scanLocked && !requirePhysicalRescan ? (
           <HUDBorderBox glow style={styles.stateCard} tone="cyan">
             <TerminalText glow tone="cyan" variant="label">
-              {activeSession ? 'RETURN SCAN READY' : 'GYM CHECK-IN READY'}
+              {activeSession ? 'RETURN SCAN READY' : 'ENTRY SCAN READY'}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
               {activeSession
@@ -499,9 +502,10 @@ function getScanErrorMessage(error: unknown) {
   if (error instanceof ApiError && error.status === 401) {
     return 'Your account session expired. Sign in again, then rescan the poster.';
   }
-  return error instanceof Error
-    ? error.message
-    : 'The scan could not be verified. Check your connection and try again.';
+  return getUserFacingErrorMessage(
+    error,
+    'The scan could not be verified. Check your connection and try again.'
+  );
 }
 
 const styles = StyleSheet.create({

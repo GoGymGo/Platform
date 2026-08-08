@@ -1,4 +1,4 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -15,6 +15,7 @@ import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { devicePresenceVerificationAvailable } from '@/config/workoutVerification';
 import { fontFamilies, spacing } from '@/constants/theme';
 import { isGoGymGoPartnerCode } from '@/domain/partnerGymQr';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -26,6 +27,14 @@ import { useAppTour } from '@/state/appTour';
 import { isAppTourGymQrPayload } from '@/testing/appTourData';
 
 export default function IdentityCheckScreen() {
+  if (!devicePresenceVerificationAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <DevicePresenceCheckScreen />;
+}
+
+function DevicePresenceCheckScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const { qrPayload } = useLocalSearchParams<{ qrPayload?: string }>();
@@ -70,7 +79,7 @@ export default function IdentityCheckScreen() {
   ) {
     return (
       <SessionUnavailable
-        body="Scan a partner-gym entry QR before the device presence check."
+        body="Scan a Partner gym entry QR before the device presence check."
         onAction={() => router.replace('/qr-scanner')}
         title="ENTRY QR REQUIRED"
       />
@@ -84,7 +93,7 @@ export default function IdentityCheckScreen() {
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before confirming the partner-gym entry."
+        body="Your Competition setup could not be checked. Retry before confirming the Partner gym entry."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"
@@ -115,7 +124,7 @@ export default function IdentityCheckScreen() {
         showsVerticalScrollIndicator={false}
       >
       <OnboardingHeader
-        label="WORKOUT CHECK-IN"
+        label="WORKOUT VERIFICATION"
         onBack={() => goBackOrReplace(router, '/qr-scanner')}
         step="PARTNER GYM"
       />

@@ -37,6 +37,7 @@ import type {
   WorkQueueItem,
 } from "./admin-types";
 import {
+  AdminUserFacingError,
   adminRequest,
   authErrorMessage,
   compactObject,
@@ -115,7 +116,7 @@ const navigation: {
   },
   {
     description:
-      "Maintain creator workouts and authoritative legal document versions.",
+      "Maintain Creator workouts and authoritative legal document versions.",
     id: "content",
     label: "Content + Legal",
     short: "CL",
@@ -563,7 +564,7 @@ export function AdminDashboard({
     const rememberMe = form.get("rememberMe") === "on";
     try {
       if (!firebaseConfigured) {
-        throw new Error(
+        throw new AdminUserFacingError(
           "Administrator sign-in is not configured for this deployment.",
         );
       }
@@ -850,7 +851,7 @@ export function AdminDashboard({
               }}
               onCreateGym={async (body) => {
                 await mutate(
-                  "Gym location created.",
+                  "Partner gym created.",
                   "operator/gym-locations",
                   "POST",
                   body,
@@ -882,7 +883,7 @@ export function AdminDashboard({
               }}
               onUpdateGym={async (gymId, body) => {
                 await mutate(
-                  "Gym location updated.",
+                  "Partner gym updated.",
                   `operator/gym-locations/${gymId}`,
                   "PUT",
                   body,
@@ -1290,7 +1291,7 @@ const partnerNavigation: {
     short: "CO",
   },
   {
-    description: "Monitor QR-verified visits at your assigned locations.",
+    description: "Monitor Verified workouts at your assigned Partner gyms.",
     id: "visits",
     label: "Gym visits",
     short: "VI",
@@ -1891,7 +1892,7 @@ function Overview({
               ? "ATTENTION ITEMS"
               : activeCompetition
                 ? "PUBLIC STATE"
-                : "NO PUBLIC CONTEST"}
+                : "NO PUBLIC COMPETITION"}
           </small>
         </div>
       </section>
@@ -2128,7 +2129,7 @@ function CompetitionsPanel({
       <FilterChips filters={activeFilters} />
       {competitions.length === 0 ? (
         <EmptyState
-          body="Start with a region, schedule, rules and weekly goal options."
+          body="Start with a region, schedule, rules and Weekly Goal options."
           title="No competitions yet"
         />
       ) : filteredCompetitions.length === 0 ? (
@@ -2727,11 +2728,11 @@ function ContentPanel({
             body={
               creatorFeaturesEnabled
                 ? "Add approved creator videos and choose exactly where they may appear."
-                : "No creator workouts are configured. Catalog controls remain locked while the program is paused."
+                : "No Creator workouts are configured. Catalog controls remain locked while the program is paused."
             }
             title={
               creatorFeaturesEnabled
-                ? "No creator workouts"
+                ? "No Creator workouts"
                 : "Creator program paused"
             }
           />
@@ -3436,7 +3437,7 @@ export function CompetitionForm({
         .map((value) => Number(value.trim()))
         .filter((value) => Number.isInteger(value) && value >= 1 && value <= 7);
       if (goalDays.length === 0)
-        throw new Error("Add at least one weekly goal.");
+        throw new AdminUserFacingError("Add at least one Weekly Goal.");
       const body: Record<string, unknown> = {
         endsAt: toIso(form, "endsAt"),
         entrantCap: optionalNumber(form.get("entrantCap")),
@@ -4020,7 +4021,7 @@ function WorkoutForm({
   return (
     <ModalShell
       onClose={onClose}
-      title={workout ? "Edit creator workout" : "New creator workout"}
+      title={workout ? "Edit Creator workout" : "New Creator workout"}
     >
       <form className="editor-form" onSubmit={(event) => void submit(event)}>
         <FormGrid>
@@ -4092,8 +4093,8 @@ function WorkoutForm({
           <ReasonField
             defaultValue={
               workout
-                ? "Update the approved creator workout configuration."
-                : "Create a creator workout draft for rights and content review."
+                ? "Update the approved Creator workout configuration."
+                : "Create a Creator workout draft for rights and content review."
             }
           />
         </FormGrid>
@@ -4231,7 +4232,7 @@ function CouponCodesForm({
       ),
     ];
     try {
-      if (codes.length === 0) throw new Error("Add at least one coupon code.");
+      if (codes.length === 0) throw new AdminUserFacingError("Add at least one coupon code.");
       await onSubmit(codes, String(form.get("reason")));
     } catch (error) {
       setFormError(errorMessage(error));

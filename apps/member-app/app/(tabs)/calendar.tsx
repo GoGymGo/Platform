@@ -135,8 +135,8 @@ export default function CalendarScreen() {
               SESSION IN PROGRESS
             </TerminalText>
             <TerminalText style={styles.activeSyncCopy} tone="muted" uppercase={false} variant="body">
-              Today will check off automatically when checkout verifies the
-              session.
+              Today will check off automatically when workout verification
+              finishes.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -149,6 +149,36 @@ export default function CalendarScreen() {
           />
           <StatCard label="PERSONAL STREAK" tone="green" value={String(currentStreak)} />
         </View>
+
+        <HUDBorderBox style={styles.primaryActionCard} tone="cyan">
+          <View style={styles.primaryActionCopy}>
+            <TerminalText tone="cyan" variant="micro">
+              SELECTED // {selectedDateIsToday ? 'TODAY' : selectedDateIsFuture ? 'UPCOMING' : 'PAST'}
+            </TerminalText>
+            <TerminalText tone="text" uppercase={false} variant="body">
+              {selectedDateLabel}
+            </TerminalText>
+          </View>
+          {selectedDateIsFuture && creatorFeaturesEnabled ? (
+            <CyberButtonPrimary
+              label="PLAN A CREATOR WORKOUT ->"
+              onPress={() => router.push(
+                `/workouts?source=calendar&plannedDate=${selectedDateKey}` as Href
+              )}
+              tone="amber"
+            />
+          ) : !selectedDateIsFuture && selectedDateIsPast ? (
+            <CyberButtonPrimary
+              label="RETURN TO TODAY TO START ->"
+              onPress={goToToday}
+            />
+          ) : !selectedDateIsFuture ? (
+            <CyberButtonPrimary
+              label="START TODAY'S VERIFIED WORKOUT ->"
+              onPress={() => router.push('/session' as Href)}
+            />
+          ) : null}
+        </HUDBorderBox>
 
         <HUDBorderBox style={styles.calendarCard} tone="cyan">
           <View style={styles.calendarHeader}>
@@ -197,8 +227,8 @@ export default function CalendarScreen() {
             </Pressable>
             <TerminalText style={styles.calendarStatus} tone="dim" uppercase={false} variant="micro">
               {competitionNotStarted
-                ? 'Verified sessions build your history until competition scoring opens.'
-                : 'Verified sessions can earn competition credit.'}
+                ? 'Verified workouts build your history until Competition scoring opens.'
+                : 'Verified workouts can earn Competition credit.'}
             </TerminalText>
           </View>
 
@@ -289,7 +319,7 @@ export default function CalendarScreen() {
                 </HUDBorderBox>
               ))}
               <TerminalText tone="dim" uppercase={false} variant="caption">
-                Planned videos are scheduling aids only. Start a verified session when you train.
+                Planned videos are scheduling aids only. Start a Verified workout when you train.
               </TerminalText>
             </View>
           ) : null}
@@ -298,11 +328,11 @@ export default function CalendarScreen() {
         <TerminalText style={styles.actionHint} tone="dim" uppercase={false} variant="caption">
           {selectedDateIsFuture
             ? creatorFeaturesEnabled
-              ? 'Plan a creator workout for this day. Verified sessions count on the day you complete them.'
-              : 'Return on this day to start your own verified workout.'
+              ? 'Plan a Creator workout for this day. Verified workouts count on the day you complete them.'
+              : 'Return on this day to start your own Verified workout.'
             : selectedDateIsPast
-              ? 'Add a personal log for this day, or return to today to start a verified workout.'
-              : 'Personal logs track your history only. Start a verified workout below for competition credit.'}
+              ? 'Add a personal log for this day, or return to today to start a Verified workout.'
+              : 'Personal logs track your history only. Start a Verified workout below for Competition credit.'}
         </TerminalText>
         <CyberButtonOutline
           disabled={selectedDateIsFuture}
@@ -396,28 +426,6 @@ export default function CalendarScreen() {
           />
         </HUDBorderBox> : null}
 
-        {selectedDateIsFuture && creatorFeaturesEnabled ? (
-          <CyberButtonPrimary
-            label="PLAN A CREATOR WORKOUT ->"
-            onPress={() => router.push(
-              `/workouts?source=calendar&plannedDate=${selectedDateKey}` as Href
-            )}
-            style={styles.sessionButton}
-            tone="amber"
-          />
-        ) : !selectedDateIsFuture && selectedDateIsPast ? (
-          <CyberButtonPrimary
-            label="RETURN TO TODAY TO START ->"
-            onPress={goToToday}
-            style={styles.sessionButton}
-          />
-        ) : !selectedDateIsFuture ? (
-          <CyberButtonPrimary
-            label="START TODAY'S VERIFIED WORKOUT ->"
-            onPress={() => router.push('/session' as Href)}
-            style={styles.sessionButton}
-          />
-        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -537,7 +545,7 @@ function WorkoutLogRow({ log }: { log: WorkoutLog }) {
       </View>
       <View style={styles.logFooter}>
         <TerminalText tone="dim" variant="micro">
-          {isVerified ? 'VERIFIED SESSION' : 'MANUAL LOG'}
+          {isVerified ? 'VERIFIED WORKOUT' : 'MANUAL LOG'}
         </TerminalText>
         <TerminalText
           glow={isVerified}
@@ -590,6 +598,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: spacing.md
+  },
+  primaryActionCard: {
+    gap: spacing.md,
+    padding: spacing.md
+  },
+  primaryActionCopy: {
+    gap: spacing.xs
   },
   statCard: {
     flex: 1,
@@ -847,9 +862,6 @@ const styles = StyleSheet.create({
   saveButton: {
     minHeight: 48,
     paddingVertical: spacing.md
-  },
-  sessionButton: {
-    marginBottom: spacing.lg
   },
   pressed: {
     opacity: 0.74,

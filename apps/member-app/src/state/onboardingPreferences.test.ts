@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { creatorFeaturesEnabled } from '@/config/features';
+import { workoutVerificationCapabilities } from '@/config/workoutVerification';
 import {
   biometricCameraConsentVersion,
   getClarityTipStorageKey,
@@ -16,6 +17,15 @@ describe('creator feature availability', () => {
 });
 
 describe('verification preference parsing', () => {
+  it('exposes only Partner gym QR verification during the pilot', () => {
+    assert.deepEqual(workoutVerificationCapabilities, {
+      devicePresence: false,
+      heartRate: false,
+      midSessionPresence: false,
+      partnerGymQr: true
+    });
+  });
+
   it('keeps the exact selected source', () => {
     assert.deepEqual(
       parseVerificationPreference(

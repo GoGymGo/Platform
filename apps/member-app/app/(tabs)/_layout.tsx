@@ -11,7 +11,7 @@ const tabScreenOptions = {
   tabBarInactiveTintColor: colors.dim,
   tabBarStyle: {
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 480 : undefined,
+    maxWidth: Platform.OS === 'web' ? 960 : undefined,
     alignSelf: 'center',
     height: 78,
     paddingTop: 8,

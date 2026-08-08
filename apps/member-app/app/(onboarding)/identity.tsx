@@ -19,6 +19,7 @@ import {
 } from '@/components/firstRun';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
+import { getUserFacingErrorMessage } from '@/components/reliability';
 import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { getPublicInitials, type PublicIdentity } from '@/domain/profile';
 import { normalizeScreenName, validateScreenName } from '@/domain/social';
@@ -95,11 +96,10 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
         mode: 'alias'
       });
     } catch (mutationError) {
-      setSubmitError(
-        mutationError instanceof Error
-          ? mutationError.message.replace(/screen name/gi, 'alias')
-          : 'Your alias could not be saved. Try again.'
-      );
+      setSubmitError(getUserFacingErrorMessage(
+        mutationError,
+        'Your Alias could not be saved. Check your connection and try again.'
+      ));
       setSaving(false);
       return;
     }
@@ -136,8 +136,8 @@ function IdentityForm({ initialIdentity }: { initialIdentity: PublicIdentity | n
             HOW SHOULD OTHERS SEE YOU?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Your private player callsign works immediately. Add a custom alias
-            only if you want one shown on rankings and Weekly Challenges.
+            Your private player ID works immediately. Add a custom Alias only
+            if you want one shown on rankings and Weekly Challenges.
           </TerminalText>
 
           <AuthTextField

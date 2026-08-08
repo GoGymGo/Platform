@@ -30,7 +30,7 @@ const bonusRules: readonly BonusRule[] = [
     value: '1-7 DAYS',
     label: 'HIT YOUR GOAL BY DAYS PICKED',
     description:
-      'Choose 1 to 7 verified workout days per week. Higher Weekly Goals can earn more entries when completed.',
+      'Choose 1 to 7 Verified workout days per week. Higher Weekly Goals can earn more entries when completed.',
     tone: 'cyan'
   },
   {
@@ -44,7 +44,7 @@ const bonusRules: readonly BonusRule[] = [
     value: 'x3',
     label: 'WEEKLY CHALLENGE PARTNER MISSES + YOU DO EXTRA DAY',
     description:
-      'If your partner misses, one extra verified workout activates your 3x bonus. The bonus is automatic when your goal already uses every available day.',
+      'If your partner misses, one extra Verified workout activates your 3x bonus. The bonus is automatic when your Weekly Goal already uses every available day.',
     tone: 'pink'
   },
   {
@@ -113,7 +113,7 @@ export default function BonusRulesModal() {
           </TerminalText>
           <TerminalText style={styles.calloutCopy} tone="muted" uppercase={false} variant="body">
             Both hit the goal: 2x each. If your partner misses, complete one
-            extra verified workout for 3x. The 3x bonus is automatic when no
+            extra Verified workout for 3x. The 3x bonus is automatic when no
             extra day is available.
           </TerminalText>
         </HUDBorderBox>

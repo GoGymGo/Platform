@@ -11,6 +11,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
+import { getUserFacingErrorMessage } from '@/components/reliability';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { spacing } from '@/constants/theme';
 import { useAppData } from '@/data/appDataHooks';
@@ -187,9 +188,10 @@ export default function AccountDataScreen() {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : 'That privacy request could not be completed. Try again.';
+  return getUserFacingErrorMessage(
+    error,
+    'That privacy request could not be completed. Check your connection and try again.'
+  );
 }
 
 const styles = StyleSheet.create({

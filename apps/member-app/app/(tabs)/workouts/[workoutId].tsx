@@ -232,11 +232,11 @@ export default function WorkoutDetailScreen() {
 
         <TerminalText style={styles.startHelper} tone="cyan" uppercase={false} variant="body">
           Start your verified GoGymGo session first, then play the video. The video alone does not
-          count as a verified workout.
+          count as a Verified workout.
         </TerminalText>
 
         <CyberButtonPrimary
-          label={setupReady ? 'START VERIFIED SESSION ->' : setupActionLabel}
+          label={setupReady ? 'START VERIFIED WORKOUT ->' : setupActionLabel}
           onPress={() => {
             const route = setupReady ? workoutStartRoute : setupRoute;
             if (route) {

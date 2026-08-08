@@ -76,7 +76,7 @@ export default function SessionTabRoute() {
             COMPETITION NOT STARTED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            QR-verified sessions unlock when the September competition begins.
+            Verified workouts unlock when the September Competition begins.
           </TerminalText>
         </HUDBorderBox>
       ) : (

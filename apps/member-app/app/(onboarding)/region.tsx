@@ -16,6 +16,7 @@ import {
   FirstRunSecondaryButton
 } from '@/components/firstRun';
 import { OnboardingHeader } from '@/components/onboarding';
+import { getUserFacingErrorMessage } from '@/components/reliability';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
 import { submitRegionWaitlist } from '@/data/regionWaitlistRepository';
@@ -125,11 +126,10 @@ export default function RegionScreen() {
       });
       setWaitlistJoined(true);
     } catch (error) {
-      setWaitlistError(
-        error instanceof Error
-          ? error.message
-          : 'The regional waitlist could not be updated. Try again.'
-      );
+      setWaitlistError(getUserFacingErrorMessage(
+        error,
+        'Your Regional updates request could not be saved. Check your connection and try again.'
+      ));
     } finally {
       setWaitlistBusy(false);
     }
@@ -243,7 +243,7 @@ export default function RegionScreen() {
             />
             {waitlistJoined ? (
               <TerminalText live="polite" tone="green" variant="label">
-                REGIONAL WAITLIST CONFIRMED
+                REGIONAL UPDATES CONFIRMED
               </TerminalText>
             ) : (
               <>
@@ -262,7 +262,7 @@ export default function RegionScreen() {
                 ) : null}
                 <FirstRunPrimaryButton
                   disabled={waitlistBusy}
-                  label={waitlistBusy ? 'JOINING WAITLIST...' : 'JOIN REGIONAL WAITLIST ->'}
+                  label={waitlistBusy ? 'SAVING REQUEST...' : 'GET REGIONAL UPDATES ->'}
                   onPress={() => void joinRegionWaitlist()}
                   tone="amber"
                 />

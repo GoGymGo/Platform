@@ -18,6 +18,7 @@ import {
   useAccessibilityAnnouncement
 } from '@/components/reliability';
 import { StreakRewards, UserAlias } from '@/components/streakRewards';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
@@ -174,6 +175,10 @@ export default function HomeScreen() {
     activeSession: activeSession !== null,
     registrationReady
   });
+  const activeWorkoutRoute =
+    activeSession?.verificationMethod === 'heartRate' && heartRateTelemetryAvailable
+    ? '/workout/active'
+    : '/qr-scanner';
   const setupRequired = workoutEntryTarget === 'setup';
   const registeredGoal = Number(goalDays);
   const successGoal = Number.isInteger(registeredGoal) && registeredGoal > 0
@@ -189,13 +194,14 @@ export default function HomeScreen() {
     setupStep === 'region'
       ? 'VERIFY YOUR REGION'
       : setupStep === 'agreements'
-        ? 'REVIEW + CONTINUE'
+        ? 'REVIEW AGREEMENTS'
         : 'CHOOSE YOUR WEEKLY GOAL';
   const resumeRequested = resume === '1';
   const pendingChallengeInvite = (weeklyChallengeRequestsQuery.data ?? [])
     .some(({ direction }) => direction === 'incoming');
   const immediateResumeTarget = getAppResumeTarget({
     activeWorkout: activeSession !== null,
+    activeWorkoutRoute,
     pendingChallengeInvite: false,
     setupRoute: setupRoute ?? null,
     unclaimedReward: false
@@ -253,6 +259,7 @@ export default function HomeScreen() {
 
     const target = getAppResumeTarget({
       activeWorkout: activeSession !== null,
+      activeWorkoutRoute,
       pendingChallengeInvite,
       setupRoute: setupRoute ?? null,
       unclaimedReward: Boolean(unclaimedReward)
@@ -265,6 +272,7 @@ export default function HomeScreen() {
     router.replace((target?.route ?? '/home') as Href);
   }, [
     activeSession,
+    activeWorkoutRoute,
     pendingChallengeInvite,
     resumeError,
     resumeLoading,
@@ -349,7 +357,7 @@ export default function HomeScreen() {
 
         {resumeRequested && resumeError ? (
           <RecoverableError
-            body="GoGymGo could not finish checking your setup, invitations and rewards. Retry the check, or continue to Home without losing any data."
+            body="GoGymGo could not finish checking your setup, invitations and Awards. Retry the check, or continue to Home without losing any data."
             continueLabel="Continue to Home"
             onContinue={() => {
               resumeHandledRef.current = true;
@@ -386,18 +394,18 @@ export default function HomeScreen() {
                     ? 'YOUR WEEKLY GOAL IS SET'
                     : verifiedSessionCount > 0
                       ? 'KEEP BUILDING YOUR WEEK'
-                      : 'START YOUR FIRST SESSION'}
+                      : 'START YOUR FIRST WORKOUT'}
               </TerminalText>
               <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
                 {setupRequired
                   ? setupMessage
                   : isBonusDayPhase
-                  ? `Verify one workout on each remaining day to add ${weeklyGoal} prize draw ${weeklyGoal === 1 ? 'entry' : 'entries'} per day.`
+                  ? `Verify one workout on each remaining day to add ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} per day.`
                   : competitionNotStarted
                     ? 'Scan the approved gym QR when you arrive and again after 30 minutes.'
                     : remainingSessions > 0
-                      ? `Complete ${remainingSessions} more verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal. Only one workout per calendar day counts.`
-                      : 'Weekly goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
+                      ? `Complete ${remainingSessions} more Verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's Weekly Goal. Only one workout per calendar day counts.`
+                      : 'Weekly Goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
               </TerminalText>
               {!setupRequired && competitionNotStarted ? (
                 <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
@@ -430,8 +438,8 @@ export default function HomeScreen() {
               accessible
               accessibilityLabel={
                 isBonusDayPhase
-                  ? `Weekly goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Weekly scoring is complete.`
-                  : `Weekly goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Achieved: ${completedSessions} of ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} this week.`
+                  ? `Weekly Goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Weekly scoring is complete.`
+                  : `Weekly Goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Achieved: ${completedSessions} of ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} this week.`
               }
               style={styles.goalProgressSummary}
             >
@@ -488,14 +496,14 @@ export default function HomeScreen() {
               }
               router.push(
                 workoutEntryTarget === 'active-session'
-                  ? '/workout/active'
+                  ? activeWorkoutRoute
                   : workoutStartRoute
               );
             }}
           />
           {setupRequired ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              Complete this step before starting a verified workout.
+              Complete this step before starting a Verified workout.
             </TerminalText>
           ) : workoutUnavailable ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
@@ -506,7 +514,7 @@ export default function HomeScreen() {
             <TerminalText style={styles.defaultMethod} tone="muted" uppercase={false} variant="caption">
               {verificationPreferenceSaved
                 ? `Pilot verification: ${verificationPreference.sourceLabel}.`
-                : 'Scan the approved gym QR to start a verified workout.'}
+                : 'Scan the approved Partner gym QR to start a Verified workout.'}
             </TerminalText>
           ) : null}
 
@@ -543,7 +551,7 @@ export default function HomeScreen() {
 
         {unclaimedReward ? (
           <Pressable
-            accessibilityHint="Open My Rewards to claim this award"
+            accessibilityHint="Open My Awards to claim this Award"
             accessibilityRole="button"
             onPress={() => router.push('/rewards/awards')}
             style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
@@ -551,10 +559,10 @@ export default function HomeScreen() {
             <HUDBorderBox glow style={styles.rewardAlert} tone="pink">
               <View style={styles.rewardAlertCopy}>
                 <TerminalText glow tone="pink" variant="label">
-                  REWARD READY // {unclaimedReward.title}
+                  AWARD READY // {unclaimedReward.title}
                 </TerminalText>
                 <TerminalText tone="text" uppercase={false} variant="body">
-                  Claim it in My Rewards. No payment setup is required.
+                  Claim it in My Awards. No payment setup is required.
                 </TerminalText>
               </View>
               <TerminalText glow tone="pink" variant="button">
@@ -587,10 +595,10 @@ export default function HomeScreen() {
                     QUICK REFERENCE
                   </TerminalText>
                   <TerminalText tone="text" uppercase={false} variant="body">
-                    How the competition works
+                    How the Competition works
                   </TerminalText>
                   <TerminalText tone="muted" uppercase={false} variant="caption">
-                    Goal, verified workouts, entries, rankings and rewards.
+                    Weekly Goal, Verified workouts, Prize Draw Entries, rankings and Rewards.
                   </TerminalText>
                 </View>
                 <TerminalText tone="cyan" variant="button">
@@ -689,9 +697,9 @@ export default function HomeScreen() {
             <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
               {prizeDrawEligible
                 ? competitionNotStarted
-                  ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
-                  : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
-                : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
+                  ? 'Your free Prize Draw Entry is secured now. Verified workouts begin earning Competition credit when scoring opens.'
+                  : `Your free Prize Draw Entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
+                : 'Your free Prize Draw Entry is secured and will carry into the next eligible regional draw.'}
             </TerminalText>
 
             {featuredCreatorWorkout ? <Pressable

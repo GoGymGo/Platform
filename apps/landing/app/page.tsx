@@ -7,25 +7,25 @@ import { siteLinks } from "./site-links";
 const journeySteps = [
   {
     number: "01",
-    title: "Choose your weekly goal",
-    copy: `Commit to ${septemberCampaign.weeklyGoalRange} per scoring week so every verified workout has a clear purpose.`,
+    title: "Choose your Weekly Goal",
+    copy: `Commit to ${septemberCampaign.weeklyGoalRange} per scoring week so every Verified workout has a clear purpose.`,
   },
   {
     number: "02",
     title: "Verify the workout",
-    copy: `Scan an active partner-gym poster when you arrive and again after at least ${septemberCampaign.minimumSessionMinutes} minutes.`,
+    copy: `Scan an active poster at a Partner gym when you arrive and again after at least ${septemberCampaign.minimumSessionMinutes} minutes.`,
   },
   {
     number: "03",
     title: "Build competition progress",
-    copy: "Approved sessions count toward your goal and published competition results—without presenting pending activity as credit.",
+    copy: "Verified workouts count toward your Weekly Goal and published Competition results—without presenting pending activity as credit.",
   },
 ];
 
 const readinessFacts = [
   {
     title: "NO PURCHASE REQUIRED",
-    copy: "Joining is free. Age, location, current competition availability, and active partner-poster access still apply.",
+    copy: "Joining is free. Age, location, current competition availability, and access to an active poster at a Partner gym still apply.",
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
@@ -33,7 +33,7 @@ const readinessFacts = [
   },
   {
     title: "CHECK CURRENT GYM STATUS",
-    copy: "A public partner-gym directory is not available. The member app confirms whether a GoGymGo poster currently qualifies.",
+    copy: "A public Partner gym directory is not available. The member app confirms whether a GoGymGo poster currently qualifies.",
   },
 ] as const;
 
@@ -44,7 +44,7 @@ const transparencyFacts = [
   },
   {
     title: "NO PURCHASE REQUIRED",
-    copy: "Joining is free. Age, location, published legal terms, competition availability, and approved partner-gym access still apply.",
+    copy: "Joining is free. Age, location, published legal terms, Competition availability, and approved Partner gym access still apply.",
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
@@ -52,7 +52,7 @@ const transparencyFacts = [
   },
   {
     title: "CURRENT GYM STATUS",
-    copy: "A public partner-gym directory is not published. The member app is authoritative for active GoGymGo posters and current availability.",
+    copy: "A public Partner gym directory is not published. The member app is authoritative for active GoGymGo posters and current availability.",
   },
 ] as const;
 
@@ -74,14 +74,14 @@ const structuredData = [
   },
 ];
 
-function SeptemberChallengePanel() {
+function SeptemberCompetitionPanel() {
   return (
     <aside
-      aria-label="September 2026 beta challenge details"
+      aria-label="September 2026 beta competition details"
       className="pilot-console"
     >
       <div className="pilot-console__header">
-        <span>CHALLENGE SNAPSHOT</span>
+        <span>COMPETITION SNAPSHOT</span>
       </div>
       <div className="pilot-console__reward">
         <span>ONE PUBLISHED REWARD</span>
@@ -107,12 +107,12 @@ function SeptemberChallengePanel() {
           <dd>{septemberCampaign.weeklyGoalRange}</dd>
         </div>
         <div>
-          <dt>VERIFIED SESSION</dt>
+          <dt>VERIFIED WORKOUT</dt>
           <dd>{septemberCampaign.minimumSessionMinutes}+ minutes</dd>
         </div>
       </dl>
       <p className="pilot-console__note">
-        Live availability, eligibility, and partner-gym status are confirmed in
+        Live availability, eligibility, and Partner gym status are confirmed in
         the app before enrollment.
       </p>
     </aside>
@@ -149,11 +149,11 @@ export default function Home() {
             {campaignState.phase === "ended" ? (
               <>
                 Build verified competition progress from weekly workouts. The
-                September 2026 beta has ended, but regional updates remain open.
+                September 2026 beta has ended, but Regional updates remain open.
               </>
             ) : (
               <>
-                Set a weekly goal, verify partner-gym workouts, and build
+                Set a Weekly Goal, verify workouts at a Partner gym, and build
                 competition progress.
               </>
             )}
@@ -194,10 +194,10 @@ export default function Home() {
           <p className="hero-trust-signal">
             <span aria-hidden="true">✓</span>
             <strong>VERIFIED BEFORE CREDIT</strong>
-            Partner-gym workouts count only after review.
+            Verified workouts at Partner gyms count only after review.
           </p>
         </div>
-        <SeptemberChallengePanel />
+            <SeptemberCompetitionPanel />
       </section>
 
       <section className="section shell" id="joining-and-verification">
@@ -296,7 +296,7 @@ export default function Home() {
               <p className="eyebrow">YOUR NEXT WORKOUT CAN COUNT</p>
               <h2>Ready to turn consistency into verified progress?</h2>
               <p>
-                Join in the member app, or get regional updates if the current
+                Join in the member app, or get Regional updates if the current
                 pilot is not available where you train.
               </p>
             </div>

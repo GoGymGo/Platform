@@ -55,7 +55,7 @@ export function buildCompetitionReminders({
     }
 
     reminders.push({
-      body: `One verified workout today adds ${weeklyGoal} prize draw ${weeklyGoal === 1 ? 'entry' : 'entries'} before a perfect-month 10x.`,
+      body: `One Verified workout today adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before a Perfect Month 10x.`,
       dateKey,
       kind: 'bonus-day',
       title: `+${weeklyGoal} ${weeklyGoal === 1 ? 'entry is' : 'entries are'} available today`

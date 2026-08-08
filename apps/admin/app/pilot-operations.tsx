@@ -9,6 +9,7 @@ import type {
 } from "@gogymgo/contracts";
 import { FormEvent, useRef, useState } from "react";
 import { parseCoordinate } from "./coordinate-input";
+import { AdminUserFacingError, errorMessage } from "./admin-dashboard-utils";
 import type {
   Competition,
   GymLocation,
@@ -76,25 +77,25 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setCreateGymSuccess("");
 
     try {
-      if (name.length < 2) throw new Error("Gym name is required.");
+      if (name.length < 2) throw new AdminUserFacingError("Partner gym name is required.");
       if (
         props.gyms.some(
           (gym) => gym.name.trim().toLowerCase() === name.toLowerCase(),
         )
       ) {
-        throw new Error(
+        throw new AdminUserFacingError(
           `${name} already exists. Select it in the assignment form below.`,
         );
       }
       if (address.length < 5) {
-        throw new Error("Enter the gym's complete street address.");
+        throw new AdminUserFacingError("Enter the Partner gym's complete street address.");
       }
-      if (!regionPolicyId) throw new Error("Choose the gym's region.");
+      if (!regionPolicyId) throw new AdminUserFacingError("Choose the Partner gym's region.");
       if (!Number.isInteger(radiusMeters) || radiusMeters < 10 || radiusMeters > 500) {
-        throw new Error("Radius must be a whole number from 10 to 500 metres.");
+        throw new AdminUserFacingError("Radius must be a whole number from 10 to 500 metres.");
       }
       if (reason.length < 8) {
-        throw new Error("Administrative reason must be at least 8 characters.");
+        throw new AdminUserFacingError("Administrative reason must be at least 8 characters.");
       }
 
       await props.onCreateGym({
@@ -170,10 +171,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setAssignGymSuccess("");
 
     try {
-      if (!competitionId) throw new Error("Choose a competition.");
-      if (!gymId) throw new Error("Choose an active gym.");
+      if (!competitionId) throw new AdminUserFacingError("Choose a Competition.");
+      if (!gymId) throw new AdminUserFacingError("Choose an active Partner gym.");
       if (reason.length < 8) {
-        throw new Error("Administrative reason must be at least 8 characters.");
+        throw new AdminUserFacingError("Administrative reason must be at least 8 characters.");
       }
       await props.onAssignGym(competitionId, gymId, { reason });
       const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
@@ -201,7 +202,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">STATIC QR PILOT</p>
-            <h2>Gym locations + posters</h2>
+            <h2>Partner gyms + QR posters</h2>
             <p>
               Configure the exact geofence, issue one static poster and revoke
               it immediately if the credential is exposed.
@@ -215,7 +216,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           ref={createGymForm}
         >
           <label>
-            <span>GYM NAME</span>
+            <span>PARTNER GYM NAME</span>
             <input name="name" required />
           </label>
           <label>
@@ -271,8 +272,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <input defaultValue={administrativeReason} name="reason" required />
           </label>
           <p className="pilot-form-help" id="gym-coordinate-help">
-            Stand near the centre of the gym and let your phone fill both
-            coordinates. You can still paste Compass coordinates if needed.
+            Stand near the centre of the Partner gym. Your current location
+            fills the coordinates used to create its verification geofence.
+            You can still paste Compass coordinates if needed.
           </p>
           <button
             className="secondary-button pilot-location-button"
@@ -292,7 +294,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             disabled={props.submitting}
             type="submit"
           >
-            {props.submitting ? "CREATING GYM..." : "+ CREATE GYM"}
+            {props.submitting ? "CREATING PARTNER GYM..." : "+ CREATE PARTNER GYM"}
           </button>
           {createGymError ? (
             <p className="pilot-form-message form-error" role="alert">
@@ -307,7 +309,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         </form>
 
         {props.gyms.length === 0 ? (
-          <p className="empty-copy">No pilot gym has been configured.</p>
+          <p className="empty-copy">No pilot Partner gym has been configured.</p>
         ) : (
           <div className="card-list pilot-gym-list">
             {props.gyms.map((gym) => (
@@ -334,8 +336,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">COMPETITION ELIGIBILITY</p>
-            <h2>Assign a gym to September</h2>
-            <p>Link an active pilot gym to the competition members can join there.</p>
+            <h2>Assign a Partner gym to September</h2>
+            <p>Link an active pilot Partner gym to the Competition members can join there.</p>
           </div>
         </div>
         <form className="pilot-form" noValidate onSubmit={assignGym}>
@@ -351,9 +353,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </select>
           </label>
           <label>
-            <span>GYM</span>
+            <span>PARTNER GYM</span>
             <select name="gymId" required>
-              <option value="">Choose gym</option>
+              <option value="">Choose Partner gym</option>
               {props.gyms
                 .filter((gym) => gym.active)
                 .map((gym) => (
@@ -456,8 +458,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         </div>
         <form className="pilot-form" onSubmit={recordCash}>
           <label className="pilot-form-wide">
-            <span>REWARD AWARD ID</span>
-            <input name="rewardAwardId" required />
+            <span>AWARD ID</span>
+            <input name="rewardAwardId" placeholder="Award ID from the settled draw" required />
           </label>
           <label>
             <span>AMOUNT (CENTS)</span>
@@ -514,17 +516,17 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 }
 
 function formErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "The request could not be completed.";
+  return errorMessage(error);
 }
 
 function locationErrorMessage(error: GeolocationPositionError) {
   if (error.code === error.PERMISSION_DENIED) {
-    return "Location access was not allowed. Open this page in Safari, allow location access when prompted, then try again.";
+    return "Location access was not allowed. Allow location access in your browser or device settings, then try again.";
   }
   if (error.code === error.TIMEOUT) {
-    return "Your phone could not get a location in time. Move near a window or outdoors briefly, then try again.";
+    return "Your device could not get a location in time. Move near a window or outdoors briefly, then try again.";
   }
-  return "Your phone could not determine its location. Check that Location Services are enabled and try again.";
+  return "Your device could not determine its location. Check that device location services and browser site permission are enabled, then try again.";
 }
 
 function GymCard({
@@ -592,7 +594,7 @@ function GymCard({
         </button>
       </div>
       <details className="pilot-details">
-        <summary>Edit gym + geofence</summary>
+        <summary>Edit Partner gym + geofence</summary>
         <form className="pilot-form" onSubmit={update}>
           <label>
             <span>NAME</span>
@@ -650,7 +652,7 @@ function GymCard({
             disabled={submitting}
             type="submit"
           >
-            SAVE GYM
+            SAVE PARTNER GYM
           </button>
         </form>
       </details>

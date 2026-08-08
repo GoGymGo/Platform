@@ -58,7 +58,7 @@ export const biometricCameraConsent: LegalDocument = {
   sections: [
     {
       heading: 'WHAT THE CHECK DOES',
-      body: 'The device check confirms that the phone user is present. The separate QR camera check confirms a partner-gym entry or exit code.'
+      body: 'The device check confirms that the device user is present. The separate QR camera check confirms a Partner gym entry or exit code.'
     },
     {
       heading: 'WHAT IS NOT STORED',

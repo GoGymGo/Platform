@@ -67,7 +67,7 @@ export default function JoinScreen() {
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
             Players can create an account or sign in below. Sponsors and
-            partner-gym teams can use their dedicated application forms.
+            Partner gym teams can use their dedicated application forms.
           </TerminalText>
         </View>
 

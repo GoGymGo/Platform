@@ -56,7 +56,7 @@ export function getAccountSetupMessage(step: AccountSetupStep) {
     return 'Review and accept the account agreements for your verified region.';
   }
   if (step === 'weekly-goal') {
-    return 'Choose the number of verified workout days you can complete each week.';
+    return 'Choose the number of Verified workout days you can complete each week.';
   }
   return 'Your competition setup is complete.';
 }

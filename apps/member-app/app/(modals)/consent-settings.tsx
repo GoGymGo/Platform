@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
 import {
@@ -14,11 +14,20 @@ import {
 } from '@/components/legal';
 import { OnboardingHeader } from '@/components/onboarding';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
+import { devicePresenceVerificationAvailable } from '@/config/workoutVerification';
 import { spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 export default function ConsentSettingsScreen() {
+  if (!devicePresenceVerificationAvailable) {
+    return <Redirect href="/privacy-policy" />;
+  }
+
+  return <DevicePresenceConsentSettingsScreen />;
+}
+
+function DevicePresenceConsentSettingsScreen() {
   const router = useRouter();
   const { accepted, busy, error, ready, toggle } = useBiometricCameraConsent();
 
@@ -35,7 +44,7 @@ export default function ConsentSettingsScreen() {
           step="PRIVACY"
         />
         <BrandScreenHeader
-          description="Review and change the device-presence choice used for verified workouts."
+          description="Review and change the device-presence choice used for Verified workouts."
           eyebrow="YOUR CHOICE"
           title="DEVICE PRESENCE"
         />

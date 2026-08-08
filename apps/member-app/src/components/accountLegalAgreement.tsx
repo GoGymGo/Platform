@@ -5,6 +5,7 @@ import { AuthStatusNotice } from '@/components/auth';
 import { HUDBorderBox, TerminalText } from '@/components/cyber';
 import { FirstRunPrimaryButton } from '@/components/firstRun';
 import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
+import { getUserFacingErrorMessage } from '@/components/reliability';
 import { fontFamilies, spacing } from '@/constants/theme';
 import {
   useCurrentLegalDocuments,
@@ -57,9 +58,10 @@ export function AccountLegalAgreement({
       }
       onComplete();
     } catch (error) {
-      setSubmissionError(
-        error instanceof Error ? error.message : 'Your agreements could not be recorded. Try again.'
-      );
+      setSubmissionError(getUserFacingErrorMessage(
+        error,
+        'Your agreements could not be recorded. Review your connection and try again.'
+      ));
     }
   }
 
@@ -120,7 +122,7 @@ export function AccountLegalAgreement({
             ? 'SAVING AGREEMENTS...'
             : legalReceiptCurrent
               ? 'CONTINUE TO WEEKLY GOAL ->'
-              : 'AGREE & CONTINUE ->'
+              : 'AGREE & CHOOSE WEEKLY GOAL ->'
         }
         onPress={() => void saveAndContinue()}
       />

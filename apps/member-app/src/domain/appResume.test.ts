@@ -42,6 +42,7 @@ test('resume prioritizes unfinished setup before every other task', () => {
   assert.deepEqual(
     getAppResumeTarget({
       activeWorkout: true,
+      activeWorkoutRoute: '/qr-scanner',
       pendingChallengeInvite: true,
       setupRoute: '/commitment?source=home',
       unclaimedReward: true
@@ -63,7 +64,7 @@ test('resume prioritizes an active workout after setup is complete', () => {
     }),
     {
       kind: 'active-workout',
-      route: '/workout/active'
+      route: '/qr-scanner'
     }
   );
 });

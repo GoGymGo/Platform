@@ -84,7 +84,9 @@ export function AppDataProvider({ children }: PropsWithChildren) {
   );
   useEffect(() => {
     if (appTourActive) {
-      queryClient.clear();
+      // Reset sample data when the scenario changes while keeping active
+      // observers attached so direct demo routes refetch instead of hanging.
+      void queryClient.resetQueries();
     }
   }, [appTourActive, appTourScenario, queryClient]);
   const mode: AppDataMode = appTourActive ? 'tour' : api ? 'api' : 'unavailable';
@@ -119,7 +121,10 @@ export function AppDataProvider({ children }: PropsWithChildren) {
     [api, appTourActive, mode]
   );
   const apiQueriesEnabled = mode !== 'unavailable';
-  const authenticatedQueriesEnabled = apiQueriesEnabled && Boolean(user);
+  // Tour repositories are isolated and provide their own sample identity. A
+  // demo deep link must not wait for Firebase auth or its queries stay pending.
+  const authenticatedQueriesEnabled =
+    apiQueriesEnabled && (appTourActive || Boolean(user));
   const value = useMemo(
     () => ({
       account,

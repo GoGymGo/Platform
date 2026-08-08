@@ -11,7 +11,7 @@ export const septemberCampaign = {
   regionName: "Vancouver Island + Gulf Islands",
   registrationLabel: "REGISTRATION OPEN",
   registrationNote:
-    "The app confirms current availability. Registration can close when the competition ends, reaches an entrant cap, or is cancelled.",
+    "The app confirms current availability. Registration can close when the Competition ends, reaches an entrant cap, or is cancelled.",
   reward: "$100 CAD",
   rewardSponsor: "GoGymGo",
   startDate: "September 1, 2026 at 12:00 a.m. PDT",

@@ -13,7 +13,7 @@ export async function verifyLocalPresence(): Promise<PresenceVerificationResult>
   if (!hasHardware || !isEnrolled) {
     return {
       message:
-        'Set up Face ID, Touch ID, fingerprint, or a device passcode before starting a verified workout.',
+        'Set up Face ID, Touch ID, fingerprint, or a device passcode before starting a Verified workout.',
       status: 'unavailable'
     };
   }

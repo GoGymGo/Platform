@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   StyleSheet,
   View,
   type StyleProp,
@@ -14,7 +15,7 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 
 type FeedbackTone = 'amber' | 'cyan' | 'green' | 'red';
 
@@ -33,6 +34,19 @@ export function useAccessibilityAnnouncement(
       AccessibilityInfo.announceForAccessibility(message);
     }
   }, [message]);
+}
+
+export function getUserFacingErrorMessage(error: unknown, fallback: string) {
+  return error instanceof UserFacingError && error.message.trim().length <= 180
+    ? error.message.trim()
+    : fallback;
+}
+
+export class UserFacingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserFacingError';
+  }
 }
 
 export function ActionFeedback({
@@ -55,6 +69,23 @@ export function ActionFeedback({
         {message}
       </TerminalText>
     </HUDBorderBox>
+  );
+}
+
+export function InlineLoadingState({
+  label = 'Loading...',
+  style
+}: {
+  label?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View accessibilityLiveRegion="polite" style={[styles.loading, style]}>
+      <ActivityIndicator color={colors.cyan} size="small" />
+      <TerminalText tone="muted" uppercase={false} variant="caption">
+        {label}
+      </TerminalText>
+    </View>
   );
 }
 
@@ -115,6 +146,12 @@ export function RecoverableScreenError(
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    minHeight: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm
+  },
   feedback: {
     gap: spacing.xs,
     padding: spacing.md

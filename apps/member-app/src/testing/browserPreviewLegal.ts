@@ -66,7 +66,7 @@ export const biometricCameraConsent: LegalDocument = {
   sections: [
     {
       heading: 'WHAT THE PREVIEW DOES',
-      body: 'The preview simulates device confirmation and partner-gym QR steps without collecting biometric information or opening the camera.'
+      body: 'The preview simulates device confirmation and Partner gym QR steps without collecting biometric information or opening the camera.'
     },
     {
       heading: 'WHAT IS NOT COLLECTED',

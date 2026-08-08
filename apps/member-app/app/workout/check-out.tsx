@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -13,6 +13,7 @@ import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
+import { legacyTimedWorkoutFlowAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
@@ -32,6 +33,14 @@ function formatClock(totalSeconds: number) {
 }
 
 export default function CheckOutScreen() {
+  if (!legacyTimedWorkoutFlowAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <LegacyCheckOutScreen />;
+}
+
+function LegacyCheckOutScreen() {
   const router = useRouter();
   const { activeSession } = useWorkoutProgress();
   const {
@@ -91,10 +100,10 @@ export default function CheckOutScreen() {
         actionLabel={activeSession ? 'RETURN TO WORKOUT' : 'START A WORKOUT'}
         body={
           !activeSession
-            ? 'Start a verified session before opening check-out.'
+            ? 'Start a Verified workout before opening the exit scan.'
             : activeSession.verificationMethod === 'heartRate' && !heartRateReady
               ? 'Wait for the required heart-rate evidence to finish uploading.'
-              : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before check-out.`
+              : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before completion verification.`
         }
         onAction={() => {
           if (activeSession) {
@@ -122,7 +131,7 @@ export default function CheckOutScreen() {
         showsVerticalScrollIndicator={false}
       >
       <OnboardingHeader
-        label="WORKOUT CHECK-OUT"
+        label="WORKOUT COMPLETION VERIFICATION"
         onBack={() => goBackOrReplace(router, '/workout/active')}
         step="FINISH"
       />

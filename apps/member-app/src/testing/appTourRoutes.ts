@@ -1,5 +1,11 @@
 import type { Href } from 'expo-router';
 
+import {
+  devicePresenceVerificationAvailable,
+  heartRateTelemetryAvailable,
+  legacyTimedWorkoutFlowAvailable,
+  midSessionPresenceVerificationAvailable
+} from '@/config/workoutVerification';
 import type { AppTourScenario } from '@/state/appTour';
 
 export type AppTourRoute = {
@@ -61,32 +67,44 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
     title: 'WORKOUT FLOW',
     routes: [
       { label: 'Choose Method', route: '/workout/method' },
-      { label: 'Heart-Rate Check-In', route: '/workout/check-in' },
+      ...(heartRateTelemetryAvailable
+        ? [{ label: 'Heart-Rate Verification', route: '/workout/check-in' }]
+        : []),
       { label: 'Partner Gym QR', route: '/qr-scanner' },
-      {
-        label: 'Partner Gym Presence',
-        route: '/workout/identity-check?qrPayload=gogymgo:gym:entry:app-tour'
-      },
-      {
-        label: 'Active Timer',
-        route: '/workout/active',
-        scenario: 'active-workout'
-      },
-      {
-        label: 'Presence Check',
-        route: '/workout/ping',
-        scenario: 'presence-check'
-      },
-      {
-        label: 'Presence Confirmed',
-        route: '/workout/ping-success',
-        scenario: 'workout-complete'
-      },
-      {
-        label: 'Check-Out',
-        route: '/workout/check-out',
-        scenario: 'workout-complete'
-      },
+      ...(devicePresenceVerificationAvailable
+        ? [{
+            label: 'Partner Gym Presence',
+            route: '/workout/identity-check?qrPayload=gogymgo:gym:entry:app-tour'
+          }]
+        : []),
+      ...(legacyTimedWorkoutFlowAvailable
+        ? [{
+            label: 'Active Timer',
+            route: '/workout/active',
+            scenario: 'active-workout' as AppTourScenario
+          }]
+        : []),
+      ...(midSessionPresenceVerificationAvailable
+        ? [
+            {
+              label: 'Presence Check',
+              route: '/workout/ping',
+              scenario: 'presence-check' as AppTourScenario
+            },
+            {
+              label: 'Presence Confirmed',
+              route: '/workout/ping-success',
+              scenario: 'workout-complete' as AppTourScenario
+            }
+          ]
+        : []),
+      ...(legacyTimedWorkoutFlowAvailable
+        ? [{
+            label: 'Completion Verification',
+            route: '/workout/check-out',
+            scenario: 'workout-complete' as AppTourScenario
+          }]
+        : []),
       {
         label: 'Workout Complete',
         route: '/workout/complete',
@@ -114,8 +132,12 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
       { label: 'Bonus Rules', route: '/bonus-rules' },
       { label: 'Privacy Policy', route: '/privacy-policy' },
       { label: 'Terms of Service', route: '/terms-of-service' },
-      { label: 'Consent Settings', route: '/consent-settings' },
-      { label: 'Presence Notice', route: '/biometric-camera-consent' }
+      ...(devicePresenceVerificationAvailable
+        ? [
+            { label: 'Consent Settings', route: '/consent-settings' },
+            { label: 'Presence Notice', route: '/biometric-camera-consent' }
+          ]
+        : [])
     ]
   }
 ];

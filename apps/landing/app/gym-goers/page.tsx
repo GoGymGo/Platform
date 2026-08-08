@@ -8,14 +8,14 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/gym-goers" },
   description:
-    "Register for the eligible September GoGymGo beta or join the regional update list for future verified workout competitions.",
-  title: "Gym-goer registration and regional updates",
+    "Register for the eligible September GoGymGo beta or request Regional updates about future Verified workout Competitions.",
+  title: "Gym-goer registration and Regional updates",
 };
 
 const points = [
   {
     title: "CHOOSE 1–7 DAYS",
-    copy: "Set a Weekly Goal that matches your real routine. Your competition goal is locked after enrollment.",
+    copy: "Set a Weekly Goal that matches your real routine. Your Weekly Goal is locked after enrollment.",
   },
   {
     title: "SCAN AT A PARTNER GYM",

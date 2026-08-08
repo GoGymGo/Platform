@@ -25,6 +25,7 @@ import {
 } from '@/components/firstRun';
 import { LegalConsentCheckbox } from '@/components/legal';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { getUserFacingErrorMessage } from '@/components/reliability';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import {
@@ -162,10 +163,10 @@ export default function CommitmentScreen() {
   const competitionDayCount = 28 + maximumRemainderDays;
   const remainderHelper =
     maximumRemainderDays === 0
-      ? 'This competition has no Bonus Days after the four scoring weeks.'
+      ? 'This Competition has no Bonus Days after the four scoring weeks.'
       : selectedBonusDays > 0
         ? `${selectedBonusDays} selected x your ${days}-day goal = ${remainderDayEntries} ${remainderDayEntries === 1 ? 'entry' : 'entries'}. A Perfect Month multiplies these Bonus Day entries by 10.`
-        : `This ${competitionDayCount}-day competition has ${maximumRemainderDays} Bonus ${maximumRemainderDays === 1 ? 'Day' : 'Days'} after day 28. Each verified Bonus Day is worth your ${days}-day goal before 10x.`;
+        : `This ${competitionDayCount}-day Competition has ${maximumRemainderDays} Bonus ${maximumRemainderDays === 1 ? 'Day' : 'Days'} after day 28. Each verified Bonus Day is worth your ${days}-day Weekly Goal before 10x.`;
 
   useEffect(() => {
     void recordFlowMetric(user?.uid, 'weekly-goal-viewed', 'weekly-goal');
@@ -187,7 +188,7 @@ export default function CommitmentScreen() {
   async function confirmWeeklyGoal() {
     setConfirmationError(null);
     if (!goalSelected || !ageEligibilityAttested || !competitionRulesAccepted) {
-      setConfirmationError('Review and accept the competition agreement.');
+      setConfirmationError('Review and accept the Competition agreement.');
       return;
     }
 
@@ -215,9 +216,10 @@ export default function CommitmentScreen() {
         });
       }
     } catch (error) {
-      setConfirmationError(
-        error instanceof Error ? error.message : 'Registration could not be completed. Try again.'
-      );
+      setConfirmationError(getUserFacingErrorMessage(
+        error,
+        'Registration could not be completed. Your selections are still here; try again.'
+      ));
     }
   }
 
@@ -258,7 +260,7 @@ export default function CommitmentScreen() {
             SEPTEMBER COMPETITION
           </TerminalText>
           <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
-            {`You may join this competition until it ends on ${competitionDateRange.endDateKey}. Your entries begin when enrollment is confirmed.`}
+            {`You may join this Competition until it ends on ${competitionDateRange.endDateKey}. Your Prize Draw Entries begin when enrollment is confirmed.`}
           </TerminalText>
         </HUDBorderBox>
 
@@ -339,7 +341,7 @@ export default function CommitmentScreen() {
             </View>
             <View style={styles.bonusSummary}>
               <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
-                Earn more through consistency, teamwork and competition.
+                Earn more through consistency, teamwork and Competition.
               </TerminalText>
               <CompactTextButton
                 label="VIEW BONUS DETAILS"
@@ -365,7 +367,7 @@ export default function CommitmentScreen() {
               />
               <LegalConsentCheckbox
                 checked={competitionRulesAccepted}
-                label={`I accept the competition rules and lock my ${days}-day weekly goal.`}
+                label={`I accept the Competition rules and lock my ${days}-day Weekly Goal.`}
                 onToggle={() => setCompetitionRulesAccepted((current) => !current)}
               />
               <LegalConsentCheckbox
@@ -392,7 +394,7 @@ export default function CommitmentScreen() {
             uppercase={false}
             variant="caption"
           >
-            Select your weekly goal to review and confirm the competition agreement.
+            Select your Weekly Goal to review and confirm the Competition agreement.
           </TerminalText>
         )}
         </ScreenScrollView>
@@ -658,7 +660,7 @@ function getWeeklyOptionAccessibilityLabel(multiplier: WeeklyMatchMultiplier) {
     return '3X bonus';
   }
 
-  return '1X, weekly goal hit';
+  return '1X, Weekly Goal hit';
 }
 
 function ChoiceControl({

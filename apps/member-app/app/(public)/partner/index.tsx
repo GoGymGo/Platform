@@ -41,7 +41,7 @@ export default function PartnerScreen() {
           step="APPLICATIONS"
         />
         <BrandScreenHeader
-          description="Apply to sponsor a regional campaign or register a verified partner gym location."
+          description="Apply to sponsor a regional campaign or register a verified Partner gym location."
           eyebrow="SPONSORS + GYMS"
           title="PARTNER WITH GOGYMGO"
         />

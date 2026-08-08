@@ -318,7 +318,7 @@ function auditFlowReliability() {
       'Hide ranking details'
     ]],
     ['app/(tabs)/calendar.tsx', [
-      'Return on this day to start your own verified workout.',
+      'Return on this day to start your own Verified workout.',
       'RETURN TO TODAY TO START ->',
       "START TODAY'S VERIFIED WORKOUT ->",
       'function goToToday()'
@@ -370,7 +370,7 @@ function auditFlowReliability() {
       "day === 1 ? 'day' : 'days'} per week"
     ]],
     ['app/(onboarding)/how-it-works.tsx', [
-      'A quick reference for competition scoring',
+      'A quick reference for Competition scoring',
       'No bank account is needed.'
     ]],
     ['app/(onboarding)/identity.tsx', [

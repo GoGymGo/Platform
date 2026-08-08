@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type GestureResponderEvent,
   type AccessibilityRole,
@@ -198,12 +199,19 @@ export function ScreenContainer({
   contentStyle,
   frameStyle
 }: ScreenContainerProps) {
+  const { width } = useWindowDimensions();
+  const responsiveFrameStyle = width >= 1100
+    ? cyberStyles.frameDesktop
+    : width >= 700
+      ? cyberStyles.frameTablet
+      : null;
+
   return createElement(
     SafeAreaView,
     { style: cyberStyles.safeArea },
     createElement(
       View,
-      { style: [cyberStyles.frame, frameStyle] },
+      { style: [cyberStyles.frame, responsiveFrameStyle, frameStyle] },
       createElement(
         View,
         { pointerEvents: 'none', style: cyberStyles.backdrop },
@@ -420,6 +428,12 @@ const cyberStyles = StyleSheet.create({
     overflow: 'hidden',
     alignSelf: 'center',
     backgroundColor: colors.background
+  },
+  frameTablet: {
+    maxWidth: 720
+  },
+  frameDesktop: {
+    maxWidth: 960
   },
   backdrop: {
     ...StyleSheet.absoluteFill,

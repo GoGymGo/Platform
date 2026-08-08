@@ -29,7 +29,7 @@ const creatorRightsTerms = [
   'I grant GoGymGo a non-exclusive, worldwide, royalty-free license to host, reproduce, edit, crop, reframe, caption, translate and format the submission for GoGymGo products and promotion.',
   'That license includes adding GoGymGo or sponsor brand placement and creating clearly reviewed AI-assisted reframes, alternate camera angles or format adaptations for supported screens.',
   'GoGymGo may moderate, decline, pause or remove a video for safety, rights, disclosure or brand-fit concerns. I retain ownership and can contact GoGymGo about withdrawal and takedown.',
-  'A creator video is workout guidance only. Users still need a separate verified GoGymGo session to earn competition credit.'
+  'A Creator workout is guidance only. Users still need a separate Verified workout to earn Competition credit.'
 ] as const;
 
 export default function CreatorVideoSubmissionScreen() {
@@ -95,7 +95,7 @@ export default function CreatorVideoSubmissionScreen() {
       return setValidationError('Review and accept the creator video rights terms.');
     if (!regionVerification?.regionCode) {
       return setValidationError(
-        'Verify your competition region before submitting a creator workout.'
+        'Verify your Competition region before submitting a Creator workout.'
       );
     }
 
@@ -135,7 +135,7 @@ export default function CreatorVideoSubmissionScreen() {
         />
         <BrandScreenHeader
           accent="pink"
-          description="Submit a hosted follow-along video for catalog review. This is a creator-content submission, not a verified workout."
+          description="Submit a hosted follow-along video for catalog review. This is a Creator workout submission, not a Verified workout."
           eyebrow={competitionRegion.label}
           title="SUBMIT A WORKOUT VIDEO"
         />

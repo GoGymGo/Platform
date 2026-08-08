@@ -295,10 +295,10 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           dateKey: session.eligibleDate,
           durationMinutes,
           entriesEarned: 0,
-          exercises: 'Server-approved GoGymGo session',
+          exercises: 'Server-approved GoGymGo workout',
           id: `verified-${session.id}`,
           source: 'verified',
-          title: 'Verified GoGymGo session'
+          title: 'Verified GoGymGo workout'
         };
       }),
     [authoritativeProgress]
@@ -441,7 +441,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           !verifiedPartnerGymCatalogAvailable
         ) {
           throw new Error(
-            'Partner-gym QR verification is not available until verified gyms are published.'
+            'Partner gym QR verification is not available until Partner gyms are published.'
           );
         }
 
@@ -461,7 +461,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         const enrollment = await account.getCurrentEnrollment();
         if (!competition) {
           throw new Error(
-            'Join the current monthly competition before starting a verified workout.'
+            'Join the current monthly Competition before starting a Verified workout.'
           );
         }
         const hasCompetitionAccess = hasSessionCompetitionAccess({
@@ -470,7 +470,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         });
         if (!hasCompetitionAccess) {
           throw new Error(
-            'Join the current monthly competition before starting a verified workout.'
+            'Join the current monthly Competition before starting a Verified workout.'
           );
         }
         if (mode === 'api' && competition.status !== 'active') {
@@ -487,7 +487,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           );
         }
         if (competition.rules.requireGymQr && verificationMethod !== 'partnerGymQr') {
-          throw new Error('This competition requires partner-gym entry and exit QR scans.');
+          throw new Error('This Competition requires Partner gym entry and exit QR scans.');
         }
         if (
           competition.rules.minHeartRateSamples > 0 &&
@@ -500,7 +500,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           );
         }
         if (verificationMethod === 'partnerGymQr' && !entryQrPayload) {
-          throw new Error('Scan the partner gym entry QR before starting this workout.');
+          throw new Error('Scan the Partner gym entry QR before starting this workout.');
         }
 
         sessionStartAttemptId.current ??= `${Date.now().toString(36)}-${Math.random()
@@ -582,7 +582,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     setSessionActionPending(true);
     try {
       await sessions.cancelSession(activeSession.id);
-      void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+      await queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
       setActiveSession(null);
       setMidSessionAlertsReady(false);
       sessionStartAttemptId.current = null;
@@ -786,10 +786,10 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
               ? effectiveWeeklyGoal
               : 0,
             exercises:
-              `Verified ${activeSession.minimumSessionSeconds / 60}-minute GoGymGo session`,
+              `Verified ${activeSession.minimumSessionSeconds / 60}-minute GoGymGo workout`,
             id: `verified-${activeSession.id}`,
             source: 'verified',
-            title: 'Verified GoGymGo session'
+            title: 'Verified GoGymGo workout'
           }
         ]);
       }

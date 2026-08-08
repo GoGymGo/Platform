@@ -1,4 +1,4 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -28,6 +28,14 @@ import { useAppTour } from '@/state/appTour';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
+  if (!heartRateTelemetryAvailable) {
+    return <Redirect href="/workout/method" />;
+  }
+
+  return <HeartRateCheckInScreen />;
+}
+
+function HeartRateCheckInScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
@@ -62,7 +70,7 @@ export default function CheckInScreen() {
     return (
       <SessionUnavailable
         actionLabel="BACK TO TRAIN"
-        body="Heart-rate telemetry is not connected in this build, so a verified session cannot start yet."
+        body="Heart-rate telemetry is not connected in this build, so a Verified workout cannot start yet."
         onAction={() => router.replace('/session')}
         title="DEVICE CONNECTION REQUIRED"
       />
@@ -86,7 +94,7 @@ export default function CheckInScreen() {
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before starting a verified workout."
+        body="Your Competition setup could not be checked. Retry before starting a Verified workout."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"
@@ -117,7 +125,7 @@ export default function CheckInScreen() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label="WORKOUT CHECK-IN"
+          label="WORKOUT VERIFICATION"
           onBack={() => goBackOrReplace(router, '/session')}
           step="START"
         />

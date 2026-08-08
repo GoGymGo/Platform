@@ -33,7 +33,7 @@ export function ProductScreens() {
         <div className="section-heading product-showcase-heading">
           <div>
             <p className="eyebrow">INSIDE THE MEMBER APP</p>
-            <h2>From verified workout to published result.</h2>
+            <h2>From Verified workout to published result.</h2>
           </div>
           <p>
             The app keeps live verification separate from final competition

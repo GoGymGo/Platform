@@ -165,7 +165,7 @@ export default function SignInScreen() {
     <AuthScreenShell
       description={gymScanContinuation
         ? 'Your gym scan is saved. Sign in and GoGymGo will take you directly to Start Workout.'
-        : 'Return to your Weekly Goal, verified workouts and prize draw entries.'}
+        : 'Return to your Weekly Goal, Verified workouts and Prize Draw Entries.'}
       eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'SECURE ACCESS'}
       onBack={() => router.replace('/join')}
       title={gymScanContinuation ? 'SIGN IN TO CONTINUE' : 'WELCOME BACK'}

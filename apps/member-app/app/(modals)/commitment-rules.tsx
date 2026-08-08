@@ -42,7 +42,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '03',
     title: 'PICK YOUR DAYS',
-    body: 'Choose 1 to 7 verified workout days per week for the month.',
+    body: 'Choose 1 to 7 Verified workout days per week for the month.',
     tone: 'cyan'
   },
   {
@@ -66,7 +66,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '07',
     title: 'MAKE-UP 3X BONUS',
-    body: 'If your Weekly Challenge partner misses, complete one extra verified workout before the scoring week closes to earn the 3x Weekly Challenge Bonus.',
+    body: 'If your Weekly Challenge partner misses, complete one extra Verified workout before the scoring week closes to earn the 3x Weekly Challenge Bonus.',
     tone: 'pink'
   },
   {
@@ -140,8 +140,8 @@ export default function CommitmentRulesModal() {
       >
         <BrandScreenHeader
           description="Choose any published Weekly Goal. Your eligible scoring begins when enrollment is confirmed."
-          eyebrow="MONTHLY COMMITMENT"
-          title="LOCK YOUR MONTH CLEARLY"
+          eyebrow="WEEKLY GOAL"
+          title="CHOOSE YOUR GOAL CLEARLY"
         />
 
         <HUDBorderBox style={styles.atGlanceCard} tone="cyan">
@@ -149,13 +149,13 @@ export default function CommitmentRulesModal() {
             RULES AT A GLANCE
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            1. Choose a goal of 1-7 verified workout days per week.
+            1. Choose a Weekly Goal of 1-7 Verified workout days per week.
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            2. Only one verified workout per calendar day counts.
+            2. Only one Verified workout per calendar day counts.
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            3. Hit all four weekly goals to earn the Perfect Month bonus.
+            3. Hit all four Weekly Goals to earn the Perfect Month bonus.
           </TerminalText>
         </HUDBorderBox>
 

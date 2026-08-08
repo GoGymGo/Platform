@@ -70,7 +70,7 @@ export default function PublicDemoScreen() {
               {"HOME // TODAY'S OBJECTIVE"}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="caption">
-              See weekly progress, the next verified workout action and the
+              See weekly progress, the next Verified workout action and the
               competition snapshot in the updated interface.
             </TerminalText>
           </View>

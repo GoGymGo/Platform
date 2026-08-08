@@ -10,6 +10,16 @@ function clean(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
+function upstreamError(status: number) {
+  if (status === 429) {
+    return "We’ve received several update requests. Please wait a few minutes and try again.";
+  }
+  if (status >= 500) {
+    return "Regional updates are temporarily unavailable. Please try again shortly.";
+  }
+  return "Review your email and city or region, then try again.";
+}
+
 export async function POST(request: Request) {
   let payload: RegionalUpdatePayload;
 
@@ -49,16 +59,21 @@ export async function POST(request: Request) {
       method: "POST",
       signal: AbortSignal.timeout(10_000),
     });
-    const body = await response.text();
+    if (!response.ok) {
+      console.error("Regional update request upstream rejected", {
+        status: response.status,
+      });
+      return Response.json(
+        { error: upstreamError(response.status) },
+        { status: response.status },
+      );
+    }
 
-    return new Response(body || null, {
-      headers: {
-        "Content-Type":
-          response.headers.get("Content-Type") ?? "application/json",
-      },
-      status: response.status,
+    return Response.json({ saved: true }, { status: 201 });
+  } catch (error) {
+    console.error("Regional update request upstream unavailable", {
+      errorType: error instanceof Error ? error.name : "UnknownError",
     });
-  } catch {
     return Response.json(
       { error: "We couldn't save your update request. Please try again." },
       { status: 502 },

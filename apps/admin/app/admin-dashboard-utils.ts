@@ -117,8 +117,17 @@ export function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+export class AdminUserFacingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminUserFacingError";
+  }
+}
+
 export function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "The request could not be completed.";
+  return error instanceof AdminUserFacingError
+    ? error.message
+    : "The request could not be completed. Try again.";
 }
 
 export function authErrorMessage(error: unknown) {
@@ -129,7 +138,25 @@ export function authErrorMessage(error: unknown) {
   if (code.includes("invalid-credential")) return "The email or password is incorrect.";
   if (code.includes("popup-closed")) return "The sign-in window was closed before authentication finished.";
   if (code.includes("popup-blocked")) return "Your browser blocked the sign-in window. Allow pop-ups and try again.";
-  return errorMessage(error);
+  return "Sign-in could not be completed. Check your connection and try again.";
+}
+
+class AdminRequestError extends AdminUserFacingError {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminRequestError";
+  }
+}
+
+function adminRequestErrorMessage(status: number) {
+  if (status === 401) return "Your admin session expired. Sign in again.";
+  if (status === 403) return "Your account does not have permission to complete this action.";
+  if (status === 404) return "This record is no longer available. Refresh the dashboard and try again.";
+  if (status === 409) return "This record changed after you opened it. Refresh the dashboard and review the latest version.";
+  if (status === 400 || status === 422) return "The request could not be completed. Review the form and try again.";
+  if (status === 429) return "Too many requests were submitted. Wait a moment and try again.";
+  if (status >= 500) return "The GoGymGo admin service is temporarily unavailable. Try again shortly.";
+  return "The request could not be completed. Try again.";
 }
 
 export function toLocalDateTime(value: string) {
@@ -140,13 +167,22 @@ export function toLocalDateTime(value: string) {
 
 export function toIso(form: FormData, name: string) {
   const value = String(form.get(name) ?? "");
-  if (!value) throw new Error(`${name} is required.`);
-  return new Date(value).toISOString();
+  if (!value) throw new AdminUserFacingError(`${name} is required.`);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new AdminUserFacingError(`Enter a valid ${name}.`);
+  }
+  return date.toISOString();
 }
 
 export function optionalIso(value: FormDataEntryValue | null) {
   const normalized = optionalString(value);
-  return normalized ? new Date(normalized).toISOString() : undefined;
+  if (!normalized) return undefined;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    throw new AdminUserFacingError("Enter a valid date and time.");
+  }
+  return date.toISOString();
 }
 
 export function optionalString(value: FormDataEntryValue | null) {
@@ -182,17 +218,30 @@ export async function adminRequest<T>(
   path: string,
   options: { body?: unknown; method?: HttpMethod } = {},
 ): Promise<T> {
-  const token = await activeUser.getIdToken();
-  const response = await fetch(`/api/gogymgo/${path}`, {
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    cache: "no-store",
-    headers: {
-      authorization: `Bearer ${token}`,
-      ...(options.body ? { "content-type": "application/json" } : {}),
-      ...(options.method ? { "idempotency-key": crypto.randomUUID() } : {}),
-    },
-    method: options.method ?? "GET",
-  });
+  let token: string;
+  try {
+    token = await activeUser.getIdToken();
+  } catch {
+    throw new AdminRequestError("Your admin session could not be confirmed. Sign in again.");
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/gogymgo/${path}`, {
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      cache: "no-store",
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(options.body ? { "content-type": "application/json" } : {}),
+        ...(options.method ? { "idempotency-key": crypto.randomUUID() } : {}),
+      },
+      method: options.method ?? "GET",
+    });
+  } catch {
+    throw new AdminRequestError(
+      "The GoGymGo admin service could not be reached. Check your connection and try again.",
+    );
+  }
   const payload = (await response.json().catch(() => null)) as
     | { error?: { code?: string; message?: string } }
     | T
@@ -206,9 +255,12 @@ export async function adminRequest<T>(
             }
           ).error
         : undefined;
-    const message =
-      apiError?.message ?? "The GoGymGo API rejected this request.";
-    const error = new Error(message || "The request could not be completed.");
+    console.error("GoGymGo admin request failed", {
+      code: apiError?.code,
+      path,
+      status: response.status,
+    });
+    const error = new AdminRequestError(adminRequestErrorMessage(response.status));
     Object.assign(error, {
       code: apiError?.code,
       status: response.status,

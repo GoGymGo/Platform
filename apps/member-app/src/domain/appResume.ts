@@ -11,6 +11,7 @@ export type AppResumeTarget = {
 
 export type AppResumeState = {
   activeWorkout: boolean;
+  activeWorkoutRoute?: string;
   pendingChallengeInvite: boolean;
   setupRoute: string | null;
   unclaimedReward: boolean;
@@ -48,6 +49,7 @@ export function getAppResumeRequestStatus({
 
 export function getAppResumeTarget({
   activeWorkout,
+  activeWorkoutRoute = '/qr-scanner',
   pendingChallengeInvite,
   setupRoute,
   unclaimedReward
@@ -62,7 +64,7 @@ export function getAppResumeTarget({
   if (activeWorkout) {
     return {
       kind: 'active-workout',
-      route: '/workout/active'
+      route: activeWorkoutRoute
     };
   }
 

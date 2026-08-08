@@ -343,7 +343,7 @@ export default function SquadScreen() {
             </TerminalText>
             <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
               Weekly Challenges are complete. Each verified Bonus Day adds {weeklyGoal}{' '}
-              prize draw {weeklyGoal === 1 ? 'entry' : 'entries'} before the Perfect Month 10x.
+              Prize Draw {weeklyGoal === 1 ? 'Entry' : 'Entries'} before the Perfect Month 10x.
             </TerminalText>
           </HUDBorderBox>
         ) : (
@@ -382,7 +382,7 @@ export default function SquadScreen() {
             {showBonusDetails ? (
               <TerminalText style={styles.forfeitCopy} tone="muted" uppercase={false} variant="body">
                 Both players hit the goal: 2x each. If your partner misses, one
-                extra verified workout upgrades your week to 3x. The upgrade is
+                extra Verified workout upgrades your week to 3x. The upgrade is
                 automatic when no extra workout day is available.
               </TerminalText>
             ) : null}
@@ -552,7 +552,7 @@ function getMatchNote(
   weeklyGoal: number
 ) {
   if (period.availability === 'solo') {
-    return `No compatible partner was available. Hit ${weeklyGoal} verified workout days for the standard 1x result.`;
+    return `No compatible partner was available. Hit ${weeklyGoal} Verified workout days for the standard 1x result.`;
   }
 
   if (period.userGoalMet && period.opponentGoalMet) {
@@ -562,11 +562,11 @@ function getMatchNote(
   if (period.userGoalMet && period.bonusWorkoutCompleted) {
     return weeklyGoal === 7
       ? 'Your seven-day goal is complete. 3x activates automatically if your partner misses.'
-      : 'Your extra verified workout is complete. 3x is ready if your partner misses.';
+      : 'Your extra Verified workout is complete. 3x is ready if your partner misses.';
   }
 
   if (period.userGoalMet) {
-    return `Your ${weeklyGoal}-day goal is complete. Add one more verified workout to unlock 3x if your partner misses.`;
+    return `Your ${weeklyGoal}-day Weekly Goal is complete. Add one more Verified workout to unlock 3x if your partner misses.`;
   }
 
   const remaining = weeklyGoal - period.userVerifiedCount;

@@ -7,7 +7,7 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/faq" },
   description:
-    "Answers about GoGymGo September beta eligibility, regional updates, Weekly Goals, verified workouts, rewards, and brand partnerships.",
+    "Answers about GoGymGo September beta eligibility, Regional updates, Weekly Goals, Verified workouts, Rewards, and brand partnerships.",
   title: "Frequently asked questions",
 };
 
@@ -65,7 +65,7 @@ const questions = [
     answer: (
       <p>
         Joining is free and no purchase is required. Eligibility, regional
-        rules, published competition terms, and approved partner-gym access
+        rules, published Competition terms, and approved Partner gym access
         still apply. Read the{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
         before joining.
@@ -82,12 +82,12 @@ const questions = [
         not qualify.
       </p>
     ),
-    question: "Which gyms count as approved partner gyms?",
+    question: "Which gyms count as approved Partner gyms?",
   },
   {
     answer: (
       <p>
-        At an approved partner gym, scan the gym’s active poster on entry with a
+        At an approved Partner gym, scan the gym’s active poster on entry with a
         fresh eligible location reading. After at least 30 minutes, scan the
         same poster again. The server reviews the submitted evidence before
         awarding verified credit.
@@ -98,7 +98,7 @@ const questions = [
   {
     answer: (
       <p>
-        Your Weekly Goal is the number of verified workout days you commit to in
+        Your Weekly Goal is the number of Verified workout days you commit to in
         each scoring week. September participants choose from{" "}
         {septemberCampaign.weeklyGoalRange}, and the selection is locked after
         enrollment.
@@ -110,8 +110,8 @@ const questions = [
     answer: (
       <p>
         The September pilot has one {septemberCampaign.reward} cash reward
-        sponsored by {septemberCampaign.rewardSponsor}. Verified activity can
-        affect Prize Draw Entry weight, but category
+        sponsored by {septemberCampaign.rewardSponsor}. Verified workouts add
+        Prize Draw Entries under the published scoring rules, but category
         placement never guarantees the reward. An audited draw determines the
         reward winner after results settle. The published{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
@@ -165,7 +165,7 @@ export default function FaqPage() {
           <h1>Frequently asked questions</h1>
           <p>
             Start here for the difference between September registration,
-            regional updates, verified workouts, rewards, and partnerships.
+            Regional updates, Verified workouts, Rewards, and partnerships.
           </p>
         </header>
 

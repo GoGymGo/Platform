@@ -18,15 +18,15 @@ import { goBackOrReplace } from '@/navigation/goBack';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const loopSteps = [
-  ['COMMIT', 'Choose 1-7 verified workout days per week.'],
-  ['VERIFY', 'Scan the approved gym QR on entry and again after 30 minutes.'],
+  ['COMMIT', 'Choose 1-7 Verified workout days per week.'],
+  ['VERIFY', 'Scan the approved Partner gym QR on entry and again after 30 minutes.'],
   [
     'BUILD ODDS',
-    'Earn prize draw entries through consistency, teamwork and competition'
+    'Earn Prize Draw Entries through consistency, teamwork and Competition'
   ],
   [
-    'CLAIM REWARD',
-    'If you win, your physical prize or coupon code appears in My Rewards with brand claim instructions. No bank account is needed.'
+    'CLAIM AWARD',
+    'If you win, your Award appears in My Awards with brand claim instructions. No bank account is needed.'
   ]
 ] as const;
 
@@ -97,14 +97,14 @@ export default function HowItWorksScreen() {
         />
 
         <BrandScreenHeader
-          description="A quick reference for competition scoring, winning odds and brand rewards."
+          description="A quick reference for Competition scoring, winning odds and brand Rewards."
           eyebrow="COMPETITION GUIDE"
           title="HOW THE COMPETITION WORKS"
         />
 
         <HUDBorderBox style={styles.flowSummary} tone="cyan">
           <TerminalText tone="cyan" uppercase={false} variant="caption">
-            Choose goal → Verify workouts → Earn entries → Improve odds → Claim rewards
+            Choose Weekly Goal → Verify workouts → Earn Prize Draw Entries → Improve odds → Claim Award
           </TerminalText>
         </HUDBorderBox>
 
@@ -153,7 +153,7 @@ export default function HowItWorksScreen() {
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
             You and your Weekly Challenge partner both hit the goal: 2X each. If they miss and
-            you complete one extra verified workout, you earn 3X. When your goal uses
+            you complete one extra Verified workout, you earn 3X. When your Weekly Goal uses
             every available day, 3X is automatic if they miss. Add the four settled
             weekly results.
           </TerminalText>
@@ -190,7 +190,7 @@ export default function HowItWorksScreen() {
             04 // PERFECT MONTH // FINAL 10X
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Hit your weekly goal in all four scoring weeks to earn the Perfect Month.
+            Hit your Weekly Goal in all four scoring weeks to earn the Perfect Month.
             Its final 10X multiplies the combined Weekly Challenge subtotal, goal-group
             bonus and any Bonus Day entries.
           </TerminalText>
@@ -199,7 +199,7 @@ export default function HowItWorksScreen() {
               EXAMPLE // 4-DAY GOAL
             </TerminalText>
             <TerminalText style={styles.exampleIntro} tone="muted" uppercase={false} variant="body">
-              You hit four verified workout days in all four weeks, you and your Weekly
+              You hit four Verified workout days in all four weeks, you and your Weekly
               Challenge partner both hit each week, and you finish first in your goal group.
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">

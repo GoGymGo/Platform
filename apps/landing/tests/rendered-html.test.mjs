@@ -29,7 +29,7 @@ test("campaign facts have one landing-owned source of truth", async () => {
   assert.match(campaign, /September 1, 2026 at 12:00 a\.m\. PDT/);
   assert.match(campaign, /October 1, 2026 at 12:00 a\.m\. PDT/);
   assert.match(campaign, /REGISTRATION OPEN/);
-  assert.match(campaign, /can close when the competition ends, reaches an entrant cap, or is cancelled/);
+  assert.match(campaign, /can close when the Competition ends, reaches an entrant cap, or is cancelled/);
   assert.match(campaign, /Denman/);
   assert.match(campaign, /South Pender/);
   assert.match(campaign, /Thetis/);
@@ -62,15 +62,15 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.match(page, /siteLinks\.regionalUpdates/);
   assert.match(page, /siteLinks\.officialRules/);
   assert.match(page, /className="eyebrow campaign-status"/);
-  assert.match(page, /Set a weekly goal, verify partner-gym workouts/);
+  assert.match(page, /Set a Weekly Goal, verify workouts at a Partner gym/);
   assert.doesNotMatch(page, /hero-campaign-note|hero-action-note|hero-qualifiers/);
   assert.equal(
     (page.match(/OUTSIDE THE PILOT REGION\? GET REGIONAL UPDATES/g) ?? []).length,
     1,
   );
   assert.match(page, /className="hero-trust-signal"/);
-  assert.match(page, /Partner-gym workouts count only after review/);
-  assert.match(page, /Live availability, eligibility, and partner-gym status are confirmed/);
+  assert.match(page, /Verified workouts at Partner gyms count only after review/);
+  assert.match(page, /Live availability, eligibility, and Partner gym status are confirmed/);
   assert.match(page, /className="section conversion-section"/);
   assert.doesNotMatch(page, /proof-strip|proof-grid|brand-teaser-section|final-cta/);
   assert.match(page, /<details className="campaign-details">/);
@@ -224,6 +224,10 @@ test("regional updates are intentionally short and separate from registration", 
   assert.match(regionalRoute, /\/v1\/region-waitlist/);
   assert.doesNotMatch(regionalRoute, /getDb|env\.DB/);
   assert.match(interestRoute, /\/v1\/interest-submissions/);
+  assert.match(interestRoute, /Partnership requests are temporarily unavailable/);
+  assert.match(interestRoute, /partnershipInterests\.has/);
+  assert.doesNotMatch(interestRoute, /return new Response\(body/);
+  assert.doesNotMatch(regionalRoute, /return new Response\(body/);
   assert.doesNotMatch(interestRoute, /env\.DB|ensureInterestTable/);
 });
 
@@ -303,7 +307,7 @@ test("FAQ, contact and public information pages are scannable and discoverable",
   assert.match(faq, /className="faq-group-title"/);
   assert.match(faq, /<nav aria-label="FAQ sections" className="faq-jump-nav">/);
   assert.match(faq, /href=\{`#faq-\$\{group\.id\}`\}/);
-  assert.match(faq, /Which gyms count as approved partner gyms\?/);
+  assert.match(faq, /Which gyms count as approved Partner gyms\?/);
   assert.match(faq, /Does joining the update list register me for the beta\?/);
   assert.match(contact, /Gym-goer updates/);
   assert.match(contact, /Fitness brand partnerships/);

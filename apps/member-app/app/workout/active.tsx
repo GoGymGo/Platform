@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -22,6 +22,7 @@ import {
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
+import { legacyTimedWorkoutFlowAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
@@ -36,6 +37,14 @@ function formatClock(totalSeconds: number) {
 }
 
 export default function ActiveWorkoutScreen() {
+  if (!legacyTimedWorkoutFlowAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <LegacyActiveWorkoutScreen />;
+}
+
+function LegacyActiveWorkoutScreen() {
   useKeepAwake('gogymgo-active-workout', { suppressDeactivateWarnings: true });
   const reduceMotion = useReducedMotionPreference();
   const router = useRouter();
@@ -157,7 +166,7 @@ export default function ActiveWorkoutScreen() {
 
     return (
       <SessionUnavailable
-        body="Start from the Session tab so check-in, the timer, and verification checkpoints can be tracked together."
+        body="Start from the Train tab so the workout timer and verification steps can be tracked together."
         onAction={() => router.replace('/session' as Href)}
       />
     );
@@ -299,7 +308,7 @@ export default function ActiveWorkoutScreen() {
               VERIFICATION
             </TerminalText>
             <TerminalText tone={session.ready ? 'green' : 'cyan'} variant="label">
-              {isHeartRateVerification ? 'HEART RATE SESSION' : 'PARTNER GYM CHECK-IN'}
+              {isHeartRateVerification ? 'HEART RATE WORKOUT' : 'PARTNER GYM QR VERIFICATION'}
             </TerminalText>
           </View>
           <TerminalText tone={session.ready ? 'green' : 'cyan'} variant="micro">

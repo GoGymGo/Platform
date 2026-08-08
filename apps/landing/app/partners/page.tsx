@@ -6,7 +6,7 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/partners" },
   description:
-    "Explore GoGymGo partner-gym opportunities and future regional campaigns for gym operators and fitness brands.",
+    "Explore GoGymGo Partner gym opportunities and future regional campaigns for gym operators and fitness brands.",
   title: "Partner with GoGymGo",
 };
 
@@ -53,7 +53,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
             Build a partnership around real gym <span>visits.</span>
           </h1>
           <p>
-            GoGymGo reviews partner-gym and fitness-brand inquiries for future
+            GoGymGo reviews Partner gym and fitness-brand inquiries for future
             regional programs. Gym operators can explore active-poster
             verification, while brands can propose rewards and approved
             campaigns. The current September pilot reward is sponsored by

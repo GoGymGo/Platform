@@ -21,6 +21,10 @@ test('new-player App Tour starts onboarding without completed setup', async () =
   assert.equal(await account.getCurrentRegionVerification(), null);
   assert.equal(await account.getCurrentEnrollment(), null);
   assert.equal((await account.getLegalReceiptStatus()).complete, false);
+  assert.equal(
+    (await account.getCurrentCompetition(undefined, 'preview-region'))?.monthKey,
+    '2026-09'
+  );
 });
 
 test('new-player App Tour records each onboarding milestone in memory', async () => {

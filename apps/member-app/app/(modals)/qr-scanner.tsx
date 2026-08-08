@@ -28,6 +28,7 @@ import { createGymScanRepository } from '@/data/gymScanRepository';
 import {
   extractGymScanCredential,
   getGymScanRemainingSeconds,
+  isGymLocationAccuracyValidationMessage,
   isGymScanCompletionReady
 } from '@/domain/gymScan';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -540,8 +541,13 @@ function formatRemaining(totalSeconds: number) {
 }
 
 function getScanErrorMessage(error: unknown) {
-  if (error instanceof ApiError && error.status === 401) {
-    return 'Your account session expired. Sign in again, then rescan the poster.';
+  if (error instanceof ApiError) {
+    if (isGymLocationAccuracyValidationMessage(error.message)) {
+      return gymLocationAccuracyWarning;
+    }
+    if (error.status === 401) {
+      return 'Your account session expired. Sign in again, then rescan the poster.';
+    }
   }
   return getUserFacingErrorMessage(
     error,

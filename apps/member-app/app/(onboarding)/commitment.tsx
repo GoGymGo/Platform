@@ -35,8 +35,10 @@ import {
   type WeeklyMatchMultiplier
 } from '@/domain/campaignEconomics';
 import { getCompetitionMonthKey, getCompetitionRegionDateKey } from '@/domain/competition';
+import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
 import {
   buildRemainderDayOptions,
+  calculateMaximumCommitmentEntries,
   calculateMonthAwareCommitmentWeight,
   calculateRemainderDayEntries,
   getCompetitionRemainderDayCount,
@@ -166,6 +168,11 @@ export default function CommitmentScreen() {
       signupEntries: 0
     },
     categoryRank === 0 ? null : categoryRank,
+    upcomingCompetitionMonthKey,
+    { categoryPodiumMultipliers: categoryMultipliers }
+  );
+  const maximumDrawEntries = calculateMaximumCommitmentEntries(
+    days,
     upcomingCompetitionMonthKey,
     { categoryPodiumMultipliers: categoryMultipliers }
   );
@@ -402,20 +409,11 @@ export default function CommitmentScreen() {
             </View>
             <View style={styles.goalSummaryDivider} />
             <View style={styles.goalSummaryItem}>
-              <TerminalText style={styles.goalSummaryValue} tone="green" variant="title">
-                {days}
-              </TerminalText>
-              <TerminalText tone="dim" variant="micro">
-                ENTRIES / HIT WEEK
-              </TerminalText>
-            </View>
-            <View style={styles.goalSummaryDivider} />
-            <View style={styles.goalSummaryItem}>
               <TerminalText style={styles.goalSummaryValue} tone="pink" variant="title">
-                {baseMonthEntries}
+                {maximumDrawEntries.toLocaleString()}
               </TerminalText>
               <TerminalText tone="dim" variant="micro">
-                FOUR-WEEK BASE
+                MAXIMUM DRAW ENTRIES
               </TerminalText>
             </View>
             <View style={styles.bonusSummary}>
@@ -423,7 +421,7 @@ export default function CommitmentScreen() {
                 Earn more through consistency, teamwork and the Contest.
               </TerminalText>
               <CompactTextButton
-                label="VIEW BONUS DETAILS"
+                label="SEE HOW TO EARN MAXIMUM ENTRIES"
                 onPress={() => setShowCalculator(true)}
                 tone="amber"
               />
@@ -870,7 +868,10 @@ function getRegistrationErrorMessage(error: unknown) {
         'You must be within 75 metres of the Partner gym whose QR poster you scanned. Return to that gym and try again.'
     };
     if (code && messages[code]) return messages[code];
-    if (/location.+not accurate enough/i.test(error.message)) {
+    if (
+      /location.+not accurate enough/i.test(error.message) ||
+      isGymLocationAccuracyValidationMessage(error.message)
+    ) {
       return gymLocationAccuracyWarning;
     }
     if (error.status === 401) {

@@ -46,6 +46,7 @@ const appTourRegionVerificationId = '10000000-0000-4000-8000-000000000004';
 const appTourLegalBundleId = '10000000-0000-4000-8000-000000000005';
 const appTourUserId = 'app-tour-player';
 export const appTourAuthToken = 'app-tour-token';
+const appTourCompetitionMonthKey = '2026-09';
 export const appTourCompetitionRegistrationEvidence = {
   gymPresence: {
     accuracyMeters: 5,
@@ -276,7 +277,7 @@ AccountReadinessRepository {
     },
     getCurrentCompetition: async (expectedMonthKey) =>
       createCurrentCompetition(
-        expectedMonthKey ?? nowIso().slice(0, 7),
+        expectedMonthKey ?? appTourCompetitionMonthKey,
         'VANCOUVER ISLAND + GULF ISLANDS'
       ),
     getCurrentEnrollment: async () => enrollment,

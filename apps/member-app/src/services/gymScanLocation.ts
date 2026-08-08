@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 
 import { assertLiveServicesAllowed } from '@/config/demoMode';
+import { normalizeGymScanAccuracyMeters } from '@/domain/gymScan';
 
 export type GymScanLocationResult =
   | {
@@ -25,14 +26,14 @@ export async function readGymScanLocation(): Promise<GymScanLocationResult> {
     const location = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.High
     });
-    if (
-      location.coords.accuracy === null ||
-      !Number.isFinite(location.coords.accuracy)
-    ) {
+    const accuracyMeters = normalizeGymScanAccuracyMeters(
+      location.coords.accuracy
+    );
+    if (accuracyMeters === null) {
       return { status: 'location-unavailable' };
     }
     return {
-      accuracyMeters: Math.max(0.1, location.coords.accuracy),
+      accuracyMeters,
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
       status: 'location-read'

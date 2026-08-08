@@ -57,6 +57,13 @@ describe('month-aware commitment projections', () => {
     }
   });
 
+  it('shows 1,520 maximum entries for a four-day September goal', () => {
+    assert.equal(
+      calculateMaximumCommitmentEntries(4, '2026-09', settings),
+      1_520
+    );
+  });
+
   it('calculates every legal calculator path in the correct order', () => {
     const weeklyResultSets = Array.from({ length: 4 ** 4 }, (_, index) => {
       let remaining = index;

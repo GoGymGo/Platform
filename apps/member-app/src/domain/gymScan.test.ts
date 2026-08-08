@@ -4,7 +4,9 @@ import { describe, it } from 'node:test';
 import {
   extractGymScanCredential,
   getGymScanRemainingSeconds,
-  isGymScanCompletionReady
+  isGymLocationAccuracyValidationMessage,
+  isGymScanCompletionReady,
+  normalizeGymScanAccuracyMeters
 } from './gymScan';
 
 describe('gym scan credentials', () => {
@@ -40,6 +42,38 @@ describe('gym scan credentials', () => {
       extractGymScanCredential(`gogymgo://profile?credential=${credential}`),
       null
     );
+  });
+});
+
+describe('gym scan location accuracy', () => {
+  it('rounds browser readings up to the API precision without making them appear more accurate', () => {
+    assert.equal(normalizeGymScanAccuracyMeters(12.34567), 12.346);
+    assert.equal(normalizeGymScanAccuracyMeters(49.9999), 50);
+    assert.equal(normalizeGymScanAccuracyMeters(50.0001), 50.001);
+  });
+
+  it('keeps readings within the API range and rejects unavailable values', () => {
+    assert.equal(normalizeGymScanAccuracyMeters(0), 0.1);
+    assert.equal(normalizeGymScanAccuracyMeters(1_500), 1_000);
+    assert.equal(normalizeGymScanAccuracyMeters(null), null);
+    assert.equal(normalizeGymScanAccuracyMeters(Number.NaN), null);
+    assert.equal(normalizeGymScanAccuracyMeters(Number.POSITIVE_INFINITY), null);
+  });
+
+  it('recognizes enrollment and workout accuracy validation messages', () => {
+    assert.equal(
+      isGymLocationAccuracyValidationMessage(
+        'gymPresence.accuracyMeters must be a number conforming to the specified constraints'
+      ),
+      true
+    );
+    assert.equal(
+      isGymLocationAccuracyValidationMessage(
+        'accuracyMeters must be a number conforming to the specified constraints'
+      ),
+      true
+    );
+    assert.equal(isGymLocationAccuracyValidationMessage('credential must be a string'), false);
   });
 });
 

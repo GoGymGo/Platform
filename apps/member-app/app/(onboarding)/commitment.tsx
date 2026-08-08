@@ -41,10 +41,15 @@ import {
   type RemainderDayCount
 } from '@/domain/commitmentProjection';
 import { getCompetitionDateRange } from '@/domain/competitionEnrollment';
+import type { CreateCompetitionEnrollmentInput } from '@/domain/accountReadiness';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useCompetitionRegistration } from '@/hooks/useCompetitionRegistration';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { clearScreenMemory, useScreenMemory } from '@/hooks/useScreenMemory';
+import { ApiError } from '@/services/api/client';
+import { readGymScanLocation } from '@/services/gymScanLocation';
+import { readPendingGymScan } from '@/services/pendingGymScan';
+import { useAppTour } from '@/state/appTour';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 import { recordFlowMetric } from '@/services/flowMetrics';
@@ -63,6 +68,7 @@ type CategoryRank = 0 | 1 | 2 | 3;
 export default function CommitmentScreen() {
   const router = useRouter();
   const reduceMotion = useReducedMotionPreference();
+  const { active: appTourActive } = useAppTour();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const { user } = useAuth();
   const isHomeSource = source === 'home';
@@ -134,6 +140,10 @@ export default function CommitmentScreen() {
   const [ageEligibilityAttested, setAgeEligibilityAttested] = useState(false);
   const [competitionRulesAccepted, setCompetitionRulesAccepted] = useState(false);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [gymPresenceStatus, setGymPresenceStatus] = useState<'checking' | 'missing' | 'ready'>(
+    'checking'
+  );
+  const [gymPresenceBusy, setGymPresenceBusy] = useState(false);
   const calculatorDialogRef = useRef<View>(null);
   const baseMonthEntries = days * 4;
   const weeklyMatchEntries = calculateWeeklyMatchEntries(days, weeklyMatchMultipliers);
@@ -172,6 +182,28 @@ export default function CommitmentScreen() {
     void recordFlowMetric(user?.uid, 'weekly-goal-viewed', 'weekly-goal');
   }, [user?.uid]);
 
+  useEffect(() => {
+    let active = true;
+
+    if (appTourActive || registration.alreadyEnrolled) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void readPendingGymScan()
+      .then((pending) => {
+        if (active) setGymPresenceStatus(pending ? 'ready' : 'missing');
+      })
+      .catch(() => {
+        if (active) setGymPresenceStatus('missing');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [appTourActive, registration.alreadyEnrolled]);
+
   function selectWeeklyMatchResult(index: number, multiplier: WeeklyMatchMultiplier) {
     setWeeklyMatchMultipliers((current) =>
       current.map((value, currentIndex) => (currentIndex === index ? multiplier : value))
@@ -193,7 +225,34 @@ export default function CommitmentScreen() {
     }
 
     try {
-      const enrollmentResult = await registration.register(days);
+      setGymPresenceBusy(true);
+      let gymPresence: CreateCompetitionEnrollmentInput['gymPresence'] | undefined;
+      if (!appTourActive && !registration.alreadyEnrolled) {
+        const pendingScan = await readPendingGymScan();
+        if (!pendingScan) {
+          setGymPresenceStatus('missing');
+          setConfirmationError(
+            'Scan the active QR poster at a Partner gym before confirming registration.'
+          );
+          return;
+        }
+        const location = await readGymScanLocation();
+        if (location.status !== 'location-read') {
+          setConfirmationError(
+            location.status === 'permission-denied'
+              ? 'Location access is required to confirm you are within 75 metres of the Partner gym. Allow location, then try again.'
+              : 'Your live location could not be read. Check location services at the gym, then try again.'
+          );
+          return;
+        }
+        gymPresence = {
+          accuracyMeters: location.accuracyMeters,
+          credential: pendingScan.credential,
+          latitude: location.latitude,
+          longitude: location.longitude
+        };
+      }
+      const enrollmentResult = await registration.register(days, gymPresence);
       setWeeklyGoal(enrollmentResult.goalDays, upcomingCompetitionMonthKey);
       [
         'days',
@@ -216,14 +275,16 @@ export default function CommitmentScreen() {
         });
       }
     } catch (error) {
-      setConfirmationError(getUserFacingErrorMessage(
-        error,
-        'Registration could not be completed. Your selections are still here; try again.'
-      ));
+      setConfirmationError(getRegistrationErrorMessage(error));
+    } finally {
+      setGymPresenceBusy(false);
     }
   }
 
-  const registrationRequirementsAccepted = ageEligibilityAttested && competitionRulesAccepted;
+  const gymPresenceReady =
+    appTourActive || registration.alreadyEnrolled || gymPresenceStatus === 'ready';
+  const registrationRequirementsAccepted =
+    ageEligibilityAttested && competitionRulesAccepted && gymPresenceReady;
 
   return (
     <FirstRunScreen>
@@ -365,6 +426,26 @@ export default function CommitmentScreen() {
                 label="VIEW OFFICIAL CONTEST RULES"
                 onPress={() => router.push('/official-rules')}
               />
+              <HUDBorderBox
+                style={styles.presenceConfirmation}
+                tone={gymPresenceReady ? 'cyan' : 'amber'}
+              >
+                <TerminalText tone={gymPresenceReady ? 'cyan' : 'amber'} variant="micro">
+                  GYM LOCATION CONFIRMATION
+                </TerminalText>
+                <TerminalText tone="muted" uppercase={false} variant="caption">
+                  {gymPresenceReady
+                    ? 'Partner gym QR scanned. When you confirm, GoGymGo will use a fresh location reading to check that you are still within 75 metres of this gym.'
+                    : 'At a Partner gym, scan its active GoGymGo QR poster. Keep location access on—you must be within 75 metres when you confirm.'}
+                </TerminalText>
+                {!registration.alreadyEnrolled && !appTourActive ? (
+                  <CompactTextButton
+                    label={gymPresenceReady ? 'RESCAN PARTNER GYM QR' : 'SCAN PARTNER GYM QR'}
+                    onPress={() => router.push('/qr-scanner?enrollment=1')}
+                    tone={gymPresenceReady ? 'cyan' : 'amber'}
+                  />
+                ) : null}
+              </HUDBorderBox>
               <LegalConsentCheckbox
                 checked={competitionRulesAccepted}
                 label={`I accept the Contest rules and lock my ${days}-day Weekly Goal.`}
@@ -381,8 +462,14 @@ export default function CommitmentScreen() {
             </HUDBorderBox>
 
             <FirstRunPrimaryButton
-              disabled={!registrationRequirementsAccepted || registration.busy}
-              label={registration.busy ? 'CHECKING REGISTRATION...' : 'CONFIRM + REGISTER ->'}
+              disabled={!registrationRequirementsAccepted || registration.busy || gymPresenceBusy}
+              label={
+                gymPresenceBusy
+                  ? 'CHECKING GYM LOCATION...'
+                  : registration.busy
+                    ? 'CHECKING REGISTRATION...'
+                    : 'CONFIRM + REGISTER ->'
+              }
               onPress={() => void confirmWeeklyGoal()}
               style={styles.topConfirmButton}
             />
@@ -725,6 +812,47 @@ function ChoiceControl({
   );
 }
 
+function getRegistrationErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    const code = getApiErrorCode(error.body);
+    const messages: Record<string, string> = {
+      GYM_INACTIVE:
+        'This Partner gym is not currently active. Ask the gym or try another participating location.',
+      GYM_LOCATION_INACCURATE:
+        'Your location is not accurate enough. Move closer to the poster or a window, then try again.',
+      GYM_NOT_ELIGIBLE_FOR_COMPETITION:
+        'This Partner gym is not participating in the current regional Contest.',
+      GYM_QR_INVALID:
+        'That gym QR is inactive or has been replaced. Scan the current GoGymGo poster and try again.',
+      OUTSIDE_GYM_GEOFENCE:
+        'You must be within 75 metres of the Partner gym whose QR poster you scanned. Return to that gym and try again.'
+    };
+    if (code && messages[code]) return messages[code];
+    if (error.status === 401) {
+      return 'Your account session expired. Sign in again, then confirm registration.';
+    }
+    if (error.status < 500 && error.message.trim().length <= 180) {
+      return error.message.trim();
+    }
+  }
+
+  return getUserFacingErrorMessage(
+    error,
+    'Registration could not be completed. Your selections are still here; try again.'
+  );
+}
+
+function getApiErrorCode(body: unknown) {
+  if (!body || typeof body !== 'object') return null;
+  const direct = body as { code?: unknown; error?: unknown };
+  if (typeof direct.code === 'string') return direct.code;
+  if (direct.error && typeof direct.error === 'object') {
+    const nested = direct.error as { code?: unknown };
+    return typeof nested.code === 'string' ? nested.code : null;
+  }
+  return null;
+}
+
 const styles = StyleSheet.create({
   scroll: {
     flex: 1
@@ -766,6 +894,11 @@ const styles = StyleSheet.create({
   registrationConsent: {
     gap: spacing.sm,
     padding: spacing.lg
+  },
+  presenceConfirmation: {
+    gap: spacing.xs,
+    marginVertical: spacing.xs,
+    padding: spacing.md
   },
   joinWindowNotice: {
     gap: spacing.xs,

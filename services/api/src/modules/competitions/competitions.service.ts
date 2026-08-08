@@ -4,15 +4,18 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import type { Database, JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { normalizeDateKey } from '../../database/date-key';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import {
+  hashOpaqueValue,
+  isAcceptableLocationAccuracy,
+} from '../gyms/gym-scan-policy';
 import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
-import { VerificationConsentsService } from '../legal/verification-consents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import {
   calculateStreaks,
@@ -76,7 +79,6 @@ export class CompetitionsService {
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
     private readonly legalDocuments: LegalDocumentsService,
-    private readonly verificationConsents: VerificationConsentsService,
     private readonly profiles: ProfilesService,
   ) {}
 
@@ -235,6 +237,13 @@ export class CompetitionsService {
           legalReceiptBundleId: request.legalReceiptBundleId ?? null,
           regionVerificationId: request.regionVerificationId,
           rulesAccepted: request.rulesAccepted,
+          gymPresence: {
+            accuracyMeters: request.gymPresence.accuracyMeters,
+            credentialHash: hashOpaqueValue(request.gymPresence.credential),
+            locationHash: hashOpaqueValue(
+              `${request.gymPresence.latitude}:${request.gymPresence.longitude}`,
+            ),
+          },
         },
         responseCode: 201,
         scope: 'competition-enrollments:create',
@@ -319,6 +328,74 @@ export class CompetitionsService {
           };
         }
 
+        const gymPresence = await transaction
+          .selectFrom('gym_qr_credentials as credential')
+          .innerJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'credential.gym_location_id',
+          )
+          .select([
+            'credential.credential_version',
+            'credential.status as credential_status',
+            'gym.active as gym_active',
+            'gym.id as gym_id',
+            'gym.name as gym_name',
+            sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
+              'presence_radius_meters',
+            ),
+            sql<boolean>`ST_DWithin(
+              ${sql.ref('gym.coordinates')},
+              ST_SetSRID(ST_MakePoint(${request.gymPresence.longitude}, ${request.gymPresence.latitude}), 4326)::geography,
+              LEAST(${sql.ref('gym.radius_meters')}, 75)
+            )`.as('within_geofence'),
+          ])
+          .where(
+            'credential.token_hash',
+            '=',
+            hashOpaqueValue(request.gymPresence.credential),
+          )
+          .executeTakeFirst();
+        if (!gymPresence || gymPresence.credential_status !== 'active') {
+          throw new UnprocessableEntityException({
+            code: 'GYM_QR_INVALID',
+            message:
+              'Scan the active GoGymGo QR poster at a Partner gym to confirm your gym location for enrollment.',
+          });
+        }
+        if (!gymPresence.gym_active) {
+          throw new ConflictException({
+            code: 'GYM_INACTIVE',
+            message: 'This Partner gym is not currently active.',
+          });
+        }
+        if (!isAcceptableLocationAccuracy(request.gymPresence.accuracyMeters)) {
+          throw new UnprocessableEntityException({
+            code: 'GYM_LOCATION_INACCURATE',
+            message:
+              'Your location is not accurate enough to confirm gym presence. Move closer to the poster or a window, then try again.',
+          });
+        }
+        if (!gymPresence.within_geofence) {
+          throw new UnprocessableEntityException({
+            code: 'OUTSIDE_GYM_GEOFENCE',
+            message: `You must be within ${gymPresence.presence_radius_meters} metres of ${gymPresence.gym_name} to enroll.`,
+          });
+        }
+        const eligibleGym = await transaction
+          .selectFrom('competition_gym_locations')
+          .select('gym_location_id')
+          .where('competition_id', '=', competition.id)
+          .where('gym_location_id', '=', gymPresence.gym_id)
+          .executeTakeFirst();
+        if (!eligibleGym) {
+          throw new UnprocessableEntityException({
+            code: 'GYM_NOT_ELIGIBLE_FOR_COMPETITION',
+            message:
+              'This Partner gym is not eligible for the current regional Contest.',
+          });
+        }
+
         const [bracket, verification, enrollmentCount] = await Promise.all([
           transaction
             .selectFrom('competition_goal_brackets')
@@ -399,10 +476,6 @@ export class CompetitionsService {
           `${verification.country_code}-${verification.subdivision_code}`,
           request.legalReceiptBundleId,
         );
-        await this.verificationConsents.assertActiveDevicePresenceConsent(
-          transaction,
-          user.id,
-        );
 
         const acceptance = await transaction
           .insertInto('competition_rule_acceptances')
@@ -413,6 +486,9 @@ export class CompetitionsService {
             competition_id: competition.id,
             metadata: {
               contestType: 'brand_rewards',
+              gymCredentialVersion: gymPresence.credential_version,
+              gymLocationId: gymPresence.gym_id,
+              presenceVerification: 'gym_qr_geofence',
               source: 'mobile',
             },
             rules_version: competition.rules_version,

@@ -44,6 +44,12 @@ test('new-player App Tour records each onboarding milestone in memory', async ()
   const enrollment = await account.enrollInCompetition(competition.id, {
     ageEligibilityAttested: true,
     goalDays: 4,
+    gymPresence: {
+      accuracyMeters: 5,
+      credential: 'app-tour-gym-credential-000000000001',
+      latitude: 49.2827,
+      longitude: -123.1207
+    },
     legalReceiptBundleId: legalReceipt.receiptBundleId,
     regionVerificationId: verification.id,
     rulesAccepted: true

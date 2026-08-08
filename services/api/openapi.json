@@ -4971,6 +4971,20 @@
         },
         "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
       },
+      "EnrollmentGymPresenceDto": {
+        "type": "object",
+        "properties": {
+          "credential": { "type": "string", "maxLength": 256, "minLength": 32 },
+          "latitude": { "type": "number", "maximum": 90, "minimum": -90 },
+          "longitude": { "type": "number", "maximum": 180, "minimum": -180 },
+          "accuracyMeters": {
+            "type": "number",
+            "maximum": 1000,
+            "minimum": 0.1
+          }
+        },
+        "required": ["credential", "latitude", "longitude", "accuracyMeters"]
+      },
       "CreateEnrollmentDto": {
         "type": "object",
         "properties": {
@@ -4978,14 +4992,18 @@
           "regionVerificationId": { "type": "string", "format": "uuid" },
           "legalReceiptBundleId": { "type": "string", "format": "uuid" },
           "rulesAccepted": { "type": "boolean", "enum": [true] },
-          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
+          "ageEligibilityAttested": { "type": "boolean", "enum": [true] },
+          "gymPresence": {
+            "$ref": "#/components/schemas/EnrollmentGymPresenceDto"
+          }
         },
         "required": [
           "goalDays",
           "regionVerificationId",
           "legalReceiptBundleId",
           "rulesAccepted",
-          "ageEligibilityAttested"
+          "ageEligibilityAttested",
+          "gymPresence"
         ]
       },
       "EnrollmentCountResponseDto": {

@@ -48,7 +48,7 @@ export interface components {
     CreateCreatorVideoSubmissionDto: { durationMinutes: number; notes?: string; regionCode: string; rightsAccepted: true; sponsorDisclosure?: string; syntheticMediaDisclosed: boolean; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
     CreateCreatorWorkoutDto: { creatorName: string; creatorUserId?: string; durationMinutes: number; reason: string; regionCodes: Array<string>; sponsorName?: string; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
     CreateCreatorWorkoutPlanDto: { note?: string; plannedDate: string };
-    CreateEnrollmentDto: { ageEligibilityAttested: true; goalDays: number; legalReceiptBundleId: string; regionVerificationId: string; rulesAccepted: true };
+    CreateEnrollmentDto: { ageEligibilityAttested: true; goalDays: number; gymPresence: components['schemas']["EnrollmentGymPresenceDto"]; legalReceiptBundleId: string; regionVerificationId: string; rulesAccepted: true };
     CreateGymLocationDto: { address: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     CreatePrivacyRequestDto: { reason?: string; requestType: "delete" | "export" };
     CreateRegionPolicyDto: { boundary: Record<string, unknown>; boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: "CAD" | "MXN" | "USD"; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; reason: string; subdivisionCode: string; timezone: string; validFrom: string; validTo?: string };
@@ -71,6 +71,7 @@ export interface components {
     DeviceAttestationReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniqueTokenCount: number };
     EligibleWeeklyChallengePartnerDto: { alias: string; goalDays: number; requestStatus: "available" | "pending"; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     EnrollmentCountResponseDto: { count: number };
+    EnrollmentGymPresenceDto: { accuracyMeters: number; credential: string; latitude: number; longitude: number };
     EnrollmentResponseDto: { competitionId: string; enrolledAt: string; goalDays: number; id: string; status: "active" | "withdrawn" | "disqualified" };
     FriendRequestDecisionDto: { decision: "accepted" | "declined" };
     FriendRequestDecisionResponseDto: { requestId: string; status: "accepted" | "declined" };
@@ -1471,6 +1472,7 @@ export type DecideRegionVerificationDto = components['schemas']["DecideRegionVer
 export type DeviceAttestationReviewDto = components['schemas']["DeviceAttestationReviewDto"];
 export type EligibleWeeklyChallengePartnerDto = components['schemas']["EligibleWeeklyChallengePartnerDto"];
 export type EnrollmentCountResponseDto = components['schemas']["EnrollmentCountResponseDto"];
+export type EnrollmentGymPresenceDto = components['schemas']["EnrollmentGymPresenceDto"];
 export type EnrollmentResponseDto = components['schemas']["EnrollmentResponseDto"];
 export type FriendRequestDecisionDto = components['schemas']["FriendRequestDecisionDto"];
 export type FriendRequestDecisionResponseDto = components['schemas']["FriendRequestDecisionResponseDto"];

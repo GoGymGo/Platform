@@ -47,6 +47,12 @@ const appTourLegalBundleId = '10000000-0000-4000-8000-000000000005';
 const appTourUserId = 'app-tour-player';
 export const appTourAuthToken = 'app-tour-token';
 export const appTourCompetitionRegistrationEvidence = {
+  gymPresence: {
+    accuracyMeters: 5,
+    credential: 'app-tour-gym-credential-000000000001',
+    latitude: 49.2827,
+    longitude: -123.1207
+  },
   legalReceiptBundleId: 'app-tour-legal-receipt',
   regionVerificationId: 'app-tour-region-verification'
 } as const;

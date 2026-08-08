@@ -93,6 +93,12 @@ describe('account readiness repository', () => {
       {
         ageEligibilityAttested: true,
         goalDays: 4,
+        gymPresence: {
+          accuracyMeters: 8,
+          credential: 'partner-gym-credential-000000000001',
+          latitude: 49.2827,
+          longitude: -123.1207
+        },
         legalReceiptBundleId: '20000000-0000-4000-8000-000000000001',
         regionVerificationId: '30000000-0000-4000-8000-000000000002',
         rulesAccepted: true
@@ -130,6 +136,19 @@ describe('account readiness repository', () => {
       latitude: 49.2827,
       longitude: -123.1207,
       method: 'device_location'
+    });
+    assert.deepEqual(requests[1].body, {
+      ageEligibilityAttested: true,
+      goalDays: 4,
+      gymPresence: {
+        accuracyMeters: 8,
+        credential: 'partner-gym-credential-000000000001',
+        latitude: 49.2827,
+        longitude: -123.1207
+      },
+      legalReceiptBundleId: '20000000-0000-4000-8000-000000000001',
+      regionVerificationId: '30000000-0000-4000-8000-000000000002',
+      rulesAccepted: true
     });
   });
 

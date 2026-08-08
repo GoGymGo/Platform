@@ -4,7 +4,9 @@ import {
   useEnrollInCompetition,
   useLegalReceiptStatus
 } from '@/data/accountReadinessHooks';
+import { UserFacingError } from '@/components/reliability';
 import type { CompetitionRegionVerification } from '@/config/regions';
+import type { CreateCompetitionEnrollmentInput } from '@/domain/accountReadiness';
 import { useAppTour } from '@/state/appTour';
 import { appTourCompetitionRegistrationEvidence } from '@/testing/appTourData';
 
@@ -27,11 +29,14 @@ export function useCompetitionRegistration({
   const competition = publishedCompetition.data ?? null;
   const competitionMonthKey = competition?.monthKey ?? defaultMonthKey;
 
-  async function register(goalDays: number) {
+  async function register(
+    goalDays: number,
+    gymPresence?: CreateCompetitionEnrollmentInput['gymPresence']
+  ) {
     const existingEnrollment = currentEnrollment.data;
     if (existingEnrollment && !appTourActive) {
       if (existingEnrollment.goalDays !== goalDays) {
-        throw new Error(
+        throw new UserFacingError(
           `You are already enrolled with a ${existingEnrollment.goalDays}-day Weekly Goal. Contact support if that enrollment is incorrect.`
         );
       }
@@ -39,10 +44,10 @@ export function useCompetitionRegistration({
     }
 
     if (!competition) {
-      throw new Error('No published regional contest is available to join.');
+      throw new UserFacingError('No published regional Contest is available to join.');
     }
     if (!competition.goalDays.includes(goalDays)) {
-      throw new Error('That Weekly Goal is not available in this contest.');
+      throw new UserFacingError('That Weekly Goal is not available in this Contest.');
     }
     if (appTourActive) {
       return enrollInCompetition.mutateAsync({
@@ -56,11 +61,18 @@ export function useCompetitionRegistration({
       });
     }
     if (regionVerification?.status !== 'verified' || !regionVerification.verificationId) {
-      throw new Error('An approved region verification is required before registration.');
+      throw new UserFacingError('An approved region verification is required before registration.');
     }
     const receipt = legalReceipt.data;
     if (!receipt?.complete || !receipt.receiptBundleId) {
-      throw new Error('Review and accept Privacy & Permissions before contest registration.');
+      throw new UserFacingError(
+        'Review and accept Privacy & Permissions before Contest registration.'
+      );
+    }
+    if (!gymPresence) {
+      throw new UserFacingError(
+        'Scan the active QR poster at a Partner gym before confirming registration.'
+      );
     }
 
     return enrollInCompetition.mutateAsync({
@@ -68,6 +80,7 @@ export function useCompetitionRegistration({
       input: {
         ageEligibilityAttested: true,
         goalDays,
+        gymPresence,
         legalReceiptBundleId: receipt.receiptBundleId,
         regionVerificationId: regionVerification.verificationId,
         rulesAccepted: true
@@ -76,6 +89,7 @@ export function useCompetitionRegistration({
   }
 
   return {
+    alreadyEnrolled: Boolean(currentEnrollment.data) && !appTourActive,
     busy:
       publishedCompetition.isLoading ||
       currentEnrollment.isLoading ||

@@ -698,18 +698,6 @@ export class AdminCompetitionConfigurationService {
         .select('id')
         .where('competition_id', '=', competition.id)
         .where('status', '=', 'published')
-        .where((expression) =>
-          expression.or([
-            expression('available_from', 'is', null),
-            expression('available_from', '<=', competition.ends_at),
-          ]),
-        )
-        .where((expression) =>
-          expression.or([
-            expression('available_until', 'is', null),
-            expression('available_until', '>', competition.ends_at),
-          ]),
-        )
         .executeTakeFirst(),
       rules.requireGymQr
         ? transaction
@@ -757,7 +745,7 @@ export class AdminCompetitionConfigurationService {
       throw new ConflictException({
         code: 'COMPETITION_REWARD_REQUIRED',
         message:
-          'Publish at least one eligible reward before publishing the competition.',
+          'Publish at least one reward before publishing the competition.',
       });
     }
     if (rules.requireGymQr && !activeGym) {

@@ -542,7 +542,7 @@ export default function HomeScreen() {
               : activeSession
                ? 'Return to workout'
                : workoutUnavailable
-                 ? `VERIFIED WORKOUTS START ${competitionStartMonth.toUpperCase()} 1`
+                 ? 'VERIFIED WORKOUTS NOT YET OPEN'
                  : 'Start workout'}
             onPress={() => {
               if (workoutEntryTarget === 'setup' && setupRoute) {

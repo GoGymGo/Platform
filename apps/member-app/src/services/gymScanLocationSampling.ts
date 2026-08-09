@@ -8,6 +8,7 @@ export type GymScanLocationResult =
       status: 'location-read';
     }
   | { status: 'permission-denied' }
+  | { status: 'mobile-required' }
   | { status: 'location-unavailable' };
 
 export type GymScanWebReading = {
@@ -80,10 +81,13 @@ export function readFreshGymScanWebLocation(
       }
     };
 
-    const minimumWaitTimer = setTimeout(() => {
-      minimumWaitElapsed = true;
-      maybeSettleAccurateReading();
-    }, Math.max(0, policy.minimumWaitMs));
+    const minimumWaitTimer = setTimeout(
+      () => {
+        minimumWaitElapsed = true;
+        maybeSettleAccurateReading();
+      },
+      Math.max(0, policy.minimumWaitMs)
+    );
     const maximumWaitTimer = setTimeout(
       settleWithBestReading,
       Math.max(policy.minimumWaitMs, policy.maximumWaitMs)
@@ -92,10 +96,7 @@ export function readFreshGymScanWebLocation(
     watchId = geolocation.watchPosition(
       (reading) => {
         const candidate = normalizeGymScanWebReading(reading);
-        if (
-          candidate &&
-          (!bestReading || candidate.accuracyMeters < bestReading.accuracyMeters)
-        ) {
+        if (candidate && (!bestReading || candidate.accuracyMeters < bestReading.accuracyMeters)) {
           bestReading = candidate;
         }
         maybeSettleAccurateReading();

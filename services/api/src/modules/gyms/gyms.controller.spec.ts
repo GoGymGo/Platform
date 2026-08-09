@@ -33,6 +33,7 @@ describe('gym controllers', () => {
       status: 'assigned',
     }),
     createGymLocation: jest.fn().mockResolvedValue({ id: 'gym-1' }),
+    getActiveCredential: jest.fn().mockResolvedValue({ id: 'credential-1' }),
     issueCredential: jest.fn().mockResolvedValue({ id: 'credential-1' }),
     listAuditHistory: jest.fn().mockResolvedValue([]),
     listGymLocations: jest.fn().mockResolvedValue([]),
@@ -126,6 +127,7 @@ describe('gym controllers', () => {
       idempotencyKey,
       reason,
     );
+    await controller.getActiveCredential(principal, 'gym-1');
     await controller.revokeCredential(
       principal,
       'gym-1',
@@ -163,6 +165,7 @@ describe('gym controllers', () => {
       idempotencyKey,
       reason.reason,
     );
+    expect(mocks.getActiveCredential).toHaveBeenCalledWith(principal, 'gym-1');
     expect(mocks.revokeCredential).toHaveBeenCalledWith(
       principal,
       'gym-1',

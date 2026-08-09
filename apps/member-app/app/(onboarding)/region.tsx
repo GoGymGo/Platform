@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 
@@ -19,6 +19,7 @@ import { OnboardingHeader } from '@/components/onboarding';
 import { getUserFacingErrorMessage } from '@/components/reliability';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { submitRegionWaitlist } from '@/data/regionWaitlistRepository';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { ApiError } from '@/services/api/client';
@@ -38,19 +39,25 @@ type VerificationState =
   | 'unsupported-region';
 
 export default function RegionScreen() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
+  }
+
+  return <MobileRegionScreen />;
+}
+
+function MobileRegionScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const { api } = useApi();
   const { user } = useAuth();
   const { source } = useLocalSearchParams<{ source?: string }>();
-  const {
-    competitionRegion,
-    regionVerification,
-    verifyCompetitionRegion
-  } = useCompetitionRegion();
+  const { competitionRegion, regionVerification, verifyCompetitionRegion } = useCompetitionRegion();
   const createRegionVerification = useCreateRegionVerification();
-  const [verificationState, setVerificationState] =
-    useState<VerificationState>('idle');
+  const [verificationState, setVerificationState] = useState<VerificationState>('idle');
   const [requestedRegion, setRequestedRegion] = useState('');
   const [waitlistBusy, setWaitlistBusy] = useState(false);
   const [waitlistJoined, setWaitlistJoined] = useState(false);
@@ -59,8 +66,7 @@ export default function RegionScreen() {
   const isHomeSource = source === 'home';
   const isGymScanSource = source === 'gym-scan';
   const approvedRegionReady =
-    regionVerification?.status === 'verified' &&
-    Boolean(regionVerification.verificationId);
+    regionVerification?.status === 'verified' && Boolean(regionVerification.verificationId);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const permissionDeniedMessage =
     'LOCATION ACCESS WAS NOT ALLOWED. ENABLE LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
@@ -88,7 +94,9 @@ export default function RegionScreen() {
 
     const result = await verifyCompetitionRegionWithDeviceLocation();
     if (result.status !== 'location-read') {
-      setVerificationState(result.status);
+      setVerificationState(
+        result.status === 'mobile-required' ? 'location-unavailable' : result.status
+      );
       return;
     }
 
@@ -126,10 +134,12 @@ export default function RegionScreen() {
       });
       setWaitlistJoined(true);
     } catch (error) {
-      setWaitlistError(getUserFacingErrorMessage(
-        error,
-        'Your Regional updates request could not be saved. Check your connection and try again.'
-      ));
+      setWaitlistError(
+        getUserFacingErrorMessage(
+          error,
+          'Your Regional updates request could not be saved. Check your connection and try again.'
+        )
+      );
     } finally {
       setWaitlistBusy(false);
     }
@@ -145,10 +155,9 @@ export default function RegionScreen() {
       >
         <OnboardingHeader
           label={isProfileSource ? 'CONTEST REGION' : 'REGION + AGREEMENTS'}
-          onBack={() => goBackOrReplace(
-            router,
-            isProfileSource ? '/profile' : isHomeSource ? '/home' : '/join'
-          )}
+          onBack={() =>
+            goBackOrReplace(router, isProfileSource ? '/profile' : isHomeSource ? '/home' : '/join')
+          }
           progress={isProfileSource ? 100 : 50}
           step={isProfileSource ? 'PROFILE' : 'SETUP // 1 OF 2'}
         />
@@ -160,12 +169,7 @@ export default function RegionScreen() {
               ? 'REGION VERIFIED'
               : 'VERIFY YOUR REGION'}
         </TerminalText>
-        <TerminalText
-          style={styles.body}
-          tone="muted"
-          uppercase={false}
-          variant="body"
-        >
+        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           {approvedRegionReady && !isProfileSource
             ? `${competitionRegion.label} sets your contest, available rewards and local scoring time.`
             : 'Your verified location sets your regional contest, available rewards and local scoring time.'}
@@ -177,9 +181,8 @@ export default function RegionScreen() {
               ONE-TIME LOCATION CHECK
             </TerminalText>
             <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
-              GoGymGo sends your location once for a secure region check. We
-              save the approved region—not your coordinates—and never track you
-              in the background.
+              GoGymGo sends your location once for a secure region check. We save the approved
+              region—not your coordinates—and never track you in the background.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -216,10 +219,7 @@ export default function RegionScreen() {
         ) : null}
 
         {verificationState === 'permission-denied' ? (
-          <AuthStatusNotice
-            message={permissionDeniedMessage}
-            tone="amber"
-          />
+          <AuthStatusNotice message={permissionDeniedMessage} tone="amber" />
         ) : null}
         {verificationState === 'location-unavailable' ? (
           <AuthStatusNotice
@@ -233,9 +233,9 @@ export default function RegionScreen() {
               OUTSIDE THE SEPTEMBER PILOT REGION
             </TerminalText>
             <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
-              The September pilot is available only on Vancouver Island and
-              the supported Gulf Islands. We will not place you in Toronto or
-              show another region&apos;s sample contest.
+              The September pilot is available only on Vancouver Island and the supported Gulf
+              Islands. We will not place you in Toronto or show another region&apos;s sample
+              contest.
             </TerminalText>
             <CyberButtonOutline
               label="TRY LOCATION AGAIN"
@@ -257,9 +257,7 @@ export default function RegionScreen() {
                   placeholder="Example: Nanaimo, BC"
                   value={requestedRegion}
                 />
-                {waitlistError ? (
-                  <AuthStatusNotice message={waitlistError} tone="red" />
-                ) : null}
+                {waitlistError ? <AuthStatusNotice message={waitlistError} tone="red" /> : null}
                 <FirstRunPrimaryButton
                   disabled={waitlistBusy}
                   label={waitlistBusy ? 'SAVING REQUEST...' : 'GET REGIONAL UPDATES ->'}
@@ -305,9 +303,14 @@ export default function RegionScreen() {
                 VERIFIED
               </TerminalText>
             </View>
-            <TerminalText style={styles.captionCopy} tone="muted" uppercase={false} variant="caption">
-              You will compete in {competitionRegion.label} and see rewards
-              available for this region.
+            <TerminalText
+              style={styles.captionCopy}
+              tone="muted"
+              uppercase={false}
+              variant="caption"
+            >
+              You will compete in {competitionRegion.label} and see rewards available for this
+              region.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -327,13 +330,15 @@ export default function RegionScreen() {
         {approvedRegionReady && !isProfileSource ? (
           <AccountLegalAgreement
             jurisdictionCode={jurisdictionCode}
-            onComplete={() => router.replace(
-              isHomeSource
-                ? '/commitment?source=home'
-                : isGymScanSource
-                  ? '/commitment?source=gym-scan'
-                  : '/commitment'
-            )}
+            onComplete={() =>
+              router.replace(
+                isHomeSource
+                  ? '/commitment?source=home'
+                  : isGymScanSource
+                    ? '/commitment?source=gym-scan'
+                    : '/commitment'
+              )
+            }
           />
         ) : null}
       </ScreenScrollView>
@@ -342,11 +347,7 @@ export default function RegionScreen() {
 }
 
 function getApiErrorCode(error: unknown) {
-  if (
-    !(error instanceof ApiError) ||
-    !error.body ||
-    typeof error.body !== 'object'
-  ) {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== 'object') {
     return null;
   }
   const body = error.body as {

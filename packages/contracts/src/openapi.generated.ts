@@ -50,7 +50,7 @@ export interface components {
     CreateCreatorWorkoutDto: { creatorName: string; creatorUserId?: string; durationMinutes: number; reason: string; regionCodes: Array<string>; sponsorName?: string; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
     CreateCreatorWorkoutPlanDto: { note?: string; plannedDate: string };
     CreateEnrollmentDto: { ageEligibilityAttested: true; goalDays: number; gymPresence: components['schemas']["EnrollmentGymPresenceDto"]; legalReceiptBundleId: string; regionVerificationId: string; rulesAccepted: true };
-    CreateGymLocationDto: { address: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
+    CreateGymLocationDto: { address?: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     CreatePrivacyRequestDto: { reason?: string; requestType: "delete" | "export" };
     CreateRegionPolicyDto: { boundary: Record<string, unknown>; boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: "CAD" | "MXN" | "USD"; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; reason: string; subdivisionCode: string; timezone: string; validFrom: string; validTo?: string };
     CreateRegionVerificationDto: { latitude: number; longitude: number; method: "device_location" };
@@ -159,7 +159,7 @@ export interface components {
     StreakSummaryResponseDto: { asOfDate: string; streaks: components['schemas']["StreakCountsDto"]; timezone: string };
     UpdateCompetitionDraftDto: { endsAt: string; entrantCap?: number | null; expectedVersion: number; goalBrackets: Array<components['schemas']["GoalBracketDto"]>; gymLocationId?: string; minimumEntrants: number; monthKey: string; name: string; reason: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rules: Record<string, unknown>; rulesVersion: string; startsAt: string };
     UpdateCreatorWorkoutDto: { creatorName: string; creatorUserId?: string; durationMinutes: number; expectedVersion: number; reason: string; regionCodes: Array<string>; sponsorName?: string; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };
-    UpdateGymLocationDto: { active: boolean; address: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
+    UpdateGymLocationDto: { active: boolean; address?: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     UpdateMeDto: { privacySettings?: components['schemas']["UpdatePrivacySettingsDto"]; publicIdentityMode?: "private" | "alias" | "real_name"; publicName?: string | null; screenName?: string };
     UpdatePrivacySettingsDto: { showRegion?: boolean; showStats?: boolean };
     UpdateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; expectedVersion: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
@@ -514,6 +514,14 @@ export interface operations {
     parameters: Record<string, never>;
     responses: {
       "200": components['schemas']["OperatorPortalAccessDto"];
+    };
+  };
+  getActiveCredential: {
+    method: "GET";
+    path: "/v1/operator/gym-locations/{gymId}/qr-credentials/active";
+    parameters: { path: { gymId: string } };
+    responses: {
+      "200": components['schemas']["GymQrCredentialResponseDto"] | null;
     };
   };
   getAvatar: {
@@ -1333,6 +1341,9 @@ export interface paths {
   };
   "/v1/operator/gym-locations/{gymId}/qr-credentials": {
     post: operations["issueCredential"];
+  };
+  "/v1/operator/gym-locations/{gymId}/qr-credentials/active": {
+    get: operations["getActiveCredential"];
   };
   "/v1/operator/gym-locations/{gymId}/qr-credentials/revoke": {
     post: operations["revokeCredential"];

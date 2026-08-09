@@ -91,10 +91,11 @@ export class CreateGymLocationDto {
   @Length(2, 160)
   name!: string;
 
-  @ApiProperty({ maxLength: 500, minLength: 5, type: String })
+  @ApiPropertyOptional({ maxLength: 500, type: String })
+  @IsOptional()
   @IsString()
-  @Length(5, 500)
-  address!: string;
+  @MaxLength(500)
+  address?: string;
 
   @ApiProperty({ type: Number })
   @Type(() => Number)

@@ -1,4 +1,5 @@
 import { assertLiveServicesAllowed } from '@/config/demoMode';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import {
   readFreshGymScanWebLocation,
   type GymScanLocationResult
@@ -8,6 +9,9 @@ export type { GymScanLocationResult } from '@/services/gymScanLocationSampling';
 
 export async function readGymScanLocation(): Promise<GymScanLocationResult> {
   assertLiveServicesAllowed('Device location');
+  if (!isMobileWebGymVerificationDevice()) {
+    return { status: 'mobile-required' };
+  }
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     return { status: 'location-unavailable' };
   }

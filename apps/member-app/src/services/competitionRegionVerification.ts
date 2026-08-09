@@ -1,6 +1,8 @@
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 
 import { assertLiveServicesAllowed } from '@/config/demoMode';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 
 export type RegionCoordinates = {
   latitude: number;
@@ -13,10 +15,14 @@ export type DeviceRegionVerificationResult =
       status: 'location-read';
     }
   | { status: 'permission-denied' }
+  | { status: 'mobile-required' }
   | { status: 'location-unavailable' };
 
 export async function verifyCompetitionRegionWithDeviceLocation(): Promise<DeviceRegionVerificationResult> {
   assertLiveServicesAllowed('Device location');
+  if (Platform.OS === 'web' && !isMobileWebGymVerificationDevice()) {
+    return { status: 'mobile-required' };
+  }
   try {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
 

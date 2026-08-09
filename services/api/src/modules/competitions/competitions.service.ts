@@ -104,6 +104,12 @@ export class CompetitionsService {
             'region.id',
             'competition.region_policy_id',
           )
+          .leftJoin('competition_enrollments as current_enrollment', (join) =>
+            join
+              .onRef('current_enrollment.competition_id', '=', 'competition.id')
+              .on('current_enrollment.user_id', '=', user.id)
+              .on('current_enrollment.status', '=', 'active'),
+          )
           .select([
             'competition.ends_at',
             'competition.entrant_cap',
@@ -130,7 +136,11 @@ export class CompetitionsService {
           )
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.ends_at', '>', now)
-          .orderBy('competition.starts_at');
+          .orderBy(
+            sql<number>`CASE WHEN current_enrollment.id IS NULL THEN 1 ELSE 0 END`,
+          )
+          .orderBy('competition.starts_at')
+          .orderBy('competition.id');
         if (query.monthKey) {
           assertMonthKey(query.monthKey);
           competitionQuery = competitionQuery.where(
@@ -207,6 +217,7 @@ export class CompetitionsService {
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.ends_at', '>', new Date())
           .orderBy('competition.starts_at')
+          .orderBy('competition.id')
           .executeTakeFirst();
 
         return enrollment

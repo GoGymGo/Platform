@@ -17,6 +17,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
@@ -181,6 +182,21 @@ export class GymOperatorController {
       requireIdempotencyKey(idempotencyKey),
       input.reason,
     );
+  }
+
+  @Get('gym-locations/:gymId/qr-credentials/active')
+  @ApiOperation({ summary: 'Recover the active printable static QR poster' })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(GymQrCredentialResponseDto) }],
+      nullable: true,
+    },
+  })
+  getActiveCredential(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('gymId', ParseUUIDPipe) gymId: string,
+  ): Promise<GymQrCredentialResponseDto | null> {
+    return this.gyms.getActiveCredential(principal, gymId);
   }
 
   @Post('gym-locations/:gymId/qr-credentials/revoke')

@@ -5,6 +5,14 @@ import type { AuditEvent, Competition, WorkQueueItem } from "./admin-types";
 
 export type HttpMethod = "DELETE" | "POST" | "PUT";
 
+export function isOperationalCompetition(competition: Competition) {
+  return ["draft", "registration", "active"].includes(competition.status);
+}
+
+export function isRewardConfigurableCompetition(competition: Competition) {
+  return ["draft", "registration"].includes(competition.status);
+}
+
 export function getQueueUrgency(item: WorkQueueItem) {
   const ageHours = Math.max(
     0,
@@ -52,11 +60,17 @@ export function getCompetitionDeadline(competition: Competition) {
         : [[competition.endsAt, "Contest ends"]];
   const next = stages.find(([value]) => new Date(value).getTime() > now);
   if (!next) {
-    return { detail: "No future player deadline", label: "COMPLETE", tone: "routine" };
+    return {
+      detail: "No future player deadline",
+      label: "COMPLETE",
+      tone: "routine",
+    };
   }
   const hours = Math.max(0, (new Date(next[0]).getTime() - now) / 3_600_000);
   const label =
-    hours < 24 ? `${Math.max(1, Math.ceil(hours))}H` : `${Math.ceil(hours / 24)}D`;
+    hours < 24
+      ? `${Math.max(1, Math.ceil(hours))}H`
+      : `${Math.ceil(hours / 24)}D`;
   return {
     detail: next[1],
     label,
@@ -142,9 +156,12 @@ export function authErrorMessage(error: unknown) {
     typeof error === "object" && error && "code" in error
       ? String(error.code)
       : "";
-  if (code.includes("invalid-credential")) return "The email or password is incorrect.";
-  if (code.includes("popup-closed")) return "The sign-in window was closed before authentication finished.";
-  if (code.includes("popup-blocked")) return "Your browser blocked the sign-in window. Allow pop-ups and try again.";
+  if (code.includes("invalid-credential"))
+    return "The email or password is incorrect.";
+  if (code.includes("popup-closed"))
+    return "The sign-in window was closed before authentication finished.";
+  if (code.includes("popup-blocked"))
+    return "Your browser blocked the sign-in window. Allow pop-ups and try again.";
   return "Sign-in could not be completed. Check your connection and try again.";
 }
 
@@ -160,17 +177,22 @@ function adminRequestErrorMessage(
   apiError?: { code?: string; message?: string },
 ) {
   if (status === 401) return "Your admin session expired. Sign in again.";
-  if (status === 403) return "Your account does not have permission to complete this action.";
-  if (status === 404) return "This record is no longer available. Refresh the dashboard and try again.";
+  if (status === 403)
+    return "Your account does not have permission to complete this action.";
+  if (status === 404)
+    return "This record is no longer available. Refresh the dashboard and try again.";
   if (status === 409) {
     const conflictMessage = apiError?.message?.trim();
     return conflictMessage
       ? conflictMessage
       : "This action conflicts with the latest record. Refresh the dashboard and review it before trying again.";
   }
-  if (status === 400 || status === 422) return "The request could not be completed. Review the form and try again.";
-  if (status === 429) return "Too many requests were submitted. Wait a moment and try again.";
-  if (status >= 500) return "The GoGymGo admin service is temporarily unavailable. Try again shortly.";
+  if (status === 400 || status === 422)
+    return "The request could not be completed. Review the form and try again.";
+  if (status === 429)
+    return "Too many requests were submitted. Wait a moment and try again.";
+  if (status >= 500)
+    return "The GoGymGo admin service is temporarily unavailable. Try again shortly.";
   return "The request could not be completed. Try again.";
 }
 
@@ -212,14 +234,20 @@ export function optionalNumber(value: FormDataEntryValue | null) {
 
 export function compactObject<T extends Record<string, unknown>>(input: T) {
   return Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined && value !== ""),
+    Object.entries(input).filter(
+      ([, value]) => value !== undefined && value !== "",
+    ),
   );
 }
 
 export function defaultCompetitionDates() {
   const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 7));
-  const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1, 7));
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 7),
+  );
+  const end = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1, 7),
+  );
   return {
     endsAt: end.toISOString(),
     monthKey: start.toISOString().slice(0, 7),
@@ -241,7 +269,9 @@ export async function adminRequest<T>(
   try {
     token = await activeUser.getIdToken();
   } catch {
-    throw new AdminRequestError("Your admin session could not be confirmed. Sign in again.");
+    throw new AdminRequestError(
+      "Your admin session could not be confirmed. Sign in again.",
+    );
   }
 
   let response: Response;
@@ -262,9 +292,7 @@ export async function adminRequest<T>(
     );
   }
   const payload = (await response.json().catch(() => null)) as
-    | { error?: { code?: string; message?: string } }
-    | T
-    | null;
+    { error?: { code?: string; message?: string } } | T | null;
   if (!response.ok) {
     const apiError =
       typeof payload === "object" && payload !== null && "error" in payload

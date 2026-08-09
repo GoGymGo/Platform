@@ -27,6 +27,7 @@ import type {
   CreatorWorkout,
   DashboardSnapshot,
   FirebaseClientConfig,
+  GymQrCredential,
   LegalDocument,
   OperatorPortalAccess,
   PartnerCompetition,
@@ -50,6 +51,7 @@ import {
   getAuditChange,
   getCompetitionDeadline,
   getQueueUrgency,
+  isRewardConfigurableCompetition,
   optionalIso,
   optionalNumber,
   optionalString,
@@ -414,6 +416,14 @@ export function AdminDashboard({
     [user],
   );
 
+  const loadActiveQr = useCallback(
+    (gymId: string) =>
+      request<GymQrCredential | null>(
+        `operator/gym-locations/${gymId}/qr-credentials/active`,
+      ),
+    [request],
+  );
+
   const refresh = useCallback(async (activeUser: User) => {
     setBusy(true);
     setLoadError("");
@@ -423,7 +433,9 @@ export function AdminDashboard({
         access = await adminRequest<OperatorPortalAccess>(
           activeUser,
           "operator/access",
-          { expectedStatuses: [404] },
+          {
+            expectedStatuses: [404],
+          },
         );
       } catch (error) {
         if (adminRequestStatus(error) !== 404) throw error;
@@ -908,6 +920,7 @@ export function AdminDashboard({
                   body,
                 )
               }
+              onLoadActiveQr={loadActiveQr}
               onRecordCash={async (body) => {
                 await mutate(
                   "Cash handoff recorded.",
@@ -3886,11 +3899,17 @@ function RewardForm({
               required
             >
               <option value="">Select a contest</option>
-              {competitions.map((competition) => (
-                <option key={competition.id} value={competition.id}>
-                  {competition.name}
-                </option>
-              ))}
+              {competitions
+                .filter(
+                  (competition) =>
+                    competition.id === reward?.competitionId ||
+                    isRewardConfigurableCompetition(competition),
+                )
+                .map((competition) => (
+                  <option key={competition.id} value={competition.id}>
+                    {competition.name}
+                  </option>
+                ))}
             </select>
           </Field>
           <Field label="BRAND / SPONSOR">

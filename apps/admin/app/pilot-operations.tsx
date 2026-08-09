@@ -9,7 +9,11 @@ import type {
 } from "@gogymgo/contracts";
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { parseCoordinate } from "./coordinate-input";
-import { AdminUserFacingError, errorMessage } from "./admin-dashboard-utils";
+import {
+  AdminUserFacingError,
+  errorMessage,
+  isOperationalCompetition,
+} from "./admin-dashboard-utils";
 import { posterSvgToJpegBlob } from "./poster-jpeg";
 import type {
   Competition,
@@ -45,6 +49,7 @@ type PilotOperationsProps = PilotData & {
     gymId: string,
     input: OperatorReasonDto,
   ) => Promise<GymQrCredential>;
+  onLoadActiveQr: (gymId: string) => Promise<GymQrCredential | null>;
   onRecordCash: (input: CashFulfillmentRequestDto) => Promise<void>;
   onRevokeQr: (gymId: string, input: OperatorReasonDto) => Promise<void>;
   onUpdateGym: (gymId: string, input: UpdateGymLocationDto) => Promise<void>;
@@ -54,92 +59,16 @@ type PilotOperationsProps = PilotData & {
 
 const administrativeReason =
   "Configure the approved September 2026 static QR pilot.";
-const posterStorageKey = "gogymgo.admin.pilot.active-poster";
 const pilotAuditHiddenStorageKey = "gogymgo.admin.pilot.audit-hidden";
 
-function isGymQrCredential(value: unknown): value is GymQrCredential {
-  if (!value || typeof value !== "object") return false;
-  const credential = value as Record<string, unknown>;
-  return (
-    Number.isInteger(credential.credentialVersion) &&
-    Number(credential.credentialVersion) > 0 &&
-    typeof credential.gymLocationId === "string" &&
-    typeof credential.id === "string" &&
-    typeof credential.issuedAt === "string" &&
-    typeof credential.printablePosterSvg === "string" &&
-    typeof credential.qrPayload === "string"
-  );
-}
-
-function forgetStoredPoster(gymLocationId?: string) {
-  if (typeof window === "undefined") return;
-  try {
-    if (gymLocationId) {
-      const stored = JSON.parse(
-        readStoredPosterValue() ?? "null",
-      ) as unknown;
-      if (
-        isGymQrCredential(stored) &&
-        stored.gymLocationId !== gymLocationId
-      ) {
-        return;
-      }
-    }
-    window.localStorage.removeItem(posterStorageKey);
-    window.sessionStorage.removeItem(posterStorageKey);
-  } catch {
-    // The poster preview remains usable even if browser storage is unavailable.
-  }
-}
-
-function readStoredPosterValue() {
-  if (typeof window === "undefined") return null;
-  const durablePoster = window.localStorage.getItem(posterStorageKey);
-  if (durablePoster) return durablePoster;
-
-  const sessionPoster = window.sessionStorage.getItem(posterStorageKey);
-  if (!sessionPoster) return null;
-  window.localStorage.setItem(posterStorageKey, sessionPoster);
-  window.sessionStorage.removeItem(posterStorageKey);
-  return sessionPoster;
-}
-
-function readStoredPoster(gyms: GymLocation[]): GymQrCredential | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = JSON.parse(readStoredPosterValue() ?? "null") as unknown;
-    if (!isGymQrCredential(stored)) {
-      forgetStoredPoster();
-      return null;
-    }
-    const gym = gyms.find((candidate) => candidate.id === stored.gymLocationId);
-    if (
-      !gym?.active ||
-      gym.activeCredentialVersion !== stored.credentialVersion
-    ) {
-      forgetStoredPoster();
-      return null;
-    }
-    return stored;
-  } catch {
-    forgetStoredPoster();
-    return null;
-  }
-}
-
-function rememberPoster(credential: GymQrCredential) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(posterStorageKey, JSON.stringify(credential));
-    window.sessionStorage.removeItem(posterStorageKey);
-  } catch {
-    // The newly issued poster still renders from component state.
-  }
-}
-
 export function PilotOperationsPanel(props: PilotOperationsProps) {
+  const { gyms, onLoadActiveQr } = props;
   const createGymForm = useRef<HTMLFormElement>(null);
   const [poster, setPoster] = useState<GymQrCredential | null>(null);
+  const [posterRecoveryMessage, setPosterRecoveryMessage] = useState("");
+  const [loadingPosterGymId, setLoadingPosterGymId] = useState<string | null>(
+    null,
+  );
   const [createGymError, setCreateGymError] = useState("");
   const [createGymSuccess, setCreateGymSuccess] = useState("");
   const [locatingGym, setLocatingGym] = useState(false);
@@ -157,12 +86,70 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   });
 
   useEffect(() => {
-    const restoreTimer = window.setTimeout(() => {
-      const storedPoster = readStoredPoster(props.gyms);
-      if (storedPoster) setPoster(storedPoster);
-    }, 0);
-    return () => window.clearTimeout(restoreTimer);
-  }, [props.gyms]);
+    let active = true;
+    const gymsWithActivePosters = gyms.filter(
+      (gym) => gym.active && gym.activeCredentialVersion,
+    );
+    if (gymsWithActivePosters.length === 0) {
+      queueMicrotask(() => {
+        if (!active) return;
+        setPoster(null);
+        setPosterRecoveryMessage("");
+      });
+      return () => {
+        active = false;
+      };
+    }
+
+    void Promise.all(
+      gymsWithActivePosters.map(async (gym) => {
+        try {
+          return { credential: await onLoadActiveQr(gym.id), failed: false };
+        } catch {
+          return { credential: null, failed: true };
+        }
+      }),
+    ).then((results) => {
+      if (!active) return;
+      const recovered = results
+        .map((result) => result.credential)
+        .filter((credential): credential is GymQrCredential =>
+          Boolean(credential),
+        )
+        .sort((left, right) => right.issuedAt.localeCompare(left.issuedAt))[0];
+      setPoster(recovered ?? null);
+      setPosterRecoveryMessage(
+        recovered
+          ? ""
+          : results.some((result) => result.failed)
+            ? "The active poster could not be restored. Refresh the dashboard and try again."
+            : "This active poster was issued before server recovery was available. Reissue it once; every future visit will restore it automatically.",
+      );
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [gyms, onLoadActiveQr]);
+
+  async function viewActivePoster(gym: GymLocation) {
+    setLoadingPosterGymId(gym.id);
+    setPosterRecoveryMessage("");
+    try {
+      const credential = await onLoadActiveQr(gym.id);
+      if (!credential) {
+        setPosterRecoveryMessage(
+          "This active poster was issued before server recovery was available. Reissue it once; every future visit will restore it automatically.",
+        );
+        return;
+      }
+      setPoster(credential);
+    } catch (error) {
+      setPosterRecoveryMessage(errorMessage(error));
+    } finally {
+      setLoadingPosterGymId(null);
+    }
+  }
 
   function changePilotAuditVisibility(hidden: boolean) {
     setPilotAuditHidden(hidden);
@@ -191,7 +178,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setCreateGymSuccess("");
 
     try {
-      if (name.length < 2) throw new AdminUserFacingError("Partner gym name is required.");
+      if (name.length < 2)
+        throw new AdminUserFacingError("Partner gym name is required.");
       if (
         props.gyms.some(
           (gym) => gym.name.trim().toLowerCase() === name.toLowerCase(),
@@ -201,20 +189,29 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           `${name} already exists. Select it in the assignment form below.`,
         );
       }
-      if (address.length < 5) {
-        throw new AdminUserFacingError("Enter the Partner gym's complete street address.");
-      }
-      if (!regionPolicyId) throw new AdminUserFacingError("Choose the Partner gym's region.");
-      if (!Number.isInteger(radiusMeters) || radiusMeters < 10 || radiusMeters > 500) {
-        throw new AdminUserFacingError("Radius must be a whole number from 10 to 500 metres.");
+      if (!regionPolicyId)
+        throw new AdminUserFacingError("Choose the Partner gym's region.");
+      if (
+        !Number.isInteger(radiusMeters) ||
+        radiusMeters < 10 ||
+        radiusMeters > 500
+      ) {
+        throw new AdminUserFacingError(
+          "Radius must be a whole number from 10 to 500 metres.",
+        );
       }
       if (reason.length < 8) {
-        throw new AdminUserFacingError("Administrative reason must be at least 8 characters.");
+        throw new AdminUserFacingError(
+          "Administrative reason must be at least 8 characters.",
+        );
       }
 
       await props.onCreateGym({
         address,
-        latitude: parseCoordinate(String(form.get("latitude") ?? ""), "latitude"),
+        latitude: parseCoordinate(
+          String(form.get("latitude") ?? ""),
+          "latitude",
+        ),
         longitude: parseCoordinate(
           String(form.get("longitude") ?? ""),
           "longitude",
@@ -238,9 +235,16 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setCreateGymSuccess("");
     setLocationMessage("");
 
+    if (!isMobileLocationBrowser()) {
+      setCreateGymError(
+        "Automatic location is available only on a phone. Open this dashboard on your phone or enter the coordinates manually.",
+      );
+      return;
+    }
+
     if (!navigator.geolocation) {
       setCreateGymError(
-        "This browser cannot provide your location. Open the dashboard in Safari and try again.",
+        "This phone browser cannot provide your location. Open the dashboard in Safari or Chrome and try again.",
       );
       return;
     }
@@ -255,7 +259,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           !(latitude instanceof HTMLInputElement) ||
           !(longitude instanceof HTMLInputElement)
         ) {
-          setCreateGymError("The location fields could not be filled. Reload and try again.");
+          setCreateGymError(
+            "The location fields could not be filled. Reload and try again.",
+          );
           setLocatingGym(false);
           return;
         }
@@ -286,9 +292,12 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 
     try {
       if (!competitionId) throw new AdminUserFacingError("Choose a Contest.");
-      if (!gymId) throw new AdminUserFacingError("Choose an active Partner gym.");
+      if (!gymId)
+        throw new AdminUserFacingError("Choose an active Partner gym.");
       if (reason.length < 8) {
-        throw new AdminUserFacingError("Administrative reason must be at least 8 characters.");
+        throw new AdminUserFacingError(
+          "Administrative reason must be at least 8 characters.",
+        );
       }
       await props.onAssignGym(competitionId, gymId, { reason });
       const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
@@ -340,8 +349,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               <input name="name" required />
             </label>
             <label>
-              <span>ADDRESS</span>
-              <input name="address" required />
+              <span>ADDRESS (OPTIONAL DISPLAY INFORMATION)</span>
+              <input name="address" />
             </label>
             <label>
               <span>REGION</span>
@@ -406,7 +415,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               onClick={useCurrentLocation}
               type="button"
             >
-              {locatingGym ? "FINDING LOCATION..." : "USE MY CURRENT LOCATION"}
+              {locatingGym ? "FINDING LOCATION..." : "USE MY PHONE LOCATION"}
             </button>
             {locationMessage ? (
               <p
@@ -450,24 +459,31 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                 key={gym.id}
                 onIssue={async (input) => {
                   const credential = await props.onIssueQr(gym.id, input);
-                  rememberPoster(credential);
+                  setPosterRecoveryMessage("");
                   setPoster(credential);
                 }}
                 onDelete={() => props.onDeleteGym(gym)}
                 onRevoke={async (input) => {
                   await props.onRevokeQr(gym.id, input);
-                  forgetStoredPoster(gym.id);
+                  setPosterRecoveryMessage("");
                   setPoster((current) =>
                     current?.gymLocationId === gym.id ? null : current,
                   );
                 }}
                 onUpdate={(input) => props.onUpdateGym(gym.id, input)}
+                onViewPoster={() => void viewActivePoster(gym)}
+                posterLoading={loadingPosterGymId === gym.id}
                 submitting={props.submitting}
               />
             ))}
           </div>
         )}
 
+        {posterRecoveryMessage ? (
+          <p className="pilot-form-message form-error" role="status">
+            {posterRecoveryMessage}
+          </p>
+        ) : null}
         {poster ? <PosterPreview credential={poster} key={poster.id} /> : null}
       </section>
 
@@ -487,11 +503,13 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <span>CONTEST</span>
             <select name="competitionId" required>
               <option value="">Choose contest</option>
-              {props.competitions.map((competition) => (
-                <option key={competition.id} value={competition.id}>
-                  {competition.name} ({competition.status})
-                </option>
-              ))}
+              {props.competitions
+                .filter(isOperationalCompetition)
+                .map((competition) => (
+                  <option key={competition.id} value={competition.id}>
+                    {competition.name} ({competition.status})
+                  </option>
+                ))}
             </select>
           </label>
           <label>
@@ -702,12 +720,23 @@ function locationErrorMessage(error: GeolocationPositionError) {
   return "Your device could not determine its location. Check that device location services and browser site permission are enabled, then try again.";
 }
 
+function isMobileLocationBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const userAgent = navigator.userAgent;
+  return (
+    /Android|iPhone|iPad|iPod|IEMobile|Mobile|Opera Mini/i.test(userAgent) ||
+    (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1)
+  );
+}
+
 function GymCard({
   gym,
   onDelete,
   onIssue,
   onRevoke,
   onUpdate,
+  onViewPoster,
+  posterLoading,
   submitting,
 }: {
   gym: GymLocation;
@@ -715,6 +744,8 @@ function GymCard({
   onIssue: (input: OperatorReasonDto) => Promise<void>;
   onRevoke: (input: OperatorReasonDto) => Promise<void>;
   onUpdate: (input: UpdateGymLocationDto) => Promise<void>;
+  onViewPoster: () => void;
+  posterLoading: boolean;
   submitting: boolean;
 }) {
   async function update(event: FormEvent<HTMLFormElement>) {
@@ -740,7 +771,7 @@ function GymCard({
           {gym.active ? "active" : "inactive"}
         </span>
         <h3>{gym.name}</h3>
-        <p>{gym.address}</p>
+        <p>{gym.address || "No display address added"}</p>
         <small>
           {gym.latitude.toFixed(6)}, {gym.longitude.toFixed(6)} ·{" "}
           {gym.radiusMeters} m · QR v{gym.activeCredentialVersion || "—"}
@@ -755,6 +786,16 @@ function GymCard({
         >
           ISSUE / REISSUE POSTER
         </button>
+        {gym.activeCredentialVersion ? (
+          <button
+            className="secondary-button"
+            disabled={submitting || posterLoading}
+            onClick={onViewPoster}
+            type="button"
+          >
+            {posterLoading ? "RESTORING POSTER..." : "VIEW ACTIVE POSTER"}
+          </button>
+        ) : null}
         <button
           className="danger-button"
           disabled={submitting || !gym.activeCredentialVersion}
@@ -786,8 +827,8 @@ function GymCard({
             <input defaultValue={gym.name} name="name" required />
           </label>
           <label>
-            <span>ADDRESS</span>
-            <input defaultValue={gym.address} name="address" required />
+            <span>ADDRESS (OPTIONAL DISPLAY INFORMATION)</span>
+            <input defaultValue={gym.address} name="address" />
           </label>
           <label>
             <span>LATITUDE</span>

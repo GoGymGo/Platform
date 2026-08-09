@@ -1,8 +1,4 @@
-export type AccountSetupStep =
-  | 'region'
-  | 'agreements'
-  | 'weekly-goal'
-  | 'complete';
+export type AccountSetupStep = 'region' | 'agreements' | 'weekly-goal' | 'complete';
 
 export function getAccountSetupStep({
   enrollmentReady,
@@ -13,16 +9,16 @@ export function getAccountSetupStep({
   legalAccepted: boolean;
   regionVerified: boolean;
 }): AccountSetupStep {
+  if (enrollmentReady) {
+    return 'complete';
+  }
   if (!regionVerified) {
     return 'region';
   }
   if (!legalAccepted) {
     return 'agreements';
   }
-  if (!enrollmentReady) {
-    return 'weekly-goal';
-  }
-  return 'complete';
+  return 'weekly-goal';
 }
 
 export function getAccountSetupRoute(step: AccountSetupStep) {
@@ -50,7 +46,7 @@ export function getAccountSetupActionLabel(step: AccountSetupStep) {
 
 export function getAccountSetupMessage(step: AccountSetupStep) {
   if (step === 'region') {
-      return 'Verify your location once to join the correct regional contest.';
+    return 'Verify your location once to join the correct regional contest.';
   }
   if (step === 'agreements') {
     return 'Review and accept the account agreements for your verified region.';

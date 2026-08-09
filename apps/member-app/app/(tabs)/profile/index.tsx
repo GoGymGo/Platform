@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
 import {
@@ -16,6 +16,7 @@ import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useMyStreaks } from '@/data/appDataHooks';
 import { getPublicInitials } from '@/domain/profile';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
 import { useAuth } from '@/state/auth';
 import { useProfile } from '@/state/profile';
@@ -82,6 +83,8 @@ function getSettingsRows(): SettingsGroups {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { signOutUser, user } = useAuth();
   const { publicName } = useProfile();
   const { data: streakSummary } = useMyStreaks();
@@ -284,6 +287,7 @@ export default function ProfileScreen() {
         />
         {showCompetitionSettings ? (
           <>
+            {mobileGymVerificationAvailable ? (
             <HUDBorderBox style={styles.regionCard} tone="cyan">
               <View style={styles.regionCopy}>
                 <TerminalText tone="dim" variant="label">
@@ -309,6 +313,7 @@ export default function ProfileScreen() {
                 style={styles.regionButton}
               />
             </HUDBorderBox>
+            ) : null}
 
             <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
               WORKOUT PREFERENCE

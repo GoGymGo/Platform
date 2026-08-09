@@ -7,10 +7,34 @@ import {
   type GymScanWebPositionOptions,
   type GymScanWebReading
 } from './gymScanLocationSampling';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+
+it('limits web gym verification location to phones and tablets', () => {
+  assert.equal(
+    isMobileWebGymVerificationDevice({
+      maxTouchPoints: 0,
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140'
+    }),
+    false
+  );
+  assert.equal(
+    isMobileWebGymVerificationDevice({
+      maxTouchPoints: 5,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) Mobile'
+    }),
+    true
+  );
+  assert.equal(
+    isMobileWebGymVerificationDevice({
+      maxTouchPoints: 5,
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Version/19 Safari'
+    }),
+    true
+  );
+});
 
 type ScheduledEvent =
-  | { afterMs: number; reading: GymScanWebReading }
-  | { afterMs: number; errorCode: number };
+  { afterMs: number; reading: GymScanWebReading } | { afterMs: number; errorCode: number };
 
 function fakeGeolocation(events: readonly ScheduledEvent[]) {
   let clearedWatchId: number | null = null;
@@ -101,10 +125,9 @@ describe('fresh browser gym location sampling', () => {
 
   it('surfaces denied permission and ignores invalid readings', async () => {
     const denied = fakeGeolocation([{ afterMs: 1, errorCode: 1 }]);
-    assert.deepEqual(
-      await readFreshGymScanWebLocation(denied.geolocation, fastPolicy),
-      { status: 'permission-denied' }
-    );
+    assert.deepEqual(await readFreshGymScanWebLocation(denied.geolocation, fastPolicy), {
+      status: 'permission-denied'
+    });
 
     const unavailable = fakeGeolocation([
       {
@@ -120,9 +143,8 @@ describe('fresh browser gym location sampling', () => {
         reading: { accuracyMeters: 20, latitude: 100, longitude: -123.5 }
       }
     ]);
-    assert.deepEqual(
-      await readFreshGymScanWebLocation(unavailable.geolocation, fastPolicy),
-      { status: 'location-unavailable' }
-    );
+    assert.deepEqual(await readFreshGymScanWebLocation(unavailable.geolocation, fastPolicy), {
+      status: 'location-unavailable'
+    });
   });
 });

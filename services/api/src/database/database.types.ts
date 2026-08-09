@@ -489,6 +489,7 @@ export interface GymQrCredentialsTable {
   gym_location_id: string;
   credential_version: number;
   token_hash: string;
+  qr_payload: string | null;
   status: GymQrCredentialStatus;
   issued_by_user_id: string;
   issued_at: Timestamp;

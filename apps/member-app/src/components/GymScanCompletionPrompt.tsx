@@ -5,6 +5,7 @@ import { AppState, Platform, StyleSheet, View } from 'react-native';
 import { CyberButtonOutline, CyberButtonPrimary, HUDBorderBox, TerminalText } from '@/components/cyber';
 import { spacing } from '@/constants/theme';
 import { isGymScanCompletionReady } from '@/domain/gymScan';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import {
   cancelGymScanCompletionReminder,
   scheduleGymScanCompletionReminder
@@ -17,6 +18,17 @@ import {
 import { useAuth } from '@/state/auth';
 
 export function GymScanCompletionPrompt() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return null;
+  }
+
+  return <MobileGymScanCompletionPrompt />;
+}
+
+function MobileGymScanCompletionPrompt() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();

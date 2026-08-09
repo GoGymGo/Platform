@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import {
   AuthConfigurationNotice,
@@ -23,6 +23,7 @@ import {
   type AuthFormErrors
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   getGymScanPostAuthRoute,
@@ -33,11 +34,14 @@ import { useAuth, type AuthSignInResult } from '@/state/auth';
 
 export default function SignInScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { challengeInvite, next } = useLocalSearchParams<{
     challengeInvite?: string;
     next?: string;
   }>();
-  const gymScanContinuation = isGymScanContinuation(next);
+  const gymScanContinuation =
+    mobileGymVerificationAvailable && isGymScanContinuation(next);
   const { social } = useAppData();
   const {
     appleSignInAvailable,
@@ -69,7 +73,7 @@ export default function SignInScreen() {
     if (challengeInvite) {
       await social.redeemContactInvitation(challengeInvite);
     }
-    if (result.isNewUser) {
+    if (result.isNewUser && mobileGymVerificationAvailable) {
       router.replace(
         gymScanContinuation ? getGymScanPostAuthRoute(true) : '/region'
       );

@@ -447,7 +447,7 @@ export class GymsService {
           .insertInto('gym_locations')
           .values({
             active: true,
-            address: input.address.trim(),
+            address: input.address?.trim() ?? '',
             coordinates: sql`ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)::geography`,
             created_at: now,
             name: input.name.trim(),
@@ -464,7 +464,7 @@ export class GymsService {
           entityType: 'gym_locations',
           nextState: {
             active: true,
-            address: input.address.trim(),
+            address: input.address?.trim() ?? '',
             name: input.name.trim(),
             radiusMeters: input.radiusMeters,
             regionPolicyId: input.regionPolicyId,
@@ -496,7 +496,7 @@ export class GymsService {
           .updateTable('gym_locations')
           .set({
             active: input.active,
-            address: input.address.trim(),
+            address: input.address?.trim() ?? '',
             coordinates: sql`ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)::geography`,
             name: input.name.trim(),
             radius_meters: input.radiusMeters,
@@ -660,6 +660,7 @@ export class GymsService {
           .executeTakeFirstOrThrow();
         const credentialVersion = Number(latest.version ?? 0) + 1;
         const token = randomBytes(32).toString('base64url');
+        const qrPayload = `https://app.gogymgo.com/scan?credential=${encodeURIComponent(token)}`;
         const credential = await transaction
           .insertInto('gym_qr_credentials')
           .values({
@@ -667,6 +668,7 @@ export class GymsService {
             gym_location_id: gym.id,
             issued_at: now,
             issued_by_user_id: operator.user.id,
+            qr_payload: qrPayload,
             status: 'active',
             token_hash: hashOpaqueValue(token),
           })
@@ -682,7 +684,6 @@ export class GymsService {
           reason,
           requestId,
         });
-        const qrPayload = `https://app.gogymgo.com/scan?credential=${encodeURIComponent(token)}`;
         return {
           credentialVersion,
           gymLocationId: gym.id,
@@ -694,6 +695,57 @@ export class GymsService {
             credentialVersion,
           ),
           qrPayload,
+        };
+      });
+  }
+
+  getActiveCredential(
+    principal: AuthenticatedPrincipal,
+    gymId: string,
+  ): Promise<GymQrCredentialResponseDto | null> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.adminAuthorization.requireGymAccess(
+          principal,
+          transaction,
+          gymId,
+          'admin',
+        );
+        const credential = await transaction
+          .selectFrom('gym_locations as gym')
+          .innerJoin(
+            'gym_qr_credentials as credential',
+            'credential.gym_location_id',
+            'gym.id',
+          )
+          .select([
+            'credential.credential_version',
+            'credential.id',
+            'credential.issued_at',
+            'credential.qr_payload',
+            'gym.id as gym_location_id',
+            'gym.name as gym_name',
+          ])
+          .where('gym.id', '=', gymId)
+          .where('gym.deleted_at', 'is', null)
+          .where('gym.active', '=', true)
+          .where('credential.status', '=', 'active')
+          .executeTakeFirst();
+        if (!credential?.qr_payload) {
+          return null;
+        }
+        return {
+          credentialVersion: credential.credential_version,
+          gymLocationId: credential.gym_location_id,
+          id: credential.id,
+          issuedAt: credential.issued_at.toISOString(),
+          printablePosterSvg: await this.buildPosterSvg(
+            credential.gym_name,
+            credential.qr_payload,
+            credential.credential_version,
+          ),
+          qrPayload: credential.qr_payload,
         };
       });
   }
@@ -770,14 +822,36 @@ export class GymsService {
             'gym.region_policy_id',
             'competition.region_policy_id',
           )
-          .select(['competition.id as competition_id', 'gym.id as gym_id'])
+          .select([
+            'competition.id as competition_id',
+            'competition.status as competition_status',
+            'gym.active as gym_active',
+            'gym.id as gym_id',
+          ])
           .where('competition.id', '=', competitionId)
+          .where('competition.deleted_at', 'is', null)
           .where('gym.id', '=', gymId)
+          .where('gym.deleted_at', 'is', null)
           .executeTakeFirst();
         if (!pair) {
           throw new BadRequestException({
             code: 'COMPETITION_GYM_REGION_MISMATCH',
             message: 'The gym and competition must belong to the same region.',
+          });
+        }
+        if (
+          !['draft', 'registration', 'active'].includes(pair.competition_status)
+        ) {
+          throw new ConflictException({
+            code: 'COMPETITION_NOT_OPERATIONAL',
+            message:
+              'Partner gyms can be assigned only to draft, registration, or active contests.',
+          });
+        }
+        if (!pair.gym_active) {
+          throw new ConflictException({
+            code: 'GYM_LOCATION_INACTIVE',
+            message: 'Only an active Partner gym can be assigned to a contest.',
           });
         }
         await transaction

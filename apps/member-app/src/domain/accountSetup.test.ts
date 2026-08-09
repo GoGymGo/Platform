@@ -12,6 +12,14 @@ describe('account setup flow', () => {
   it('always resolves the earliest missing requirement', () => {
     assert.equal(
       getAccountSetupStep({
+        enrollmentReady: true,
+        legalAccepted: false,
+        regionVerified: false
+      }),
+      'complete'
+    );
+    assert.equal(
+      getAccountSetupStep({
         enrollmentReady: false,
         legalAccepted: false,
         regionVerified: false
@@ -39,6 +47,17 @@ describe('account setup flow', () => {
         enrollmentReady: true,
         legalAccepted: true,
         regionVerified: true
+      }),
+      'complete'
+    );
+  });
+
+  it('treats an active server enrollment as completed setup on a returning device', () => {
+    assert.equal(
+      getAccountSetupStep({
+        enrollmentReady: true,
+        legalAccepted: false,
+        regionVerified: false
       }),
       'complete'
     );

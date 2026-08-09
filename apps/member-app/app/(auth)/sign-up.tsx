@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import {
   AuthConfigurationNotice,
@@ -22,6 +22,7 @@ import {
   type AuthFormErrors
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   getGymScanPostAuthRoute,
@@ -34,11 +35,14 @@ import { useAppData } from '@/data/appDataHooks';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { challengeInvite, next } = useLocalSearchParams<{
     challengeInvite?: string;
     next?: string;
   }>();
-  const gymScanContinuation = isGymScanContinuation(next);
+  const gymScanContinuation =
+    mobileGymVerificationAvailable && isGymScanContinuation(next);
   const { social } = useAppData();
   const {
     appleSignInAvailable,
@@ -59,7 +63,7 @@ export default function SignUpScreen() {
     router.replace(
       gymScanContinuation
         ? getGymScanPostAuthRoute(result.isNewUser)
-        : result.isNewUser
+        : result.isNewUser && mobileGymVerificationAvailable
           ? '/region'
           : '/home'
     );
@@ -96,7 +100,9 @@ export default function SignUpScreen() {
             ? `challenge:${challengeInvite}`
             : gymScanContinuation
               ? gymScanSetupNext
-              : 'region'
+              : mobileGymVerificationAvailable
+                ? 'region'
+                : 'home'
         }
       });
     } catch (error) {

@@ -147,14 +147,14 @@ export const appTourRoutes = appTourRouteGroups.flatMap(({ routes }) => routes);
 const publicDemoRouteNames = new Set([
   '/home',
   '/calendar',
-  '/session',
   '/leaderboard',
   '/winners-circle',
   '/leaderboard/rewards',
   '/rewards/awards',
   '/squad',
   '/squad/social',
-  '/profile'
+  '/profile',
+  '/workouts'
 ]);
 
 export const publicDemoRoutes = appTourRoutes.filter(({ route }) =>

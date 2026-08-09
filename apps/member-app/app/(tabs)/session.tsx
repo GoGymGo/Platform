@@ -1,5 +1,5 @@
-import { type Href, useRouter } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { Redirect, type Href, useRouter } from 'expo-router';
+import { Platform, StyleSheet } from 'react-native';
 
 import {
   CyberButtonPrimary,
@@ -12,10 +12,22 @@ import { RecoverableScreenError } from '@/components/reliability';
 import { BrandScreenHeader } from '@/components/screenLayout';
 import { colors, spacing } from '@/constants/theme';
 import { getWorkoutAccessMode } from '@/domain/workoutAccess';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function SessionTabRoute() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
+  }
+
+  return <MobileSessionTabRoute />;
+}
+
+function MobileSessionTabRoute() {
   const router = useRouter();
   const { competition } = useWorkoutProgress();
   const verifiedWorkoutUnavailable = getWorkoutAccessMode(

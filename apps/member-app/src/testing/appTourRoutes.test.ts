@@ -28,14 +28,14 @@ test('the public demo exposes the first ten reviewed product destinations', () =
     [
       '/home',
       '/calendar',
-      '/session',
       '/leaderboard',
       '/winners-circle',
       '/leaderboard/rewards',
       '/rewards/awards',
       '/squad',
       '/squad/social',
-      '/profile'
+      '/profile',
+      '/workouts'
     ]
   );
 });

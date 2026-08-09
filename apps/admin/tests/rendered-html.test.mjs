@@ -109,7 +109,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /action\.auditReason \?\?/);
   assert.match(dashboardUtils, /idempotency-key/);
   assert.match(dashboardUtils, /"DELETE" \| "POST" \| "PUT"/);
-  assert.match(dashboardUtils, /expectedStatuses\?\.includes\(response\.status\)/);
+  assert.match(
+    dashboardUtils,
+    /expectedStatuses\?\.includes\(response\.status\)/,
+  );
   assert.match(
     dashboardUtils,
     /adminRequestErrorMessage\(response\.status, apiError\)/,
@@ -157,7 +160,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /operator\/cash-fulfillments/);
   assert.match(pilot, /STATIC QR PILOT/);
   assert.match(pilot, /Compass coordinates/);
-  assert.match(pilot, /USE MY CURRENT LOCATION/);
+  assert.match(pilot, /USE MY PHONE LOCATION/);
   assert.match(pilot, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(pilot, /Location access was not allowed/);
   assert.match(pilot, /available in the assignment form below/);
@@ -173,15 +176,13 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /pilot-collapsible-panel/);
   assert.match(pilot, /DELETE GYM/);
   assert.match(pilot, /\.jpg`/);
-  assert.match(pilot, /localStorage\.setItem\(posterStorageKey/);
-  assert.match(pilot, /localStorage\.getItem\(posterStorageKey/);
-  assert.match(pilot, /sessionStorage\.getItem\(posterStorageKey/);
-  assert.match(pilot, /sessionStorage\.removeItem\(posterStorageKey/);
-  assert.match(
-    pilot,
-    /gym\.activeCredentialVersion !== stored\.credentialVersion/,
-  );
-  assert.match(pilot, /forgetStoredPoster\(gym\.id\)/);
+  assert.match(pilot, /onLoadActiveQr/);
+  assert.match(pilot, /VIEW ACTIVE POSTER/);
+  assert.match(pilot, /server recovery was available/);
+  assert.doesNotMatch(pilot, /posterStorageKey/);
+  assert.match(dashboard, /qr-credentials\/active/);
+  assert.match(pilot, /\.filter\(isOperationalCompetition\)/);
+  assert.match(dashboard, /isRewardConfigurableCompetition\(competition\)/);
   assert.match(dashboard, /downloadPosterJpeg/);
   assert.match(dashboard, /ADVANCED OPTIONS/);
   assert.match(dashboard, /rewardType !== "coupon"/);

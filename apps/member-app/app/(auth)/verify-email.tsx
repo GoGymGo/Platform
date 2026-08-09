@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import {
   AuthConfigurationNotice,
@@ -13,6 +13,7 @@ import {
 } from '@/components/cyber';
 import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { getAuthErrorMessage } from '@/domain/auth';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { fontFamilies, spacing } from '@/constants/theme';
 import {
   gymScanAuthNext,
@@ -26,6 +27,8 @@ import { useAuth } from '@/state/auth';
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { next } = useLocalSearchParams<{ next?: string }>();
   const {
     firebaseConfigured,
@@ -40,6 +43,10 @@ export default function VerifyEmailScreen() {
   const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
   const polling = useRef(false);
   const continueAfterVerification = useCallback(() => {
+    if (!mobileGymVerificationAvailable && !challengeInvite) {
+      router.replace('/home?resume=1');
+      return;
+    }
     router.replace(
       challengeInvite
         ? { pathname: '/join', params: { challengeInvite } }
@@ -55,7 +62,7 @@ export default function VerifyEmailScreen() {
               ? '/profile'
               : '/home?resume=1'
     );
-  }, [challengeInvite, next, router]);
+  }, [challengeInvite, mobileGymVerificationAvailable, next, router]);
 
   useEffect(() => {
     if (appTourActive || !user || user.emailVerified) {

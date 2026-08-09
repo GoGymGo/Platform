@@ -1,6 +1,6 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenLoadingState,
@@ -32,6 +32,7 @@ import {
   getAppResumeTarget
 } from '@/domain/appResume';
 import { getPublicInitials } from '@/domain/profile';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
@@ -60,6 +61,8 @@ function formatCampaignDate(dateKey: string) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { goalDays, registered, resume } = useLocalSearchParams<{
     goalDays?: string;
     registered?: string;
@@ -200,10 +203,10 @@ export default function HomeScreen() {
   const pendingChallengeInvite = (weeklyChallengeRequestsQuery.data ?? [])
     .some(({ direction }) => direction === 'incoming');
   const immediateResumeTarget = getAppResumeTarget({
-    activeWorkout: activeSession !== null,
+    activeWorkout: mobileGymVerificationAvailable && activeSession !== null,
     activeWorkoutRoute,
     pendingChallengeInvite: false,
-    setupRoute: setupRoute ?? null,
+    setupRoute: mobileGymVerificationAvailable ? setupRoute ?? null : null,
     unclaimedReward: false
   });
   const secondaryResumeLoading =
@@ -258,10 +261,10 @@ export default function HomeScreen() {
     }
 
     const target = getAppResumeTarget({
-      activeWorkout: activeSession !== null,
+      activeWorkout: mobileGymVerificationAvailable && activeSession !== null,
       activeWorkoutRoute,
       pendingChallengeInvite,
-      setupRoute: setupRoute ?? null,
+      setupRoute: mobileGymVerificationAvailable ? setupRoute ?? null : null,
       unclaimedReward: Boolean(unclaimedReward)
     });
     resumeHandledRef.current = true;
@@ -273,6 +276,7 @@ export default function HomeScreen() {
   }, [
     activeSession,
     activeWorkoutRoute,
+    mobileGymVerificationAvailable,
     pendingChallengeInvite,
     resumeError,
     resumeLoading,
@@ -321,7 +325,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <TerminalText tone="cyan" variant="label">
-              {setupRequired
+              {mobileGymVerificationAvailable && setupRequired
                 ? 'SETUP INCOMPLETE'
                 : 'ACCOUNT READY // ' + competitionRegion}
             </TerminalText>
@@ -370,6 +374,7 @@ export default function HomeScreen() {
           />
         ) : null}
 
+        {mobileGymVerificationAvailable ? (
         <HUDBorderBox style={styles.commitmentCard} tone={setupRequired ? 'amber' : 'cyan'}>
           <View style={styles.commitmentHeader}>
             <View style={styles.commitmentTitleBlock}>
@@ -548,6 +553,7 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </HUDBorderBox>
+        ) : null}
 
         {unclaimedReward ? (
           <Pressable

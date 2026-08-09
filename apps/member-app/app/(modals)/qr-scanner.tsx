@@ -1,7 +1,7 @@
 import type { GymScanResultDto } from '@gogymgo/contracts';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { randomUUID } from 'expo-crypto';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 
@@ -14,10 +14,7 @@ import {
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import {
-  getUserFacingErrorMessage,
-  RecoverableScreenError
-} from '@/components/reliability';
+import { getUserFacingErrorMessage, RecoverableScreenError } from '@/components/reliability';
 import { OnboardingHeader } from '@/components/onboarding';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { SessionUnavailable } from '@/components/session';
@@ -31,6 +28,7 @@ import {
   isGymLocationAccuracyValidationMessage,
   isGymScanCompletionReady
 } from '@/domain/gymScan';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { getGymScanSetupRoute } from '@/navigation/gymScanFlow';
@@ -48,6 +46,17 @@ import { useAppTour } from '@/state/appTour';
 type ScanUiState = 'ready' | 'locating' | 'submitting' | 'result';
 
 export default function QrScannerModal() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
+  }
+
+  return <MobileQrScannerModal />;
+}
+
+function MobileQrScannerModal() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const {
@@ -62,10 +71,7 @@ export default function QrScannerModal() {
   const enrollmentPresenceMode = enrollment === '1';
   const posterScanReady = posterScan === '1' || Boolean(linkedCredential);
   const { api, configured } = useApi();
-  const repository = useMemo(
-    () => (api ? createGymScanRepository(api) : null),
-    [api]
-  );
+  const repository = useMemo(() => (api ? createGymScanRepository(api) : null), [api]);
   const {
     checking: registrationChecking,
     error: registrationError,
@@ -174,8 +180,8 @@ export default function QrScannerModal() {
         setState('result');
         setError(
           location.status === 'permission-denied'
-            ? 'Location access was not allowed. Enable location in device settings, then try again.'
-            : 'Your live location could not be read. Check location services and try again.'
+              ? 'Location access was not allowed. Enable location in device settings, then try again.'
+              : 'Your live location could not be read. Check location services and try again.'
         );
         return;
       }
@@ -280,12 +286,12 @@ export default function QrScannerModal() {
   const resultTone = completionReady
     ? 'green'
     : result?.outcome === 'verified'
-    ? 'green'
-    : result?.outcome === 'started'
-      ? 'cyan'
-      : result?.outcome === 'too_early'
-        ? 'amber'
-        : 'red';
+      ? 'green'
+      : result?.outcome === 'started'
+        ? 'cyan'
+        : result?.outcome === 'too_early'
+          ? 'amber'
+          : 'red';
 
   return (
     <ScreenContainer>
@@ -321,9 +327,7 @@ export default function QrScannerModal() {
 
         <HUDBorderBox style={styles.instructions} tone="cyan">
           <TerminalText tone="cyan" variant="label">
-            {enrollmentPresenceMode
-              ? 'ACTIVE QR // WITHIN 75 METRES'
-              : 'ONE POSTER // TWO SCANS'}
+            {enrollmentPresenceMode ? 'ACTIVE QR // WITHIN 75 METRES' : 'ONE POSTER // TWO SCANS'}
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
             {enrollmentPresenceMode
@@ -353,9 +357,10 @@ export default function QrScannerModal() {
               uppercase={false}
               variant="body"
             >
-              {error ?? (completionReady
-                ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
-                : resultMessage(result!))}
+              {error ??
+                (completionReady
+                  ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
+                  : resultMessage(result!))}
             </TerminalText>
             {result?.gymName ? (
               <TerminalText glow tone="cyan" variant="label">
@@ -369,7 +374,9 @@ export default function QrScannerModal() {
             ) : null}
             {error?.startsWith('Location access') ? (
               <CyberButtonOutline
-                label={Platform.OS === 'web' ? 'TRY AFTER ALLOWING LOCATION' : 'OPEN DEVICE SETTINGS'}
+                label={
+                  Platform.OS === 'web' ? 'TRY AFTER ALLOWING LOCATION' : 'OPEN DEVICE SETTINGS'
+                }
                 onPress={() => {
                   if (Platform.OS === 'web') {
                     scanAgain();
@@ -381,10 +388,7 @@ export default function QrScannerModal() {
               />
             ) : null}
             {completionReady ? (
-              <CyberButtonPrimary
-                label="OPEN SCANNER TO FINISH"
-                onPress={openFinishScanner}
-              />
+              <CyberButtonPrimary label="OPEN SCANNER TO FINISH" onPress={openFinishScanner} />
             ) : null}
             <CyberButtonOutline
               label={
@@ -531,7 +535,9 @@ function rejectionMessage(reason: string | null) {
     session_expired: 'The four-hour session window expired. Start a new visit with another scan.',
     session_gym_mismatch: 'Finish at the same gym where this session started.'
   };
-  return reason ? messages[reason] ?? 'The server could not verify this scan.' : 'The server could not verify this scan.';
+  return reason
+    ? (messages[reason] ?? 'The server could not verify this scan.')
+    : 'The server could not verify this scan.';
 }
 
 function formatRemaining(totalSeconds: number) {

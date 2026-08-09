@@ -14,28 +14,15 @@ import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export function useSessionRegistrationAccess() {
   const { competition, progressReady } = useWorkoutProgress();
-  const {
-    regionReady,
-    regionVerification
-  } = useCompetitionRegion();
+  const { regionReady, regionVerification } = useCompetitionRegion();
   const regionVerified =
-    regionVerification?.status === 'verified' &&
-    Boolean(regionVerification.verificationId);
-  const jurisdictionCode =
-    regionVerification?.jurisdictionCode ||
-    'GLOBAL';
+    regionVerification?.status === 'verified' && Boolean(regionVerification.verificationId);
+  const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const regionCode = regionVerification?.regionCode ?? '';
   const legalReceipt = useLegalReceiptStatus(jurisdictionCode);
-  const currentCompetition = useCurrentCompetition(
-    competition.competitionMonthKey,
-    regionCode
-  );
+  const currentCompetition = useCurrentCompetition(competition.competitionMonthKey, regionCode);
   const currentEnrollment = useCurrentEnrollment();
-  const competitionId = currentCompetition.data?.id ?? null;
-  const enrollmentCompetitionId = currentEnrollment.data?.competitionId ?? null;
-  const enrollmentReady = Boolean(
-    competitionId && enrollmentCompetitionId === competitionId
-  );
+  const enrollmentReady = Boolean(currentEnrollment.data);
   const retry = async () => {
     await Promise.all([
       currentCompetition.refetch(),

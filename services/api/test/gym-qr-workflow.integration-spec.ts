@@ -152,12 +152,12 @@ describeWithDatabase('connected static QR pilot', () => {
     });
   });
 
-  it('accepts a coarse desktop reading without expanding the maximum allowance', async () => {
+  it('caps coarse location uncertainty without expanding the maximum allowance', async () => {
     const nearby = await projectedPoint(125);
     await expect(
-      gyms.scan(principal, 'desktop-nearby-key', {
+      gyms.scan(principal, 'coarse-nearby-key', {
         ...scanRequest(
-          'desktop-nearby-event',
+          'coarse-nearby-event',
           nearby.latitude,
           nearby.longitude,
         ),
@@ -169,9 +169,9 @@ describeWithDatabase('connected static QR pilot', () => {
     await database.connection.deleteFrom('workout_sessions').execute();
     const tooFar = await projectedPoint(125.5);
     await expect(
-      gyms.scan(principal, 'desktop-too-far-key', {
+      gyms.scan(principal, 'coarse-too-far-key', {
         ...scanRequest(
-          'desktop-too-far-event',
+          'coarse-too-far-event',
           tooFar.latitude,
           tooFar.longitude,
         ),

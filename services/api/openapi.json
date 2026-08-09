@@ -2447,6 +2447,39 @@
         "tags": ["operator gyms and pilot"]
       }
     },
+    "/v1/operator/gym-locations/{gymId}/qr-credentials/active": {
+      "get": {
+        "operationId": "getActiveCredential",
+        "parameters": [
+          {
+            "name": "gymId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GymQrCredentialResponseDto"
+                    }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Recover the active printable static QR poster",
+        "tags": ["operator gyms and pilot"]
+      }
+    },
     "/v1/operator/gym-locations/{gymId}/qr-credentials/revoke": {
       "post": {
         "operationId": "revokeCredential",
@@ -6117,7 +6150,7 @@
         "properties": {
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "maxLength": 160, "minLength": 2 },
-          "address": { "type": "string", "maxLength": 500, "minLength": 5 },
+          "address": { "type": "string", "maxLength": 500 },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
           "radiusMeters": {
@@ -6131,7 +6164,6 @@
         "required": [
           "regionPolicyId",
           "name",
-          "address",
           "latitude",
           "longitude",
           "radiusMeters",
@@ -6143,7 +6175,7 @@
         "properties": {
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "maxLength": 160, "minLength": 2 },
-          "address": { "type": "string", "maxLength": 500, "minLength": 5 },
+          "address": { "type": "string", "maxLength": 500 },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
           "radiusMeters": {
@@ -6158,7 +6190,6 @@
         "required": [
           "regionPolicyId",
           "name",
-          "address",
           "latitude",
           "longitude",
           "radiusMeters",

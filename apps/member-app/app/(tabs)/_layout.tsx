@@ -4,6 +4,7 @@ import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
 import { colors, fontFamilies } from '@/constants/theme';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 
 const tabScreenOptions = {
   headerShown: false,
@@ -43,6 +44,9 @@ const tabScreenOptions = {
 } as const;
 
 export default function TabsLayout() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
   return (
     <AuthGate>
       <View style={styles.layout}>
@@ -70,6 +74,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="session"
             options={{
+              href: mobileGymVerificationAvailable ? undefined : null,
               title: 'Train',
               tabBarAccessibilityLabel: 'Training tab',
               tabBarIcon: ({ color, focused }) => (

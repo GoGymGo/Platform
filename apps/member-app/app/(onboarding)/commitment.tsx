@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Camera } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -16,11 +16,7 @@ import {
 } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
-import {
-  HUDBorderBox,
-  ScreenScrollView,
-  TerminalText
-} from '@/components/cyber';
+import { HUDBorderBox, ScreenScrollView, TerminalText } from '@/components/cyber';
 import {
   FirstRunPrimaryButton,
   FirstRunScreen,
@@ -38,6 +34,7 @@ import {
 } from '@/domain/campaignEconomics';
 import { getCompetitionMonthKey, getCompetitionRegionDateKey } from '@/domain/competition';
 import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import {
   buildRemainderDayOptions,
   calculateMaximumCommitmentEntries,
@@ -72,6 +69,17 @@ type CategoryRank = 0 | 1 | 2 | 3;
 type ConfirmationPhase = 'idle' | 'locating' | 'registering';
 
 export default function CommitmentScreen() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
+  }
+
+  return <MobileCommitmentScreen />;
+}
+
+function MobileCommitmentScreen() {
   const router = useRouter();
   const reduceMotion = useReducedMotionPreference();
   const { active: appTourActive } = useAppTour();
@@ -85,9 +93,7 @@ export default function CommitmentScreen() {
     new Date(),
     competitionRegion.timeZone
   );
-  const defaultCompetitionMonthKey = getCompetitionMonthKey(
-    registrationReferenceDateKey
-  );
+  const defaultCompetitionMonthKey = getCompetitionMonthKey(registrationReferenceDateKey);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const registration = useCompetitionRegistration({
     defaultMonthKey: defaultCompetitionMonthKey,
@@ -96,9 +102,7 @@ export default function CommitmentScreen() {
     regionVerification
   });
   const upcomingCompetitionMonthKey = registration.competitionMonthKey;
-  const categoryMultipliers = resolveCategoryPodiumMultipliers(
-    registration.competition?.rules
-  );
+  const categoryMultipliers = resolveCategoryPodiumMultipliers(registration.competition?.rules);
   const categoryOptions = [
     { label: 'NONE', value: 0 },
     {
@@ -114,22 +118,17 @@ export default function CommitmentScreen() {
       value: 3
     }
   ] as const;
-  const publishedGoalOptions = registration.competition?.goalDays?.filter(
-    (day) => dayOptions.includes(day as (typeof dayOptions)[number])
+  const publishedGoalOptions = registration.competition?.goalDays?.filter((day) =>
+    dayOptions.includes(day as (typeof dayOptions)[number])
   );
   const availableGoalOptions =
-    publishedGoalOptions && publishedGoalOptions.length > 0
-      ? publishedGoalOptions
-      : dayOptions;
+    publishedGoalOptions && publishedGoalOptions.length > 0 ? publishedGoalOptions : dayOptions;
   const maximumSelectableGoal = Math.max(...availableGoalOptions);
   const draftKey = `weekly-goal:${user?.uid ?? 'anonymous'}:${upcomingCompetitionMonthKey}`;
   const [days, setDays] = useScreenMemory(`${draftKey}:days`, () =>
     Math.min(weeklyGoal, maximumSelectableGoal)
   );
-  const [goalSelected, setGoalSelected] = useScreenMemory(
-    `${draftKey}:selected`,
-    false
-  );
+  const [goalSelected, setGoalSelected] = useScreenMemory(`${draftKey}:selected`, false);
   const [weeklyMatchMultipliers, setWeeklyMatchMultipliers] = useScreenMemory<
     readonly WeeklyMatchMultiplier[]
   >(`${draftKey}:match-results`, defaultWeeklyMatchMultipliers);
@@ -174,11 +173,9 @@ export default function CommitmentScreen() {
     upcomingCompetitionMonthKey,
     { categoryPodiumMultipliers: categoryMultipliers }
   );
-  const maximumDrawEntries = calculateMaximumCommitmentEntries(
-    days,
-    upcomingCompetitionMonthKey,
-    { categoryPodiumMultipliers: categoryMultipliers }
-  );
+  const maximumDrawEntries = calculateMaximumCommitmentEntries(days, upcomingCompetitionMonthKey, {
+    categoryPodiumMultipliers: categoryMultipliers
+  });
   const competitionDayCount = 28 + maximumRemainderDays;
   const remainderHelper =
     maximumRemainderDays === 0
@@ -190,6 +187,12 @@ export default function CommitmentScreen() {
   useEffect(() => {
     void recordFlowMetric(user?.uid, 'weekly-goal-viewed', 'weekly-goal');
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (isHomeSource && registration.alreadyEnrolled) {
+      router.replace('/home');
+    }
+  }, [isHomeSource, registration.alreadyEnrolled, router]);
 
   useEffect(() => {
     let active = true;
@@ -271,8 +274,8 @@ export default function CommitmentScreen() {
         if (location.status !== 'location-read') {
           setConfirmationError(
             location.status === 'permission-denied'
-              ? 'Location access is required to confirm you are within 75 metres of the Partner gym. Allow location, then try again.'
-              : 'Your live location could not be read. Check location services at the gym, then try again.'
+                ? 'Location access is required to confirm you are within 75 metres of the Partner gym. Allow location, then try again.'
+                : 'Your live location could not be read. Check location services at the gym, then try again.'
           );
           return;
         }
@@ -328,14 +331,12 @@ export default function CommitmentScreen() {
       >
         <OnboardingHeader
           label="WEEKLY GOAL"
-          onBack={() => goBackOrReplace(
-            router,
-            isHomeSource
-              ? '/home'
-              : isGymScanSource
-                ? '/region?source=gym-scan'
-                : '/region'
-          )}
+          onBack={() =>
+            goBackOrReplace(
+              router,
+              isHomeSource ? '/home' : isGymScanSource ? '/region?source=gym-scan' : '/region'
+            )
+          }
           progress={100}
           step="SETUP // 2 OF 2"
         />
@@ -351,7 +352,12 @@ export default function CommitmentScreen() {
           <TerminalText tone="cyan" variant="label">
             SEPTEMBER CONTEST REGISTRATION OPEN
           </TerminalText>
-          <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
+          <TerminalText
+            style={styles.editorialCaption}
+            tone="muted"
+            uppercase={false}
+            variant="caption"
+          >
             Contest runs from September 1st to September 30th.
           </TerminalText>
         </HUDBorderBox>
@@ -423,7 +429,12 @@ export default function CommitmentScreen() {
               </TerminalText>
             </View>
             <View style={styles.bonusSummary}>
-              <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
+              <TerminalText
+                style={styles.editorialCaption}
+                tone="muted"
+                uppercase={false}
+                variant="caption"
+              >
                 Earn more through consistency, teamwork and the Contest.
               </TerminalText>
               <FirstRunSecondaryButton
@@ -442,7 +453,12 @@ export default function CommitmentScreen() {
               <TerminalText tone="cyan" variant="label">
                 CONFIRM YOUR {days}-DAY GOAL
               </TerminalText>
-              <TerminalText style={styles.editorialBody} tone="muted" uppercase={false} variant="body">
+              <TerminalText
+                style={styles.editorialBody}
+                tone="muted"
+                uppercase={false}
+                variant="body"
+              >
                 {gymPresenceReady
                   ? 'Accept the rules and lock this goal for the month.'
                   : 'Scan the Partner gym QR to continue to the acceptance checks.'}
@@ -516,11 +532,7 @@ export default function CommitmentScreen() {
               ) : (
                 <FirstRunPrimaryButton
                   disabled={!registrationRequirementsAccepted || registration.busy}
-                  label={
-                    registration.busy
-                      ? 'CHECKING REGISTRATION...'
-                      : 'CONFIRM + REGISTER ->'
-                  }
+                  label={registration.busy ? 'CHECKING REGISTRATION...' : 'CONFIRM + REGISTER ->'}
                   onPress={() => void confirmWeeklyGoal()}
                   style={styles.topConfirmButton}
                 />
@@ -537,7 +549,7 @@ export default function CommitmentScreen() {
             Select your Weekly Goal to review and confirm the Contest agreement.
           </TerminalText>
         )}
-        </ScreenScrollView>
+      </ScreenScrollView>
 
       <Modal
         animationType={reduceMotion ? 'none' : 'fade'}
@@ -959,11 +971,7 @@ function GymLocationVerificationProgress({
   });
 
   return (
-    <HUDBorderBox
-      glow
-      style={styles.locationProgressCard}
-      tone="cyan"
-    >
+    <HUDBorderBox glow style={styles.locationProgressCard} tone="cyan">
       <View style={styles.locationProgressHeader}>
         <TerminalText live="polite" glow tone="cyan" variant="label">
           {locating ? 'ACQUIRING LIVE GYM POSITION' : 'SECURING CONTEST REGISTRATION'}
@@ -979,9 +987,7 @@ function GymLocationVerificationProgress({
         }}
         style={styles.locationProgressTrack}
       >
-        <Animated.View
-          style={[styles.locationProgressFill, { width: progressWidth }]}
-        >
+        <Animated.View style={[styles.locationProgressFill, { width: progressWidth }]}>
           <View style={styles.locationProgressLeadingEdge} />
         </Animated.View>
       </View>

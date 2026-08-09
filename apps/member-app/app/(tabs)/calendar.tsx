@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -14,6 +14,7 @@ import { OnboardingHeader } from '@/components/onboarding';
 import { creatorFeaturesEnabled } from '@/config/features';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useCreatorWorkoutPlans } from '@/data/appDataHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -29,6 +30,8 @@ const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { width: viewportWidth } = useWindowDimensions();
   const compactCalendar = viewportWidth < 360;
   const {
@@ -172,7 +175,7 @@ export default function CalendarScreen() {
               label="RETURN TO TODAY TO START ->"
               onPress={goToToday}
             />
-          ) : !selectedDateIsFuture ? (
+          ) : !selectedDateIsFuture && mobileGymVerificationAvailable ? (
             <CyberButtonPrimary
               label="START TODAY'S VERIFIED WORKOUT ->"
               onPress={() => router.push('/session' as Href)}

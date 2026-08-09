@@ -154,11 +154,19 @@ class AdminRequestError extends AdminUserFacingError {
   }
 }
 
-function adminRequestErrorMessage(status: number) {
+function adminRequestErrorMessage(
+  status: number,
+  apiError?: { code?: string; message?: string },
+) {
   if (status === 401) return "Your admin session expired. Sign in again.";
   if (status === 403) return "Your account does not have permission to complete this action.";
   if (status === 404) return "This record is no longer available. Refresh the dashboard and try again.";
-  if (status === 409) return "This record changed after you opened it. Refresh the dashboard and review the latest version.";
+  if (status === 409) {
+    const conflictMessage = apiError?.message?.trim();
+    return conflictMessage
+      ? conflictMessage
+      : "This action conflicts with the latest record. Refresh the dashboard and review it before trying again.";
+  }
   if (status === 400 || status === 422) return "The request could not be completed. Review the form and try again.";
   if (status === 429) return "Too many requests were submitted. Wait a moment and try again.";
   if (status >= 500) return "The GoGymGo admin service is temporarily unavailable. Try again shortly.";
@@ -272,7 +280,9 @@ export async function adminRequest<T>(
         status: response.status,
       });
     }
-    const error = new AdminRequestError(adminRequestErrorMessage(response.status));
+    const error = new AdminRequestError(
+      adminRequestErrorMessage(response.status, apiError),
+    );
     Object.assign(error, {
       code: apiError?.code,
       status: response.status,

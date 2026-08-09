@@ -1117,6 +1117,9 @@ export function AdminDashboard({
         <ConfirmationDialog
           action={confirmAction}
           onClose={() => setConfirmAction(null)}
+          onRefresh={async () => {
+            if (user) await refresh(user);
+          }}
           submitting={submitting}
         />
       ) : null}
@@ -4292,14 +4295,18 @@ function CouponCodesForm({
 function ConfirmationDialog({
   action,
   onClose,
+  onRefresh,
   submitting,
 }: {
   action: ConfirmAction;
   onClose: () => void;
+  onRefresh: () => Promise<void>;
   submitting: boolean;
 }) {
   const [reason, setReason] = useState("");
   const [formError, setFormError] = useState("");
+  const [requiresReview, setRequiresReview] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   async function confirm() {
     setFormError("");
     const auditReason = action.auditReason ?? reason.trim();
@@ -4312,7 +4319,13 @@ function ConfirmationDialog({
       onClose();
     } catch (error) {
       setFormError(errorMessage(error));
+      setRequiresReview(adminRequestStatus(error) === 409);
     }
+  }
+  async function refreshAndReview() {
+    setRefreshing(true);
+    await onRefresh();
+    onClose();
   }
   return (
     <ModalShell onClose={onClose} title={action.actionLabel} compact>
@@ -4335,20 +4348,34 @@ function ConfirmationDialog({
       )}
       {formError ? <p className="form-error">{formError}</p> : null}
       <div className="form-actions">
-        <button className="secondary-button" onClick={onClose} type="button">
-          GO BACK
-        </button>
-        <button
-          autoFocus={Boolean(action.auditReason)}
-          className={
-            action.tone === "danger" ? "danger-button" : "primary-button"
-          }
-          disabled={submitting}
-          onClick={() => void confirm()}
-          type="button"
-        >
-          {submitting ? "SAVING…" : action.actionLabel.toUpperCase()}
-        </button>
+        {requiresReview ? (
+          <button
+            autoFocus
+            className="primary-button"
+            disabled={refreshing}
+            onClick={() => void refreshAndReview()}
+            type="button"
+          >
+            {refreshing ? "REFRESHING…" : "REFRESH + REVIEW"}
+          </button>
+        ) : (
+          <>
+            <button className="secondary-button" onClick={onClose} type="button">
+              GO BACK
+            </button>
+            <button
+              autoFocus={Boolean(action.auditReason)}
+              className={
+                action.tone === "danger" ? "danger-button" : "primary-button"
+              }
+              disabled={submitting}
+              onClick={() => void confirm()}
+              type="button"
+            >
+              {submitting ? "SAVING…" : action.actionLabel.toUpperCase()}
+            </button>
+          </>
+        )}
       </div>
     </ModalShell>
   );

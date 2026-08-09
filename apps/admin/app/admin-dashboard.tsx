@@ -3682,26 +3682,41 @@ function RewardForm({
   submitting: boolean;
 }) {
   const [formError, setFormError] = useState("");
+  const [rewardType, setRewardType] = useState<Reward["rewardType"]>(
+    reward?.rewardType ?? "physical",
+  );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
     const form = new FormData(event.currentTarget);
     try {
+      const selectedRewardType = String(form.get("rewardType"));
+      const claimUrl = optionalString(form.get("claimUrl"));
+      const fulfillmentInstructions = optionalString(
+        form.get("fulfillmentInstructions"),
+      );
+      if (
+        selectedRewardType !== "coupon" &&
+        !claimUrl &&
+        !fulfillmentInstructions
+      ) {
+        throw new AdminUserFacingError(
+          "Add either a secure claim URL or fulfillment instructions.",
+        );
+      }
       const body = compactObject({
         availableFrom: optionalIso(form.get("availableFrom")),
         availableUntil: optionalIso(form.get("availableUntil")),
-        claimUrl: optionalString(form.get("claimUrl")),
+        claimUrl,
         competitionId: String(form.get("competitionId")),
         description: String(form.get("description")),
         displayOrder: Number(form.get("displayOrder") || 0),
         expectedVersion: reward?.version,
-        fulfillmentInstructions: optionalString(
-          form.get("fulfillmentInstructions"),
-        ),
+        fulfillmentInstructions,
         imageUrl: optionalString(form.get("imageUrl")),
         inventoryTotal: Number(form.get("inventoryTotal")),
         reason: String(form.get("reason")),
-        rewardType: String(form.get("rewardType")),
+        rewardType: selectedRewardType,
         sponsorName: String(form.get("sponsorName")),
         termsUrl: optionalString(form.get("termsUrl")),
         title: String(form.get("title")),
@@ -3744,15 +3759,18 @@ function RewardForm({
           </Field>
           <Field label="REWARD TYPE">
             <select
-              defaultValue={reward?.rewardType ?? "physical"}
               name="rewardType"
+              onChange={(event) =>
+                setRewardType(event.target.value as Reward["rewardType"])
+              }
+              value={rewardType}
             >
               <option value="physical">Physical</option>
               <option value="coupon">Coupon code</option>
               <option value="cash">Cash</option>
             </select>
           </Field>
-          <Field label="INVENTORY">
+          <Field label="QUANTITY">
             <input
               defaultValue={reward?.inventoryTotal ?? 1}
               max={100000}
@@ -3770,75 +3788,107 @@ function RewardForm({
               rows={4}
             />
           </Field>
-          <Field label="IMAGE URL">
-            <input
-              defaultValue={reward?.imageUrl ?? ""}
-              name="imageUrl"
-              placeholder="https://"
-              type="url"
-            />
-          </Field>
-          <Field label="TERMS URL">
-            <input
-              defaultValue={reward?.termsUrl ?? ""}
-              name="termsUrl"
-              placeholder="https://"
-              type="url"
-            />
-          </Field>
-          <Field label="CLAIM URL">
-            <input
-              defaultValue={reward?.claimUrl ?? ""}
-              name="claimUrl"
-              placeholder="https://"
-              type="url"
-            />
-          </Field>
-          <Field label="DISPLAY ORDER">
-            <input
-              defaultValue={reward?.displayOrder ?? 0}
-              min={0}
-              name="displayOrder"
-              type="number"
-            />
-          </Field>
-          <Field label="AVAILABLE FROM">
-            <input
-              defaultValue={
-                reward?.availableFrom
-                  ? toLocalDateTime(reward.availableFrom)
-                  : ""
-              }
-              name="availableFrom"
-              type="datetime-local"
-            />
-          </Field>
-          <Field label="AVAILABLE UNTIL">
-            <input
-              defaultValue={
-                reward?.availableUntil
-                  ? toLocalDateTime(reward.availableUntil)
-                  : ""
-              }
-              name="availableUntil"
-              type="datetime-local"
-            />
-          </Field>
-          <Field label="FULFILLMENT INSTRUCTIONS" wide>
-            <textarea
-              defaultValue={reward?.fulfillmentInstructions ?? ""}
-              name="fulfillmentInstructions"
-              rows={3}
-            />
-          </Field>
-          <ReasonField
-            defaultValue={
-              reward
-                ? "Update the verified brand reward configuration."
-                : "Create a verified brand reward draft for review."
-            }
-          />
+          {rewardType !== "coupon" ? (
+            <fieldset className="reward-fulfillment">
+              <legend>
+                {rewardType === "cash"
+                  ? "CASH FULFILLMENT"
+                  : "PHYSICAL REWARD FULFILLMENT"}
+              </legend>
+              <p>Add at least one way for a winner to receive this reward.</p>
+              <div className="reward-fulfillment-fields">
+                <Field
+                  label={
+                    rewardType === "cash" ? "PAYMENT / CLAIM URL" : "CLAIM URL"
+                  }
+                >
+                  <input
+                    defaultValue={reward?.claimUrl ?? ""}
+                    name="claimUrl"
+                    placeholder="https://"
+                    type="url"
+                  />
+                </Field>
+                <Field
+                  label={
+                    rewardType === "cash"
+                      ? "PAYMENT INSTRUCTIONS"
+                      : "FULFILLMENT INSTRUCTIONS"
+                  }
+                >
+                  <textarea
+                    defaultValue={reward?.fulfillmentInstructions ?? ""}
+                    name="fulfillmentInstructions"
+                    rows={3}
+                  />
+                </Field>
+              </div>
+            </fieldset>
+          ) : null}
+          <details className="reward-advanced">
+            <summary>
+              <span>ADVANCED OPTIONS</span>
+              <small>Images, terms, timing and display order</small>
+            </summary>
+            <div className="reward-advanced-grid">
+              <Field label="IMAGE URL">
+                <input
+                  defaultValue={reward?.imageUrl ?? ""}
+                  name="imageUrl"
+                  placeholder="https://"
+                  type="url"
+                />
+              </Field>
+              <Field label="TERMS URL">
+                <input
+                  defaultValue={reward?.termsUrl ?? ""}
+                  name="termsUrl"
+                  placeholder="https://"
+                  type="url"
+                />
+              </Field>
+              <Field label="DISPLAY ORDER">
+                <input
+                  defaultValue={reward?.displayOrder ?? 0}
+                  min={0}
+                  name="displayOrder"
+                  type="number"
+                />
+              </Field>
+              <Field label="AVAILABLE FROM">
+                <input
+                  defaultValue={
+                    reward?.availableFrom
+                      ? toLocalDateTime(reward.availableFrom)
+                      : ""
+                  }
+                  name="availableFrom"
+                  type="datetime-local"
+                />
+              </Field>
+              <Field label="AVAILABLE UNTIL">
+                <input
+                  defaultValue={
+                    reward?.availableUntil
+                      ? toLocalDateTime(reward.availableUntil)
+                      : ""
+                  }
+                  name="availableUntil"
+                  type="datetime-local"
+                />
+              </Field>
+            </div>
+          </details>
         </FormGrid>
+        <input
+          name="reason"
+          type="hidden"
+          value={
+            reward
+              ? "Update the verified brand reward configuration."
+              : "Create a verified brand reward draft for review."
+          }
+        />
         {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}

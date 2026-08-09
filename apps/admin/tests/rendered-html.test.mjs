@@ -156,6 +156,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /available in the assignment form below/);
   assert.match(pilot, /formErrorMessage/);
   assert.match(pilot, /DOWNLOAD JPEG FOR PRINTING/);
+  assert.match(pilot, /aria-expanded=\{!collapsed\}/);
+  assert.match(pilot, /\{collapsed \? "Expand" : "Collapse"\}/);
   assert.match(pilot, /\.jpg`/);
   assert.match(pilot, /localStorage\.setItem\(posterStorageKey/);
   assert.match(pilot, /localStorage\.getItem\(posterStorageKey/);
@@ -167,6 +169,9 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   );
   assert.match(pilot, /forgetStoredPoster\(gym\.id\)/);
   assert.match(dashboard, /downloadPosterJpeg/);
+  assert.match(dashboard, /ADVANCED OPTIONS/);
+  assert.match(dashboard, /rewardType !== "coupon"/);
+  assert.match(dashboard, /type="hidden"[\s\S]*value=\{/);
   assert.match(posterJpeg, /canvas\.toBlob/);
   assert.match(posterJpeg, /"image\/jpeg"/);
   assert.match(posterJpeg, /new Path2D/);

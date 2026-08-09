@@ -1909,6 +1909,84 @@ td small {
   grid-column: 1 / -1;
 }
 
+.reward-fulfillment,
+.reward-advanced {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px 2px 7px 2px;
+  background: rgba(53, 226, 228, 0.025);
+}
+
+.reward-fulfillment {
+  padding: 16px;
+}
+
+.reward-fulfillment legend {
+  padding: 0 7px;
+  color: var(--cyan-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+}
+
+.reward-fulfillment > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.reward-fulfillment-fields,
+.reward-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.reward-advanced summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 16px;
+  color: var(--yellow);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  list-style: none;
+}
+
+.reward-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.reward-advanced summary::after {
+  content: "+";
+  color: var(--yellow);
+  font-size: 18px;
+}
+
+.reward-advanced[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.reward-advanced[open] summary::after {
+  content: "−";
+}
+
+.reward-advanced summary small {
+  margin-left: auto;
+  color: var(--muted-2);
+  font-family: var(--body);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.reward-advanced-grid {
+  padding: 16px;
+}
+
 .field input,
 .field select,
 .field textarea,
@@ -2541,6 +2619,8 @@ td small {
 
   .competition-stats,
   .form-grid,
+  .reward-advanced-grid,
+  .reward-fulfillment-fields,
   .health-detail,
   .checkbox-grid {
     grid-template-columns: 1fr;
@@ -2723,7 +2803,6 @@ td small {
 
 .poster-preview {
   display: grid;
-  justify-items: center;
   gap: 18px;
   margin-top: 22px;
   border: 1px solid var(--cyan);
@@ -2732,11 +2811,29 @@ td small {
   padding: 20px;
 }
 
-.poster-preview > div {
+.poster-preview-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
   gap: 16px;
+}
+
+.poster-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.poster-preview-content {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  width: 100%;
+}
+
+.poster-preview-content[hidden] {
+  display: none;
 }
 
 .poster-preview img {
@@ -2777,6 +2874,14 @@ td small {
 
   .pilot-details {
     grid-column: auto;
+  }
+
+  .poster-preview-header {
+    align-items: flex-start;
+  }
+
+  .poster-preview-actions {
+    gap: 10px;
   }
 }
 

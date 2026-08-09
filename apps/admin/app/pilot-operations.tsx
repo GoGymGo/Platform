@@ -7,7 +7,7 @@ import type {
   OperatorReasonDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { parseCoordinate } from "./coordinate-input";
 import { AdminUserFacingError, errorMessage } from "./admin-dashboard-utils";
 import { posterSvgToJpegBlob } from "./poster-jpeg";
@@ -771,6 +771,8 @@ function PosterPreview({
 }) {
   const [source, setSource] = useState<string | null>(null);
   const [conversionError, setConversionError] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
+  const contentId = useId();
 
   useEffect(() => {
     let active = true;
@@ -801,36 +803,49 @@ function PosterPreview({
 
   return (
     <div className="poster-preview">
-      <div>
+      <div className="poster-preview-header">
         <strong>
           PRINTABLE QR POSTER · VERSION {credential.credentialVersion}
         </strong>
-        <button className="text-button" onClick={onClose} type="button">
-          Close
-        </button>
-      </div>
-      {source ? (
-        <>
-          {/* Generated object URLs cannot use the Sites image optimizer. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt="Printable GoGymGo gym QR poster" src={source} />
-          <a
-            className="primary-button"
-            download={`gogymgo-gym-qr-v${credential.credentialVersion}.jpg`}
-            href={source}
+        <div className="poster-preview-actions">
+          <button
+            aria-controls={contentId}
+            aria-expanded={!collapsed}
+            className="text-button"
+            onClick={() => setCollapsed((current) => !current)}
+            type="button"
           >
-            DOWNLOAD JPEG FOR PRINTING
-          </a>
-        </>
-      ) : conversionError ? (
-        <p className="poster-preview-status error-message" role="alert">
-          {conversionError}
-        </p>
-      ) : (
-        <p className="poster-preview-status" role="status">
-          PREPARING JPEG PREVIEW...
-        </p>
-      )}
+            {collapsed ? "Expand" : "Collapse"}
+          </button>
+          <button className="text-button" onClick={onClose} type="button">
+            Close
+          </button>
+        </div>
+      </div>
+      <div className="poster-preview-content" hidden={collapsed} id={contentId}>
+        {source ? (
+          <>
+            {/* Generated object URLs cannot use the Sites image optimizer. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img alt="Printable GoGymGo gym QR poster" src={source} />
+            <a
+              className="primary-button"
+              download={`gogymgo-gym-qr-v${credential.credentialVersion}.jpg`}
+              href={source}
+            >
+              DOWNLOAD JPEG FOR PRINTING
+            </a>
+          </>
+        ) : conversionError ? (
+          <p className="poster-preview-status error-message" role="alert">
+            {conversionError}
+          </p>
+        ) : (
+          <p className="poster-preview-status" role="status">
+            PREPARING JPEG PREVIEW...
+          </p>
+        )}
+      </div>
     </div>
   );
 }

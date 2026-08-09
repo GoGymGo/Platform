@@ -23,6 +23,11 @@ export function isWithinGymGeofence(
   radiusMeters: number,
   accuracyMeters = 0,
 ): boolean {
+  const trustedAccuracyMeters = Math.min(
+    accuracyMeters,
+    gymScanPolicy.maximumAccuracyMeters,
+  );
+
   return (
     Number.isFinite(distanceMeters) &&
     Number.isFinite(radiusMeters) &&
@@ -30,8 +35,7 @@ export function isWithinGymGeofence(
     distanceMeters >= 0 &&
     radiusMeters >= 0 &&
     accuracyMeters >= 0 &&
-    accuracyMeters <= gymScanPolicy.maximumAccuracyMeters &&
-    distanceMeters <= radiusMeters + accuracyMeters
+    distanceMeters <= radiusMeters + trustedAccuracyMeters
   );
 }
 

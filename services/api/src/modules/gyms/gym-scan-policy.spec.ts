@@ -25,7 +25,11 @@ describe('static gym QR scan policy', () => {
     expect(isWithinGymGeofence(105.001, 75, 30)).toBe(false);
     expect(isWithinGymGeofence(125, 75, 50)).toBe(true);
     expect(isWithinGymGeofence(125.001, 75, 50)).toBe(false);
-    expect(isWithinGymGeofence(125, 75, 50.001)).toBe(false);
+  });
+
+  it('caps coarse desktop uncertainty instead of rejecting a nearby centre point', () => {
+    expect(isWithinGymGeofence(125, 75, 100_000)).toBe(true);
+    expect(isWithinGymGeofence(125.001, 75, 100_000)).toBe(false);
   });
 
   it('rejects poor accuracy readings', () => {

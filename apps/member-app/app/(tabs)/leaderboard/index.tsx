@@ -71,7 +71,13 @@ export default function LeaderboardScreen() {
   const hasSettledWeek = competition.periodResults.some((period) => period.status === 'settled');
   const categoryScore = competition.periodEntriesBeforePerfectMonth;
   const standingsVisible = !competitionNotStarted;
-  const myRank = myGoalLeaderboard?.rows.find(
+  const myGoalLeaderboardRows = Array.isArray(myGoalLeaderboard?.rows)
+    ? myGoalLeaderboard.rows
+    : [];
+  const selectedLeaderboardRows = Array.isArray(selectedLeaderboard?.rows)
+    ? selectedLeaderboard.rows
+    : [];
+  const myRank = myGoalLeaderboardRows.find(
     ({ alias }) => alias.toLowerCase() === publicName.toLowerCase()
   )?.rank;
   const currentRankLabel = getCompetitionRankLabel({
@@ -252,7 +258,7 @@ export default function LeaderboardScreen() {
                 title="COULD NOT LOAD STANDINGS"
               />
             ) : null}
-            {selectedLeaderboard?.rows.map((row) => (
+            {selectedLeaderboardRows.map((row) => (
               <LeaderboardResultRow
                 compact={compactRankings}
                 isCurrentUser={row.alias.toLowerCase() === publicName.toLowerCase()}
@@ -263,7 +269,9 @@ export default function LeaderboardScreen() {
                 row={row}
               />
             ))}
-            {!selectedLeaderboardQuery.isError && !leaderboardPending && !selectedLeaderboard ? (
+            {!selectedLeaderboardQuery.isError &&
+            !leaderboardPending &&
+            selectedLeaderboardRows.length === 0 ? (
               <HUDBorderBox style={styles.emptyStandings} tone="muted">
                 <TerminalText glow tone="amber" variant="label">
                   STANDINGS NOT AVAILABLE YET

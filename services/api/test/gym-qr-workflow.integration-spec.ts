@@ -101,9 +101,14 @@ describeWithDatabase('connected static QR pilot', () => {
   });
 
   it('rejects poor accuracy, revoked credentials and replayed client events', async () => {
+    const inaccuratePoint = await projectedPoint(125.5);
     await expect(
       gyms.scan(principal, 'accuracy-key', {
-        ...scanRequest('accuracy-event'),
+        ...scanRequest(
+          'accuracy-event',
+          inaccuratePoint.latitude,
+          inaccuratePoint.longitude,
+        ),
         accuracyMeters: 50.01,
       }),
     ).resolves.toMatchObject({
@@ -144,6 +149,37 @@ describeWithDatabase('connected static QR pilot', () => {
     ).resolves.toMatchObject({
       outcome: 'rejected',
       rejectionReason: 'replayed_event',
+    });
+  });
+
+  it('accepts a coarse desktop reading without expanding the maximum allowance', async () => {
+    const nearby = await projectedPoint(125);
+    await expect(
+      gyms.scan(principal, 'desktop-nearby-key', {
+        ...scanRequest(
+          'desktop-nearby-event',
+          nearby.latitude,
+          nearby.longitude,
+        ),
+        accuracyMeters: 100_000,
+      }),
+    ).resolves.toMatchObject({ outcome: 'started' });
+
+    await database.connection.deleteFrom('gym_scan_events').execute();
+    await database.connection.deleteFrom('workout_sessions').execute();
+    const tooFar = await projectedPoint(125.5);
+    await expect(
+      gyms.scan(principal, 'desktop-too-far-key', {
+        ...scanRequest(
+          'desktop-too-far-event',
+          tooFar.latitude,
+          tooFar.longitude,
+        ),
+        accuracyMeters: 100_000,
+      }),
+    ).resolves.toMatchObject({
+      outcome: 'rejected',
+      rejectionReason: 'inaccurate_location',
     });
   });
 

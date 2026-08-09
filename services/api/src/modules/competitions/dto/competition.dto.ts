@@ -157,11 +157,11 @@ export class EnrollmentGymPresenceDto {
   @IsLongitude()
   longitude!: number;
 
-  @ApiProperty({ maximum: 1_000, minimum: 0.1, type: Number })
+  @ApiProperty({ maximum: 100_000, minimum: 0.1, type: Number })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0.1)
-  @Max(1_000)
+  @Max(100_000)
   accuracyMeters!: number;
 }
 

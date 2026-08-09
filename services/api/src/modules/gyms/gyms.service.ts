@@ -129,16 +129,18 @@ export class GymsService {
         if (!credential.gym_active) {
           return this.rejected(now, 'gym_inactive', credential);
         }
-        if (!isAcceptableLocationAccuracy(request.accuracyMeters)) {
+        const withinGeofence = isWithinGymGeofence(
+          credential.distance_meters,
+          credential.radius_meters,
+          request.accuracyMeters,
+        );
+        if (
+          !withinGeofence &&
+          !isAcceptableLocationAccuracy(request.accuracyMeters)
+        ) {
           return this.rejected(now, 'inaccurate_location', credential);
         }
-        if (
-          !isWithinGymGeofence(
-            credential.distance_meters,
-            credential.radius_meters,
-            request.accuracyMeters,
-          )
-        ) {
+        if (!withinGeofence) {
           return this.rejected(now, 'outside_geofence', credential);
         }
 

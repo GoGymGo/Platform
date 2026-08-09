@@ -108,9 +108,9 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
       { idempotencyKey, method: 'POST' }
     ),
-    getCategoryLeaderboard: (goal) => api.request<CategoryLeaderboard>(
+    getCategoryLeaderboard: (goal) => api.request<unknown>(
       `/v1/leaderboards/current?goal=${goal}`
-    ),
+    ).then((response) => normalizeCategoryLeaderboard(response, goal)),
     getCompetitionMatches: (competitionMonthKey, weeklyGoal, regionCode) =>
       api.request<readonly CompetitionMatch[]>(
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
@@ -226,6 +226,43 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     ),
     mode: 'api'
   };
+}
+
+function normalizeCategoryLeaderboard(
+  response: unknown,
+  requestedGoal: GoalCategory
+): CategoryLeaderboard | null {
+  if (!isRecord(response) || !Array.isArray(response.rows)) {
+    return null;
+  }
+
+  return {
+    goal: requestedGoal,
+    rows: response.rows.filter(isCategoryLeaderboardRow)
+  };
+}
+
+function isCategoryLeaderboardRow(
+  value: unknown
+): value is CategoryLeaderboard['rows'][number] {
+  return isRecord(value) &&
+    typeof value.alias === 'string' &&
+    isFiniteNumber(value.categoryEntries) &&
+    isFiniteNumber(value.rank) &&
+    isRecord(value.streaks) &&
+    isFiniteNumber(value.streaks.daily) &&
+    isFiniteNumber(value.streaks.monthly) &&
+    isFiniteNumber(value.streaks.weekly) &&
+    isFiniteNumber(value.streaks.yearly) &&
+    isFiniteNumber(value.verifiedDays);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function createUnavailableDataSource(): AppDataSource {

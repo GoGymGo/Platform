@@ -3,6 +3,8 @@ import { Camera } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Animated,
+  Easing,
   findNodeHandle,
   Modal,
   Platform,
@@ -28,7 +30,7 @@ import { LegalConsentCheckbox } from '@/components/legal';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { getUserFacingErrorMessage } from '@/components/reliability';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { gymLocationAccuracyWarning } from '@/constants/gymScan';
 import {
   calculateWeeklyMatchEntries,
@@ -67,6 +69,7 @@ const matchOptions = [
 ] as const;
 const defaultWeeklyMatchMultipliers: readonly WeeklyMatchMultiplier[] = [1, 1, 1, 1];
 type CategoryRank = 0 | 1 | 2 | 3;
+type ConfirmationPhase = 'idle' | 'locating' | 'registering';
 
 export default function CommitmentScreen() {
   const router = useRouter();
@@ -144,7 +147,7 @@ export default function CommitmentScreen() {
   const [gymPresenceStatus, setGymPresenceStatus] = useState<'checking' | 'missing' | 'ready'>(
     'checking'
   );
-  const [gymPresenceBusy, setGymPresenceBusy] = useState(false);
+  const [confirmationPhase, setConfirmationPhase] = useState<ConfirmationPhase>('idle');
   const calculatorDialogRef = useRef<View>(null);
   const baseMonthEntries = days * 4;
   const weeklyMatchEntries = calculateWeeklyMatchEntries(days, weeklyMatchMultipliers);
@@ -251,7 +254,9 @@ export default function CommitmentScreen() {
     }
 
     try {
-      setGymPresenceBusy(true);
+      setConfirmationPhase(
+        !appTourActive && !registration.alreadyEnrolled ? 'locating' : 'registering'
+      );
       let gymPresence: CreateCompetitionEnrollmentInput['gymPresence'] | undefined;
       if (!appTourActive && !registration.alreadyEnrolled) {
         const pendingScan = await readPendingGymScan();
@@ -278,6 +283,7 @@ export default function CommitmentScreen() {
           longitude: location.longitude
         };
       }
+      setConfirmationPhase('registering');
       const enrollmentResult = await registration.register(days, gymPresence);
       setWeeklyGoal(enrollmentResult.goalDays, upcomingCompetitionMonthKey);
       [
@@ -303,7 +309,7 @@ export default function CommitmentScreen() {
     } catch (error) {
       setConfirmationError(getRegistrationErrorMessage(error));
     } finally {
-      setGymPresenceBusy(false);
+      setConfirmationPhase('idle');
     }
   }
 
@@ -502,18 +508,23 @@ export default function CommitmentScreen() {
             </HUDBorderBox>
 
             {gymPresenceReady ? (
-              <FirstRunPrimaryButton
-                disabled={!registrationRequirementsAccepted || registration.busy || gymPresenceBusy}
-                label={
-                  gymPresenceBusy
-                    ? 'CHECKING GYM LOCATION...'
-                    : registration.busy
+              confirmationPhase !== 'idle' ? (
+                <GymLocationVerificationProgress
+                  phase={confirmationPhase}
+                  reduceMotion={reduceMotion}
+                />
+              ) : (
+                <FirstRunPrimaryButton
+                  disabled={!registrationRequirementsAccepted || registration.busy}
+                  label={
+                    registration.busy
                       ? 'CHECKING REGISTRATION...'
                       : 'CONFIRM + REGISTER ->'
-                }
-                onPress={() => void confirmWeeklyGoal()}
-                style={styles.topConfirmButton}
-              />
+                  }
+                  onPress={() => void confirmWeeklyGoal()}
+                  style={styles.topConfirmButton}
+                />
+              )
             ) : null}
           </>
         ) : (
@@ -900,6 +911,105 @@ function getApiErrorCode(body: unknown) {
   return null;
 }
 
+function GymLocationVerificationProgress({
+  phase,
+  reduceMotion
+}: {
+  phase: Exclude<ConfirmationPhase, 'idle'>;
+  reduceMotion: boolean;
+}) {
+  const [progress] = useState(() => new Animated.Value(0));
+  const locating = phase === 'locating';
+
+  useEffect(() => {
+    progress.stopAnimation();
+    if (reduceMotion) {
+      progress.setValue(0.72);
+      return;
+    }
+
+    progress.setValue(0);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progress, {
+          duration: 1_150,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: false
+        }),
+        Animated.timing(progress, {
+          duration: 300,
+          easing: Easing.linear,
+          toValue: 0,
+          useNativeDriver: false
+        })
+      ])
+    );
+    animation.start();
+
+    return () => {
+      animation.stop();
+      progress.stopAnimation();
+    };
+  }, [phase, progress, reduceMotion]);
+
+  const progressWidth = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['14%', '100%']
+  });
+
+  return (
+    <HUDBorderBox
+      glow
+      style={styles.locationProgressCard}
+      tone="cyan"
+    >
+      <View style={styles.locationProgressHeader}>
+        <TerminalText live="polite" glow tone="cyan" variant="label">
+          {locating ? 'ACQUIRING LIVE GYM POSITION' : 'SECURING CONTEST REGISTRATION'}
+        </TerminalText>
+        <TerminalText tone="cyan" variant="micro">
+          {locating ? 'LIVE SIGNAL' : 'COMMITTING'}
+        </TerminalText>
+      </View>
+      <View
+        accessibilityRole="progressbar"
+        accessibilityValue={{
+          text: locating ? 'Acquiring live gym position' : 'Securing Contest registration'
+        }}
+        style={styles.locationProgressTrack}
+      >
+        <Animated.View
+          style={[styles.locationProgressFill, { width: progressWidth }]}
+        >
+          <View style={styles.locationProgressLeadingEdge} />
+        </Animated.View>
+      </View>
+      <View style={styles.locationProgressScale}>
+        <TerminalText tone="dim" variant="micro">
+          00
+        </TerminalText>
+        <TerminalText tone="dim" variant="micro">
+          VERIFY
+        </TerminalText>
+        <TerminalText tone="dim" variant="micro">
+          100
+        </TerminalText>
+      </View>
+      <TerminalText
+        style={styles.locationProgressCopy}
+        tone="muted"
+        uppercase={false}
+        variant="caption"
+      >
+        {locating
+          ? 'Hold steady while GoGymGo locks a fresh location signal and compares it with this Partner gym.'
+          : 'Gym presence confirmed. Saving your Weekly Goal and Contest entry.'}
+      </TerminalText>
+    </HUDBorderBox>
+  );
+}
+
 const styles = StyleSheet.create({
   scroll: {
     flex: 1
@@ -1009,6 +1119,50 @@ const styles = StyleSheet.create({
   },
   topConfirmButton: {
     marginBottom: spacing.md
+  },
+  locationProgressCard: {
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.panelAlpha70
+  },
+  locationProgressHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs
+  },
+  locationProgressTrack: {
+    width: '100%',
+    height: 12,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderCyanStrong,
+    borderRadius: 2,
+    backgroundColor: colors.surfaceCyanProgress
+  },
+  locationProgressFill: {
+    height: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    backgroundColor: colors.cyan,
+    ...cyberGlow.cyan
+  },
+  locationProgressLeadingEdge: {
+    width: 3,
+    height: '100%',
+    backgroundColor: colors.text
+  },
+  locationProgressScale: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  locationProgressCopy: {
+    marginTop: spacing.xs,
+    lineHeight: 20
   },
   dayButton: {
     width: '23%',

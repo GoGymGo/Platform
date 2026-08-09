@@ -369,20 +369,22 @@ export class CompetitionsService {
             message: 'This Partner gym is not currently active.',
           });
         }
-        if (!isAcceptableLocationAccuracy(request.gymPresence.accuracyMeters)) {
+        const withinGeofence = isWithinGymGeofence(
+          gymPresence.distance_meters,
+          gymPresence.presence_radius_meters,
+          request.gymPresence.accuracyMeters,
+        );
+        if (
+          !withinGeofence &&
+          !isAcceptableLocationAccuracy(request.gymPresence.accuracyMeters)
+        ) {
           throw new UnprocessableEntityException({
             code: 'GYM_LOCATION_INACCURATE',
             message:
               'Your location is not accurate enough to confirm gym presence. Move closer to the poster or a window, then try again.',
           });
         }
-        if (
-          !isWithinGymGeofence(
-            gymPresence.distance_meters,
-            gymPresence.presence_radius_meters,
-            request.gymPresence.accuracyMeters,
-          )
-        ) {
+        if (!withinGeofence) {
           throw new UnprocessableEntityException({
             code: 'OUTSIDE_GYM_GEOFENCE',
             message: `You must be within ${gymPresence.presence_radius_meters} metres of ${gymPresence.gym_name} to enroll.`,

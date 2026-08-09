@@ -348,6 +348,7 @@ export class CompetitionsService {
             'credential.gym_location_id',
           )
           .select([
+            'credential.competition_id',
             'credential.credential_version',
             'credential.status as credential_status',
             'gym.active as gym_active',
@@ -367,11 +368,14 @@ export class CompetitionsService {
             hashOpaqueValue(request.gymPresence.credential),
           )
           .executeTakeFirst();
-        if (!gymPresence || gymPresence.credential_status !== 'active') {
+        if (
+          !gymPresence ||
+          gymPresence.credential_status !== 'active' ||
+          gymPresence.competition_id !== competition.id
+        ) {
           throw new UnprocessableEntityException({
             code: 'GYM_QR_INVALID',
-            message:
-              'Scan the active GoGymGo QR poster at a Partner gym to confirm your gym location for enrollment.',
+            message: `Scan the active ${competition.name} QR poster at a Partner gym to confirm your gym location for enrollment.`,
           });
         }
         if (!gymPresence.gym_active) {

@@ -2405,10 +2405,16 @@
         "tags": ["operator gyms and pilot"]
       }
     },
-    "/v1/operator/gym-locations/{gymId}/qr-credentials": {
+    "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials": {
       "post": {
         "operationId": "issueCredential",
         "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
           {
             "name": "gymId",
             "required": true,
@@ -2447,10 +2453,16 @@
         "tags": ["operator gyms and pilot"]
       }
     },
-    "/v1/operator/gym-locations/{gymId}/qr-credentials/active": {
+    "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/active": {
       "get": {
         "operationId": "getActiveCredential",
         "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
           {
             "name": "gymId",
             "required": true,
@@ -2480,10 +2492,16 @@
         "tags": ["operator gyms and pilot"]
       }
     },
-    "/v1/operator/gym-locations/{gymId}/qr-credentials/revoke": {
+    "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/revoke": {
       "post": {
         "operationId": "revokeCredential",
         "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
           {
             "name": "gymId",
             "required": true,
@@ -5026,6 +5044,14 @@
         },
         "required": ["id", "email", "portal", "roles", "assignments"]
       },
+      "ActiveGymQrCredentialDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": { "type": "string", "format": "uuid" },
+          "credentialVersion": { "type": "number" }
+        },
+        "required": ["competitionId", "credentialVersion"]
+      },
       "PartnerGymDto": {
         "type": "object",
         "properties": {
@@ -5039,6 +5065,10 @@
           "radiusMeters": { "type": "number" },
           "active": { "type": "boolean" },
           "activeCredentialVersion": { "type": "number", "nullable": true },
+          "activeQrCredentials": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActiveGymQrCredentialDto" }
+          },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" },
           "accessLevel": { "type": "string", "enum": ["admin", "staff"] }
@@ -5054,6 +5084,7 @@
           "radiusMeters",
           "active",
           "activeCredentialVersion",
+          "activeQrCredentials",
           "createdAt",
           "updatedAt",
           "accessLevel"
@@ -5118,7 +5149,11 @@
           "endsAt": { "type": "string", "format": "date-time" },
           "gymLocationId": { "type": "string", "format": "uuid" },
           "gymName": { "type": "string" },
-          "proposedByUserId": { "type": "string", "format": "uuid" }
+          "proposedByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
         },
         "required": [
           "id",
@@ -6137,6 +6172,10 @@
           "radiusMeters": { "type": "number" },
           "active": { "type": "boolean" },
           "activeCredentialVersion": { "type": "number", "nullable": true },
+          "activeQrCredentials": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActiveGymQrCredentialDto" }
+          },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" }
         },
@@ -6151,6 +6190,7 @@
           "radiusMeters",
           "active",
           "activeCredentialVersion",
+          "activeQrCredentials",
           "createdAt",
           "updatedAt"
         ]
@@ -6212,6 +6252,8 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "gymLocationId": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
           "credentialVersion": { "type": "number" },
           "qrPayload": { "type": "string" },
           "printablePosterSvg": { "type": "string" },
@@ -6220,6 +6262,8 @@
         "required": [
           "id",
           "gymLocationId",
+          "competitionId",
+          "competitionName",
           "credentialVersion",
           "qrPayload",
           "printablePosterSvg",

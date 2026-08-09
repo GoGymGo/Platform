@@ -35,7 +35,10 @@ describeWithDatabase('connected static QR pilot', () => {
   let database: DatabaseService;
   let migrated: MigratedPostgisTestDatabase;
   let gyms: GymsService;
+  let competitionId: string;
   let gymId: string;
+  let regionId: string;
+  let regionVerificationId: string;
   let userId: string;
 
   beforeAll(async () => {
@@ -258,6 +261,7 @@ describeWithDatabase('connected static QR pilot', () => {
     const replacement = await database.connection
       .insertInto('gym_qr_credentials')
       .values({
+        competition_id: competitionId,
         credential_version: 2,
         gym_location_id: gymId,
         issued_at: new Date(),
@@ -326,6 +330,122 @@ describeWithDatabase('connected static QR pilot', () => {
       .executeTakeFirstOrThrow();
     expect(session.status).toBe('cancelled');
     await expect(scanEventCount()).resolves.toBe(2);
+  });
+
+  it('keeps two active contest posters at one gym and scans into the poster contest', async () => {
+    const now = Date.now();
+    const original = await database.connection
+      .selectFrom('competitions')
+      .select(['rules', 'rules_version'])
+      .where('id', '=', competitionId)
+      .executeTakeFirstOrThrow();
+    const secondCompetition = await database.connection
+      .insertInto('competitions')
+      .values({
+        ends_at: new Date(now + 48 * 60 * 60_000),
+        minimum_entrants: 2,
+        month_key: '2026-10',
+        name: 'Second Same Gym Competition',
+        region_policy_id: regionId,
+        registration_closes_at: new Date(now - 2 * 60 * 60_000),
+        registration_opens_at: new Date(now - 48 * 60 * 60_000),
+        rules: original.rules,
+        rules_version: original.rules_version,
+        starts_at: new Date(now - 60 * 60_000),
+        status: 'active',
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('competition_goal_brackets')
+      .values({
+        competition_id: secondCompetition.id,
+        created_at: new Date(),
+        goal_days: 3,
+        label: '3 DAYS / WEEK',
+      })
+      .execute();
+    const acceptance = await database.connection
+      .insertInto('competition_rule_acceptances')
+      .values({
+        accepted_at: new Date(),
+        age_eligibility_attested: true,
+        competition_id: secondCompetition.id,
+        metadata: {},
+        rules_version: original.rules_version,
+        user_id: userId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const enrollment = await database.connection
+      .insertInto('competition_enrollments')
+      .values({
+        competition_id: secondCompetition.id,
+        enrolled_at: new Date(),
+        goal_days: 3,
+        region_verification_id: regionVerificationId,
+        rules_acceptance_id: acceptance.id,
+        status: 'active',
+        user_id: userId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('competition_progress')
+      .values({
+        category_score: 0,
+        competition_id: secondCompetition.id,
+        enrollment_id: enrollment.id,
+        goal_days: 3,
+        prize_draw_entries: 1,
+        updated_at: new Date(),
+        user_id: userId,
+        verified_days: 0,
+      })
+      .execute();
+    await database.connection
+      .insertInto('competition_gym_locations')
+      .values({
+        competition_id: secondCompetition.id,
+        created_at: new Date(),
+        gym_location_id: gymId,
+      })
+      .execute();
+    const secondCredential = 'second-contest-same-gym-credential';
+    await database.connection
+      .insertInto('gym_qr_credentials')
+      .values({
+        competition_id: secondCompetition.id,
+        credential_version: 2,
+        gym_location_id: gymId,
+        issued_at: new Date(),
+        issued_by_user_id: userId,
+        status: 'active',
+        token_hash: hashOpaqueValue(secondCredential),
+      })
+      .execute();
+
+    const result = await gyms.scan(principal, 'second-contest-scan', {
+      ...scanRequest('second-contest-event'),
+      credential: secondCredential,
+    });
+    expect(result.outcome).toBe('started');
+    const session = await database.connection
+      .selectFrom('workout_sessions')
+      .select('competition_id')
+      .where('id', '=', result.sessionId!)
+      .executeTakeFirstOrThrow();
+    expect(session.competition_id).toBe(secondCompetition.id);
+
+    const activePosters = await database.connection
+      .selectFrom('gym_qr_credentials')
+      .select('competition_id')
+      .where('gym_location_id', '=', gymId)
+      .where('status', '=', 'active')
+      .execute();
+    expect(
+      new Set(activePosters.map((poster) => poster.competition_id)),
+    ).toEqual(new Set([competitionId, secondCompetition.id]));
   });
 
   function scanRequest(
@@ -398,6 +518,7 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    regionId = region.id;
     const now = Date.now();
     const rules = {
       categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
@@ -430,6 +551,7 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    competitionId = competition.id;
     await database.connection
       .insertInto('competition_goal_brackets')
       .values({
@@ -454,6 +576,7 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    regionVerificationId = verification.id;
     const acceptance = await database.connection
       .insertInto('competition_rule_acceptances')
       .values({
@@ -504,6 +627,7 @@ describeWithDatabase('connected static QR pilot', () => {
     await database.connection
       .insertInto('gym_qr_credentials')
       .values({
+        competition_id: competition.id,
         credential_version: 1,
         gym_location_id: gym.rows[0].id,
         issued_at: new Date(),

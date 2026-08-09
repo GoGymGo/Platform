@@ -63,11 +63,6 @@ export class OperatorPortalService {
               'region.id',
               'gym.region_policy_id',
             )
-            .leftJoin('gym_qr_credentials as credential', (join) =>
-              join
-                .onRef('credential.gym_location_id', '=', 'gym.id')
-                .on('credential.status', '=', 'active'),
-            )
             .select([
               'gym.active',
               'gym.address',
@@ -78,7 +73,27 @@ export class OperatorPortalService {
               'gym.region_policy_id',
               'gym.updated_at',
               'region.code as region_code',
-              'credential.credential_version as active_credential_version',
+              sql<number | null>`(
+                SELECT MAX(credential.credential_version)::integer
+                FROM gym_qr_credentials AS credential
+                WHERE credential.gym_location_id = gym.id
+                  AND credential.status = 'active'
+              )`.as('active_credential_version'),
+              sql<
+                Array<{ competitionId: string; credentialVersion: number }>
+              >`COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'competitionId', credential.competition_id,
+                    'credentialVersion', credential.credential_version
+                  )
+                  ORDER BY credential.credential_version DESC
+                )
+                FROM gym_qr_credentials AS credential
+                WHERE credential.gym_location_id = gym.id
+                  AND credential.status = 'active'
+                  AND credential.competition_id IS NOT NULL
+              ), '[]'::json)`.as('active_qr_credentials'),
               sql<number>`ST_Y(gym.coordinates::geometry)`.as('latitude'),
               sql<number>`ST_X(gym.coordinates::geometry)`.as('longitude'),
             ])
@@ -108,16 +123,21 @@ export class OperatorPortalService {
             .limit(500)
             .execute(),
           transaction
-            .selectFrom('partner_competition_proposals as proposal')
+            .selectFrom('competition_gym_locations as assignment')
             .innerJoin(
               'competitions as competition',
               'competition.id',
-              'proposal.competition_id',
+              'assignment.competition_id',
             )
             .innerJoin(
               'gym_locations as gym',
               'gym.id',
-              'proposal.gym_location_id',
+              'assignment.gym_location_id',
+            )
+            .leftJoin('partner_competition_proposals as proposal', (join) =>
+              join
+                .onRef('proposal.competition_id', '=', 'competition.id')
+                .onRef('proposal.gym_location_id', '=', 'gym.id'),
             )
             .innerJoin(
               'region_policies as region',
@@ -145,7 +165,7 @@ export class OperatorPortalService {
               'region.code as region_code',
               'region.metro_name as region_name',
             ])
-            .where('proposal.gym_location_id', 'in', gymIds)
+            .where('assignment.gym_location_id', 'in', gymIds)
             .where('competition.deleted_at', 'is', null)
             .where('gym.deleted_at', 'is', null)
             .orderBy('competition.starts_at', 'desc')
@@ -251,6 +271,7 @@ export class OperatorPortalService {
             accessLevel: assignmentByGym.get(gym.id) ?? 'staff',
             active: gym.active,
             activeCredentialVersion: gym.active_credential_version,
+            activeQrCredentials: gym.active_qr_credentials,
             address: gym.address,
             createdAt: gym.created_at.toISOString(),
             id: gym.id,

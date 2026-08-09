@@ -182,7 +182,11 @@ h3 {
 }
 
 .mobile-admin-navigation {
-  display: none;
+  display: none !important;
+}
+
+.partner-mobile-navigation {
+  display: none !important;
 }
 
 .mobile-admin-more {
@@ -2044,6 +2048,32 @@ td small {
   border-color: var(--line-bright);
 }
 
+.reason-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 3px;
+}
+
+.reason-preset-chips button {
+  border: 1px solid rgba(244, 202, 67, 0.34);
+  border-radius: 999px;
+  background: rgba(244, 202, 67, 0.06);
+  padding: 7px 10px;
+  color: var(--yellow);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.reason-preset-chips button:hover,
+.reason-preset-chips button.selected {
+  border-color: var(--yellow);
+  background: rgba(244, 202, 67, 0.16);
+  color: #fff1a8;
+}
+
 .editor-form .form-actions {
   justify-content: flex-end;
   margin-top: 22px;
@@ -2592,6 +2622,99 @@ td small {
   border-color: rgba(244, 202, 67, 0.34);
 }
 
+.contest-homes-panel {
+  border-color: rgba(53, 226, 228, 0.28);
+}
+
+.contest-home-list {
+  display: grid;
+  gap: 10px;
+}
+
+.contest-home-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px 2px 8px 2px;
+  background: rgba(4, 10, 13, 0.66);
+}
+
+.contest-home-card > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.contest-home-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.contest-home-card > summary > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+
+.contest-home-card > summary strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.contest-home-card > summary small {
+  color: var(--muted);
+}
+
+.contest-home-card > summary > b {
+  color: var(--yellow);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.contest-home-card[open] > summary {
+  border-bottom: 1px solid var(--line);
+  background: rgba(53, 226, 228, 0.045);
+}
+
+.contest-home-card[open] > summary > b::after {
+  content: " · OPEN";
+  color: var(--green);
+}
+
+.contest-home-body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.contest-home-resources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.contest-home-resources > div {
+  border: 1px solid var(--line);
+  border-radius: 6px 2px 6px 2px;
+  padding: 12px;
+}
+
+.contest-home-resources small {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.contest-home-resources p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 @media (max-width: 960px) {
   .admin-shell {
     grid-template-columns: 84px minmax(0, 1fr);
@@ -2667,7 +2790,7 @@ td small {
   }
 
   .mobile-admin-navigation {
-    display: grid;
+    display: grid !important;
     height: 100%;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 3px;
@@ -2675,7 +2798,7 @@ td small {
   }
 
   .partner-mobile-navigation {
-    display: grid;
+    display: grid !important;
     height: 100%;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 3px;
@@ -2876,6 +2999,18 @@ td small {
   .contest-launch-actions .text-button {
     width: 100%;
     justify-content: center;
+  }
+
+  .contest-home-card > summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .contest-home-card > summary > b {
+    grid-column: 1 / -1;
+  }
+
+  .contest-home-resources {
+    grid-template-columns: 1fr;
   }
 
   .panel-toolbar,
@@ -3154,6 +3289,15 @@ td small {
 
 .pilot-form-wide {
   grid-column: span 2;
+}
+
+.pilot-reason-field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
 }
 
 .pilot-form-help,

@@ -166,25 +166,27 @@ export class GymOperatorController {
     );
   }
 
-  @Post('gym-locations/:gymId/qr-credentials')
+  @Post('competitions/:competitionId/gym-locations/:gymId/qr-credentials')
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Issue a printable static QR poster' })
   @ApiCreatedResponse({ type: GymQrCredentialResponseDto })
   issueCredential(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: OperatorReasonDto,
   ): Promise<GymQrCredentialResponseDto> {
     return this.gyms.issueCredential(
       principal,
+      competitionId,
       gymId,
       requireIdempotencyKey(idempotencyKey),
       input.reason,
     );
   }
 
-  @Get('gym-locations/:gymId/qr-credentials/active')
+  @Get('competitions/:competitionId/gym-locations/:gymId/qr-credentials/active')
   @ApiOperation({ summary: 'Recover the active printable static QR poster' })
   @ApiOkResponse({
     schema: {
@@ -194,23 +196,28 @@ export class GymOperatorController {
   })
   getActiveCredential(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
   ): Promise<GymQrCredentialResponseDto | null> {
-    return this.gyms.getActiveCredential(principal, gymId);
+    return this.gyms.getActiveCredential(principal, competitionId, gymId);
   }
 
-  @Post('gym-locations/:gymId/qr-credentials/revoke')
+  @Post(
+    'competitions/:competitionId/gym-locations/:gymId/qr-credentials/revoke',
+  )
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Revoke a gym QR poster' })
   @ApiOkResponse({ type: Object })
   revokeCredential(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: OperatorReasonDto,
   ): Promise<{ id: string; status: 'revoked' }> {
     return this.gyms.revokeCredential(
       principal,
+      competitionId,
       gymId,
       requireIdempotencyKey(idempotencyKey),
       input.reason,

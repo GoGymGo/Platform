@@ -46,8 +46,8 @@ export class PartnerCompetitionDto extends AdminDashboardCompetitionDto {
   @ApiProperty({ type: String })
   gymName!: string;
 
-  @ApiProperty({ format: 'uuid', type: String })
-  proposedByUserId!: string;
+  @ApiProperty({ format: 'uuid', nullable: true, type: String })
+  proposedByUserId!: string | null;
 }
 
 export class PartnerDashboardSnapshotDto {

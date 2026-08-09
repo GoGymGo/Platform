@@ -486,6 +486,7 @@ export interface PartnerCompetitionProposalsTable {
 
 export interface GymQrCredentialsTable {
   id: Generated<string>;
+  competition_id: string | null;
   gym_location_id: string;
   credential_version: number;
   token_hash: string;

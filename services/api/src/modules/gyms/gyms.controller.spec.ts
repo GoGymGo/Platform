@@ -123,13 +123,15 @@ describe('gym controllers', () => {
     await controller.updateGym(principal, 'gym-1', idempotencyKey, update);
     await controller.issueCredential(
       principal,
+      'competition-1',
       'gym-1',
       idempotencyKey,
       reason,
     );
-    await controller.getActiveCredential(principal, 'gym-1');
+    await controller.getActiveCredential(principal, 'competition-1', 'gym-1');
     await controller.revokeCredential(
       principal,
+      'competition-1',
       'gym-1',
       idempotencyKey,
       reason,
@@ -161,13 +163,19 @@ describe('gym controllers', () => {
     );
     expect(mocks.issueCredential).toHaveBeenCalledWith(
       principal,
+      'competition-1',
       'gym-1',
       idempotencyKey,
       reason.reason,
     );
-    expect(mocks.getActiveCredential).toHaveBeenCalledWith(principal, 'gym-1');
+    expect(mocks.getActiveCredential).toHaveBeenCalledWith(
+      principal,
+      'competition-1',
+      'gym-1',
+    );
     expect(mocks.revokeCredential).toHaveBeenCalledWith(
       principal,
+      'competition-1',
       'gym-1',
       idempotencyKey,
       reason.reason,

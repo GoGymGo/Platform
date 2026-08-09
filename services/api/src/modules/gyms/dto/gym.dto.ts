@@ -157,11 +157,22 @@ export class GymLocationResponseDto {
   @ApiProperty({ nullable: true, type: Number })
   activeCredentialVersion!: number | null;
 
+  @ApiProperty({ isArray: true, type: () => ActiveGymQrCredentialDto })
+  activeQrCredentials!: ActiveGymQrCredentialDto[];
+
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 
   @ApiProperty({ format: 'date-time', type: String })
   updatedAt!: string;
+}
+
+export class ActiveGymQrCredentialDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ type: Number })
+  credentialVersion!: number;
 }
 
 export class GymQrCredentialResponseDto {
@@ -170,6 +181,12 @@ export class GymQrCredentialResponseDto {
 
   @ApiProperty({ format: 'uuid', type: String })
   gymLocationId!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ type: String })
+  competitionName!: string;
 
   @ApiProperty({ type: Number })
   credentialVersion!: number;

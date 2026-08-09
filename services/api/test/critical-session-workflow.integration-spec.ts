@@ -132,6 +132,81 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await migrated?.stop();
   });
 
+  it('rejects a different contest poster when two contests share one gym', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const source = await database.connection
+      .selectFrom('competitions as competition')
+      .innerJoin(
+        'competition_gym_locations as assignment',
+        'assignment.competition_id',
+        'competition.id',
+      )
+      .select([
+        'assignment.gym_location_id',
+        'competition.ends_at',
+        'competition.region_policy_id',
+        'competition.registration_closes_at',
+        'competition.registration_opens_at',
+        'competition.rules',
+        'competition.rules_version',
+        'competition.starts_at',
+      ])
+      .where('competition.id', '=', fixture.competitionId)
+      .executeTakeFirstOrThrow();
+    const otherCompetition = await database.connection
+      .insertInto('competitions')
+      .values({
+        ends_at: source.ends_at,
+        minimum_entrants: 2,
+        month_key: '2030-02',
+        name: 'Different Contest At Same Gym',
+        region_policy_id: source.region_policy_id,
+        registration_closes_at: source.registration_closes_at,
+        registration_opens_at: source.registration_opens_at,
+        rules: source.rules,
+        rules_version: source.rules_version,
+        starts_at: source.starts_at,
+        status: 'registration',
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('competition_goal_brackets')
+      .values({
+        competition_id: otherCompetition.id,
+        created_at: new Date(),
+        goal_days: 3,
+        label: 'Three days',
+      })
+      .execute();
+    await database.connection
+      .insertInto('competition_gym_locations')
+      .values({
+        competition_id: otherCompetition.id,
+        created_at: new Date(),
+        gym_location_id: source.gym_location_id,
+      })
+      .execute();
+
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        otherCompetition.id,
+        'wrong-contest-poster-enrollment',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          gymPresence: fixture.gymPresence,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_QR_INVALID' },
+    });
+  });
+
   it('accepts evidence once and awards the verified day exactly once', async () => {
     const fixture = await seedRegistrationCompetition();
     await expect(
@@ -780,9 +855,14 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await migrated.pool.query(
       `INSERT INTO gym_qr_credentials
-         (gym_location_id, credential_version, token_hash, status, issued_by_user_id)
-       VALUES ($1, 1, $2, 'active', $3)`,
-      [gym.rows[0].id, hashOpaqueValue(gymCredential), operatorUserId],
+         (competition_id, gym_location_id, credential_version, token_hash, status, issued_by_user_id)
+       VALUES ($1, $2, 1, $3, 'active', $4)`,
+      [
+        competition.rows[0].id,
+        gym.rows[0].id,
+        hashOpaqueValue(gymCredential),
+        operatorUserId,
+      ],
     );
     await migrated.pool.query(
       `INSERT INTO competition_gym_locations (competition_id, gym_location_id)
@@ -902,9 +982,14 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await migrated.pool.query(
       `INSERT INTO gym_qr_credentials
-         (gym_location_id, credential_version, token_hash, status, issued_by_user_id)
-       VALUES ($1, 1, $2, 'active', $3)`,
-      [gym.rows[0].id, hashOpaqueValue(gymCredential), operatorUserId],
+         (competition_id, gym_location_id, credential_version, token_hash, status, issued_by_user_id)
+       VALUES ($1, $2, 1, $3, 'active', $4)`,
+      [
+        competition.rows[0].id,
+        gym.rows[0].id,
+        hashOpaqueValue(gymCredential),
+        operatorUserId,
+      ],
     );
     await migrated.pool.query(
       `INSERT INTO competition_gym_locations (competition_id, gym_location_id)

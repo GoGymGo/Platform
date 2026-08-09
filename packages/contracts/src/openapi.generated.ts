@@ -3,6 +3,7 @@
 
 export interface components {
   schemas: {
+    ActiveGymQrCredentialDto: { competitionId: string; credentialVersion: number };
     AddRewardCouponCodesDto: { codes: Array<string>; reason: string };
     AddedCouponCodesResponseDto: { added: number; rewardId: string };
     AdminDashboardAuditEventDto: { action: string; actorEmail: string | null; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
@@ -81,8 +82,8 @@ export interface components {
     FriendResponseDto: { friendsSince: string; screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     GoalBracketDto: { goalDays: number; label: string };
     GymApplicationDto: { gymAddress: string; gymName: string; managerName: string; region: string; workEmail: string };
-    GymLocationResponseDto: { active: boolean; activeCredentialVersion: number | null; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
-    GymQrCredentialResponseDto: { credentialVersion: number; gymLocationId: string; id: string; issuedAt: string; printablePosterSvg: string; qrPayload: string };
+    GymLocationResponseDto: { active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
+    GymQrCredentialResponseDto: { competitionId: string; competitionName: string; credentialVersion: number; gymLocationId: string; id: string; issuedAt: string; printablePosterSvg: string; qrPayload: string };
     GymQrReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniquePayloadCount: number };
     GymScanRequestDto: { accuracyMeters: number; credential: string; eventId: string; latitude: number; longitude: number };
     GymScanResultDto: { credentialVersion?: number | null; expiresAt?: string | null; gymLocationId?: string | null; gymName?: string | null; minimumCompleteAt?: string | null; outcome: "started" | "too_early" | "verified" | "rejected"; rejectionReason?: string | null; remainingSeconds: number; serverTimestamp: string; sessionId?: string | null; startedAt?: string | null };
@@ -112,9 +113,9 @@ export interface components {
     OperatorWorkQueueItemDto: { createdAt: string; id: string; kind: "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "workout_session"; regionCode?: string; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code" };
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
     PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
-    PartnerCompetitionDto: { assignedGymIds: Array<string>; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
+    PartnerCompetitionDto: { assignedGymIds: Array<string>; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string | null; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
     PartnerDashboardSnapshotDto: { competitions: Array<components['schemas']["PartnerCompetitionDto"]>; generatedAt: string; gyms: Array<components['schemas']["PartnerGymDto"]>; operator: components['schemas']["AdminDashboardIdentityDto"]; regions: Array<components['schemas']["AdminDashboardRegionDto"]>; sessions: Array<components['schemas']["OperatorGymSessionDto"]> };
-    PartnerGymDto: { accessLevel: "admin" | "staff"; active: boolean; activeCredentialVersion: number | null; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
+    PartnerGymDto: { accessLevel: "admin" | "staff"; active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
     PrivacyDownloadActionDto: { expiresAt: string; url: string };
     PrivacyRequestResponseDto: { completedAt: string | null; downloadAvailable: boolean; exportExpiresAt: string | null; failureCode: string | null; id: string; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested" };
     PrivacySettingsDto: { showRegion: boolean; showStats: boolean };
@@ -518,8 +519,8 @@ export interface operations {
   };
   getActiveCredential: {
     method: "GET";
-    path: "/v1/operator/gym-locations/{gymId}/qr-credentials/active";
-    parameters: { path: { gymId: string } };
+    path: "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/active";
+    parameters: { path: { competitionId: string; gymId: string } };
     responses: {
       "200": components['schemas']["GymQrCredentialResponseDto"] | null;
     };
@@ -736,8 +737,8 @@ export interface operations {
   };
   issueCredential: {
     method: "POST";
-    path: "/v1/operator/gym-locations/{gymId}/qr-credentials";
-    parameters: { header: { "Idempotency-Key": string }; path: { gymId: string } };
+    path: "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials";
+    parameters: { header: { "Idempotency-Key": string }; path: { competitionId: string; gymId: string } };
     requestBody: components['schemas']["OperatorReasonDto"];
     responses: {
       "201": components['schemas']["GymQrCredentialResponseDto"];
@@ -996,8 +997,8 @@ export interface operations {
   };
   revokeCredential: {
     method: "POST";
-    path: "/v1/operator/gym-locations/{gymId}/qr-credentials/revoke";
-    parameters: { header: { "Idempotency-Key": string }; path: { gymId: string } };
+    path: "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/revoke";
+    parameters: { header: { "Idempotency-Key": string }; path: { competitionId: string; gymId: string } };
     requestBody: components['schemas']["OperatorReasonDto"];
     responses: {
       "200": Record<string, unknown>;
@@ -1274,6 +1275,15 @@ export interface paths {
   "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}": {
     post: operations["assignCompetitionGym"];
   };
+  "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials": {
+    post: operations["issueCredential"];
+  };
+  "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/active": {
+    get: operations["getActiveCredential"];
+  };
+  "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/revoke": {
+    post: operations["revokeCredential"];
+  };
   "/v1/operator/configuration/competitions": {
     post: operations["createCompetition"];
   };
@@ -1338,15 +1348,6 @@ export interface paths {
   "/v1/operator/gym-locations/{gymId}": {
     put: operations["updateGym"];
     delete: operations["deleteGym"];
-  };
-  "/v1/operator/gym-locations/{gymId}/qr-credentials": {
-    post: operations["issueCredential"];
-  };
-  "/v1/operator/gym-locations/{gymId}/qr-credentials/active": {
-    get: operations["getActiveCredential"];
-  };
-  "/v1/operator/gym-locations/{gymId}/qr-credentials/revoke": {
-    post: operations["revokeCredential"];
   };
   "/v1/operator/gym-sessions": {
     get: operations["listGymSessions"];
@@ -1481,6 +1482,7 @@ export interface paths {
   };
 }
 
+export type ActiveGymQrCredentialDto = components['schemas']["ActiveGymQrCredentialDto"];
 export type AddRewardCouponCodesDto = components['schemas']["AddRewardCouponCodesDto"];
 export type AddedCouponCodesResponseDto = components['schemas']["AddedCouponCodesResponseDto"];
 export type AdminDashboardAuditEventDto = components['schemas']["AdminDashboardAuditEventDto"];

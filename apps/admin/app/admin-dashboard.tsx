@@ -68,6 +68,10 @@ import {
 } from "./contest-launch-flow";
 import { PilotOperationsPanel, type PilotData } from "./pilot-operations";
 import { downloadPosterJpeg } from "./poster-jpeg";
+import {
+  genericAdministrativeReasons,
+  ReasonPresetChips,
+} from "./reason-presets";
 
 type AuthStage = "checking" | "denied" | "ready" | "signed-out";
 type ConfirmAction = {
@@ -93,10 +97,9 @@ const navigation: {
   short: string;
 }[] = [
   {
-    description:
-      "Current launch readiness, workload and system health at a glance.",
+    description: "A separate operating home for every existing contest.",
     id: "overview",
-    label: "Overview",
+    label: "Contest home",
     short: "OV",
   },
   {
@@ -157,7 +160,6 @@ const mobilePrimarySections = new Set<AdminSection>([
   "pilot",
 ]);
 const contestSetupSectionSet = new Set<AdminSection>([
-  "overview",
   ...(contestSetupSections as AdminSection[]),
 ]);
 
@@ -450,9 +452,9 @@ export function AdminDashboard({
   );
 
   const loadActiveQr = useCallback(
-    (gymId: string) =>
+    (competitionId: string, gymId: string) =>
       request<GymQrCredential | null>(
-        `operator/gym-locations/${gymId}/qr-credentials/active`,
+        `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/active`,
       ),
     [request],
   );
@@ -717,11 +719,11 @@ export function AdminDashboard({
     snapshot.regions,
     pilotData.gyms,
   );
-  const navigationLocks: NavigationLocks = getContestSetupLocks(
-    contestLaunchState,
-    snapshot.regions.length > 0,
+  const navigationLocks: NavigationLocks =
+    getContestSetupLocks(contestLaunchState);
+  const setupCompetitions = snapshot.competitions.filter(
+    (competition) => competition.status === "draft",
   );
-  const setupCompetitions = snapshot.competitions;
   const setupRewards = snapshot.rewards;
   const setupRegions = snapshot.regions;
 
@@ -746,10 +748,7 @@ export function AdminDashboard({
       setupRegions,
       pilotData.gyms,
     );
-    const nextLocks: NavigationLocks = getContestSetupLocks(
-      nextState,
-      setupRegions.length > 0,
-    );
+    const nextLocks: NavigationLocks = getContestSetupLocks(nextState);
     if (nextLocks[section]) setSection("competitions");
   }
 
@@ -786,6 +785,46 @@ export function AdminDashboard({
         (reward.rewardType === "coupon" && reward.couponCodeCount === 0),
     ).length,
   };
+
+  function requestContestDeletion(competition: Competition) {
+    setConfirmAction({
+      actionLabel: "Delete contest",
+      description: `${competition.name} will be removed from the operating dashboard. Participation, results, and audit records remain preserved.`,
+      execute: (reason) =>
+        mutate(
+          "Contest deleted from the dashboard.",
+          `operator/configuration/competitions/${competition.id}`,
+          "DELETE",
+          { expectedVersion: competition.version, reason },
+        ),
+      tone: "danger",
+    });
+  }
+
+  function requestContestStatus(
+    competition: Competition,
+    action: "cancel" | "publish",
+  ) {
+    setConfirmAction({
+      actionLabel: action === "publish" ? "Publish contest" : "Cancel contest",
+      auditReason:
+        action === "publish"
+          ? "Publish the approved contest after operator confirmation."
+          : undefined,
+      description:
+        action === "publish"
+          ? `${competition.name} will become visible and joinable in the player app immediately.`
+          : `${competition.name} will be cancelled. This action is recorded in the audit ledger.`,
+      execute: (reason) =>
+        mutate(
+          action === "publish" ? "Contest published." : "Contest cancelled.",
+          `operator/configuration/competitions/${competition.id}/status-action`,
+          "POST",
+          { action, expectedVersion: competition.version, reason },
+        ),
+      tone: action === "cancel" ? "danger" : "primary",
+    });
+  }
 
   return (
     <div className="admin-shell">
@@ -917,7 +956,7 @@ export function AdminDashboard({
           {contestSetupSectionSet.has(section) ? (
             <ContestLaunchGuide
               competition={setupCompetition}
-              competitions={snapshot.competitions}
+              competitions={setupCompetitions}
               launchState={contestLaunchState}
               locks={navigationLocks}
               onCreateContest={() => setCompetitionEditor("new")}
@@ -930,32 +969,27 @@ export function AdminDashboard({
           {section === "overview" ? (
             <Overview
               activeCompetitions={activeCompetitions}
+              competitions={snapshot.competitions.filter(
+                (competition) => competition.status !== "draft",
+              )}
+              gyms={pilotData.gyms}
               health={health}
+              onCreate={() => setCompetitionEditor("new")}
+              onDelete={requestContestDeletion}
               publishReady={publishReady}
               queue={queue}
+              rewards={snapshot.rewards}
               snapshot={snapshot}
               onNavigate={navigateToSection}
+              onStatus={requestContestStatus}
             />
           ) : null}
           {section === "competitions" ? (
             <CompetitionsPanel
-              competitions={snapshot.competitions}
+              competitions={draftCompetitions}
               gyms={pilotData.gyms}
               onCreate={() => setCompetitionEditor("new")}
-              onDelete={(competition) =>
-                setConfirmAction({
-                  actionLabel: "Delete contest",
-                  description: `${competition.name} will be removed from the operating dashboard. Participation, results, and audit records remain preserved.`,
-                  execute: (reason) =>
-                    mutate(
-                      "Contest deleted from the dashboard.",
-                      `operator/configuration/competitions/${competition.id}`,
-                      "DELETE",
-                      { expectedVersion: competition.version, reason },
-                    ),
-                  tone: "danger",
-                })
-              }
+              onDelete={requestContestDeletion}
               onEdit={setCompetitionEditor}
               onSelectSetup={(competition) => {
                 selectSetupCompetition(competition.id);
@@ -968,34 +1002,7 @@ export function AdminDashboard({
                 setSection(getNextContestSetupSection(nextState));
               }}
               selectedCompetitionId={setupCompetition?.id ?? ""}
-              onStatus={(competition, action) =>
-                setConfirmAction({
-                  actionLabel:
-                    action === "publish" ? "Publish contest" : "Cancel contest",
-                  auditReason:
-                    action === "publish"
-                      ? "Publish the approved contest after operator confirmation."
-                      : undefined,
-                  description:
-                    action === "publish"
-                      ? `${competition.name} will become visible and joinable in the player app immediately.`
-                      : `${competition.name} will be cancelled. This action is recorded in the audit ledger.`,
-                  execute: (reason) =>
-                    mutate(
-                      action === "publish"
-                        ? "Contest published."
-                        : "Contest cancelled.",
-                      `operator/configuration/competitions/${competition.id}/status-action`,
-                      "POST",
-                      {
-                        action,
-                        expectedVersion: competition.version,
-                        reason,
-                      },
-                    ),
-                  tone: action === "cancel" ? "danger" : "primary",
-                })
-              }
+              onStatus={requestContestStatus}
               regions={snapshot.regions}
               rewards={snapshot.rewards}
             />
@@ -1037,7 +1044,7 @@ export function AdminDashboard({
               onIssueQr={(gymId, body) =>
                 mutate(
                   "Printable QR poster issued.",
-                  `operator/gym-locations/${gymId}/qr-credentials`,
+                  `operator/competitions/${setupCompetition.id}/gym-locations/${gymId}/qr-credentials`,
                   "POST",
                   body,
                 )
@@ -1054,7 +1061,7 @@ export function AdminDashboard({
               onRevokeQr={async (gymId, body) => {
                 await mutate(
                   "QR credential revoked.",
-                  `operator/gym-locations/${gymId}/qr-credentials/revoke`,
+                  `operator/competitions/${setupCompetition.id}/gym-locations/${gymId}/qr-credentials/revoke`,
                   "POST",
                   body,
                 );
@@ -1590,37 +1597,47 @@ function PartnerWorkspace({
     (competition) => competition.status === "draft",
   ).length;
 
-  async function issueQr(gymId: string, gymName: string) {
+  async function issueQr(
+    competitionId: string,
+    competitionName: string,
+    gymId: string,
+    gymName: string,
+  ) {
     if (
       !window.confirm(
-        `Issue a new QR poster for ${gymName}? Any current poster will stop working.`,
+        `Issue a new ${competitionName} QR poster for ${gymName}? Only the current poster for this contest will stop working.`,
       )
     ) {
       return;
     }
     const credential = await onMutate<{ printablePosterSvg: string }>(
       "New QR poster issued.",
-      `operator/gym-locations/${gymId}/qr-credentials`,
+      `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
       "POST",
       { reason: "Issue a gym QR poster from the scoped partner workspace." },
     );
     await downloadPosterJpeg(
       credential.printablePosterSvg,
-      `${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-gogymgo-poster.jpg`,
+      `${competitionName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-poster.jpg`,
     );
   }
 
-  async function revokeQr(gymId: string, gymName: string) {
+  async function revokeQr(
+    competitionId: string,
+    competitionName: string,
+    gymId: string,
+    gymName: string,
+  ) {
     if (
       !window.confirm(
-        `Revoke the current QR poster for ${gymName}? Members will not be able to use it again.`,
+        `Revoke the ${competitionName} QR poster for ${gymName}? Other contest posters at this gym will keep working.`,
       )
     ) {
       return;
     }
     await onMutate(
       "QR poster revoked.",
-      `operator/gym-locations/${gymId}/qr-credentials/revoke`,
+      `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/revoke`,
       "POST",
       { reason: "Revoke the gym QR poster from the scoped partner workspace." },
     );
@@ -1807,41 +1824,18 @@ function PartnerWorkspace({
                         Region <strong>{gym.regionCode}</strong>
                       </span>
                       <span>
-                        QR poster{" "}
+                        CONTEST POSTERS{" "}
                         <strong>
-                          {gym.activeCredentialVersion
-                            ? `V${gym.activeCredentialVersion}`
-                            : "Not issued"}
+                          {(gym.activeQrCredentials ?? []).length} ACTIVE
                         </strong>
                       </span>
                       <span>
                         Radius <strong>{gym.radiusMeters} m</strong>
                       </span>
                     </div>
-                    {gym.accessLevel === "admin" ? (
-                      <div className="card-actions">
-                        <button
-                          className="secondary-button"
-                          disabled={submitting || !gym.active}
-                          onClick={() => void issueQr(gym.id, gym.name)}
-                          type="button"
-                        >
-                          {gym.activeCredentialVersion
-                            ? "REPLACE + DOWNLOAD QR"
-                            : "ISSUE + DOWNLOAD QR"}
-                        </button>
-                        {gym.activeCredentialVersion ? (
-                          <button
-                            className="danger-button"
-                            disabled={submitting}
-                            onClick={() => void revokeQr(gym.id, gym.name)}
-                            type="button"
-                          >
-                            REVOKE QR
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <p className="action-guidance compact">
+                      Issue and manage posters from the contest they belong to.
+                    </p>
                   </article>
                 ))}
               </div>
@@ -1877,6 +1871,14 @@ function PartnerWorkspace({
               ) : (
                 <div className="card-list">
                   {snapshot.competitions.map((competition) => {
+                    const competitionGym = snapshot.gyms.find(
+                      (gym) => gym.id === competition.gymLocationId,
+                    );
+                    const activeCredentialVersion =
+                      competitionGym?.activeQrCredentials.find(
+                        (credential) =>
+                          credential.competitionId === competition.id,
+                      )?.credentialVersion ?? null;
                     const canEdit =
                       competition.status === "draft" &&
                       adminGyms.some(
@@ -1916,15 +1918,59 @@ function PartnerWorkspace({
                             <strong>{competition.enrollmentCount}</strong>
                           </span>
                         </div>
-                        {canEdit ? (
+                        {canEdit || competitionGym?.accessLevel === "admin" ? (
                           <div className="card-actions">
-                            <button
-                              className="secondary-button"
-                              onClick={() => setCompetitionEditor(competition)}
-                              type="button"
-                            >
-                              EDIT PROPOSAL
-                            </button>
+                            {canEdit ? (
+                              <button
+                                className="secondary-button"
+                                onClick={() =>
+                                  setCompetitionEditor(competition)
+                                }
+                                type="button"
+                              >
+                                EDIT PROPOSAL
+                              </button>
+                            ) : null}
+                            {competitionGym?.accessLevel === "admin" ? (
+                              <>
+                                <button
+                                  className="primary-button"
+                                  disabled={
+                                    submitting || !competitionGym.active
+                                  }
+                                  onClick={() =>
+                                    void issueQr(
+                                      competition.id,
+                                      competition.name,
+                                      competitionGym.id,
+                                      competitionGym.name,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  {activeCredentialVersion
+                                    ? "REISSUE THIS CONTEST POSTER"
+                                    : "ISSUE THIS CONTEST POSTER"}
+                                </button>
+                                {activeCredentialVersion ? (
+                                  <button
+                                    className="danger-button"
+                                    disabled={submitting}
+                                    onClick={() =>
+                                      void revokeQr(
+                                        competition.id,
+                                        competition.name,
+                                        competitionGym.id,
+                                        competitionGym.name,
+                                      )
+                                    }
+                                    type="button"
+                                  >
+                                    REVOKE THIS CONTEST QR
+                                  </button>
+                                ) : null}
+                              </>
+                            ) : null}
                           </div>
                         ) : null}
                       </article>
@@ -2126,8 +2172,9 @@ function ContestLaunchGuide({
           <p className="eyebrow">GUIDED CONTEST LAUNCH</p>
           <h2>{competition?.name ?? "Start with a contest"}</h2>
           <p>
-            Each contest keeps its own reward, region and gym assignment. The
-            same Partner gym can support more than one contest.
+            Each draft must complete these steps in order. A Partner gym can
+            support more than one contest, but every contest gets its own QR
+            poster.
           </p>
         </div>
         <div className="contest-launch-selector">
@@ -2145,7 +2192,11 @@ function ContestLaunchGuide({
               ))}
             </select>
           </label>
-          <button className="secondary-button" onClick={onCreateContest} type="button">
+          <button
+            className="secondary-button"
+            onClick={onCreateContest}
+            type="button"
+          >
             + NEW CONTEST
           </button>
         </div>
@@ -2209,11 +2260,17 @@ function ContestLaunchGuide({
           </button>
         ) : null}
         {launchState.blockedReason ? (
-          <button className="primary-button" onClick={onCreateContest} type="button">
+          <button
+            className="primary-button"
+            onClick={onCreateContest}
+            type="button"
+          >
             CREATE REPLACEMENT CONTEST →
           </button>
         ) : launchState.published ? (
-          <span className="setup-complete-message">SETUP COMPLETE · CONTEST OPEN</span>
+          <span className="setup-complete-message">
+            SETUP COMPLETE · CONTEST OPEN
+          </span>
         ) : (
           <button
             className="primary-button"
@@ -2232,18 +2289,30 @@ function ContestLaunchGuide({
 
 function Overview({
   activeCompetitions,
+  competitions,
+  gyms,
   health,
+  onCreate,
+  onDelete,
   publishReady,
   queue,
+  rewards,
   snapshot,
   onNavigate,
+  onStatus,
 }: {
   activeCompetitions: Competition[];
+  competitions: Competition[];
+  gyms: PilotData["gyms"];
   health: SystemHealth | null;
+  onCreate: () => void;
+  onDelete: (competition: Competition) => void;
   publishReady: Competition[];
   queue: WorkQueueItem[];
+  rewards: Reward[];
   snapshot: DashboardSnapshot;
   onNavigate: (section: AdminSection) => void;
+  onStatus: (competition: Competition, action: "cancel") => void;
 }) {
   const draftRewards = snapshot.rewards.filter(
     (reward) => reward.status === "draft",
@@ -2319,7 +2388,7 @@ function Overview({
               onClick={() => onNavigate("competitions")}
               type="button"
             >
-              OPEN CONTESTS
+              CREATE / CONTINUE SETUP
             </button>
           </div>
         </div>
@@ -2341,6 +2410,129 @@ function Overview({
                 : "NO PUBLIC CONTEST"}
           </small>
         </div>
+      </section>
+      <section className="panel contest-homes-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">EXISTING CONTEST HOMES</p>
+            <h2>Each contest stays separate</h2>
+            <p>
+              Open one contest at a time to see its schedule, reward, assigned
+              gyms and contest-specific QR posters.
+            </p>
+          </div>
+          <button className="primary-button" onClick={onCreate} type="button">
+            + CREATE ANOTHER CONTEST
+          </button>
+        </div>
+        {competitions.length === 0 ? (
+          <EmptyState
+            body="Create a contest draft to begin the guided setup. Once published, it receives its own home here."
+            title="No existing contest homes"
+          />
+        ) : (
+          <div className="contest-home-list">
+            {competitions.map((competition) => {
+              const assignedGyms = gyms.filter((gym) =>
+                competition.assignedGymIds.includes(gym.id),
+              );
+              const qrReadyGyms = assignedGyms.filter((gym) =>
+                (gym.activeQrCredentials ?? []).some(
+                  (credential) => credential.competitionId === competition.id,
+                ),
+              );
+              const contestRewards = rewards.filter(
+                (reward) => reward.competitionId === competition.id,
+              );
+              return (
+                <details className="contest-home-card" key={competition.id}>
+                  <summary>
+                    <span className={`status-tag ${competition.status}`}>
+                      {competition.status}
+                    </span>
+                    <span>
+                      <strong>{competition.name}</strong>
+                      <small>
+                        {competition.regionName} Â· {competition.monthKey}
+                      </small>
+                    </span>
+                    <b>OPEN CONTEST HOME</b>
+                  </summary>
+                  <div className="contest-home-body">
+                    <div className="competition-stats">
+                      <div>
+                        <small>PLAYER WINDOW</small>
+                        <strong>
+                          {formatDate(competition.startsAt)} â€”{" "}
+                          {formatDate(competition.endsAt)}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>ENROLLED</small>
+                        <strong>{competition.enrollmentCount}</strong>
+                      </div>
+                      <div>
+                        <small>REWARDS</small>
+                        <strong>
+                          {contestRewards.length} TOTAL Â·{" "}
+                          {competition.publishedRewardCount} PUBLISHED
+                        </strong>
+                      </div>
+                      <div>
+                        <small>GYMS + POSTERS</small>
+                        <strong>
+                          {assignedGyms.length} GYM
+                          {assignedGyms.length === 1 ? "" : "S"} Â·{" "}
+                          {qrReadyGyms.length} CONTEST QR
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="contest-home-resources">
+                      <div>
+                        <small>ASSIGNED PARTNER GYMS</small>
+                        <p>
+                          {assignedGyms.length > 0
+                            ? assignedGyms.map((gym) => gym.name).join(", ")
+                            : "No gym assignment recorded."}
+                        </p>
+                      </div>
+                      <div>
+                        <small>REWARD CATALOG</small>
+                        <p>
+                          {contestRewards.length > 0
+                            ? contestRewards
+                                .map((reward) => reward.title)
+                                .join(", ")
+                            : "No rewards recorded."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="card-actions">
+                      {competition.status === "registration" ? (
+                        <button
+                          className="danger-button"
+                          onClick={() => onStatus(competition, "cancel")}
+                          type="button"
+                        >
+                          CANCEL CONTEST
+                        </button>
+                      ) : null}
+                      {["cancelled", "settled"].includes(competition.status) ? (
+                        <button
+                          className="danger-button"
+                          onClick={() => onDelete(competition)}
+                          type="button"
+                        >
+                          DELETE FROM DASHBOARD
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        )}
       </section>
       <section className="metric-grid">
         <Metric
@@ -2898,7 +3090,9 @@ function RewardsPanel({
               : "Create the first verified brand reward, then publish it before releasing a contest."
           }
           title={
-            competition ? "No reward for this contest" : "No brand rewards configured"
+            competition
+              ? "No reward for this contest"
+              : "No brand rewards configured"
           }
         />
       ) : filteredRewards.length === 0 ? (
@@ -4952,8 +5146,11 @@ function ConfirmationDialog({
           Your confirmation will be recorded automatically in the audit history.
         </p>
       ) : (
-        <Field label="REQUIRED AUDIT REASON">
+        <div className="field reason-field">
+          <span>REQUIRED AUDIT REASON</span>
+          <ReasonPresetChips onSelect={setReason} selected={reason} />
           <textarea
+            aria-label="Required audit reason"
             autoFocus
             minLength={8}
             onChange={(event) => setReason(event.target.value)}
@@ -4961,7 +5158,7 @@ function ConfirmationDialog({
             rows={4}
             value={reason}
           />
-        </Field>
+        </div>
       )}
       {formError ? <p className="form-error">{formError}</p> : null}
       <div className="form-actions">
@@ -5083,16 +5280,26 @@ function Field({
 }
 
 function ReasonField({ defaultValue }: { defaultValue: string }) {
+  const [reason, setReason] = useState(defaultValue);
+  const presets = [defaultValue, ...genericAdministrativeReasons];
   return (
-    <Field label="REQUIRED AUDIT REASON" wide>
+    <div className="field wide reason-field">
+      <span>REQUIRED AUDIT REASON</span>
+      <ReasonPresetChips
+        onSelect={setReason}
+        presets={presets}
+        selected={reason}
+      />
       <textarea
-        defaultValue={defaultValue}
+        aria-label="Required audit reason"
         minLength={8}
         name="reason"
+        onChange={(event) => setReason(event.target.value)}
         required
         rows={3}
+        value={reason}
       />
-    </Field>
+    </div>
   );
 }
 

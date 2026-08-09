@@ -206,7 +206,7 @@ export type PartnerGym = GymLocation & {
 export type PartnerCompetition = Competition & {
   gymLocationId: string;
   gymName: string;
-  proposedByUserId: string;
+  proposedByUserId: string | null;
 };
 
 export type PartnerDashboardSnapshot = {

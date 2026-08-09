@@ -16,6 +16,10 @@ const region = {
 const gym = {
   active: true,
   activeCredentialVersion: 4,
+  activeQrCredentials: [
+    { competitionId: "one", credentialVersion: 3 },
+    { competitionId: "two", credentialVersion: 4 },
+  ],
   id: "gym-1",
 };
 
@@ -35,18 +39,41 @@ function publishedReward(competitionId) {
   return { competitionId, status: "published" };
 }
 
-test("keeps same-region, same-gym contests independently ready", () => {
+test("requires a separate poster for same-region, same-gym contests", () => {
   const first = competition("one");
   const second = competition("two");
   const rewards = [publishedReward("one"), publishedReward("two")];
+  const firstPosterOnly = {
+    ...gym,
+    activeQrCredentials: [gym.activeQrCredentials[0]],
+  };
 
-  const firstState = getContestLaunchState(first, rewards, [region], [gym]);
+  const firstState = getContestLaunchState(
+    first,
+    rewards,
+    [region],
+    [firstPosterOnly],
+  );
+  const blockedSecond = getContestLaunchState(
+    second,
+    rewards,
+    [region],
+    [firstPosterOnly],
+  );
   const secondState = getContestLaunchState(second, rewards, [region], [gym]);
 
   assert.equal(firstState.readyToPublish, true);
+  assert.equal(blockedSecond.qrReady, false);
+  assert.equal(blockedSecond.readyToPublish, false);
   assert.equal(secondState.readyToPublish, true);
-  assert.deepEqual(firstState.assignedGyms.map(({ id }) => id), ["gym-1"]);
-  assert.deepEqual(secondState.assignedGyms.map(({ id }) => id), ["gym-1"]);
+  assert.deepEqual(
+    firstState.assignedGyms.map(({ id }) => id),
+    ["gym-1"],
+  );
+  assert.deepEqual(
+    secondState.assignedGyms.map(({ id }) => id),
+    ["gym-1"],
+  );
 });
 
 test("explains a cancelled contest instead of silently advancing it", () => {
@@ -57,7 +84,7 @@ test("explains a cancelled contest instead of silently advancing it", () => {
     [region],
     [gym],
   );
-  const locks = getContestSetupLocks(state, true);
+  const locks = getContestSetupLocks(state);
 
   assert.match(state.blockedReason, /cancelled/i);
   assert.equal(state.completedSteps, 0);
@@ -69,26 +96,34 @@ test("explains a cancelled contest instead of silently advancing it", () => {
 test("unlocks each setup section only after its prerequisite", () => {
   const draft = competition("draft");
   const noReward = getContestLaunchState(draft, [], [region], [gym]);
-  assert.equal(getContestSetupLocks(noReward, true).rewards, "");
-  assert.match(getContestSetupLocks(noReward, true).regions, /reward/i);
-  assert.match(getContestSetupLocks(noReward, true).pilot, /reward/i);
+  assert.equal(getContestSetupLocks(noReward).rewards, "");
+  assert.match(getContestSetupLocks(noReward).regions, /reward/i);
+  assert.match(getContestSetupLocks(noReward).pilot, /reward/i);
   assert.equal(getNextContestSetupSection(noReward), "rewards");
 
-  const noQrGym = { ...gym, activeCredentialVersion: null };
+  const noQrGym = {
+    ...gym,
+    activeCredentialVersion: null,
+    activeQrCredentials: [],
+  };
   const noQr = getContestLaunchState(
     draft,
     [publishedReward(draft.id)],
     [region],
     [noQrGym],
   );
-  assert.equal(getContestSetupLocks(noQr, true).pilot, "");
+  assert.equal(getContestSetupLocks(noQr).pilot, "");
   assert.equal(noQr.gymAssigned, true);
   assert.equal(noQr.qrReady, false);
   assert.equal(getNextContestSetupSection(noQr), "pilot");
 });
 
-test("prefers the explicitly selected contest without deduplicating by region", () => {
+test("keeps published contests out of the new-contest setup wizard", () => {
   const contests = [competition("one", "registration"), competition("two")];
-  assert.equal(chooseSetupCompetition(contests, "one")?.id, "one");
+  assert.equal(chooseSetupCompetition(contests, "one")?.id, "two");
   assert.equal(chooseSetupCompetition(contests, "")?.id, "two");
+  assert.equal(
+    chooseSetupCompetition([competition("one", "registration")], "one"),
+    null,
+  );
 });

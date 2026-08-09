@@ -18,12 +18,11 @@ export const contestSetupSections = [
  */
 export function chooseSetupCompetition(competitions, preferredId) {
   return (
-    competitions.find((competition) => competition.id === preferredId) ??
-    competitions.find((competition) => competition.status === "draft") ??
-    competitions.find((competition) =>
-      ["registration", "active"].includes(competition.status),
+    competitions.find(
+      (competition) =>
+        competition.id === preferredId && competition.status === "draft",
     ) ??
-    competitions[0] ??
+    competitions.find((competition) => competition.status === "draft") ??
     null
   );
 }
@@ -35,29 +34,26 @@ export function chooseSetupCompetition(competitions, preferredId) {
  * @param {GymLocation[]} gyms
  */
 export function getContestLaunchState(competition, rewards, regions, gyms) {
-  const operational = Boolean(
-    competition &&
-      ["draft", "registration", "active"].includes(competition.status),
-  );
+  const operational = Boolean(competition && competition.status === "draft");
   const rewardReady = Boolean(
     competition &&
-      rewards.some(
-        (reward) =>
-          reward.competitionId === competition.id &&
-          reward.status === "published",
-      ),
+    rewards.some(
+      (reward) =>
+        reward.competitionId === competition.id &&
+        reward.status === "published",
+    ),
   );
   const region = competition
     ? regions.find((candidate) => candidate.id === competition.regionPolicyId)
     : undefined;
   const regionReady = Boolean(
     competition &&
-      region?.competitionEnabled &&
-      new Date(region.validFrom).getTime() <=
-        new Date(competition.registrationOpensAt).getTime() &&
-      (region.validTo === null ||
-        new Date(region.validTo).getTime() >=
-          new Date(competition.endsAt).getTime()),
+    region?.competitionEnabled &&
+    new Date(region.validFrom).getTime() <=
+      new Date(competition.registrationOpensAt).getTime() &&
+    (region.validTo === null ||
+      new Date(region.validTo).getTime() >=
+        new Date(competition.endsAt).getTime()),
   );
   const assignedGyms = competition
     ? gyms.filter(
@@ -66,20 +62,24 @@ export function getContestLaunchState(competition, rewards, regions, gyms) {
       )
     : [];
   const gymAssigned = assignedGyms.length > 0;
-  const qrReady = assignedGyms.some((gym) => gym.activeCredentialVersion !== null);
+  const qrReady = assignedGyms.some((gym) =>
+    (gym.activeQrCredentials ?? []).some(
+      (credential) => credential.competitionId === competition?.id,
+    ),
+  );
   const published = Boolean(
     competition && ["registration", "active"].includes(competition.status),
   );
   const readyToPublish = Boolean(
     competition &&
-      competition.status === "draft" &&
-      rewardReady &&
-      regionReady &&
-      gymAssigned &&
-      qrReady,
+    competition.status === "draft" &&
+    rewardReady &&
+    regionReady &&
+    gymAssigned &&
+    qrReady,
   );
   const blockedReason = !competition
-    ? "Create or select a contest to begin."
+    ? ""
     : competition.status === "cancelled"
       ? `${competition.name} is cancelled and cannot receive a gym or QR poster. Delete it or create a new contest draft.`
       : ["settling", "settled"].includes(competition.status)
@@ -114,20 +114,15 @@ export function getContestLaunchState(competition, rewards, regions, gyms) {
 
 /**
  * @param {ReturnType<typeof getContestLaunchState>} state
- * @param {boolean} hasAnyRegion
  */
-export function getContestSetupLocks(state, hasAnyRegion) {
-  const contestReason = state.blockedReason || "Create or select an active contest first.";
-  const rewardReason = state.operational
-    ? ""
-    : contestReason;
-  const regionReason = !hasAnyRegion
-    ? ""
-    : !state.operational
-      ? contestReason
-      : !state.rewardReady
-        ? "Publish a reward for the selected contest before confirming its region."
-        : "";
+export function getContestSetupLocks(state) {
+  const contestReason = state.blockedReason || "Create a contest draft first.";
+  const rewardReason = state.operational ? "" : contestReason;
+  const regionReason = !state.operational
+    ? contestReason
+    : !state.rewardReady
+      ? "Publish a reward for the selected contest before confirming its region."
+      : "";
   const pilotReason = !state.operational
     ? contestReason
     : !state.rewardReady

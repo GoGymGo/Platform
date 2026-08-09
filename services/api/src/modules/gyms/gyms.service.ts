@@ -114,6 +114,7 @@ export class GymsService {
             'gym.region_policy_id',
           )
           .select([
+            'credential.competition_id',
             'credential.credential_version',
             'credential.status as credential_status',
             'gym.active as gym_active',
@@ -129,7 +130,11 @@ export class GymsService {
           .where('credential.token_hash', '=', tokenHash)
           .executeTakeFirst();
 
-        if (!credential || credential.credential_status !== 'active') {
+        if (
+          !credential ||
+          credential.credential_status !== 'active' ||
+          !credential.competition_id
+        ) {
           return this.rejected(now, 'invalid_or_revoked_credential');
         }
         if (!credential.gym_active) {
@@ -160,6 +165,7 @@ export class GymsService {
           return this.rejected(now, 'replayed_event', credential);
         }
 
+        const credentialCompetitionId = credential.competition_id;
         const enrollment = await transaction
           .selectFrom('competition_gym_locations as eligible_gym')
           .innerJoin(
@@ -180,6 +186,8 @@ export class GymsService {
             'enrollment.id as enrollment_id',
           ])
           .where('eligible_gym.gym_location_id', '=', credential.gym_id)
+          .where('eligible_gym.competition_id', '=', credentialCompetitionId)
+          .where('competition.id', '=', credentialCompetitionId)
           .where('competition.status', '=', 'active')
           .where('competition.starts_at', '<=', now)
           .where('competition.ends_at', '>', now)
@@ -607,6 +615,7 @@ export class GymsService {
 
   issueCredential(
     principal: AuthenticatedPrincipal,
+    competitionId: string,
     gymId: string,
     requestId: string,
     reason: string,
@@ -639,6 +648,46 @@ export class GymsService {
             message: 'A QR poster cannot be issued for an inactive gym.',
           });
         }
+        const competition = await transaction
+          .selectFrom('competition_gym_locations as assignment')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'assignment.competition_id',
+          )
+          .innerJoin(
+            'region_policies as region',
+            'region.id',
+            'competition.region_policy_id',
+          )
+          .select([
+            'competition.ends_at',
+            'competition.id',
+            'competition.name',
+            'competition.registration_opens_at',
+            'competition.starts_at',
+            'competition.status',
+            'region.metro_name as region_name',
+            'region.timezone',
+          ])
+          .where('assignment.competition_id', '=', competitionId)
+          .where('assignment.gym_location_id', '=', gym.id)
+          .where('competition.deleted_at', 'is', null)
+          .executeTakeFirst();
+        if (!competition) {
+          throw new ConflictException({
+            code: 'CONTEST_GYM_ASSIGNMENT_REQUIRED',
+            message:
+              'Assign this gym to the selected contest before issuing its poster.',
+          });
+        }
+        if (!['draft', 'registration', 'active'].includes(competition.status)) {
+          throw new ConflictException({
+            code: 'COMPETITION_NOT_CONFIGURABLE',
+            message:
+              'QR posters can be issued only for a draft, registration, or active contest.',
+          });
+        }
         const now = new Date();
         await transaction
           .updateTable('gym_qr_credentials')
@@ -648,6 +697,7 @@ export class GymsService {
             revoked_by_user_id: operator.user.id,
             status: 'revoked',
           })
+          .where('competition_id', '=', competition.id)
           .where('gym_location_id', '=', gym.id)
           .where('status', '=', 'active')
           .execute();
@@ -664,6 +714,7 @@ export class GymsService {
         const credential = await transaction
           .insertInto('gym_qr_credentials')
           .values({
+            competition_id: competition.id,
             credential_version: credentialVersion,
             gym_location_id: gym.id,
             issued_at: now,
@@ -679,18 +730,25 @@ export class GymsService {
           actorUserId: operator.user.id,
           entityId: credential.id,
           entityType: 'gym_qr_credentials',
-          nextState: { credentialVersion, gymLocationId: gym.id },
+          nextState: {
+            competitionId: competition.id,
+            credentialVersion,
+            gymLocationId: gym.id,
+          },
           previousState: null,
           reason,
           requestId,
         });
         return {
+          competitionId: competition.id,
+          competitionName: competition.name,
           credentialVersion,
           gymLocationId: gym.id,
           id: credential.id,
           issuedAt: credential.issued_at.toISOString(),
           printablePosterSvg: await this.buildPosterSvg(
             gym.name,
+            competition,
             qrPayload,
             credentialVersion,
           ),
@@ -701,6 +759,7 @@ export class GymsService {
 
   getActiveCredential(
     principal: AuthenticatedPrincipal,
+    competitionId: string,
     gymId: string,
   ): Promise<GymQrCredentialResponseDto | null> {
     return this.database.connection
@@ -719,15 +778,34 @@ export class GymsService {
             'credential.gym_location_id',
             'gym.id',
           )
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'credential.competition_id',
+          )
+          .innerJoin(
+            'region_policies as region',
+            'region.id',
+            'competition.region_policy_id',
+          )
           .select([
+            'competition.ends_at',
+            'competition.id as competition_id',
+            'competition.name as competition_name',
+            'competition.registration_opens_at',
+            'competition.starts_at',
             'credential.credential_version',
             'credential.id',
             'credential.issued_at',
             'credential.qr_payload',
             'gym.id as gym_location_id',
             'gym.name as gym_name',
+            'region.metro_name as region_name',
+            'region.timezone',
           ])
           .where('gym.id', '=', gymId)
+          .where('competition.id', '=', competitionId)
+          .where('competition.deleted_at', 'is', null)
           .where('gym.deleted_at', 'is', null)
           .where('gym.active', '=', true)
           .where('credential.status', '=', 'active')
@@ -736,12 +814,23 @@ export class GymsService {
           return null;
         }
         return {
+          competitionId: credential.competition_id,
+          competitionName: credential.competition_name,
           credentialVersion: credential.credential_version,
           gymLocationId: credential.gym_location_id,
           id: credential.id,
           issuedAt: credential.issued_at.toISOString(),
           printablePosterSvg: await this.buildPosterSvg(
             credential.gym_name,
+            {
+              ends_at: credential.ends_at,
+              id: credential.competition_id,
+              name: credential.competition_name,
+              registration_opens_at: credential.registration_opens_at,
+              region_name: credential.region_name,
+              starts_at: credential.starts_at,
+              timezone: credential.timezone,
+            },
             credential.qr_payload,
             credential.credential_version,
           ),
@@ -752,6 +841,7 @@ export class GymsService {
 
   revokeCredential(
     principal: AuthenticatedPrincipal,
+    competitionId: string,
     gymId: string,
     requestId: string,
     reason: string,
@@ -774,6 +864,7 @@ export class GymsService {
             revoked_by_user_id: operator.user.id,
             status: 'revoked',
           })
+          .where('competition_id', '=', competitionId)
           .where('gym_location_id', '=', gymId)
           .where('status', '=', 'active')
           .returning(['credential_version', 'id'])
@@ -791,6 +882,7 @@ export class GymsService {
           entityType: 'gym_qr_credentials',
           nextState: { status: 'revoked' },
           previousState: {
+            competitionId,
             credentialVersion: credential.credential_version,
             status: 'active',
           },
@@ -1337,13 +1429,28 @@ export class GymsService {
         'region.id',
         'gym.region_policy_id',
       )
-      .leftJoin('gym_qr_credentials as credential', (join) =>
-        join
-          .onRef('credential.gym_location_id', '=', 'gym.id')
-          .on('credential.status', '=', 'active'),
-      )
       .select([
-        'credential.credential_version as active_credential_version',
+        sql<number | null>`(
+          SELECT MAX(credential.credential_version)::integer
+          FROM gym_qr_credentials AS credential
+          WHERE credential.gym_location_id = gym.id
+            AND credential.status = 'active'
+        )`.as('active_credential_version'),
+        sql<
+          Array<{ competitionId: string; credentialVersion: number }>
+        >`COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'competitionId', credential.competition_id,
+              'credentialVersion', credential.credential_version
+            )
+            ORDER BY credential.credential_version DESC
+          )
+          FROM gym_qr_credentials AS credential
+          WHERE credential.gym_location_id = gym.id
+            AND credential.status = 'active'
+            AND credential.competition_id IS NOT NULL
+        ), '[]'::json)`.as('active_qr_credentials'),
         'gym.active',
         'gym.address',
         'gym.created_at',
@@ -1382,6 +1489,10 @@ export class GymsService {
   private mapGymLocation(gym: {
     active: boolean;
     active_credential_version: number | null;
+    active_qr_credentials: Array<{
+      competitionId: string;
+      credentialVersion: number;
+    }>;
     address: string;
     created_at: Date;
     id: string;
@@ -1396,6 +1507,7 @@ export class GymsService {
     return {
       active: gym.active,
       activeCredentialVersion: gym.active_credential_version,
+      activeQrCredentials: gym.active_qr_credentials,
       address: gym.address,
       createdAt: gym.created_at.toISOString(),
       id: gym.id,
@@ -1461,6 +1573,15 @@ export class GymsService {
 
   private async buildPosterSvg(
     gymName: string,
+    competition: {
+      ends_at: Date;
+      id: string;
+      name: string;
+      registration_opens_at: Date;
+      region_name: string;
+      starts_at: Date;
+      timezone: string;
+    },
     qrPayload: string,
     credentialVersion: number,
   ): Promise<string> {
@@ -1479,15 +1600,37 @@ export class GymsService {
     if (!qrViewBox) {
       throw new Error('The QR renderer did not return an SVG viewBox.');
     }
-    const safeName = gymName
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&apos;');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="GoGymGo QR poster for ${safeName}">
-  <title>GoGymGo $100 September Contest at ${safeName}</title>
-  <desc>Scan the QR code and sign up for the $100 September Contest. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
+    const escapeXml = (value: string) =>
+      value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+    const safeGymName = escapeXml(gymName);
+    const safeContestName = escapeXml(competition.name);
+    const safeContestDisplayName = escapeXml(
+      competition.name.length > 34
+        ? `${competition.name.slice(0, 31)}...`
+        : competition.name,
+    );
+    const safeRegionName = escapeXml(competition.region_name.toUpperCase());
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: competition.timezone,
+      year: 'numeric',
+    });
+    const registrationDate = dateFormatter
+      .format(competition.registration_opens_at)
+      .toUpperCase();
+    const contestStarts = dateFormatter
+      .format(competition.starts_at)
+      .toUpperCase();
+    const contestEnds = dateFormatter.format(competition.ends_at).toUpperCase();
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="${safeContestName} QR poster for ${safeGymName}">
+  <title>${safeContestName} at ${safeGymName}</title>
+  <desc>This poster is valid only for ${safeContestName}. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
   <rect width="1000" height="1400" fill="#05090b"/>
   <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
 
@@ -1496,21 +1639,21 @@ export class GymsService {
     <text x="500" y="124" text-anchor="middle" font-family="Orbitron, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="2"><tspan fill="#34E5E8">GO</tspan><tspan fill="#FF2D9B">GYM</tspan><tspan fill="#34E5E8">GO</tspan></text>
   </g>
 
-  <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">SEPTEMBER 2026 - VANCOUVER ISLAND + GULF ISLANDS</text>
-  <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE AND SIGN UP FOR THE</text>
-  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="53" font-weight="700">$100 SEPTEMBER CONTEST.</text>
+  <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">${safeRegionName}</text>
+  <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE TO JOIN</text>
+  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="44" font-weight="700">${safeContestDisplayName}</text>
 
   <rect x="160" y="345" width="680" height="680" rx="34" fill="#fff"/>
-  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open the GoGymGo contest">
+  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open ${safeContestName}">
     ${qrBody}
   </svg>
 
-  <text x="500" y="1084" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="38" font-weight="700">${safeName}</text>
+  <text x="500" y="1084" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="38" font-weight="700">${safeGymName}</text>
   <text x="500" y="1130" text-anchor="middle" fill="#34E5E8" font-family="Share Tech Mono, monospace" font-size="25" letter-spacing="2">SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT</text>
   <line x1="100" y1="1165" x2="900" y2="1165" stroke="#173A46" stroke-width="2"/>
 
-  <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION OPENS AUGUST 1  |  CHALLENGE SEPTEMBER 1-30, 2026</text>
-  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">ONE $100 CAD REWARD  |  FREE TO ENTER  |  NO PURCHASE REQUIRED  |  AGE 19+</text>
+  <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION ${registrationDate}  |  CONTEST ${contestStarts} - ${contestEnds}</text>
+  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">CONTEST-SPECIFIC POSTER  |  FREE TO ENTER  |  NO PURCHASE REQUIRED</text>
   <text x="500" y="1288" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">Choose a 1-7 day weekly goal. Complete it to earn Prize Draw Entries.</text>
   <text x="500" y="1324" text-anchor="middle" fill="#96AAB0" font-family="Share Tech Mono, monospace" font-size="16">Location access is required. Entries improve odds but do not guarantee the reward.</text>
   <text x="500" y="1358" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="16">Official Rules and eligibility apply - GOGYMGO.COM</text>

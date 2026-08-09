@@ -193,7 +193,13 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /selectedCompetition\.assignedGymIds/);
   assert.match(pilot, /Assign a gym to \{props\.selectedCompetition\.name\}/);
   assert.match(pilot, /can also be assigned independently to another/);
-  assert.match(pilot, /reusable across every contest assigned to that/);
+  assert.match(pilot, /Every contest receives a different poster/);
+  assert.doesNotMatch(pilot, /reusable across every contest assigned to that/);
+  assert.match(pilot, /activeQrCredentials/);
+  assert.match(dashboard, /EXISTING CONTEST HOMES/);
+  assert.match(dashboard, /CREATE ANOTHER CONTEST/);
+  assert.match(dashboard, /ReasonPresetChips/);
+  assert.match(styles, /\.mobile-admin-navigation \{[\s\S]*display: none !important/);
   assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);
   assert.match(contestLaunchFlow, /competition\.assignedGymIds \?\? \[\]/);
   assert.match(contestLaunchFlow, /competition\.status === "cancelled"/);

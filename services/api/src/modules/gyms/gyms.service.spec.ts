@@ -15,6 +15,15 @@ import { GymsService } from './gyms.service';
 interface GymsServiceInternals {
   buildPosterSvg(
     gymName: string,
+    competition: {
+      ends_at: Date;
+      id: string;
+      name: string;
+      registration_opens_at: Date;
+      region_name: string;
+      starts_at: Date;
+      timezone: string;
+    },
     qrPayload: string,
     credentialVersion: number,
   ): Promise<string>;
@@ -32,6 +41,10 @@ interface GymsServiceInternals {
   mapGymLocation(gym: {
     active: boolean;
     active_credential_version: number | null;
+    active_qr_credentials: Array<{
+      competitionId: string;
+      credentialVersion: number;
+    }>;
     address: string;
     created_at: Date;
     id: string;
@@ -159,6 +172,9 @@ describe('gym service privacy-safe presentation helpers', () => {
     const gym = service.mapGymLocation({
       active: true,
       active_credential_version: 2,
+      active_qr_credentials: [
+        { competitionId: 'competition-1', credentialVersion: 2 },
+      ],
       address: '1 Pilot Way',
       created_at: createdAt,
       id: 'gym-1',
@@ -173,6 +189,9 @@ describe('gym service privacy-safe presentation helpers', () => {
     expect(gym).toEqual({
       active: true,
       activeCredentialVersion: 2,
+      activeQrCredentials: [
+        { competitionId: 'competition-1', credentialVersion: 2 },
+      ],
       address: '1 Pilot Way',
       createdAt: createdAt.toISOString(),
       id: 'gym-1',
@@ -234,6 +253,15 @@ describe('gym service privacy-safe presentation helpers', () => {
   it('generates a printable non-executable poster with an escaped gym name', async () => {
     const poster = await service.buildPosterSvg(
       `Harbour & <script> "Gym"`,
+      {
+        ends_at: new Date('2026-09-30T07:00:00.000Z'),
+        id: 'competition-1',
+        name: 'Cameron & Friends',
+        registration_opens_at: new Date('2026-08-01T07:00:00.000Z'),
+        region_name: 'Vancouver Island',
+        starts_at: new Date('2026-09-01T07:00:00.000Z'),
+        timezone: 'America/Vancouver',
+      },
       'https://app.gogymgo.com/scan?credential=opaque-test-value',
       7,
     );
@@ -241,18 +269,16 @@ describe('gym service privacy-safe presentation helpers', () => {
     expect(poster).toContain('aria-label="GoGymGo logo"');
     expect(poster).toContain('<text x="500" y="124" text-anchor="middle"');
     expect(poster).not.toContain('<svg x="72" y="52"');
-    expect(poster).toContain(
-      'Scan the QR code and sign up for the $100 September Contest.',
-    );
-    expect(poster).toContain('$100 SEPTEMBER CONTEST.');
+    expect(poster).toContain('valid only for Cameron &amp; Friends');
+    expect(poster).toContain('Cameron &amp; Friends');
     expect(poster).toContain('SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT');
-    expect(poster).toContain('REGISTRATION OPENS AUGUST 1');
+    expect(poster).toContain('REGISTRATION AUG 1, 2026');
     expect(poster).toContain('NO PURCHASE REQUIRED');
     expect(poster).toContain('Harbour &amp; &lt;script&gt; &quot;Gym&quot;');
     expect(poster).toContain('POSTER V7');
     expect(poster).toContain('<svg x="190" y="375" width="620" height="620"');
     const positionedQrTag = poster.match(
-      /<svg x="190" y="375"[^>]*aria-label="Scan to open the GoGymGo contest">/,
+      /<svg x="190" y="375"[^>]*aria-label="Scan to open Cameron &amp; Friends">/,
     )?.[0];
     expect(positionedQrTag).toBeDefined();
     expect(positionedQrTag?.match(/\bwidth=/g)).toHaveLength(1);

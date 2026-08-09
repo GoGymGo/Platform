@@ -83,6 +83,7 @@ export class OperatorPortalService {
               sql<number>`ST_X(gym.coordinates::geometry)`.as('longitude'),
             ])
             .where('gym.id', 'in', gymIds)
+            .where('gym.deleted_at', 'is', null)
             .orderBy('gym.name')
             .execute(),
           transaction
@@ -145,6 +146,8 @@ export class OperatorPortalService {
               'region.metro_name as region_name',
             ])
             .where('proposal.gym_location_id', 'in', gymIds)
+            .where('competition.deleted_at', 'is', null)
+            .where('gym.deleted_at', 'is', null)
             .orderBy('competition.starts_at', 'desc')
             .execute(),
         ]);
@@ -211,6 +214,7 @@ export class OperatorPortalService {
                   'valid_to',
                 ])
                 .where('id', 'in', regionIds)
+                .where('deleted_at', 'is', null)
                 .execute();
 
         return {

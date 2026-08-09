@@ -820,14 +820,26 @@ export function AdminDashboard({
             <CompetitionsPanel
               competitions={snapshot.competitions}
               onCreate={() => setCompetitionEditor("new")}
+              onDelete={(competition) =>
+                setConfirmAction({
+                  actionLabel: "Delete contest",
+                  description: `${competition.name} will be removed from the operating dashboard. Participation, results, and audit records remain preserved.`,
+                  execute: (reason) =>
+                    mutate(
+                      "Contest deleted from the dashboard.",
+                      `operator/configuration/competitions/${competition.id}`,
+                      "DELETE",
+                      { expectedVersion: competition.version, reason },
+                    ),
+                  tone: "danger",
+                })
+              }
               onEdit={setCompetitionEditor}
               onNavigate={setSection}
               onStatus={(competition, action) =>
                 setConfirmAction({
                   actionLabel:
-                    action === "publish"
-                      ? "Publish contest"
-                      : "Cancel contest",
+                    action === "publish" ? "Publish contest" : "Cancel contest",
                   auditReason:
                     action === "publish"
                       ? "Publish the approved contest after operator confirmation."
@@ -874,6 +886,20 @@ export function AdminDashboard({
                   body,
                 );
               }}
+              onDeleteGym={(gym) =>
+                setConfirmAction({
+                  actionLabel: "Delete Partner gym",
+                  description: `${gym.name} will be removed from the dashboard. Existing visit and audit evidence remains preserved.`,
+                  execute: (reason) =>
+                    mutate(
+                      "Partner gym deleted from the dashboard.",
+                      `operator/gym-locations/${gym.id}`,
+                      "DELETE",
+                      { reason },
+                    ),
+                  tone: "danger",
+                })
+              }
               onIssueQr={(gymId, body) =>
                 mutate(
                   "Printable QR poster issued.",
@@ -914,6 +940,20 @@ export function AdminDashboard({
             <RewardsPanel
               onCouponCodes={setCouponReward}
               onCreate={() => setRewardEditor("new")}
+              onDelete={(reward) =>
+                setConfirmAction({
+                  actionLabel: "Delete reward",
+                  description: `${reward.title} will be removed from the dashboard. Award, redemption, and audit records remain preserved.`,
+                  execute: (reason) =>
+                    mutate(
+                      "Reward deleted from the dashboard.",
+                      `operator/configuration/rewards/${reward.id}`,
+                      "DELETE",
+                      { expectedVersion: reward.version, reason },
+                    ),
+                  tone: "danger",
+                })
+              }
               onEdit={setRewardEditor}
               onStatus={(reward, action) =>
                 setConfirmAction({
@@ -940,7 +980,22 @@ export function AdminDashboard({
           ) : null}
           {section === "regions" ? (
             <RegionsPanel
+              evaluatedAt={snapshot.generatedAt}
               onCreate={() => setRegionEditor(true)}
+              onDelete={(region) =>
+                setConfirmAction({
+                  actionLabel: "Delete region policy",
+                  description: `${region.metroName} ${region.policyVersion} will be removed from the dashboard. Historical eligibility evidence remains preserved.`,
+                  execute: (reason) =>
+                    mutate(
+                      "Regional policy deleted from the dashboard.",
+                      `operator/configuration/region-policies/${region.id}`,
+                      "DELETE",
+                      { reason },
+                    ),
+                  tone: "danger",
+                })
+              }
               regions={snapshot.regions}
             />
           ) : null}
@@ -950,6 +1005,34 @@ export function AdminDashboard({
               documents={snapshot.legalDocuments}
               onCreateDocument={() => setLegalEditor(true)}
               onCreateWorkout={() => setWorkoutEditor("new")}
+              onDeleteDocument={(document) =>
+                setConfirmAction({
+                  actionLabel: "Delete legal version",
+                  description: `${document.title} version ${document.version} will be removed from the dashboard. The immutable document, receipts, and audit evidence remain preserved.`,
+                  execute: (reason) =>
+                    mutate(
+                      "Legal version deleted from the dashboard.",
+                      `operator/configuration/legal-documents/${document.id}`,
+                      "DELETE",
+                      { reason },
+                    ),
+                  tone: "danger",
+                })
+              }
+              onDeleteWorkout={(workout) =>
+                setConfirmAction({
+                  actionLabel: "Delete workout",
+                  description: `${workout.title} will be removed from the dashboard. Existing member planning and audit records remain preserved.`,
+                  execute: (reason) =>
+                    mutate(
+                      "Creator workout deleted from the dashboard.",
+                      `operator/configuration/creator-workouts/${workout.id}`,
+                      "DELETE",
+                      { expectedVersion: workout.version, reason },
+                    ),
+                  tone: "danger",
+                })
+              }
               onEditWorkout={setWorkoutEditor}
               onWorkoutStatus={(workout, action) =>
                 setConfirmAction({
@@ -1012,9 +1095,7 @@ export function AdminDashboard({
           onClose={() => setCompetitionEditor(null)}
           onSubmit={async (body, editing) => {
             await mutate(
-              editing
-                ? "Contest draft updated."
-                : "Contest draft created.",
+              editing ? "Contest draft updated." : "Contest draft created.",
               editing
                 ? `operator/configuration/competitions/${editing.id}`
                 : "operator/configuration/competitions",
@@ -2049,12 +2130,14 @@ function Metric({
 function CompetitionsPanel({
   competitions,
   onCreate,
+  onDelete,
   onEdit,
   onNavigate,
   onStatus,
 }: {
   competitions: Competition[];
   onCreate: () => void;
+  onDelete: (competition: Competition) => void;
   onEdit: (competition: Competition) => void;
   onNavigate: (section: AdminSection) => void;
   onStatus: (competition: Competition, action: "cancel" | "publish") => void;
@@ -2273,6 +2356,17 @@ function CompetitionsPanel({
                       CANCEL
                     </button>
                   ) : null}
+                  {["cancelled", "draft", "settled"].includes(
+                    competition.status,
+                  ) ? (
+                    <button
+                      className="danger-button"
+                      onClick={() => onDelete(competition)}
+                      type="button"
+                    >
+                      DELETE
+                    </button>
+                  ) : null}
                 </div>
               </article>
             );
@@ -2286,12 +2380,14 @@ function CompetitionsPanel({
 function RewardsPanel({
   onCouponCodes,
   onCreate,
+  onDelete,
   onEdit,
   onStatus,
   rewards,
 }: {
   onCouponCodes: (reward: Reward) => void;
   onCreate: () => void;
+  onDelete: (reward: Reward) => void;
   onEdit: (reward: Reward) => void;
   onStatus: (reward: Reward, action: "archive" | "publish") => void;
   rewards: Reward[];
@@ -2363,8 +2459,7 @@ function RewardsPanel({
           <p className="eyebrow">BRAND REWARD CATALOG</p>
           <h2>Rewards</h2>
           <p>
-            Only real, in-stock published rewards can unlock a contest
-            launch.
+            Only real, in-stock published rewards can unlock a contest launch.
           </p>
         </div>
         <button className="primary-button" onClick={onCreate} type="button">
@@ -2567,6 +2662,15 @@ function RewardsPanel({
                               Archive
                             </button>
                           ) : null}
+                          {["archived", "draft"].includes(reward.status) ? (
+                            <button
+                              className="text-button danger-text"
+                              onClick={() => onDelete(reward)}
+                              type="button"
+                            >
+                              Delete
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -2588,10 +2692,14 @@ function RewardsPanel({
 }
 
 function RegionsPanel({
+  evaluatedAt,
   onCreate,
+  onDelete,
   regions,
 }: {
+  evaluatedAt: string;
   onCreate: () => void;
+  onDelete: (region: RegionPolicy) => void;
   regions: RegionPolicy[];
 }) {
   return (
@@ -2616,43 +2724,57 @@ function RegionsPanel({
         />
       ) : (
         <div className="card-list">
-          {regions.map((region) => (
-            <article className="region-card" key={region.id}>
-              <div className="region-code">{region.code}</div>
-              <div>
-                <span
-                  className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
-                >
-                  {region.competitionEnabled
-                    ? "contest enabled"
-                    : "disabled"}
-                </span>
-                <h3>{region.metroName}</h3>
-                <p>
-                  {region.countryCode}-{region.subdivisionCode} ·{" "}
-                  {region.timezone}
-                </p>
-              </div>
-              <dl>
+          {regions.map((region) => {
+            const deletable =
+              !region.competitionEnabled ||
+              (region.validTo !== null &&
+                new Date(region.validTo).getTime() <=
+                  new Date(evaluatedAt).getTime());
+            return (
+              <article className="region-card" key={region.id}>
+                <div className="region-code">{region.code}</div>
                 <div>
-                  <dt>POLICY</dt>
-                  <dd>{region.policyVersion}</dd>
+                  <span
+                    className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
+                  >
+                    {region.competitionEnabled ? "contest enabled" : "disabled"}
+                  </span>
+                  <h3>{region.metroName}</h3>
+                  <p>
+                    {region.countryCode}-{region.subdivisionCode} ·{" "}
+                    {region.timezone}
+                  </p>
                 </div>
-                <div>
-                  <dt>BOUNDARY</dt>
-                  <dd>{region.boundaryVersion}</dd>
-                </div>
-                <div>
-                  <dt>MINIMUM AGE</dt>
-                  <dd>{region.minimumAge}</dd>
-                </div>
-                <div>
-                  <dt>VALID FROM</dt>
-                  <dd>{formatDate(region.validFrom)}</dd>
-                </div>
-              </dl>
-            </article>
-          ))}
+                <dl>
+                  <div>
+                    <dt>POLICY</dt>
+                    <dd>{region.policyVersion}</dd>
+                  </div>
+                  <div>
+                    <dt>BOUNDARY</dt>
+                    <dd>{region.boundaryVersion}</dd>
+                  </div>
+                  <div>
+                    <dt>MINIMUM AGE</dt>
+                    <dd>{region.minimumAge}</dd>
+                  </div>
+                  <div>
+                    <dt>VALID FROM</dt>
+                    <dd>{formatDate(region.validFrom)}</dd>
+                  </div>
+                </dl>
+                {deletable ? (
+                  <button
+                    className="text-button danger-text"
+                    onClick={() => onDelete(region)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
@@ -2664,6 +2786,8 @@ function ContentPanel({
   documents,
   onCreateDocument,
   onCreateWorkout,
+  onDeleteDocument,
+  onDeleteWorkout,
   onEditWorkout,
   onWithdrawDocument,
   onWorkoutStatus,
@@ -2673,6 +2797,8 @@ function ContentPanel({
   documents: LegalDocument[];
   onCreateDocument: () => void;
   onCreateWorkout: () => void;
+  onDeleteDocument: (document: LegalDocument) => void;
+  onDeleteWorkout: (workout: CreatorWorkout) => void;
   onEditWorkout: (workout: CreatorWorkout) => void;
   onWithdrawDocument: (document: LegalDocument) => void;
   onWorkoutStatus: (
@@ -2774,6 +2900,15 @@ function ContentPanel({
                       type="button"
                     >
                       Edit
+                    </button>
+                  ) : null}
+                  {!workout.published ? (
+                    <button
+                      className="text-button danger-text"
+                      onClick={() => onDeleteWorkout(workout)}
+                      type="button"
+                    >
+                      Delete
                     </button>
                   ) : null}
                   <button
@@ -2935,7 +3070,15 @@ function ContentPanel({
                           >
                             Withdraw
                           </button>
-                        ) : null}
+                        ) : (
+                          <button
+                            className="text-button danger-text"
+                            onClick={() => onDeleteDocument(document)}
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -4300,7 +4443,8 @@ function CouponCodesForm({
       ),
     ];
     try {
-      if (codes.length === 0) throw new AdminUserFacingError("Add at least one coupon code.");
+      if (codes.length === 0)
+        throw new AdminUserFacingError("Add at least one coupon code.");
       await onSubmit(codes, String(form.get("reason")));
     } catch (error) {
       setFormError(errorMessage(error));
@@ -4413,7 +4557,11 @@ function ConfirmationDialog({
           </button>
         ) : (
           <>
-            <button className="secondary-button" onClick={onClose} type="button">
+            <button
+              className="secondary-button"
+              onClick={onClose}
+              type="button"
+            >
               GO BACK
             </button>
             <button

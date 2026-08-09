@@ -15,6 +15,10 @@ import type {
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
+  canDeleteCompetition,
+  requiresExclusiveCompetitionSlot,
+} from './admin-deletion-policy';
+import {
   assertUniqueGoalBrackets,
   parseAdminCompetitionRules,
   parseCompetitionSchedule,
@@ -22,9 +26,11 @@ import {
 import { AdminAuthorizationService } from './admin-authorization.service';
 import {
   CompetitionStatusAction,
+  type AdminDeletedEntityResponseDto,
   type AdminEntityResponseDto,
   type CompetitionStatusActionDto,
   type CreateCompetitionDraftDto,
+  type DeleteVersionedAdminEntityDto,
   type UpdateCompetitionDraftDto,
 } from './dto/admin-configuration.dto';
 
@@ -32,6 +38,11 @@ interface AdminEntityJson extends JsonObject {
   id: string;
   status: CompetitionStatus;
   version: number;
+}
+
+interface DeletedEntityJson extends JsonObject {
+  id: string;
+  status: 'deleted';
 }
 
 const partnerCompetitionRules = parseAdminCompetitionRules({
@@ -88,7 +99,6 @@ export class AdminCompetitionConfigurationService {
         await this.assertRegionExists(transaction, input.regionPolicyId);
         await this.assertCompetitionSlotAvailable(
           transaction,
-          input.regionPolicyId,
           input.monthKey,
           actor.proposalGymId,
         );
@@ -197,6 +207,7 @@ export class AdminCompetitionConfigurationService {
           .selectFrom('competitions')
           .selectAll()
           .where('id', '=', competitionId)
+          .where('deleted_at', 'is', null)
           .forUpdate()
           .executeTakeFirst();
         if (!current) {
@@ -231,7 +242,6 @@ export class AdminCompetitionConfigurationService {
         await this.assertRegionExists(transaction, input.regionPolicyId);
         await this.assertCompetitionSlotAvailable(
           transaction,
-          input.regionPolicyId,
           input.monthKey,
           actor.proposalGymId,
           competitionId,
@@ -342,6 +352,7 @@ export class AdminCompetitionConfigurationService {
           .selectFrom('competitions')
           .selectAll()
           .where('id', '=', competitionId)
+          .where('deleted_at', 'is', null)
           .forUpdate()
           .executeTakeFirst();
         if (!competition) {
@@ -421,6 +432,90 @@ export class AdminCompetitionConfigurationService {
           status: updated.status,
           version: updated.configuration_version,
         };
+      },
+    );
+  }
+
+  delete(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    idempotencyKey: string,
+    input: DeleteVersionedAdminEntityDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.idempotency.execute<DeletedEntityJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { ...input, competitionId },
+        scope: `admin-competitions:${competitionId}:delete`,
+      },
+      async (transaction) => {
+        const admin = await this.authorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const competition = await transaction
+          .selectFrom('competitions')
+          .selectAll()
+          .where('id', '=', competitionId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!competition) {
+          throw new NotFoundException({
+            code: 'COMPETITION_NOT_FOUND',
+            message: 'The competition was not found.',
+          });
+        }
+        this.assertExpectedVersion(
+          competition.configuration_version,
+          input.expectedVersion,
+        );
+        if (!canDeleteCompetition(competition.status)) {
+          throw new ConflictException({
+            code: 'COMPETITION_DELETE_REQUIRES_TERMINAL_STATUS',
+            message:
+              'Only draft, cancelled, or settled competitions can be deleted from the dashboard.',
+          });
+        }
+
+        const deletedAt = new Date();
+        const deleted = await transaction
+          .updateTable('competitions')
+          .set({
+            configuration_version: sql<number>`configuration_version + 1`,
+            deleted_at: deletedAt,
+            updated_at: deletedAt,
+          })
+          .where('id', '=', competitionId)
+          .where('configuration_version', '=', input.expectedVersion)
+          .where('deleted_at', 'is', null)
+          .returning('id')
+          .executeTakeFirst();
+        if (!deleted) throw this.versionConflict();
+        await transaction
+          .deleteFrom('partner_competition_proposals')
+          .where('competition_id', '=', competitionId)
+          .execute();
+        await this.authorization.audit(transaction, {
+          action: 'competition.deleted',
+          actorUserId: admin.id,
+          entityId: competitionId,
+          entityType: 'competitions',
+          nextState: {
+            deletedAt: deletedAt.toISOString(),
+            status: 'deleted',
+          },
+          previousState: {
+            monthKey: competition.month_key,
+            name: competition.name,
+            status: competition.status,
+            version: competition.configuration_version,
+          },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return { id: deleted.id, status: 'deleted' };
       },
     );
   }
@@ -588,6 +683,7 @@ export class AdminCompetitionConfigurationService {
       .selectFrom('region_policies')
       .select('id')
       .where('id', '=', regionPolicyId)
+      .where('deleted_at', 'is', null)
       .executeTakeFirst();
     if (!region) {
       throw new NotFoundException({
@@ -613,44 +709,24 @@ export class AdminCompetitionConfigurationService {
 
   private async assertCompetitionSlotAvailable(
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
-    regionPolicyId: string,
     monthKey: string,
     proposalGymId: string | null,
     excludingCompetitionId?: string,
   ): Promise<void> {
-    const duplicate = proposalGymId
-      ? await transaction
-          .selectFrom('partner_competition_proposals')
-          .select('competition_id')
-          .where('gym_location_id', '=', proposalGymId)
-          .where('month_key', '=', monthKey)
-          .$if(Boolean(excludingCompetitionId), (query) =>
-            query.where('competition_id', '!=', excludingCompetitionId!),
-          )
-          .executeTakeFirst()
-      : await transaction
-          .selectFrom('competitions as competition')
-          .leftJoin(
-            'partner_competition_proposals as proposal',
-            'proposal.competition_id',
-            'competition.id',
-          )
-          .select('competition.id')
-          .where('competition.region_policy_id', '=', regionPolicyId)
-          .where('competition.month_key', '=', monthKey)
-          .where('proposal.competition_id', 'is', null)
-          .$if(Boolean(excludingCompetitionId), (query) =>
-            query.where('competition.id', '!=', excludingCompetitionId!),
-          )
-          .executeTakeFirst();
+    if (!requiresExclusiveCompetitionSlot(proposalGymId)) return;
+    const duplicate = await transaction
+      .selectFrom('partner_competition_proposals')
+      .select('competition_id')
+      .where('gym_location_id', '=', proposalGymId!)
+      .where('month_key', '=', monthKey)
+      .$if(Boolean(excludingCompetitionId), (query) =>
+        query.where('competition_id', '!=', excludingCompetitionId!),
+      )
+      .executeTakeFirst();
     if (duplicate) {
       throw new ConflictException({
-        code: proposalGymId
-          ? 'PARTNER_COMPETITION_GYM_MONTH_EXISTS'
-          : 'COMPETITION_REGION_MONTH_EXISTS',
-        message: proposalGymId
-          ? 'This gym already has a competition proposal for that month.'
-          : 'A GoGymGo competition already exists for this region and month.',
+        code: 'PARTNER_COMPETITION_GYM_MONTH_EXISTS',
+        message: 'This gym already has a competition proposal for that month.',
       });
     }
   }

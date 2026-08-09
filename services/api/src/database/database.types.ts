@@ -232,6 +232,7 @@ export interface RegionPoliciesTable {
   boundary: unknown;
   valid_from: Timestamp;
   valid_to: NullableTimestamp;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
 }
 
@@ -300,6 +301,7 @@ export interface CompetitionsTable {
   registration_closes_at: Timestamp;
   starts_at: Timestamp;
   ends_at: Timestamp;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -339,6 +341,7 @@ export interface LegalDocumentsTable {
     string | null | undefined,
     string | null
   >;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
 }
 
@@ -455,6 +458,7 @@ export interface GymLocationsTable {
   coordinates: unknown;
   radius_meters: number;
   active: boolean;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -587,6 +591,7 @@ export interface RewardCatalogItemsTable {
   available_from: NullableTimestamp;
   available_until: NullableTimestamp;
   version: number;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -746,6 +751,7 @@ export interface CreatorWorkoutsTable {
   region_codes: string[];
   published: boolean;
   published_at: NullableTimestamp;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
   version: Generated<number>;

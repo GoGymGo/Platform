@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -143,6 +144,24 @@ export class GymOperatorController {
       gymId,
       requireIdempotencyKey(idempotencyKey),
       input,
+    );
+  }
+
+  @Delete('gym-locations/:gymId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Delete an inactive gym from the admin dashboard' })
+  @ApiOkResponse({ type: Object })
+  deleteGym(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('gymId', ParseUUIDPipe) gymId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: OperatorReasonDto,
+  ): Promise<{ id: string; status: 'deleted' }> {
+    return this.gyms.deleteGymLocation(
+      principal,
+      gymId,
+      requireIdempotencyKey(idempotencyKey),
+      input.reason,
     );
   }
 

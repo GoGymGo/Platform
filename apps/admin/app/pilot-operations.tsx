@@ -40,6 +40,7 @@ type PilotOperationsProps = PilotData & {
     input: AssignCompetitionGymDto,
   ) => Promise<void>;
   onCreateGym: (input: CreateGymLocationDto) => Promise<void>;
+  onDeleteGym: (gym: GymLocation) => void;
   onIssueQr: (
     gymId: string,
     input: OperatorReasonDto,
@@ -452,6 +453,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                   rememberPoster(credential);
                   setPoster(credential);
                 }}
+                onDelete={() => props.onDeleteGym(gym)}
                 onRevoke={async (input) => {
                   await props.onRevokeQr(gym.id, input);
                   forgetStoredPoster(gym.id);
@@ -702,12 +704,14 @@ function locationErrorMessage(error: GeolocationPositionError) {
 
 function GymCard({
   gym,
+  onDelete,
   onIssue,
   onRevoke,
   onUpdate,
   submitting,
 }: {
   gym: GymLocation;
+  onDelete: () => void;
   onIssue: (input: OperatorReasonDto) => Promise<void>;
   onRevoke: (input: OperatorReasonDto) => Promise<void>;
   onUpdate: (input: UpdateGymLocationDto) => Promise<void>;
@@ -763,6 +767,16 @@ function GymCard({
         >
           REVOKE QR
         </button>
+        {!gym.active ? (
+          <button
+            className="danger-button"
+            disabled={submitting}
+            onClick={onDelete}
+            type="button"
+          >
+            DELETE GYM
+          </button>
+        ) : null}
       </div>
       <details className="pilot-details">
         <summary>Edit Partner gym + geofence</summary>

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Headers,
   Param,
   ParseUUIDPipe,
@@ -18,6 +19,10 @@ import {
 import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
+import {
+  AdminDeletedEntityResponseDto,
+  DeleteVersionedAdminEntityDto,
+} from '../operator/dto/admin-configuration.dto';
 import { AdminRewardsService } from './admin-rewards.service';
 import {
   AddRewardCouponCodesDto,
@@ -79,6 +84,26 @@ export class AdminRewardsController {
     @Body() input: RewardCatalogStatusActionDto,
   ): Promise<AdminRewardResponseDto> {
     return this.rewards.changeStatus(
+      principal,
+      rewardId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
+  @Delete(':rewardId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Delete an inactive reward from the admin dashboard',
+  })
+  @ApiOkResponse({ type: AdminDeletedEntityResponseDto })
+  delete(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('rewardId', ParseUUIDPipe) rewardId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: DeleteVersionedAdminEntityDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.rewards.delete(
       principal,
       rewardId,
       requireIdempotencyKey(idempotencyKey),

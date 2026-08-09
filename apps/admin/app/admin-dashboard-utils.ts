@@ -3,7 +3,7 @@
 import type { User } from "firebase/auth";
 import type { AuditEvent, Competition, WorkQueueItem } from "./admin-types";
 
-export type HttpMethod = "POST" | "PUT";
+export type HttpMethod = "DELETE" | "POST" | "PUT";
 
 export function getQueueUrgency(item: WorkQueueItem) {
   const ageHours = Math.max(
@@ -80,6 +80,7 @@ export function getAuditChange(event: AuditEvent) {
     ["revoke", "active", "revoked"],
     ["approve", "pending review", "approved"],
     ["reject", "pending review", "rejected"],
+    ["delete", "retired record", "deleted from dashboard"],
     ["create", "not present", "created"],
     ["update", "previous version", "updated version"],
   ];

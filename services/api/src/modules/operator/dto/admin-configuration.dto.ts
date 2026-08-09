@@ -194,6 +194,21 @@ export class CompetitionStatusActionDto extends OperatorReasonDto {
   expectedVersion!: number;
 }
 
+export class DeleteVersionedAdminEntityDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
+
+export class AdminDeletedEntityResponseDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ enum: ['deleted'], type: String })
+  status!: 'deleted';
+}
+
 export class CreateCreatorWorkoutDto extends OperatorReasonDto {
   @ApiPropertyOptional({ format: 'uuid', type: String })
   @IsOptional()

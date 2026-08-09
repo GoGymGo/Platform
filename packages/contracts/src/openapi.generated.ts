@@ -14,6 +14,7 @@ export interface components {
     AdminDashboardRegionDto: { boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: string; id: string; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; subdivisionCode: string; timezone: string; validFrom: string; validTo: string | null };
     AdminDashboardRewardDto: { assignedCouponCodeCount: number; availableFrom: string | null; availableUntil: string | null; claimUrl: string | null; competitionId: string; competitionName: string; couponCodeCount: number; description: string; displayOrder: number; fulfillmentInstructions: string | null; id: string; imageUrl: string | null; inventoryTotal: number; rewardType: string; sponsorName: string; status: string; termsUrl: string | null; title: string; version: number };
     AdminDashboardSnapshotDto: { admin: components['schemas']["AdminDashboardIdentityDto"]; auditEvents: Array<components['schemas']["AdminDashboardAuditEventDto"]>; competitions: Array<components['schemas']["AdminDashboardCompetitionDto"]>; creatorWorkouts: Array<components['schemas']["AdminDashboardCreatorWorkoutDto"]>; generatedAt: string; legalDocuments: Array<components['schemas']["AdminDashboardLegalDocumentDto"]>; regions: Array<components['schemas']["AdminDashboardRegionDto"]>; rewards: Array<components['schemas']["AdminDashboardRewardDto"]> };
+    AdminDeletedEntityResponseDto: { id: string; status: "deleted" };
     AdminEntityResponseDto: { id: string; status: string; version: number };
     AdminLegalDocumentResponseDto: { contentSha256: string; id: string; status: "effective" | "scheduled" | "withdrawn" };
     AdminRegionPolicyResponseDto: { code: string; id: string; policyVersion: string };
@@ -68,6 +69,7 @@ export interface components {
     DecidePrivacyRequestDto: { decision: "processing" | "rejected"; reason: string };
     DecideProfileMediaDto: { decision: "approved" | "rejected"; reason: string };
     DecideRegionVerificationDto: { decision: "approved" | "rejected"; expiresAt?: string; reason: string };
+    DeleteVersionedAdminEntityDto: { expectedVersion: number; reason: string };
     DeviceAttestationReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniqueTokenCount: number };
     EligibleWeeklyChallengePartnerDto: { alias: string; goalDays: number; requestStatus: "available" | "pending"; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     EnrollmentCountResponseDto: { count: number };
@@ -417,6 +419,60 @@ export interface operations {
     requestBody: components['schemas']["DecideRegionVerificationDto"];
     responses: {
       "200": components['schemas']["OperatorActionResponseDto"];
+    };
+  };
+  delete_delete_v1_operator_configuration_legal_documents_legalDocumentId: {
+    method: "DELETE";
+    path: "/v1/operator/configuration/legal-documents/{legalDocumentId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { legalDocumentId: string } };
+    requestBody: components['schemas']["WithdrawLegalDocumentDto"];
+    responses: {
+      "200": components['schemas']["AdminDeletedEntityResponseDto"];
+    };
+  };
+  delete_delete_v1_operator_configuration_rewards_rewardId: {
+    method: "DELETE";
+    path: "/v1/operator/configuration/rewards/{rewardId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { rewardId: string } };
+    requestBody: components['schemas']["DeleteVersionedAdminEntityDto"];
+    responses: {
+      "200": components['schemas']["AdminDeletedEntityResponseDto"];
+    };
+  };
+  deleteCompetition: {
+    method: "DELETE";
+    path: "/v1/operator/configuration/competitions/{competitionId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { competitionId: string } };
+    requestBody: components['schemas']["DeleteVersionedAdminEntityDto"];
+    responses: {
+      "200": components['schemas']["AdminDeletedEntityResponseDto"];
+    };
+  };
+  deleteGym: {
+    method: "DELETE";
+    path: "/v1/operator/gym-locations/{gymId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { gymId: string } };
+    requestBody: components['schemas']["OperatorReasonDto"];
+    responses: {
+      "200": Record<string, unknown>;
+    };
+  };
+  deleteRegionPolicy: {
+    method: "DELETE";
+    path: "/v1/operator/configuration/region-policies/{regionPolicyId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { regionPolicyId: string } };
+    requestBody: components['schemas']["OperatorReasonDto"];
+    responses: {
+      "200": components['schemas']["AdminDeletedEntityResponseDto"];
+    };
+  };
+  deleteWorkout: {
+    method: "DELETE";
+    path: "/v1/operator/configuration/creator-workouts/{workoutId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { workoutId: string } };
+    requestBody: components['schemas']["DeleteVersionedAdminEntityDto"];
+    responses: {
+      "200": components['schemas']["AdminDeletedEntityResponseDto"];
     };
   };
   disable: {
@@ -1215,6 +1271,7 @@ export interface paths {
   };
   "/v1/operator/configuration/competitions/{competitionId}": {
     put: operations["updateCompetition"];
+    delete: operations["deleteCompetition"];
   };
   "/v1/operator/configuration/competitions/{competitionId}/status-action": {
     post: operations["changeCompetitionStatus"];
@@ -1224,6 +1281,7 @@ export interface paths {
   };
   "/v1/operator/configuration/creator-workouts/{workoutId}": {
     put: operations["updateWorkout"];
+    delete: operations["deleteWorkout"];
   };
   "/v1/operator/configuration/creator-workouts/{workoutId}/status-action": {
     post: operations["changeWorkoutStatus"];
@@ -1234,17 +1292,24 @@ export interface paths {
   "/v1/operator/configuration/legal-documents": {
     post: operations["publish"];
   };
+  "/v1/operator/configuration/legal-documents/{legalDocumentId}": {
+    delete: operations["delete_delete_v1_operator_configuration_legal_documents_legalDocumentId"];
+  };
   "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
     post: operations["withdraw"];
   };
   "/v1/operator/configuration/region-policies": {
     post: operations["createRegionPolicy"];
   };
+  "/v1/operator/configuration/region-policies/{regionPolicyId}": {
+    delete: operations["deleteRegionPolicy"];
+  };
   "/v1/operator/configuration/rewards": {
     post: operations["create_post_v1_operator_configuration_rewards"];
   };
   "/v1/operator/configuration/rewards/{rewardId}": {
     put: operations["update"];
+    delete: operations["delete_delete_v1_operator_configuration_rewards_rewardId"];
   };
   "/v1/operator/configuration/rewards/{rewardId}/coupon-codes": {
     post: operations["addCouponCodes"];
@@ -1264,6 +1329,7 @@ export interface paths {
   };
   "/v1/operator/gym-locations/{gymId}": {
     put: operations["updateGym"];
+    delete: operations["deleteGym"];
   };
   "/v1/operator/gym-locations/{gymId}/qr-credentials": {
     post: operations["issueCredential"];
@@ -1415,6 +1481,7 @@ export type AdminDashboardLegalDocumentDto = components['schemas']["AdminDashboa
 export type AdminDashboardRegionDto = components['schemas']["AdminDashboardRegionDto"];
 export type AdminDashboardRewardDto = components['schemas']["AdminDashboardRewardDto"];
 export type AdminDashboardSnapshotDto = components['schemas']["AdminDashboardSnapshotDto"];
+export type AdminDeletedEntityResponseDto = components['schemas']["AdminDeletedEntityResponseDto"];
 export type AdminEntityResponseDto = components['schemas']["AdminEntityResponseDto"];
 export type AdminLegalDocumentResponseDto = components['schemas']["AdminLegalDocumentResponseDto"];
 export type AdminRegionPolicyResponseDto = components['schemas']["AdminRegionPolicyResponseDto"];
@@ -1469,6 +1536,7 @@ export type DecidePartnerApplicationDto = components['schemas']["DecidePartnerAp
 export type DecidePrivacyRequestDto = components['schemas']["DecidePrivacyRequestDto"];
 export type DecideProfileMediaDto = components['schemas']["DecideProfileMediaDto"];
 export type DecideRegionVerificationDto = components['schemas']["DecideRegionVerificationDto"];
+export type DeleteVersionedAdminEntityDto = components['schemas']["DeleteVersionedAdminEntityDto"];
 export type DeviceAttestationReviewDto = components['schemas']["DeviceAttestationReviewDto"];
 export type EligibleWeeklyChallengePartnerDto = components['schemas']["EligibleWeeklyChallengePartnerDto"];
 export type EnrollmentCountResponseDto = components['schemas']["EnrollmentCountResponseDto"];

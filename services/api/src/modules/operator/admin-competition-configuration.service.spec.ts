@@ -21,6 +21,32 @@ const rules: JsonValue = {
 };
 
 describe('AdminCompetitionConfigurationService publication', () => {
+  it('allows more than one platform contest in the same region and month', async () => {
+    const selectFrom = jest.fn(() => {
+      throw new Error('Platform contests must not run a duplicate-slot query.');
+    });
+    const transaction = {
+      selectFrom,
+    } as unknown as Transaction<Database>;
+    const service = new AdminCompetitionConfigurationService(
+      {} as AdminAuthorizationService,
+      {} as IdempotencyService,
+      {} as NotificationsService,
+    );
+    const slotCheck = service as unknown as {
+      assertCompetitionSlotAvailable(
+        transaction: Transaction<Database>,
+        monthKey: string,
+        proposalGymId: string | null,
+      ): Promise<void>;
+    };
+
+    await expect(
+      slotCheck.assertCompetitionSlotAvailable(transaction, '2026-09', null),
+    ).resolves.toBeUndefined();
+    expect(selectFrom).not.toHaveBeenCalled();
+  });
+
   it('accepts a published reward without applying a hidden availability-window gate', async () => {
     let rewardAvailabilityFilterUsed = false;
 

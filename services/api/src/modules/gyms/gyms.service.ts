@@ -15,6 +15,7 @@ import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { parseCompetitionRules } from '../competitions/competition-rules';
 import { LedgerService } from '../ledger/ledger.service';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
+import { canDeleteGym } from '../operator/admin-deletion-policy';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   CashFulfillmentRecordDto,
@@ -54,6 +55,11 @@ interface GymScanJson extends JsonObject {
   serverTimestamp: string;
   sessionId: string | null;
   startedAt: string | null;
+}
+
+interface DeletedGymJson extends JsonObject {
+  id: string;
+  status: 'deleted';
 }
 
 @Injectable()
@@ -514,6 +520,91 @@ export class GymsService {
       });
   }
 
+  deleteGymLocation(
+    principal: AuthenticatedPrincipal,
+    gymId: string,
+    requestId: string,
+    reason: string,
+  ): Promise<{ id: string; status: 'deleted' }> {
+    return this.idempotency.execute<DeletedGymJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: { gymId, reason },
+        scope: `admin-gym-locations:${gymId}:delete`,
+      },
+      async (transaction) => {
+        const admin = await this.adminAuthorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const gym = await transaction
+          .selectFrom('gym_locations')
+          .selectAll()
+          .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!gym) {
+          throw new NotFoundException({
+            code: 'GYM_LOCATION_NOT_FOUND',
+            message: 'The gym location was not found.',
+          });
+        }
+        if (!canDeleteGym(gym.active)) {
+          throw new ConflictException({
+            code: 'GYM_DELETE_REQUIRES_INACTIVE',
+            message: 'Deactivate the gym before deleting it.',
+          });
+        }
+
+        const deletedAt = new Date();
+        await transaction
+          .updateTable('gym_qr_credentials')
+          .set({
+            revocation_reason: 'Gym deleted from the admin dashboard.',
+            revoked_at: deletedAt,
+            revoked_by_user_id: admin.id,
+            status: 'revoked',
+          })
+          .where('gym_location_id', '=', gymId)
+          .where('status', '=', 'active')
+          .execute();
+        await transaction
+          .updateTable('gym_partner_assignments')
+          .set({ active: false, updated_at: deletedAt })
+          .where('gym_location_id', '=', gymId)
+          .where('active', '=', true)
+          .execute();
+        const deleted = await transaction
+          .updateTable('gym_locations')
+          .set({ deleted_at: deletedAt, updated_at: deletedAt })
+          .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await this.adminAuthorization.audit(transaction, {
+          action: 'gym_location.deleted',
+          actorUserId: admin.id,
+          entityId: gymId,
+          entityType: 'gym_locations',
+          nextState: {
+            deletedAt: deletedAt.toISOString(),
+            status: 'deleted',
+          },
+          previousState: {
+            active: gym.active,
+            name: gym.name,
+            regionPolicyId: gym.region_policy_id,
+          },
+          reason,
+          requestId,
+        });
+        return { id: deleted.id, status: 'deleted' };
+      },
+    );
+  }
+
   issueCredential(
     principal: AuthenticatedPrincipal,
     gymId: string,
@@ -533,6 +624,7 @@ export class GymsService {
           .selectFrom('gym_locations')
           .select(['active', 'id', 'name'])
           .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
           .forUpdate()
           .executeTakeFirst();
         if (!gym) {
@@ -1193,7 +1285,8 @@ export class GymsService {
         sql<number>`ST_X(${sql.ref('gym.coordinates')}::geometry)`.as(
           'longitude',
         ),
-      ]);
+      ])
+      .where('gym.deleted_at', 'is', null);
   }
 
   private async getGymLocation(

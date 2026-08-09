@@ -48,6 +48,7 @@ export class RegionsService {
     const policies = await this.database.connection
       .selectFrom('region_policies')
       .selectAll()
+      .where('deleted_at', 'is', null)
       .where('valid_from', '<=', now)
       .where((expression) =>
         expression.or([
@@ -189,6 +190,7 @@ export class RegionsService {
               )
             )`.as('contains_location'),
           ])
+          .where('policy.deleted_at', 'is', null)
           .where('policy.competition_enabled', '=', true)
           .where('policy.valid_from', '<=', now)
           .where((expression) =>

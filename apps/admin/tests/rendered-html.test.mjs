@@ -108,6 +108,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /recorded automatically in the audit history/);
   assert.match(dashboard, /action\.auditReason \?\?/);
   assert.match(dashboardUtils, /idempotency-key/);
+  assert.match(dashboardUtils, /"DELETE" \| "POST" \| "PUT"/);
   assert.match(dashboardUtils, /expectedStatuses\?\.includes\(response\.status\)/);
   assert.match(
     dashboardUtils,
@@ -142,6 +143,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /No regional policies configured/);
   assert.match(dashboard, /No legal documents published/);
   assert.match(dashboard, /No audit events recorded/);
+  assert.match(dashboard, /Delete contest/);
+  assert.match(dashboard, /Delete reward/);
+  assert.match(dashboard, /Delete region policy/);
+  assert.match(dashboard, /Delete legal version/);
+  assert.match(dashboard, /Delete workout/);
+  assert.match(dashboard, /remain preserved/);
   assert.match(dashboard, /operator\/gym-locations/);
   assert.match(dashboard, /operator\/gym-sessions/);
   assert.match(dashboard, /operator\/region-waitlist/);
@@ -164,6 +171,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /CLEAR FROM VIEW/);
   assert.match(pilot, /RESTORE AUDIT HISTORY/);
   assert.match(pilot, /pilot-collapsible-panel/);
+  assert.match(pilot, /DELETE GYM/);
   assert.match(pilot, /\.jpg`/);
   assert.match(pilot, /localStorage\.setItem\(posterStorageKey/);
   assert.match(pilot, /localStorage\.getItem\(posterStorageKey/);
@@ -198,6 +206,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     proxy,
     /buildUpstreamUrl\(baseUrl, path, request\.nextUrl\.search\)/,
   );
+  assert.match(proxy, /export function DELETE/);
   assert.doesNotMatch(proxy, /firebase.*private|serviceAccount/i);
 
   assert.match(environmentExample, /GOGYMGO_API_URL=/);

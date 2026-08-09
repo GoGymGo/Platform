@@ -1386,9 +1386,13 @@ button:disabled {
 
 .region-card {
   display: grid;
-  grid-template-columns: 100px minmax(230px, 0.7fr) 1fr;
+  grid-template-columns: 100px minmax(230px, 0.7fr) 1fr auto;
   align-items: center;
   gap: 22px;
+}
+
+.region-card > .text-button {
+  justify-self: end;
 }
 
 .region-code {
@@ -2388,6 +2392,10 @@ td small {
   .region-card dl {
     grid-column: 1 / -1;
   }
+
+  .region-card > .text-button {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 800px) {
@@ -2671,6 +2679,11 @@ td small {
   .region-card dl {
     grid-column: auto;
     grid-template-columns: 1fr;
+  }
+
+  .region-card > .text-button {
+    grid-column: auto;
+    justify-self: stretch;
   }
 
   .card-title-row,

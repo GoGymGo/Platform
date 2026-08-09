@@ -58,6 +58,7 @@ export class AdminDashboardService {
               'valid_from',
               'valid_to',
             ])
+            .where('deleted_at', 'is', null)
             .orderBy('created_at', 'desc')
             .execute(),
           transaction
@@ -85,6 +86,7 @@ export class AdminDashboardService {
               'region.code as region_code',
               'region.metro_name as region_name',
             ])
+            .where('competition.deleted_at', 'is', null)
             .orderBy('competition.starts_at', 'desc')
             .execute(),
           transaction
@@ -110,6 +112,7 @@ export class AdminDashboardService {
                 'published_count',
               ),
             ])
+            .where('deleted_at', 'is', null)
             .groupBy('competition_id')
             .execute(),
           transaction
@@ -138,6 +141,8 @@ export class AdminDashboardService {
               'reward.version',
               'competition.name as competition_name',
             ])
+            .where('reward.deleted_at', 'is', null)
+            .where('competition.deleted_at', 'is', null)
             .orderBy('reward.updated_at', 'desc')
             .execute(),
           transaction
@@ -154,11 +159,13 @@ export class AdminDashboardService {
           transaction
             .selectFrom('creator_workouts')
             .selectAll()
+            .where('deleted_at', 'is', null)
             .orderBy('updated_at', 'desc')
             .execute(),
           transaction
             .selectFrom('legal_documents')
             .selectAll()
+            .where('deleted_at', 'is', null)
             .orderBy('effective_at', 'desc')
             .execute(),
           transaction

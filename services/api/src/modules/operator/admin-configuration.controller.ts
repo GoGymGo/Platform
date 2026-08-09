@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -26,15 +27,18 @@ import { AdminWorkoutConfigurationService } from './admin-workout-configuration.
 import { AdminDashboardSnapshotDto } from './dto/admin-dashboard.dto';
 import {
   AdminEntityResponseDto,
+  AdminDeletedEntityResponseDto,
   AdminRegionPolicyResponseDto,
   CompetitionStatusActionDto,
   CreateCompetitionDraftDto,
   CreateCreatorWorkoutDto,
   CreateRegionPolicyDto,
   CreatorWorkoutStatusActionDto,
+  DeleteVersionedAdminEntityDto,
   UpdateCompetitionDraftDto,
   UpdateCreatorWorkoutDto,
 } from './dto/admin-configuration.dto';
+import { OperatorReasonDto } from './dto/operator.dto';
 
 @ApiTags('operator-configuration')
 @ApiBearerAuth('firebase')
@@ -70,6 +74,26 @@ export class AdminConfigurationController {
   ): Promise<AdminRegionPolicyResponseDto> {
     return this.regions.create(
       principal,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
+  @Delete('region-policies/:regionPolicyId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Delete a retired regional policy from the admin dashboard',
+  })
+  @ApiOkResponse({ type: AdminDeletedEntityResponseDto })
+  deleteRegionPolicy(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('regionPolicyId', ParseUUIDPipe) regionPolicyId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: OperatorReasonDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.regions.delete(
+      principal,
+      regionPolicyId,
       requireIdempotencyKey(idempotencyKey),
       input,
     );
@@ -127,6 +151,26 @@ export class AdminConfigurationController {
     );
   }
 
+  @Delete('competitions/:competitionId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Delete a terminal competition from the admin dashboard',
+  })
+  @ApiOkResponse({ type: AdminDeletedEntityResponseDto })
+  deleteCompetition(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: DeleteVersionedAdminEntityDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.competitions.delete(
+      principal,
+      competitionId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
   @Post('creator-workouts')
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Create an unpublished creator workout' })
@@ -172,6 +216,26 @@ export class AdminConfigurationController {
     @Body() input: CreatorWorkoutStatusActionDto,
   ): Promise<AdminEntityResponseDto> {
     return this.workouts.changeStatus(
+      principal,
+      workoutId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
+  @Delete('creator-workouts/:workoutId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Delete an unpublished workout from the admin dashboard',
+  })
+  @ApiOkResponse({ type: AdminDeletedEntityResponseDto })
+  deleteWorkout(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('workoutId', ParseUUIDPipe) workoutId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: DeleteVersionedAdminEntityDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.workouts.delete(
       principal,
       workoutId,
       requireIdempotencyKey(idempotencyKey),

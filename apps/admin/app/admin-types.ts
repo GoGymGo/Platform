@@ -31,6 +31,7 @@ export type GoalBracket = {
 };
 
 export type Competition = {
+  assignedGymIds: string[];
   endsAt: string;
   enrollmentCount: number;
   entrantCap: number | null;

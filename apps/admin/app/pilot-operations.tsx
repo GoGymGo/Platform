@@ -7,12 +7,18 @@ import type {
   OperatorReasonDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { parseCoordinate } from "./coordinate-input";
 import {
   AdminUserFacingError,
   errorMessage,
-  isOperationalCompetition,
 } from "./admin-dashboard-utils";
 import { posterSvgToJpegBlob } from "./poster-jpeg";
 import type {
@@ -37,7 +43,6 @@ export type PilotData = {
 };
 
 type PilotOperationsProps = PilotData & {
-  competitions: Competition[];
   onAssignGym: (
     competitionId: string,
     gymId: string,
@@ -54,6 +59,7 @@ type PilotOperationsProps = PilotData & {
   onRevokeQr: (gymId: string, input: OperatorReasonDto) => Promise<void>;
   onUpdateGym: (gymId: string, input: UpdateGymLocationDto) => Promise<void>;
   regions: RegionPolicy[];
+  selectedCompetition: Competition;
   submitting: boolean;
 };
 
@@ -63,6 +69,20 @@ const pilotAuditHiddenStorageKey = "gogymgo.admin.pilot.audit-hidden";
 
 export function PilotOperationsPanel(props: PilotOperationsProps) {
   const { gyms, onLoadActiveQr } = props;
+  const selectedCompetitionAssignedGymIds = useMemo(
+    () => props.selectedCompetition.assignedGymIds ?? [],
+    [props.selectedCompetition.assignedGymIds],
+  );
+  const selectedRegionGyms = gyms.filter(
+    (gym) => gym.regionPolicyId === props.selectedCompetition.regionPolicyId,
+  );
+  const assignedGymIds = new Set(selectedCompetitionAssignedGymIds);
+  const activeAssignedGyms = selectedRegionGyms.filter(
+    (gym) => gym.active && assignedGymIds.has(gym.id),
+  );
+  const availableAssignmentGyms = selectedRegionGyms.filter(
+    (gym) => gym.active && !assignedGymIds.has(gym.id),
+  );
   const createGymForm = useRef<HTMLFormElement>(null);
   const [poster, setPoster] = useState<GymQrCredential | null>(null);
   const [posterRecoveryMessage, setPosterRecoveryMessage] = useState("");
@@ -88,7 +108,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   useEffect(() => {
     let active = true;
     const gymsWithActivePosters = gyms.filter(
-      (gym) => gym.active && gym.activeCredentialVersion,
+      (gym) =>
+        selectedCompetitionAssignedGymIds.includes(gym.id) &&
+        gym.active &&
+        gym.activeCredentialVersion,
     );
     if (gymsWithActivePosters.length === 0) {
       queueMicrotask(() => {
@@ -130,7 +153,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     return () => {
       active = false;
     };
-  }, [gyms, onLoadActiveQr]);
+  }, [gyms, onLoadActiveQr, selectedCompetitionAssignedGymIds]);
 
   async function viewActivePoster(gym: GymLocation) {
     setLoadingPosterGymId(gym.id);
@@ -284,14 +307,13 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   async function assignGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const competitionId = String(form.get("competitionId") ?? "");
+    const competitionId = props.selectedCompetition.id;
     const gymId = String(form.get("gymId") ?? "");
     const reason = String(form.get("reason") ?? "").trim();
     setAssignGymError("");
     setAssignGymSuccess("");
 
     try {
-      if (!competitionId) throw new AdminUserFacingError("Choose a Contest.");
       if (!gymId)
         throw new AdminUserFacingError("Choose an active Partner gym.");
       if (reason.length < 8) {
@@ -301,7 +323,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       }
       await props.onAssignGym(competitionId, gymId, { reason });
       const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
-      setAssignGymSuccess(`${gymName} is assigned to the September contest.`);
+      setAssignGymSuccess(
+        `${gymName} is assigned to ${props.selectedCompetition.name}. Its active gym poster can serve this contest too.`,
+      );
     } catch (error) {
       setAssignGymError(formErrorMessage(error));
     }
@@ -321,14 +345,97 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 
   return (
     <div className="section-stack">
+      <section className="panel contest-gym-assignment">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">CONTEST GYM ASSIGNMENT</p>
+            <h2>Assign a gym to {props.selectedCompetition.name}</h2>
+            <p>
+              This assignment belongs only to this contest. SkyGate or any
+              other Partner gym can also be assigned independently to another
+              contest in the same region.
+            </p>
+          </div>
+          <span className="setup-context-tag">
+            {props.selectedCompetition.regionName}
+          </span>
+        </div>
+        <form className="pilot-form" noValidate onSubmit={assignGym}>
+          <label>
+            <span>SELECTED CONTEST</span>
+            <input
+              aria-readonly="true"
+              readOnly
+              value={`${props.selectedCompetition.name} (${props.selectedCompetition.status})`}
+            />
+          </label>
+          <label>
+            <span>PARTNER GYM IN THIS REGION</span>
+            <select
+              disabled={availableAssignmentGyms.length === 0}
+              name="gymId"
+              required
+            >
+              <option value="">
+                {availableAssignmentGyms.length === 0
+                  ? "No unassigned active gym available"
+                  : "Choose Partner gym"}
+              </option>
+              {selectedRegionGyms
+                .filter((gym) => gym.active)
+                .map((gym) => (
+                  <option
+                    disabled={assignedGymIds.has(gym.id)}
+                    key={gym.id}
+                    value={gym.id}
+                  >
+                    {gym.name}
+                    {assignedGymIds.has(gym.id) ? " (already assigned)" : ""}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="pilot-form-wide">
+            <span>ADMINISTRATIVE REASON</span>
+            <input defaultValue={administrativeReason} name="reason" required />
+          </label>
+          <button
+            className="primary-button"
+            disabled={props.submitting || availableAssignmentGyms.length === 0}
+            type="submit"
+          >
+            {props.submitting ? "ASSIGNING GYM..." : "ASSIGN GYM + CONTINUE"}
+          </button>
+          {activeAssignedGyms.length > 0 ? (
+            <p className="pilot-form-message form-success">
+              {activeAssignedGyms.length} active gym assignment
+              {activeAssignedGyms.length === 1 ? "" : "s"} saved for this
+              contest.
+              Continue below to issue or recover the gym poster.
+            </p>
+          ) : null}
+          {assignGymError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {assignGymError}
+            </p>
+          ) : null}
+          {assignGymSuccess ? (
+            <p aria-live="polite" className="pilot-form-message form-success">
+              {assignGymSuccess}
+            </p>
+          ) : null}
+        </form>
+      </section>
+
       <section className="panel">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">STATIC QR PILOT</p>
-            <h2>Partner gyms + QR posters</h2>
+            <h2>QR posters for {props.selectedCompetition.name}</h2>
             <p>
-              Configure the exact geofence, issue one static poster and revoke
-              it immediately if the credential is exposed.
+              Issue or recover a poster only after its gym is assigned above.
+              A gym poster is reusable across every contest assigned to that
+              gym; do not reissue it just to add another contest.
             </p>
           </div>
         </div>
@@ -354,13 +461,21 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </label>
             <label>
               <span>REGION</span>
-              <select name="regionPolicyId" required>
-                <option value="">Choose region</option>
-                {props.regions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.metroName} ({region.code})
-                  </option>
-                ))}
+              <select
+                defaultValue={props.selectedCompetition.regionPolicyId}
+                name="regionPolicyId"
+                required
+              >
+                {props.regions
+                  .filter(
+                    (region) =>
+                      region.id === props.selectedCompetition.regionPolicyId,
+                  )
+                  .map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.metroName} ({region.code})
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -447,13 +562,13 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </form>
         </details>
 
-        {props.gyms.length === 0 ? (
+        {selectedRegionGyms.length === 0 ? (
           <p className="empty-copy">
-            No pilot Partner gym has been configured.
+            No Partner gym has been configured for this contest region.
           </p>
         ) : (
           <div className="card-list pilot-gym-list">
-            {props.gyms.map((gym) => (
+            {selectedRegionGyms.map((gym) => (
               <GymCard
                 gym={gym}
                 key={gym.id}
@@ -473,6 +588,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                 onUpdate={(input) => props.onUpdateGym(gym.id, input)}
                 onViewPoster={() => void viewActivePoster(gym)}
                 posterLoading={loadingPosterGymId === gym.id}
+                qrLocked={!assignedGymIds.has(gym.id)}
+                selectedContestName={props.selectedCompetition.name}
                 submitting={props.submitting}
               />
             ))}
@@ -485,68 +602,6 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </p>
         ) : null}
         {poster ? <PosterPreview credential={poster} key={poster.id} /> : null}
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">CONTEST ELIGIBILITY</p>
-            <h2>Assign a Partner gym to September</h2>
-            <p>
-              Link an active pilot Partner gym to the Contest members can join
-              there.
-            </p>
-          </div>
-        </div>
-        <form className="pilot-form" noValidate onSubmit={assignGym}>
-          <label>
-            <span>CONTEST</span>
-            <select name="competitionId" required>
-              <option value="">Choose contest</option>
-              {props.competitions
-                .filter(isOperationalCompetition)
-                .map((competition) => (
-                  <option key={competition.id} value={competition.id}>
-                    {competition.name} ({competition.status})
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            <span>PARTNER GYM</span>
-            <select name="gymId" required>
-              <option value="">Choose Partner gym</option>
-              {props.gyms
-                .filter((gym) => gym.active)
-                .map((gym) => (
-                  <option key={gym.id} value={gym.id}>
-                    {gym.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="pilot-form-wide">
-            <span>ADMINISTRATIVE REASON</span>
-            <input defaultValue={administrativeReason} name="reason" required />
-          </label>
-          <button
-            className="primary-button"
-            disabled={props.submitting}
-            type="submit"
-          >
-            {props.submitting ? "ASSIGNING GYM..." : "ASSIGN GYM"}
-          </button>
-          {assignGymError ? (
-            <p className="pilot-form-message form-error" role="alert">
-              {assignGymError}
-            </p>
-          ) : null}
-          {assignGymSuccess ? (
-            <p aria-live="polite" className="pilot-form-message form-success">
-              {assignGymSuccess}
-            </p>
-          ) : null}
-        </form>
       </section>
 
       <PilotTable
@@ -737,6 +792,8 @@ function GymCard({
   onUpdate,
   onViewPoster,
   posterLoading,
+  qrLocked,
+  selectedContestName,
   submitting,
 }: {
   gym: GymLocation;
@@ -746,8 +803,11 @@ function GymCard({
   onUpdate: (input: UpdateGymLocationDto) => Promise<void>;
   onViewPoster: () => void;
   posterLoading: boolean;
+  qrLocked: boolean;
+  selectedContestName: string;
   submitting: boolean;
 }) {
+  const qrLockId = useId();
   async function update(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -770,6 +830,9 @@ function GymCard({
         <span className={`status-tag ${gym.active ? "active" : "archived"}`}>
           {gym.active ? "active" : "inactive"}
         </span>
+        <span className="setup-context-tag">
+          {qrLocked ? "ASSIGN TO CONTEST FIRST" : `ASSIGNED · ${selectedContestName}`}
+        </span>
         <h3>{gym.name}</h3>
         <p>{gym.address || "No display address added"}</p>
         <small>
@@ -779,8 +842,9 @@ function GymCard({
       </div>
       <div className="inline-actions pilot-gym-actions">
         <button
+          aria-describedby={qrLocked ? qrLockId : undefined}
           className="primary-button"
-          disabled={submitting}
+          disabled={submitting || qrLocked}
           onClick={() => void onIssue({ reason: administrativeReason })}
           type="button"
         >
@@ -788,8 +852,9 @@ function GymCard({
         </button>
         {gym.activeCredentialVersion ? (
           <button
+            aria-describedby={qrLocked ? qrLockId : undefined}
             className="secondary-button"
-            disabled={submitting || posterLoading}
+            disabled={submitting || posterLoading || qrLocked}
             onClick={onViewPoster}
             type="button"
           >
@@ -819,6 +884,13 @@ function GymCard({
           </button>
         ) : null}
       </div>
+      {qrLocked ? (
+        <p className="action-guidance compact" id={qrLockId}>
+          Assign {gym.name} to {selectedContestName} above before issuing or
+          viewing its QR poster. An existing credential can still be revoked
+          immediately for security.
+        </p>
+      ) : null}
       <details className="pilot-details">
         <summary>Edit Partner gym + geofence</summary>
         <form className="pilot-form" onSubmit={update}>

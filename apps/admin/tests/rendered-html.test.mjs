@@ -48,6 +48,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   const [
     dashboard,
     dashboardUtils,
+    contestLaunchFlow,
     pilot,
     posterJpeg,
     proxy,
@@ -62,6 +63,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
       new URL("../app/admin-dashboard-utils.ts", import.meta.url),
       "utf8",
     ),
+    readFile(new URL("../app/contest-launch-flow.js", import.meta.url), "utf8"),
     readFile(new URL("../app/pilot-operations.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/poster-jpeg.ts", import.meta.url), "utf8"),
     readFile(
@@ -134,9 +136,16 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /useStoredPreference/);
   assert.match(dashboard, /Saved on this device/);
   assert.match(dashboard, /className="nav-count"/);
+  assert.match(dashboard, /GUIDED CONTEST LAUNCH/);
+  assert.match(dashboard, /1\. Contest/);
+  assert.match(dashboard, /2\. Reward/);
+  assert.match(dashboard, /3\. Region/);
+  assert.match(dashboard, /4\. Gym \+ QR/);
+  assert.match(dashboard, /disabled=\{Boolean\(navigationLocks\[item\.id\]\)\}/);
+  assert.match(dashboard, /gogymgo\.admin\.setup\.competition-id/);
   assert.match(dashboard, /getQueueUrgency/);
   assert.match(dashboard, /NEXT DEADLINE/);
-  assert.match(dashboard, /RESOLVE IN REWARDS/);
+  assert.match(dashboard, /CONTINUE SETUP/);
   assert.match(dashboard, /RELATED AUDIT EVIDENCE/);
   assert.match(dashboard, /Table density/);
   assert.match(dashboard, /className="column-menu"/);
@@ -181,7 +190,14 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /server recovery was available/);
   assert.doesNotMatch(pilot, /posterStorageKey/);
   assert.match(dashboard, /qr-credentials\/active/);
-  assert.match(pilot, /\.filter\(isOperationalCompetition\)/);
+  assert.match(pilot, /selectedCompetition\.assignedGymIds/);
+  assert.match(pilot, /Assign a gym to \{props\.selectedCompetition\.name\}/);
+  assert.match(pilot, /can also be assigned independently to another/);
+  assert.match(pilot, /reusable across every contest assigned to that/);
+  assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);
+  assert.match(contestLaunchFlow, /competition\.assignedGymIds \?\? \[\]/);
+  assert.match(contestLaunchFlow, /competition\.status === "cancelled"/);
+  assert.match(contestLaunchFlow, /Publish a reward for the selected contest/);
   assert.match(dashboard, /isRewardConfigurableCompetition\(competition\)/);
   assert.match(dashboard, /downloadPosterJpeg/);
   assert.match(dashboard, /ADVANCED OPTIONS/);

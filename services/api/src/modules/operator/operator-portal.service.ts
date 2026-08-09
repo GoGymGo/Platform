@@ -219,6 +219,7 @@ export class OperatorPortalService {
 
         return {
           competitions: competitions.map((competition) => ({
+            assignedGymIds: [competition.gym_id],
             endsAt: competition.ends_at.toISOString(),
             enrollmentCount: enrollmentByCompetition.get(competition.id) ?? 0,
             entrantCap: competition.entrant_cap,

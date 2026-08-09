@@ -67,6 +67,9 @@ export class AdminDashboardCompetitionDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
 
+  @ApiProperty({ format: 'uuid', isArray: true, type: String })
+  assignedGymIds!: string[];
+
   @ApiProperty({ format: 'uuid', type: String })
   regionPolicyId!: string;
 

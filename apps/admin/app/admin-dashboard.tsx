@@ -59,6 +59,13 @@ import {
   toLocalDateTime,
   type HttpMethod,
 } from "./admin-dashboard-utils";
+import {
+  chooseSetupCompetition,
+  contestSetupSections,
+  getContestLaunchState,
+  getContestSetupLocks,
+  getNextContestSetupSection,
+} from "./contest-launch-flow";
 import { PilotOperationsPanel, type PilotData } from "./pilot-operations";
 import { downloadPosterJpeg } from "./poster-jpeg";
 
@@ -72,6 +79,7 @@ type ConfirmAction = {
 };
 
 type NavigationCounts = Partial<Record<AdminSection, number>>;
+type NavigationLocks = Partial<Record<AdminSection, string>>;
 
 type ActiveFilter = {
   label: string;
@@ -93,30 +101,31 @@ const navigation: {
   },
   {
     description:
-      "Manage pilot gyms, static QR posters, field sessions and intake.",
-    id: "pilot",
-    label: "QR Pilot",
-    short: "QR",
-  },
-  {
-    description: "Build, review and release regional contests to players.",
+      "Step 1 of 4: create the contest draft that owns every later setup choice.",
     id: "competitions",
-    label: "Contests",
-    short: "CO",
+    label: "1. Contest",
+    short: "01",
   },
   {
     description:
-      "Control reward inventory, coupon readiness and publication status.",
+      "Step 2 of 4: create and publish a reward for the selected contest.",
     id: "rewards",
-    label: "Rewards",
-    short: "RW",
+    label: "2. Reward",
+    short: "02",
   },
   {
     description:
-      "Review the geographic and age policies that determine eligibility.",
+      "Step 3 of 4: confirm the selected contest has a valid enabled region.",
     id: "regions",
-    label: "Regions",
-    short: "RG",
+    label: "3. Region",
+    short: "03",
+  },
+  {
+    description:
+      "Step 4 of 4: assign a Partner gym and issue or recover its QR poster.",
+    id: "pilot",
+    label: "4. Gym + QR",
+    short: "04",
   },
   {
     description:
@@ -142,10 +151,14 @@ const navigation: {
 ];
 
 const mobilePrimarySections = new Set<AdminSection>([
-  "overview",
-  "pilot",
   "competitions",
-  "operations",
+  "rewards",
+  "regions",
+  "pilot",
+]);
+const contestSetupSectionSet = new Set<AdminSection>([
+  "overview",
+  ...(contestSetupSections as AdminSection[]),
 ]);
 
 const creatorFeaturesEnabled = false;
@@ -218,10 +231,12 @@ export function BrandWordmark() {
 
 function MobileAdminNavigation({
   counts,
+  locks,
   onNavigate,
   section,
 }: {
   counts: NavigationCounts;
+  locks: NavigationLocks;
   onNavigate: (section: AdminSection) => void;
   section: AdminSection;
 }) {
@@ -260,15 +275,22 @@ function MobileAdminNavigation({
       {primaryItems.map((item) => (
         <button
           aria-current={section === item.id ? "page" : undefined}
+          aria-label={
+            locks[item.id]
+              ? `${item.label}. Locked: ${locks[item.id]}`
+              : item.label
+          }
           className={
             section === item.id ? "mobile-nav-item active" : "mobile-nav-item"
           }
           key={item.id}
+          disabled={Boolean(locks[item.id])}
           onClick={() => navigate(item.id)}
           type="button"
         >
           <span>{item.short}</span>
           <small>{item.label}</small>
+          {locks[item.id] ? <i aria-hidden="true">LOCKED</i> : null}
           {counts[item.id] ? (
             <b
               aria-label={`${counts[item.id]} items need attention`}
@@ -317,7 +339,13 @@ function MobileAdminNavigation({
           {secondaryItems.map((item) => (
             <button
               aria-current={section === item.id ? "page" : undefined}
+              aria-label={
+                locks[item.id]
+                  ? `${item.label}. Locked: ${locks[item.id]}`
+                  : item.label
+              }
               className={section === item.id ? "active" : undefined}
+              disabled={Boolean(locks[item.id])}
               key={item.id}
               onClick={() => navigate(item.id)}
               type="button"
@@ -325,6 +353,7 @@ function MobileAdminNavigation({
               <span>{item.short}</span>
               <strong>{item.label}</strong>
               <small>{item.description}</small>
+              {locks[item.id] ? <em>{locks[item.id]}</em> : null}
               {counts[item.id] ? (
                 <b
                   aria-label={`${counts[item.id]} items need attention`}
@@ -392,6 +421,10 @@ export function AdminDashboard({
   >(null);
   const [rewardEditor, setRewardEditor] = useState<Reward | "new" | null>(null);
   const [regionEditor, setRegionEditor] = useState(false);
+  const [setupCompetitionId, setSetupCompetitionId] = useStoredPreference(
+    "gogymgo.admin.setup.competition-id",
+    "",
+  );
   const [workoutEditor, setWorkoutEditor] = useState<
     CreatorWorkout | "new" | null
   >(null);
@@ -674,13 +707,65 @@ export function AdminDashboard({
 
   if (!snapshot) return null;
 
+  const setupCompetition = chooseSetupCompetition(
+    snapshot.competitions,
+    setupCompetitionId,
+  );
+  const contestLaunchState = getContestLaunchState(
+    setupCompetition,
+    snapshot.rewards,
+    snapshot.regions,
+    pilotData.gyms,
+  );
+  const navigationLocks: NavigationLocks = getContestSetupLocks(
+    contestLaunchState,
+    snapshot.regions.length > 0,
+  );
+  const setupCompetitions = snapshot.competitions;
+  const setupRewards = snapshot.rewards;
+  const setupRegions = snapshot.regions;
+
+  function navigateToSection(nextSection: AdminSection) {
+    const lockReason = navigationLocks[nextSection];
+    if (lockReason) {
+      setToast(lockReason);
+      return;
+    }
+    setSection(nextSection);
+  }
+
+  function selectSetupCompetition(nextCompetitionId: string) {
+    setSetupCompetitionId(nextCompetitionId);
+    const nextCompetition =
+      setupCompetitions.find(
+        (competition) => competition.id === nextCompetitionId,
+      ) ?? null;
+    const nextState = getContestLaunchState(
+      nextCompetition,
+      setupRewards,
+      setupRegions,
+      pilotData.gyms,
+    );
+    const nextLocks: NavigationLocks = getContestSetupLocks(
+      nextState,
+      setupRegions.length > 0,
+    );
+    if (nextLocks[section]) setSection("competitions");
+  }
+
   const draftCompetitions = snapshot.competitions.filter(
     (competition) => competition.status === "draft",
   );
   const publishReady = draftCompetitions.filter(
-    (competition) => competition.publishedRewardCount > 0,
+    (competition) =>
+      getContestLaunchState(
+        competition,
+        snapshot.rewards,
+        snapshot.regions,
+        pilotData.gyms,
+      ).readyToPublish,
   );
-  const activeCompetition = snapshot.competitions.find((competition) =>
+  const activeCompetitions = snapshot.competitions.filter((competition) =>
     ["registration", "active"].includes(competition.status),
   );
   const activeNavigation =
@@ -716,15 +801,25 @@ export function AdminDashboard({
           {navigation.map((item) => (
             <button
               aria-current={section === item.id ? "page" : undefined}
-              aria-label={item.label}
+              aria-label={
+                navigationLocks[item.id]
+                  ? `${item.label}. Locked: ${navigationLocks[item.id]}`
+                  : item.label
+              }
               className={section === item.id ? "nav-item active" : "nav-item"}
+              disabled={Boolean(navigationLocks[item.id])}
               key={item.id}
-              onClick={() => setSection(item.id)}
-              title={item.label}
+              onClick={() => navigateToSection(item.id)}
+              title={navigationLocks[item.id] || item.label}
               type="button"
             >
               <span className="nav-short">{item.short}</span>
               <span>{item.label}</span>
+              {navigationLocks[item.id] ? (
+                <i aria-hidden="true" className="nav-lock">
+                  LOCKED
+                </i>
+              ) : null}
               {navigationCounts[item.id] ? (
                 <b
                   aria-label={`${navigationCounts[item.id]} items need attention`}
@@ -738,7 +833,8 @@ export function AdminDashboard({
         </nav>
         <MobileAdminNavigation
           counts={navigationCounts}
-          onNavigate={setSection}
+          locks={navigationLocks}
+          onNavigate={navigateToSection}
           section={section}
         />
         <div className="sidebar-footer">
@@ -818,19 +914,33 @@ export function AdminDashboard({
         ) : null}
 
         <div className="workspace">
+          {contestSetupSectionSet.has(section) ? (
+            <ContestLaunchGuide
+              competition={setupCompetition}
+              competitions={snapshot.competitions}
+              launchState={contestLaunchState}
+              locks={navigationLocks}
+              onCreateContest={() => setCompetitionEditor("new")}
+              onEditContest={setCompetitionEditor}
+              onNavigate={navigateToSection}
+              onSelectCompetition={selectSetupCompetition}
+              section={section}
+            />
+          ) : null}
           {section === "overview" ? (
             <Overview
-              activeCompetition={activeCompetition}
+              activeCompetitions={activeCompetitions}
               health={health}
               publishReady={publishReady}
               queue={queue}
               snapshot={snapshot}
-              onNavigate={setSection}
+              onNavigate={navigateToSection}
             />
           ) : null}
           {section === "competitions" ? (
             <CompetitionsPanel
               competitions={snapshot.competitions}
+              gyms={pilotData.gyms}
               onCreate={() => setCompetitionEditor("new")}
               onDelete={(competition) =>
                 setConfirmAction({
@@ -847,7 +957,17 @@ export function AdminDashboard({
                 })
               }
               onEdit={setCompetitionEditor}
-              onNavigate={setSection}
+              onSelectSetup={(competition) => {
+                selectSetupCompetition(competition.id);
+                const nextState = getContestLaunchState(
+                  competition,
+                  snapshot.rewards,
+                  snapshot.regions,
+                  pilotData.gyms,
+                );
+                setSection(getNextContestSetupSection(nextState));
+              }}
+              selectedCompetitionId={setupCompetition?.id ?? ""}
               onStatus={(competition, action) =>
                 setConfirmAction({
                   actionLabel:
@@ -876,12 +996,14 @@ export function AdminDashboard({
                   tone: action === "cancel" ? "danger" : "primary",
                 })
               }
+              regions={snapshot.regions}
+              rewards={snapshot.rewards}
             />
           ) : null}
-          {section === "pilot" ? (
+          {section === "pilot" && setupCompetition ? (
             <PilotOperationsPanel
               {...pilotData}
-              competitions={snapshot.competitions}
+              key={setupCompetition.id}
               onAssignGym={async (competitionId, gymId, body) => {
                 await mutate(
                   "Gym assigned to contest.",
@@ -946,11 +1068,13 @@ export function AdminDashboard({
                 );
               }}
               regions={snapshot.regions}
+              selectedCompetition={setupCompetition}
               submitting={submitting}
             />
           ) : null}
           {section === "rewards" ? (
             <RewardsPanel
+              competition={setupCompetition}
               onCouponCodes={setCouponReward}
               onCreate={() => setRewardEditor("new")}
               onDelete={(reward) =>
@@ -976,15 +1100,20 @@ export function AdminDashboard({
                     action === "publish"
                       ? `${reward.title} will become part of the public contest reward catalog.`
                       : `${reward.title} will be removed from the public reward catalog.`,
-                  execute: (reason) =>
-                    mutate(
+                  execute: async (reason) => {
+                    await mutate(
                       action === "publish"
-                        ? "Reward published."
+                        ? "Reward published. Continue by confirming the contest region."
                         : "Reward archived.",
                       `operator/configuration/rewards/${reward.id}/status-action`,
                       "POST",
                       { action, expectedVersion: reward.version, reason },
-                    ),
+                    );
+                    if (action === "publish") {
+                      setSetupCompetitionId(reward.competitionId);
+                      setSection("regions");
+                    }
+                  },
                   tone: action === "archive" ? "danger" : "primary",
                 })
               }
@@ -1010,6 +1139,7 @@ export function AdminDashboard({
                 })
               }
               regions={snapshot.regions}
+              selectedRegionId={setupCompetition?.regionPolicyId}
             />
           ) : null}
           {section === "content" ? (
@@ -1090,7 +1220,7 @@ export function AdminDashboard({
             <OperationsPanel
               events={snapshot.auditEvents}
               health={health}
-              onNavigate={setSection}
+              onNavigate={navigateToSection}
               queue={queue}
             />
           ) : null}
@@ -1107,7 +1237,7 @@ export function AdminDashboard({
           }
           onClose={() => setCompetitionEditor(null)}
           onSubmit={async (body, editing) => {
-            await mutate(
+            const result = await mutate<{ id: string }>(
               editing ? "Contest draft updated." : "Contest draft created.",
               editing
                 ? `operator/configuration/competitions/${editing.id}`
@@ -1116,6 +1246,8 @@ export function AdminDashboard({
               body,
             );
             setCompetitionEditor(null);
+            setSetupCompetitionId(editing?.id ?? result.id);
+            if (!editing) setSection("rewards");
           }}
           regions={snapshot.regions}
           submitting={submitting}
@@ -1124,6 +1256,7 @@ export function AdminDashboard({
       {rewardEditor ? (
         <RewardForm
           competitions={snapshot.competitions}
+          competitionId={setupCompetition?.id}
           onClose={() => setRewardEditor(null)}
           onSubmit={async (body, editing) => {
             await mutate(
@@ -1134,6 +1267,10 @@ export function AdminDashboard({
               editing ? "PUT" : "POST",
               body,
             );
+            const rewardCompetitionId = String(body.competitionId ?? "");
+            if (rewardCompetitionId) {
+              setSetupCompetitionId(rewardCompetitionId);
+            }
             setRewardEditor(null);
           }}
           reward={rewardEditor === "new" ? undefined : rewardEditor}
@@ -1897,15 +2034,211 @@ function PartnerWorkspace({
   );
 }
 
+function ContestLaunchGuide({
+  competition,
+  competitions,
+  launchState,
+  locks,
+  onCreateContest,
+  onEditContest,
+  onNavigate,
+  onSelectCompetition,
+  section,
+}: {
+  competition: Competition | null;
+  competitions: Competition[];
+  launchState: ReturnType<typeof getContestLaunchState>;
+  locks: NavigationLocks;
+  onCreateContest: () => void;
+  onEditContest: (competition: Competition) => void;
+  onNavigate: (section: AdminSection) => void;
+  onSelectCompetition: (competitionId: string) => void;
+  section: AdminSection;
+}) {
+  const gymAndQrReady = launchState.gymAssigned && launchState.qrReady;
+  const steps: {
+    complete: boolean;
+    detail: string;
+    id: AdminSection;
+    label: string;
+    lockReason?: string;
+  }[] = [
+    {
+      complete: launchState.operational,
+      detail: competition
+        ? competition.status === "cancelled"
+          ? "Cancelled — create a replacement"
+          : `${competition.status} · ${competition.monthKey}`
+        : "Create or select a contest",
+      id: "competitions",
+      label: "1. Contest",
+    },
+    {
+      complete: launchState.rewardReady,
+      detail: launchState.rewardReady
+        ? "Published reward ready"
+        : "Create and publish a reward",
+      id: "rewards",
+      label: "2. Reward",
+      lockReason: locks.rewards,
+    },
+    {
+      complete: launchState.regionReady,
+      detail: launchState.regionReady
+        ? `${launchState.region?.metroName ?? "Region"} is ready`
+        : "Confirm full-schedule coverage",
+      id: "regions",
+      label: "3. Region",
+      lockReason: locks.regions,
+    },
+    {
+      complete: gymAndQrReady,
+      detail: gymAndQrReady
+        ? `${launchState.assignedGyms.length} assigned gym${launchState.assignedGyms.length === 1 ? "" : "s"} · QR ready`
+        : launchState.gymAssigned
+          ? "Issue or recover the gym QR poster"
+          : "Assign a gym, then issue its poster",
+      id: "pilot",
+      label: "4. Gym + QR",
+      lockReason: locks.pilot,
+    },
+    {
+      complete: launchState.published,
+      detail: launchState.published
+        ? "Contest is open to players"
+        : launchState.readyToPublish
+          ? "Ready for final review"
+          : "Complete steps 1–4 first",
+      id: "competitions",
+      label: "5. Publish",
+      lockReason:
+        launchState.readyToPublish || launchState.published
+          ? ""
+          : "Complete the contest, reward, region, gym and QR steps first.",
+    },
+  ];
+  const nextSection = getNextContestSetupSection(launchState) as AdminSection;
+
+  return (
+    <section className="contest-launch-guide" aria-label="Contest launch setup">
+      <div className="contest-launch-heading">
+        <div>
+          <p className="eyebrow">GUIDED CONTEST LAUNCH</p>
+          <h2>{competition?.name ?? "Start with a contest"}</h2>
+          <p>
+            Each contest keeps its own reward, region and gym assignment. The
+            same Partner gym can support more than one contest.
+          </p>
+        </div>
+        <div className="contest-launch-selector">
+          <label>
+            <span>CONTEST BEING SET UP</span>
+            <select
+              onChange={(event) => onSelectCompetition(event.target.value)}
+              value={competition?.id ?? ""}
+            >
+              <option value="">Select a contest</option>
+              {competitions.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name} ({candidate.status})
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="secondary-button" onClick={onCreateContest} type="button">
+            + NEW CONTEST
+          </button>
+        </div>
+      </div>
+
+      {launchState.blockedReason ? (
+        <div className="setup-blocked-message" role="status">
+          <strong>THIS CONTEST CANNOT CONTINUE</strong>
+          <span>{launchState.blockedReason}</span>
+        </div>
+      ) : null}
+
+      <div className="contest-launch-progress" aria-hidden="true">
+        <span style={{ width: `${(launchState.completedSteps / 5) * 100}%` }} />
+      </div>
+      <ol className="contest-launch-steps">
+        {steps.map((step) => {
+          const locked = Boolean(step.lockReason);
+          const current = step.id === section && !step.complete;
+          return (
+            <li
+              className={
+                step.complete
+                  ? "complete"
+                  : locked
+                    ? "locked"
+                    : current
+                      ? "current"
+                      : "available"
+              }
+              key={step.label}
+            >
+              <button
+                aria-label={
+                  locked
+                    ? `${step.label}. Locked: ${step.lockReason}`
+                    : `${step.label}. ${step.detail}`
+                }
+                disabled={locked}
+                onClick={() => onNavigate(step.id)}
+                title={step.lockReason}
+                type="button"
+              >
+                <b>{step.complete ? "✓" : locked ? "LOCK" : "NEXT"}</b>
+                <span>{step.label}</span>
+                <small>{step.detail}</small>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="contest-launch-actions">
+        {competition?.status === "draft" && !launchState.regionReady ? (
+          <button
+            className="text-button"
+            onClick={() => onEditContest(competition)}
+            type="button"
+          >
+            EDIT CONTEST REGION
+          </button>
+        ) : null}
+        {launchState.blockedReason ? (
+          <button className="primary-button" onClick={onCreateContest} type="button">
+            CREATE REPLACEMENT CONTEST →
+          </button>
+        ) : launchState.published ? (
+          <span className="setup-complete-message">SETUP COMPLETE · CONTEST OPEN</span>
+        ) : (
+          <button
+            className="primary-button"
+            onClick={() => onNavigate(nextSection)}
+            type="button"
+          >
+            {launchState.readyToPublish
+              ? "REVIEW + PUBLISH →"
+              : `CONTINUE TO ${navigation.find((item) => item.id === nextSection)?.label.toUpperCase() ?? "NEXT STEP"} →`}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Overview({
-  activeCompetition,
+  activeCompetitions,
   health,
   publishReady,
   queue,
   snapshot,
   onNavigate,
 }: {
-  activeCompetition?: Competition;
+  activeCompetitions: Competition[];
   health: SystemHealth | null;
   publishReady: Competition[];
   queue: WorkQueueItem[];
@@ -1941,8 +2274,10 @@ function Overview({
               ? `${queue.length} review item${queue.length === 1 ? "" : "s"} need attention.`
               : healthNeedsAttention
                 ? "System health needs review."
-                : activeCompetition
-                  ? "A contest is live."
+                : activeCompetitions.length > 0
+                  ? activeCompetitions.length === 1
+                    ? "A contest is live."
+                    : `${activeCompetitions.length} contests are live.`
                   : publishReady.length > 0
                     ? "Ready for a controlled launch."
                     : "Build the next contest."}
@@ -1952,8 +2287,8 @@ function Overview({
               ? "Open the human review queue first, then return to launch and publication work."
               : healthNeedsAttention
                 ? "Check the worker heartbeat and queue health before making publication changes."
-                : activeCompetition
-                  ? `${activeCompetition.name} is ${activeCompetition.status} with ${activeCompetition.enrollmentCount} enrolled players.`
+                : activeCompetitions.length > 0
+                  ? `${activeCompetitions.map((competition) => competition.name).join(" + ")} ${activeCompetitions.length === 1 ? "is" : "are"} public with ${activeCompetitions.reduce((total, competition) => total + competition.enrollmentCount, 0)} enrolled players.`
                   : publishReady.length > 0
                     ? `${publishReady[0].name} has a published reward and can be released after your final review.`
                     : "No contest is currently public. Add and publish a real reward before releasing a draft to players."}
@@ -1992,15 +2327,17 @@ function Overview({
           <span>
             {attentionCount > 0
               ? String(attentionCount).padStart(2, "0")
-              : activeCompetition
-                ? "LIVE"
+              : activeCompetitions.length > 0
+                ? String(activeCompetitions.length).padStart(2, "0")
                 : "SAFE"}
           </span>
           <small>
             {attentionCount > 0
               ? "ATTENTION ITEMS"
-              : activeCompetition
-                ? "PUBLIC STATE"
+              : activeCompetitions.length > 0
+                ? activeCompetitions.length === 1
+                  ? "PUBLIC CONTEST"
+                  : "PUBLIC CONTESTS"
                 : "NO PUBLIC CONTEST"}
           </small>
         </div>
@@ -2142,18 +2479,26 @@ function Metric({
 
 function CompetitionsPanel({
   competitions,
+  gyms,
   onCreate,
   onDelete,
   onEdit,
-  onNavigate,
+  onSelectSetup,
   onStatus,
+  regions,
+  rewards,
+  selectedCompetitionId,
 }: {
   competitions: Competition[];
+  gyms: PilotData["gyms"];
   onCreate: () => void;
   onDelete: (competition: Competition) => void;
   onEdit: (competition: Competition) => void;
-  onNavigate: (section: AdminSection) => void;
+  onSelectSetup: (competition: Competition) => void;
   onStatus: (competition: Competition, action: "cancel" | "publish") => void;
+  regions: RegionPolicy[];
+  rewards: Reward[];
+  selectedCompetitionId: string;
 }) {
   const [query, setQuery] = useStoredPreference(
     "gogymgo.admin.competitions.query",
@@ -2253,18 +2598,34 @@ function CompetitionsPanel({
           {filteredCompetitions.map((competition) => {
             const ended = new Date(competition.endsAt) <= new Date();
             const deadline = getCompetitionDeadline(competition);
-            const canPublish =
-              competition.status === "draft" &&
-              !ended &&
-              competition.publishedRewardCount > 0;
+            const setupState = getContestLaunchState(
+              competition,
+              rewards,
+              regions,
+              gyms,
+            );
+            const canPublish = !ended && setupState.readyToPublish;
             const publishGateId = `competition-${competition.id}-publish-gate`;
             const publishBlocker = ended
               ? "The player window has ended."
-              : competition.publishedRewardCount === 0
+              : !setupState.rewardReady
                 ? "Publish at least one eligible reward first."
-                : "Complete the remaining launch review.";
+                : !setupState.regionReady
+                  ? "Confirm an enabled region policy that covers the full contest schedule."
+                  : !setupState.gymAssigned
+                    ? "Assign at least one active Partner gym."
+                    : !setupState.qrReady
+                      ? "Issue or recover the assigned gym's QR poster."
+                      : "Complete the remaining launch review.";
             return (
-              <article className="competition-card" key={competition.id}>
+              <article
+                className={
+                  competition.id === selectedCompetitionId
+                    ? "competition-card selected-setup-contest"
+                    : "competition-card"
+                }
+                key={competition.id}
+              >
                 <div className="card-title-row">
                   <div>
                     <span className={`status-tag ${competition.status}`}>
@@ -2328,18 +2689,29 @@ function CompetitionsPanel({
                       <strong>PUBLISH BLOCKED</strong>
                       {publishBlocker}
                     </span>
-                    {competition.publishedRewardCount === 0 ? (
+                    {!setupState.readyToPublish ? (
                       <button
                         className="resolution-link"
-                        onClick={() => onNavigate("rewards")}
+                        onClick={() => onSelectSetup(competition)}
                         type="button"
                       >
-                        RESOLVE IN REWARDS →
+                        CONTINUE SETUP →
                       </button>
                     ) : null}
                   </div>
                 ) : null}
                 <div className="card-actions">
+                  {setupState.operational ? (
+                    <button
+                      className="secondary-button"
+                      onClick={() => onSelectSetup(competition)}
+                      type="button"
+                    >
+                      {competition.id === selectedCompetitionId
+                        ? "SELECTED FOR SETUP"
+                        : "SET UP THIS CONTEST"}
+                    </button>
+                  ) : null}
                   {competition.status === "draft" ? (
                     <button
                       className="secondary-button"
@@ -2391,6 +2763,7 @@ function CompetitionsPanel({
 }
 
 function RewardsPanel({
+  competition,
   onCouponCodes,
   onCreate,
   onDelete,
@@ -2398,6 +2771,7 @@ function RewardsPanel({
   onStatus,
   rewards,
 }: {
+  competition: Competition | null;
   onCouponCodes: (reward: Reward) => void;
   onCreate: () => void;
   onDelete: (reward: Reward) => void;
@@ -2422,8 +2796,11 @@ function RewardsPanel({
     ["competition", "type", "inventory"],
   );
   const [page, setPage] = useState(1);
+  const contestRewards = competition
+    ? rewards.filter((reward) => reward.competitionId === competition.id)
+    : rewards;
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredRewards = rewards.filter((reward) => {
+  const filteredRewards = contestRewards.filter((reward) => {
     const matchesStatus =
       statusFilter === "all" || reward.status === statusFilter;
     const matchesQuery =
@@ -2435,7 +2812,7 @@ function RewardsPanel({
     return matchesStatus && matchesQuery;
   });
   const statusOptions = Array.from(
-    new Set(rewards.map((reward) => reward.status)),
+    new Set(contestRewards.map((reward) => reward.status)),
   );
   const visibleColumnSet = new Set(visibleColumns);
   const pageSize = density === "compact" ? 12 : 8;
@@ -2472,14 +2849,16 @@ function RewardsPanel({
           <p className="eyebrow">BRAND REWARD CATALOG</p>
           <h2>Rewards</h2>
           <p>
-            Only real, in-stock published rewards can unlock a contest launch.
+            {competition
+              ? `Showing rewards for ${competition.name}. Publish at least one to unlock the region step.`
+              : "Only real, in-stock published rewards can unlock a contest launch."}
           </p>
         </div>
         <button className="primary-button" onClick={onCreate} type="button">
           + NEW REWARD
         </button>
       </div>
-      {rewards.length > 0 ? (
+      {contestRewards.length > 0 ? (
         <div
           aria-label="Filter rewards"
           className="panel-toolbar"
@@ -2511,10 +2890,16 @@ function RewardsPanel({
         </div>
       ) : null}
       <FilterChips filters={activeFilters} />
-      {rewards.length === 0 ? (
+      {contestRewards.length === 0 ? (
         <EmptyState
-          body="Create the first verified brand reward, then publish it before releasing a contest."
-          title="No brand rewards configured"
+          body={
+            competition
+              ? `Create and publish the first reward for ${competition.name}.`
+              : "Create the first verified brand reward, then publish it before releasing a contest."
+          }
+          title={
+            competition ? "No reward for this contest" : "No brand rewards configured"
+          }
         />
       ) : filteredRewards.length === 0 ? (
         <EmptyState
@@ -2709,11 +3094,13 @@ function RegionsPanel({
   onCreate,
   onDelete,
   regions,
+  selectedRegionId,
 }: {
   evaluatedAt: string;
   onCreate: () => void;
   onDelete: (region: RegionPolicy) => void;
   regions: RegionPolicy[];
+  selectedRegionId?: string;
 }) {
   return (
     <section className="panel">
@@ -2744,9 +3131,21 @@ function RegionsPanel({
                 new Date(region.validTo).getTime() <=
                   new Date(evaluatedAt).getTime());
             return (
-              <article className="region-card" key={region.id}>
+              <article
+                className={
+                  region.id === selectedRegionId
+                    ? "region-card selected-region"
+                    : "region-card"
+                }
+                key={region.id}
+              >
                 <div className="region-code">{region.code}</div>
                 <div>
+                  {region.id === selectedRegionId ? (
+                    <span className="setup-context-tag">
+                      SELECTED CONTEST REGION
+                    </span>
+                  ) : null}
                   <span
                     className={`status-tag ${region.competitionEnabled ? "active" : "archived"}`}
                   >
@@ -3829,12 +4228,14 @@ export function CompetitionForm({
 
 function RewardForm({
   competitions,
+  competitionId,
   onClose,
   onSubmit,
   reward,
   submitting,
 }: {
   competitions: Competition[];
+  competitionId?: string;
   onClose: () => void;
   onSubmit: (body: Record<string, unknown>, editing?: Reward) => Promise<void>;
   reward?: Reward;
@@ -3894,7 +4295,7 @@ function RewardForm({
         <FormGrid>
           <Field label="CONTEST" wide>
             <select
-              defaultValue={reward?.competitionId}
+              defaultValue={reward?.competitionId ?? competitionId}
               name="competitionId"
               required
             >

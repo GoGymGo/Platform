@@ -4181,6 +4181,10 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
+          "assignedGymIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
@@ -4208,6 +4212,7 @@
         },
         "required": [
           "id",
+          "assignedGymIds",
           "regionPolicyId",
           "regionCode",
           "regionName",
@@ -5083,6 +5088,10 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
+          "assignedGymIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
@@ -5113,6 +5122,7 @@
         },
         "required": [
           "id",
+          "assignedGymIds",
           "regionPolicyId",
           "regionCode",
           "regionName",

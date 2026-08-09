@@ -150,8 +150,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /formErrorMessage/);
   assert.match(pilot, /DOWNLOAD JPEG FOR PRINTING/);
   assert.match(pilot, /\.jpg`/);
-  assert.match(pilot, /sessionStorage\.setItem\(posterStorageKey/);
+  assert.match(pilot, /localStorage\.setItem\(posterStorageKey/);
+  assert.match(pilot, /localStorage\.getItem\(posterStorageKey/);
   assert.match(pilot, /sessionStorage\.getItem\(posterStorageKey/);
+  assert.match(pilot, /sessionStorage\.removeItem\(posterStorageKey/);
   assert.match(
     pilot,
     /gym\.activeCredentialVersion !== stored\.credentialVersion/,

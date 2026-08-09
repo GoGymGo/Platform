@@ -74,7 +74,7 @@ function forgetStoredPoster(gymLocationId?: string) {
   try {
     if (gymLocationId) {
       const stored = JSON.parse(
-        window.sessionStorage.getItem(posterStorageKey) ?? "null",
+        readStoredPosterValue() ?? "null",
       ) as unknown;
       if (
         isGymQrCredential(stored) &&
@@ -83,18 +83,29 @@ function forgetStoredPoster(gymLocationId?: string) {
         return;
       }
     }
+    window.localStorage.removeItem(posterStorageKey);
     window.sessionStorage.removeItem(posterStorageKey);
   } catch {
     // The poster preview remains usable even if browser storage is unavailable.
   }
 }
 
+function readStoredPosterValue() {
+  if (typeof window === "undefined") return null;
+  const durablePoster = window.localStorage.getItem(posterStorageKey);
+  if (durablePoster) return durablePoster;
+
+  const sessionPoster = window.sessionStorage.getItem(posterStorageKey);
+  if (!sessionPoster) return null;
+  window.localStorage.setItem(posterStorageKey, sessionPoster);
+  window.sessionStorage.removeItem(posterStorageKey);
+  return sessionPoster;
+}
+
 function readStoredPoster(gyms: GymLocation[]): GymQrCredential | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = JSON.parse(
-      window.sessionStorage.getItem(posterStorageKey) ?? "null",
-    ) as unknown;
+    const stored = JSON.parse(readStoredPosterValue() ?? "null") as unknown;
     if (!isGymQrCredential(stored)) {
       forgetStoredPoster();
       return null;
@@ -117,7 +128,8 @@ function readStoredPoster(gyms: GymLocation[]): GymQrCredential | null {
 function rememberPoster(credential: GymQrCredential) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(posterStorageKey, JSON.stringify(credential));
+    window.localStorage.setItem(posterStorageKey, JSON.stringify(credential));
+    window.sessionStorage.removeItem(posterStorageKey);
   } catch {
     // The newly issued poster still renders from component state.
   }

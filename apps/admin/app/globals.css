@@ -2993,6 +2993,14 @@ td small {
   gap: 16px;
 }
 
+.poster-collapse-button {
+  color: var(--yellow);
+}
+
+.poster-collapse-button:hover {
+  color: #ffe783;
+}
+
 .poster-preview-content {
   display: grid;
   justify-items: center;

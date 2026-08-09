@@ -158,6 +158,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /DOWNLOAD JPEG FOR PRINTING/);
   assert.match(pilot, /aria-expanded=\{!collapsed\}/);
   assert.match(pilot, /\{collapsed \? "Expand" : "Collapse"\}/);
+  assert.match(pilot, /poster-collapse-button/);
+  assert.doesNotMatch(pilot, />\s*Close\s*</);
   assert.match(pilot, /pilotAuditHiddenStorageKey/);
   assert.match(pilot, /CLEAR FROM VIEW/);
   assert.match(pilot, /RESTORE AUDIT HISTORY/);

@@ -466,13 +466,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           </div>
         )}
 
-        {poster ? (
-          <PosterPreview
-            credential={poster}
-            key={poster.id}
-            onClose={() => setPoster(null)}
-          />
-        ) : null}
+        {poster ? <PosterPreview credential={poster} key={poster.id} /> : null}
       </section>
 
       <section className="panel">
@@ -837,13 +831,7 @@ function GymCard({
   );
 }
 
-function PosterPreview({
-  credential,
-  onClose,
-}: {
-  credential: GymQrCredential;
-  onClose: () => void;
-}) {
+function PosterPreview({ credential }: { credential: GymQrCredential }) {
   const [source, setSource] = useState<string | null>(null);
   const [conversionError, setConversionError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
@@ -886,14 +874,11 @@ function PosterPreview({
           <button
             aria-controls={contentId}
             aria-expanded={!collapsed}
-            className="text-button"
+            className="text-button poster-collapse-button"
             onClick={() => setCollapsed((current) => !current)}
             type="button"
           >
             {collapsed ? "Expand" : "Collapse"}
-          </button>
-          <button className="text-button" onClick={onClose} type="button">
-            Close
           </button>
         </div>
       </div>

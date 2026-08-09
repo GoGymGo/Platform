@@ -102,6 +102,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let legalDocuments: LegalDocumentsService;
   let operatorUserId: string;
   let profiles: ProfilesService;
+  let registrationFixtureSequence = 0;
   let sessions: SessionsService;
 
   beforeAll(async () => {
@@ -785,6 +786,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
 
   async function seedRegistrationCompetition(): Promise<CompetitionFixture> {
     const now = Date.now();
+    const fixtureSequence = ++registrationFixtureSequence;
     const user = await profiles.ensureUser(userPrincipal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(
       userPrincipal,
@@ -796,7 +798,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
           timezone, language_codes, minimum_age, competition_enabled,
            boundary_version, policy_version, boundary, valid_from)
        VALUES
-         ('critical-session-region', 'CA', 'BC', 'Critical Session Region',
+         ($2, 'CA', 'BC', 'Critical Session Region',
            'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
           'boundary-v1', 'policy-v1',
           ST_GeogFromText(
@@ -804,7 +806,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
           ),
           $1)
        RETURNING id`,
-      [new Date(now - 24 * 60 * 60_000)],
+      [
+        new Date(now - 24 * 60 * 60_000),
+        `critical-session-region-${fixtureSequence}`,
+      ],
     );
     const verification = await migrated.pool.query<{ id: string }>(
       `INSERT INTO region_verifications

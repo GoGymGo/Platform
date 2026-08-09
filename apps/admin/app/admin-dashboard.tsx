@@ -3139,8 +3139,11 @@ function OperationsPanel({
                       <dd className="record-id">{selectedItem.id}</dd>
                     </div>
                   </dl>
-                  <section className="queue-review-history">
-                    <span>RELATED AUDIT EVIDENCE</span>
+                  <details className="queue-review-history">
+                    <summary>
+                      RELATED AUDIT EVIDENCE
+                      <small>{selectedHistory.length}</small>
+                    </summary>
                     {selectedHistory.length > 0 ? (
                       selectedHistory.map((event) => (
                         <div key={event.id}>
@@ -3158,7 +3161,7 @@ function OperationsPanel({
                         ID above while completing the review.
                       </p>
                     )}
-                  </section>
+                  </details>
                   {selectedDestination ? (
                     <button
                       className="primary-button full"

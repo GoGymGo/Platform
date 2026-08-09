@@ -54,6 +54,7 @@ type PilotOperationsProps = PilotData & {
 const administrativeReason =
   "Configure the approved September 2026 static QR pilot.";
 const posterStorageKey = "gogymgo.admin.pilot.active-poster";
+const pilotAuditHiddenStorageKey = "gogymgo.admin.pilot.audit-hidden";
 
 function isGymQrCredential(value: unknown): value is GymQrCredential {
   if (!value || typeof value !== "object") return false;
@@ -144,6 +145,15 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   const [locationMessage, setLocationMessage] = useState("");
   const [assignGymError, setAssignGymError] = useState("");
   const [assignGymSuccess, setAssignGymSuccess] = useState("");
+  const [createGymOpen, setCreateGymOpen] = useState(props.gyms.length === 0);
+  const [pilotAuditHidden, setPilotAuditHidden] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(pilotAuditHiddenStorageKey) === "true";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -152,6 +162,19 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, [props.gyms]);
+
+  function changePilotAuditVisibility(hidden: boolean) {
+    setPilotAuditHidden(hidden);
+    try {
+      if (hidden) {
+        window.localStorage.setItem(pilotAuditHiddenStorageKey, "true");
+      } else {
+        window.localStorage.removeItem(pilotAuditHiddenStorageKey);
+      }
+    } catch {
+      // The visibility choice still applies until this view is closed.
+    }
+  }
 
   async function createGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -299,107 +322,125 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </p>
           </div>
         </div>
-        <form
-          className="pilot-form"
-          noValidate
-          onSubmit={createGym}
-          ref={createGymForm}
+        <details
+          className="pilot-action-disclosure"
+          onToggle={(event) => setCreateGymOpen(event.currentTarget.open)}
+          open={createGymOpen}
         >
-          <label>
-            <span>PARTNER GYM NAME</span>
-            <input name="name" required />
-          </label>
-          <label>
-            <span>ADDRESS</span>
-            <input name="address" required />
-          </label>
-          <label>
-            <span>REGION</span>
-            <select name="regionPolicyId" required>
-              <option value="">Choose region</option>
-              {props.regions.map((region) => (
-                <option key={region.id} value={region.id}>
-                  {region.metroName} ({region.code})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>LATITUDE</span>
-            <input
-              aria-describedby="gym-coordinate-help"
-              inputMode="decimal"
-              name="latitude"
-              placeholder={'48.123456 or 48\u00b0 7\u2032 24\u2033 N'}
-              required
-              type="text"
-            />
-          </label>
-          <label>
-            <span>LONGITUDE</span>
-            <input
-              aria-describedby="gym-coordinate-help"
-              inputMode="decimal"
-              name="longitude"
-              placeholder={'-123.123456 or 123\u00b0 7\u2032 24\u2033 W'}
-              required
-              type="text"
-            />
-          </label>
-          <label>
-            <span>RADIUS (METRES)</span>
-            <input
-              defaultValue="75"
-              max="500"
-              min="10"
-              name="radiusMeters"
-              required
-              type="number"
-            />
-          </label>
-          <label className="pilot-form-wide">
-            <span>ADMINISTRATIVE REASON</span>
-            <input defaultValue={administrativeReason} name="reason" required />
-          </label>
-          <p className="pilot-form-help" id="gym-coordinate-help">
-            Stand near the centre of the Partner gym. Your current location
-            fills the coordinates used to create its verification geofence.
-            You can still paste Compass coordinates if needed.
-          </p>
-          <button
-            className="secondary-button pilot-location-button"
-            disabled={props.submitting || locatingGym}
-            onClick={useCurrentLocation}
-            type="button"
+          <summary>+ CREATE A NEW PARTNER GYM</summary>
+          <form
+            className="pilot-form"
+            noValidate
+            onSubmit={createGym}
+            ref={createGymForm}
           >
-            {locatingGym ? "FINDING LOCATION..." : "USE MY CURRENT LOCATION"}
-          </button>
-          {locationMessage ? (
-            <p aria-live="polite" className="pilot-form-message location-success">
-              {locationMessage}
+            <label>
+              <span>PARTNER GYM NAME</span>
+              <input name="name" required />
+            </label>
+            <label>
+              <span>ADDRESS</span>
+              <input name="address" required />
+            </label>
+            <label>
+              <span>REGION</span>
+              <select name="regionPolicyId" required>
+                <option value="">Choose region</option>
+                {props.regions.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.metroName} ({region.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>LATITUDE</span>
+              <input
+                aria-describedby="gym-coordinate-help"
+                inputMode="decimal"
+                name="latitude"
+                placeholder={"48.123456 or 48\u00b0 7\u2032 24\u2033 N"}
+                required
+                type="text"
+              />
+            </label>
+            <label>
+              <span>LONGITUDE</span>
+              <input
+                aria-describedby="gym-coordinate-help"
+                inputMode="decimal"
+                name="longitude"
+                placeholder={"-123.123456 or 123\u00b0 7\u2032 24\u2033 W"}
+                required
+                type="text"
+              />
+            </label>
+            <label>
+              <span>RADIUS (METRES)</span>
+              <input
+                defaultValue="75"
+                max="500"
+                min="10"
+                name="radiusMeters"
+                required
+                type="number"
+              />
+            </label>
+            <label className="pilot-form-wide">
+              <span>ADMINISTRATIVE REASON</span>
+              <input
+                defaultValue={administrativeReason}
+                name="reason"
+                required
+              />
+            </label>
+            <p className="pilot-form-help" id="gym-coordinate-help">
+              Stand near the centre of the Partner gym. Your current location
+              fills the coordinates used to create its verification geofence.
+              You can still paste Compass coordinates if needed.
             </p>
-          ) : null}
-          <button
-            className="primary-button"
-            disabled={props.submitting}
-            type="submit"
-          >
-            {props.submitting ? "CREATING PARTNER GYM..." : "+ CREATE PARTNER GYM"}
-          </button>
-          {createGymError ? (
-            <p className="pilot-form-message form-error" role="alert">
-              {createGymError}
-            </p>
-          ) : null}
-          {createGymSuccess ? (
-            <p aria-live="polite" className="pilot-form-message form-success">
-              {createGymSuccess}
-            </p>
-          ) : null}
-        </form>
+            <button
+              className="secondary-button pilot-location-button"
+              disabled={props.submitting || locatingGym}
+              onClick={useCurrentLocation}
+              type="button"
+            >
+              {locatingGym ? "FINDING LOCATION..." : "USE MY CURRENT LOCATION"}
+            </button>
+            {locationMessage ? (
+              <p
+                aria-live="polite"
+                className="pilot-form-message location-success"
+              >
+                {locationMessage}
+              </p>
+            ) : null}
+            <button
+              className="primary-button"
+              disabled={props.submitting}
+              type="submit"
+            >
+              {props.submitting
+                ? "CREATING PARTNER GYM..."
+                : "+ CREATE PARTNER GYM"}
+            </button>
+            {createGymError ? (
+              <p className="pilot-form-message form-error" role="alert">
+                {createGymError}
+              </p>
+            ) : null}
+            {createGymSuccess ? (
+              <p aria-live="polite" className="pilot-form-message form-success">
+                {createGymSuccess}
+              </p>
+            ) : null}
+          </form>
+        </details>
 
         {props.gyms.length === 0 ? (
-          <p className="empty-copy">No pilot Partner gym has been configured.</p>
+          <p className="empty-copy">
+            No pilot Partner gym has been configured.
+          </p>
         ) : (
           <div className="card-list pilot-gym-list">
             {props.gyms.map((gym) => (
@@ -439,7 +480,10 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">CONTEST ELIGIBILITY</p>
             <h2>Assign a Partner gym to September</h2>
-            <p>Link an active pilot Partner gym to the Contest members can join there.</p>
+            <p>
+              Link an active pilot Partner gym to the Contest members can join
+              there.
+            </p>
           </div>
         </div>
         <form className="pilot-form" noValidate onSubmit={assignGym}>
@@ -492,6 +536,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       </section>
 
       <PilotTable
+        defaultOpen
         empty="No QR visits have been recorded."
         eyebrow="SERVER-AUTHORITATIVE VISITS"
         headings={["Gym", "Started", "Completed", "Status"]}
@@ -547,72 +592,102 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         title="Partner submissions"
       />
 
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">IN-PERSON CASH HANDOFF</p>
-            <h2>Record fulfillment</h2>
-            <p>
-              The draw must already be settled. This action is permanent and
-              audited.
-            </p>
+      <section className="panel pilot-collapsible-panel pilot-action-panel">
+        <details>
+          <summary className="pilot-collapsible-summary">
+            <div>
+              <p className="eyebrow">IN-PERSON CASH HANDOFF</p>
+              <h2>Record fulfillment</h2>
+              <p>
+                The draw must already be settled. This action is permanent and
+                audited.
+              </p>
+            </div>
+          </summary>
+          <div className="pilot-collapsible-body">
+            <form className="pilot-form" onSubmit={recordCash}>
+              <label className="pilot-form-wide">
+                <span>AWARD ID</span>
+                <input
+                  name="rewardAwardId"
+                  placeholder="Award ID from the settled draw"
+                  required
+                />
+              </label>
+              <label>
+                <span>AMOUNT (CENTS)</span>
+                <input
+                  defaultValue="10000"
+                  min="1"
+                  name="amountCents"
+                  required
+                  type="number"
+                />
+              </label>
+              <label>
+                <span>CURRENCY</span>
+                <input
+                  defaultValue="CAD"
+                  maxLength={3}
+                  minLength={3}
+                  name="currency"
+                  required
+                />
+              </label>
+              <label className="pilot-form-wide">
+                <span>FULFILLMENT NOTE + REASON</span>
+                <input
+                  name="reason"
+                  placeholder="Cash handed to winner in person by …"
+                  required
+                />
+              </label>
+              <button
+                className="danger-button"
+                disabled={props.submitting}
+                type="submit"
+              >
+                RECORD CASH HANDOFF
+              </button>
+            </form>
           </div>
-        </div>
-        <form className="pilot-form" onSubmit={recordCash}>
-          <label className="pilot-form-wide">
-            <span>AWARD ID</span>
-            <input name="rewardAwardId" placeholder="Award ID from the settled draw" required />
-          </label>
-          <label>
-            <span>AMOUNT (CENTS)</span>
-            <input
-              defaultValue="10000"
-              min="1"
-              name="amountCents"
-              required
-              type="number"
-            />
-          </label>
-          <label>
-            <span>CURRENCY</span>
-            <input
-              defaultValue="CAD"
-              maxLength={3}
-              minLength={3}
-              name="currency"
-              required
-            />
-          </label>
-          <label className="pilot-form-wide">
-            <span>FULFILLMENT NOTE + REASON</span>
-            <input
-              name="reason"
-              placeholder="Cash handed to winner in person by …"
-              required
-            />
-          </label>
-          <button
-            className="danger-button"
-            disabled={props.submitting}
-            type="submit"
-          >
-            RECORD CASH HANDOFF
-          </button>
-        </form>
+        </details>
       </section>
 
-      <PilotTable
-        empty="No pilot audit events."
-        eyebrow="APPEND-ONLY PILOT LEDGER"
-        headings={["Action", "Entity", "Reason", "Time"]}
-        rows={props.auditEvents.map((entry) => [
-          entry.action,
-          `${entry.entityType} · ${entry.entityId}`,
-          entry.reason,
-          formatDateTime(entry.createdAt),
-        ])}
-        title="Pilot audit history"
-      />
+      {pilotAuditHidden ? (
+        <section className="panel pilot-dismissed-panel">
+          <div>
+            <p className="eyebrow">APPEND-ONLY PILOT LEDGER</p>
+            <h2>Pilot audit history cleared from view</h2>
+            <p>
+              The authoritative audit records are preserved. This dashboard
+              preference affects only this device.
+            </p>
+          </div>
+          <button
+            className="secondary-button"
+            onClick={() => changePilotAuditVisibility(false)}
+            type="button"
+          >
+            RESTORE AUDIT HISTORY
+          </button>
+        </section>
+      ) : (
+        <PilotTable
+          dismissLabel="CLEAR FROM VIEW"
+          empty="No pilot audit events."
+          eyebrow="APPEND-ONLY PILOT LEDGER"
+          headings={["Action", "Entity", "Reason", "Time"]}
+          onDismiss={() => changePilotAuditVisibility(true)}
+          rows={props.auditEvents.map((entry) => [
+            entry.action,
+            `${entry.entityType} · ${entry.entityId}`,
+            entry.reason,
+            formatDateTime(entry.createdAt),
+          ])}
+          title="Pilot audit history"
+        />
+      )}
     </div>
   );
 }
@@ -851,57 +926,82 @@ function PosterPreview({
 }
 
 function PilotTable({
+  defaultOpen = false,
+  dismissLabel,
   empty,
   eyebrow,
   headings,
+  onDismiss,
   rows,
   title,
 }: {
+  defaultOpen?: boolean;
+  dismissLabel?: string;
   empty: string;
   eyebrow: string;
   headings: string[];
+  onDismiss?: () => void;
   rows: string[][];
   title: string;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      {rows.length === 0 ? (
-        <p className="empty-copy">{empty}</p>
-      ) : (
-        <div
-          aria-label={`${title} table, scroll horizontally for more columns`}
-          className="table-wrap"
-          role="region"
-          tabIndex={0}
-        >
-          <table>
-            <thead>
-              <tr>
-                {headings.map((heading) => (
-                  <th key={heading} scope="col">
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={`${title}-${rowIndex}`}>
-                  {row.map((cell, cellIndex) => (
-                    <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
+    <section className="panel pilot-collapsible-panel">
+      <details
+        onToggle={(event) => setOpen(event.currentTarget.open)}
+        open={open}
+      >
+        <summary className="pilot-collapsible-summary">
+          <div>
+            <p className="eyebrow">{eyebrow}</p>
+            <h2>{title}</h2>
+          </div>
+          <span className="pilot-panel-count">
+            {rows.length} {rows.length === 1 ? "RECORD" : "RECORDS"}
+          </span>
+        </summary>
+        <div className="pilot-collapsible-body">
+          {onDismiss ? (
+            <div className="pilot-panel-controls">
+              <span>Records remain preserved in the authoritative ledger.</span>
+              <button className="text-button" onClick={onDismiss} type="button">
+                {dismissLabel ?? "CLEAR FROM VIEW"}
+              </button>
+            </div>
+          ) : null}
+          {rows.length === 0 ? (
+            <p className="empty-copy">{empty}</p>
+          ) : (
+            <div
+              aria-label={`${title} table, scroll horizontally for more columns`}
+              className="table-wrap"
+              role="region"
+              tabIndex={0}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    {headings.map((heading) => (
+                      <th key={heading} scope="col">
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rowIndex) => (
+                    <tr key={`${title}-${rowIndex}`}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </details>
     </section>
   );
 }

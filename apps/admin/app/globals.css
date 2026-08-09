@@ -846,11 +846,41 @@ main {
   padding-top: 16px;
 }
 
-.queue-review-history > span {
+.queue-review-history > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--muted-2);
+  cursor: pointer;
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.1em;
+  list-style: none;
+}
+
+.queue-review-history > summary::-webkit-details-marker {
+  display: none;
+}
+
+.queue-review-history > summary::after {
+  content: "+";
+  color: var(--cyan-soft);
+  font-size: 15px;
+}
+
+.queue-review-history[open] > summary {
+  margin-bottom: 8px;
+}
+
+.queue-review-history[open] > summary::after {
+  content: "−";
+}
+
+.queue-review-history > summary small {
+  display: inline;
+  margin-left: auto;
+  color: var(--cyan-soft);
 }
 
 .queue-review-history > div {
@@ -2670,6 +2700,48 @@ td small {
   }
 }
 
+.pilot-action-disclosure {
+  margin: 18px 0 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px 2px 8px 2px;
+  background: rgba(5, 9, 12, 0.42);
+}
+
+.pilot-action-disclosure > summary {
+  padding: 16px 18px;
+  color: var(--yellow);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  list-style: none;
+}
+
+.pilot-action-disclosure > summary::-webkit-details-marker,
+.pilot-collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pilot-action-disclosure > summary::after {
+  float: right;
+  content: "+";
+  font-size: 18px;
+}
+
+.pilot-action-disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.pilot-action-disclosure[open] > summary::after {
+  content: "−";
+}
+
+.pilot-action-disclosure .pilot-form {
+  margin: 0;
+  border: 0;
+  background: transparent;
+}
+
 .pilot-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2679,6 +2751,102 @@ td small {
   border-radius: 8px 2px 8px 2px;
   background: rgba(5, 9, 12, 0.42);
   padding: 18px;
+}
+
+.pilot-collapsible-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.pilot-collapsible-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: clamp(20px, 3vw, 30px);
+  cursor: pointer;
+  list-style: none;
+}
+
+.pilot-collapsible-summary h2 {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: clamp(21px, 3vw, 29px);
+}
+
+.pilot-collapsible-summary p:not(.eyebrow) {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pilot-panel-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-bright);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--cyan-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.pilot-collapsible-summary::after {
+  content: "+";
+  color: var(--yellow);
+  font-size: 20px;
+}
+
+.pilot-collapsible-panel details[open] > .pilot-collapsible-summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.pilot-collapsible-panel details[open] > .pilot-collapsible-summary::after {
+  content: "−";
+}
+
+.pilot-collapsible-body {
+  padding: 20px clamp(20px, 3vw, 30px) clamp(20px, 3vw, 30px);
+}
+
+.pilot-collapsible-body > .pilot-form {
+  margin: 0;
+}
+
+.pilot-panel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.pilot-panel-controls span {
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+.pilot-dismissed-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  border-style: dashed;
+}
+
+.pilot-dismissed-panel h2 {
+  margin: 7px 0 6px;
+  font-size: 21px;
+}
+
+.pilot-dismissed-panel p:not(.eyebrow) {
+  max-width: 650px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .pilot-form label {
@@ -2882,6 +3050,24 @@ td small {
 
   .poster-preview-actions {
     gap: 10px;
+  }
+
+  .pilot-collapsible-summary {
+    align-items: flex-start;
+  }
+
+  .pilot-panel-count {
+    display: none;
+  }
+
+  .pilot-panel-controls,
+  .pilot-dismissed-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pilot-panel-controls {
+    justify-content: flex-start;
   }
 }
 

@@ -3,6 +3,15 @@ export type MobileWebRuntime = {
   userAgent?: string;
 };
 
+export type GymVerificationHomeState = {
+  desktopSetupChecking: boolean;
+  desktopSetupError: boolean;
+  desktopSetupPending: boolean;
+  resumeRequested: boolean;
+  setupRequired: boolean;
+  showWorkoutActions: boolean;
+};
+
 export function isMobileWebGymVerificationDevice(
   runtime: MobileWebRuntime | null = readBrowserRuntime()
 ) {
@@ -12,6 +21,43 @@ export function isMobileWebGymVerificationDevice(
     /Android|iPhone|iPad|iPod|IEMobile|Mobile|Opera Mini/i.test(userAgent) ||
     (/Macintosh/i.test(userAgent) && (runtime.maxTouchPoints ?? 0) > 1)
   );
+}
+
+export function getAuthenticatedHomeRoute(
+  mobileGymVerificationAvailable: boolean
+) {
+  return mobileGymVerificationAvailable ? '/home?resume=1' : '/home';
+}
+
+export function getGymVerificationHomeState({
+  mobileGymVerificationAvailable,
+  resume,
+  setupChecking,
+  setupError,
+  setupRequired
+}: {
+  mobileGymVerificationAvailable: boolean;
+  resume?: string;
+  setupChecking: boolean;
+  setupError: boolean;
+  setupRequired: boolean;
+}): GymVerificationHomeState {
+  return {
+    desktopSetupChecking:
+      !mobileGymVerificationAvailable && setupChecking,
+    desktopSetupError:
+      !mobileGymVerificationAvailable && setupError,
+    desktopSetupPending:
+      !mobileGymVerificationAvailable &&
+      !setupChecking &&
+      !setupError &&
+      setupRequired,
+    resumeRequested:
+      mobileGymVerificationAvailable && resume === '1',
+    setupRequired:
+      mobileGymVerificationAvailable && setupRequired,
+    showWorkoutActions: mobileGymVerificationAvailable
+  };
 }
 
 function readBrowserRuntime(): MobileWebRuntime | null {

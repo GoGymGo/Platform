@@ -23,7 +23,10 @@ import {
   type AuthFormErrors
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
-import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import {
+  getAuthenticatedHomeRoute,
+  isMobileWebGymVerificationDevice
+} from '@/domain/mobileGymVerification';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   getGymScanPostAuthRoute,
@@ -90,7 +93,7 @@ export default function SignInScreen() {
       return;
     }
 
-    router.replace('/home?resume=1');
+    router.replace(getAuthenticatedHomeRoute(mobileGymVerificationAvailable));
   };
   const {
     busyProvider,
@@ -159,7 +162,7 @@ export default function SignInScreen() {
         router.replace(getGymScanPostAuthRoute(false));
         return;
       }
-      router.replace('/home?resume=1');
+      router.replace(getAuthenticatedHomeRoute(mobileGymVerificationAvailable));
     } finally {
       setSubmitting(false);
     }

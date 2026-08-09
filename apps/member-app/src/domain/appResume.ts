@@ -40,10 +40,13 @@ export function getAppResumeRequestStatus({
   }
 
   return {
-    error: registrationError || secondaryError,
+    // Invitations and Awards are enhancements to the landing decision. A
+    // temporary failure in either request must never block the member from
+    // reaching Home, especially on a mobile connection.
+    error: registrationError,
     loading:
       registrationLoading ||
-      (!registrationError && secondaryLoading)
+      (!registrationError && !secondaryError && secondaryLoading)
   };
 }
 

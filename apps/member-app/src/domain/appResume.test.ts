@@ -38,6 +38,22 @@ test('resume reports failed checks when no local target is known', () => {
   );
 });
 
+test('optional invitation and Award failures never block Home', () => {
+  assert.deepEqual(
+    getAppResumeRequestStatus({
+      hasImmediateTarget: false,
+      registrationError: false,
+      registrationLoading: false,
+      secondaryError: true,
+      secondaryLoading: false
+    }),
+    {
+      error: false,
+      loading: false
+    }
+  );
+});
+
 test('resume prioritizes unfinished setup before every other task', () => {
   assert.deepEqual(
     getAppResumeTarget({

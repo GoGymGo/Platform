@@ -13,7 +13,10 @@ import {
 } from '@/components/cyber';
 import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { getAuthErrorMessage } from '@/domain/auth';
-import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import {
+  getAuthenticatedHomeRoute,
+  isMobileWebGymVerificationDevice
+} from '@/domain/mobileGymVerification';
 import { fontFamilies, spacing } from '@/constants/theme';
 import {
   gymScanAuthNext,
@@ -44,7 +47,7 @@ export default function VerifyEmailScreen() {
   const polling = useRef(false);
   const continueAfterVerification = useCallback(() => {
     if (!mobileGymVerificationAvailable && !challengeInvite) {
-      router.replace('/home?resume=1');
+      router.replace(getAuthenticatedHomeRoute(false));
       return;
     }
     router.replace(
@@ -60,7 +63,7 @@ export default function VerifyEmailScreen() {
             ? '/identity'
             : next === 'profile'
               ? '/profile'
-              : '/home?resume=1'
+              : getAuthenticatedHomeRoute(mobileGymVerificationAvailable)
     );
   }, [challengeInvite, mobileGymVerificationAvailable, next, router]);
 

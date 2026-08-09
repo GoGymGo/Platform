@@ -290,7 +290,7 @@ function auditDesignSystemCoverage(appDirectory) {
 function auditFlowReliability() {
   const requirements = new Map([
     ['app/(auth)/sign-in.tsx', [
-      '/home?resume=1',
+      'getAuthenticatedHomeRoute',
       'emailSignInReady',
       'Enter your email and password to continue.'
     ]],

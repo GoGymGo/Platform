@@ -32,7 +32,10 @@ import {
   getAppResumeTarget
 } from '@/domain/appResume';
 import { getPublicInitials } from '@/domain/profile';
-import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import {
+  getGymVerificationHomeState,
+  isMobileWebGymVerificationDevice
+} from '@/domain/mobileGymVerification';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
@@ -183,6 +186,22 @@ export default function HomeScreen() {
     ? '/workout/active'
     : '/qr-scanner';
   const setupRequired = workoutEntryTarget === 'setup';
+  const gymVerificationHome = getGymVerificationHomeState({
+    mobileGymVerificationAvailable,
+    resume,
+    setupChecking: registrationChecking,
+    setupError: registrationError,
+    setupRequired
+  });
+  const desktopSetupChecking = gymVerificationHome.desktopSetupChecking;
+  const desktopSetupError = gymVerificationHome.desktopSetupError;
+  const desktopSetupPending = gymVerificationHome.desktopSetupPending;
+  const effectiveSetupRequired = gymVerificationHome.setupRequired;
+  const showGoalProgress =
+    !effectiveSetupRequired &&
+    !desktopSetupChecking &&
+    !desktopSetupError &&
+    !desktopSetupPending;
   const registeredGoal = Number(goalDays);
   const successGoal = Number.isInteger(registeredGoal) && registeredGoal > 0
     ? registeredGoal
@@ -199,7 +218,7 @@ export default function HomeScreen() {
       : setupStep === 'agreements'
         ? 'REVIEW AGREEMENTS'
         : 'CHOOSE YOUR WEEKLY GOAL';
-  const resumeRequested = resume === '1';
+  const resumeRequested = gymVerificationHome.resumeRequested;
   const pendingChallengeInvite = (weeklyChallengeRequestsQuery.data ?? [])
     .some(({ direction }) => direction === 'incoming');
   const immediateResumeTarget = getAppResumeTarget({
@@ -304,8 +323,8 @@ export default function HomeScreen() {
   if (
     !profileReady ||
     !progressReady ||
-    registrationChecking ||
-    !verificationPreferenceReady
+    (mobileGymVerificationAvailable && registrationChecking) ||
+    (mobileGymVerificationAvailable && !verificationPreferenceReady)
   ) {
     return <ScreenLoadingState body="Checking your profile and contest registration." />;
   }
@@ -325,8 +344,14 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <TerminalText tone="cyan" variant="label">
-              {mobileGymVerificationAvailable && setupRequired
+              {effectiveSetupRequired
                 ? 'SETUP INCOMPLETE'
+                : desktopSetupChecking
+                  ? 'ACCOUNT READY // SYNCING CONTEST STATUS'
+                : desktopSetupError
+                  ? 'ACCOUNT READY // CONTEST STATUS UNAVAILABLE'
+                : desktopSetupPending
+                  ? 'ACCOUNT READY // MOBILE CONTEST SETUP PENDING'
                 : 'ACCOUNT READY // ' + competitionRegion}
             </TerminalText>
             <UserAlias
@@ -361,7 +386,7 @@ export default function HomeScreen() {
 
         {resumeRequested && resumeError ? (
           <RecoverableError
-            body="GoGymGo could not finish checking your setup, invitations and Awards. Retry the check, or continue to Home without losing any data."
+            body="GoGymGo could not finish checking your contest registration. Retry the check, or continue to Home without losing any data."
             continueLabel="Continue to Home"
             onContinue={() => {
               resumeHandledRef.current = true;
@@ -374,16 +399,21 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {mobileGymVerificationAvailable ? (
-        <HUDBorderBox style={styles.commitmentCard} tone={setupRequired ? 'amber' : 'cyan'}>
+        <HUDBorderBox style={styles.commitmentCard} tone={effectiveSetupRequired ? 'amber' : 'cyan'}>
           <View style={styles.commitmentHeader}>
             <View style={styles.commitmentTitleBlock}>
               <TerminalText
-                tone={setupRequired ? 'amber' : 'cyan'}
+                tone={effectiveSetupRequired ? 'amber' : 'cyan'}
                 variant="label"
               >
-                {setupRequired
+                {effectiveSetupRequired
                   ? setupEyebrow
+                  : desktopSetupChecking
+                    ? 'SYNCING CONTEST STATUS'
+                  : desktopSetupError
+                    ? 'CONTEST STATUS UNAVAILABLE'
+                  : desktopSetupPending
+                    ? 'CONTINUE ON MOBILE'
                   : isBonusDayPhase
                   ? 'BONUS DAYS 29-31'
                   : competitionNotStarted
@@ -391,8 +421,14 @@ export default function HomeScreen() {
                     : `WEEK ${currentWeekIndex ?? 1} // ${completedSessions > 0 ? 'IN MOTION' : 'READY'}`}
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
-                {setupRequired
+                {effectiveSetupRequired
                   ? setupTitle
+                  : desktopSetupChecking
+                    ? 'LOADING YOUR CONTEST'
+                  : desktopSetupError
+                    ? 'YOUR ACCOUNT IS STILL AVAILABLE'
+                  : desktopSetupPending
+                    ? 'FINISH CONTEST SETUP ON A PHONE OR TABLET'
                   : isBonusDayPhase
                   ? `ADD ${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} PER DAY`
                   : competitionNotStarted
@@ -402,8 +438,16 @@ export default function HomeScreen() {
                       : 'START YOUR FIRST WORKOUT'}
               </TerminalText>
               <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
-                {setupRequired
+                {effectiveSetupRequired
                   ? setupMessage
+                  : desktopSetupChecking
+                    ? 'Your account is ready. GoGymGo is loading the latest contest status.'
+                  : desktopSetupError
+                    ? 'GoGymGo could not refresh the contest status. You can still use Home, Calendar, Compete, Awards and your profile.'
+                  : desktopSetupPending
+                    ? 'Your account is ready. Contest registration and Verified workouts are completed on a phone or tablet.'
+                  : !mobileGymVerificationAvailable
+                    ? 'Your contest status, Weekly Goal and Prize Draw Entries stay synced here. Verified workouts are completed on a phone or tablet.'
                   : isBonusDayPhase
                   ? `Verify one workout on each remaining day to add ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} per day.`
                   : competitionNotStarted
@@ -412,7 +456,7 @@ export default function HomeScreen() {
                       ? `Complete ${remainingSessions} more Verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's Weekly Goal. Only one workout per calendar day counts.`
                       : 'Weekly Goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
               </TerminalText>
-              {!setupRequired && competitionNotStarted ? (
+              {showGoalProgress && competitionNotStarted ? (
                 <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
                   SCORING STARTS {competitionStartMonth.toUpperCase()} 1ST 12:00AM.
                 </TerminalText>
@@ -420,13 +464,17 @@ export default function HomeScreen() {
             </View>
             <View style={styles.multiplierBlock}>
               <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
-                {setupRequired
+                {effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
                   ? '--'
                   : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
-                {setupRequired
-                  ? 'NEXT STEP'
+                {effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
+                  ? desktopSetupChecking
+                    ? 'SYNCING'
+                    : desktopSetupError
+                      ? 'CHECK LATER'
+                      : 'NEXT STEP'
                   : competitionNotStarted
                   ? 'DAY GOAL'
                    : liveMultiplier === 3
@@ -438,7 +486,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {!setupRequired ? (
+          {showGoalProgress ? (
             <View
               accessible
               accessibilityLabel={
@@ -473,7 +521,7 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
-          {!setupRequired ? <View style={styles.weekDots}>
+          {showGoalProgress ? <View style={styles.weekDots}>
             {Array.from({ length: weeklyGoal }, (_, index) => (
               <View
                 key={index}
@@ -485,6 +533,8 @@ export default function HomeScreen() {
             ))}
           </View> : null}
 
+          {gymVerificationHome.showWorkoutActions ? (
+          <>
           <CyberButtonPrimary
             disabled={!setupRequired && workoutUnavailable && !activeSession}
             label={setupRequired
@@ -522,8 +572,10 @@ export default function HomeScreen() {
                 : 'Scan the approved Partner gym QR to start a Verified workout.'}
             </TerminalText>
           ) : null}
+          </>
+          ) : null}
 
-          {!setupRequired && competitionNotStarted ? (
+          {!effectiveSetupRequired && competitionNotStarted ? (
             <View style={styles.launchStatus}>
               <View style={styles.launchHeader}>
                 <TerminalText tone="dim" variant="micro">
@@ -553,7 +605,6 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </HUDBorderBox>
-        ) : null}
 
         {unclaimedReward ? (
           <Pressable

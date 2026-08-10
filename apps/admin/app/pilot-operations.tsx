@@ -108,6 +108,8 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   const availableAssignmentGyms = selectedRegionGyms.filter(
     (gym) => gym.active && !assignedGymIds.has(gym.id),
   );
+  const assignmentComplete =
+    activeAssignedGyms.length > 0 && availableAssignmentGyms.length === 0;
   const createGymForm = useRef<HTMLFormElement>(null);
   const [poster, setPoster] = useState<GymQrCredential | null>(null);
   const [posterRecoveryMessage, setPosterRecoveryMessage] = useState("");
@@ -215,6 +217,23 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     } finally {
       setLoadingPosterGymId(null);
     }
+  }
+
+  async function issueQrForGym(
+    gym: GymLocation,
+    input: OperatorReasonDto,
+  ) {
+    setPosterRecoveryMessage("");
+    const credential = await props.onIssueQr(gym.id, input);
+    if (
+      credential.competitionId !== props.selectedCompetition.id ||
+      credential.gymLocationId !== gym.id
+    ) {
+      throw new AdminUserFacingError(
+        "The generated poster did not match the selected contest and gym. Do not print it. Refresh the dashboard and try again.",
+      );
+    }
+    setPoster(credential);
   }
 
   function changePilotAuditVisibility(hidden: boolean) {
@@ -414,84 +433,99 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">CONTEST GYM ASSIGNMENT</p>
-            <h2>Assign a gym to {props.selectedCompetition.name}</h2>
-            <p>Choose the Partner gym where players will scan for this contest.</p>
+            <h2>
+              {assignmentComplete
+                ? `Gym assignment complete for ${props.selectedCompetition.name}`
+                : activeAssignedGyms.length > 0
+                  ? `Assign another gym to ${props.selectedCompetition.name}`
+                  : `Assign a gym to ${props.selectedCompetition.name}`}
+            </h2>
+            <p>
+              {assignmentComplete
+                ? "Continue directly to this contest's QR poster."
+                : "Choose the Partner gym where players will scan for this contest."}
+            </p>
           </div>
           <span className="setup-context-tag">
             {props.selectedCompetition.regionName}
           </span>
         </div>
-        <form className="pilot-form" noValidate onSubmit={assignGym}>
-          <label>
-            <span>SELECTED CONTEST</span>
-            <input
-              aria-readonly="true"
-              readOnly
-              value={`${props.selectedCompetition.name} (${props.selectedCompetition.status})`}
-            />
-          </label>
-          <label>
-            <span>PARTNER GYM IN THIS REGION</span>
-            <select
-              disabled={availableAssignmentGyms.length === 0}
-              name="gymId"
-              required
+        {assignmentComplete ? (
+          <div className="pilot-assignment-complete">
+            <p className="pilot-form-message form-success" role="status">
+              {activeAssignedGyms.map((gym) => gym.name).join(", ")}{" "}
+              {activeAssignedGyms.length === 1 ? "is" : "are"} assigned to{" "}
+              {props.selectedCompetition.name}. This contest can now receive its
+              own QR poster without changing any other contest at this gym.
+            </p>
+            <a
+              className="primary-button"
+              href={`#contest-gym-qr-${activeAssignedGyms[0].id}`}
             >
-              <option value="">
-                {availableAssignmentGyms.length === 0
-                  ? "No unassigned active gym available"
-                  : "Choose Partner gym"}
-              </option>
-              {selectedRegionGyms
-                .filter((gym) => gym.active)
-                .map((gym) => (
-                  <option
-                    disabled={assignedGymIds.has(gym.id)}
-                    key={gym.id}
-                    value={gym.id}
-                  >
+              CONTINUE TO {props.selectedCompetition.name.toUpperCase()} QR
+              POSTER ↓
+            </a>
+          </div>
+        ) : availableAssignmentGyms.length > 0 ? (
+          <form className="pilot-form" noValidate onSubmit={assignGym}>
+            <label>
+              <span>SELECTED CONTEST</span>
+              <input
+                aria-readonly="true"
+                readOnly
+                value={`${props.selectedCompetition.name} (${props.selectedCompetition.status})`}
+              />
+            </label>
+            <label>
+              <span>PARTNER GYM IN THIS REGION</span>
+              <select name="gymId" required>
+                <option value="">Choose Partner gym</option>
+                {availableAssignmentGyms.map((gym) => (
+                  <option key={gym.id} value={gym.id}>
                     {gym.name}
-                    {assignedGymIds.has(gym.id) ? " (already assigned)" : ""}
                   </option>
                 ))}
-            </select>
-          </label>
-          <PilotReasonField />
-          <button
-            className="primary-button"
-            disabled={props.submitting || availableAssignmentGyms.length === 0}
-            type="submit"
-          >
-            {props.submitting ? "ASSIGNING GYM..." : "ASSIGN GYM + CONTINUE"}
-          </button>
-          {activeAssignedGyms.length > 0 ? (
-            <p className="pilot-form-message form-success">
-              {activeAssignedGyms.length} active gym assignment
-              {activeAssignedGyms.length === 1 ? "" : "s"} saved for this
-              contest. Continue below to issue or recover the gym poster.
-            </p>
-          ) : null}
-          {assignGymSuccess ? (
-            <p aria-live="polite" className="pilot-form-message form-success">
-              {assignGymSuccess}
-            </p>
-          ) : null}
-          {availableAssignmentGyms.length === 0 ? (
-            <p className="pilot-form-message form-error" role="status">
-              {selectedRegionGyms.some((gym) => gym.active)
-                ? "Every active Partner gym in this region is already assigned to this contest."
-                : "No active Partner gym is available in this region. Create a gym below before continuing."}
-            </p>
-          ) : null}
-          {assignGymError ? (
-            <p className="pilot-form-message form-error" role="alert">
-              {assignGymError}
-            </p>
-          ) : null}
-        </form>
+              </select>
+            </label>
+            <PilotReasonField />
+            <button
+              className="primary-button"
+              disabled={props.submitting}
+              type="submit"
+            >
+              {props.submitting
+                ? "ASSIGNING GYM..."
+                : activeAssignedGyms.length > 0
+                  ? "ASSIGN ANOTHER GYM"
+                  : "ASSIGN GYM + CONTINUE"}
+            </button>
+            {activeAssignedGyms.length > 0 ? (
+              <p className="pilot-form-message form-success">
+                {activeAssignedGyms.map((gym) => gym.name).join(", ")} {" "}
+                {activeAssignedGyms.length === 1 ? "is" : "are"} already
+                assigned to this contest.
+              </p>
+            ) : null}
+            {assignGymSuccess ? (
+              <p aria-live="polite" className="pilot-form-message form-success">
+                {assignGymSuccess}
+              </p>
+            ) : null}
+            {assignGymError ? (
+              <p className="pilot-form-message form-error" role="alert">
+                {assignGymError}
+              </p>
+            ) : null}
+          </form>
+        ) : (
+          <p className="pilot-form-message form-error" role="status">
+            No active Partner gym is available in this region. Create a gym
+            below before continuing.
+          </p>
+        )}
       </section>
 
-      <section className="panel">
+      <section className="panel" id="contest-qr-posters">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">STATIC QR PILOT</p>
@@ -633,11 +667,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                 }
                 gym={gym}
                 key={gym.id}
-                onIssue={async (input) => {
-                  const credential = await props.onIssueQr(gym.id, input);
-                  setPosterRecoveryMessage("");
-                  setPoster(credential);
-                }}
+                onIssue={(input) => issueQrForGym(gym, input)}
                 onDelete={() => props.onDeleteGym(gym)}
                 onRevoke={async (input) => {
                   await props.onRevokeQr(gym.id, input);
@@ -878,6 +908,33 @@ function GymCard({
 }) {
   const qrLockId = useId();
   const [formError, setFormError] = useState("");
+  const [qrError, setQrError] = useState("");
+  const [qrSuccess, setQrSuccess] = useState("");
+
+  async function issueQr() {
+    setQrError("");
+    setQrSuccess("");
+    try {
+      await onIssue({ reason: administrativeReason });
+      setQrSuccess(
+        `${selectedContestName} poster generated. The printable poster is ready below.`,
+      );
+    } catch (error) {
+      setQrError(formErrorMessage(error));
+    }
+  }
+
+  async function revokeQr() {
+    setQrError("");
+    setQrSuccess("");
+    try {
+      await onRevoke({ reason: "Revoke the current QR poster." });
+      setQrSuccess(`${selectedContestName} poster revoked.`);
+    } catch (error) {
+      setQrError(formErrorMessage(error));
+    }
+  }
+
   async function update(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
@@ -904,7 +961,10 @@ function GymCard({
   }
 
   return (
-    <article className="region-card pilot-gym-card">
+    <article
+      className="region-card pilot-gym-card"
+      id={`contest-gym-qr-${gym.id}`}
+    >
       <div className="region-code">QR</div>
       <div>
         <span className={`status-tag ${gym.active ? "active" : "archived"}`}>
@@ -928,10 +988,10 @@ function GymCard({
           aria-describedby={qrLocked ? qrLockId : undefined}
           className="primary-button"
           disabled={submitting || qrLocked}
-          onClick={() => void onIssue({ reason: administrativeReason })}
+          onClick={() => void issueQr()}
           type="button"
         >
-          ISSUE / REISSUE POSTER
+          ISSUE / REISSUE {selectedContestName.toUpperCase()} POSTER
         </button>
         {activeCredentialVersion ? (
           <button
@@ -947,11 +1007,7 @@ function GymCard({
         <button
           className="danger-button"
           disabled={submitting || !activeCredentialVersion}
-          onClick={() =>
-            void onRevoke({
-              reason: "Revoke the current QR poster.",
-            })
-          }
+          onClick={() => void revokeQr()}
           type="button"
         >
           REVOKE QR
@@ -971,6 +1027,22 @@ function GymCard({
         <p className="action-guidance compact" id={qrLockId}>
           Assign {gym.name} to {selectedContestName} above before issuing or
           viewing its QR poster. An existing QR poster can still be revoked.
+        </p>
+      ) : null}
+      {qrSuccess ? (
+        <p
+          aria-live="polite"
+          className="pilot-form-message form-success pilot-qr-action-message"
+        >
+          {qrSuccess}
+        </p>
+      ) : null}
+      {qrError ? (
+        <p
+          className="pilot-form-message form-error pilot-qr-action-message"
+          role="alert"
+        >
+          {qrError}
         </p>
       ) : null}
       <details className="pilot-details">

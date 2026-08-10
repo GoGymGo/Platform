@@ -2671,6 +2671,22 @@ textarea[aria-invalid="true"] {
   border-color: rgba(244, 202, 67, 0.34);
 }
 
+.pilot-assignment-complete {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.pilot-assignment-complete .pilot-form-message {
+  margin: 0;
+}
+
+.pilot-assignment-complete .primary-button {
+  text-align: center;
+  text-decoration: none;
+}
+
 .contest-homes-panel {
   border-color: rgba(53, 226, 228, 0.28);
 }
@@ -3412,6 +3428,14 @@ textarea[aria-invalid="true"] {
   display: grid;
 }
 
+.pilot-gym-card {
+  scroll-margin-top: 24px;
+}
+
+.pilot-qr-action-message {
+  grid-column: 1 / -1;
+}
+
 .pilot-details {
   grid-column: 1 / -1;
   border-top: 1px solid var(--line);
@@ -3509,6 +3533,10 @@ textarea[aria-invalid="true"] {
 }
 
 @media (max-width: 800px) {
+  .pilot-assignment-complete {
+    grid-template-columns: 1fr;
+  }
+
   .pilot-form,
   .pilot-two-column {
     grid-template-columns: 1fr;

@@ -195,7 +195,28 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.doesNotMatch(pilot, /posterStorageKey/);
   assert.match(dashboard, /qr-credentials\/active/);
   assert.match(pilot, /selectedCompetition\.assignedGymIds/);
-  assert.match(pilot, /Assign a gym to \{props\.selectedCompetition\.name\}/);
+  assert.match(pilot, /const assignmentComplete/);
+  assert.match(pilot, /pilot-assignment-complete/);
+  assert.match(
+    pilot,
+    /CONTINUE TO \{props\.selectedCompetition\.name\.toUpperCase\(\)\} QR/,
+  );
+  assert.doesNotMatch(
+    pilot,
+    /Every active Partner gym in this region is already assigned to this contest/,
+  );
+  assert.match(
+    pilot,
+    /credential\.competitionId !== props\.selectedCompetition\.id/,
+  );
+  assert.match(pilot, /credential\.gymLocationId !== gym\.id/);
+  assert.match(pilot, /The generated poster did not match/);
+  assert.match(
+    pilot,
+    /ISSUE \/ REISSUE \{selectedContestName\.toUpperCase\(\)\} POSTER/,
+  );
+  assert.match(styles, /\.pilot-assignment-complete/);
+  assert.match(styles, /\.pilot-qr-action-message/);
   assert.doesNotMatch(pilot, /can also be assigned independently to another/);
   assert.doesNotMatch(pilot, /Every contest receives a different poster/);
   assert.doesNotMatch(pilot, /reusable across every contest assigned to that/);

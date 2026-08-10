@@ -503,7 +503,7 @@ function MobileQrScannerModal() {
         ) : (
           <View style={styles.cameraShell}>
             <CameraView
-              autofocus="on"
+              autofocus={Platform.OS === 'web' ? 'on' : 'off'}
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               facing="back"
               onBarcodeScanned={scanLocked ? undefined : handleBarcodeScanned}

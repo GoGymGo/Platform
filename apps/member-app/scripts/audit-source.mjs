@@ -726,6 +726,14 @@ function auditAuthoritativeSessionRulesBoundary() {
       'app/(modals)/qr-scanner.tsx: pilot QR status must use the authoritative scan endpoint and server remaining time'
     );
   }
+  if (
+    !qrScanner.includes("autofocus={Platform.OS === 'web' ? 'on' : 'off'}") ||
+    !qrScanner.includes('facing="back"')
+  ) {
+    issues.push(
+      'app/(modals)/qr-scanner.tsx: QR scanning must use the rear camera with continuous platform-appropriate focus'
+    );
+  }
 }
 
 function collectSourceFiles(directory) {

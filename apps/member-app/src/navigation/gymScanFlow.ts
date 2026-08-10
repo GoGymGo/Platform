@@ -15,11 +15,12 @@ export function getGymScanPostAuthRoute(isNewUser: boolean) {
     : gymScanWorkoutRoute;
 }
 
-// A scanned competition without an enrollment always begins at Step 1, even
-// when the returning account's region and legal receipts are still current.
 export function getGymScanSetupRoute(step: AccountSetupStep) {
-  if (step !== 'complete') {
+  if (step === 'region' || step === 'agreements') {
     return `/region?source=${gymScanSource}`;
+  }
+  if (step === 'weekly-goal') {
+    return `/commitment?source=${gymScanSource}`;
   }
   return null;
 }

@@ -14,10 +14,10 @@ describe('gym scan navigation', () => {
     assert.equal(getGymScanPostAuthRoute(true), '/region?source=gym-scan');
   });
 
-  it('starts every unregistered scanned competition at setup step one', () => {
+  it('resumes an unregistered scanned competition at the required setup screen', () => {
     assert.equal(getGymScanSetupRoute('region'), '/region?source=gym-scan');
     assert.equal(getGymScanSetupRoute('agreements'), '/region?source=gym-scan');
-    assert.equal(getGymScanSetupRoute('weekly-goal'), '/region?source=gym-scan');
+    assert.equal(getGymScanSetupRoute('weekly-goal'), '/commitment?source=gym-scan');
     assert.equal(getGymScanSetupRoute('complete'), null);
   });
 

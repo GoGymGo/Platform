@@ -848,7 +848,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
        VALUES ($1, 3, 'Three days')`,
       [competition.rows[0].id],
     );
-    const gymCredential = 'critical-session-gym-credential-00000001';
+    const gymCredential = `critical-session-gym-credential-${fixtureSequence
+      .toString()
+      .padStart(8, '0')}`;
     const gym = await migrated.pool.query<{ id: string }>(
       `INSERT INTO gym_locations
          (region_policy_id, name, address, coordinates, radius_meters, active)

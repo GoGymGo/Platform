@@ -66,7 +66,12 @@ import {
   getContestSetupLocks,
   getNextContestSetupSection,
 } from "./contest-launch-flow";
-import { PilotOperationsPanel, type PilotData } from "./pilot-operations";
+import {
+  assertGymQrCredentialScope,
+  PilotOperationsPanel,
+  PosterPreview,
+  type PilotData,
+} from "./pilot-operations";
 import { downloadPosterJpeg } from "./poster-jpeg";
 import {
   genericAdministrativeReasons,
@@ -982,12 +987,22 @@ export function AdminDashboard({
               health={health}
               onCreate={() => setCompetitionEditor("new")}
               onDelete={requestContestDeletion}
+              onIssueQr={(competitionId, gymId, body) =>
+                mutate(
+                  "Printable QR poster issued.",
+                  `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
+                  "POST",
+                  body,
+                )
+              }
+              onLoadActiveQr={loadActiveQr}
               publishReady={publishReady}
               queue={queue}
               rewards={snapshot.rewards}
               snapshot={snapshot}
               onNavigate={navigateToSection}
               onStatus={requestContestStatus}
+              submitting={submitting}
             />
           ) : null}
           {section === "competitions" ? (
@@ -1046,10 +1061,10 @@ export function AdminDashboard({
                   tone: "danger",
                 })
               }
-              onIssueQr={(gymId, body) =>
+              onIssueQr={(competitionId, gymId, body) =>
                 mutate(
                   "Printable QR poster issued.",
-                  `operator/competitions/${setupCompetition.id}/gym-locations/${gymId}/qr-credentials`,
+                  `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
                   "POST",
                   body,
                 )
@@ -1063,10 +1078,10 @@ export function AdminDashboard({
                   body,
                 );
               }}
-              onRevokeQr={async (gymId, body) => {
+              onRevokeQr={async (competitionId, gymId, body) => {
                 await mutate(
                   "QR poster revoked.",
-                  `operator/competitions/${setupCompetition.id}/gym-locations/${gymId}/qr-credentials/revoke`,
+                  `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/revoke`,
                   "POST",
                   body,
                 );
@@ -2288,12 +2303,15 @@ function Overview({
   health,
   onCreate,
   onDelete,
+  onIssueQr,
+  onLoadActiveQr,
   publishReady,
   queue,
   rewards,
   snapshot,
   onNavigate,
   onStatus,
+  submitting,
 }: {
   activeCompetitions: Competition[];
   competitions: Competition[];
@@ -2301,13 +2319,31 @@ function Overview({
   health: SystemHealth | null;
   onCreate: () => void;
   onDelete: (competition: Competition) => void;
+  onIssueQr: (
+    competitionId: string,
+    gymId: string,
+    body: { reason: string },
+  ) => Promise<GymQrCredential>;
+  onLoadActiveQr: (
+    competitionId: string,
+    gymId: string,
+  ) => Promise<GymQrCredential | null>;
   publishReady: Competition[];
   queue: WorkQueueItem[];
   rewards: Reward[];
   snapshot: DashboardSnapshot;
   onNavigate: (section: AdminSection) => void;
   onStatus: (competition: Competition, action: "cancel") => void;
+  submitting: boolean;
 }) {
+  const [contestHomePoster, setContestHomePoster] =
+    useState<GymQrCredential | null>(null);
+  const [posterActionKey, setPosterActionKey] = useState<string | null>(null);
+  const [posterActionMessage, setPosterActionMessage] = useState<{
+    competitionId: string;
+    message: string;
+    tone: "error" | "success";
+  } | null>(null);
   const draftRewards = snapshot.rewards.filter(
     (reward) => reward.status === "draft",
   ).length;
@@ -2323,6 +2359,76 @@ function Overview({
   const oldestUrgency = oldestQueueItem
     ? getQueueUrgency(oldestQueueItem)
     : null;
+
+  async function loadContestHomePoster(
+    competition: Competition,
+    gym: PilotData["gyms"][number],
+  ) {
+    const actionKey = `load:${competition.id}:${gym.id}`;
+    setPosterActionKey(actionKey);
+    setPosterActionMessage(null);
+    try {
+      const loaded = await onLoadActiveQr(competition.id, gym.id);
+      if (!loaded) {
+        throw new AdminUserFacingError(
+          `${competition.name} does not have an active QR poster for ${gym.name}. Issue it below.`,
+        );
+      }
+      const credential = assertGymQrCredentialScope(
+        loaded,
+        competition.id,
+        gym.id,
+      );
+      setContestHomePoster(credential);
+      setPosterActionMessage({
+        competitionId: competition.id,
+        message: `${competition.name}'s poster for ${gym.name} is loaded below.`,
+        tone: "success",
+      });
+    } catch (error) {
+      setPosterActionMessage({
+        competitionId: competition.id,
+        message: errorMessage(error),
+        tone: "error",
+      });
+    } finally {
+      setPosterActionKey(null);
+    }
+  }
+
+  async function issueContestHomePoster(
+    competition: Competition,
+    gym: PilotData["gyms"][number],
+  ) {
+    const actionKey = `issue:${competition.id}:${gym.id}`;
+    setPosterActionKey(actionKey);
+    setPosterActionMessage(null);
+    try {
+      const issued = await onIssueQr(competition.id, gym.id, {
+        reason: `Issue the ${competition.name} contest-specific QR poster.`,
+      });
+      const credential = assertGymQrCredentialScope(
+        issued,
+        competition.id,
+        gym.id,
+      );
+      setContestHomePoster(credential);
+      setPosterActionMessage({
+        competitionId: competition.id,
+        message: `A new ${competition.name} poster for ${gym.name} is ready below. Older ${competition.name} posters for this gym no longer work. Other contest posters are unchanged.`,
+        tone: "success",
+      });
+    } catch (error) {
+      setPosterActionMessage({
+        competitionId: competition.id,
+        message: errorMessage(error),
+        tone: "error",
+      });
+    } finally {
+      setPosterActionKey(null);
+    }
+  }
+
   return (
     <>
       <section
@@ -2501,6 +2607,99 @@ function Overview({
                         </p>
                       </div>
                     </div>
+                    {assignedGyms.length > 0 ? (
+                      <div className="contest-home-poster-controls">
+                        <div className="contest-home-poster-heading">
+                          <small>CONTEST-SPECIFIC QR POSTERS</small>
+                          <p>
+                            These controls are locked to {competition.name}.
+                            Posters belonging to another contest at the same gym
+                            are never loaded or replaced here.
+                          </p>
+                        </div>
+                        {assignedGyms.map((gym) => {
+                          const activeCredential = (
+                            gym.activeQrCredentials ?? []
+                          ).find(
+                            (credential) =>
+                              credential.competitionId === competition.id,
+                          );
+                          const loadActionKey = `load:${competition.id}:${gym.id}`;
+                          const issueActionKey = `issue:${competition.id}:${gym.id}`;
+                          return (
+                            <div
+                              className="contest-home-poster-row"
+                              key={`${competition.id}:${gym.id}`}
+                            >
+                              <div>
+                                <strong>{gym.name}</strong>
+                                <small>
+                                  {gym.active
+                                    ? activeCredential
+                                      ? `${competition.name} QR v${activeCredential.credentialVersion} active`
+                                      : `No ${competition.name} poster issued yet`
+                                    : "Gym inactive"}
+                                </small>
+                              </div>
+                              <div className="inline-actions">
+                                {activeCredential ? (
+                                  <button
+                                    className="secondary-button"
+                                    disabled={
+                                      submitting ||
+                                      posterActionKey !== null ||
+                                      !gym.active
+                                    }
+                                    onClick={() =>
+                                      void loadContestHomePoster(competition, gym)
+                                    }
+                                    type="button"
+                                  >
+                                    {posterActionKey === loadActionKey
+                                      ? "LOADING POSTER..."
+                                      : `VIEW ${competition.name.toUpperCase()} POSTER`}
+                                  </button>
+                                ) : null}
+                                <button
+                                  className="primary-button"
+                                  disabled={
+                                    submitting ||
+                                    posterActionKey !== null ||
+                                    !gym.active
+                                  }
+                                  onClick={() =>
+                                    void issueContestHomePoster(competition, gym)
+                                  }
+                                  type="button"
+                                >
+                                  {posterActionKey === issueActionKey
+                                    ? "GENERATING POSTER..."
+                                    : `${activeCredential ? "REISSUE" : "ISSUE"} ${competition.name.toUpperCase()} POSTER`}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    {posterActionMessage?.competitionId === competition.id ? (
+                      <p
+                        className={`pilot-form-message ${posterActionMessage.tone === "error" ? "form-error" : "form-success"}`}
+                        role={
+                          posterActionMessage.tone === "error"
+                            ? "alert"
+                            : "status"
+                        }
+                      >
+                        {posterActionMessage.message}
+                      </p>
+                    ) : null}
+                    {contestHomePoster?.competitionId === competition.id ? (
+                      <PosterPreview
+                        credential={contestHomePoster}
+                        key={contestHomePoster.id}
+                      />
+                    ) : null}
                     <div className="card-actions">
                       {competition.status === "registration" ? (
                         <button

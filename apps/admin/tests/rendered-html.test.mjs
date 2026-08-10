@@ -205,12 +205,18 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     pilot,
     /Every active Partner gym in this region is already assigned to this contest/,
   );
+  assert.match(pilot, /export function assertGymQrCredentialScope/);
+  assert.match(pilot, /credential\.competitionId !== competitionId/);
+  assert.match(pilot, /credential\.gymLocationId !== gymId/);
+  assert.match(pilot, /The loaded poster did not match/);
   assert.match(
     pilot,
-    /credential\.competitionId !== props\.selectedCompetition\.id/,
+    /props\.onIssueQr\([\s\S]*props\.selectedCompetition\.id,[\s\S]*gym\.id/,
   );
-  assert.match(pilot, /credential\.gymLocationId !== gym\.id/);
-  assert.match(pilot, /The generated poster did not match/);
+  assert.match(
+    pilot,
+    /props\.onRevokeQr\([\s\S]*props\.selectedCompetition\.id,[\s\S]*gym\.id/,
+  );
   assert.match(
     pilot,
     /ISSUE \/ REISSUE \{selectedContestName\.toUpperCase\(\)\} POSTER/,
@@ -223,6 +229,19 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /activeQrCredentials/);
   assert.match(dashboard, /EXISTING CONTEST HOMES/);
   assert.match(dashboard, /CREATE ANOTHER CONTEST/);
+  assert.match(dashboard, /CONTEST-SPECIFIC QR POSTERS/);
+  assert.match(dashboard, /These controls are locked to \{competition\.name\}/);
+  assert.match(dashboard, /VIEW \$\{competition\.name\.toUpperCase\(\)\} POSTER/);
+  assert.match(
+    dashboard,
+    /onIssueQr\(competition\.id, gym\.id,[\s\S]*assertGymQrCredentialScope/,
+  );
+  assert.match(
+    dashboard,
+    /operator\/competitions\/\$\{competitionId\}\/gym-locations\/\$\{gymId\}\/qr-credentials/,
+  );
+  assert.match(styles, /\.contest-home-poster-controls/);
+  assert.match(styles, /\.contest-home-poster-row/);
   assert.match(dashboard, /ReasonPresetChips/);
   assert.match(styles, /\.mobile-admin-navigation \{[\s\S]*display: none !important/);
   assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);

@@ -46,6 +46,7 @@ type PilotOperationsProps = PilotData & {
   onCreateGym: (input: CreateGymLocationDto) => Promise<void>;
   onDeleteGym: (gym: GymLocation) => void;
   onIssueQr: (
+    competitionId: string,
     gymId: string,
     input: OperatorReasonDto,
   ) => Promise<GymQrCredential>;
@@ -54,7 +55,11 @@ type PilotOperationsProps = PilotData & {
     gymId: string,
   ) => Promise<GymQrCredential | null>;
   onRecordCash: (input: CashFulfillmentRequestDto) => Promise<void>;
-  onRevokeQr: (gymId: string, input: OperatorReasonDto) => Promise<void>;
+  onRevokeQr: (
+    competitionId: string,
+    gymId: string,
+    input: OperatorReasonDto,
+  ) => Promise<void>;
   onUpdateGym: (gymId: string, input: UpdateGymLocationDto) => Promise<void>;
   regions: RegionPolicy[];
   selectedCompetition: Competition;
@@ -63,6 +68,22 @@ type PilotOperationsProps = PilotData & {
 
 const administrativeReason = "Configure the approved contest gym and QR setup.";
 const pilotAuditHiddenStorageKey = "gogymgo.admin.pilot.audit-hidden";
+
+export function assertGymQrCredentialScope(
+  credential: GymQrCredential,
+  competitionId: string,
+  gymId: string,
+): GymQrCredential {
+  if (
+    credential.competitionId !== competitionId ||
+    credential.gymLocationId !== gymId
+  ) {
+    throw new AdminUserFacingError(
+      "The loaded poster did not match the selected contest and gym. Do not print it. Refresh the dashboard and try again.",
+    );
+  }
+  return credential;
+}
 
 function PilotReasonField({
   defaultValue = administrativeReason,
@@ -158,11 +179,18 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     void Promise.all(
       gymsWithActivePosters.map(async (gym) => {
         try {
+          const credential = await onLoadActiveQr(
+            props.selectedCompetition.id,
+            gym.id,
+          );
           return {
-            credential: await onLoadActiveQr(
-              props.selectedCompetition.id,
-              gym.id,
-            ),
+            credential: credential
+              ? assertGymQrCredentialScope(
+                  credential,
+                  props.selectedCompetition.id,
+                  gym.id,
+                )
+              : null,
             failed: false,
           };
         } catch {
@@ -201,10 +229,17 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setLoadingPosterGymId(gym.id);
     setPosterRecoveryMessage("");
     try {
-      const credential = await onLoadActiveQr(
+      const loadedCredential = await onLoadActiveQr(
         props.selectedCompetition.id,
         gym.id,
       );
+      const credential = loadedCredential
+        ? assertGymQrCredentialScope(
+            loadedCredential,
+            props.selectedCompetition.id,
+            gym.id,
+          )
+        : null;
       if (!credential) {
         setPosterRecoveryMessage(
           "This poster could not be loaded. Reissue it to create a new downloadable copy.",
@@ -224,15 +259,16 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     input: OperatorReasonDto,
   ) {
     setPosterRecoveryMessage("");
-    const credential = await props.onIssueQr(gym.id, input);
-    if (
-      credential.competitionId !== props.selectedCompetition.id ||
-      credential.gymLocationId !== gym.id
-    ) {
-      throw new AdminUserFacingError(
-        "The generated poster did not match the selected contest and gym. Do not print it. Refresh the dashboard and try again.",
-      );
-    }
+    const issuedCredential = await props.onIssueQr(
+      props.selectedCompetition.id,
+      gym.id,
+      input,
+    );
+    const credential = assertGymQrCredentialScope(
+      issuedCredential,
+      props.selectedCompetition.id,
+      gym.id,
+    );
     setPoster(credential);
   }
 
@@ -670,7 +706,11 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                 onIssue={(input) => issueQrForGym(gym, input)}
                 onDelete={() => props.onDeleteGym(gym)}
                 onRevoke={async (input) => {
-                  await props.onRevokeQr(gym.id, input);
+                  await props.onRevokeQr(
+                    props.selectedCompetition.id,
+                    gym.id,
+                    input,
+                  );
                   setPosterRecoveryMessage("");
                   setPoster((current) =>
                     current?.gymLocationId === gym.id ? null : current,
@@ -1114,7 +1154,11 @@ function GymCard({
   );
 }
 
-function PosterPreview({ credential }: { credential: GymQrCredential }) {
+export function PosterPreview({
+  credential,
+}: {
+  credential: GymQrCredential;
+}) {
   const [source, setSource] = useState<string | null>(null);
   const [conversionError, setConversionError] = useState("");
   const [collapsed, setCollapsed] = useState(false);

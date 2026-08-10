@@ -222,6 +222,19 @@ describeWithDatabase('critical session and ledger workflow', () => {
         fixture.gymPresence.credential,
       ),
     ).resolves.toMatchObject({ id: fixture.competitionId });
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'existing-first-contest-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
     await expect(
       competitions.getCurrentEnrollment(userPrincipal, otherCompetition.id),
     ).resolves.toBeNull();

@@ -10,6 +10,7 @@ import type {
 import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { parseCoordinate } from "./coordinate-input";
 import { AdminUserFacingError, errorMessage } from "./admin-dashboard-utils";
+import { formValidationError } from "./form-validation";
 import { posterSvgToJpegBlob } from "./poster-jpeg";
 import {
   genericAdministrativeReasons,
@@ -119,6 +120,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   const [locationMessage, setLocationMessage] = useState("");
   const [assignGymError, setAssignGymError] = useState("");
   const [assignGymSuccess, setAssignGymSuccess] = useState("");
+  const [cashFormError, setCashFormError] = useState("");
   const [createGymOpen, setCreateGymOpen] = useState(props.gyms.length === 0);
   const [pilotAuditHidden, setPilotAuditHidden] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -179,7 +181,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           ? ""
           : results.some((result) => result.failed)
             ? "The active poster could not be restored. Refresh the dashboard and try again."
-            : "This active poster was issued before server recovery was available. Reissue it once; every future visit will restore it automatically.",
+            : "This poster could not be loaded. Reissue it to create a new downloadable copy.",
       );
     });
 
@@ -203,7 +205,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       );
       if (!credential) {
         setPosterRecoveryMessage(
-          "This active poster was issued before server recovery was available. Reissue it once; every future visit will restore it automatically.",
+          "This poster could not be loaded. Reissue it to create a new downloadable copy.",
         );
         return;
       }
@@ -240,6 +242,12 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 
     setCreateGymError("");
     setCreateGymSuccess("");
+
+    const validationError = formValidationError(formElement);
+    if (validationError) {
+      setCreateGymError(validationError);
+      return;
+    }
 
     try {
       if (name.length < 2)
@@ -354,6 +362,12 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     setAssignGymError("");
     setAssignGymSuccess("");
 
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setAssignGymError(validationError);
+      return;
+    }
+
     try {
       if (!gymId)
         throw new AdminUserFacingError("Choose an active Partner gym.");
@@ -365,7 +379,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       await props.onAssignGym(competitionId, gymId, { reason });
       const gymName = props.gyms.find((gym) => gym.id === gymId)?.name ?? "Gym";
       setAssignGymSuccess(
-        `${gymName} is assigned to ${props.selectedCompetition.name}. Issue this contest's separate poster below.`,
+        `${gymName} is assigned to ${props.selectedCompetition.name}. Continue below to issue its QR poster.`,
       );
     } catch (error) {
       setAssignGymError(formErrorMessage(error));
@@ -374,14 +388,24 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 
   async function recordCash(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCashFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setCashFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
-    await props.onRecordCash({
-      amountCents: Number(form.get("amountCents")),
-      currency: String(form.get("currency") ?? "CAD").toUpperCase(),
-      reason: String(form.get("reason") ?? "").trim(),
-      rewardAwardId: String(form.get("rewardAwardId") ?? "").trim(),
-    });
-    event.currentTarget.reset();
+    try {
+      await props.onRecordCash({
+        amountCents: Number(form.get("amountCents")),
+        currency: String(form.get("currency") ?? "CAD").toUpperCase(),
+        reason: String(form.get("reason") ?? "").trim(),
+        rewardAwardId: String(form.get("rewardAwardId") ?? "").trim(),
+      });
+      event.currentTarget.reset();
+    } catch (error) {
+      setCashFormError(formErrorMessage(error));
+    }
   }
 
   return (
@@ -391,11 +415,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">CONTEST GYM ASSIGNMENT</p>
             <h2>Assign a gym to {props.selectedCompetition.name}</h2>
-            <p>
-              This assignment belongs only to this contest. SkyGate or any other
-              Partner gym can also be assigned independently to another contest
-              in the same region.
-            </p>
+            <p>Choose the Partner gym where players will scan for this contest.</p>
           </div>
           <span className="setup-context-tag">
             {props.selectedCompetition.regionName}
@@ -451,14 +471,21 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               contest. Continue below to issue or recover the gym poster.
             </p>
           ) : null}
-          {assignGymError ? (
-            <p className="pilot-form-message form-error" role="alert">
-              {assignGymError}
-            </p>
-          ) : null}
           {assignGymSuccess ? (
             <p aria-live="polite" className="pilot-form-message form-success">
               {assignGymSuccess}
+            </p>
+          ) : null}
+          {availableAssignmentGyms.length === 0 ? (
+            <p className="pilot-form-message form-error" role="status">
+              {selectedRegionGyms.some((gym) => gym.active)
+                ? "Every active Partner gym in this region is already assigned to this contest."
+                : "No active Partner gym is available in this region. Create a gym below before continuing."}
+            </p>
+          ) : null}
+          {assignGymError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {assignGymError}
             </p>
           ) : null}
         </form>
@@ -470,9 +497,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <p className="eyebrow">STATIC QR PILOT</p>
             <h2>QR posters for {props.selectedCompetition.name}</h2>
             <p>
-              Issue or recover a poster only after its gym is assigned above.
-              Every contest receives a different poster, even when multiple
-              contests use the same Partner gym.
+              Issue or recover the printable QR poster for an assigned gym.
             </p>
           </div>
         </div>
@@ -510,7 +535,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                   )
                   .map((region) => (
                     <option key={region.id} value={region.id}>
-                      {region.metroName} ({region.code})
+                      {region.metroName}
                     </option>
                   ))}
               </select>
@@ -579,14 +604,14 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                 ? "CREATING PARTNER GYM..."
                 : "+ CREATE PARTNER GYM"}
             </button>
-            {createGymError ? (
-              <p className="pilot-form-message form-error" role="alert">
-                {createGymError}
-              </p>
-            ) : null}
             {createGymSuccess ? (
               <p aria-live="polite" className="pilot-form-message form-success">
                 {createGymSuccess}
+              </p>
+            ) : null}
+            {createGymError ? (
+              <p className="pilot-form-message form-error" role="alert">
+                {createGymError}
               </p>
             ) : null}
           </form>
@@ -643,7 +668,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       <PilotTable
         defaultOpen
         empty="No QR visits have been recorded."
-        eyebrow="SERVER-AUTHORITATIVE VISITS"
+        eyebrow="QR VISITS"
         headings={["Gym", "Started", "Completed", "Status"]}
         rows={props.sessions.map((session) => [
           session.gymName,
@@ -710,7 +735,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </div>
           </summary>
           <div className="pilot-collapsible-body">
-            <form className="pilot-form" onSubmit={recordCash}>
+            <form className="pilot-form" noValidate onSubmit={recordCash}>
               <label className="pilot-form-wide">
                 <span>AWARD ID</span>
                 <input
@@ -742,6 +767,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               <label className="pilot-form-wide">
                 <span>FULFILLMENT NOTE + REASON</span>
                 <input
+                  minLength={8}
                   name="reason"
                   placeholder="Cash handed to winner in person by …"
                   required
@@ -754,6 +780,11 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               >
                 RECORD CASH HANDOFF
               </button>
+              {cashFormError ? (
+                <p className="pilot-form-message form-error" role="alert">
+                  {cashFormError}
+                </p>
+              ) : null}
             </form>
           </div>
         </details>
@@ -762,11 +793,11 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
       {pilotAuditHidden ? (
         <section className="panel pilot-dismissed-panel">
           <div>
-            <p className="eyebrow">APPEND-ONLY PILOT LEDGER</p>
+            <p className="eyebrow">PILOT AUDIT HISTORY</p>
             <h2>Pilot audit history cleared from view</h2>
             <p>
-              The authoritative audit records are preserved. This dashboard
-              preference affects only this device.
+              The audit records remain saved. This display choice affects only
+              this device.
             </p>
           </div>
           <button
@@ -781,7 +812,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         <PilotTable
           dismissLabel="CLEAR FROM VIEW"
           empty="No pilot audit events."
-          eyebrow="APPEND-ONLY PILOT LEDGER"
+          eyebrow="PILOT AUDIT HISTORY"
           headings={["Action", "Entity", "Reason", "Time"]}
           onDismiss={() => changePilotAuditVisibility(true)}
           rows={props.auditEvents.map((entry) => [
@@ -846,19 +877,30 @@ function GymCard({
   submitting: boolean;
 }) {
   const qrLockId = useId();
+  const [formError, setFormError] = useState("");
   async function update(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
-    await onUpdate({
-      active: form.get("active") === "on",
-      address: String(form.get("address") ?? "").trim(),
-      latitude: Number(form.get("latitude")),
-      longitude: Number(form.get("longitude")),
-      name: String(form.get("name") ?? "").trim(),
-      radiusMeters: Number(form.get("radiusMeters")),
-      reason: String(form.get("reason") ?? "").trim(),
-      regionPolicyId: gym.regionPolicyId,
-    });
+    try {
+      await onUpdate({
+        active: form.get("active") === "on",
+        address: String(form.get("address") ?? "").trim(),
+        latitude: Number(form.get("latitude")),
+        longitude: Number(form.get("longitude")),
+        name: String(form.get("name") ?? "").trim(),
+        radiusMeters: Number(form.get("radiusMeters")),
+        reason: String(form.get("reason") ?? "").trim(),
+        regionPolicyId: gym.regionPolicyId,
+      });
+    } catch (error) {
+      setFormError(formErrorMessage(error));
+    }
   }
 
   return (
@@ -907,7 +949,7 @@ function GymCard({
           disabled={submitting || !activeCredentialVersion}
           onClick={() =>
             void onRevoke({
-              reason: "Revoke the current static QR credential.",
+              reason: "Revoke the current QR poster.",
             })
           }
           type="button"
@@ -928,13 +970,12 @@ function GymCard({
       {qrLocked ? (
         <p className="action-guidance compact" id={qrLockId}>
           Assign {gym.name} to {selectedContestName} above before issuing or
-          viewing its QR poster. An existing credential can still be revoked
-          immediately for security.
+          viewing its QR poster. An existing QR poster can still be revoked.
         </p>
       ) : null}
       <details className="pilot-details">
         <summary>Edit Partner gym + geofence</summary>
-        <form className="pilot-form" onSubmit={update}>
+        <form className="pilot-form" noValidate onSubmit={update}>
           <label>
             <span>NAME</span>
             <input defaultValue={gym.name} name="name" required />
@@ -990,6 +1031,11 @@ function GymCard({
           >
             SAVE PARTNER GYM
           </button>
+          {formError ? (
+            <p className="pilot-form-message form-error" role="alert">
+              {formError}
+            </p>
+          ) : null}
         </form>
       </details>
     </article>
@@ -1122,7 +1168,7 @@ function PilotTable({
         <div className="pilot-collapsible-body">
           {onDismiss ? (
             <div className="pilot-panel-controls">
-              <span>Records remain preserved in the authoritative ledger.</span>
+              <span>Records remain saved in the audit history.</span>
               <button className="text-button" onClick={onDismiss} type="button">
                 {dismissLabel ?? "CLEAR FROM VIEW"}
               </button>

@@ -72,6 +72,7 @@ import {
   genericAdministrativeReasons,
   ReasonPresetChips,
 } from "./reason-presets";
+import { formValidationError } from "./form-validation";
 
 type AuthStage = "checking" | "denied" | "ready" | "signed-out";
 type ConfirmAction = {
@@ -97,7 +98,7 @@ const navigation: {
   short: string;
 }[] = [
   {
-    description: "A separate operating home for every existing contest.",
+    description: "Review every existing contest from one place.",
     id: "overview",
     label: "Contest home",
     short: "OV",
@@ -132,7 +133,7 @@ const navigation: {
   },
   {
     description:
-      "Maintain Creator workouts and authoritative legal document versions.",
+      "Manage Creator workouts and published legal content.",
     id: "content",
     label: "Content + Legal",
     short: "CL",
@@ -622,6 +623,11 @@ export function AdminDashboard({
   ): Promise<void> {
     event.preventDefault();
     setLoadError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setLoadError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
@@ -789,7 +795,7 @@ export function AdminDashboard({
   function requestContestDeletion(competition: Competition) {
     setConfirmAction({
       actionLabel: "Delete contest",
-      description: `${competition.name} will be removed from the operating dashboard. Participation, results, and audit records remain preserved.`,
+      description: `${competition.name} will be removed from the operating dashboard. Existing participation, results, and audit records will not be affected.`,
       execute: (reason) =>
         mutate(
           "Contest deleted from the dashboard.",
@@ -814,7 +820,7 @@ export function AdminDashboard({
       description:
         action === "publish"
           ? `${competition.name} will become visible and joinable in the player app immediately.`
-          : `${competition.name} will be cancelled. This action is recorded in the audit ledger.`,
+          : `${competition.name} will be cancelled. This action is recorded in the audit history.`,
       execute: (reason) =>
         mutate(
           action === "publish" ? "Contest published." : "Contest cancelled.",
@@ -1029,7 +1035,7 @@ export function AdminDashboard({
               onDeleteGym={(gym) =>
                 setConfirmAction({
                   actionLabel: "Delete Partner gym",
-                  description: `${gym.name} will be removed from the dashboard. Existing visit and audit evidence remains preserved.`,
+                  description: `${gym.name} will be removed from the dashboard. Existing visit and audit records will not be affected.`,
                   execute: (reason) =>
                     mutate(
                       "Partner gym deleted from the dashboard.",
@@ -1059,7 +1065,7 @@ export function AdminDashboard({
               }}
               onRevokeQr={async (gymId, body) => {
                 await mutate(
-                  "QR credential revoked.",
+                  "QR poster revoked.",
                   `operator/competitions/${setupCompetition.id}/gym-locations/${gymId}/qr-credentials/revoke`,
                   "POST",
                   body,
@@ -1086,7 +1092,7 @@ export function AdminDashboard({
               onDelete={(reward) =>
                 setConfirmAction({
                   actionLabel: "Delete reward",
-                  description: `${reward.title} will be removed from the dashboard. Award, redemption, and audit records remain preserved.`,
+                  description: `${reward.title} will be removed from the dashboard. Existing award, redemption, and audit records will not be affected.`,
                   execute: (reason) =>
                     mutate(
                       "Reward deleted from the dashboard.",
@@ -1132,11 +1138,11 @@ export function AdminDashboard({
               onCreate={() => setRegionEditor(true)}
               onDelete={(region) =>
                 setConfirmAction({
-                  actionLabel: "Delete region policy",
-                  description: `${region.metroName} ${region.policyVersion} will be removed from the dashboard. Historical eligibility evidence remains preserved.`,
+                  actionLabel: "Delete region",
+                  description: `${region.metroName} will be removed from the dashboard. Existing contest records will not be affected.`,
                   execute: (reason) =>
                     mutate(
-                      "Regional policy deleted from the dashboard.",
+                      "Region deleted from the dashboard.",
                       `operator/configuration/region-policies/${region.id}`,
                       "DELETE",
                       { reason },
@@ -1157,7 +1163,7 @@ export function AdminDashboard({
               onDeleteDocument={(document) =>
                 setConfirmAction({
                   actionLabel: "Delete legal version",
-                  description: `${document.title} version ${document.version} will be removed from the dashboard. The immutable document, receipts, and audit evidence remain preserved.`,
+                  description: `${document.title} version ${document.version} will be removed from the dashboard. Existing acceptance records will not be affected.`,
                   execute: (reason) =>
                     mutate(
                       "Legal version deleted from the dashboard.",
@@ -1171,7 +1177,7 @@ export function AdminDashboard({
               onDeleteWorkout={(workout) =>
                 setConfirmAction({
                   actionLabel: "Delete workout",
-                  description: `${workout.title} will be removed from the dashboard. Existing member planning and audit records remain preserved.`,
+                  description: `${workout.title} will be removed from the dashboard. Existing member planning and audit records will not be affected.`,
                   execute: (reason) =>
                     mutate(
                       "Creator workout deleted from the dashboard.",
@@ -1288,7 +1294,7 @@ export function AdminDashboard({
           onClose={() => setRegionEditor(false)}
           onSubmit={async (body) => {
             await mutate(
-              "Regional policy created.",
+              "Region added.",
               "operator/configuration/region-policies",
               "POST",
               body,
@@ -1409,14 +1415,13 @@ function SignInScreen({
           <span>01</span>
           <p>
             <strong>Role-based workspaces</strong>
-            Your server-assigned account role decides which tools and gym data
-            you can access.
+            Your account role decides which tools and gym data you can access.
           </p>
           <span>02</span>
           <p>
             <strong>Every change is traceable</strong>
-            Reasons, previous states and new states are recorded in an
-            append-only audit history.
+            Reasons, previous states and new states are recorded in the audit
+            history.
           </p>
         </div>
       </section>
@@ -1427,19 +1432,15 @@ function SignInScreen({
           <div className="alert error compact" role="alert">
             <span>!</span>
             <p>
-              {signedInEmail || "This account"} is signed in, but the backend
-              did not confirm operator access or an active gym assignment.
+              {signedInEmail || "This account"} does not have access to this
+              workspace or an active gym assignment.
             </p>
           </div>
         ) : null}
-        {error && firebaseConfigured ? (
-          <p className="form-error">{error}</p>
-        ) : null}
         {!firebaseConfigured ? (
           <p className="configuration-note" role="status">
-            Firebase sign-in has not been configured for this dashboard build.
-            Add the existing GoGymGo Firebase web configuration before operator
-            sign-in can start.
+            Sign-in is temporarily unavailable. Contact GoGymGo support and try
+            again later.
           </p>
         ) : denied && onSignOut ? (
           <button
@@ -1476,6 +1477,7 @@ function SignInScreen({
             </div>
             <form
               className="stacked-form"
+              noValidate
               onSubmit={(event) => void onEmailSignIn(event)}
             >
               <input name="portal" type="hidden" value={portal} />
@@ -1509,12 +1511,16 @@ function SignInScreen({
                   ? "ENTER GOGYMGO CONTROL"
                   : "ENTER PARTNER WORKSPACE"}
               </button>
+              {error && firebaseConfigured ? (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
             </form>
           </>
         )}
         <p className="fine-print">
-          Choosing a workspace does not grant permissions. The backend verifies
-          the account, role and assigned gyms on every request.
+          Your account role and assigned gyms determine what you can access.
         </p>
       </section>
     </main>
@@ -1795,10 +1801,7 @@ function PartnerWorkspace({
                 <div>
                   <p className="eyebrow">ASSIGNED LOCATIONS</p>
                   <h2>My gyms</h2>
-                  <p>
-                    Location and QR access is restricted independently for every
-                    gym.
-                  </p>
+                  <p>View each assigned gym and manage its QR posters.</p>
                 </div>
               </div>
               <div className="card-list partner-gym-list">
@@ -1819,9 +1822,6 @@ function PartnerWorkspace({
                       </span>
                     </div>
                     <div className="partner-gym-details">
-                      <span>
-                        Region <strong>{gym.regionCode}</strong>
-                      </span>
                       <span>
                         CONTEST POSTERS{" "}
                         <strong>
@@ -2170,11 +2170,7 @@ function ContestLaunchGuide({
         <div>
           <p className="eyebrow">GUIDED CONTEST LAUNCH</p>
           <h2>{competition?.name ?? "Start with a contest"}</h2>
-          <p>
-            Each draft must complete these steps in order. A Partner gym can
-            support more than one contest, but every contest gets its own QR
-            poster.
-          </p>
+          <p>Complete these steps in order to prepare the contest for players.</p>
         </div>
         <div className="contest-launch-selector">
           <label>
@@ -2413,10 +2409,10 @@ function Overview({
         <div className="panel-heading">
           <div>
             <p className="eyebrow">EXISTING CONTEST HOMES</p>
-            <h2>Each contest stays separate</h2>
+            <h2>Your contests</h2>
             <p>
-              Open one contest at a time to see its schedule, reward, assigned
-              gyms and contest-specific QR posters.
+              Open a contest to review its schedule, rewards, assigned gyms and
+              QR posters.
             </p>
           </div>
           <button className="primary-button" onClick={onCreate} type="button">
@@ -2796,7 +2792,7 @@ function CompetitionsPanel({
               : !setupState.rewardReady
                 ? "Publish at least one eligible reward first."
                 : !setupState.regionReady
-                  ? "Confirm an enabled region policy that covers the full contest schedule."
+                  ? "Choose an enabled region that covers the full contest schedule."
                   : !setupState.gymAssigned
                     ? "Assign at least one active Partner gym."
                     : !setupState.qrReady
@@ -3293,21 +3289,21 @@ function RegionsPanel({
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">AUTHORITATIVE LOCATION BOUNDARIES</p>
-          <h2>Regional policies</h2>
+          <p className="eyebrow">PLAYER ELIGIBILITY AREAS</p>
+          <h2>Regions</h2>
           <p>
-            Immutable, time-bounded geographic rules decide which contests a
-            player may enter.
+            Add and review the geographic areas where players can join a
+            contest.
           </p>
         </div>
         <button className="primary-button" onClick={onCreate} type="button">
-          + NEW REGION POLICY
+          + ADD REGION
         </button>
       </div>
       {regions.length === 0 ? (
         <EmptyState
-          body="Create the first time-bounded regional policy before configuring a contest."
-          title="No regional policies configured"
+          body="Add the first region before configuring a contest."
+          title="No regions added"
         />
       ) : (
         <div className="card-list">
@@ -3317,6 +3313,14 @@ function RegionsPanel({
               (region.validTo !== null &&
                 new Date(region.validTo).getTime() <=
                   new Date(evaluatedAt).getTime());
+            const countryName =
+              region.countryCode === "CA"
+                ? "Canada"
+                : region.countryCode === "US"
+                  ? "United States"
+                  : region.countryCode === "MX"
+                    ? "Mexico"
+                    : region.countryCode;
             return (
               <article
                 className={
@@ -3326,7 +3330,9 @@ function RegionsPanel({
                 }
                 key={region.id}
               >
-                <div className="region-code">{region.code}</div>
+                <div className="region-code">
+                  {countryName} · {region.subdivisionCode}
+                </div>
                 <div>
                   {region.id === selectedRegionId ? (
                     <span className="setup-context-tag">
@@ -3340,26 +3346,30 @@ function RegionsPanel({
                   </span>
                   <h3>{region.metroName}</h3>
                   <p>
-                    {region.countryCode}-{region.subdivisionCode} ·{" "}
-                    {region.timezone}
+                    {region.timezone.split("/").pop()?.replaceAll("_", " ") ??
+                      region.timezone}
                   </p>
                 </div>
                 <dl>
                   <div>
-                    <dt>POLICY</dt>
-                    <dd>{region.policyVersion}</dd>
-                  </div>
-                  <div>
-                    <dt>BOUNDARY</dt>
-                    <dd>{region.boundaryVersion}</dd>
+                    <dt>CONTESTS</dt>
+                    <dd>{region.competitionEnabled ? "Allowed" : "Disabled"}</dd>
                   </div>
                   <div>
                     <dt>MINIMUM AGE</dt>
-                    <dd>{region.minimumAge}</dd>
+                    <dd>{region.minimumAge}+</dd>
                   </div>
                   <div>
-                    <dt>VALID FROM</dt>
+                    <dt>STARTS</dt>
                     <dd>{formatDate(region.validFrom)}</dd>
+                  </div>
+                  <div>
+                    <dt>ENDS</dt>
+                    <dd>
+                      {region.validTo
+                        ? formatDate(region.validTo)
+                        : "No scheduled end"}
+                    </dd>
                   </div>
                 </dl>
                 {deletable ? (
@@ -3536,7 +3546,7 @@ function ContentPanel({
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">SERVER-AUTHORITATIVE LEGAL TEXT</p>
+            <p className="eyebrow">PUBLISHED LEGAL CONTENT</p>
             <h2>Legal documents</h2>
             <p>
               Publish approved, versioned policy text and withdraw superseded
@@ -3899,7 +3909,7 @@ function OperationsPanel({
                       ))
                     ) : (
                       <p>
-                        No related ledger event is available yet. Use the record
+                        No related audit entry is available yet. Use the record
                         ID above while completing the review.
                       </p>
                     )}
@@ -3958,7 +3968,7 @@ function MetricCard({
     <div className="metric static">
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>AUTHORITATIVE STATE</small>
+      <small>CURRENT STATE</small>
     </div>
   );
 }
@@ -4012,7 +4022,7 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">APPEND-ONLY LEDGER</p>
+          <p className="eyebrow">ADMINISTRATIVE RECORDS</p>
           <h2>Audit history</h2>
           <p>
             The latest 100 administrative decisions, including who acted and
@@ -4190,6 +4200,11 @@ export function CompetitionForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     try {
       const goalDays = String(form.get("goalDays") ?? "")
@@ -4217,7 +4232,10 @@ export function CompetitionForm({
         registrationOpensAt: toIso(form, "registrationOpensAt"),
         rules: partnerMode
           ? (competition?.rules ?? defaultCompetitionRules)
-          : JSON.parse(String(form.get("rules"))),
+          : parseJsonInput(
+              String(form.get("rules")),
+              "Scoring and verification rules",
+            ),
         rulesVersion: partnerMode
           ? (competition?.rulesVersion ?? "partner-proposal-v1")
           : String(form.get("rulesVersion")),
@@ -4242,7 +4260,11 @@ export function CompetitionForm({
             : "New contest draft"
       }
     >
-      <form className="editor-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="editor-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
         <FormGrid>
           {gyms ? (
             <Field label="GYM">
@@ -4261,7 +4283,7 @@ export function CompetitionForm({
               </select>
             </Field>
           ) : null}
-          <Field label="REGION POLICY">
+          <Field label="REGION">
             <select
               defaultValue={
                 competition?.regionPolicyId ?? selectedGym?.regionPolicyId
@@ -4273,7 +4295,7 @@ export function CompetitionForm({
               <option value="">Select a region</option>
               {selectableRegions.map((region) => (
                 <option key={region.id} value={region.id}>
-                  {region.metroName} · {region.policyVersion}
+                  {region.metroName}
                 </option>
               ))}
             </select>
@@ -4394,7 +4416,6 @@ export function CompetitionForm({
             }
           />
         </FormGrid>
-        {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}
           submitting={submitting}
@@ -4408,6 +4429,11 @@ export function CompetitionForm({
                 : "CREATE DRAFT"
           }
         />
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
       </form>
     </ModalShell>
   );
@@ -4435,6 +4461,11 @@ function RewardForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     try {
       const selectedRewardType = String(form.get("rewardType"));
@@ -4478,7 +4509,11 @@ function RewardForm({
       onClose={onClose}
       title={reward ? "Edit reward draft" : "New brand reward"}
     >
-      <form className="editor-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="editor-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
         <FormGrid>
           <Field label="CONTEST" wide>
             <select
@@ -4642,15 +4677,105 @@ function RewardForm({
               : "Create a verified brand reward draft for review."
           }
         />
-        {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}
           submitting={submitting}
           submitLabel={reward ? "SAVE REWARD" : "CREATE REWARD"}
         />
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
       </form>
     </ModalShell>
   );
+}
+
+function parseJsonInput(value: string, label: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    throw new AdminUserFacingError(
+      `${label} cannot be read. Check for missing commas, quotation marks or brackets.`,
+    );
+  }
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeRegionBoundary(value: string): Record<string, unknown> {
+  if (!value.trim()) {
+    throw new AdminUserFacingError(
+      "Upload the approved region boundary file or paste the boundary data before continuing.",
+    );
+  }
+
+  let source: unknown;
+  try {
+    source = JSON.parse(value) as unknown;
+  } catch {
+    throw new AdminUserFacingError(
+      "The boundary file could not be read. Upload the original boundary file or paste its complete contents.",
+    );
+  }
+
+  const polygons: unknown[] = [];
+  const addGeometry = (geometry: unknown) => {
+    if (!isJsonRecord(geometry) || !Array.isArray(geometry.coordinates)) {
+      return;
+    }
+    if (geometry.type === "Polygon") {
+      polygons.push(geometry.coordinates);
+    } else if (geometry.type === "MultiPolygon") {
+      polygons.push(...geometry.coordinates);
+    }
+  };
+
+  if (isJsonRecord(source) && source.type === "Feature") {
+    addGeometry(source.geometry);
+  } else if (
+    isJsonRecord(source) &&
+    source.type === "FeatureCollection" &&
+    Array.isArray(source.features)
+  ) {
+    source.features.forEach((feature) => {
+      if (isJsonRecord(feature)) addGeometry(feature.geometry);
+    });
+  } else {
+    addGeometry(source);
+  }
+
+  if (polygons.length === 0) {
+    throw new AdminUserFacingError(
+      "The boundary file does not contain a usable region shape. Ask your mapping provider for a complete boundary file and upload it again.",
+    );
+  }
+
+  return { coordinates: polygons, type: "MultiPolygon" };
+}
+
+function automaticRegionCode(name: string, subdivisionCode: string): string {
+  const code = `${name}-${subdivisionCode}`
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64)
+    .replace(/-+$/g, "");
+  if (code.length < 2) {
+    throw new AdminUserFacingError(
+      "Region name and province or state code must contain letters or numbers.",
+    );
+  }
+  return code;
+}
+
+function automaticRegionVersion(validFrom: string): string {
+  return `effective-${validFrom.replace(/[-:.]/g, "").replace("Z", "z")}`;
 }
 
 function RegionForm({
@@ -4663,84 +4788,196 @@ function RegionForm({
   submitting: boolean;
 }) {
   const [formError, setFormError] = useState("");
+  const [boundaryText, setBoundaryText] = useState("");
+  const [boundaryFileName, setBoundaryFileName] = useState("");
+  const [countryCode, setCountryCode] = useState("CA");
+  const [subdivisionCode, setSubdivisionCode] = useState("BC");
+  const [currency, setCurrency] = useState("CAD");
+  const [timezone, setTimezone] = useState("America/Vancouver");
+  const [languageCode, setLanguageCode] = useState("en-CA");
+
+  function chooseCountry(nextCountryCode: string) {
+    setCountryCode(nextCountryCode);
+    if (nextCountryCode === "US") {
+      setSubdivisionCode("WA");
+      setCurrency("USD");
+      setTimezone("America/Los_Angeles");
+      setLanguageCode("en-US");
+    } else if (nextCountryCode === "MX") {
+      setSubdivisionCode("JAL");
+      setCurrency("MXN");
+      setTimezone("America/Mexico_City");
+      setLanguageCode("es-MX");
+    } else {
+      setSubdivisionCode("BC");
+      setCurrency("CAD");
+      setTimezone("America/Vancouver");
+      setLanguageCode("en-CA");
+    }
+  }
+
+  async function loadBoundaryFile(file: File | undefined) {
+    setFormError("");
+    setBoundaryFileName("");
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const boundary = normalizeRegionBoundary(text);
+      setBoundaryText(JSON.stringify(boundary, null, 2));
+      setBoundaryFileName(file.name);
+    } catch (error) {
+      setBoundaryText("");
+      setFormError(errorMessage(error));
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     try {
+      const metroName = String(form.get("metroName") ?? "").trim();
+      const subdivisionCode = String(
+        form.get("subdivisionCode") ?? "",
+      ).toUpperCase();
+      const validFrom = toIso(form, "validFrom");
+      const validTo = optionalIso(form.get("validTo"));
+      if (validTo && new Date(validTo) <= new Date(validFrom)) {
+        throw new AdminUserFacingError(
+          "Ends on must be later than starts on, or left blank when the region has no scheduled end.",
+        );
+      }
+      const policyVersion = automaticRegionVersion(validFrom);
       await onSubmit(
         compactObject({
-          boundary: JSON.parse(String(form.get("boundary"))),
-          boundaryVersion: String(form.get("boundaryVersion")),
-          code: String(form.get("code")),
+          boundary: normalizeRegionBoundary(boundaryText),
+          boundaryVersion: `boundary-${policyVersion}`,
+          code: automaticRegionCode(metroName, subdivisionCode),
           competitionEnabled: form.get("competitionEnabled") === "on",
           countryCode: String(form.get("countryCode")).toUpperCase(),
           currency: String(form.get("currency")).toUpperCase(),
-          languageCodes: String(form.get("languageCodes"))
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean),
-          metroName: String(form.get("metroName")),
+          languageCodes: [String(form.get("languageCode"))],
+          metroName,
           minimumAge: Number(form.get("minimumAge")),
-          policyVersion: String(form.get("policyVersion")),
-          reason: String(form.get("reason")),
-          subdivisionCode: String(form.get("subdivisionCode")).toUpperCase(),
+          policyVersion,
+          reason:
+            "Add a region for contest eligibility.",
+          subdivisionCode,
           timezone: String(form.get("timezone")),
-          validFrom: toIso(form, "validFrom"),
-          validTo: optionalIso(form.get("validTo")),
+          validFrom,
+          validTo,
         }),
       );
     } catch (error) {
       setFormError(errorMessage(error));
     }
   }
+
   return (
-    <ModalShell onClose={onClose} title="New regional policy">
-      <form className="editor-form" onSubmit={(event) => void submit(event)}>
+    <ModalShell onClose={onClose} title="Add a region">
+      <form
+        className="editor-form region-onboarding-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
         <div className="alert warning compact">
           <span>!</span>
           <p>
-            Regional policies are immutable. Use an approved GeoJSON
-            MultiPolygon and confirm the boundary version before saving.
+            Check the region name, dates and boundary before saving. A saved
+            region cannot be edited; create a replacement if its coverage
+            changes later.
+          </p>
+        </div>
+        <div className="region-onboarding-summary">
+          <strong>WHAT YOU NEED</strong>
+          <p>
+            A recognizable region name, its local settings, the start date and
+            an approved boundary file from your mapping provider.
           </p>
         </div>
         <FormGrid>
-          <Field label="REGION CODE">
-            <input name="code" placeholder="vancouver-island-bc" required />
-          </Field>
-          <Field label="DISPLAY NAME">
-            <input name="metroName" placeholder="Vancouver Island" required />
+          <Field label="REGION NAME" wide>
+            <input
+              data-validation-label="Region name"
+              name="metroName"
+              placeholder="Vancouver Island"
+              required
+            />
+            <small className="field-help">
+              Use the name gym owners and players will recognize.
+            </small>
           </Field>
           <Field label="COUNTRY">
-            <input
-              defaultValue="CA"
-              maxLength={2}
+            <select
               name="countryCode"
+              onChange={(event) => chooseCountry(event.target.value)}
               required
-            />
-          </Field>
-          <Field label="SUBDIVISION">
-            <input
-              defaultValue="BC"
-              maxLength={8}
-              name="subdivisionCode"
-              required
-            />
-          </Field>
-          <Field label="CURRENCY">
-            <select defaultValue="CAD" name="currency">
-              <option>CAD</option>
-              <option>USD</option>
-              <option>MXN</option>
+              value={countryCode}
+            >
+              <option value="CA">Canada</option>
+              <option value="US">United States</option>
+              <option value="MX">Mexico</option>
             </select>
           </Field>
-          <Field label="TIMEZONE">
-            <input defaultValue="America/Vancouver" name="timezone" required />
+          <Field label="PROVINCE / STATE CODE">
+            <input
+              data-validation-label="Province or state code"
+              maxLength={8}
+              name="subdivisionCode"
+              onChange={(event) =>
+                setSubdivisionCode(event.target.value.toUpperCase())
+              }
+              pattern="[A-Za-z0-9-]{1,8}"
+              placeholder="BC"
+              required
+              value={subdivisionCode}
+            />
+            <small className="field-help">
+              Enter the short code, such as BC, WA or JAL.
+            </small>
           </Field>
-          <Field label="LANGUAGES">
-            <input defaultValue="en-CA" name="languageCodes" required />
+          <Field label="LOCAL TIME ZONE">
+            <select
+              name="timezone"
+              onChange={(event) => setTimezone(event.target.value)}
+              required
+              value={timezone}
+            >
+              <optgroup label="Canada">
+                <option value="America/Vancouver">Pacific — Vancouver</option>
+                <option value="America/Edmonton">Mountain — Edmonton</option>
+                <option value="America/Regina">Central — Regina</option>
+                <option value="America/Winnipeg">Central — Winnipeg</option>
+                <option value="America/Toronto">Eastern — Toronto</option>
+                <option value="America/Halifax">Atlantic — Halifax</option>
+                <option value="America/St_Johns">
+                  Newfoundland — St. John&apos;s
+                </option>
+              </optgroup>
+              <optgroup label="United States">
+                <option value="America/Los_Angeles">Pacific</option>
+                <option value="America/Denver">Mountain</option>
+                <option value="America/Chicago">Central</option>
+                <option value="America/New_York">Eastern</option>
+                <option value="America/Phoenix">Arizona</option>
+                <option value="America/Anchorage">Alaska</option>
+                <option value="Pacific/Honolulu">Hawaii</option>
+              </optgroup>
+              <optgroup label="Mexico">
+                <option value="America/Tijuana">Tijuana</option>
+                <option value="America/Chihuahua">Chihuahua</option>
+                <option value="America/Monterrey">Monterrey</option>
+                <option value="America/Mexico_City">Mexico City</option>
+                <option value="America/Cancun">Cancún</option>
+              </optgroup>
+            </select>
           </Field>
-          <Field label="MINIMUM AGE">
+          <Field label="MINIMUM PARTICIPANT AGE">
             <input
               defaultValue={19}
               max={99}
@@ -4750,46 +4987,109 @@ function RegionForm({
               type="number"
             />
           </Field>
-          <Field label="POLICY VERSION">
-            <input name="policyVersion" placeholder="2026-09-v1" required />
-          </Field>
-          <Field label="BOUNDARY VERSION">
+          <Field label="STARTS ON">
             <input
-              name="boundaryVersion"
-              placeholder="approved-source-v1"
+              defaultValue={toLocalDateTime(new Date().toISOString())}
+              name="validFrom"
               required
+              type="datetime-local"
             />
           </Field>
-          <Field label="VALID FROM">
-            <input name="validFrom" required type="datetime-local" />
-          </Field>
-          <Field label="VALID TO (OPTIONAL)">
+          <Field label="ENDS ON (OPTIONAL)">
             <input name="validTo" type="datetime-local" />
           </Field>
-          <Field label="GEOJSON MULTIPOLYGON" wide>
-            <textarea
-              defaultValue={
-                '{\n  "type": "MultiPolygon",\n  "coordinates": []\n}'
+          <details className="reward-advanced region-settings-advanced">
+            <summary>
+              <span>REVIEW LOCAL SETTINGS</span>
+              <small>Currency and language are filled from the country</small>
+            </summary>
+            <div className="reward-advanced-grid">
+              <Field label="CURRENCY">
+                <select
+                  name="currency"
+                  onChange={(event) => setCurrency(event.target.value)}
+                  required
+                  value={currency}
+                >
+                  <option value="CAD">Canadian dollar (CAD)</option>
+                  <option value="USD">US dollar (USD)</option>
+                  <option value="MXN">Mexican peso (MXN)</option>
+                </select>
+              </Field>
+              <Field label="PRIMARY LANGUAGE">
+                <select
+                  name="languageCode"
+                  onChange={(event) => setLanguageCode(event.target.value)}
+                  required
+                  value={languageCode}
+                >
+                  <option value="en-CA">English (Canada)</option>
+                  <option value="fr-CA">French (Canada)</option>
+                  <option value="en-US">English (United States)</option>
+                  <option value="es-MX">Spanish (Mexico)</option>
+                </select>
+              </Field>
+            </div>
+          </details>
+          <Field label="REGION BOUNDARY FILE" wide>
+            <input
+              accept=".json,.geojson,application/json,application/geo+json"
+              aria-describedby="region-boundary-help"
+              onChange={(event) =>
+                void loadBoundaryFile(event.currentTarget.files?.[0])
               }
-              name="boundary"
-              required
-              rows={10}
+              type="file"
             />
+            <small className="field-help" id="region-boundary-help">
+              Upload the approved boundary file supplied by your mapping
+              provider. GoGymGo uses it to decide whether a phone is inside the
+              region.
+            </small>
+            {boundaryFileName ? (
+              <span className="boundary-file-ready" role="status">
+                READY — {boundaryFileName}
+              </span>
+            ) : null}
           </Field>
-          <Field label="CONTEST OPERATIONS" wide>
-            <label className="check-row">
-              <input name="competitionEnabled" type="checkbox" />
-              Enable contests within this approved boundary
-            </label>
-          </Field>
-          <ReasonField defaultValue="Create an approved regional policy for GoGymGo operations." />
+          <details className="reward-advanced region-boundary-advanced">
+            <summary>
+              <span>PASTE BOUNDARY DATA INSTEAD</span>
+              <small>Use this only if you received boundary text</small>
+            </summary>
+            <div className="reward-advanced-grid">
+              <Field label="APPROVED BOUNDARY DATA" wide>
+                <textarea
+                  aria-label="Approved boundary data"
+                  onChange={(event) => {
+                    setBoundaryText(event.target.value);
+                    setBoundaryFileName("");
+                  }}
+                  placeholder="Paste the complete boundary text from your mapping provider."
+                  rows={10}
+                  value={boundaryText}
+                />
+              </Field>
+            </div>
+          </details>
+          <label className="check-row field wide">
+            <input
+              defaultChecked
+              name="competitionEnabled"
+              type="checkbox"
+            />
+            <span>Allow contests to use this region immediately</span>
+          </label>
         </FormGrid>
-        {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}
           submitting={submitting}
-          submitLabel="CREATE REGION POLICY"
+          submitLabel="ADD REGION"
         />
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
       </form>
     </ModalShell>
   );
@@ -4815,15 +5115,26 @@ function WorkoutForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     try {
+      const regionCodes = form.getAll("regionCodes").map(String);
+      if (regionCodes.length === 0) {
+        throw new AdminUserFacingError(
+          "Choose at least one region where this workout is available.",
+        );
+      }
       await onSubmit(
         compactObject({
           creatorName: String(form.get("creatorName")),
           durationMinutes: Number(form.get("durationMinutes")),
           expectedVersion: workout?.version,
           reason: String(form.get("reason")),
-          regionCodes: form.getAll("regionCodes").map(String),
+          regionCodes,
           sponsorName: optionalString(form.get("sponsorName")),
           thumbnailUrl: optionalString(form.get("thumbnailUrl")),
           title: String(form.get("title")),
@@ -4841,7 +5152,11 @@ function WorkoutForm({
       onClose={onClose}
       title={workout ? "Edit Creator workout" : "New Creator workout"}
     >
-      <form className="editor-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="editor-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
         <FormGrid>
           <Field label="WORKOUT TITLE">
             <input defaultValue={workout?.title} name="title" required />
@@ -4916,12 +5231,16 @@ function WorkoutForm({
             }
           />
         </FormGrid>
-        {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}
           submitting={submitting}
           submitLabel={workout ? "SAVE WORKOUT" : "CREATE WORKOUT"}
         />
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
       </form>
     </ModalShell>
   );
@@ -4940,10 +5259,18 @@ function LegalDocumentForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     try {
       await onSubmit({
-        content: JSON.parse(String(form.get("content"))),
+        content: parseJsonInput(
+          String(form.get("content")),
+          "Document content",
+        ),
         documentKey: String(form.get("documentKey")),
         effectiveAt: toIso(form, "effectiveAt"),
         jurisdictionCode: String(form.get("jurisdictionCode")),
@@ -4960,7 +5287,11 @@ function LegalDocumentForm({
   }
   return (
     <ModalShell onClose={onClose} title="Publish legal document version">
-      <form className="editor-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="editor-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
         <div className="alert warning compact">
           <span>!</span>
           <p>
@@ -5014,12 +5345,16 @@ function LegalDocumentForm({
             </span>
           </label>
         </FormGrid>
-        {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}
           submitting={submitting}
           submitLabel="PUBLISH VERSION"
         />
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
       </form>
     </ModalShell>
   );
@@ -5040,6 +5375,11 @@ function CouponCodesForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     const codes = [
       ...new Set(
@@ -5062,10 +5402,14 @@ function CouponCodesForm({
       onClose={onClose}
       title={`Add coupon inventory · ${reward.title}`}
     >
-      <form className="editor-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="editor-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
         <p className="modal-copy">
-          Enter one unique coupon code per line. Codes are encrypted by the
-          backend before storage and never returned in this dashboard.
+          Enter one unique coupon code per line. Codes are stored securely and
+          hidden after you add them.
         </p>
         <Field label="COUPON CODES">
           <textarea
@@ -5085,12 +5429,16 @@ function CouponCodesForm({
             rows={3}
           />
         </Field>
-        {formError ? <p className="form-error">{formError}</p> : null}
         <FormActions
           onClose={onClose}
           submitting={submitting}
           submitLabel="ENCRYPT + ADD CODES"
         />
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
       </form>
     </ModalShell>
   );
@@ -5153,7 +5501,6 @@ function ConfirmationDialog({
           />
         </div>
       )}
-      {formError ? <p className="form-error">{formError}</p> : null}
       <div className="form-actions">
         {requiresReview ? (
           <button
@@ -5188,6 +5535,11 @@ function ConfirmationDialog({
           </>
         )}
       </div>
+      {formError ? (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      ) : null}
     </ModalShell>
   );
 }

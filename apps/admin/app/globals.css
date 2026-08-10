@@ -2083,9 +2083,58 @@ td small {
 
 .form-error {
   margin: 14px 0 0;
-  color: #ff8b91;
+  border: 1px solid rgba(255, 45, 64, 0.7);
+  border-radius: 7px;
+  background: rgba(89, 6, 15, 0.34);
+  padding: 12px 14px;
+  color: #ff5f68;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: #ff3948 !important;
+  box-shadow: 0 0 0 2px rgba(255, 57, 72, 0.16);
+}
+
+.region-onboarding-summary {
+  margin-bottom: 18px;
+  border-left: 2px solid var(--cyan);
+  background: rgba(52, 229, 232, 0.055);
+  padding: 12px 14px;
+}
+
+.region-onboarding-summary strong,
+.boundary-file-ready {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.region-onboarding-summary p,
+.field-help {
+  margin: 5px 0 0;
+  color: var(--muted);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
+}
+
+.field-help,
+.boundary-file-ready {
+  display: block;
+}
+
+.boundary-file-ready {
+  margin-top: 8px;
+  color: var(--green);
+}
+
+.region-boundary-advanced {
+  grid-column: 1 / -1;
 }
 
 .check-row {

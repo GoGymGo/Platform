@@ -35,7 +35,7 @@ test("server-renders the role-aware GoGymGo operator entry screen", async () => 
   assert.match(html, /INVITATION-ONLY OPERATOR ACCESS/);
   assert.match(html, /Role-based workspaces/);
   assert.match(html, /Sign in to continue/);
-  assert.match(html, /Firebase sign-in has not been configured/);
+  assert.match(html, /Sign-in is temporarily unavailable/);
   assert.doesNotMatch(html, /CONTROL DECK ONLINE|SYSTEM OVERVIEW/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);
   assert.doesNotMatch(
@@ -57,6 +57,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     environmentExample,
     authorization,
     styles,
+    formValidation,
   ] = await Promise.all([
     readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8"),
     readFile(
@@ -81,6 +82,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
       "utf8",
     ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/form-validation.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(dashboardUtils, /getIdToken\(\)/);
@@ -154,15 +156,15 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /className="pagination"/);
   assert.match(dashboard, /className="audit-diff"/);
   assert.match(dashboardUtils, /event\.before \|\| event\.after/);
-  assert.match(dashboard, /No regional policies configured/);
+  assert.match(dashboard, /No regions added/);
   assert.match(dashboard, /No legal documents published/);
   assert.match(dashboard, /No audit events recorded/);
   assert.match(dashboard, /Delete contest/);
   assert.match(dashboard, /Delete reward/);
-  assert.match(dashboard, /Delete region policy/);
+  assert.match(dashboard, /Delete region/);
   assert.match(dashboard, /Delete legal version/);
   assert.match(dashboard, /Delete workout/);
-  assert.match(dashboard, /remain preserved/);
+  assert.doesNotMatch(dashboard, /remain preserved/);
   assert.match(dashboard, /operator\/gym-locations/);
   assert.match(dashboard, /operator\/gym-sessions/);
   assert.match(dashboard, /operator\/region-waitlist/);
@@ -189,13 +191,13 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /\.jpg`/);
   assert.match(pilot, /onLoadActiveQr/);
   assert.match(pilot, /VIEW ACTIVE POSTER/);
-  assert.match(pilot, /server recovery was available/);
+  assert.doesNotMatch(pilot, /server recovery was available|future visit/);
   assert.doesNotMatch(pilot, /posterStorageKey/);
   assert.match(dashboard, /qr-credentials\/active/);
   assert.match(pilot, /selectedCompetition\.assignedGymIds/);
   assert.match(pilot, /Assign a gym to \{props\.selectedCompetition\.name\}/);
-  assert.match(pilot, /can also be assigned independently to another/);
-  assert.match(pilot, /Every contest receives a different poster/);
+  assert.doesNotMatch(pilot, /can also be assigned independently to another/);
+  assert.doesNotMatch(pilot, /Every contest receives a different poster/);
   assert.doesNotMatch(pilot, /reusable across every contest assigned to that/);
   assert.match(pilot, /activeQrCredentials/);
   assert.match(dashboard, /EXISTING CONTEST HOMES/);
@@ -261,6 +263,48 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(styles, /\.audit-diff/);
   assert.match(styles, /\.primary-button,[\s\S]*?min-height: 44px/);
   assert.match(styles, /\.table-wrap:focus-visible/);
+
+  assert.match(dashboard, /title="Add a region"/);
+  assert.match(dashboard, /<Field label="REGION NAME"/);
+  assert.match(dashboard, /<Field label="REGION BOUNDARY FILE"/);
+  assert.match(dashboard, /GoGymGo uses it to decide whether a phone is inside/);
+  assert.doesNotMatch(
+    dashboard,
+    /<Field label="(?:REGION CODE|DISPLAY NAME|POLICY VERSION|BOUNDARY VERSION|GEOJSON)/,
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /Each contest stays separate|time-bounded regional policy|REGION POLICY|server-assigned account role|backend verifies/,
+  );
+  assert.doesNotMatch(
+    pilot,
+    /SERVER-AUTHORITATIVE|APPEND-ONLY PILOT LEDGER|authoritative ledger/,
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /SERVER-AUTHORITATIVE LEGAL TEXT|APPEND-ONLY LEDGER|AUTHORITATIVE STATE|audit ledger/,
+  );
+
+  const dashboardForms = dashboard.match(/<form\b[\s\S]*?>/g) ?? [];
+  const pilotForms = pilot.match(/<form\b[\s\S]*?>/g) ?? [];
+  assert.equal(dashboardForms.length, 7);
+  assert.equal(pilotForms.length, 4);
+  dashboardForms.forEach((form) => assert.match(form, /noValidate/));
+  pilotForms.forEach((form) => assert.match(form, /noValidate/));
+  assert.equal(
+    dashboard.match(/formValidationError\(/g)?.length,
+    dashboardForms.length,
+  );
+  assert.equal(
+    pilot.match(/formValidationError\(/g)?.length,
+    pilotForms.length,
+  );
+  assert.match(formValidation, /Please fix the following/);
+  assert.match(formValidation, /control\.validity\.valueMissing/);
+  assert.match(formValidation, /aria-invalid/);
+  assert.match(formValidation, /invalidControls\[0\]\?\.focus\(\)/);
+  assert.match(styles, /\.form-error \{[\s\S]*border:/);
+  assert.match(styles, /input\[aria-invalid="true"\]/);
 
   assert.match(layout, /GoGymGo Admin/);
   assert.match(layout, /new URL\("\/og\.png", origin\)/);

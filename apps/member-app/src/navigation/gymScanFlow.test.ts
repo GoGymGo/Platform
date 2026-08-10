@@ -9,15 +9,15 @@ import {
 } from './gymScanFlow';
 
 describe('gym scan navigation', () => {
-  it('returns established players to the scanned workout and new players to setup', () => {
+  it('checks a returning account against the scanned competition and starts new accounts at step one', () => {
     assert.equal(getGymScanPostAuthRoute(false), gymScanWorkoutRoute);
     assert.equal(getGymScanPostAuthRoute(true), '/region?source=gym-scan');
   });
 
-  it('preserves the gym scan source through every missing setup step', () => {
+  it('starts every unregistered scanned competition at setup step one', () => {
     assert.equal(getGymScanSetupRoute('region'), '/region?source=gym-scan');
     assert.equal(getGymScanSetupRoute('agreements'), '/region?source=gym-scan');
-    assert.equal(getGymScanSetupRoute('weekly-goal'), '/commitment?source=gym-scan');
+    assert.equal(getGymScanSetupRoute('weekly-goal'), '/region?source=gym-scan');
     assert.equal(getGymScanSetupRoute('complete'), null);
   });
 

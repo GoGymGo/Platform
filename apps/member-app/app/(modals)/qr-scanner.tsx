@@ -83,8 +83,6 @@ function MobileQrScannerModal() {
     ready: registrationReady,
     retry: retryRegistration,
     retrying: registrationRetrying,
-    setupActionLabel,
-    setupMessage,
     setupStep
   } = useSessionRegistrationAccess({
     gymQrCredential: enrollmentPresenceMode ? null : effectiveCredential,
@@ -264,17 +262,8 @@ function MobileQrScannerModal() {
     );
   }
   if (!enrollmentPresenceMode && !registrationReady) {
-    return (
-      <SessionUnavailable
-        actionLabel={setupActionLabel}
-        body={setupMessage}
-        onAction={() => {
-          const setupRoute = getGymScanSetupRoute(setupStep);
-          if (setupRoute) router.replace(setupRoute);
-        }}
-        title="FINISH SETUP"
-      />
-    );
+    const setupRoute = getGymScanSetupRoute(setupStep);
+    return <Redirect href={setupRoute ?? '/home'} />;
   }
   if (
     !enrollmentPresenceMode &&
@@ -514,7 +503,9 @@ function MobileQrScannerModal() {
         ) : (
           <View style={styles.cameraShell}>
             <CameraView
+              autofocus="on"
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              facing="back"
               onBarcodeScanned={scanLocked ? undefined : handleBarcodeScanned}
               style={styles.camera}
             />

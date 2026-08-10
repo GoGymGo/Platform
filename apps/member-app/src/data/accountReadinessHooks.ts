@@ -51,7 +51,12 @@ export function useCreateRegionVerification() {
   });
 }
 
-export function useCurrentCompetition(expectedMonthKey: string | null, regionCode: string) {
+export function useCurrentCompetition(
+  expectedMonthKey: string | null,
+  regionCode: string,
+  gymQrCredential: string | null = null,
+  gymQrScanKey: number | null = null
+) {
   const context = useAccountReadinessContext();
   return useQuery({
     enabled:
@@ -59,22 +64,29 @@ export function useCurrentCompetition(expectedMonthKey: string | null, regionCod
       regionCode.length > 0 &&
       (expectedMonthKey === null || expectedMonthKey.length > 0),
     queryFn: () =>
-      context.account.getCurrentCompetition(expectedMonthKey ?? undefined, regionCode),
+      gymQrCredential
+        ? context.account.resolveCompetitionByGymQr(gymQrCredential)
+        : context.account.getCurrentCompetition(expectedMonthKey ?? undefined, regionCode),
     queryKey: [
       ...context.queryKey,
       'current-competition',
-      expectedMonthKey ?? 'published',
+      gymQrCredential ? `gym-qr-${gymQrScanKey ?? 'pending'}` : (expectedMonthKey ?? 'published'),
       regionCode
     ]
   });
 }
 
-export function useCurrentEnrollment() {
+export function useCurrentEnrollment(
+  competitionId: string | null = null,
+  waitForCompetition = false
+) {
   const context = useAccountReadinessContext();
   return useQuery({
-    enabled: context.enabled,
-    queryFn: () => context.account.getCurrentEnrollment(),
-    queryKey: [...context.queryKey, 'current-enrollment']
+    enabled: context.enabled && (!waitForCompetition || Boolean(competitionId)),
+    queryFn: () => context.account.getCurrentEnrollment(competitionId ?? undefined),
+    queryKey: competitionId
+      ? [...context.queryKey, 'current-enrollment', competitionId]
+      : [...context.queryKey, 'current-enrollment']
   });
 }
 
@@ -89,8 +101,13 @@ export function useEnrollInCompetition() {
       competitionId: string;
       input: CreateCompetitionEnrollmentInput;
     }) => context.account.enrollInCompetition(competitionId, input),
-    onSuccess: (enrollment) =>
-      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], enrollment)
+    onSuccess: (enrollment) => {
+      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], enrollment);
+      queryClient.setQueryData(
+        [...context.queryKey, 'current-enrollment', enrollment.competitionId],
+        enrollment
+      );
+    }
   });
 }
 

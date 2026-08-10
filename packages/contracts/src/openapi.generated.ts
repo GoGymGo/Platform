@@ -133,6 +133,7 @@ export interface components {
     RegisterPushDeviceDto: { platform: "android" | "ios"; pushToken: string };
     RejectSessionDto: { evidenceSnapshotSha256: string; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
     RemoveAvatarResponseDto: { status: "removed" };
+    ResolveGymQrCompetitionDto: { credential: string };
     RewardAwardResponseDto: { awardedAt: string; awardRank: number; claimedAt: string | null; id: string; imageUrl: string | null; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; status: "awarded" | "cancelled" | "claimed" | "fulfilled" | "redeemed"; title: string };
     RewardAwardStatusActionDto: { action: "cancel" | "fulfill" | "redeem"; reason: string };
     RewardCatalogItemResponseDto: { competitionId: string; competitionName: string; description: string; id: string; imageUrl: string | null; inventoryRemaining: number; inventoryTotal: number; monthKey: string; regionCode: string; regionName: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl: string | null; title: string };
@@ -560,7 +561,7 @@ export interface operations {
   getCurrentEnrollment: {
     method: "GET";
     path: "/v1/competitions/current/enrollment";
-    parameters: Record<string, never>;
+    parameters: { query: { competitionId?: string } };
     responses: {
       "200": components['schemas']["EnrollmentResponseDto"] | null;
     };
@@ -968,6 +969,15 @@ export interface operations {
       "200": components['schemas']["RemoveAvatarResponseDto"];
     };
   };
+  resolveGymQrCompetition: {
+    method: "POST";
+    path: "/v1/competitions/resolve-gym-qr";
+    parameters: Record<string, never>;
+    requestBody: components['schemas']["ResolveGymQrCompetitionDto"];
+    responses: {
+      "200": components['schemas']["CompetitionResponseDto"] | null;
+    };
+  };
   respondToChallengeInvitation: {
     method: "PATCH";
     path: "/v1/social/challenges/{challengeId}/invitations/me";
@@ -1164,6 +1174,9 @@ export interface paths {
   };
   "/v1/competitions/current/enrollment": {
     get: operations["getCurrentEnrollment"];
+  };
+  "/v1/competitions/resolve-gym-qr": {
+    post: operations["resolveGymQrCompetition"];
   };
   "/v1/competitions/weekly-challenges/requests/{requestId}": {
     patch: operations["respondToWeeklyChallengeRequest"];
@@ -1612,6 +1625,7 @@ export type RegionWaitlistRequestDto = components['schemas']["RegionWaitlistRequ
 export type RegisterPushDeviceDto = components['schemas']["RegisterPushDeviceDto"];
 export type RejectSessionDto = components['schemas']["RejectSessionDto"];
 export type RemoveAvatarResponseDto = components['schemas']["RemoveAvatarResponseDto"];
+export type ResolveGymQrCompetitionDto = components['schemas']["ResolveGymQrCompetitionDto"];
 export type RewardAwardResponseDto = components['schemas']["RewardAwardResponseDto"];
 export type RewardAwardStatusActionDto = components['schemas']["RewardAwardStatusActionDto"];
 export type RewardCatalogItemResponseDto = components['schemas']["RewardCatalogItemResponseDto"];

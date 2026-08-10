@@ -188,6 +188,46 @@ describeWithDatabase('critical session and ledger workflow', () => {
         gym_location_id: source.gym_location_id,
       })
       .execute();
+    const otherCredential =
+      'different-contest-same-gym-credential-000000000001';
+    const latestCredential = await database.connection
+      .selectFrom('gym_qr_credentials')
+      .select((expression) =>
+        expression.fn.max<number>('credential_version').as('version'),
+      )
+      .where('gym_location_id', '=', source.gym_location_id)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('gym_qr_credentials')
+      .values({
+        competition_id: otherCompetition.id,
+        credential_version: Number(latestCredential.version ?? 0) + 1,
+        gym_location_id: source.gym_location_id,
+        issued_by_user_id: operatorUserId,
+        qr_payload: `https://app.gogymgo.com/scan?credential=${otherCredential}`,
+        status: 'active',
+        token_hash: hashOpaqueValue(otherCredential),
+      })
+      .execute();
+
+    await expect(
+      competitions.resolveGymQrCompetition(userPrincipal, otherCredential),
+    ).resolves.toMatchObject({
+      id: otherCompetition.id,
+      name: 'Different Contest At Same Gym',
+    });
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toMatchObject({ id: fixture.competitionId });
+    await expect(
+      competitions.getCurrentEnrollment(userPrincipal, otherCompetition.id),
+    ).resolves.toBeNull();
+    await expect(
+      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+    ).resolves.toMatchObject({ competitionId: fixture.competitionId });
 
     await expect(
       competitions.enroll(

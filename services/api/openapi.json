@@ -1153,10 +1153,51 @@
         "tags": ["competitions"]
       }
     },
+    "/v1/competitions/resolve-gym-qr": {
+      "post": {
+        "operationId": "resolveGymQrCompetition",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveGymQrCompetitionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/CompetitionResponseDto" }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Resolve the joinable competition encoded by a gym QR poster",
+        "tags": ["competitions"]
+      }
+    },
     "/v1/competitions/current/enrollment": {
       "get": {
         "operationId": "getCurrentEnrollment",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -5319,6 +5360,13 @@
           "enrolledAt": { "type": "string", "format": "date-time" }
         },
         "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
+      },
+      "ResolveGymQrCompetitionDto": {
+        "type": "object",
+        "properties": {
+          "credential": { "type": "string", "maxLength": 256, "minLength": 32 }
+        },
+        "required": ["credential"]
       },
       "EnrollmentGymPresenceDto": {
         "type": "object",

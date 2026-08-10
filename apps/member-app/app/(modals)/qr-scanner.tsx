@@ -72,8 +72,13 @@ function MobileQrScannerModal() {
   const posterScanReady = posterScan === '1' || Boolean(linkedCredential);
   const { api, configured } = useApi();
   const repository = useMemo(() => (api ? createGymScanRepository(api) : null), [api]);
+  const [pendingIntent, setPendingIntent] = useState<PendingGymScan | null>(null);
+  const [pendingIntentLoading, setPendingIntentLoading] = useState(true);
+  const linkedCredentialValue = extractGymScanCredential(linkedCredential ?? '');
+  const effectiveCredential = linkedCredentialValue ?? pendingIntent?.credential ?? null;
   const {
     checking: registrationChecking,
+    currentCompetition: scannedCompetition,
     error: registrationError,
     ready: registrationReady,
     retry: retryRegistration,
@@ -81,19 +86,18 @@ function MobileQrScannerModal() {
     setupActionLabel,
     setupMessage,
     setupStep
-  } = useSessionRegistrationAccess();
+  } = useSessionRegistrationAccess({
+    gymQrCredential: enrollmentPresenceMode ? null : effectiveCredential,
+    gymQrScanKey: enrollmentPresenceMode ? null : (pendingIntent?.createdAt ?? null)
+  });
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraRequested, setCameraRequested] = useState(false);
   const [clockNow, setClockNow] = useState<number | null>(null);
-  const [pendingIntent, setPendingIntent] = useState<PendingGymScan | null>(null);
-  const [pendingIntentLoading, setPendingIntentLoading] = useState(true);
   const [requirePhysicalRescan, setRequirePhysicalRescan] = useState(false);
   const [scanLocked, setScanLocked] = useState(false);
   const [state, setState] = useState<ScanUiState>('ready');
   const [result, setResult] = useState<GymScanResultDto | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const linkedCredentialValue = extractGymScanCredential(linkedCredential ?? '');
-  const effectiveCredential = linkedCredentialValue ?? pendingIntent?.credential ?? null;
   const activeSession = pendingIntent?.activeSession ?? null;
   const timerTarget =
     result?.outcome === 'started' || result?.outcome === 'too_early'
@@ -109,6 +113,7 @@ function MobileQrScannerModal() {
     clockNow !== null &&
     isGymScanCompletionReady(timerTarget, clockNow) &&
     Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
+  const scannedContestAcceptsWorkouts = scannedCompetition?.status === 'active';
 
   useEffect(() => {
     let active = true;
@@ -268,6 +273,24 @@ function MobileQrScannerModal() {
           if (setupRoute) router.replace(setupRoute);
         }}
         title="FINISH SETUP"
+      />
+    );
+  }
+  if (
+    !enrollmentPresenceMode &&
+    effectiveCredential &&
+    scannedCompetition &&
+    !scannedContestAcceptsWorkouts
+  ) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO HOME"
+        body={`You are registered for ${scannedCompetition.name}. Workout scans open when this contest begins on ${new Intl.DateTimeFormat(
+          'en-CA',
+          { day: 'numeric', month: 'long', year: 'numeric' }
+        ).format(new Date(scannedCompetition.startsAt))}.`}
+        onAction={() => router.replace('/home')}
+        title="REGISTRATION COMPLETE"
       />
     );
   }

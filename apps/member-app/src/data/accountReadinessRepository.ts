@@ -22,7 +22,9 @@ export type AccountReadinessRepository = {
     expectedMonthKey: string | undefined,
     regionCode: string
   ) => Promise<CurrentCompetition | null>;
-  getCurrentEnrollment: () => Promise<CompetitionEnrollment | null>;
+  getCurrentEnrollment: (
+    competitionId?: string
+  ) => Promise<CompetitionEnrollment | null>;
   getCurrentRegionVerification: (
     regionCode?: string
   ) => Promise<RegionVerification | null>;
@@ -37,6 +39,9 @@ export type AccountReadinessRepository = {
   recordLegalReceipt: (
     bundle: CurrentLegalDocuments
   ) => Promise<LegalReceiptStatus>;
+  resolveCompetitionByGymQr: (
+    credential: string
+  ) => Promise<CurrentCompetition | null>;
 };
 
 export function createAccountReadinessRepository(
@@ -77,9 +82,13 @@ function createApiRepository(api: ApiClient): AccountReadinessRepository {
         `/v1/competitions/current?${query.join('&')}`
       );
     },
-    getCurrentEnrollment: () => api.request<CompetitionEnrollment | null>(
-      '/v1/competitions/current/enrollment'
-    ),
+    getCurrentEnrollment: (competitionId) => competitionId
+      ? api.request<CompetitionEnrollment | null>(
+          `/v1/competitions/current/enrollment?competitionId=${encodeURIComponent(competitionId)}`
+        )
+      : api.request<CompetitionEnrollment | null>(
+          '/v1/competitions/current/enrollment'
+        ),
     getCurrentRegionVerification: (regionCode) => regionCode
       ? api.request<RegionVerification | null>(
           `/v1/me/region-verifications/current?regionCode=${encodeURIComponent(regionCode)}`
@@ -124,6 +133,13 @@ function createApiRepository(api: ApiClient): AccountReadinessRepository {
       },
       idempotencyKey: createIdempotencyKey('legal-receipt'),
       method: 'POST'
+    }),
+    resolveCompetitionByGymQr: (credential) => api.request<
+      CurrentCompetition | null,
+      { credential: string }
+    >('/v1/competitions/resolve-gym-qr', {
+      body: { credential },
+      method: 'POST'
     })
   };
 }
@@ -140,7 +156,8 @@ function createUnavailableRepository(): AccountReadinessRepository {
     getCurrentRegionVerification: async () => null,
     getCurrentLegalDocuments: async () => emptyLegalBundle,
     getLegalReceiptStatus: async () => emptyLegalReceipt,
-    recordLegalReceipt: unavailable
+    recordLegalReceipt: unavailable,
+    resolveCompetitionByGymQr: async () => null
   };
 }
 

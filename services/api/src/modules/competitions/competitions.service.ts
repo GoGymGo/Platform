@@ -83,9 +83,28 @@ export class CompetitionsService {
     private readonly profiles: ProfilesService,
   ) {}
 
-  async getCurrent(
+  getCurrent(
     principal: AuthenticatedPrincipal,
     query: CurrentCompetitionQueryDto = {},
+  ): Promise<CompetitionResponseDto | null> {
+    return this.findCurrentCompetition(principal, query);
+  }
+
+  resolveGymQrCompetition(
+    principal: AuthenticatedPrincipal,
+    credential: string,
+  ): Promise<CompetitionResponseDto | null> {
+    return this.findCurrentCompetition(
+      principal,
+      {},
+      hashOpaqueValue(credential),
+    );
+  }
+
+  private async findCurrentCompetition(
+    principal: AuthenticatedPrincipal,
+    query: CurrentCompetitionQueryDto,
+    credentialHash?: string,
   ): Promise<CompetitionResponseDto | null> {
     return this.database.connection
       .transaction()
@@ -156,6 +175,16 @@ export class CompetitionsService {
             query.region,
           );
         }
+        if (credentialHash) {
+          competitionQuery = competitionQuery
+            .innerJoin(
+              'gym_qr_credentials as resolved_credential',
+              'resolved_credential.competition_id',
+              'competition.id',
+            )
+            .where('resolved_credential.token_hash', '=', credentialHash)
+            .where('resolved_credential.status', '=', 'active');
+        }
         const competition = await competitionQuery.executeTakeFirst();
         if (!competition) {
           return null;
@@ -193,12 +222,13 @@ export class CompetitionsService {
 
   async getCurrentEnrollment(
     principal: AuthenticatedPrincipal,
+    competitionId?: string,
   ): Promise<EnrollmentResponseDto | null> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        const enrollment = await transaction
+        let enrollmentQuery = transaction
           .selectFrom('competition_enrollments as enrollment')
           .innerJoin(
             'competitions as competition',
@@ -217,8 +247,15 @@ export class CompetitionsService {
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.ends_at', '>', new Date())
           .orderBy('competition.starts_at')
-          .orderBy('competition.id')
-          .executeTakeFirst();
+          .orderBy('competition.id');
+        if (competitionId) {
+          enrollmentQuery = enrollmentQuery.where(
+            'competition.id',
+            '=',
+            competitionId,
+          );
+        }
+        const enrollment = await enrollmentQuery.executeTakeFirst();
 
         return enrollment
           ? {

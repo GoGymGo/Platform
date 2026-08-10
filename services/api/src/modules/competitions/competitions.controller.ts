@@ -29,10 +29,12 @@ import {
   CompetitionMatchResponseDto,
   CompetitionResponseDto,
   CurrentCompetitionQueryDto,
+  CurrentEnrollmentQueryDto,
   CreateEnrollmentDto,
   EnrollmentCountQueryDto,
   EnrollmentCountResponseDto,
   EnrollmentResponseDto,
+  ResolveGymQrCompetitionDto,
   CreateWeeklyChallengeRequestDto,
   EligibleWeeklyChallengePartnerDto,
   WeeklyChallengePeriodQueryDto,
@@ -64,6 +66,27 @@ export class CompetitionsController {
     return this.competitions.getCurrent(principal, query);
   }
 
+  @Post('resolve-gym-qr')
+  @ApiBearerAuth('firebase')
+  @ApiOperation({
+    summary: 'Resolve the joinable competition encoded by a gym QR poster',
+  })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(CompetitionResponseDto) }],
+      nullable: true,
+    },
+  })
+  resolveGymQrCompetition(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Body() request: ResolveGymQrCompetitionDto,
+  ): Promise<CompetitionResponseDto | null> {
+    return this.competitions.resolveGymQrCompetition(
+      principal,
+      request.credential,
+    );
+  }
+
   @Get('current/enrollment')
   @ApiBearerAuth('firebase')
   @ApiOperation({
@@ -77,8 +100,12 @@ export class CompetitionsController {
   })
   getCurrentEnrollment(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Query() query: CurrentEnrollmentQueryDto,
   ): Promise<EnrollmentResponseDto | null> {
-    return this.competitions.getCurrentEnrollment(principal);
+    return this.competitions.getCurrentEnrollment(
+      principal,
+      query.competitionId,
+    );
   }
 
   @Post(':competitionId/enrollments')

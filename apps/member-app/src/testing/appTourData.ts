@@ -297,7 +297,12 @@ AccountReadinessRepository {
         receiptBundleId: appTourLegalBundleId
       };
       return legalReceipt;
-    }
+    },
+    resolveCompetitionByGymQr: async () =>
+      createCurrentCompetition(
+        appTourCompetitionMonthKey,
+        'VANCOUVER ISLAND + GULF ISLANDS'
+      )
   };
 }
 

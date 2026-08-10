@@ -141,6 +141,20 @@ export class CurrentCompetitionQueryDto {
   region?: string;
 }
 
+export class ResolveGymQrCompetitionDto {
+  @ApiProperty({ maxLength: 256, minLength: 32, type: String })
+  @IsString()
+  @Length(32, 256)
+  credential!: string;
+}
+
+export class CurrentEnrollmentQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  competitionId?: string;
+}
+
 export class EnrollmentGymPresenceDto {
   @ApiProperty({ maxLength: 256, minLength: 32, type: String })
   @IsString()

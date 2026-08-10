@@ -12,7 +12,13 @@ import {
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
-export function useSessionRegistrationAccess() {
+export function useSessionRegistrationAccess({
+  gymQrCredential = null,
+  gymQrScanKey = null
+}: {
+  gymQrCredential?: string | null;
+  gymQrScanKey?: number | null;
+} = {}) {
   const { competition, progressReady } = useWorkoutProgress();
   const { regionReady, regionVerification } = useCompetitionRegion();
   const regionVerified =
@@ -20,8 +26,17 @@ export function useSessionRegistrationAccess() {
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const regionCode = regionVerification?.regionCode ?? '';
   const legalReceipt = useLegalReceiptStatus(jurisdictionCode);
-  const currentCompetition = useCurrentCompetition(competition.competitionMonthKey, regionCode);
-  const currentEnrollment = useCurrentEnrollment();
+  const currentCompetition = useCurrentCompetition(
+    competition.competitionMonthKey,
+    regionCode,
+    gymQrCredential,
+    gymQrScanKey
+  );
+  const resolvedCompetition = currentCompetition.data ?? null;
+  const currentEnrollment = useCurrentEnrollment(
+    resolvedCompetition?.id ?? null,
+    Boolean(gymQrCredential)
+  );
   const enrollmentReady = Boolean(currentEnrollment.data);
   const retry = async () => {
     await Promise.all([
@@ -47,7 +62,7 @@ export function useSessionRegistrationAccess() {
       currentCompetition.isError ||
       currentEnrollment.isError ||
       (regionVerified && legalReceipt.isError),
-    currentCompetition: currentCompetition.data ?? null,
+    currentCompetition: resolvedCompetition,
     ready: setupStep === 'complete',
     retry,
     retrying:

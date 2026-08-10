@@ -50,7 +50,7 @@ import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { clearScreenMemory, useScreenMemory } from '@/hooks/useScreenMemory';
 import { ApiError } from '@/services/api/client';
 import { readGymScanLocation } from '@/services/gymScanLocation';
-import { readPendingGymScan } from '@/services/pendingGymScan';
+import { readPendingGymScan, type PendingGymScan } from '@/services/pendingGymScan';
 import { useAppTour } from '@/state/appTour';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
@@ -67,6 +67,15 @@ const matchOptions = [
 const defaultWeeklyMatchMultipliers: readonly WeeklyMatchMultiplier[] = [1, 1, 1, 1];
 type CategoryRank = 0 | 1 | 2 | 3;
 type ConfirmationPhase = 'idle' | 'locating' | 'registering';
+
+function formatContestWindowDate(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    month: 'long',
+    timeZone,
+    year: 'numeric'
+  }).format(new Date(value));
+}
 
 export default function CommitmentScreen() {
   const mobileGymVerificationAvailable =
@@ -95,13 +104,31 @@ function MobileCommitmentScreen() {
   );
   const defaultCompetitionMonthKey = getCompetitionMonthKey(registrationReferenceDateKey);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
+  const [pendingGymScan, setPendingGymScan] = useState<PendingGymScan | null>(null);
   const registration = useCompetitionRegistration({
     defaultMonthKey: defaultCompetitionMonthKey,
+    gymQrCredential: pendingGymScan?.credential ?? null,
+    gymQrScanKey: pendingGymScan?.createdAt ?? null,
     jurisdictionCode,
     regionCode: regionVerification?.regionCode ?? '',
     regionVerification
   });
   const upcomingCompetitionMonthKey = registration.competitionMonthKey;
+  const resolvedCompetitionName = registration.competition?.name ?? 'REGIONAL CONTEST';
+  const contestNoticeLabel = pendingGymScan
+    ? registration.competition
+      ? `QR SELECTED // ${resolvedCompetitionName}`
+      : 'CHECKING SCANNED CONTEST...'
+    : `${resolvedCompetitionName} REGISTRATION OPEN`;
+  const contestWindowCopy = registration.competition
+    ? `Contest runs from ${formatContestWindowDate(
+        registration.competition.startsAt,
+        competitionRegion.timeZone
+      )} to ${formatContestWindowDate(
+        registration.competition.endsAt,
+        competitionRegion.timeZone
+      )}.`
+    : 'Scan the Partner gym poster to select its contest.';
   const categoryMultipliers = resolveCategoryPodiumMultipliers(registration.competition?.rules);
   const categoryOptions = [
     { label: 'NONE', value: 0 },
@@ -205,10 +232,16 @@ function MobileCommitmentScreen() {
 
     void readPendingGymScan()
       .then((pending) => {
-        if (active) setGymPresenceStatus(pending ? 'ready' : 'missing');
+        if (active) {
+          setPendingGymScan(pending);
+          setGymPresenceStatus(pending ? 'ready' : 'missing');
+        }
       })
       .catch(() => {
-        if (active) setGymPresenceStatus('missing');
+        if (active) {
+          setPendingGymScan(null);
+          setGymPresenceStatus('missing');
+        }
       });
 
     return () => {
@@ -274,8 +307,8 @@ function MobileCommitmentScreen() {
         if (location.status !== 'location-read') {
           setConfirmationError(
             location.status === 'permission-denied'
-                ? 'Location access is required to confirm you are within 75 metres of the Partner gym. Allow location, then try again.'
-                : 'Your live location could not be read. Check location services at the gym, then try again.'
+              ? 'Location access is required to confirm you are within 75 metres of the Partner gym. Allow location, then try again.'
+              : 'Your live location could not be read. Check location services at the gym, then try again.'
           );
           return;
         }
@@ -298,7 +331,11 @@ function MobileCommitmentScreen() {
         'bonus-days',
         'calculator-open'
       ].forEach((key) => clearScreenMemory(`${draftKey}:${key}`));
-      if (isGymScanSource) {
+      const selectedContestAcceptsWorkouts =
+        registration.competition?.status === 'active' &&
+        Date.now() >= Date.parse(registration.competition.startsAt) &&
+        Date.now() < Date.parse(registration.competition.endsAt);
+      if (isGymScanSource && selectedContestAcceptsWorkouts) {
         router.replace('/qr-scanner?posterScan=1');
       } else {
         router.replace({
@@ -350,7 +387,7 @@ function MobileCommitmentScreen() {
 
         <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
           <TerminalText tone="cyan" variant="label">
-            SEPTEMBER CONTEST REGISTRATION OPEN
+            {contestNoticeLabel}
           </TerminalText>
           <TerminalText
             style={styles.editorialCaption}
@@ -358,7 +395,7 @@ function MobileCommitmentScreen() {
             uppercase={false}
             variant="caption"
           >
-            Contest runs from September 1st to September 30th.
+            {contestWindowCopy}
           </TerminalText>
         </HUDBorderBox>
 

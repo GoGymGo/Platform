@@ -988,7 +988,6 @@ export function AdminDashboard({
             <CompetitionsPanel
               competitions={draftCompetitions}
               gyms={pilotData.gyms}
-              onCreate={() => setCompetitionEditor("new")}
               onDelete={requestContestDeletion}
               onEdit={setCompetitionEditor}
               onSelectSetup={(competition) => {
@@ -2192,13 +2191,6 @@ function ContestLaunchGuide({
               ))}
             </select>
           </label>
-          <button
-            className="secondary-button"
-            onClick={onCreateContest}
-            type="button"
-          >
-            + NEW CONTEST
-          </button>
         </div>
       </div>
 
@@ -2274,10 +2266,16 @@ function ContestLaunchGuide({
         ) : (
           <button
             className="primary-button"
-            onClick={() => onNavigate(nextSection)}
+            onClick={
+              !competition
+                ? onCreateContest
+                : () => onNavigate(nextSection)
+            }
             type="button"
           >
-            {launchState.readyToPublish
+            {!competition
+              ? "CREATE NEW CONTEST →"
+              : launchState.readyToPublish
               ? "REVIEW + PUBLISH →"
               : `CONTINUE TO ${navigation.find((item) => item.id === nextSection)?.label.toUpperCase() ?? "NEXT STEP"} →`}
           </button>
@@ -2672,7 +2670,6 @@ function Metric({
 function CompetitionsPanel({
   competitions,
   gyms,
-  onCreate,
   onDelete,
   onEdit,
   onSelectSetup,
@@ -2683,7 +2680,6 @@ function CompetitionsPanel({
 }: {
   competitions: Competition[];
   gyms: PilotData["gyms"];
-  onCreate: () => void;
   onDelete: (competition: Competition) => void;
   onEdit: (competition: Competition) => void;
   onSelectSetup: (competition: Competition) => void;
@@ -2739,9 +2735,6 @@ function CompetitionsPanel({
             surface.
           </p>
         </div>
-        <button className="primary-button" onClick={onCreate} type="button">
-          + NEW CONTEST
-        </button>
       </div>
       {competitions.length > 0 ? (
         <div

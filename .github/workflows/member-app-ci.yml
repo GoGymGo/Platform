@@ -2,14 +2,6 @@ name: Member App CI
 
 on:
   pull_request:
-    paths:
-      - "apps/member-app/**"
-      - "packages/brand/**"
-      - "packages/contracts/**"
-      - "services/api/openapi.json"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/member-app-ci.yml"
   push:
     branches: [main]
     paths:
@@ -29,15 +21,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
+  member-app-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
       run:
         working-directory: apps/member-app
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           cache: npm
           cache-dependency-path: package-lock.json

@@ -37,8 +37,9 @@ After `admin.gogymgo.com` resolves through Cloudflare:
 1. In Cloudflare Zero Trust, create a self-hosted Access application for the
    exact hostname `admin.gogymgo.com`.
 2. Use an email identity provider or one-time PIN and create an **Allow** policy
-   limited to approved GoGymGo administrator email addresses. The first entry
-   is `s1ck5ense123@gmail.com`.
+   limited to approved GoGymGo administrator email addresses. Keep the first
+   owner entry in the protected access register; do not commit it to this
+   repository.
 3. Add a final deny-by-default policy and use a short administrator session
    lifetime. Do not use a public bypass rule.
 4. Confirm an unapproved email is stopped by Cloudflare before the application

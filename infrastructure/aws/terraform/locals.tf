@@ -17,6 +17,7 @@ locals {
     DATABASE_URL                  = "${local.name}/database-url"
     EXPO_PUSH_ACCESS_TOKEN        = "${local.name}/expo-push-access-token"
     FIREBASE_SERVICE_ACCOUNT_JSON = "${local.name}/firebase-service-account-json"
+    GOGYMGO_OWNER_EMAIL           = "${local.name}/owner-email"
     PRIVACY_PSEUDONYMIZATION_KEY  = "${local.name}/privacy-pseudonymization-key"
     REWARD_CODE_ENCRYPTION_KEY    = "${local.name}/reward-code-encryption-key"
   }
@@ -64,6 +65,7 @@ locals {
   api_secret_environment = {
     DATABASE_URL                  = aws_secretsmanager_secret.runtime["DATABASE_URL"].arn
     FIREBASE_SERVICE_ACCOUNT_JSON = aws_secretsmanager_secret.runtime["FIREBASE_SERVICE_ACCOUNT_JSON"].arn
+    GOGYMGO_OWNER_EMAIL           = aws_secretsmanager_secret.runtime["GOGYMGO_OWNER_EMAIL"].arn
     REWARD_CODE_ENCRYPTION_KEY    = aws_secretsmanager_secret.runtime["REWARD_CODE_ENCRYPTION_KEY"].arn
   }
 

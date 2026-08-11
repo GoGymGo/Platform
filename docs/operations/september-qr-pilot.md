@@ -25,8 +25,8 @@ npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 
 1. Apply all migrations and deploy the same image digest to the API and worker.
 2. Configure the production-shaped regional boundary.
-3. Have `s1ck5ense123@gmail.com` verify email and sign in once, then run the
-   audited administrator bootstrap.
+3. Have the configured GoGymGo owner verify email and sign in once, then run
+   the audited administrator bootstrap.
 4. Create the real condo gym with its verified name, street address and measured
    coordinates; keep the radius at 75 m.
 5. Assign the gym to the September competition, issue the poster and print it.

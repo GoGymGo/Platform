@@ -16,7 +16,7 @@ const describeWithDatabase =
   process.env.RUN_DATABASE_INTEGRATION === 'true' ? describe : describe.skip;
 
 const adminPrincipal: AuthenticatedPrincipal = {
-  email: 's1ck5ense123@gmail.com',
+  email: 'owner@gogymgo.example',
   emailVerified: true,
   firebaseUid: 'critical-legal-admin',
   roles: ['admin'],
@@ -48,7 +48,13 @@ describeWithDatabase('critical account legal receipt workflow', () => {
     const idempotency = new IdempotencyService(database);
     profiles = new ProfilesService(database);
     const authorization = new AdminAuthorizationService(profiles);
-    adminLegal = new AdminLegalDocumentsService(authorization, idempotency);
+    adminLegal = new AdminLegalDocumentsService(
+      authorization,
+      idempotency,
+      createTestConfig(migrated.databaseUrl, {
+        GOGYMGO_OWNER_EMAIL: adminPrincipal.email,
+      }),
+    );
     legal = new LegalDocumentsService(database, idempotency, profiles);
     await profiles.ensureUser(adminPrincipal, database.connection);
   });

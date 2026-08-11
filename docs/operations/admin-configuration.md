@@ -22,21 +22,26 @@ The worker changes a published competition from `registration` to `active` at it
 
 There is deliberately no public role-grant endpoint. A user must verify their Firebase email and sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:
 
-The first production administrator is deliberately restricted to
-`s1ck5ense123@gmail.com`.
+The first production administrator is deliberately restricted to the owner
+identity stored as `GOGYMGO_OWNER_EMAIL` in the protected runtime secret manager.
 
 ```powershell
-$env:BOOTSTRAP_ADMIN_EMAIL='s1ck5ense123@gmail.com'
+$env:GOGYMGO_OWNER_EMAIL='<protected owner email>'
+$env:BOOTSTRAP_ADMIN_EMAIL=$env:GOGYMGO_OWNER_EMAIL
 $env:BOOTSTRAP_ADMIN_REASON='<approved change-ticket reason>'
 $env:CONFIRM_BOOTSTRAP_ADMIN='yes'
 npm.cmd run admin:bootstrap --workspace @gogymgo/api
 ```
 
-`DATABASE_URL` must already come from the runtime secret manager. Do not place any of these values in source control, shell scripts, CI logs, or Expo environment variables. The command resolves the already-created database user by email, is idempotent and records `user.admin_bootstrapped` in the append-only operator audit ledger.
+`DATABASE_URL` and `GOGYMGO_OWNER_EMAIL` must already come from the runtime
+secret manager. Do not place any of these values in source control, shell
+scripts, CI logs, or Expo environment variables. The command resolves the
+already-created database user by email, is idempotent and records
+`user.admin_bootstrapped` in the append-only operator audit ledger.
 
-Publishing a legal document is additionally restricted to this owner email and
-requires explicit approval of the exact immutable version. Unapproved legacy
-documents are not returned by the member legal API.
+Publishing a legal document is additionally restricted to this configured
+owner identity and requires explicit approval of the exact immutable version.
+Unapproved legacy documents are not returned by the member legal API.
 
 After the first bootstrap, role administration should be implemented as a separate, dual-approval security workflow before additional administrators are delegated. Do not broaden the configuration endpoints to grant roles.
 

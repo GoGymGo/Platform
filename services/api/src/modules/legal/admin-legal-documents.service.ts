@@ -5,8 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import type { Environment } from '../../config/environment';
 import type { JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { canDeleteLegalDocument } from '../operator/admin-deletion-policy';
@@ -29,6 +31,7 @@ export class AdminLegalDocumentsService {
   constructor(
     private readonly authorization: AdminAuthorizationService,
     private readonly idempotency: IdempotencyService,
+    private readonly config: ConfigService<Environment, true>,
   ) {}
 
   async publish(
@@ -62,8 +65,12 @@ export class AdminLegalDocumentsService {
           principal,
           transaction,
         );
+        const ownerEmail = this.config.get('GOGYMGO_OWNER_EMAIL', {
+          infer: true,
+        });
         if (
-          principal.email?.trim().toLowerCase() !== 's1ck5ense123@gmail.com'
+          !ownerEmail ||
+          principal.email?.trim().toLowerCase() !== ownerEmail
         ) {
           throw new ForbiddenException({
             code: 'LEGAL_OWNER_APPROVAL_REQUIRED',

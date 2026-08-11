@@ -17,6 +17,17 @@ const optionalUrl = z.preprocess(
   z.string().url().optional(),
 );
 
+const optionalEmail = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase())
+    .optional(),
+);
+
 const optionalSecret = z.preprocess(
   (value) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -72,6 +83,7 @@ export const environmentSchema = z
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_SERVICE_ACCOUNT_JSON: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
+    GOGYMGO_OWNER_EMAIL: optionalEmail,
     DATABASE_URL: z
       .string()
       .url()
@@ -143,6 +155,14 @@ export const environmentSchema = z
     }
 
     if (environment.NODE_ENV === 'production') {
+      if (!environment.GOGYMGO_OWNER_EMAIL) {
+        context.addIssue({
+          code: 'custom',
+          message: 'GOGYMGO_OWNER_EMAIL is required in production.',
+          path: ['GOGYMGO_OWNER_EMAIL'],
+        });
+      }
+
       const databaseHost = new URL(environment.DATABASE_URL).hostname
         .trim()
         .toLowerCase();

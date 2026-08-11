@@ -77,6 +77,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = contains(keys(local.api_secret_environment), "GOGYMGO_OWNER_EMAIL") && !contains(keys(local.worker_secret_environment), "GOGYMGO_OWNER_EMAIL")
+    error_message = "Only the API task may receive the protected owner identity."
+  }
+
+  assert {
     condition     = aws_budgets_budget.monthly.cost_types[0].include_credit == false && aws_budgets_budget.monthly.cost_types[0].include_refund == false
     error_message = "The staging budget must measure gross usage before credits and refunds obscure the underlying run rate."
   }
@@ -103,7 +108,7 @@ run "feature_secrets_remain_role_scoped" {
   }
 
   assert {
-    condition     = length(local.api_secret_environment) == 3 && length(local.worker_secret_environment) == 5
+    condition     = length(local.api_secret_environment) == 4 && length(local.worker_secret_environment) == 5
     error_message = "API-only and worker-only secret injection must remain isolated."
   }
 

@@ -94,11 +94,11 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.source_commit }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           cache: npm
           cache-dependency-path: package-lock.json
@@ -150,7 +150,7 @@ jobs:
           }
           NODE
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.MEMBER_WEB_DEPLOY_ROLE_ARN }}

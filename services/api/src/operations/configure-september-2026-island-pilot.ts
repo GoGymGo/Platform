@@ -374,11 +374,20 @@ async function findAdministrator(
   config: ConfigService<Environment, true>,
 ): Promise<AuthenticatedPrincipal> {
   const requestedUid = process.env.PILOT_ADMIN_FIREBASE_UID?.trim();
-  const requestedEmail = (
-    process.env.PILOT_ADMIN_EMAIL ?? 's1ck5ense123@gmail.com'
-  )
+  const ownerEmail = config.get('GOGYMGO_OWNER_EMAIL', { infer: true });
+  if (!ownerEmail) {
+    throw new Error(
+      'GOGYMGO_OWNER_EMAIL must identify the protected GoGymGo owner.',
+    );
+  }
+  const requestedEmail = (process.env.PILOT_ADMIN_EMAIL ?? ownerEmail)
     .trim()
     .toLowerCase();
+  if (requestedEmail !== ownerEmail) {
+    throw new Error(
+      'PILOT_ADMIN_EMAIL must match the protected GoGymGo owner identity.',
+    );
+  }
   let query = database.connection
     .selectFrom('users')
     .select(['email', 'email_verified', 'firebase_uid', 'roles'])
@@ -392,7 +401,11 @@ async function findAdministrator(
   const administrators = await query.execute();
   if (administrators.length === 1) {
     const administrator = administrators[0];
-    if (!administrator.email || !administrator.email_verified) {
+    if (
+      !administrator.email ||
+      !administrator.email_verified ||
+      administrator.email.trim().toLowerCase() !== ownerEmail
+    ) {
       throw new Error('The pilot administrator must have a verified email.');
     }
     return {
@@ -411,12 +424,6 @@ async function findAdministrator(
         : 'PILOT_ADMIN_EMAIL does not identify one active administrator.',
     );
   }
-  if (requestedEmail !== 's1ck5ense123@gmail.com') {
-    throw new Error(
-      'Only the verified GoGymGo bootstrap owner can be created automatically.',
-    );
-  }
-
   const { getAuth } = await import('firebase-admin/auth');
   const firebaseApp = await getGoGymGoFirebaseApp(config);
   const firebaseUser =

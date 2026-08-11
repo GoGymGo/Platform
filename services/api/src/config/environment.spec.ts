@@ -4,6 +4,7 @@ const productionEnvironment = {
   CORS_ORIGINS: 'https://app.gogymgo.com',
   DATABASE_URL: 'postgresql://gogymgo:secret@10.20.0.3:5432/gogymgo',
   FIREBASE_PROJECT_ID: 'gogymgo-production',
+  GOGYMGO_OWNER_EMAIL: 'owner@gogymgo.example',
   NODE_ENV: 'production',
   OPENAPI_ENABLED: 'false',
   PRETTY_LOGS_ENABLED: 'false',
@@ -67,6 +68,11 @@ describe('environment validation', () => {
   });
 
   it.each([
+    [
+      'missing owner identity',
+      { GOGYMGO_OWNER_EMAIL: '' },
+      /GOGYMGO_OWNER_EMAIL is required/i,
+    ],
     [
       'loopback database',
       { DATABASE_URL: 'postgresql://gogymgo:secret@localhost:5432/gogymgo' },

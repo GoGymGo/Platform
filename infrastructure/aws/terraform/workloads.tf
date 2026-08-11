@@ -100,7 +100,7 @@ resource "aws_ecs_task_definition" "api" {
 
   lifecycle {
     ignore_changes       = [container_definitions]
-    replace_triggered_by = [aws_secretsmanager_secret.runtime["GOGYMGO_OWNER_EMAIL"]]
+    replace_triggered_by = [aws_iam_role_policy.ecs_execution]
   }
 }
 

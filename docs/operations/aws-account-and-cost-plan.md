@@ -44,7 +44,7 @@ automatically.
   task, with separate runtime roles and no direct inbound task access;
 - one internet-facing HTTPS Application Load Balancer and ACM certificate;
 - one immutable ECR repository, three private encrypted S3 buckets, one KMS key,
-  five application secret containers plus the RDS-managed master secret;
+  six application secret containers plus the RDS-managed master secret;
 - one CloudFront distribution with a private S3 origin and a low-cost SPA route
   function for the browser member app;
 - CloudWatch logs, five alarms, and one monthly AWS Budget;

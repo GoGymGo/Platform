@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   chooseSetupCompetition,
-  getContestLaunchState,
+  isContestReadyToPublish,
 } from "../app/contest-launch-flow.js";
 
 const region = {
@@ -46,67 +46,63 @@ test("requires a separate poster for same-region, same-gym contests", () => {
     activeQrCredentials: [gym.activeQrCredentials[0]],
   };
 
-  const firstState = getContestLaunchState(
-    first,
-    rewards,
-    [region],
-    [firstPosterOnly],
+  assert.equal(
+    isContestReadyToPublish(first, rewards, [region], [firstPosterOnly]),
+    true,
   );
-  const blockedSecond = getContestLaunchState(
-    second,
-    rewards,
-    [region],
-    [firstPosterOnly],
+  assert.equal(
+    isContestReadyToPublish(second, rewards, [region], [firstPosterOnly]),
+    false,
   );
-  const secondState = getContestLaunchState(second, rewards, [region], [gym]);
-
-  assert.equal(firstState.readyToPublish, true);
-  assert.equal(blockedSecond.qrReady, false);
-  assert.equal(blockedSecond.readyToPublish, false);
-  assert.equal(secondState.readyToPublish, true);
-  assert.deepEqual(
-    firstState.assignedGyms.map(({ id }) => id),
-    ["gym-1"],
-  );
-  assert.deepEqual(
-    secondState.assignedGyms.map(({ id }) => id),
-    ["gym-1"],
+  assert.equal(
+    isContestReadyToPublish(second, rewards, [region], [gym]),
+    true,
   );
 });
 
-test("explains a cancelled contest instead of silently advancing it", () => {
-  const cancelled = competition("cancelled", "cancelled");
-  const state = getContestLaunchState(
-    cancelled,
-    [publishedReward(cancelled.id)],
-    [region],
-    [gym],
-  );
-  assert.match(state.blockedReason, /cancelled/i);
-  assert.equal(state.completedSteps, 0);
+test("never treats a non-draft contest as publish-ready", () => {
+  for (const status of ["registration", "active", "settled", "cancelled"]) {
+    const candidate = competition(status, status);
+    assert.equal(
+      isContestReadyToPublish(
+        candidate,
+        [publishedReward(candidate.id)],
+        [region],
+        [gym],
+      ),
+      false,
+    );
+  }
 });
 
-test("reports each setup prerequisite independently", () => {
+test("requires every setup prerequisite", () => {
   const draft = competition("draft");
-  const noReward = getContestLaunchState(draft, [], [region], [gym]);
-  assert.equal(noReward.operational, true);
-  assert.equal(noReward.rewardReady, false);
-  assert.equal(noReward.readyToPublish, false);
+  assert.equal(isContestReadyToPublish(draft, [], [region], [gym]), false);
 
   const noQrGym = {
     ...gym,
     activeCredentialVersion: null,
     activeQrCredentials: [],
   };
-  const noQr = getContestLaunchState(
-    draft,
-    [publishedReward(draft.id)],
-    [region],
-    [noQrGym],
+  assert.equal(
+    isContestReadyToPublish(
+      draft,
+      [publishedReward(draft.id)],
+      [region],
+      [noQrGym],
+    ),
+    false,
   );
-  assert.equal(noQr.gymAssigned, true);
-  assert.equal(noQr.qrReady, false);
-  assert.equal(noQr.readyToPublish, false);
+
+  assert.equal(
+    isContestReadyToPublish(
+      draft,
+      [publishedReward(draft.id)],
+      [{ ...region, competitionEnabled: false }],
+      [gym],
+    ),
+    false,
+  );
 });
 
 test("keeps published contests out of the new-contest setup wizard", () => {

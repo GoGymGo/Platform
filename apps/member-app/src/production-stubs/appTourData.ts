@@ -1,3 +1,5 @@
+import type { GymScanResultDto } from '@gogymgo/contracts';
+
 import type { AccountReadinessRepository } from '@/data/accountReadinessRepository';
 import type { AccountSettingsRepository } from '@/data/accountSettingsRepository';
 import type { AppDataSource } from '@/data/appData';
@@ -5,6 +7,7 @@ import type { SocialRepository } from '@/data/socialRepository';
 import type { WorkoutSessionRepository } from '@/data/sessionRepository';
 import type { PublicIdentity } from '@/domain/profile';
 import type { PersistedActiveWorkoutSession } from '@/domain/workoutProgress';
+import type { PendingGymScan } from '@/services/pendingGymScan';
 import type { AuthenticatedUser } from '@/state/auth';
 import type { AppTourScenario } from '@/state/appTour';
 
@@ -28,6 +31,25 @@ function unavailable(): never {
 }
 
 export function createAppTourGymQrPayload(_mode: AppTourQrMode): string {
+  return unavailable();
+}
+
+export function createAppTourPendingGymScan(
+  _scenario: AppTourScenario,
+  _now?: number
+): PendingGymScan {
+  return unavailable();
+}
+
+export function createAppTourVerifiedGymLocationResult(
+  _now?: number
+): GymScanResultDto {
+  return unavailable();
+}
+
+export function createAppTourStartedGymLocationResult(
+  _now?: number
+): GymScanResultDto {
   return unavailable();
 }
 

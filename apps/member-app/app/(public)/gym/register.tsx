@@ -82,7 +82,7 @@ export default function GymRegistrationScreen() {
         />
 
         <BrandScreenHeader
-          description="Request a GoGymGo entry and exit QR-code set for one gym location. We review the location and manager details before activation."
+          description="Request one GoGymGo Contest QR for a gym location. Players use it once to select the gym, then verify workouts with live location."
           eyebrow="PARTNER GYM"
           title="REGISTER A GYM"
         />
@@ -90,7 +90,7 @@ export default function GymRegistrationScreen() {
         <View style={styles.processList}>
           <ProcessRow index="01" text="SUBMIT ONE GYM LOCATION" />
           <ProcessRow index="02" text="GOGYMGO REVIEWS THE LOCATION" />
-          <ProcessRow index="03" text="APPROVED GYMS RECEIVE ENTRY + EXIT QR CODES" />
+          <ProcessRow index="03" text="APPROVED GYMS RECEIVE A CONTEST QR" />
         </View>
 
         <HUDBorderBox style={styles.form} tone="cyan">
@@ -136,7 +136,7 @@ export default function GymRegistrationScreen() {
             <AuthStatusNotice message={submissionError} tone="red" />
           ) : submitted ? (
             <AuthStatusNotice
-              message="GYM QR REQUEST RECORDED. GOGYMGO WILL VERIFY THIS LOCATION BEFORE ISSUING OR ACTIVATING ANY QR CODES."
+              message="GYM QR REQUEST RECORDED. GOGYMGO WILL VERIFY THIS LOCATION BEFORE ISSUING OR ACTIVATING THE CONTEST QR."
               tone="green"
             />
           ) : null}
@@ -148,7 +148,7 @@ export default function GymRegistrationScreen() {
                 ? 'REQUEST RECORDED'
                 : submitting
                   ? 'RECORDING...'
-                  : 'REQUEST GYM QR CODES ->'
+                  : 'REQUEST GYM QR ->'
             }
             onPress={submitRequest}
           />

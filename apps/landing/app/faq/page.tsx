@@ -78,8 +78,8 @@ const questions = [
       <p>
         Only a gym displaying an active GoGymGo partner poster can support this
         verification flow. The member app is authoritative for current partner
-        availability. A scan at an ordinary gym or from an inactive poster does
-        not qualify.
+        availability. Only the initial Contest QR from an active Partner gym
+        poster can select the gym for location verification.
       </p>
     ),
     question: "Which gyms count as approved Partner gyms?",
@@ -87,10 +87,11 @@ const questions = [
   {
     answer: (
       <p>
-        At an approved Partner gym, scan the gym’s active poster on entry with a
-        fresh eligible location reading. After at least 30 minutes, scan the
-        same poster again. The server reviews the submitted evidence before
-        awarding verified credit.
+        Scan the active Contest QR once to select the Partner gym. For each
+        workout, use Start Workout for a fresh location check, train for at
+        least 30 minutes, then use Finish Workout for another fresh location
+        check. The server reviews both location checks before awarding verified
+        credit.
       </p>
     ),
     question: "How is a workout verified?",

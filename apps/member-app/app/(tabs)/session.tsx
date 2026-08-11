@@ -50,7 +50,7 @@ function MobileSessionTabRoute() {
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your contest setup could not be checked. Retry before scanning a gym poster."
+        body="Your Contest setup could not be checked. Retry before starting a gym location check."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"
@@ -61,8 +61,8 @@ function MobileSessionTabRoute() {
   return (
     <ScreenContainer contentStyle={styles.screen}>
       <BrandScreenHeader
-        description="Scan the same static GoGymGo poster when you enter and after at least 30 minutes. Server time and a live 75-metre location check determine whether the workout day is verified."
-        eyebrow="SEPTEMBER QR PILOT"
+        description="The gym selected during registration is reused automatically. A fresh 75-metre location check is required when you start and finish, with at least 30 minutes measured by server time. Workouts started in time may finish during the 15-minute completion period after the Contest ends."
+        eyebrow="PARTNER GYM PILOT"
         style={styles.header}
         title="VERIFY A GYM VISIT"
       />
@@ -94,14 +94,14 @@ function MobileSessionTabRoute() {
       ) : (
         <HUDBorderBox style={styles.notice} tone="cyan">
           <TerminalText tone="cyan" variant="label">
-            STATIC QR READY
+            GYM LOCATION READY
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Missing the exit scan earns no contest credit. A gym poster may
-            be replaced by an administrator; revoked posters are rejected.
+            Check your live location to start the timer, then check it again when
+            Finish Workout unlocks. Workout verification uses fresh location checks.
           </TerminalText>
           <CyberButtonPrimary
-            label="SCAN GYM QR ->"
+            label="CHECK GYM LOCATION ->"
             onPress={() => router.push('/qr-scanner')}
           />
         </HUDBorderBox>

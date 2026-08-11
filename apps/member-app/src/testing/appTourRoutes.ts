@@ -70,7 +70,7 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
       ...(heartRateTelemetryAvailable
         ? [{ label: 'Heart-Rate Verification', route: '/workout/check-in' }]
         : []),
-      { label: 'Partner Gym QR', route: '/qr-scanner' },
+      { label: 'Gym Location', route: '/qr-scanner' },
       ...(devicePresenceVerificationAvailable
         ? [{
             label: 'Partner Gym Presence',

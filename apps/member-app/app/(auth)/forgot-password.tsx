@@ -51,9 +51,9 @@ export default function ForgotPasswordScreen() {
   return (
     <AuthScreenShell
       description={gymScanContinuation
-        ? 'Your gym scan is saved. Reset your password, then sign in to continue to Start Workout.'
+        ? 'Your Partner gym selection is saved. Reset your password, then sign in to continue to Start Workout.'
         : 'Enter your account email and we will send a secure password-reset link.'}
-      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT RECOVERY'}
+      eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'ACCOUNT RECOVERY'}
       footer={(
         <FirstRunSecondaryButton
           label="BACK TO SIGN IN"

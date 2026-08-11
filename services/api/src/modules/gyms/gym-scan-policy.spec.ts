@@ -1,4 +1,7 @@
 import {
+  canCompleteGymSession,
+  canStartGymSession,
+  competitionCompletionDeadline,
   gymScanPolicy,
   hashOpaqueValue,
   isAcceptableLocationAccuracy,
@@ -74,5 +77,39 @@ describe('static gym QR scan policy', () => {
         startedAt,
       }),
     ).toEqual({ outcome: 'rejected', reason: 'session_expired' });
+  });
+
+  it('keeps the 30-minute minimum and provides a 15-minute completion grace period', () => {
+    const endsAt = new Date('2026-09-01T18:00:00.000Z');
+
+    expect(competitionCompletionDeadline(endsAt)).toEqual(
+      new Date('2026-09-01T18:15:00.000Z'),
+    );
+    expect(
+      canStartGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T17:44:59.999Z'),
+      }),
+    ).toBe(true);
+    expect(
+      canStartGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T17:45:00.000Z'),
+      }),
+    ).toBe(false);
+    expect(
+      canCompleteGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T18:14:59.999Z'),
+        startedAt: new Date('2026-09-01T17:45:00.000Z'),
+      }),
+    ).toBe(true);
+    expect(
+      canCompleteGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T18:15:00.000Z'),
+        startedAt: new Date('2026-09-01T17:45:00.000Z'),
+      }),
+    ).toBe(false);
   });
 });

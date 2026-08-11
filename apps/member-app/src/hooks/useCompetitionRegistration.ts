@@ -105,6 +105,8 @@ export function useCompetitionRegistration({
       legalReceipt.isLoading ||
       enrollInCompetition.isPending,
     competition,
+    competitionError: publishedCompetition.isError,
+    competitionLoading: publishedCompetition.isLoading,
     competitionMonthKey,
     register
   };

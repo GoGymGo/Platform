@@ -51,14 +51,14 @@ export const termsOfService = configuredDocument('terms_of_service');
 export const officialContestRules = configuredDocument('official_contest_rules');
 
 export const biometricCameraConsent: LegalDocument = {
-  title: 'DEVICE PRESENCE / QR CAMERA NOTICE',
+  title: 'DEVICE PRESENCE / GYM QR NOTICE',
   effectiveDate: 'JULY 5, 2026',
   intro:
-    'This notice covers local device authentication and QR scanning used to verify GoGymGo workouts.',
+    'This notice covers local device authentication and the initial QR scan used to select a Partner gym.',
   sections: [
     {
       heading: 'WHAT THE CHECK DOES',
-      body: 'The device check confirms that the device user is present. The separate QR camera check confirms a Partner gym entry or exit code.'
+      body: 'The device check confirms that the device user is present. The initial QR camera check selects the Partner gym used for later workout location verification.'
     },
     {
       heading: 'WHAT IS NOT STORED',
@@ -71,17 +71,17 @@ export const biometricCameraConsent: LegalDocument = {
     },
     {
       heading: 'WHAT MAY BE STORED',
-      body: 'GoGymGo may store a non-biometric checkpoint result, time, session ID, QR result, device-integrity signals and fraud-review status so the workout can be audited for entry and prize eligibility.'
+      body: 'GoGymGo may store a non-biometric checkpoint result, time, session ID, initial QR result, gym-location result, device-integrity signals and fraud-review status so the workout can be audited for entry and prize eligibility.'
     },
     {
       heading: 'YOUR CHOICE',
-      body: 'You can decline a camera or device check, but a workout or QR session may not be eligible without a required checkpoint.'
+      body: 'You can decline a camera, location or device check, but enrollment or a workout may not be eligible without a required checkpoint.'
     }
   ]
 };
 
 export const biometricConsentCopy = {
   title: 'DEVICE PRESENCE NOTICE',
-  body: 'Your phone handles Face ID, Touch ID, fingerprint, or passcode checks. GoGymGo receives only the result and never receives biometric data. QR scanning is a separate camera step; its frames are processed locally and are not stored.',
+  body: 'Your phone handles Face ID, Touch ID, fingerprint, or passcode checks. GoGymGo receives only the result and never receives biometric data. The initial gym QR is processed locally and its camera frames are not stored.',
   checkbox: 'I understand and consent to local device presence checks for workout verification.'
 } as const;

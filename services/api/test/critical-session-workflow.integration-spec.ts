@@ -158,7 +158,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       .insertInto('competitions')
       .values({
         ends_at: source.ends_at,
-        minimum_entrants: 2,
+        minimum_entrants: 1,
         month_key: '2030-02',
         name: 'Different Contest At Same Gym',
         region_policy_id: source.region_policy_id,

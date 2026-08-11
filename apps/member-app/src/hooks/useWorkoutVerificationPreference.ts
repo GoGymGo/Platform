@@ -13,7 +13,7 @@ import {
 const defaultPreference: VerificationPreference = {
   method: 'partnerGymQr',
   sourceKey: 'partnerGymQr',
-  sourceLabel: 'PARTNER GYM QR'
+  sourceLabel: 'PARTNER GYM LOCATION'
 };
 
 export function useWorkoutVerificationPreference() {

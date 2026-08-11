@@ -1,3 +1,5 @@
+import type { GymScanResultDto } from '@gogymgo/contracts';
+
 import type { AccountReadinessRepository } from '@/data/accountReadinessRepository';
 import type { AccountSettingsRepository } from '@/data/accountSettingsRepository';
 import type { AppDataSource } from '@/data/appData';
@@ -36,6 +38,7 @@ import type {
 } from '@/domain/social';
 import type { AccountProfile, PublicIdentity } from '@/domain/profile';
 import type { PersistedActiveWorkoutSession } from '@/domain/workoutProgress';
+import type { PendingGymScan } from '@/services/pendingGymScan';
 import type { AuthenticatedUser } from '@/state/auth';
 import type { AppTourScenario } from '@/state/appTour';
 
@@ -85,6 +88,69 @@ export type AppTourQrMode = 'entry' | 'exit';
 
 export function createAppTourGymQrPayload(mode: AppTourQrMode) {
   return `app-tour-gym-${mode}-credential-000000000001`;
+}
+
+export function createAppTourPendingGymScan(
+  scenario: AppTourScenario,
+  now = Date.now()
+): PendingGymScan {
+  const workoutActive = scenario === 'active-workout' || scenario === 'presence-check';
+  const elapsedSeconds = scenario === 'presence-check' ? 31 * 60 : 8 * 60;
+  const startedAt = now - elapsedSeconds * 1000;
+
+  return {
+    activeSession: workoutActive
+      ? {
+          expiresAt: new Date(startedAt + 4 * 60 * 60 * 1000).toISOString(),
+          gymName: 'SKYGATE',
+          minimumCompleteAt: new Date(startedAt + 30 * 60 * 1000).toISOString(),
+          sessionId: 'app-tour-gym-session',
+          startedAt: new Date(startedAt).toISOString()
+        }
+      : null,
+    competitionId: 'app-tour-competition',
+    credential: createAppTourGymQrPayload('entry'),
+    credentialValidUntil: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: now
+  };
+}
+
+export function createAppTourVerifiedGymLocationResult(
+  now = Date.now()
+): GymScanResultDto {
+  const startedAt = now - 31 * 60 * 1000;
+
+  return {
+    credentialVersion: 1,
+    expiresAt: new Date(startedAt + 4 * 60 * 60 * 1000).toISOString(),
+    gymLocationId: 'app-tour-gym',
+    gymName: 'SKYGATE',
+    minimumCompleteAt: new Date(startedAt + 30 * 60 * 1000).toISOString(),
+    outcome: 'verified',
+    rejectionReason: null,
+    remainingSeconds: 0,
+    serverTimestamp: new Date(now).toISOString(),
+    sessionId: 'app-tour-gym-session',
+    startedAt: new Date(startedAt).toISOString()
+  };
+}
+
+export function createAppTourStartedGymLocationResult(
+  now = Date.now()
+): GymScanResultDto {
+  return {
+    credentialVersion: 1,
+    expiresAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
+    gymLocationId: 'app-tour-gym',
+    gymName: 'SKYGATE',
+    minimumCompleteAt: new Date(now + 30 * 60 * 1000).toISOString(),
+    outcome: 'started',
+    rejectionReason: null,
+    remainingSeconds: 30 * 60,
+    serverTimestamp: new Date(now).toISOString(),
+    sessionId: 'app-tour-gym-session',
+    startedAt: new Date(now).toISOString()
+  };
 }
 
 export function isAppTourGymQrPayload(
@@ -572,7 +638,7 @@ function createCurrentCompetition(
     entrantCap: null,
     goalDays: [1, 2, 3, 4, 5, 6, 7],
     id: appTourCompetitionId,
-    minimumEntrants: 100,
+    minimumEntrants: 1,
     monthKey,
     name: `${regionName} Monthly Contest`,
     regionCode: 'vancouver-island-gulf-islands-bc',

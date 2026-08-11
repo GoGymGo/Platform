@@ -17,7 +17,7 @@ export async function scheduleGymScanCompletionReminder({
     reminderTimeout = null;
     if ('Notification' in window && window.Notification.permission === 'granted') {
       new window.Notification('Time to finish your workout', {
-        body: `Your 30-minute minimum${gymName ? ` at ${gymName}` : ''} is complete. Return to the poster and scan again.`
+        body: `Your 30-minute minimum${gymName ? ` at ${gymName}` : ''} is complete. Return to the gym and verify your location to finish.`
       });
     }
   }, delay);

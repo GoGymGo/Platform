@@ -1,12 +1,14 @@
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 
 const projectRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const expoCli = require.resolve('expo/bin/cli', { paths: [projectRoot] });
 const result = spawnSync(
   process.execPath,
-  [expoCli, 'export', '--platform', 'web', '--output-dir', 'dist'],
+  [expoCli, 'export', '--platform', 'web', '--output-dir', 'dist', '--clear'],
   {
     cwd: projectRoot,
     env: {
@@ -22,4 +24,14 @@ if (result.error) {
   throw result.error;
 }
 
-process.exit(result.status ?? 1);
+if (result.status !== 0) {
+  process.exit(result.status ?? 1);
+}
+
+fs.writeFileSync(
+  path.join(projectRoot, 'dist', 'browser-test-preview-build.json'),
+  `${JSON.stringify({
+    cacheCleared: true,
+    browserTestPreviewEnabled: true
+  }, null, 2)}\n`
+);

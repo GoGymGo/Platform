@@ -13,7 +13,7 @@ const journeySteps = [
   {
     number: "02",
     title: "Verify the workout",
-    copy: `Scan an active poster at a Partner gym when you arrive and again after at least ${septemberCampaign.minimumSessionMinutes} minutes.`,
+    copy: `Use a fresh start location check at your selected Partner gym, then a fresh finish location check after at least ${septemberCampaign.minimumSessionMinutes} minutes.`,
   },
   {
     number: "03",
@@ -29,7 +29,7 @@ const readinessFacts = [
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
-    copy: `Entry and exit scans, fresh location readings, and the ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed before a workout counts.`,
+    copy: `Start and finish location checks and the ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed before a workout counts.`,
   },
   {
     title: "CHECK CURRENT GYM STATUS",
@@ -48,7 +48,7 @@ const transparencyFacts = [
   },
   {
     title: "VERIFICATION BEFORE CREDIT",
-    copy: `A workout stays pending until the submitted entry scan, exit scan, fresh location readings, and ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed.`,
+    copy: `A workout stays pending until its start and finish location checks and ${septemberCampaign.minimumSessionMinutes}+ minute minimum are reviewed.`,
   },
   {
     title: "CURRENT GYM STATUS",

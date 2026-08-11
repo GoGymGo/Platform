@@ -91,7 +91,7 @@ function LegacyCheckOutScreen() {
           label: 'PRESENCE',
           value: activeSession?.presenceCheckRequired ? 'PASS' : 'NOT REQUIRED'
         },
-        { label: 'GYM QR', value: 'READY' }
+        { label: 'GYM LOCATION', value: 'READY' }
       ];
 
   if (!activeSession || !checkoutReady) {
@@ -100,7 +100,7 @@ function LegacyCheckOutScreen() {
         actionLabel={activeSession ? 'RETURN TO WORKOUT' : 'START A WORKOUT'}
         body={
           !activeSession
-            ? 'Start a Verified workout before opening the exit scan.'
+            ? 'Start a Verified workout before opening the finish location check.'
             : activeSession.verificationMethod === 'heartRate' && !heartRateReady
               ? 'Wait for the required heart-rate evidence to finish uploading.'
               : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before completion verification.`

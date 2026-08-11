@@ -33,7 +33,7 @@ export function getPreferenceOwnerId(userId: string | null | undefined) {
 const defaultVerificationPreference: VerificationPreference = {
   method: 'partnerGymQr',
   sourceKey: 'partnerGymQr',
-  sourceLabel: 'PARTNER GYM QR'
+  sourceLabel: 'PARTNER GYM LOCATION'
 };
 
 const heartRateVerificationPreference: VerificationPreference = {
@@ -52,6 +52,9 @@ function getSupportedVerificationPreference(
     return heartRateTelemetryAvailable
       ? heartRateVerificationPreference
       : defaultVerificationPreference;
+  }
+  if (preference.method === 'partnerGymQr') {
+    return defaultVerificationPreference;
   }
   return preference;
 }
@@ -152,7 +155,7 @@ export async function getVerificationPreference(userId: string): Promise<Verific
         return {
           method: 'partnerGymQr',
           sourceKey: 'partnerGymQr',
-          sourceLabel: 'PARTNER GYM QR'
+          sourceLabel: 'PARTNER GYM LOCATION'
         };
       }
 
@@ -207,7 +210,7 @@ export async function savePreferredVerificationMethod(
         ? {
             method: supportedMethod,
             sourceKey: 'partnerGymQr',
-            sourceLabel: 'PARTNER GYM QR'
+            sourceLabel: 'PARTNER GYM LOCATION'
           }
         : heartRateVerificationPreference
   );

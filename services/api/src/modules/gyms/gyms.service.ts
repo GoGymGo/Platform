@@ -35,6 +35,9 @@ import type {
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import {
+  canCompleteGymSession,
+  canStartGymSession,
+  competitionCompletionDeadline,
   gymScanPolicy,
   hashOpaqueValue,
   isAcceptableLocationAccuracy,
@@ -179,18 +182,19 @@ export class GymsService {
             'competition.id',
           )
           .select([
+            'competition.ends_at',
             'competition.id as competition_id',
             'competition.rules',
             'competition.rules_version',
+            'competition.status as competition_status',
             'enrollment.goal_days',
             'enrollment.id as enrollment_id',
           ])
           .where('eligible_gym.gym_location_id', '=', credential.gym_id)
           .where('eligible_gym.competition_id', '=', credentialCompetitionId)
           .where('competition.id', '=', credentialCompetitionId)
-          .where('competition.status', '=', 'active')
+          .where('competition.status', 'in', ['active', 'settling'])
           .where('competition.starts_at', '<=', now)
-          .where('competition.ends_at', '>', now)
           .where('enrollment.user_id', '=', user.id)
           .where('enrollment.status', '=', 'active')
           .executeTakeFirst();
@@ -220,8 +224,29 @@ export class GymsService {
           .executeTakeFirst();
 
         if (!active) {
+          if (
+            enrollment.competition_status !== 'active' ||
+            !canStartGymSession({
+              competitionEndsAt: enrollment.ends_at,
+              now,
+            })
+          ) {
+            return this.rejected(
+              now,
+              now < enrollment.ends_at
+                ? 'insufficient_completion_time'
+                : 'competition_unavailable',
+              credential,
+            );
+          }
+          const competitionDeadline = competitionCompletionDeadline(
+            enrollment.ends_at,
+          );
           const expiresAt = new Date(
-            now.getTime() + gymScanPolicy.sessionExpiryMilliseconds,
+            Math.min(
+              now.getTime() + gymScanPolicy.sessionExpiryMilliseconds,
+              competitionDeadline.getTime(),
+            ),
           );
           const session = await transaction
             .insertInto('workout_sessions')
@@ -301,7 +326,48 @@ export class GymsService {
             active,
           );
         }
+        if (
+          !canCompleteGymSession({
+            competitionEndsAt: enrollment.ends_at,
+            now,
+            startedAt: active.started_at,
+          })
+        ) {
+          await transaction
+            .updateTable('workout_sessions')
+            .set({
+              completed_at: now,
+              status: 'cancelled',
+              updated_at: now,
+              verification_summary: {
+                outcome: 'competition_completion_grace_expired',
+                verificationMode: 'static_qr',
+              },
+            })
+            .where('id', '=', active.id)
+            .where('status', '=', 'active')
+            .executeTakeFirstOrThrow();
+          await this.recordScan(transaction, {
+            clientEventHash,
+            credentialVersion: credential.credential_version,
+            gymLocationId: credential.gym_id,
+            outcome: 'rejected',
+            scanType: 'exit',
+            serverTimestamp: now,
+            sessionId: active.id,
+            userId: user.id,
+          });
+          return this.rejected(
+            now,
+            'completion_grace_expired',
+            credential,
+            active,
+          );
+        }
 
+        // Finish requests reuse the gym credential saved during enrollment.
+        // Completion relies on the fresh geofence reading above and server time;
+        // the API does not receive or require evidence of another camera scan.
         const expiresAt = active.expires_at!;
         const resolution = resolveActiveSessionScan({
           expiresAt,
@@ -1308,6 +1374,23 @@ export class GymsService {
 
   async expireIncompleteSessions(): Promise<number> {
     const now = new Date();
+    const due = await this.database.connection
+      .selectFrom('workout_sessions as session')
+      .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'session.competition_id',
+      )
+      .select('session.id')
+      .where('session.status', '=', 'active')
+      .where((expression) =>
+        expression.or([
+          expression('session.expires_at', '<=', now),
+          sql<boolean>`${sql.ref('competition.ends_at')} + INTERVAL '15 minutes' < ${now}`,
+        ]),
+      )
+      .execute();
+    if (due.length === 0) return 0;
     const expired = await this.database.connection
       .updateTable('workout_sessions')
       .set({
@@ -1319,9 +1402,12 @@ export class GymsService {
           verificationMode: 'static_qr',
         },
       })
-      .where('verification_mode', '=', 'static_qr')
       .where('status', '=', 'active')
-      .where('expires_at', '<=', now)
+      .where(
+        'id',
+        'in',
+        due.map((session) => session.id),
+      )
       .returning('id')
       .execute();
     return expired.length;
@@ -1630,7 +1716,7 @@ export class GymsService {
     const contestEnds = dateFormatter.format(competition.ends_at).toUpperCase();
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="${safeContestName} QR poster for ${safeGymName}">
   <title>${safeContestName} at ${safeGymName}</title>
-  <desc>This poster is valid only for ${safeContestName}. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
+  <desc>This poster is valid only for ${safeContestName}. Scan once to join and select this gym. Workout start and finish use fresh location checks.</desc>
   <rect width="1000" height="1400" fill="#05090b"/>
   <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
 
@@ -1649,7 +1735,7 @@ export class GymsService {
   </svg>
 
   <text x="500" y="1084" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="38" font-weight="700">${safeGymName}</text>
-  <text x="500" y="1130" text-anchor="middle" fill="#34E5E8" font-family="Share Tech Mono, monospace" font-size="25" letter-spacing="2">SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT</text>
+  <text x="500" y="1130" text-anchor="middle" fill="#34E5E8" font-family="Share Tech Mono, monospace" font-size="21" letter-spacing="1">SCAN ONCE  &gt;  LOCATION IN  &gt;  TRAIN 30+ MIN  &gt;  LOCATION OUT</text>
   <line x1="100" y1="1165" x2="900" y2="1165" stroke="#173A46" stroke-width="2"/>
 
   <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION ${registrationDate}  |  CONTEST ${contestStarts} - ${contestEnds}</text>

@@ -77,14 +77,16 @@ Test all of these before announcing the QR flow:
 1. New player scans, creates an account, completes setup, and reaches Start
    Workout without rescanning.
 2. Returning signed-out player scans, signs in, and reaches Start Workout.
-3. Signed-in player scans and starts the server-authoritative timer.
-4. Player scans the same poster after the minimum duration and reaches Finish
-   Workout.
-5. A scan submitted outside the configured gym radius is rejected by the server.
+3. Signed-in player uses a fresh start location check and starts the
+   server-authoritative timer.
+4. Player uses a fresh finish location check after the minimum duration and
+   reaches Finish Workout.
+5. A location check submitted outside the configured gym radius is rejected by
+   the server.
 6. The browser fallback still works when no native app is installed.
 7. With native notification permission enabled, the installed app sends a local
-   reminder when the server's 30-minute minimum is reached and opens the scanner
-   when the reminder is tapped.
+   reminder when the server's 30-minute minimum is reached and opens the gym
+   location screen when the reminder is tapped.
 8. The browser build shows the completion banner while open and immediately when
    reopened. Do not claim that a fully closed browser tab will notify the player;
    that requires a separately deployed web-push service.

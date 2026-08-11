@@ -1,10 +1,42 @@
 import { createHash } from 'node:crypto';
 
 export const gymScanPolicy = {
+  competitionCompletionGraceMilliseconds: 15 * 60 * 1_000,
   maximumAccuracyMeters: 50,
   minimumSessionMilliseconds: 30 * 60 * 1_000,
   sessionExpiryMilliseconds: 4 * 60 * 60 * 1_000,
 } as const;
+
+export function competitionCompletionDeadline(endsAt: Date): Date {
+  return new Date(
+    endsAt.getTime() + gymScanPolicy.competitionCompletionGraceMilliseconds,
+  );
+}
+
+export function canStartGymSession(input: {
+  competitionEndsAt: Date;
+  now: Date;
+}): boolean {
+  const completionDeadline = competitionCompletionDeadline(
+    input.competitionEndsAt,
+  );
+  return (
+    input.now < input.competitionEndsAt &&
+    input.now.getTime() + gymScanPolicy.minimumSessionMilliseconds <
+      completionDeadline.getTime()
+  );
+}
+
+export function canCompleteGymSession(input: {
+  competitionEndsAt: Date;
+  now: Date;
+  startedAt: Date;
+}): boolean {
+  return (
+    input.startedAt < input.competitionEndsAt &&
+    input.now < competitionCompletionDeadline(input.competitionEndsAt)
+  );
+}
 
 export function hashOpaqueValue(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');

@@ -808,7 +808,7 @@ async function configureCompetition(
         goalDays,
         label: `${goalDays} ${goalDays === 1 ? 'DAY' : 'DAYS'} / WEEK`,
       })),
-      minimumEntrants: 2,
+      minimumEntrants: 1,
       monthKey: competitionMonthKey,
       name: 'GoGymGo September 2026 Island Pilot',
       reason:

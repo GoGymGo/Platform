@@ -94,7 +94,8 @@ export function parseCompetitionSchedule(input: {
   ) {
     throw new BadRequestException({
       code: 'COMPETITION_DURATION_TOO_SHORT',
-      message: 'A competition must run for at least 30 minutes.',
+      message:
+        'A competition must run for at least 30 minutes. Eligible workouts receive a 15-minute completion period after it ends.',
     });
   }
   return schedule;

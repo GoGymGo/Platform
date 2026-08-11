@@ -16,6 +16,8 @@ export type PendingGymScanSession = {
 
 export type PendingGymScan = {
   activeSession: PendingGymScanSession | null;
+  competitionId: string | null;
+  credentialValidUntil: string | null;
   createdAt: number;
   credential: string;
 };
@@ -48,7 +50,27 @@ export async function readPendingGymScan(
   const stored = await storage.getItem(pendingGymScanStorageKey);
   const pending = parsePendingGymScan(stored);
 
-  if (!pending || pending.createdAt > now + 60_000 || now - pending.createdAt > pendingGymScanMaxAgeMs) {
+  const hasEnrolledCredential = Boolean(pending?.credentialValidUntil);
+  const credentialValidUntil = pending?.credentialValidUntil
+    ? Date.parse(pending.credentialValidUntil)
+    : null;
+  const enrolledCredentialExpired =
+    hasEnrolledCredential &&
+    credentialValidUntil !== null &&
+    Number.isFinite(credentialValidUntil) &&
+    credentialValidUntil <= now &&
+    (!pending?.activeSession || Date.parse(pending.activeSession.expiresAt) <= now);
+  const abandonedSelectionExpired =
+    !hasEnrolledCredential &&
+    pending !== null &&
+    now - pending.createdAt > pendingGymScanMaxAgeMs;
+
+  if (
+    !pending ||
+    pending.createdAt > now + 60_000 ||
+    enrolledCredentialExpired ||
+    abandonedSelectionExpired
+  ) {
     if (stored) {
       await storage.removeItem(pendingGymScanStorageKey);
     }
@@ -77,6 +99,9 @@ export async function rememberGymScanCredential(
   const existing = await readPendingGymScan({ ...dependencies, storage });
   const pending: PendingGymScan = {
     activeSession: existing?.credential === credential ? existing.activeSession : null,
+    competitionId: existing?.credential === credential ? existing.competitionId : null,
+    credentialValidUntil:
+      existing?.credential === credential ? existing.credentialValidUntil : null,
     createdAt: now,
     credential
   };
@@ -85,22 +110,52 @@ export async function rememberGymScanCredential(
   return pending;
 }
 
+export async function rememberCompetitionGymAccess(
+  {
+    competitionId,
+    credential,
+    credentialValidUntil
+  }: {
+    competitionId: string;
+    credential: string;
+    credentialValidUntil: string;
+  },
+  dependencies: PendingGymScanDependencies = {}
+) {
+  if (!competitionId || !Number.isFinite(Date.parse(credentialValidUntil))) {
+    throw new Error('A competition and valid gym access window are required.');
+  }
+
+  const storage = dependencies.storage ?? AsyncStorage;
+  const pending = await rememberGymScanCredential(credential, {
+    ...dependencies,
+    storage
+  });
+  const nextPending: PendingGymScan = {
+    ...pending,
+    competitionId,
+    credentialValidUntil
+  };
+  await storage.setItem(pendingGymScanStorageKey, JSON.stringify(nextPending));
+  notifyPendingGymScan(nextPending);
+  return nextPending;
+}
+
 export async function rememberGymScanResult(
   credential: string,
   result: GymScanResultDto,
   dependencies: PendingGymScanDependencies = {}
 ) {
   const storage = dependencies.storage ?? AsyncStorage;
-  if (result.outcome === 'verified') {
-    await storage.removeItem(pendingGymScanStorageKey);
-    notifyPendingGymScan(null);
-    return null;
-  }
-
   const pending = await rememberGymScanCredential(credential, {
     ...dependencies,
     storage
   });
+  if (result.outcome === 'verified' && !pending.credentialValidUntil) {
+    await storage.removeItem(pendingGymScanStorageKey);
+    notifyPendingGymScan(null);
+    return null;
+  }
   const activeSession = parseActiveSession(result);
   const nextPending: PendingGymScan = {
     ...pending,
@@ -138,6 +193,15 @@ function parsePendingGymScan(value: string | null): PendingGymScan | null {
 
     return {
       activeSession: parseStoredActiveSession(parsed.activeSession),
+      competitionId:
+        typeof parsed.competitionId === 'string' && parsed.competitionId
+          ? parsed.competitionId
+          : null,
+      credentialValidUntil:
+        typeof parsed.credentialValidUntil === 'string' &&
+        Number.isFinite(Date.parse(parsed.credentialValidUntil))
+          ? parsed.credentialValidUntil
+          : null,
       createdAt: parsed.createdAt,
       credential: parsed.credential
     };

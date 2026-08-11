@@ -271,7 +271,9 @@ describe('gym service privacy-safe presentation helpers', () => {
     expect(poster).not.toContain('<svg x="72" y="52"');
     expect(poster).toContain('valid only for Cameron &amp; Friends');
     expect(poster).toContain('Cameron &amp; Friends');
-    expect(poster).toContain('SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT');
+    expect(poster).toContain(
+      'SCAN ONCE  &gt;  LOCATION IN  &gt;  TRAIN 30+ MIN  &gt;  LOCATION OUT',
+    );
     expect(poster).toContain('REGISTRATION AUG 1, 2026');
     expect(poster).toContain('NO PURCHASE REQUIRED');
     expect(poster).toContain('Harbour &amp; &lt;script&gt; &quot;Gym&quot;');

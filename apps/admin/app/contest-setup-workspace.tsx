@@ -72,6 +72,7 @@ const sectionLabels: Record<SetupSection, string> = {
   region: "Region + gym",
   review: "Review + publish",
 };
+const minimumContestDurationMs = 30 * 60 * 1_000;
 
 function parseRules(value: string): Record<string, unknown> {
   try {
@@ -337,6 +338,9 @@ export function ContestSetupWorkspace({
     ) {
       errors.contest =
         "Use a valid schedule: registration opens, registration closes, contest starts, then contest ends.";
+    } else if (endsAt.getTime() - startsAt.getTime() < minimumContestDurationMs) {
+      errors.contest =
+        "Allow at least 30 minutes for the required workout. Players who start in time have 15 minutes after the contest ends to finish verification.";
     }
     if (!selectedRegion) {
       errors.region = "Detect or choose an enabled contest region.";
@@ -598,6 +602,11 @@ export function ContestSetupWorkspace({
                   required
                   type="datetime-local"
                 />
+                <small className="field-help">
+                  Workouts require 30 minutes. Start checks close 15 minutes
+                  before this time, and eligible workouts may finish during the
+                  15-minute completion period afterward.
+                </small>
               </SetupField>
               <SetupField label="ENTRANT CAP (OPTIONAL)">
                 <input
@@ -975,6 +984,10 @@ export function ContestSetupWorkspace({
               <div>
                 <small>GYM + POSTER</small>
                 <strong>{selectedGym?.name || "Not selected"}</strong>
+              </div>
+              <div>
+                <small>WORKOUT TIMING</small>
+                <strong>30 MINUTES + 15-MINUTE COMPLETION PERIOD</strong>
               </div>
             </div>
             {flowError ? (

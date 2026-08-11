@@ -46,7 +46,7 @@ import {
 } from './dto/gym.dto';
 import { GymsService } from './gyms.service';
 
-@ApiTags('gym scans')
+@ApiTags('gym location checks')
 @ApiBearerAuth('firebase')
 @Controller('gym-scans')
 export class GymScansController {
@@ -55,7 +55,8 @@ export class GymScansController {
   @Post()
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({
-    summary: 'Start, check, or complete a static-QR gym session',
+    summary:
+      'Start, check, or complete a Partner-gym location-verified session',
   })
   @ApiOkResponse({ type: GymScanResultDto })
   scan(
@@ -245,7 +246,9 @@ export class GymOperatorController {
   }
 
   @Get('gym-sessions')
-  @ApiOperation({ summary: 'List complete and incomplete QR visits' })
+  @ApiOperation({
+    summary: 'List complete and incomplete location-verified gym visits',
+  })
   @ApiOkResponse({ isArray: true, type: OperatorGymSessionDto })
   listGymSessions(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,

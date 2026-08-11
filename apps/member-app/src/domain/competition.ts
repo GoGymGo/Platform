@@ -344,6 +344,18 @@ export function getCompetitionRegionDateKey(date: Date, timeZone: string) {
   return `${values.get('year')}-${values.get('month')}-${values.get('day')}`;
 }
 
+export function formatCompetitionOpeningDateTime(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'long',
+    timeZone,
+    timeZoneName: 'short',
+    year: 'numeric'
+  }).format(new Date(value));
+}
+
 export function isCompetitionBonusDay(dateKey: string) {
   const monthKey = getCompetitionMonthKey(dateKey);
 

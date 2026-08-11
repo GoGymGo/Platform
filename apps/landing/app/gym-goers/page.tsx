@@ -18,12 +18,12 @@ const points = [
     copy: "Set a Weekly Goal that matches your real routine. Your Weekly Goal is locked after enrollment.",
   },
   {
-    title: "SCAN AT A PARTNER GYM",
-    copy: "Scan an approved gym poster on entry with a fresh eligible location reading.",
+    title: "CHECK LOCATION AT THE GYM",
+    copy: "Use Start Workout for a fresh location check at your selected Partner gym.",
   },
   {
     title: "TRAIN FOR 30+ MINUTES",
-    copy: "Scan the same poster again after the authoritative 30-minute minimum to submit the workout for review.",
+    copy: "Use Finish Workout for another fresh location check after the authoritative 30-minute minimum.",
   },
   {
     title: "FOLLOW THE RESULT",

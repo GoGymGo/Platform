@@ -115,9 +115,9 @@ export default function SignUpScreen() {
   return (
     <AuthScreenShell
       description={gymScanContinuation
-        ? 'Your gym scan is saved. Create your account, finish setup, and GoGymGo will return you to Start Workout.'
+        ? 'Your Partner gym selection is saved. Create your account, finish setup, and GoGymGo will return you to Start Workout.'
         : 'Create one secure account for your Weekly Goal, Verified workouts and brand Rewards.'}
-      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT SETUP'}
+      eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'ACCOUNT SETUP'}
       onBack={() => router.replace(
         gymScanContinuation
           ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }

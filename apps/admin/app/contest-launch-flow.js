@@ -27,21 +27,17 @@ export function chooseSetupCompetition(competitions, preferredId) {
  * @param {RegionPolicy[]} regions
  * @param {GymLocation[]} gyms
  */
-export function getContestLaunchState(competition, rewards, regions, gyms) {
-  const operational = Boolean(competition && competition.status === "draft");
-  const rewardReady = Boolean(
-    competition &&
-    rewards.some(
-      (reward) =>
-        reward.competitionId === competition.id &&
-        reward.status === "published",
-    ),
+export function isContestReadyToPublish(competition, rewards, regions, gyms) {
+  if (!competition || competition.status !== "draft") return false;
+
+  const rewardReady = rewards.some(
+    (reward) =>
+      reward.competitionId === competition.id && reward.status === "published",
   );
-  const region = competition
-    ? regions.find((candidate) => candidate.id === competition.regionPolicyId)
-    : undefined;
+  const region = regions.find(
+    (candidate) => candidate.id === competition.regionPolicyId,
+  );
   const regionReady = Boolean(
-    competition &&
     region?.competitionEnabled &&
     new Date(region.validFrom).getTime() <=
       new Date(competition.registrationOpensAt).getTime() &&
@@ -49,59 +45,15 @@ export function getContestLaunchState(competition, rewards, regions, gyms) {
       new Date(region.validTo).getTime() >=
         new Date(competition.endsAt).getTime()),
   );
-  const assignedGyms = competition
-    ? gyms.filter(
-        (gym) =>
-          (competition.assignedGymIds ?? []).includes(gym.id) && gym.active,
-      )
-    : [];
-  const gymAssigned = assignedGyms.length > 0;
+  const assignedGyms = gyms.filter(
+    (gym) =>
+      (competition.assignedGymIds ?? []).includes(gym.id) && gym.active,
+  );
   const qrReady = assignedGyms.some((gym) =>
     (gym.activeQrCredentials ?? []).some(
-      (credential) => credential.competitionId === competition?.id,
+      (credential) => credential.competitionId === competition.id,
     ),
   );
-  const published = Boolean(
-    competition && ["registration", "active"].includes(competition.status),
-  );
-  const readyToPublish = Boolean(
-    competition &&
-    competition.status === "draft" &&
-    rewardReady &&
-    regionReady &&
-    gymAssigned &&
-    qrReady,
-  );
-  const blockedReason = !competition
-    ? ""
-    : competition.status === "cancelled"
-      ? `${competition.name} is cancelled and cannot receive a gym or QR poster. Delete it or create a new contest draft.`
-      : ["settling", "settled"].includes(competition.status)
-        ? `${competition.name} is finished and cannot be configured again.`
-        : "";
-  const completedSteps = !operational
-    ? 0
-    : !rewardReady
-      ? 1
-      : !regionReady
-        ? 2
-        : !gymAssigned || !qrReady
-          ? 3
-          : published
-            ? 5
-            : 4;
 
-  return {
-    assignedGyms,
-    blockedReason,
-    completedSteps,
-    gymAssigned,
-    operational,
-    published,
-    qrReady,
-    readyToPublish,
-    region,
-    regionReady,
-    rewardReady,
-  };
+  return rewardReady && regionReady && assignedGyms.length > 0 && qrReady;
 }

@@ -1,4 +1,4 @@
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Camera } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -25,16 +25,20 @@ import {
 import { LegalConsentCheckbox } from '@/components/legal';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { getUserFacingErrorMessage } from '@/components/reliability';
+import { SessionUnavailable } from '@/components/session';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, cyberGlow, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { useRewardCatalog } from '@/data/appDataHooks';
 import { gymLocationAccuracyWarning } from '@/constants/gymScan';
 import {
   calculateWeeklyMatchEntries,
   type WeeklyMatchMultiplier
 } from '@/domain/campaignEconomics';
 import { getCompetitionMonthKey, getCompetitionRegionDateKey } from '@/domain/competition';
+import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
 import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import type { RewardCatalogItem } from '@/domain/rewards';
 import {
   buildRemainderDayOptions,
   calculateMaximumCommitmentEntries,
@@ -43,14 +47,21 @@ import {
   getCompetitionRemainderDayCount,
   type RemainderDayCount
 } from '@/domain/commitmentProjection';
-import type { CreateCompetitionEnrollmentInput } from '@/domain/accountReadiness';
+import type {
+  CreateCompetitionEnrollmentInput,
+  CurrentCompetition
+} from '@/domain/accountReadiness';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useCompetitionRegistration } from '@/hooks/useCompetitionRegistration';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { clearScreenMemory, useScreenMemory } from '@/hooks/useScreenMemory';
 import { ApiError } from '@/services/api/client';
 import { readGymScanLocation } from '@/services/gymScanLocation';
-import { readPendingGymScan, type PendingGymScan } from '@/services/pendingGymScan';
+import {
+  readPendingGymScan,
+  rememberCompetitionGymAccess,
+  type PendingGymScan
+} from '@/services/pendingGymScan';
 import { useAppTour } from '@/state/appTour';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
@@ -78,11 +89,20 @@ function formatContestWindowDate(value: string, timeZone: string) {
 }
 
 export default function CommitmentScreen() {
+  const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const mobileGymVerificationAvailable =
     Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
 
-  if (!mobileGymVerificationAvailable) {
-    return <Redirect href="/home" />;
+  if (!mobileGymVerificationAvailable && !appTourActive) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO HOME"
+        body="Contest gym selection and live-location confirmation must be completed in GoGymGo on a phone or tablet."
+        onAction={() => router.replace('/home')}
+        title="PHONE OR TABLET REQUIRED"
+      />
+    );
   }
 
   return <MobileCommitmentScreen />;
@@ -105,6 +125,7 @@ function MobileCommitmentScreen() {
   const defaultCompetitionMonthKey = getCompetitionMonthKey(registrationReferenceDateKey);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const [pendingGymScan, setPendingGymScan] = useState<PendingGymScan | null>(null);
+  const [pendingGymScanHydrated, setPendingGymScanHydrated] = useState(false);
   const registration = useCompetitionRegistration({
     defaultMonthKey: defaultCompetitionMonthKey,
     gymQrCredential: pendingGymScan?.credential ?? null,
@@ -114,21 +135,16 @@ function MobileCommitmentScreen() {
     regionVerification
   });
   const upcomingCompetitionMonthKey = registration.competitionMonthKey;
-  const resolvedCompetitionName = registration.competition?.name ?? 'REGIONAL CONTEST';
-  const contestNoticeLabel = pendingGymScan
-    ? registration.competition
-      ? `QR SELECTED // ${resolvedCompetitionName}`
-      : 'CHECKING SCANNED CONTEST...'
-    : `${resolvedCompetitionName} REGISTRATION OPEN`;
-  const contestWindowCopy = registration.competition
-    ? `Contest runs from ${formatContestWindowDate(
-        registration.competition.startsAt,
-        competitionRegion.timeZone
-      )} to ${formatContestWindowDate(
-        registration.competition.endsAt,
-        competitionRegion.timeZone
-      )}.`
-    : 'Scan the Partner gym poster to select its contest.';
+  const rewardsQuery = useRewardCatalog(
+    registration.competition?.regionCode ?? '',
+    registration.competition?.monthKey
+  );
+  const contestRewards = (rewardsQuery.data ?? []).filter(
+    (reward) => reward.competitionId === registration.competition?.id
+  );
+  const contestContextLoading =
+    (!pendingGymScanHydrated && !registration.alreadyEnrolled) ||
+    registration.competitionLoading;
   const categoryMultipliers = resolveCategoryPodiumMultipliers(registration.competition?.rules);
   const categoryOptions = [
     { label: 'NONE', value: 0 },
@@ -235,12 +251,14 @@ function MobileCommitmentScreen() {
         if (active) {
           setPendingGymScan(pending);
           setGymPresenceStatus(pending ? 'ready' : 'missing');
+          setPendingGymScanHydrated(true);
         }
       })
       .catch(() => {
         if (active) {
           setPendingGymScan(null);
           setGymPresenceStatus('missing');
+          setPendingGymScanHydrated(true);
         }
       });
 
@@ -294,6 +312,7 @@ function MobileCommitmentScreen() {
         !appTourActive && !registration.alreadyEnrolled ? 'locating' : 'registering'
       );
       let gymPresence: CreateCompetitionEnrollmentInput['gymPresence'] | undefined;
+      let confirmedGymScan: PendingGymScan | null = null;
       if (!appTourActive && !registration.alreadyEnrolled) {
         const pendingScan = await readPendingGymScan();
         if (!pendingScan) {
@@ -303,6 +322,7 @@ function MobileCommitmentScreen() {
           );
           return;
         }
+        confirmedGymScan = pendingScan;
         const location = await readGymScanLocation();
         if (location.status !== 'location-read') {
           setConfirmationError(
@@ -321,6 +341,19 @@ function MobileCommitmentScreen() {
       }
       setConfirmationPhase('registering');
       const enrollmentResult = await registration.register(days, gymPresence);
+      if (confirmedGymScan && registration.competition) {
+        try {
+          await rememberCompetitionGymAccess({
+            competitionId: registration.competition.id,
+            credential: confirmedGymScan.credential,
+            credentialValidUntil: getWorkoutCompletionDeadline(
+              registration.competition.endsAt
+            ).toISOString()
+          });
+        } catch {
+          // Enrollment remains authoritative if device storage becomes unavailable.
+        }
+      }
       setWeeklyGoal(enrollmentResult.goalDays, upcomingCompetitionMonthKey);
       [
         'days',
@@ -336,7 +369,7 @@ function MobileCommitmentScreen() {
         Date.now() >= Date.parse(registration.competition.startsAt) &&
         Date.now() < Date.parse(registration.competition.endsAt);
       if (isGymScanSource && selectedContestAcceptsWorkouts) {
-        router.replace('/qr-scanner?posterScan=1');
+        router.replace('/qr-scanner');
       } else {
         router.replace({
           pathname: '/home',
@@ -385,23 +418,54 @@ function MobileCommitmentScreen() {
           Choose a realistic number of workout days you can repeat each week.
         </TerminalText>
 
-        <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
-          <TerminalText tone="cyan" variant="label">
-            {contestNoticeLabel}
-          </TerminalText>
-          <TerminalText
-            style={styles.editorialCaption}
-            tone="muted"
-            uppercase={false}
-            variant="caption"
-          >
-            {contestWindowCopy}
-          </TerminalText>
-        </HUDBorderBox>
+        {contestContextLoading ? (
+          <HUDBorderBox style={styles.contestContextCard} tone="muted">
+            <TerminalText live="polite" tone="cyan" variant="label">
+              LOADING CONTEST DETAILS...
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              {isGymScanSource
+                ? 'Matching this Partner gym QR with its Contest and available offers.'
+                : 'Loading the regional Contest and its available offers.'}
+            </TerminalText>
+          </HUDBorderBox>
+        ) : registration.competition ? (
+          <ContestEntryContext
+            isQrSelected={Boolean(pendingGymScan)}
+            rewards={contestRewards}
+            rewardsError={rewardsQuery.isError}
+            rewardsLoading={rewardsQuery.isPending}
+            timeZone={competitionRegion.timeZone}
+            competition={registration.competition}
+          />
+        ) : (
+          <HUDBorderBox style={styles.contestContextError} tone="amber">
+            <TerminalText tone="amber" variant="label">
+              CONTEST DETAILS UNAVAILABLE
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              {pendingGymScan || registration.competitionError
+                ? 'This QR could not be matched with a Contest you can join. Scan the current poster at the Partner gym and try again.'
+                : 'There is no regional Contest available to join right now.'}
+            </TerminalText>
+            {pendingGymScan ? (
+              <FirstRunSecondaryButton
+                disabled={cameraPermissionBusy}
+                label={cameraPermissionBusy ? 'OPENING CAMERA...' : 'SCAN CURRENT CONTEST QR'}
+                onPress={() => void openGymScanner()}
+                style={styles.contextRetryButton}
+                tone="amber"
+              />
+            ) : null}
+          </HUDBorderBox>
+        )}
 
         <View accessibilityRole="radiogroup" style={styles.dayPicker}>
           {dayOptions.map((day) => {
-            const available = availableGoalOptions.includes(day);
+            const available =
+              Boolean(registration.competition) &&
+              !contestContextLoading &&
+              availableGoalOptions.includes(day);
 
             return (
               <Pressable
@@ -498,7 +562,7 @@ function MobileCommitmentScreen() {
               >
                 {gymPresenceReady
                   ? 'Accept the rules and lock this goal for the month.'
-                  : 'Scan the Partner gym QR to continue to the acceptance checks.'}
+                  : 'Select this Contest from its Partner gym QR before accepting the terms.'}
               </TerminalText>
               <CompactTextButton
                 label="VIEW OFFICIAL CONTEST RULES"
@@ -509,36 +573,28 @@ function MobileCommitmentScreen() {
                 tone={gymPresenceReady ? 'cyan' : 'amber'}
               >
                 <TerminalText tone={gymPresenceReady ? 'cyan' : 'amber'} variant="micro">
-                  GYM LOCATION CONFIRMATION
+                  GYM LOCATION CHECK
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
                   {gymPresenceReady
-                    ? 'Partner gym QR scanned. When you confirm, GoGymGo will use a fresh location reading to check that you are still within 75 metres of this gym.'
-                    : 'At a Partner gym, scan its active GoGymGo QR poster. Keep location access on—you must be within 75 metres when you confirm.'}
+                    ? 'Partner gym selected. When you confirm, GoGymGo will request a fresh location reading and verify that you are within 75 metres. Workout verification uses fresh location checks from here.'
+                    : 'Open the Contest from its Partner gym QR first. Keep location access on—you must be within 75 metres when you confirm.'}
                 </TerminalText>
                 {!registration.alreadyEnrolled ? (
-                  gymPresenceReady ? (
-                    <FirstRunSecondaryButton
-                      disabled={cameraPermissionBusy}
-                      label={cameraPermissionBusy ? 'OPENING CAMERA...' : 'RESCAN PARTNER GYM QR'}
-                      onPress={() => void openGymScanner()}
-                      style={styles.scanCta}
-                      tone="cyan"
-                    />
-                  ) : (
+                  !gymPresenceReady ? (
                     <FirstRunPrimaryButton
-                      accessibilityHint="Requests camera access and opens the Partner gym QR scanner."
+                      accessibilityHint="Requests camera access and opens the Partner gym QR scanner for initial gym selection."
                       disabled={cameraPermissionBusy}
                       label={
                         cameraPermissionBusy
                           ? 'OPENING CAMERA...'
-                          : 'SCAN PARTNER GYM QR TO CONTINUE ->'
+                          : 'SELECT GYM WITH QR ->'
                       }
                       onPress={() => void openGymScanner()}
                       style={styles.scanCta}
                       tone="amber"
                     />
-                  )
+                  ) : null
                 ) : null}
               </HUDBorderBox>
               {gymPresenceReady ? (
@@ -741,6 +797,116 @@ function MobileCommitmentScreen() {
         </View>
       </Modal>
     </FirstRunScreen>
+  );
+}
+
+function ContestEntryContext({
+  competition,
+  isQrSelected,
+  rewards,
+  rewardsError,
+  rewardsLoading,
+  timeZone
+}: {
+  competition: CurrentCompetition;
+  isQrSelected: boolean;
+  rewards: readonly RewardCatalogItem[];
+  rewardsError: boolean;
+  rewardsLoading: boolean;
+  timeZone: string;
+}) {
+  const contestWindow = `${formatContestWindowDate(
+    competition.startsAt,
+    timeZone
+  )} to ${formatContestWindowDate(competition.endsAt, timeZone)}`;
+
+  return (
+    <HUDBorderBox style={styles.contestContextCard} tone="cyan">
+      <View style={styles.contestContextHeader}>
+        <TerminalText tone="cyan" variant="label">
+          CONTEST YOU&apos;RE JOINING
+        </TerminalText>
+        {isQrSelected ? (
+          <TerminalText tone="green" variant="micro">
+            QR MATCHED
+          </TerminalText>
+        ) : null}
+      </View>
+
+      <TerminalText style={styles.contestName} tone="text" variant="body">
+        {competition.name}
+      </TerminalText>
+
+      <View style={styles.contestDetails}>
+        <View style={styles.contestDetailRow}>
+          <TerminalText style={styles.contestDetailLabel} tone="dim" variant="micro">
+            LOCATION
+          </TerminalText>
+          <TerminalText
+            style={styles.contestDetailValue}
+            tone="muted"
+            uppercase={false}
+            variant="caption"
+          >
+            {competition.regionName}
+          </TerminalText>
+        </View>
+        <View style={styles.contestDetailRow}>
+          <TerminalText style={styles.contestDetailLabel} tone="dim" variant="micro">
+            DATES
+          </TerminalText>
+          <TerminalText
+            style={styles.contestDetailValue}
+            tone="muted"
+            uppercase={false}
+            variant="caption"
+          >
+            {contestWindow}
+          </TerminalText>
+        </View>
+      </View>
+
+      <View style={styles.contestOffers}>
+        <TerminalText tone="pink" variant="micro">
+          WHAT&apos;S OFFERED
+        </TerminalText>
+        {rewardsLoading ? (
+          <TerminalText live="polite" tone="muted" uppercase={false} variant="caption">
+            Loading this Contest&apos;s offers...
+          </TerminalText>
+        ) : rewardsError ? (
+          <TerminalText tone="muted" uppercase={false} variant="caption">
+            Offer details could not be loaded. You can still review the Contest rules before
+            confirming.
+          </TerminalText>
+        ) : rewards.length === 0 ? (
+          <TerminalText tone="muted" uppercase={false} variant="caption">
+            Rewards for this Contest will be published soon.
+          </TerminalText>
+        ) : (
+          <View style={styles.contestOfferList}>
+            {rewards.map((reward) => (
+              <View key={reward.id} style={styles.contestOffer}>
+                <View style={styles.contestOfferHeader}>
+                  <TerminalText style={styles.contestOfferTitle} tone="text" variant="body">
+                    {reward.title}
+                  </TerminalText>
+                  <TerminalText tone="pink" variant="micro">
+                    {reward.rewardType === 'coupon' ? 'COUPON' : 'PRIZE'}
+                  </TerminalText>
+                </View>
+                <TerminalText tone="cyan" variant="micro">
+                  OFFERED BY {reward.sponsorName}
+                </TerminalText>
+                <TerminalText tone="muted" uppercase={false} variant="caption">
+                  {reward.description}
+                </TerminalText>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </HUDBorderBox>
   );
 }
 
@@ -1103,14 +1269,85 @@ const styles = StyleSheet.create({
   scanCta: {
     marginTop: spacing.sm
   },
-  joinWindowNotice: {
+  contestContextCard: {
     gap: spacing.xs,
     marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    padding: spacing.md,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan,
+    backgroundColor: colors.surfaceCyanFaint
+  },
+  contestContextError: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.md,
     borderLeftWidth: 2,
     borderLeftColor: colors.statusWarning,
     backgroundColor: colors.surfaceWarning
+  },
+  contextRetryButton: {
+    marginTop: spacing.xs
+  },
+  contestContextHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs
+  },
+  contestName: {
+    fontFamily: fontFamilies.display,
+    fontSize: 19,
+    lineHeight: 24
+  },
+  contestDetails: {
+    gap: spacing.xs,
+    paddingTop: spacing.xs
+  },
+  contestDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
+  },
+  contestDetailLabel: {
+    width: 64,
+    paddingTop: 2
+  },
+  contestDetailValue: {
+    minWidth: 0,
+    flex: 1,
+    fontFamily: fontFamilies.ui,
+    lineHeight: 19
+  },
+  contestOffers: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderCyanSubtle
+  },
+  contestOfferList: {
+    gap: spacing.sm
+  },
+  contestOffer: {
+    gap: 3,
+    paddingLeft: spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.borderPinkStrong
+  },
+  contestOfferHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.xs
+  },
+  contestOfferTitle: {
+    minWidth: 0,
+    flex: 1,
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 20
   },
   dayPicker: {
     flexDirection: 'row',

@@ -37,7 +37,7 @@ const ruleItems: readonly RuleItem[] = [
     body: 'Creator features are based on GoGymGo selection and verified completions, not YouTube views.'
   },
   { body: 'GoGymGo controls stay outside the hosted video player.' },
-  { body: 'Users earn entries only after an approved gym QR entry and exit.' }
+  { body: 'Users earn entries only after approved start and finish gym-location checks.' }
 ];
 
 export default function WorkoutDetailScreen() {

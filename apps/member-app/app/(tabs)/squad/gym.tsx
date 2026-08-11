@@ -30,7 +30,7 @@ export default function GymCompetitionScreen() {
           step="PARTNER GYM"
         />
         <BrandScreenHeader
-          description="Partner gym Contests and QR-verified workouts will appear here when participating Partner gyms are ready."
+          description="Partner gym Contests and location-verified workouts will appear here when participating Partner gyms are ready."
           eyebrow="PARTNER GYM"
           title="GYM CONTEST"
         />

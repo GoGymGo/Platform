@@ -441,7 +441,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           !verifiedPartnerGymCatalogAvailable
         ) {
           throw new Error(
-            'Partner gym QR verification is not available until Partner gyms are published.'
+            'Partner gym location verification is not available until Partner gyms are published.'
           );
         }
 
@@ -487,7 +487,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           );
         }
         if (competition.rules.requireGymQr && verificationMethod !== 'partnerGymQr') {
-          throw new Error('This Contest requires Partner gym entry and exit QR scans.');
+          throw new Error('This Contest requires Partner gym start and finish location checks.');
         }
         if (
           competition.rules.minHeartRateSamples > 0 &&
@@ -500,7 +500,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           );
         }
         if (verificationMethod === 'partnerGymQr' && !entryQrPayload) {
-          throw new Error('Scan the Partner gym entry QR before starting this workout.');
+          throw new Error('Select the Partner gym before starting this workout.');
         }
 
         sessionStartAttemptId.current ??= `${Date.now().toString(36)}-${Math.random()

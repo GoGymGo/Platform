@@ -227,7 +227,7 @@ function LegacyActiveWorkoutScreen() {
           </TerminalText>
         </View>
         <TerminalText style={styles.headerLabel} tone="muted" variant="label">
-          {isHeartRateVerification ? 'HEART RATE' : 'PARTNER GYM QR'}
+          {isHeartRateVerification ? 'HEART RATE' : 'PARTNER GYM LOCATION'}
         </TerminalText>
       </View>
       <WorkoutFlowProgress stage="verify" style={styles.workoutFlowProgress} />
@@ -308,7 +308,7 @@ function LegacyActiveWorkoutScreen() {
               VERIFICATION
             </TerminalText>
             <TerminalText tone={session.ready ? 'green' : 'cyan'} variant="label">
-              {isHeartRateVerification ? 'HEART RATE WORKOUT' : 'PARTNER GYM QR VERIFICATION'}
+              {isHeartRateVerification ? 'HEART RATE WORKOUT' : 'PARTNER GYM LOCATION'}
             </TerminalText>
           </View>
           <TerminalText tone={session.ready ? 'green' : 'cyan'} variant="micro">
@@ -346,8 +346,8 @@ function LegacyActiveWorkoutScreen() {
                 </>
               ) : (
                 <>
-                  <SessionStatusCell label="ENTRY QR" tone="green" value="COMPLETE" />
-                  <SessionStatusCell label="EXIT QR" tone="cyan" value="ACTION NEEDED" />
+                  <SessionStatusCell label="START LOCATION" tone="green" value="VERIFIED" />
+                  <SessionStatusCell label="FINISH LOCATION" tone="cyan" value="ACTION NEEDED" />
                 </>
               )}
               <SessionStatusCell label="PRESENCE" tone={presenceTone} value={presenceValue} />

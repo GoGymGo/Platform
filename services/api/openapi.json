@@ -2643,7 +2643,7 @@
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "List complete and incomplete QR visits",
+        "summary": "List complete and incomplete location-verified gym visits",
         "tags": ["operator gyms and pilot"]
       }
     },
@@ -2787,8 +2787,8 @@
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "Start, check, or complete a static-QR gym session",
-        "tags": ["gym scans"]
+        "summary": "Start, check, or complete a Partner-gym location-verified session",
+        "tags": ["gym location checks"]
       }
     },
     "/v1/region-waitlist": {
@@ -6428,7 +6428,12 @@
         "type": "object",
         "properties": {
           "eventId": { "type": "string", "format": "uuid" },
-          "credential": { "type": "string", "minLength": 32, "maxLength": 256 },
+          "credential": {
+            "type": "string",
+            "description": "Gym credential saved during enrollment and reused automatically; it is not proof of a fresh QR capture.",
+            "minLength": 32,
+            "maxLength": 256
+          },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
           "accuracyMeters": {

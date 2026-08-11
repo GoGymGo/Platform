@@ -19,7 +19,7 @@ const partnerOptions = [
     title: 'APPLY AS A SPONSOR'
   },
   {
-    body: 'Request verified entry and exit QR codes for your gym location.',
+    body: 'Request a Contest QR that lets players select and location-verify your gym.',
     route: '/gym/register' as Href,
     title: 'REGISTER A PARTNER GYM'
   }

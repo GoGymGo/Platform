@@ -55,7 +55,7 @@ may remain stable when their mapping is documented.
 | Challenge check-in | A completion recorded inside a social Challenge                     | Verified workout                            | challenge check-in                   |
 | Prize draw entry   | A non-cash chance in a sponsor-funded draw                          | Ticket, point, payout                       | ledger entry                         |
 | Reward             | The published pilot cash reward or a future approved sponsor reward | Payout                                      | reward catalog and award             |
-| Partner gym        | A gym supporting entry and exit QR verification                     | Partner when the gym meaning is unclear     | gym application and QR evidence      |
+| Partner gym        | A gym supporting location-verified workouts                         | Partner when the gym meaning is unclear     | gym application and saved credential |
 | Creator workout    | Approved workout guidance that can be added to a calendar           | Verified workout                            | creator catalog and plan             |
 
 The UI term **Alias** maps to the API field `screenName`. Alias validation is
@@ -122,7 +122,7 @@ Competition timing requirements:
 - An eligible player may join before the competition starts or while it is
   active. Enrollment closes only when the competition ends, reaches its
   published entrant cap, or is cancelled.
-- The September pilot requires at least two eligible entrants to launch and may
+- Every contest can launch with one eligible entrant and may
   optionally have a sponsor-approved maximum.
 - A player who joins after scoring begins may select any published Weekly Goal.
   Only verified results earned after enrollment is confirmed count.
@@ -132,22 +132,26 @@ Competition timing requirements:
 Users can start from a creator workout plan or their own workout, but both paths
 must enter the same authoritative verification lifecycle.
 
-The only pilot verification method is an approved static gym QR combined with
-a fresh browser location reading. The same poster is scanned on entry and exit.
+The only pilot verification method is an approved static gym QR selected once
+during enrollment, combined with fresh browser location readings at workout
+start and finish. The poster is not rescanned for workouts.
 
 Required lifecycle:
 
-1. confirm the user is enrolled in the current active competition;
-2. scan an active, non-revoked gym QR while within the configured 75 m radius;
-3. create one authoritative server session and four-hour expiry;
+1. confirm the user is enrolled in the current active competition and has a
+   selected Partner gym;
+2. complete a fresh start location check within the configured 75 m radius;
+3. create one authoritative server session that expires at the earlier of four
+   hours or 15 minutes after the competition ends;
 4. wait at least 30 minutes using server time;
-5. scan the same poster again with a fresh eligible location reading; and
+5. complete a fresh finish location check at the selected Partner gym no later
+   than 15 minutes after the competition ends; and
 6. reconcile the verified or rejected result through authoritative progress.
 
 Evidence and trust requirements:
 
 - QR camera frames are processed locally and are not stored; the validated QR
-  payload is the submitted evidence.
+  payload identifies the selected Partner gym for later location checks.
 - Raw location coordinates are used only for the immediate check and are not
   persisted or logged.
 - The app must never fabricate QR, location, timer or verification evidence.

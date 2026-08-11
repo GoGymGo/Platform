@@ -160,6 +160,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(contestSetupWorkspace, /PUBLISH CONTEST/);
   assert.match(contestSetupWorkspace, /setup-section-error/);
   assert.match(contestSetupWorkspace, /minimumEntrants: 1/);
+  assert.match(
+    contestSetupWorkspace,
+    /30 MINUTES \+ 15-MINUTE COMPLETION PERIOD/,
+  );
+  assert.match(contestSetupWorkspace, /Start checks close 15 minutes/);
+  assert.match(dashboard, /15-minute completion/);
   assert.doesNotMatch(contestSetupWorkspace, /name="minimumEntrants"/);
   assert.doesNotMatch(
     contestSetupWorkspace,
@@ -275,9 +281,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(styles, /\.contest-home-poster-row/);
   assert.match(dashboard, /ReasonPresetChips/);
   assert.match(styles, /\.mobile-admin-navigation \{[\s\S]*display: none !important/);
+  assert.match(styles, /\.panel \{[\s\S]*?min-width: 0;/);
+  assert.match(styles, /\.table-wrap \{[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: auto;/);
   assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);
   assert.match(contestLaunchFlow, /competition\.assignedGymIds \?\? \[\]/);
-  assert.match(contestLaunchFlow, /competition\.status === "cancelled"/);
+  assert.match(contestLaunchFlow, /competition\.status !== "draft"/);
+  assert.doesNotMatch(contestLaunchFlow, /completedSteps|blockedReason/);
   assert.match(
     contestSetupWorkspace,
     /publishes the reward, creates the QR poster and opens the contest/,

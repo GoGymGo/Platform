@@ -198,7 +198,7 @@
         "expo-camera",
         {
           "barcodeScannerEnabled": true,
-          "cameraPermission": "GoGymGo uses your camera only to scan entry and exit QR codes at participating partner gyms.",
+          "cameraPermission": "GoGymGo uses your camera only to select a participating Partner gym from its Contest QR code.",
           "recordAudioAndroid": false
         }
       ],
@@ -218,7 +218,7 @@
         "expo-image-picker",
         {
           "photosPermission": "GoGymGo lets you choose an optional profile image for your public profile.",
-          "cameraPermission": "GoGymGo uses your camera only to scan entry and exit QR codes at participating partner gyms.",
+          "cameraPermission": "GoGymGo uses your camera only to select a participating Partner gym from its Contest QR code.",
           "microphonePermission": false
         }
       ]

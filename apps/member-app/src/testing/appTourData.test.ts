@@ -5,7 +5,10 @@ import { extractGymScanCredential } from '@/domain/gymScan';
 
 import {
   createAppTourAccountReadinessRepository,
-  createAppTourGymQrPayload
+  createAppTourGymQrPayload,
+  createAppTourPendingGymScan,
+  createAppTourStartedGymLocationResult,
+  createAppTourVerifiedGymLocationResult
 } from './appTourData';
 
 test('App Tour QR payloads pass through the production scanner contract', () => {
@@ -13,6 +16,21 @@ test('App Tour QR payloads pass through the production scanner contract', () => 
     const payload = createAppTourGymQrPayload(mode);
     assert.equal(extractGymScanCredential(payload), payload);
   }
+});
+
+test('App Tour gym-location fixtures keep preview state outside production screens', () => {
+  const now = Date.parse('2026-09-10T18:00:00.000Z');
+  const active = createAppTourPendingGymScan('active-workout', now);
+  const verified = createAppTourVerifiedGymLocationResult(now);
+  const started = createAppTourStartedGymLocationResult(now);
+
+  assert.equal(active.activeSession?.gymName, 'SKYGATE');
+  assert.equal(active.activeSession?.minimumCompleteAt, '2026-09-10T18:22:00.000Z');
+  assert.equal(verified.outcome, 'verified');
+  assert.equal(started.outcome, 'started');
+  assert.equal(started.remainingSeconds, 30 * 60);
+  assert.equal(verified.gymName, 'SKYGATE');
+  assert.equal(verified.remainingSeconds, 0);
 });
 
 test('new-player App Tour starts onboarding without completed setup', async () => {

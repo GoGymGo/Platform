@@ -23,7 +23,13 @@ export class GymScanRequestDto {
   @IsUUID()
   eventId!: string;
 
-  @ApiProperty({ minLength: 32, maxLength: 256, type: String })
+  @ApiProperty({
+    description:
+      'Gym credential saved during enrollment and reused automatically; it is not proof of a fresh QR capture.',
+    minLength: 32,
+    maxLength: 256,
+    type: String,
+  })
   @IsString()
   @Length(32, 256)
   credential!: string;

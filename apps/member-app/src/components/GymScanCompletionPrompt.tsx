@@ -86,7 +86,7 @@ function MobileGymScanCompletionPrompt() {
       return;
     }
     const previousTitle = document.title;
-    document.title = 'Time to scan again | GoGymGo';
+    document.title = 'Time to finish your workout | GoGymGo';
     return () => {
       document.title = previousTitle;
     };
@@ -109,12 +109,12 @@ function MobileGymScanCompletionPrompt() {
           30 MINUTES COMPLETE
         </TerminalText>
         <TerminalText tone="text" uppercase={false} variant="body">
-          Return to {activeSession.gymName ?? 'the same gym poster'} and scan again
-          to finish and verify your workout.
+          Return to {activeSession.gymName ?? 'your selected Partner gym'} and verify
+          your live location to finish the workout.
         </TerminalText>
         <View style={styles.actions}>
           <CyberButtonPrimary
-            label="SCAN TO FINISH ->"
+            label="VERIFY LOCATION TO FINISH ->"
             onPress={() => router.push('/qr-scanner')}
             style={styles.primaryAction}
           />

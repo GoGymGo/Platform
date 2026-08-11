@@ -60,7 +60,7 @@ import {
 } from "./admin-dashboard-utils";
 import {
   chooseSetupCompetition,
-  getContestLaunchState,
+  isContestReadyToPublish,
 } from "./contest-launch-flow";
 import {
   assertGymQrCredentialScope,
@@ -709,12 +709,12 @@ export function AdminDashboard({
   );
   const publishReady = draftCompetitions.filter(
     (competition) =>
-      getContestLaunchState(
+      isContestReadyToPublish(
         competition,
         snapshot.rewards,
         snapshot.regions,
         pilotData.gyms,
-      ).readyToPublish,
+      ),
   );
   const activeCompetitions = snapshot.competitions.filter((competition) =>
     ["registration", "active"].includes(competition.status),
@@ -3991,6 +3991,17 @@ function CompetitionForm({
     }
     const form = new FormData(event.currentTarget);
     try {
+      const startsAt = new Date(String(form.get("startsAt") ?? ""));
+      const endsAt = new Date(String(form.get("endsAt") ?? ""));
+      if (
+        Number.isNaN(startsAt.getTime()) ||
+        Number.isNaN(endsAt.getTime()) ||
+        endsAt.getTime() - startsAt.getTime() < 30 * 60 * 1_000
+      ) {
+        throw new AdminUserFacingError(
+          "Allow at least 30 minutes for the workout. Eligible workouts receive 15 minutes after the contest ends to finish verification.",
+        );
+      }
       const goalDays = String(form.get("goalDays") ?? "")
         .split(",")
         .map((value) => Number(value.trim()))
@@ -4138,6 +4149,10 @@ function CompetitionForm({
               required
               type="datetime-local"
             />
+            <small className="field-help">
+              Workouts require 30 minutes and receive a 15-minute completion
+              period after the contest ends.
+            </small>
           </Field>
           <ReasonField
             defaultValue={

@@ -19,10 +19,12 @@ describe('production legal fallbacks', () => {
 
   it('contains complete, effective documents for every public legal screen', () => {
     for (const document of [privacyPolicy, termsOfService, officialContestRules]) {
-      assert.equal(document.effectiveDate, 'AUGUST 3, 2026');
       assert.ok(document.intro.length > 80);
       assert.ok(document.sections.length >= 15);
     }
+    assert.equal(privacyPolicy.effectiveDate, 'AUGUST 11, 2026');
+    assert.equal(termsOfService.effectiveDate, 'AUGUST 11, 2026');
+    assert.equal(officialContestRules.effectiveDate, 'AUGUST 11, 2026');
 
     const privacyCopy = JSON.stringify(privacyPolicy);
     assert.match(privacyCopy, /Privacy Officer/);

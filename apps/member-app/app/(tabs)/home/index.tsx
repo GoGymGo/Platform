@@ -451,7 +451,7 @@ export default function HomeScreen() {
                   : isBonusDayPhase
                   ? `Verify one workout on each remaining day to add ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} per day.`
                   : competitionNotStarted
-                    ? 'Scan the approved gym QR when you arrive and again after 30 minutes.'
+                    ? 'Use a fresh gym location check when you start and finish each workout.'
                     : remainingSessions > 0
                       ? `Complete ${remainingSessions} more Verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's Weekly Goal. Only one workout per calendar day counts.`
                       : 'Weekly Goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
@@ -569,7 +569,7 @@ export default function HomeScreen() {
             <TerminalText style={styles.defaultMethod} tone="muted" uppercase={false} variant="caption">
               {verificationPreferenceSaved
                 ? `Pilot verification: ${verificationPreference.sourceLabel}.`
-                : 'Scan the approved Partner gym QR to start a Verified workout.'}
+                : 'Check your location at the selected Partner gym to start a Verified workout.'}
             </TerminalText>
           ) : null}
           </>

@@ -79,9 +79,9 @@ function DevicePresenceCheckScreen() {
   ) {
     return (
       <SessionUnavailable
-        body="Scan a Partner gym entry QR before the device presence check."
+        body="Select a Partner gym from its Contest QR before the device presence check."
         onAction={() => router.replace('/qr-scanner')}
-        title="ENTRY QR REQUIRED"
+        title="PARTNER GYM REQUIRED"
       />
     );
   }

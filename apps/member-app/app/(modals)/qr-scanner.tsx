@@ -28,6 +28,7 @@ import {
   isGymLocationAccuracyValidationMessage,
   isGymScanCompletionReady
 } from '@/domain/gymScan';
+import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -42,15 +43,30 @@ import {
 } from '@/services/pendingGymScan';
 import { useApi } from '@/state/api';
 import { useAppTour } from '@/state/appTour';
+import { useCompetitionRegion } from '@/state/competitionRegion';
+import {
+  createAppTourPendingGymScan,
+  createAppTourStartedGymLocationResult,
+  createAppTourVerifiedGymLocationResult
+} from '@/testing/appTourData';
 
 type ScanUiState = 'ready' | 'locating' | 'submitting' | 'result';
 
 export default function QrScannerModal() {
+  const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const mobileGymVerificationAvailable =
     Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
 
-  if (!mobileGymVerificationAvailable) {
-    return <Redirect href="/home" />;
+  if (!mobileGymVerificationAvailable && !appTourActive) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO HOME"
+        body="Gym QR and live-location verification must be completed in GoGymGo on a phone or tablet. Your account and Contest enrollment are unchanged."
+        onAction={() => router.replace('/home')}
+        title="PHONE OR TABLET REQUIRED"
+      />
+    );
   }
 
   return <MobileQrScannerModal />;
@@ -58,18 +74,13 @@ export default function QrScannerModal() {
 
 function MobileQrScannerModal() {
   const router = useRouter();
-  const { active: appTourActive } = useAppTour();
-  const {
-    credential: linkedCredential,
-    enrollment,
-    posterScan
-  } = useLocalSearchParams<{
+  const { active: appTourActive, scenario: appTourScenario } = useAppTour();
+  const { competitionRegion } = useCompetitionRegion();
+  const { credential: linkedCredential, enrollment } = useLocalSearchParams<{
     credential?: string;
     enrollment?: string;
-    posterScan?: string;
   }>();
   const enrollmentPresenceMode = enrollment === '1';
-  const posterScanReady = posterScan === '1' || Boolean(linkedCredential);
   const { api, configured } = useApi();
   const repository = useMemo(() => (api ? createGymScanRepository(api) : null), [api]);
   const [pendingIntent, setPendingIntent] = useState<PendingGymScan | null>(null);
@@ -89,9 +100,7 @@ function MobileQrScannerModal() {
     gymQrScanKey: enrollmentPresenceMode ? null : (pendingIntent?.createdAt ?? null)
   });
   const [permission, requestPermission] = useCameraPermissions();
-  const [cameraRequested, setCameraRequested] = useState(false);
   const [clockNow, setClockNow] = useState<number | null>(null);
-  const [requirePhysicalRescan, setRequirePhysicalRescan] = useState(false);
   const [scanLocked, setScanLocked] = useState(false);
   const [state, setState] = useState<ScanUiState>('ready');
   const [result, setResult] = useState<GymScanResultDto | null>(null);
@@ -111,6 +120,11 @@ function MobileQrScannerModal() {
     clockNow !== null &&
     isGymScanCompletionReady(timerTarget, clockNow) &&
     Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
+  const workoutActive =
+    !enrollmentPresenceMode &&
+    Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
+  const workoutVerified = !enrollmentPresenceMode && result?.outcome === 'verified';
+  const workoutGymName = result?.gymName ?? activeSession?.gymName ?? null;
   const scannedContestAcceptsWorkouts = scannedCompetition?.status === 'active';
 
   useEffect(() => {
@@ -118,11 +132,22 @@ function MobileQrScannerModal() {
 
     async function hydratePendingIntent() {
       try {
-        const pending = linkedCredentialValue
+        const stored = linkedCredentialValue
           ? await rememberGymScanCredential(linkedCredentialValue)
           : await readPendingGymScan();
+        const pending =
+          appTourActive && !enrollmentPresenceMode
+            ? createAppTourPendingGymScan(appTourScenario)
+            : stored;
         if (active) {
           setPendingIntent(pending);
+          setResult(
+            appTourActive &&
+              !enrollmentPresenceMode &&
+              appTourScenario === 'workout-complete'
+              ? createAppTourVerifiedGymLocationResult()
+              : null
+          );
         }
       } finally {
         if (active) {
@@ -135,7 +160,7 @@ function MobileQrScannerModal() {
     return () => {
       active = false;
     };
-  }, [linkedCredentialValue]);
+  }, [appTourActive, appTourScenario, enrollmentPresenceMode, linkedCredentialValue]);
 
   useEffect(() => {
     if (!timerTarget) {
@@ -151,12 +176,21 @@ function MobileQrScannerModal() {
   }, [timerTarget]);
 
   const submitCredential = useCallback(
-    async (rawPayload: string) => {
-      if (scanLocked || (!repository && !enrollmentPresenceMode)) return;
+    async (rawPayload: string, allowSavedCredential = false) => {
+      if (
+        (!allowSavedCredential && scanLocked) ||
+        (!repository && !appTourActive && !enrollmentPresenceMode)
+      ) {
+        return;
+      }
       const credential = extractGymScanCredential(rawPayload);
       if (!credential) {
         setScanLocked(true);
-        setError('That code is not a valid GoGymGo gym QR. Check the poster and scan again.');
+        setError(
+          enrollmentPresenceMode
+            ? 'That code is not a valid GoGymGo gym QR. Check the poster and try again.'
+            : 'The saved Partner gym could not be verified. Return to Training and try again.'
+        );
         return;
       }
       setScanLocked(true);
@@ -177,31 +211,65 @@ function MobileQrScannerModal() {
         router.replace('/commitment?source=gym-scan');
         return;
       }
-      if (!repository) return;
-      const location = await readGymScanLocation();
-      if (location.status !== 'location-read') {
+      if (!repository && !appTourActive) return;
+      let location;
+      try {
+        location = appTourActive
+          ? {
+              accuracyMeters: 5,
+              latitude: 48.4284,
+              longitude: -123.3656,
+              status: 'location-read' as const
+            }
+          : await readGymScanLocation();
+      } catch (locationError) {
         setState('result');
         setError(
-          location.status === 'permission-denied'
-              ? 'Location access was not allowed. Enable location in device settings, then try again.'
-              : 'Your live location could not be read. Check location services and try again.'
+          getUserFacingErrorMessage(
+            locationError,
+            'Location services could not be opened. Check device settings and try again.'
+          )
         );
+        return;
+      }
+      if (location.status !== 'location-read') {
+        setState('result');
+        setError(locationStatusMessage(location.status));
         return;
       }
       setState('submitting');
       try {
-        const scanResult = await repository.scan({
-          accuracyMeters: location.accuracyMeters,
-          credential,
-          eventId: randomUUID(),
-          latitude: location.latitude,
-          longitude: location.longitude
-        });
+        const scanResult = appTourActive
+          ? activeSession
+            ? createAppTourVerifiedGymLocationResult()
+            : createAppTourStartedGymLocationResult()
+          : await repository!.scan({
+              accuracyMeters: location.accuracyMeters,
+              credential,
+              eventId: randomUUID(),
+              latitude: location.latitude,
+              longitude: location.longitude
+            });
         setResult(scanResult);
-        if (scanResult.outcome === 'started' || scanResult.outcome === 'too_early') {
-          setRequirePhysicalRescan(true);
-        } else if (scanResult.outcome === 'verified') {
-          setRequirePhysicalRescan(false);
+        if (appTourActive) {
+          setPendingIntent((current) => {
+            const pending = current ?? createAppTourPendingGymScan('ready');
+            return {
+              ...pending,
+              activeSession:
+                scanResult.outcome === 'started' || scanResult.outcome === 'too_early'
+                  ? {
+                      expiresAt: scanResult.expiresAt!,
+                      gymName: scanResult.gymName ?? null,
+                      minimumCompleteAt: scanResult.minimumCompleteAt!,
+                      sessionId: scanResult.sessionId!,
+                      startedAt: scanResult.startedAt!
+                    }
+                  : null,
+              credential
+            };
+          });
+          return;
         }
         try {
           setPendingIntent(await rememberGymScanResult(credential, scanResult));
@@ -214,7 +282,7 @@ function MobileQrScannerModal() {
         setState('result');
       }
     },
-    [enrollmentPresenceMode, repository, router, scanLocked]
+    [activeSession, appTourActive, enrollmentPresenceMode, repository, router, scanLocked]
   );
 
   function handleBarcodeScanned(scan: BarcodeScanningResult) {
@@ -226,15 +294,6 @@ function MobileQrScannerModal() {
     setState('ready');
     setResult(null);
     setError(null);
-  }
-
-  function openFinishScanner() {
-    setCameraRequested(true);
-    setError(null);
-    setRequirePhysicalRescan(true);
-    setResult(null);
-    setScanLocked(false);
-    setState('ready');
   }
 
   if (pendingIntentLoading) {
@@ -254,7 +313,7 @@ function MobileQrScannerModal() {
   if (!enrollmentPresenceMode && registrationError) {
     return (
       <RecoverableScreenError
-        body="Your contest setup could not be checked. Retry before scanning the gym poster."
+        body="Your contest setup could not be checked. Retry before starting a location check."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"
@@ -274,12 +333,22 @@ function MobileQrScannerModal() {
     return (
       <SessionUnavailable
         actionLabel="BACK TO HOME"
-        body={`You are registered for ${scannedCompetition.name}. Workout scans open when this contest begins on ${new Intl.DateTimeFormat(
-          'en-CA',
-          { day: 'numeric', month: 'long', year: 'numeric' }
-        ).format(new Date(scannedCompetition.startsAt))}.`}
+        body={`You are registered for ${scannedCompetition.name}. Workout location checks open on ${formatCompetitionOpeningDateTime(
+          scannedCompetition.startsAt,
+          competitionRegion.timeZone
+        )}.`}
         onAction={() => router.replace('/home')}
         title="REGISTRATION COMPLETE"
+      />
+    );
+  }
+  if (!enrollmentPresenceMode && !effectiveCredential) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO TRAINING"
+        body="This device no longer has the Partner gym selected during registration. Your Contest enrollment is safe, but a gym location check cannot start on this device."
+        onAction={() => router.replace('/session')}
+        title="GYM LOCATION UNAVAILABLE"
       />
     );
   }
@@ -287,9 +356,9 @@ function MobileQrScannerModal() {
     return (
       <SessionUnavailable
         actionLabel="BACK TO TRAINING"
-        body="The secure scan service is temporarily unavailable. Your account and contest data are safe."
+        body="The secure gym-location service is temporarily unavailable. Your account and contest data are safe."
         onAction={() => router.replace('/session')}
-        title="QR SERVICE OFFLINE"
+        title="LOCATION SERVICE OFFLINE"
       />
     );
   }
@@ -313,42 +382,120 @@ function MobileQrScannerModal() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label="PARTNER GYM QR"
+          label={enrollmentPresenceMode ? 'PARTNER GYM QR' : 'GYM LOCATION'}
           onBack={() =>
             goBackOrReplace(router, enrollmentPresenceMode ? '/commitment' : '/session')
           }
           step={enrollmentPresenceMode ? 'CONTEST ENROLLMENT' : 'VERIFICATION'}
         />
-        <BrandScreenHeader
-          description={
-            enrollmentPresenceMode
-              ? 'Scan the active GoGymGo QR poster at this Partner gym, then confirm enrollment while you are still at the gym.'
-              : 'Scan the gym poster once to start, then scan the same poster after the server timer to finish.'
-          }
-          eyebrow={enrollmentPresenceMode ? 'GYM LOCATION' : 'VERIFIED GYM WORKOUT'}
-          title={
-            enrollmentPresenceMode
-              ? "SCAN THIS GYM'S QR"
-              : completionReady
-                ? 'READY TO FINISH'
-                : activeSession || result?.outcome === 'started' || result?.outcome === 'too_early'
-                  ? 'WORKOUT IN PROGRESS'
-                  : 'START OR FINISH YOUR WORKOUT'
-          }
-        />
+        {workoutActive ? (
+          <HUDBorderBox
+            glow
+            style={styles.timerCard}
+            tone={error ? 'red' : completionReady ? 'green' : 'cyan'}
+          >
+            <TerminalText
+              glow
+              tone={error ? 'red' : completionReady ? 'green' : 'cyan'}
+              variant="label"
+            >
+              {completionReady ? '30 MINUTES COMPLETE' : 'WORKOUT TIMER'}
+            </TerminalText>
+            <TerminalText
+              glow
+              live="polite"
+              style={styles.remaining}
+              tone="pink"
+              variant="display"
+            >
+              {completionReady ? '00:00' : formatRemaining(displayRemainingSeconds)}
+            </TerminalText>
+            {workoutGymName ? (
+              <TerminalText glow tone="cyan" variant="label">
+                {workoutGymName}
+              </TerminalText>
+            ) : null}
+            <TerminalText tone={error ? 'red' : 'muted'} uppercase={false} variant="body">
+              {error ??
+                (completionReady
+                  ? 'Tap Finish Workout. GoGymGo will check your live location at the gym.'
+                  : 'When the timer reaches 00:00, tap Finish Workout. GoGymGo will check your live location at the gym.')}
+            </TerminalText>
+            {busy ? (
+              <TerminalText live="polite" glow tone="cyan" variant="label">
+                {state === 'locating' ? 'READING LIVE LOCATION...' : 'VERIFYING WITH SERVER...'}
+              </TerminalText>
+            ) : (
+              <>
+                {error?.startsWith('Location access') && Platform.OS !== 'web' ? (
+                  <CyberButtonOutline
+                    label="OPEN DEVICE SETTINGS"
+                    onPress={() => void Linking.openSettings()}
+                    tone="amber"
+                  />
+                ) : null}
+                <CyberButtonPrimary
+                  disabled={!completionReady}
+                  label={
+                    completionReady
+                      ? error
+                        ? 'TRY LOCATION CHECK AGAIN'
+                        : 'FINISH WORKOUT + LOCATION CHECK'
+                      : 'FINISH WORKOUT AT 00:00'
+                  }
+                  onPress={() => void submitCredential(effectiveCredential!, true)}
+                />
+              </>
+            )}
+          </HUDBorderBox>
+        ) : workoutVerified ? (
+          <HUDBorderBox glow style={styles.stateCard} tone="green">
+            <TerminalText glow live="polite" tone="green" variant="label">
+              WORKOUT VERIFIED
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              Your finish location was confirmed. Today counts toward your Contest goal.
+            </TerminalText>
+            {workoutGymName ? (
+              <TerminalText glow tone="cyan" variant="label">
+                {workoutGymName}
+              </TerminalText>
+            ) : null}
+            <CyberButtonOutline
+              label="BACK TO TRAINING"
+              onPress={() => goBackOrReplace(router, '/session')}
+            />
+          </HUDBorderBox>
+        ) : (
+          <>
+            <BrandScreenHeader
+              description={
+                enrollmentPresenceMode
+                  ? 'Use the active GoGymGo QR once to select this Partner gym for Contest enrollment.'
+                  : 'GoGymGo checks your live location before starting and finishing the workout. The QR selected during registration is reused automatically.'
+              }
+              eyebrow={
+                enrollmentPresenceMode ? 'INITIAL GYM SELECTION' : 'VERIFIED GYM WORKOUT'
+              }
+              title={enrollmentPresenceMode ? "SCAN THIS GYM'S QR" : 'START YOUR WORKOUT'}
+            />
 
-        <HUDBorderBox style={styles.instructions} tone="cyan">
-          <TerminalText tone="cyan" variant="label">
-            {enrollmentPresenceMode ? 'ACTIVE QR // WITHIN 75 METRES' : 'ONE POSTER // TWO SCANS'}
-          </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
-            {enrollmentPresenceMode
-              ? 'After this scan, you will return to registration. Confirm while you are still within 75 metres; GoGymGo will request a fresh location reading then.'
-              : 'Scan once at the gym, then choose Start Workout. After the server timer reaches 00:00, scan the same poster again and choose Finish Workout. Your location is checked only when you submit each scan.'}
-          </TerminalText>
-        </HUDBorderBox>
+            <HUDBorderBox style={styles.instructions} tone="cyan">
+              <TerminalText tone="cyan" variant="label">
+                {enrollmentPresenceMode
+                  ? 'SCAN ONCE // SELECT THIS GYM'
+                  : 'FRESH LOCATION // START + FINISH'}
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="body">
+                {enrollmentPresenceMode
+                  ? 'After this initial scan, you will return to registration. GoGymGo will request a fresh location reading when you confirm.'
+                  : 'Choose Check Location + Start Workout while you are at the selected Partner gym. When the timer reaches 00:00, use Check Location + Finish Workout. A workout started in time may finish during the 15-minute completion period after the Contest ends.'}
+              </TerminalText>
+            </HUDBorderBox>
+          </>
+        )}
 
-        {busy ? (
+        {workoutActive || workoutVerified ? null : busy ? (
           <HUDBorderBox glow style={styles.stateCard} tone="cyan">
             <TerminalText live="polite" glow tone="cyan" variant="label">
               {state === 'locating' ? 'READING LIVE LOCATION...' : 'VERIFYING WITH SERVER...'}
@@ -358,7 +505,9 @@ function MobileQrScannerModal() {
           <HUDBorderBox glow style={styles.stateCard} tone={error ? 'red' : resultTone}>
             <TerminalText glow tone={error ? 'red' : resultTone} variant="label">
               {error
-                ? 'SCAN NOT COMPLETED'
+                ? enrollmentPresenceMode
+                  ? 'GYM NOT SELECTED'
+                  : 'LOCATION CHECK NOT COMPLETED'
                 : completionReady
                   ? '30 MINUTES COMPLETE'
                   : resultTitle(result!)}
@@ -371,7 +520,7 @@ function MobileQrScannerModal() {
             >
               {error ??
                 (completionReady
-                  ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
+                  ? 'Check your live location to finish and verify this workout.'
                   : resultMessage(result!))}
             </TerminalText>
             {result?.gymName ? (
@@ -400,7 +549,10 @@ function MobileQrScannerModal() {
               />
             ) : null}
             {completionReady ? (
-              <CyberButtonPrimary label="OPEN SCANNER TO FINISH" onPress={openFinishScanner} />
+              <CyberButtonPrimary
+                label="CHECK LOCATION + FINISH WORKOUT"
+                onPress={() => void submitCredential(effectiveCredential!, true)}
+              />
             ) : null}
             <CyberButtonOutline
               label={
@@ -419,19 +571,29 @@ function MobileQrScannerModal() {
               }}
             />
           </HUDBorderBox>
-        ) : !enrollmentPresenceMode &&
-          posterScanReady &&
-          effectiveCredential &&
-          !scanLocked &&
-          !requirePhysicalRescan ? (
-          <HUDBorderBox glow style={styles.stateCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
-              {activeSession ? 'RETURN SCAN READY' : 'ENTRY SCAN READY'}
+        ) : !enrollmentPresenceMode && effectiveCredential && !scanLocked ? (
+          <HUDBorderBox
+            glow
+            style={styles.stateCard}
+            tone={activeSession && completionReady ? 'green' : 'cyan'}
+          >
+            <TerminalText
+              glow
+              tone={activeSession && completionReady ? 'green' : 'cyan'}
+              variant="label"
+            >
+              {activeSession
+                ? completionReady
+                  ? 'READY FOR FINAL LOCATION CHECK'
+                  : 'WORKOUT TIMER ACTIVE'
+                : 'READY FOR START LOCATION CHECK'}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
               {activeSession
-                ? 'Choose Finish Workout to check your location and complete this active gym session.'
-                : 'Choose Start Workout to check your location and begin the authoritative server timer.'}
+                ? completionReady
+                  ? 'Confirm that you are back within 75 metres of the selected Partner gym to finish this workout.'
+                  : 'Keep training. Finish Workout unlocks at 00:00 and will request a fresh location reading.'
+                : 'Confirm that you are within 75 metres of the selected Partner gym to begin the server timer.'}
             </TerminalText>
             {activeSession?.gymName ? (
               <TerminalText glow tone="cyan" variant="label">
@@ -440,35 +602,19 @@ function MobileQrScannerModal() {
             ) : null}
             {activeSession ? (
               <TerminalText glow style={styles.remaining} tone="pink" variant="display">
-                {formatRemaining(displayRemainingSeconds)}
+                {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
               </TerminalText>
             ) : null}
             <CyberButtonPrimary
-              label={activeSession ? 'FINISH WORKOUT' : 'START WORKOUT'}
-              onPress={() => void submitCredential(effectiveCredential)}
-            />
-          </HUDBorderBox>
-        ) : !enrollmentPresenceMode && activeSession && !cameraRequested ? (
-          <HUDBorderBox glow style={styles.stateCard} tone={completionReady ? 'green' : 'cyan'}>
-            <TerminalText glow tone={completionReady ? 'green' : 'cyan'} variant="label">
-              {completionReady ? '30 MINUTES COMPLETE' : 'WORKOUT TIMER ACTIVE'}
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              {completionReady
-                ? 'Return to the same gym poster and scan it again to finish and verify your workout.'
-                : 'When the timer reaches 00:00, scan the same gym poster again to verify your workout day.'}
-            </TerminalText>
-            {activeSession.gymName ? (
-              <TerminalText glow tone="cyan" variant="label">
-                {activeSession.gymName}
-              </TerminalText>
-            ) : null}
-            <TerminalText glow style={styles.remaining} tone="pink" variant="display">
-              {completionReady ? 'READY' : formatRemaining(displayRemainingSeconds)}
-            </TerminalText>
-            <CyberButtonPrimary
-              label="SCAN POSTER TO FINISH"
-              onPress={() => setCameraRequested(true)}
+              disabled={Boolean(activeSession) && !completionReady}
+              label={
+                activeSession
+                  ? completionReady
+                    ? 'CHECK LOCATION + FINISH WORKOUT'
+                    : 'FINISH AVAILABLE AT 00:00'
+                  : 'CHECK LOCATION + START WORKOUT'
+              }
+              onPress={() => void submitCredential(effectiveCredential, true)}
             />
           </HUDBorderBox>
         ) : appTourActive ? (
@@ -521,37 +667,54 @@ function resultTitle(result: GymScanResultDto) {
   if (result.outcome === 'started') return 'WORKOUT STARTED';
   if (result.outcome === 'too_early') return 'KEEP GOING';
   if (result.outcome === 'verified') return 'WORKOUT DAY VERIFIED';
-  return 'SCAN REJECTED';
+  return 'LOCATION CHECK REJECTED';
 }
 
 function resultMessage(result: GymScanResultDto) {
   if (result.outcome === 'started') {
-    return 'Workout tracking is active on the server. Scan this same poster again after the minimum time.';
+    return 'Your start location was verified and workout tracking is active on the server. Finish Workout unlocks after 30 minutes and remains available through the Contest completion deadline.';
   }
   if (result.outcome === 'too_early') {
     return 'The session is active, but the 30-minute minimum has not been reached yet.';
   }
   if (result.outcome === 'verified') {
-    return 'Entry and exit were verified. This is your one eligible contest day for today.';
+    return 'Your start and finish locations were verified. This is your one eligible Contest day for today.';
   }
   return rejectionMessage(result.rejectionReason ?? null);
 }
 
 function rejectionMessage(reason: string | null) {
   const messages: Record<string, string> = {
-    competition_unavailable: 'Join the active contest before scanning a gym poster.',
+    competition_unavailable: 'Join the active Contest before starting a gym location check.',
+    completion_grace_expired:
+      'The 15-minute completion period has ended, so this workout cannot be verified.',
     daily_limit_reached: 'You already earned one verified contest day today.',
     gym_inactive: 'This gym is not active for the current contest.',
     inaccurate_location: gymLocationAccuracyWarning,
-    invalid_or_revoked_credential: 'This poster is invalid or has been replaced by the gym.',
-    outside_geofence: 'You must be within 75 metres of the configured gym to scan.',
-    replayed_event: 'This scan was already processed. Scan the poster again.',
-    session_expired: 'The four-hour session window expired. Start a new visit with another scan.',
+    insufficient_completion_time:
+      'There is not enough time left to complete the required 30-minute workout before the 15-minute completion period ends.',
+    invalid_or_revoked_credential:
+      'The gym selected during registration is no longer active for this Contest.',
+    outside_geofence: 'You must be within 75 metres of the selected Partner gym.',
+    replayed_event: 'This location check was already processed. Try again.',
+    session_expired: 'The workout session window expired. Start a new gym visit.',
     session_gym_mismatch: 'Finish at the same gym where this session started.'
   };
   return reason
-    ? (messages[reason] ?? 'The server could not verify this scan.')
-    : 'The server could not verify this scan.';
+    ? (messages[reason] ?? 'The server could not verify this location check.')
+    : 'The server could not verify this location check.';
+}
+
+function locationStatusMessage(
+  status: 'location-unavailable' | 'mobile-required' | 'permission-denied'
+) {
+  if (status === 'permission-denied') {
+    return 'Location access was not allowed. Enable location in device settings, then try again.';
+  }
+  if (status === 'mobile-required') {
+    return 'Open GoGymGo on a phone or tablet to complete the live location check.';
+  }
+  return 'Your live location could not be read. Check location services and try again.';
 }
 
 function formatRemaining(totalSeconds: number) {
@@ -566,12 +729,12 @@ function getScanErrorMessage(error: unknown) {
       return gymLocationAccuracyWarning;
     }
     if (error.status === 401) {
-      return 'Your account session expired. Sign in again, then rescan the poster.';
+      return 'Your account session expired. Sign in again, then retry the location check.';
     }
   }
   return getUserFacingErrorMessage(
     error,
-    'The scan could not be verified. Check your connection and try again.'
+    'The location check could not be verified. Check your connection and try again.'
   );
 }
 
@@ -582,6 +745,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg
   },
   stateCard: {
+    gap: spacing.lg,
+    padding: spacing.lg
+  },
+  timerCard: {
     gap: spacing.lg,
     padding: spacing.lg
   },

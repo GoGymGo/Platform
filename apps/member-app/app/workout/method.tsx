@@ -41,10 +41,10 @@ const verificationOptions: readonly VerificationOption[] = [
   },
   {
     available: verifiedPartnerGymCatalogAvailable,
-    body: 'Scan the approved gym poster at entry and exit. The server verifies the credential, location and session time.',
+    body: 'Use the gym selected during registration. The server verifies a fresh location at workout start and finish, plus the session time.',
     method: 'partnerGymQr',
     route: '/qr-scanner',
-    title: 'PARTNER GYM QR'
+    title: 'PARTNER GYM LOCATION'
   }
 ];
 
@@ -53,7 +53,7 @@ export default function WorkoutMethodScreen() {
   const { user } = useAuth();
   const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
   const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('partnerGymQr');
-  const [preferredSourceLabel, setPreferredSourceLabel] = useState('PARTNER GYM QR');
+  const [preferredSourceLabel, setPreferredSourceLabel] = useState('PARTNER GYM LOCATION');
   const [showVerificationRules, setShowVerificationRules] = useState(false);
   const orderedOptions = useMemo(
     () =>
@@ -101,7 +101,7 @@ export default function WorkoutMethodScreen() {
         />
         <WorkoutFlowProgress stage="device" style={styles.workoutProgress} />
         <BrandScreenHeader
-          description="Use the approved Partner gym poster and a fresh location reading to start and finish your Verified workout."
+          description="Use fresh location readings at your selected Partner gym to start and finish your Verified workout."
           eyebrow="WORKOUT VERIFICATION"
           title="VERIFY YOUR WORKOUT"
         />
@@ -165,7 +165,7 @@ export default function WorkoutMethodScreen() {
         {showVerificationRules ? (
           <HUDBorderBox style={styles.noteCard} tone="muted">
             <TerminalText style={styles.noteCopy} tone="muted" uppercase={false} variant="body">
-              Scan the same approved Partner gym poster at entry and exit. GoGymGo checks a fresh location reading and the server timer before awarding a Verified workout.
+              Your initial Contest QR selects the Partner gym once. After that, GoGymGo checks a fresh location reading at workout start and finish, plus the server timer, before awarding a Verified workout.
             </TerminalText>
           </HUDBorderBox>
         ) : null}

@@ -54,7 +54,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '05',
     title: 'VERIFY SESSIONS',
-    body: 'Scan the same approved gym QR on entry and exit. Both scans require live location within the gym geofence.',
+    body: 'The initial Contest QR selects your Partner gym. Each workout requires a fresh live-location check at start and finish within that gym\'s geofence, at least 30 minutes of server time, and completion no later than 15 minutes after the Contest ends.',
     tone: 'cyan'
   },
   {

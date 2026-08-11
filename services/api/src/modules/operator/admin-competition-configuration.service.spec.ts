@@ -21,6 +21,35 @@ const rules: JsonValue = {
 };
 
 describe('AdminCompetitionConfigurationService publication', () => {
+  it('enforces one entrant as the platform-wide start minimum', () => {
+    const service = new AdminCompetitionConfigurationService(
+      {} as AdminAuthorizationService,
+      {} as IdempotencyService,
+      {} as NotificationsService,
+    );
+    const draftValidator = service as unknown as {
+      validateDraft(input: Record<string, unknown>): unknown;
+    };
+
+    expect(() =>
+      draftValidator.validateDraft({
+        endsAt: '2026-10-01T07:00:00.000Z',
+        entrantCap: 500,
+        goalBrackets: [{ goalDays: 3, label: '3 DAYS / WEEK' }],
+        minimumEntrants: 2,
+        monthKey: '2026-09',
+        name: 'September Challenge',
+        reason: 'Verify the platform contest start minimum.',
+        regionPolicyId: '4e1c3601-5ed2-4f3b-a7f0-1ac7da650106',
+        registrationClosesAt: '2026-09-01T07:00:00.000Z',
+        registrationOpensAt: '2026-08-01T07:00:00.000Z',
+        rules,
+        rulesVersion: '2026-09-v1',
+        startsAt: '2026-09-01T07:00:00.000Z',
+      }),
+    ).toThrow('A contest must be able to start with one entrant.');
+  });
+
   it('allows more than one platform contest in the same region and month', async () => {
     const selectFrom = jest.fn(() => {
       throw new Error('Platform contests must not run a duplicate-slot query.');

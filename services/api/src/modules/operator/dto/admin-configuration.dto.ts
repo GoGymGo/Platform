@@ -135,9 +135,10 @@ export class CreateCompetitionDraftDto extends OperatorReasonDto {
   @IsObject()
   rules!: Record<string, unknown>;
 
-  @ApiProperty({ minimum: 1, type: Number })
+  @ApiProperty({ maximum: 1, minimum: 1, type: Number })
   @IsInt()
   @Min(1)
+  @Max(1)
   minimumEntrants!: number;
 
   @ApiPropertyOptional({ minimum: 1, nullable: true, type: Number })

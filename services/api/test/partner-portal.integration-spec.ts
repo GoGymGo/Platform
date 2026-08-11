@@ -245,7 +245,7 @@ describeWithDatabase('gym partner operator portal', () => {
       entrantCap: 500,
       goalBrackets: [{ goalDays: 3, label: '3 DAYS / WEEK' }],
       ...(partner ? { gymLocationId: gymId } : {}),
-      minimumEntrants: 2,
+      minimumEntrants: 1,
       monthKey: '2027-09',
       name,
       reason: 'Exercise the scoped partner competition workflow.',

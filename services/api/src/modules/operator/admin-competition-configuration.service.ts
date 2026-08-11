@@ -524,6 +524,12 @@ export class AdminCompetitionConfigurationService {
     const schedule = parseCompetitionSchedule(input);
     const rules = parseAdminCompetitionRules(input.rules);
     assertUniqueGoalBrackets(input.goalBrackets);
+    if (input.minimumEntrants !== 1) {
+      throw new BadRequestException({
+        code: 'COMPETITION_MINIMUM_ENTRANTS_INVALID',
+        message: 'A contest must be able to start with one entrant.',
+      });
+    }
     if (
       input.entrantCap !== undefined &&
       input.entrantCap !== null &&

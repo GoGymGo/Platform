@@ -114,7 +114,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run build -- --clear
+          npm run build
           npm run audit:production-bundle -- dist
           npm run audit:demo-isolation
           node <<'NODE'

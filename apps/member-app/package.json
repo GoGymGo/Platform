@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "build": "expo export --platform web --output-dir dist && node scripts/write-app-link-associations.mjs dist",
+    "build": "expo export --platform web --output-dir dist --clear && node scripts/write-app-link-associations.mjs dist",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

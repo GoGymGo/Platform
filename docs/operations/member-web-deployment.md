@@ -64,7 +64,7 @@ The static browser build is configured for Firebase Hosting in
 
 ```powershell
 $env:NODE_OPTIONS = '--max-old-space-size=1024'
-npx.cmd expo export --platform web --output-dir dist
+npx.cmd expo export --platform web --output-dir dist --clear
 npm.cmd run audit:production-bundle -- dist
 ```
 

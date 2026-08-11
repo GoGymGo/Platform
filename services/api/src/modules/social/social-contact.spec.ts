@@ -19,6 +19,12 @@ describe('social contact invitation boundaries', () => {
     expect(() => normalizeContactDestination('email', 'not-an-email')).toThrow(
       BadRequestException,
     );
+    expect(() =>
+      normalizeContactDestination('email', 'player@@example.com'),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      normalizeContactDestination('email', `!@!.${'!.'.repeat(70)}`),
+    ).toThrow(BadRequestException);
     expect(() => normalizeContactDestination('phone', '123')).toThrow(
       BadRequestException,
     );

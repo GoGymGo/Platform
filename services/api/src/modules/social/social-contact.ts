@@ -8,7 +8,16 @@ export function normalizeContactDestination(
   const trimmed = value.trim();
   if (channel === 'email') {
     const email = trimmed.toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const atIndex = email.indexOf('@');
+    const domain = email.slice(atIndex + 1);
+    const finalDotIndex = domain.lastIndexOf('.');
+    const isValid =
+      atIndex > 0 &&
+      atIndex === email.lastIndexOf('@') &&
+      finalDotIndex > 0 &&
+      finalDotIndex < domain.length - 1 &&
+      !/\s/u.test(email);
+    if (!isValid) {
       throw new BadRequestException({
         code: 'CHALLENGE_CONTACT_EMAIL_INVALID',
         message: 'Enter a valid email address.',

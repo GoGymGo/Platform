@@ -1069,8 +1069,8 @@ async function main(): Promise<void> {
     console.log(
       `Public legal documents configured: ${legalDocumentIds.join(', ')}.`,
     );
-  } finally {
     failureExitCode = 19;
+  } finally {
     try {
       await app.close();
     } catch (error: unknown) {

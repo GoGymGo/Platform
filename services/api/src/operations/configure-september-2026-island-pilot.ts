@@ -35,6 +35,7 @@ const boundaryVersion = 'statcan-2021-islands-trust-2026-01-v1';
 const competitionMonthKey = '2026-09';
 const applyConfiguration = process.env.APPLY_PILOT_CONFIGURATION === 'yes';
 const publishCompetition = process.env.PUBLISH_PILOT_COMPETITION === 'yes';
+let failureExitCode = 10;
 
 type PublicLegalDocument = {
   content: {
@@ -992,6 +993,7 @@ async function main(): Promise<void> {
   });
   try {
     const database = app.get(DatabaseService);
+    failureExitCode = 11;
     const boundary = applyConfiguration
       ? await loadBoundaryArtifact()
       : await (async () => {
@@ -1001,6 +1003,7 @@ async function main(): Promise<void> {
           ]);
           return buildBoundary(database, province, localTrustAreas);
         })();
+    failureExitCode = 12;
     await validateBoundaryPoints(database, boundary);
 
     console.log(
@@ -1018,33 +1021,39 @@ async function main(): Promise<void> {
       return;
     }
 
+    failureExitCode = 13;
     const principal = await findAdministrator(
       database,
       app.get(ConfigService<Environment, true>),
     );
+    failureExitCode = 14;
     const legalDocumentIds = await publishPublicLegalDocuments(
       database,
       app.get(AdminLegalDocumentsService),
       principal,
     );
+    failureExitCode = 15;
     const regionPolicyId = await configureRegion(
       database,
       app.get(AdminRegionConfigurationService),
       principal,
       boundary,
     );
+    failureExitCode = 16;
     const competition = await configureCompetition(
       database,
       app.get(AdminCompetitionConfigurationService),
       principal,
       regionPolicyId,
     );
+    failureExitCode = 17;
     const rewardId = await configurePilotReward(
       database,
       app.get(AdminRewardsService),
       principal,
       competition.id,
     );
+    failureExitCode = 18;
     const publication = await publishCompetitionWhenReady(
       database,
       app.get(AdminCompetitionConfigurationService),
@@ -1061,6 +1070,7 @@ async function main(): Promise<void> {
       `Public legal documents configured: ${legalDocumentIds.join(', ')}.`,
     );
   } finally {
+    failureExitCode = 19;
     await app.close();
   }
 }
@@ -1069,5 +1079,5 @@ void main().catch((error: unknown) => {
   console.error(
     error instanceof Error ? (error.stack ?? error.message) : String(error),
   );
-  process.exitCode = 1;
+  process.exitCode = failureExitCode;
 });

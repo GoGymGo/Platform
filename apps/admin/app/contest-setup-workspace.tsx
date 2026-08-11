@@ -427,7 +427,7 @@ export function ContestSetupWorkspace({
           goalDays: goal,
           label: `${goal} DAY${goal === 1 ? "" : "S"} / WEEK`,
         })),
-        minimumEntrants: Number(form.get("minimumEntrants")),
+        minimumEntrants: 1,
         monthKey: String(form.get("monthKey")),
         name: String(form.get("name")).trim(),
         reason: competition
@@ -642,15 +642,6 @@ export function ContestSetupWorkspace({
                   name="endsAt"
                   required
                   type="datetime-local"
-                />
-              </SetupField>
-              <SetupField label="MINIMUM ENTRANTS">
-                <input
-                  defaultValue={competition?.minimumEntrants ?? 1}
-                  min={1}
-                  name="minimumEntrants"
-                  required
-                  type="number"
                 />
               </SetupField>
               <SetupField label="ENTRANT CAP (OPTIONAL)">

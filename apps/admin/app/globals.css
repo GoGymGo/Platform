@@ -2519,12 +2519,15 @@ td small {
   border: 1px solid rgba(244, 202, 67, 0.34);
   border-radius: 999px;
   background: rgba(244, 202, 67, 0.06);
-  padding: 7px 10px;
-  color: var(--yellow);
+  min-height: 36px;
+  padding: 8px 12px;
+  color: #ffe487;
   cursor: pointer;
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-family: var(--body);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
 }
 
 .reason-preset-chips button:hover,
@@ -2532,6 +2535,26 @@ td small {
   border-color: var(--yellow);
   background: rgba(244, 202, 67, 0.16);
   color: #fff1a8;
+}
+
+.reason-field > span,
+.pilot-reason-field > span {
+  color: #ffe487;
+  font-family: var(--body);
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+}
+
+.reason-field input,
+.reason-field textarea,
+.pilot-reason-field input {
+  color: #fff8da;
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.5;
 }
 
 .editor-form .form-actions {

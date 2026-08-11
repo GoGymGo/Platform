@@ -60,7 +60,6 @@ import {
   type HttpMethod,
 } from "./admin-dashboard-utils";
 import {
-  buildTestContestSchedule,
   chooseSetupCompetition,
   contestSetupSections,
   getContestLaunchState,
@@ -4661,7 +4660,7 @@ export function CompetitionForm({
           goalDays: goal,
           label: `${goal} DAY${goal === 1 ? "" : "S"} / WEEK`,
         })),
-        minimumEntrants: Number(form.get("minimumEntrants")),
+        minimumEntrants: 1,
         ...(gyms
           ? { gymLocationId: String(form.get("gymLocationId") ?? "") }
           : {}),
@@ -4752,17 +4751,6 @@ export function CompetitionForm({
           <Field label="NAME" wide>
             <input defaultValue={competition?.name} name="name" required />
           </Field>
-          {!partnerMode ? (
-            <Field label="RULES VERSION">
-              <input
-                defaultValue={
-                  competition?.rulesVersion ?? `${dates.monthKey}-v1`
-                }
-                name="rulesVersion"
-                required
-              />
-            </Field>
-          ) : null}
           <Field label="WEEKLY GOALS">
             <input
               defaultValue={
@@ -4774,15 +4762,6 @@ export function CompetitionForm({
               required
             />
           </Field>
-          <Field label="MINIMUM ENTRANTS">
-            <input
-              defaultValue={competition?.minimumEntrants ?? 1}
-              min={1}
-              name="minimumEntrants"
-              required
-              type="number"
-            />
-          </Field>
           <Field label="ENTRANT CAP (OPTIONAL)">
             <input
               defaultValue={competition?.entrantCap ?? ""}
@@ -4791,31 +4770,6 @@ export function CompetitionForm({
               type="number"
             />
           </Field>
-          <div className="field wide">
-            <span>TESTING SHORTCUT</span>
-            <button
-              className="secondary-button"
-              onClick={(event) => {
-                const form = event.currentTarget.form;
-                if (!form) return;
-                const schedule = buildTestContestSchedule();
-                for (const [name, value] of Object.entries(schedule)) {
-                  const input = form.elements.namedItem(name);
-                  if (input instanceof HTMLInputElement) {
-                    input.value =
-                      name === "monthKey" ? value : toLocalDateTime(value);
-                  }
-                }
-              }}
-              type="button"
-            >
-              SET 30-MINUTE TEST WINDOW
-            </button>
-            <small className="field-help">
-              Opens registration now, starts in 15 minutes, and ends 30 minutes
-              after the start time.
-            </small>
-          </div>
           <Field label="REGISTRATION OPENS">
             <input
               defaultValue={toLocalDateTime(
@@ -4857,18 +4811,35 @@ export function CompetitionForm({
             />
           </Field>
           {!partnerMode ? (
-            <Field label="SCORING + VERIFICATION RULES (JSON)" wide>
-              <textarea
-                defaultValue={JSON.stringify(
-                  competition?.rules ?? defaultCompetitionRules,
-                  null,
-                  2,
-                )}
-                name="rules"
-                required
-                rows={12}
-              />
-            </Field>
+            <details className="reward-advanced competition-advanced-settings">
+              <summary>
+                <span>ADVANCED CONTEST SETTINGS</span>
+                <small>Rules version and scoring configuration</small>
+              </summary>
+              <div className="reward-advanced-grid">
+                <Field label="RULES VERSION">
+                  <input
+                    defaultValue={
+                      competition?.rulesVersion ?? `${dates.monthKey}-v1`
+                    }
+                    name="rulesVersion"
+                    required
+                  />
+                </Field>
+                <Field label="SCORING + VERIFICATION RULES" wide>
+                  <textarea
+                    defaultValue={JSON.stringify(
+                      competition?.rules ?? defaultCompetitionRules,
+                      null,
+                      2,
+                    )}
+                    name="rules"
+                    required
+                    rows={12}
+                  />
+                </Field>
+              </div>
+            </details>
           ) : null}
           <ReasonField
             defaultValue={

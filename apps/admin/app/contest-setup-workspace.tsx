@@ -35,23 +35,13 @@ const defaultCompetitionRules = {
   weeklyChallengeRecoveryMultiplier: 3,
 };
 
-type SetupSection = "contest" | "gym" | "region" | "review" | "reward";
-
-export type NewSetupGym = {
-  address: string;
-  latitude: number;
-  longitude: number;
-  name: string;
-  radiusMeters: number;
-  regionPolicyId: string;
-};
+type SetupSection = "contest" | "region" | "review" | "reward";
 
 export type ContestSetupSubmission = {
   competition?: Competition;
   competitionBody: Record<string, unknown>;
   couponCodes: string[];
   gymId: string | null;
-  newGym?: NewSetupGym;
   reward?: Reward;
   rewardBody: Record<string, unknown> | null;
 };
@@ -79,8 +69,7 @@ export type ContestSetupWorkspaceProps = {
 const sectionLabels: Record<SetupSection, string> = {
   contest: "Contest",
   reward: "Reward",
-  region: "Region",
-  gym: "Gym + QR",
+  region: "Region + gym",
   review: "Review + publish",
 };
 
@@ -205,8 +194,9 @@ function statusForStep(
 ) {
   if (section === "contest") return competition ? "SAVED" : "FILL IN";
   if (section === "reward") return publishedReward ? "READY" : "FILL IN";
-  if (section === "region") return selectedRegion ? "SELECTED" : "CHOOSE";
-  if (section === "gym") return selectedGym ? "SELECTED" : "CHOOSE";
+  if (section === "region") {
+    return selectedRegion && selectedGym ? "SELECTED" : "CHOOSE";
+  }
   return "FINAL";
 }
 
@@ -261,19 +251,14 @@ export function ContestSetupWorkspace({
   const [locationMessage, setLocationMessage] = useState("");
   const [locationIssue, setLocationIssue] = useState("");
   const [locating, setLocating] = useState(false);
-  const [detectedCoordinates, setDetectedCoordinates] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const selectedRegion = enabledRegions.find(
     (region) => region.id === selectedRegionId,
   );
   const regionGyms = gyms.filter(
     (gym) => gym.active && gym.regionPolicyId === selectedRegionId,
-  );
+  ).sort((left, right) => left.name.localeCompare(right.name));
   const selectedGym = regionGyms.find((gym) => gym.id === selectedGymId);
-  const creatingGym = selectedGymId === "new";
 
   function useMyLocation() {
     setLocationIssue("");
@@ -289,9 +274,9 @@ export function ContestSetupWorkspace({
       (position) => {
         const latitude = position.coords.latitude;
         const longitude = position.coords.longitude;
-        setDetectedCoordinates({ latitude, longitude });
         const nearestGym = [...gyms]
           .filter((gym) =>
+            gym.active &&
             enabledRegions.some((region) => region.id === gym.regionPolicyId),
           )
           .sort(
@@ -380,26 +365,13 @@ export function ContestSetupWorkspace({
         }
       }
     }
-    if (!selectedGymId) {
-      errors.gym = "Choose an active Partner gym or create one here.";
-    } else if (creatingGym) {
-      const latitude = Number(formData.get("newGymLatitude"));
-      const longitude = Number(formData.get("newGymLongitude"));
-      if (
-        !Number.isFinite(latitude) ||
-        latitude < -90 ||
-        latitude > 90 ||
-        !Number.isFinite(longitude) ||
-        longitude < -180 ||
-        longitude > 180
-      ) {
-        errors.gym =
-          "Add valid latitude and longitude for the new gym, or use your location.";
-      }
+    if (!selectedGym) {
+      errors.region ??=
+        "Choose an approved Partner gym that GoGymGo has added to this region.";
     }
     setSectionErrors(errors);
     const firstSection = (
-      ["contest", "reward", "region", "gym"] as SetupSection[]
+      ["contest", "reward", "region"] as SetupSection[]
     ).find((section) => errors[section]);
     if (firstSection) {
       document
@@ -461,16 +433,6 @@ export function ContestSetupWorkspace({
             termsUrl: optionalString(form.get("termsUrl")),
             title: String(form.get("title")).trim(),
           });
-      const newGym = creatingGym
-        ? {
-            address: String(form.get("newGymAddress") ?? "").trim(),
-            latitude: Number(form.get("newGymLatitude")),
-            longitude: Number(form.get("newGymLongitude")),
-            name: String(form.get("newGymName")).trim(),
-            radiusMeters: Number(form.get("newGymRadiusMeters")),
-            regionPolicyId: selectedRegionId,
-          }
-        : undefined;
       await onPublish(
         {
           competition: competition ?? undefined,
@@ -480,7 +442,6 @@ export function ContestSetupWorkspace({
               ? couponCodes(form.get("couponCodes"))
               : [],
           gymId: selectedGym?.id ?? null,
-          newGym,
           reward: editableReward,
           rewardBody,
         },
@@ -495,13 +456,7 @@ export function ContestSetupWorkspace({
     }
   }
 
-  const steps: SetupSection[] = [
-    "contest",
-    "reward",
-    "region",
-    "gym",
-    "review",
-  ];
+  const steps: SetupSection[] = ["contest", "reward", "region", "review"];
 
   return (
     <section className="one-page-setup">
@@ -882,7 +837,7 @@ export function ContestSetupWorkspace({
                 <p className="eyebrow">REGION SELECTION</p>
                 <h3>Detect, then confirm the contest region</h3>
               </div>
-              {selectedRegion ? (
+              {selectedRegion && selectedGym ? (
                 <span className="setup-ready-tag">SELECTED</span>
               ) : null}
             </header>
@@ -943,6 +898,37 @@ export function ContestSetupWorkspace({
                 </div>
               ) : null}
             </div>
+            <div className="setup-assigned-gym-choice">
+              <SetupField label="ASSIGNED GYM" wide>
+                <select
+                  disabled={!selectedRegionId}
+                  name="gymId"
+                  onChange={(event) => setSelectedGymId(event.target.value)}
+                  required
+                  value={selectedGymId}
+                >
+                  <option value="">
+                    {!selectedRegionId
+                      ? "Choose a region first"
+                      : regionGyms.length > 0
+                        ? "Choose an approved partner gym"
+                        : "No approved partner gyms in this region"}
+                  </option>
+                  {regionGyms.map((gym) => (
+                    <option key={gym.id} value={gym.id}>
+                      {gym.name}
+                      {competition?.assignedGymIds.includes(gym.id)
+                        ? " · already assigned"
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                <small className="field-help">
+                  Only active partner gyms approved and added by GoGymGo appear
+                  here. The contest QR poster is created automatically.
+                </small>
+              </SetupField>
+            </div>
             <button
               className="text-button setup-create-region"
               onClick={onCreateRegion}
@@ -954,116 +940,12 @@ export function ContestSetupWorkspace({
         </section>
 
         <section
-          className="setup-flow-card"
-          data-setup-section="gym"
-          id="setup-gym"
-        >
-          <div className="setup-flow-card-index">
-            <span>04</span>
-            <small>GYM + QR</small>
-          </div>
-          <div className="setup-flow-card-body">
-            <header>
-              <div>
-                <p className="eyebrow">PARTNER GYM + POSTER</p>
-                <h3>Choose the gym once</h3>
-                <p>The contest-specific QR poster is issued automatically.</p>
-              </div>
-              {selectedGym ? <span className="setup-ready-tag">SELECTED</span> : null}
-            </header>
-            <SectionError message={sectionErrors.gym} />
-            <SetupField label="PARTNER GYM" wide>
-              <select
-                disabled={!selectedRegionId}
-                name="gymId"
-                onChange={(event) => setSelectedGymId(event.target.value)}
-                required
-                value={selectedGymId}
-              >
-                <option value="">
-                  {selectedRegionId ? "Choose a gym" : "Choose a region first"}
-                </option>
-                {regionGyms.map((gym) => (
-                  <option key={gym.id} value={gym.id}>
-                    {gym.name}{competition?.assignedGymIds.includes(gym.id) ? " · already assigned" : ""}
-                  </option>
-                ))}
-                {selectedRegionId ? <option value="new">+ Create a new gym here</option> : null}
-              </select>
-            </SetupField>
-            {creatingGym ? (
-              <div className="setup-new-gym">
-                <div className="form-grid setup-form-grid">
-                  <SetupField label="GYM NAME">
-                    <input minLength={2} name="newGymName" required />
-                  </SetupField>
-                  <SetupField label="ADDRESS">
-                    <input name="newGymAddress" />
-                  </SetupField>
-                  <SetupField label="LATITUDE">
-                    <input
-                      defaultValue={detectedCoordinates?.latitude.toFixed(6)}
-                      key={`latitude-${detectedCoordinates?.latitude ?? "empty"}`}
-                      max={90}
-                      min={-90}
-                      name="newGymLatitude"
-                      required
-                      step="any"
-                      type="number"
-                    />
-                  </SetupField>
-                  <SetupField label="LONGITUDE">
-                    <input
-                      defaultValue={detectedCoordinates?.longitude.toFixed(6)}
-                      key={`longitude-${detectedCoordinates?.longitude ?? "empty"}`}
-                      max={180}
-                      min={-180}
-                      name="newGymLongitude"
-                      required
-                      step="any"
-                      type="number"
-                    />
-                  </SetupField>
-                  <SetupField label="VERIFICATION RADIUS (METRES)">
-                    <input
-                      defaultValue={75}
-                      max={500}
-                      min={10}
-                      name="newGymRadiusMeters"
-                      required
-                      type="number"
-                    />
-                  </SetupField>
-                </div>
-                <button
-                  className="secondary-button setup-location-button"
-                  disabled={locating || submitting}
-                  onClick={useMyLocation}
-                  type="button"
-                >
-                  {locating ? "DETECTING LOCATION..." : "USE MY LOCATION FOR THIS GYM"}
-                </button>
-              </div>
-            ) : selectedGym ? (
-              <div className="setup-existing-record compact">
-                <span className="status-dot active" />
-                <div>
-                  <strong>{selectedGym.name}</strong>
-                  <p>{selectedGym.address || selectedRegion?.metroName}</p>
-                </div>
-                <span className="setup-auto-note">QR POSTER: AUTOMATIC</span>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section
           className="setup-flow-card setup-review-card"
           data-setup-section="review"
           id="setup-review"
         >
           <div className="setup-flow-card-index">
-            <span>05</span>
+            <span>04</span>
             <small>REVIEW</small>
           </div>
           <div className="setup-flow-card-body">
@@ -1092,9 +974,7 @@ export function ContestSetupWorkspace({
               </div>
               <div>
                 <small>GYM + POSTER</small>
-                <strong>
-                  {selectedGym?.name || (creatingGym ? "New gym details" : "Not selected")}
-                </strong>
+                <strong>{selectedGym?.name || "Not selected"}</strong>
               </div>
             </div>
             {flowError ? (

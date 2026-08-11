@@ -901,24 +901,10 @@ export function AdminDashboard({
       }
 
       reportProgress("Assigning the Partner gym...");
-      let gymId = submission.gymId;
-      if (submission.newGym) {
-        const createdGym = await request<PilotData["gyms"][number]>(
-          "operator/gym-locations",
-          {
-            body: {
-              ...submission.newGym,
-              reason:
-                "Create the approved Partner gym during contest launch.",
-            },
-            method: "POST",
-          },
-        );
-        gymId = createdGym.id;
-      }
+      const gymId = submission.gymId;
       if (!gymId) {
         throw new AdminUserFacingError(
-          "Choose a Partner gym before publishing the contest.",
+          "Choose an approved Partner gym before publishing the contest.",
         );
       }
       const alreadyAssigned = submission.competition?.assignedGymIds.includes(
@@ -1767,7 +1753,9 @@ function PartnerWorkspace({
   const activeNavigation =
     partnerNavigation.find((item) => item.id === section) ??
     partnerNavigation[0];
-  const adminGyms = snapshot.gyms.filter((gym) => gym.accessLevel === "admin");
+  const adminGyms = snapshot.gyms.filter(
+    (gym) => gym.active && gym.accessLevel === "admin",
+  );
   const activeVisits = snapshot.sessions.filter(
     (session) => session.status === "active",
   ).length;
@@ -4707,7 +4695,7 @@ export function CompetitionForm({
       >
         <FormGrid>
           {gyms ? (
-            <Field label="GYM">
+            <Field label="APPROVED PARTNER GYM">
               <select
                 onChange={(event) => setSelectedGymId(event.target.value)}
                 name="gymLocationId"
@@ -4721,6 +4709,10 @@ export function CompetitionForm({
                   </option>
                 ))}
               </select>
+              <small className="field-help">
+                Choose from the active gyms GoGymGo has assigned to your owner
+                account.
+              </small>
             </Field>
           ) : null}
           <Field label="REGION">

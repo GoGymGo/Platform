@@ -173,6 +173,19 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     /TESTING SHORTCUT|SET 30-MINUTE TEST WINDOW/,
   );
   assert.match(contestSetupWorkspace, /ADVANCED CONTEST SETTINGS/);
+  assert.match(contestSetupWorkspace, /ASSIGNED GYM/);
+  assert.match(contestSetupWorkspace, /Only active partner gyms approved/);
+  assert.match(contestSetupWorkspace, /added by GoGymGo/);
+  assert.match(contestSetupWorkspace, /contest QR poster is created automatically/);
+  assert.match(
+    styles,
+    /\.setup-anchor-rail \{[\s\S]*grid-template-columns: repeat\(4, minmax\(150px, 1fr\)\)/,
+  );
+  assert.doesNotMatch(
+    contestSetupWorkspace,
+    /Create a new gym here|newGymName|newGymLatitude|newGymLongitude/,
+  );
+  assert.match(dashboard, /gym\.active && gym\.accessLevel === "admin"/);
   assert.doesNotMatch(contestSetupWorkspace, /onNavigate/);
   assert.match(dashboard, /getQueueUrgency/);
   assert.match(dashboard, /NEXT DEADLINE/);

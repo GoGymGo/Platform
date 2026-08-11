@@ -69,7 +69,7 @@
   background: rgba(5, 12, 18, 0.96);
   border: 1px solid var(--line);
   display: grid;
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
   overflow-x: auto;
   position: sticky;
   top: 12px;
@@ -172,8 +172,7 @@
 }
 
 .setup-ready-tag,
-.setup-draft-tag,
-.setup-auto-note {
+.setup-draft-tag {
   border: 1px solid rgba(53, 226, 228, 0.35);
   color: var(--cyan);
   flex: 0 0 auto;
@@ -204,11 +203,6 @@
   display: flex;
   gap: 16px;
   padding: 18px;
-}
-
-.setup-existing-record.compact {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .setup-existing-record strong,
@@ -314,12 +308,10 @@
   justify-self: start;
 }
 
-.setup-new-gym {
-  background: rgba(255, 255, 255, 0.015);
-  border: 1px solid var(--line);
-  display: grid;
-  gap: 16px;
-  padding: 20px;
+.setup-assigned-gym-choice {
+  border-top: 1px solid var(--line);
+  max-width: 680px;
+  padding-top: 18px;
 }
 
 .setup-review-card {
@@ -475,8 +467,7 @@
   }
 
   .setup-flow-card-body > header,
-  .setup-existing-record,
-  .setup-existing-record.compact {
+  .setup-existing-record {
     align-items: flex-start;
     display: flex;
     flex-direction: column;

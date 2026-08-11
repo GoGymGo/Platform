@@ -33,6 +33,7 @@ const regionCode = 'vancouver-island-gulf-islands-bc';
 const regionPolicyVersion = '2026-09-pilot-v1';
 const boundaryVersion = 'statcan-2021-islands-trust-2026-01-v1';
 const competitionMonthKey = '2026-09';
+const competitionName = 'GoGymGo September 2026 Island Pilot';
 const applyConfiguration = process.env.APPLY_PILOT_CONFIGURATION === 'yes';
 const publishCompetition = process.env.PUBLISH_PILOT_COMPETITION === 'yes';
 let failureExitCode = 10;
@@ -790,6 +791,7 @@ async function configureCompetition(
     .select(['configuration_version', 'id', 'status'])
     .where('region_policy_id', '=', regionPolicyId)
     .where('month_key', '=', competitionMonthKey)
+    .where('name', '=', competitionName)
     .executeTakeFirst();
   if (existing) {
     return {
@@ -811,7 +813,7 @@ async function configureCompetition(
       })),
       minimumEntrants: 1,
       monthKey: competitionMonthKey,
-      name: 'GoGymGo September 2026 Island Pilot',
+      name: competitionName,
       reason:
         'Create the September 2026 Vancouver Island and Gulf Islands pilot competition draft.',
       regionPolicyId,

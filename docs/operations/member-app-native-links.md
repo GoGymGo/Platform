@@ -97,7 +97,7 @@ they move outside the radius.
 
 ## Current release blocker
 
-As of August 5, 2026, the code and build pipeline are prepared, but the final
+As of August 11, 2026, the code and build pipeline are prepared, but the final
 Apple Team ID, iOS bundle ID, Android package, and Android signing-certificate
 fingerprint have not been recorded in this repository. Native QR opening must not
 be described as live until those real values are configured, the association

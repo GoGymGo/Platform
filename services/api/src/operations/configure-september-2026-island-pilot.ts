@@ -719,7 +719,7 @@ async function publishPublicLegalDocuments(
 
     const result = await service.publish(
       principal,
-      `publish-${document.documentKey}-2026-08-03-public-beta-v1`,
+      `publish-${document.documentKey}-${document.version}`,
       {
         content: document.content,
         documentKey: document.documentKey,

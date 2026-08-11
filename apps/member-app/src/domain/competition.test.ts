@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildCompetitionCalendar,
+  canLoadWeeklyChallengePairing,
   evaluateMonthlyCompetition,
   formatCompetitionOpeningDateTime,
   getCompetitionRankLabel,
@@ -334,6 +335,37 @@ describe('competition clarity labels', () => {
         isRemainderDayPhase: true
       }),
       'COMPLETE'
+    );
+  });
+
+  it('loads Weekly Challenge pairing only during an active scoring period', () => {
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: false,
+        phase: 'before-month'
+      }),
+      false
+    );
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: true,
+        phase: 'scoring-period'
+      }),
+      true
+    );
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: false,
+        phase: 'scoring-period'
+      }),
+      false
+    );
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: true,
+        phase: 'bonus-days'
+      }),
+      false
     );
   });
 });

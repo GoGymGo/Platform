@@ -140,6 +140,9 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /className="nav-count"/);
   assert.match(dashboard, /GUIDED CONTEST LAUNCH/);
   assert.match(dashboard, /CREATE NEW CONTEST/);
+  assert.match(dashboard, /SET 30-MINUTE TEST WINDOW/);
+  assert.match(dashboard, /defaultValue=\{competition\?\.minimumEntrants \?\? 1\}/);
+  assert.match(dashboard, /name="minimumEntrants"/);
   assert.doesNotMatch(dashboard, /\+ NEW CONTEST/);
   assert.match(dashboard, /1\. Contest/);
   assert.match(dashboard, /2\. Reward/);

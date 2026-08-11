@@ -12,6 +12,29 @@ export const contestSetupSections = [
   "pilot",
 ];
 
+export const testContestDurationMinutes = 30;
+
+/**
+ * Builds a short, valid contest schedule for staging verification.
+ * @param {Date} [referenceDate]
+ */
+export function buildTestContestSchedule(referenceDate = new Date()) {
+  const registrationOpensAt = new Date(referenceDate);
+  const startsAt = new Date(referenceDate.getTime() + 15 * 60 * 1_000);
+  startsAt.setSeconds(0, 0);
+  const endsAt = new Date(
+    startsAt.getTime() + testContestDurationMinutes * 60 * 1_000,
+  );
+
+  return {
+    endsAt: endsAt.toISOString(),
+    monthKey: startsAt.toISOString().slice(0, 7),
+    registrationClosesAt: startsAt.toISOString(),
+    registrationOpensAt: registrationOpensAt.toISOString(),
+    startsAt: startsAt.toISOString(),
+  };
+}
+
 /**
  * @param {Competition[]} competitions
  * @param {string} preferredId

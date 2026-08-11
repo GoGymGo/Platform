@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildTestContestSchedule,
   chooseSetupCompetition,
   getContestLaunchState,
   getContestSetupLocks,
   getNextContestSetupSection,
 } from "../app/contest-launch-flow.js";
+
+test("builds a same-day 30-minute contest test window", () => {
+  const schedule = buildTestContestSchedule(
+    new Date("2026-08-10T16:00:30.000Z"),
+  );
+
+  assert.equal(schedule.monthKey, "2026-08");
+  assert.equal(schedule.registrationOpensAt, "2026-08-10T16:00:30.000Z");
+  assert.equal(schedule.registrationClosesAt, "2026-08-10T16:15:00.000Z");
+  assert.equal(schedule.startsAt, "2026-08-10T16:15:00.000Z");
+  assert.equal(schedule.endsAt, "2026-08-10T16:45:00.000Z");
+});
 
 const region = {
   competitionEnabled: true,

@@ -60,6 +60,7 @@ import {
   type HttpMethod,
 } from "./admin-dashboard-utils";
 import {
+  buildTestContestSchedule,
   chooseSetupCompetition,
   contestSetupSections,
   getContestLaunchState,
@@ -4534,8 +4535,8 @@ export function CompetitionForm({
           </Field>
           <Field label="MINIMUM ENTRANTS">
             <input
-              defaultValue={competition?.minimumEntrants ?? 2}
-              min={2}
+              defaultValue={competition?.minimumEntrants ?? 1}
+              min={1}
               name="minimumEntrants"
               required
               type="number"
@@ -4544,11 +4545,36 @@ export function CompetitionForm({
           <Field label="ENTRANT CAP (OPTIONAL)">
             <input
               defaultValue={competition?.entrantCap ?? ""}
-              min={2}
+              min={1}
               name="entrantCap"
               type="number"
             />
           </Field>
+          <div className="field wide">
+            <span>TESTING SHORTCUT</span>
+            <button
+              className="secondary-button"
+              onClick={(event) => {
+                const form = event.currentTarget.form;
+                if (!form) return;
+                const schedule = buildTestContestSchedule();
+                for (const [name, value] of Object.entries(schedule)) {
+                  const input = form.elements.namedItem(name);
+                  if (input instanceof HTMLInputElement) {
+                    input.value =
+                      name === "monthKey" ? value : toLocalDateTime(value);
+                  }
+                }
+              }}
+              type="button"
+            >
+              SET 30-MINUTE TEST WINDOW
+            </button>
+            <small className="field-help">
+              Opens registration now, starts in 15 minutes, and ends 30 minutes
+              after the start time.
+            </small>
+          </div>
           <Field label="REGISTRATION OPENS">
             <input
               defaultValue={toLocalDateTime(

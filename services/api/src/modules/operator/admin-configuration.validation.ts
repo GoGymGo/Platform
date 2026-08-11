@@ -63,6 +63,8 @@ export interface CompetitionSchedule {
   startsAt: Date;
 }
 
+const minimumCompetitionDurationMs = 30 * 60 * 1_000;
+
 export function parseCompetitionSchedule(input: {
   endsAt: string;
   registrationClosesAt: string;
@@ -84,6 +86,15 @@ export function parseCompetitionSchedule(input: {
       code: 'COMPETITION_SCHEDULE_INVALID',
       message:
         'Registration open, registration close, competition start, and competition end must be chronological.',
+    });
+  }
+  if (
+    schedule.endsAt.getTime() - schedule.startsAt.getTime() <
+    minimumCompetitionDurationMs
+  ) {
+    throw new BadRequestException({
+      code: 'COMPETITION_DURATION_TOO_SHORT',
+      message: 'A competition must run for at least 30 minutes.',
     });
   }
   return schedule;

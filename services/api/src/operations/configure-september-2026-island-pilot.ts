@@ -1071,7 +1071,15 @@ async function main(): Promise<void> {
     );
   } finally {
     failureExitCode = 19;
-    await app.close();
+    try {
+      await app.close();
+    } catch (error: unknown) {
+      const errorType = error instanceof Error ? error.name : 'UnknownError';
+      console.warn(
+        `Pilot configuration completed, but application cleanup reported ${errorType}. ` +
+          'The one-off container will release remaining resources.',
+      );
+    }
   }
 }
 

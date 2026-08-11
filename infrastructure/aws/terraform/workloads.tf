@@ -99,8 +99,9 @@ resource "aws_ecs_task_definition" "api" {
   }
 
   lifecycle {
-    ignore_changes       = [container_definitions]
-    replace_triggered_by = [aws_iam_role_policy.ecs_execution]
+    create_before_destroy = true
+    ignore_changes        = [container_definitions]
+    replace_triggered_by  = [aws_iam_role_policy.ecs_execution]
   }
 }
 

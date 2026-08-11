@@ -67,6 +67,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_ecs_service.api.deployment_minimum_healthy_percent == 100 && aws_ecs_service.worker.deployment_minimum_healthy_percent == 100
+    error_message = "API and worker rollouts must preserve their healthy task while a replacement starts."
+  }
+
+  assert {
     condition     = length(aws_ecs_service.api.load_balancer) == 0
     error_message = "The bootstrap API service must not attach an unassociated target group before an HTTPS certificate and listener exist."
   }

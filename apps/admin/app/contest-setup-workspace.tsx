@@ -46,12 +46,12 @@ export type ContestSetupSubmission = {
   rewardBody: Record<string, unknown> | null;
 };
 
-export type ContestSetupPublishResult = {
+type ContestSetupPublishResult = {
   competitionId: string;
   poster: GymQrCredential;
 };
 
-export type ContestSetupWorkspaceProps = {
+type ContestSetupWorkspaceProps = {
   competition: Competition | null;
   competitions: Competition[];
   gyms: GymLocation[];

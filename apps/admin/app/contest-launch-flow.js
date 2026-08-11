@@ -5,36 +5,6 @@
 /** @typedef {import("./admin-types").RegionPolicy} RegionPolicy */
 /** @typedef {import("./admin-types").Reward} Reward */
 
-export const contestSetupSections = [
-  "competitions",
-  "rewards",
-  "regions",
-  "pilot",
-];
-
-export const testContestDurationMinutes = 30;
-
-/**
- * Builds a short, valid contest schedule for staging verification.
- * @param {Date} [referenceDate]
- */
-export function buildTestContestSchedule(referenceDate = new Date()) {
-  const registrationOpensAt = new Date(referenceDate);
-  const startsAt = new Date(referenceDate.getTime() + 15 * 60 * 1_000);
-  startsAt.setSeconds(0, 0);
-  const endsAt = new Date(
-    startsAt.getTime() + testContestDurationMinutes * 60 * 1_000,
-  );
-
-  return {
-    endsAt: endsAt.toISOString(),
-    monthKey: startsAt.toISOString().slice(0, 7),
-    registrationClosesAt: startsAt.toISOString(),
-    registrationOpensAt: registrationOpensAt.toISOString(),
-    startsAt: startsAt.toISOString(),
-  };
-}
-
 /**
  * @param {Competition[]} competitions
  * @param {string} preferredId
@@ -134,41 +104,4 @@ export function getContestLaunchState(competition, rewards, regions, gyms) {
     regionReady,
     rewardReady,
   };
-}
-
-/**
- * @param {ReturnType<typeof getContestLaunchState>} state
- */
-export function getContestSetupLocks(state) {
-  const contestReason = state.blockedReason || "Create a contest draft first.";
-  const rewardReason = state.operational ? "" : contestReason;
-  const regionReason = !state.operational
-    ? contestReason
-    : !state.rewardReady
-      ? "Publish a reward for the selected contest before confirming its region."
-      : "";
-  const pilotReason = !state.operational
-    ? contestReason
-    : !state.rewardReady
-      ? "Publish a reward for the selected contest before setting up its gym and QR poster."
-      : !state.regionReady
-        ? "Confirm an enabled region policy that covers the full contest schedule first."
-        : "";
-
-  return {
-    pilot: pilotReason,
-    regions: regionReason,
-    rewards: rewardReason,
-  };
-}
-
-/**
- * @param {ReturnType<typeof getContestLaunchState>} state
- */
-export function getNextContestSetupSection(state) {
-  if (!state.operational) return "competitions";
-  if (!state.rewardReady) return "rewards";
-  if (!state.regionReady) return "regions";
-  if (!state.gymAssigned || !state.qrReady) return "pilot";
-  return "competitions";
 }

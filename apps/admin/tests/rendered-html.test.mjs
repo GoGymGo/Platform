@@ -137,27 +137,20 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /<dialog/);
   assert.match(dashboard, /showModal\(\)/);
   assert.match(dashboard, /onCancel=/);
-  assert.match(dashboard, /PUBLISH BLOCKED/);
-  assert.match(dashboard, /Filter contests/);
   assert.match(dashboard, /Filter rewards/);
   assert.match(dashboard, /Filter work queue/);
   assert.match(dashboard, /Filter audit history/);
   assert.match(dashboard, /useStoredPreference/);
   assert.match(dashboard, /Saved on this device/);
   assert.match(dashboard, /className="nav-count"/);
-  assert.match(dashboard, /GUIDED CONTEST LAUNCH/);
-  assert.match(dashboard, /CREATE NEW CONTEST/);
+  assert.doesNotMatch(dashboard, /GUIDED CONTEST LAUNCH/);
   assert.doesNotMatch(dashboard, /TESTING SHORTCUT|SET 30-MINUTE TEST WINDOW/);
   assert.doesNotMatch(dashboard, /Opens registration now/);
   assert.match(dashboard, /minimumEntrants: 1/);
   assert.doesNotMatch(dashboard, /name="minimumEntrants"/);
-  assert.match(dashboard, /competition-advanced-settings/);
   assert.doesNotMatch(dashboard, /\+ NEW CONTEST/);
-  assert.match(dashboard, /1\. Contest/);
-  assert.match(dashboard, /2\. Reward/);
-  assert.match(dashboard, /3\. Region/);
-  assert.match(dashboard, /4\. Gym \+ QR/);
-  assert.match(dashboard, /disabled=\{Boolean\(navigationLocks\[item\.id\]\)\}/);
+  assert.doesNotMatch(dashboard, /navigationLocks|ContestLaunchGuide/);
+  assert.match(dashboard, /<ContestSetupWorkspace/);
   assert.match(dashboard, /gogymgo\.admin\.setup\.competition-id/);
   assert.match(dashboard, /publishCompleteContestSetup/);
   assert.match(dashboard, /setContestHomeId\(competitionId\)/);
@@ -188,8 +181,6 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /gym\.active && gym\.accessLevel === "admin"/);
   assert.doesNotMatch(contestSetupWorkspace, /onNavigate/);
   assert.match(dashboard, /getQueueUrgency/);
-  assert.match(dashboard, /NEXT DEADLINE/);
-  assert.match(dashboard, /CONTINUE SETUP/);
   assert.match(dashboard, /RELATED AUDIT EVIDENCE/);
   assert.match(dashboard, /Table density/);
   assert.match(dashboard, /className="column-menu"/);
@@ -287,7 +278,11 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);
   assert.match(contestLaunchFlow, /competition\.assignedGymIds \?\? \[\]/);
   assert.match(contestLaunchFlow, /competition\.status === "cancelled"/);
-  assert.match(contestLaunchFlow, /Publish a reward for the selected contest/);
+  assert.match(
+    contestSetupWorkspace,
+    /publishes the reward, creates the QR poster and opens the contest/,
+  );
+  assert.match(contestSetupWorkspace, /minimumEntrants: 1/);
   assert.match(dashboard, /isRewardConfigurableCompetition\(competition\)/);
   assert.match(dashboard, /downloadPosterJpeg/);
   assert.match(dashboard, /ADVANCED OPTIONS/);

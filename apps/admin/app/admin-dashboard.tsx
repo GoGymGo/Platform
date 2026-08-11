@@ -49,7 +49,6 @@ import {
   formatDateTime,
   formatQueueAge,
   getAuditChange,
-  getCompetitionDeadline,
   getQueueUrgency,
   isRewardConfigurableCompetition,
   optionalIso,
@@ -61,10 +60,7 @@ import {
 } from "./admin-dashboard-utils";
 import {
   chooseSetupCompetition,
-  contestSetupSections,
   getContestLaunchState,
-  getContestSetupLocks,
-  getNextContestSetupSection,
 } from "./contest-launch-flow";
 import {
   assertGymQrCredentialScope,
@@ -81,7 +77,6 @@ import { formValidationError } from "./form-validation";
 import {
   ContestSetupWorkspace,
   type ContestSetupSubmission,
-  type ContestSetupWorkspaceProps,
 } from "./contest-setup-workspace";
 
 type AuthStage = "checking" | "denied" | "ready" | "signed-out";
@@ -100,7 +95,6 @@ type AdminEntityResult = {
 };
 
 type NavigationCounts = Partial<Record<AdminSection, number>>;
-type NavigationLocks = Partial<Record<AdminSection, string>>;
 
 type ActiveFilter = {
   label: string;
@@ -153,10 +147,6 @@ const mobilePrimarySections = new Set<AdminSection>([
   "competitions",
   "operations",
 ]);
-const contestSetupSectionSet = new Set<AdminSection>([
-  ...(contestSetupSections as AdminSection[]),
-]);
-
 const creatorFeaturesEnabled = false;
 
 const emptyPilotData: PilotData = {
@@ -194,7 +184,7 @@ function useStoredPreference<T>(key: string, fallback: T) {
   return [value, updateValue] as const;
 }
 
-export function BrandMark() {
+function BrandMark() {
   return (
     <span aria-label="GoGymGo" className="brand-mark" role="img">
       <Image
@@ -209,7 +199,7 @@ export function BrandMark() {
   );
 }
 
-export function BrandWordmark() {
+function BrandWordmark() {
   return (
     <strong aria-label="GoGymGo" className="brand-wordmark">
       <span aria-hidden="true" className="brand-wordmark-cyan">
@@ -227,12 +217,10 @@ export function BrandWordmark() {
 
 function MobileAdminNavigation({
   counts,
-  locks,
   onNavigate,
   section,
 }: {
   counts: NavigationCounts;
-  locks: NavigationLocks;
   onNavigate: (section: AdminSection) => void;
   section: AdminSection;
 }) {
@@ -271,22 +259,16 @@ function MobileAdminNavigation({
       {primaryItems.map((item) => (
         <button
           aria-current={section === item.id ? "page" : undefined}
-          aria-label={
-            locks[item.id]
-              ? `${item.label}. Locked: ${locks[item.id]}`
-              : item.label
-          }
+          aria-label={item.label}
           className={
             section === item.id ? "mobile-nav-item active" : "mobile-nav-item"
           }
           key={item.id}
-          disabled={Boolean(locks[item.id])}
           onClick={() => navigate(item.id)}
           type="button"
         >
           <span>{item.short}</span>
           <small>{item.label}</small>
-          {locks[item.id] ? <i aria-hidden="true">LOCKED</i> : null}
           {counts[item.id] ? (
             <b
               aria-label={`${counts[item.id]} items need attention`}
@@ -335,13 +317,8 @@ function MobileAdminNavigation({
           {secondaryItems.map((item) => (
             <button
               aria-current={section === item.id ? "page" : undefined}
-              aria-label={
-                locks[item.id]
-                  ? `${item.label}. Locked: ${locks[item.id]}`
-                  : item.label
-              }
+              aria-label={item.label}
               className={section === item.id ? "active" : undefined}
-              disabled={Boolean(locks[item.id])}
               key={item.id}
               onClick={() => navigate(item.id)}
               type="button"
@@ -349,7 +326,6 @@ function MobileAdminNavigation({
               <span>{item.short}</span>
               <strong>{item.label}</strong>
               <small>{item.description}</small>
-              {locks[item.id] ? <em>{locks[item.id]}</em> : null}
               {counts[item.id] ? (
                 <b
                   aria-label={`${counts[item.id]} items need attention`}
@@ -412,9 +388,6 @@ export function AdminDashboard({
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [competitionEditor, setCompetitionEditor] = useState<
-    Competition | "new" | null
-  >(null);
   const [rewardEditor, setRewardEditor] = useState<Reward | "new" | null>(null);
   const [regionEditor, setRegionEditor] = useState(false);
   const [setupCompetitionId, setSetupCompetitionId] = useStoredPreference(
@@ -719,43 +692,16 @@ export function AdminDashboard({
     snapshot.competitions,
     setupCompetitionId,
   );
-  const contestLaunchState = getContestLaunchState(
-    setupCompetition,
-    snapshot.rewards,
-    snapshot.regions,
-    pilotData.gyms,
-  );
-  const navigationLocks: NavigationLocks =
-    getContestSetupLocks(contestLaunchState);
   const setupCompetitions = snapshot.competitions.filter(
     (competition) => competition.status === "draft",
   );
-  const setupRewards = snapshot.rewards;
-  const setupRegions = snapshot.regions;
 
   function navigateToSection(nextSection: AdminSection) {
-    const lockReason = navigationLocks[nextSection];
-    if (lockReason) {
-      setToast(lockReason);
-      return;
-    }
     setSection(nextSection);
   }
 
   function selectSetupCompetition(nextCompetitionId: string) {
     setSetupCompetitionId(nextCompetitionId);
-    const nextCompetition =
-      setupCompetitions.find(
-        (competition) => competition.id === nextCompetitionId,
-      ) ?? null;
-    const nextState = getContestLaunchState(
-      nextCompetition,
-      setupRewards,
-      setupRegions,
-      pilotData.gyms,
-    );
-    const nextLocks: NavigationLocks = getContestSetupLocks(nextState);
-    if (nextLocks[section]) setSection("competitions");
   }
 
   const draftCompetitions = snapshot.competitions.filter(
@@ -782,14 +728,6 @@ export function AdminDashboard({
         competition.publishedRewardCount === 0,
     ).length,
     operations: queue.length,
-    pilot: pilotData.partnerApplications.filter((application) =>
-      ["submitted", "in_review"].includes(application.status),
-    ).length,
-    rewards: snapshot.rewards.filter(
-      (reward) =>
-        reward.status === "draft" ||
-        (reward.rewardType === "coupon" && reward.couponCodeCount === 0),
-    ).length,
   };
 
   function requestContestDeletion(competition: Competition) {
@@ -980,25 +918,15 @@ export function AdminDashboard({
           {navigation.map((item) => (
             <button
               aria-current={section === item.id ? "page" : undefined}
-              aria-label={
-                navigationLocks[item.id]
-                  ? `${item.label}. Locked: ${navigationLocks[item.id]}`
-                  : item.label
-              }
+              aria-label={item.label}
               className={section === item.id ? "nav-item active" : "nav-item"}
-              disabled={Boolean(navigationLocks[item.id])}
               key={item.id}
               onClick={() => navigateToSection(item.id)}
-              title={navigationLocks[item.id] || item.label}
+              title={item.label}
               type="button"
             >
               <span className="nav-short">{item.short}</span>
               <span>{item.label}</span>
-              {navigationLocks[item.id] ? (
-                <i aria-hidden="true" className="nav-lock">
-                  LOCKED
-                </i>
-              ) : null}
               {navigationCounts[item.id] ? (
                 <b
                   aria-label={`${navigationCounts[item.id]} items need attention`}
@@ -1012,7 +940,6 @@ export function AdminDashboard({
         </nav>
         <MobileAdminNavigation
           counts={navigationCounts}
-          locks={navigationLocks}
           onNavigate={navigateToSection}
           section={section}
         />
@@ -1093,19 +1020,6 @@ export function AdminDashboard({
         ) : null}
 
         <div className="workspace">
-          {section !== "competitions" && contestSetupSectionSet.has(section) ? (
-            <ContestLaunchGuide
-              competition={setupCompetition}
-              competitions={setupCompetitions}
-              launchState={contestLaunchState}
-              locks={navigationLocks}
-              onCreateContest={() => setCompetitionEditor("new")}
-              onEditContest={setCompetitionEditor}
-              onNavigate={navigateToSection}
-              onSelectCompetition={selectSetupCompetition}
-              section={section}
-            />
-          ) : null}
           {section === "overview" ? (
             <Overview
               activeCompetitions={activeCompetitions}
@@ -1139,36 +1053,17 @@ export function AdminDashboard({
             />
           ) : null}
           {section === "competitions" ? (
-            <CompetitionsPanel
-              competitions={draftCompetitions}
+            <ContestSetupWorkspace
+              competition={setupCompetition}
+              competitions={setupCompetitions}
               gyms={pilotData.gyms}
-              onDelete={requestContestDeletion}
-              onEdit={setCompetitionEditor}
-              onSelectSetup={(competition) => {
-                selectSetupCompetition(competition.id);
-                const nextState = getContestLaunchState(
-                  competition,
-                  snapshot.rewards,
-                  snapshot.regions,
-                  pilotData.gyms,
-                );
-                setSection(getNextContestSetupSection(nextState));
-              }}
-              selectedCompetitionId={setupCompetition?.id ?? ""}
-              onStatus={requestContestStatus}
+              key={setupCompetition?.id ?? "new"}
+              onCreateRegion={() => setRegionEditor(true)}
+              onPublish={publishCompleteContestSetup}
+              onSelectCompetition={selectSetupCompetition}
               regions={snapshot.regions}
               rewards={snapshot.rewards}
-              setupWorkspace={{
-                competition: setupCompetition,
-                competitions: setupCompetitions,
-                gyms: pilotData.gyms,
-                onCreateRegion: () => setRegionEditor(true),
-                onPublish: publishCompleteContestSetup,
-                onSelectCompetition: selectSetupCompetition,
-                regions: snapshot.regions,
-                rewards: snapshot.rewards,
-                submitting,
-              }}
+              submitting={submitting}
             />
           ) : null}
           {section === "pilot" && setupCompetition ? (
@@ -1401,29 +1296,6 @@ export function AdminDashboard({
         </div>
       </main>
 
-      {competitionEditor ? (
-        <CompetitionForm
-          competition={
-            competitionEditor === "new" ? undefined : competitionEditor
-          }
-          onClose={() => setCompetitionEditor(null)}
-          onSubmit={async (body, editing) => {
-            const result = await mutate<{ id: string }>(
-              editing ? "Contest draft updated." : "Contest draft created.",
-              editing
-                ? `operator/configuration/competitions/${editing.id}`
-                : "operator/configuration/competitions",
-              editing ? "PUT" : "POST",
-              body,
-            );
-            setCompetitionEditor(null);
-            setSetupCompetitionId(editing?.id ?? result.id);
-            if (!editing) setSection("rewards");
-          }}
-          regions={snapshot.regions}
-          submitting={submitting}
-        />
-      ) : null}
       {rewardEditor ? (
         <RewardForm
           competitions={snapshot.competitions}
@@ -2145,7 +2017,7 @@ function PartnerWorkspace({
             <section className="panel">
               <div className="panel-heading">
                 <div>
-                  <p className="eyebrow">QR SESSION ACTIVITY</p>
+                  <p className="eyebrow">LOCATION-CHECK ACTIVITY</p>
                   <h2>Gym visits</h2>
                   <p>
                     Only sessions recorded at your assigned locations appear
@@ -2155,7 +2027,7 @@ function PartnerWorkspace({
               </div>
               {snapshot.sessions.length === 0 ? (
                 <EmptyState
-                  body="QR visits will appear after members scan in."
+                  body="Gym visits will appear after members complete a start location check."
                   title="No gym visits yet"
                 />
               ) : (
@@ -2224,7 +2096,6 @@ function PartnerWorkspace({
             );
             setCompetitionEditor(null);
           }}
-          partnerMode
           regions={snapshot.regions}
           submitting={submitting}
         />
@@ -2237,208 +2108,6 @@ function PartnerWorkspace({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function ContestLaunchGuide({
-  competition,
-  competitions,
-  launchState,
-  locks,
-  onCreateContest,
-  onEditContest,
-  onNavigate,
-  onSelectCompetition,
-  section,
-}: {
-  competition: Competition | null;
-  competitions: Competition[];
-  launchState: ReturnType<typeof getContestLaunchState>;
-  locks: NavigationLocks;
-  onCreateContest: () => void;
-  onEditContest: (competition: Competition) => void;
-  onNavigate: (section: AdminSection) => void;
-  onSelectCompetition: (competitionId: string) => void;
-  section: AdminSection;
-}) {
-  const gymAndQrReady = launchState.gymAssigned && launchState.qrReady;
-  const steps: {
-    complete: boolean;
-    detail: string;
-    id: AdminSection;
-    label: string;
-    lockReason?: string;
-  }[] = [
-    {
-      complete: launchState.operational,
-      detail: competition
-        ? competition.status === "cancelled"
-          ? "Cancelled — create a replacement"
-          : `${competition.status} · ${competition.monthKey}`
-        : "Create or select a contest",
-      id: "competitions",
-      label: "1. Contest",
-    },
-    {
-      complete: launchState.rewardReady,
-      detail: launchState.rewardReady
-        ? "Published reward ready"
-        : "Create and publish a reward",
-      id: "rewards",
-      label: "2. Reward",
-      lockReason: locks.rewards,
-    },
-    {
-      complete: launchState.regionReady,
-      detail: launchState.regionReady
-        ? `${launchState.region?.metroName ?? "Region"} is ready`
-        : "Confirm full-schedule coverage",
-      id: "regions",
-      label: "3. Region",
-      lockReason: locks.regions,
-    },
-    {
-      complete: gymAndQrReady,
-      detail: gymAndQrReady
-        ? `${launchState.assignedGyms.length} assigned gym${launchState.assignedGyms.length === 1 ? "" : "s"} · QR ready`
-        : launchState.gymAssigned
-          ? "Issue or recover the gym QR poster"
-          : "Assign a gym, then issue its poster",
-      id: "pilot",
-      label: "4. Gym + QR",
-      lockReason: locks.pilot,
-    },
-    {
-      complete: launchState.published,
-      detail: launchState.published
-        ? "Contest is open to players"
-        : launchState.readyToPublish
-          ? "Ready for final review"
-          : "Complete steps 1–4 first",
-      id: "competitions",
-      label: "5. Publish",
-      lockReason:
-        launchState.readyToPublish || launchState.published
-          ? ""
-          : "Complete the contest, reward, region, gym and QR steps first.",
-    },
-  ];
-  const nextSection = getNextContestSetupSection(launchState) as AdminSection;
-
-  return (
-    <section className="contest-launch-guide" aria-label="Contest launch setup">
-      <div className="contest-launch-heading">
-        <div>
-          <p className="eyebrow">GUIDED CONTEST LAUNCH</p>
-          <h2>{competition?.name ?? "Start with a contest"}</h2>
-          <p>Complete these steps in order to prepare the contest for players.</p>
-        </div>
-        <div className="contest-launch-selector">
-          <label>
-            <span>CONTEST BEING SET UP</span>
-            <select
-              onChange={(event) => onSelectCompetition(event.target.value)}
-              value={competition?.id ?? ""}
-            >
-              <option value="">Select a contest</option>
-              {competitions.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name} ({candidate.status})
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-
-      {launchState.blockedReason ? (
-        <div className="setup-blocked-message" role="status">
-          <strong>THIS CONTEST CANNOT CONTINUE</strong>
-          <span>{launchState.blockedReason}</span>
-        </div>
-      ) : null}
-
-      <div className="contest-launch-progress" aria-hidden="true">
-        <span style={{ width: `${(launchState.completedSteps / 5) * 100}%` }} />
-      </div>
-      <ol className="contest-launch-steps">
-        {steps.map((step) => {
-          const locked = Boolean(step.lockReason);
-          const current = step.id === section && !step.complete;
-          return (
-            <li
-              className={
-                step.complete
-                  ? "complete"
-                  : locked
-                    ? "locked"
-                    : current
-                      ? "current"
-                      : "available"
-              }
-              key={step.label}
-            >
-              <button
-                aria-label={
-                  locked
-                    ? `${step.label}. Locked: ${step.lockReason}`
-                    : `${step.label}. ${step.detail}`
-                }
-                disabled={locked}
-                onClick={() => onNavigate(step.id)}
-                title={step.lockReason}
-                type="button"
-              >
-                <b>{step.complete ? "✓" : locked ? "LOCK" : "NEXT"}</b>
-                <span>{step.label}</span>
-                <small>{step.detail}</small>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className="contest-launch-actions">
-        {competition?.status === "draft" && !launchState.regionReady ? (
-          <button
-            className="text-button"
-            onClick={() => onEditContest(competition)}
-            type="button"
-          >
-            EDIT CONTEST REGION
-          </button>
-        ) : null}
-        {launchState.blockedReason ? (
-          <button
-            className="primary-button"
-            onClick={onCreateContest}
-            type="button"
-          >
-            CREATE REPLACEMENT CONTEST →
-          </button>
-        ) : launchState.published ? (
-          <span className="setup-complete-message">
-            SETUP COMPLETE · CONTEST OPEN
-          </span>
-        ) : (
-          <button
-            className="primary-button"
-            onClick={
-              !competition
-                ? onCreateContest
-                : () => onNavigate(nextSection)
-            }
-            type="button"
-          >
-            {!competition
-              ? "CREATE NEW CONTEST →"
-              : launchState.readyToPublish
-              ? "REVIEW + PUBLISH →"
-              : `CONTINUE TO ${navigation.find((item) => item.id === nextSection)?.label.toUpperCase() ?? "NEXT STEP"} →`}
-          </button>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -2752,7 +2421,7 @@ function Overview({
                     <span>
                       <strong>{competition.name}</strong>
                       <small>
-                        {competition.regionName} Â· {competition.monthKey}
+                        {competition.regionName} · {competition.monthKey}
                       </small>
                     </span>
                     <b>OPEN CONTEST HOME</b>
@@ -2762,7 +2431,7 @@ function Overview({
                       <div>
                         <small>PLAYER WINDOW</small>
                         <strong>
-                          {formatDate(competition.startsAt)} â€”{" "}
+                          {formatDate(competition.startsAt)} —{" "}
                           {formatDate(competition.endsAt)}
                         </strong>
                       </div>
@@ -2773,7 +2442,7 @@ function Overview({
                       <div>
                         <small>REWARDS</small>
                         <strong>
-                          {contestRewards.length} TOTAL Â·{" "}
+                          {contestRewards.length} TOTAL ·{" "}
                           {competition.publishedRewardCount} PUBLISHED
                         </strong>
                       </div>
@@ -2781,7 +2450,7 @@ function Overview({
                         <small>GYMS + POSTERS</small>
                         <strong>
                           {assignedGyms.length} GYM
-                          {assignedGyms.length === 1 ? "" : "S"} Â·{" "}
+                          {assignedGyms.length === 1 ? "" : "S"} ·{" "}
                           {qrReadyGyms.length} CONTEST QR
                         </strong>
                       </div>
@@ -3061,316 +2730,6 @@ function Metric({
   );
 }
 
-type LegacyCompetitionsPanelProps = {
-  competitions: Competition[];
-  gyms: PilotData["gyms"];
-  onDelete: (competition: Competition) => void;
-  onEdit: (competition: Competition) => void;
-  onSelectSetup: (competition: Competition) => void;
-  onStatus: (competition: Competition, action: "cancel" | "publish") => void;
-  regions: RegionPolicy[];
-  rewards: Reward[];
-  selectedCompetitionId: string;
-};
-
-function CompetitionsPanel(
-  props: LegacyCompetitionsPanelProps & {
-    setupWorkspace?: ContestSetupWorkspaceProps;
-  },
-) {
-  if (props.setupWorkspace) {
-    return (
-      <ContestSetupWorkspace
-        {...props.setupWorkspace}
-        key={props.setupWorkspace.competition?.id ?? "new"}
-      />
-    );
-  }
-  return (
-    <LegacyCompetitionsPanel
-      competitions={props.competitions}
-      gyms={props.gyms}
-      onDelete={props.onDelete}
-      onEdit={props.onEdit}
-      onSelectSetup={props.onSelectSetup}
-      onStatus={props.onStatus}
-      regions={props.regions}
-      rewards={props.rewards}
-      selectedCompetitionId={props.selectedCompetitionId}
-    />
-  );
-}
-
-function LegacyCompetitionsPanel({
-  competitions,
-  gyms,
-  onDelete,
-  onEdit,
-  onSelectSetup,
-  onStatus,
-  regions,
-  rewards,
-  selectedCompetitionId,
-}: LegacyCompetitionsPanelProps) {
-  const [query, setQuery] = useStoredPreference(
-    "gogymgo.admin.competitions.query",
-    "",
-  );
-  const [statusFilter, setStatusFilter] = useStoredPreference(
-    "gogymgo.admin.competitions.status",
-    "all",
-  );
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredCompetitions = competitions.filter((competition) => {
-    const matchesStatus =
-      statusFilter === "all" || competition.status === statusFilter;
-    const matchesQuery =
-      !normalizedQuery ||
-      [competition.name, competition.regionName, competition.monthKey]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedQuery);
-    return matchesStatus && matchesQuery;
-  });
-  const statusOptions = Array.from(
-    new Set(competitions.map((competition) => competition.status)),
-  );
-  const activeFilters: ActiveFilter[] = [
-    ...(query
-      ? [{ label: `Search: ${query}`, onClear: () => setQuery("") }]
-      : []),
-    ...(statusFilter !== "all"
-      ? [
-          {
-            label: `Status: ${statusFilter.replaceAll("_", " ")}`,
-            onClear: () => setStatusFilter("all"),
-          },
-        ]
-      : []),
-  ];
-  return (
-    <section className="panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">REGIONAL CONTEST CONTROL</p>
-          <h2>Contests</h2>
-          <p>
-            Create drafts, confirm reward readiness and publish to every player
-            surface.
-          </p>
-        </div>
-      </div>
-      {competitions.length > 0 ? (
-        <div
-          aria-label="Filter contests"
-          className="panel-toolbar"
-          role="search"
-        >
-          <label className="filter-field">
-            <span>SEARCH</span>
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Name, region or month"
-              type="search"
-              value={query}
-            />
-          </label>
-          <label className="filter-field compact">
-            <span>STATUS</span>
-            <select
-              onChange={(event) => setStatusFilter(event.target.value)}
-              value={statusFilter}
-            >
-              <option value="all">All statuses</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      ) : null}
-      <FilterChips filters={activeFilters} />
-      {competitions.length === 0 ? (
-        <EmptyState
-          body="Start with a region, schedule, rules and Weekly Goal options."
-          title="No contests yet"
-        />
-      ) : filteredCompetitions.length === 0 ? (
-        <EmptyState
-          body="Try a different search term or status filter."
-          title="No contests match"
-        />
-      ) : (
-        <div className="card-list">
-          {filteredCompetitions.map((competition) => {
-            const ended = new Date(competition.endsAt) <= new Date();
-            const deadline = getCompetitionDeadline(competition);
-            const setupState = getContestLaunchState(
-              competition,
-              rewards,
-              regions,
-              gyms,
-            );
-            const canPublish = !ended && setupState.readyToPublish;
-            const publishGateId = `competition-${competition.id}-publish-gate`;
-            const publishBlocker = ended
-              ? "The player window has ended."
-              : !setupState.rewardReady
-                ? "Publish at least one eligible reward first."
-                : !setupState.regionReady
-                  ? "Choose an enabled region that covers the full contest schedule."
-                  : !setupState.gymAssigned
-                    ? "Assign at least one active Partner gym."
-                    : !setupState.qrReady
-                      ? "Issue or recover the assigned gym's QR poster."
-                      : "Complete the remaining launch review.";
-            return (
-              <article
-                className={
-                  competition.id === selectedCompetitionId
-                    ? "competition-card selected-setup-contest"
-                    : "competition-card"
-                }
-                key={competition.id}
-              >
-                <div className="card-title-row">
-                  <div>
-                    <span className={`status-tag ${competition.status}`}>
-                      {competition.status}
-                    </span>
-                    <h3>{competition.name}</h3>
-                    <p>
-                      {competition.regionName} · {competition.monthKey}
-                    </p>
-                  </div>
-                  <div className="version-badge">V{competition.version}</div>
-                </div>
-                <div className="competition-stats">
-                  <div>
-                    <small>PLAYER WINDOW</small>
-                    <strong>
-                      {formatDate(competition.startsAt)} —{" "}
-                      {formatDate(competition.endsAt)}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>ENROLLED</small>
-                    <strong>{competition.enrollmentCount}</strong>
-                  </div>
-                  <div>
-                    <small>GOALS</small>
-                    <strong>
-                      {competition.goalBrackets
-                        .map((goal) => goal.goalDays)
-                        .join(", ")}{" "}
-                      DAYS
-                    </strong>
-                  </div>
-                  <div>
-                    <small>REWARD GATE</small>
-                    <strong
-                      className={
-                        competition.publishedRewardCount > 0
-                          ? "positive"
-                          : "warning-text"
-                      }
-                    >
-                      {competition.publishedRewardCount > 0
-                        ? `${competition.publishedRewardCount} PUBLISHED`
-                        : "REWARD REQUIRED"}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>NEXT DEADLINE</small>
-                    <div className="deadline-stack">
-                      <span className={`deadline-tag ${deadline.tone}`}>
-                        {deadline.label}
-                      </span>
-                      <small>{deadline.detail}</small>
-                    </div>
-                  </div>
-                </div>
-                {competition.status === "draft" && !canPublish ? (
-                  <div className="action-guidance" id={publishGateId}>
-                    <span>
-                      <strong>PUBLISH BLOCKED</strong>
-                      {publishBlocker}
-                    </span>
-                    {!setupState.readyToPublish ? (
-                      <button
-                        className="resolution-link"
-                        onClick={() => onSelectSetup(competition)}
-                        type="button"
-                      >
-                        CONTINUE SETUP →
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="card-actions">
-                  {setupState.operational ? (
-                    <button
-                      className="secondary-button"
-                      onClick={() => onSelectSetup(competition)}
-                      type="button"
-                    >
-                      {competition.id === selectedCompetitionId
-                        ? "SELECTED FOR SETUP"
-                        : "SET UP THIS CONTEST"}
-                    </button>
-                  ) : null}
-                  {competition.status === "draft" ? (
-                    <button
-                      className="secondary-button"
-                      onClick={() => onEdit(competition)}
-                      type="button"
-                    >
-                      EDIT DRAFT
-                    </button>
-                  ) : null}
-                  {competition.status === "draft" ? (
-                    <button
-                      className="primary-button"
-                      aria-describedby={!canPublish ? publishGateId : undefined}
-                      disabled={!canPublish}
-                      onClick={() => onStatus(competition, "publish")}
-                      type="button"
-                    >
-                      PUBLISH
-                    </button>
-                  ) : null}
-                  {["draft", "registration"].includes(competition.status) ? (
-                    <button
-                      className="danger-button"
-                      onClick={() => onStatus(competition, "cancel")}
-                      type="button"
-                    >
-                      CANCEL
-                    </button>
-                  ) : null}
-                  {["cancelled", "draft", "settled"].includes(
-                    competition.status,
-                  ) ? (
-                    <button
-                      className="danger-button"
-                      onClick={() => onDelete(competition)}
-                      type="button"
-                    >
-                      DELETE
-                    </button>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function RewardsPanel({
   competition,
   onCouponCodes,
@@ -3582,7 +2941,7 @@ function RewardsPanel({
                   ) : null}
                   <th scope="col">Status</th>
                   <th
-                    aria-label="Frozen actions"
+                    aria-label="Actions"
                     className="sticky-action-column"
                     scope="col"
                   />
@@ -4060,7 +3419,7 @@ function ContentPanel({
                     ) : null}
                     <th scope="col">Status</th>
                     <th
-                      aria-label="Frozen actions"
+                      aria-label="Actions"
                       className="sticky-action-column"
                       scope="col"
                     />
@@ -4593,25 +3952,23 @@ function AuditDiff({ event }: { event: AuditEvent }) {
   );
 }
 
-export function CompetitionForm({
+function CompetitionForm({
   competition,
   gymLocationId,
   gyms,
   onClose,
   onSubmit,
-  partnerMode = false,
   regions,
   submitting,
 }: {
   competition?: Competition;
   gymLocationId?: string;
-  gyms?: { id: string; name: string; regionPolicyId: string }[];
+  gyms: { id: string; name: string; regionPolicyId: string }[];
   onClose: () => void;
   onSubmit: (
     body: Record<string, unknown>,
     editing?: Competition,
   ) => Promise<void>;
-  partnerMode?: boolean;
   regions: RegionPolicy[];
   submitting: boolean;
 }) {
@@ -4621,10 +3978,9 @@ export function CompetitionForm({
     gymLocationId ?? gyms?.[0]?.id ?? "",
   );
   const selectedGym = gyms?.find((gym) => gym.id === selectedGymId);
-  const selectableRegions =
-    partnerMode && selectedGym
-      ? regions.filter((region) => region.id === selectedGym.regionPolicyId)
-      : regions;
+  const selectableRegions = selectedGym
+    ? regions.filter((region) => region.id === selectedGym.regionPolicyId)
+    : [];
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
@@ -4649,24 +4005,15 @@ export function CompetitionForm({
           label: `${goal} DAY${goal === 1 ? "" : "S"} / WEEK`,
         })),
         minimumEntrants: 1,
-        ...(gyms
-          ? { gymLocationId: String(form.get("gymLocationId") ?? "") }
-          : {}),
+        gymLocationId: String(form.get("gymLocationId") ?? ""),
         monthKey: String(form.get("monthKey")),
         name: String(form.get("name")),
         reason: String(form.get("reason")),
         regionPolicyId: String(form.get("regionPolicyId")),
         registrationClosesAt: toIso(form, "registrationClosesAt"),
         registrationOpensAt: toIso(form, "registrationOpensAt"),
-        rules: partnerMode
-          ? (competition?.rules ?? defaultCompetitionRules)
-          : parseJsonInput(
-              String(form.get("rules")),
-              "Scoring and verification rules",
-            ),
-        rulesVersion: partnerMode
-          ? (competition?.rulesVersion ?? "partner-proposal-v1")
-          : String(form.get("rulesVersion")),
+        rules: competition?.rules ?? defaultCompetitionRules,
+        rulesVersion: competition?.rulesVersion ?? "partner-proposal-v1",
         startsAt: toIso(form, "startsAt"),
         ...(competition ? { expectedVersion: competition.version } : {}),
       };
@@ -4678,15 +4025,7 @@ export function CompetitionForm({
   return (
     <ModalShell
       onClose={onClose}
-      title={
-        partnerMode
-          ? competition
-            ? "Edit contest proposal"
-            : "New contest proposal"
-          : competition
-            ? "Edit contest draft"
-            : "New contest draft"
-      }
+      title={competition ? "Edit contest proposal" : "New contest proposal"}
     >
       <form
         className="editor-form"
@@ -4694,27 +4033,25 @@ export function CompetitionForm({
         onSubmit={(event) => void submit(event)}
       >
         <FormGrid>
-          {gyms ? (
-            <Field label="APPROVED PARTNER GYM">
-              <select
-                onChange={(event) => setSelectedGymId(event.target.value)}
-                name="gymLocationId"
-                required
-                value={selectedGymId}
-              >
-                <option value="">Select a gym</option>
-                {gyms.map((gym) => (
-                  <option key={gym.id} value={gym.id}>
-                    {gym.name}
-                  </option>
-                ))}
-              </select>
-              <small className="field-help">
-                Choose from the active gyms GoGymGo has assigned to your owner
-                account.
-              </small>
-            </Field>
-          ) : null}
+          <Field label="APPROVED PARTNER GYM">
+            <select
+              onChange={(event) => setSelectedGymId(event.target.value)}
+              name="gymLocationId"
+              required
+              value={selectedGymId}
+            >
+              <option value="">Select a gym</option>
+              {gyms.map((gym) => (
+                <option key={gym.id} value={gym.id}>
+                  {gym.name}
+                </option>
+              ))}
+            </select>
+            <small className="field-help">
+              Choose from the active gyms GoGymGo has assigned to your owner
+              account.
+            </small>
+          </Field>
           <Field label="REGION">
             <select
               defaultValue={
@@ -4802,46 +4139,11 @@ export function CompetitionForm({
               type="datetime-local"
             />
           </Field>
-          {!partnerMode ? (
-            <details className="reward-advanced competition-advanced-settings">
-              <summary>
-                <span>ADVANCED CONTEST SETTINGS</span>
-                <small>Rules version and scoring configuration</small>
-              </summary>
-              <div className="reward-advanced-grid">
-                <Field label="RULES VERSION">
-                  <input
-                    defaultValue={
-                      competition?.rulesVersion ?? `${dates.monthKey}-v1`
-                    }
-                    name="rulesVersion"
-                    required
-                  />
-                </Field>
-                <Field label="SCORING + VERIFICATION RULES" wide>
-                  <textarea
-                    defaultValue={JSON.stringify(
-                      competition?.rules ?? defaultCompetitionRules,
-                      null,
-                      2,
-                    )}
-                    name="rules"
-                    required
-                    rows={12}
-                  />
-                </Field>
-              </div>
-            </details>
-          ) : null}
           <ReasonField
             defaultValue={
-              partnerMode
-                ? competition
-                  ? "Update this gym contest proposal for GoGymGo review."
-                  : "Submit a gym contest proposal for GoGymGo review."
-                : competition
-                  ? "Update the contest configuration after administrative review."
-                  : "Create a new contest draft for administrative review."
+              competition
+                ? "Update this gym contest proposal for GoGymGo review."
+                : "Submit a gym contest proposal for GoGymGo review."
             }
           />
         </FormGrid>
@@ -4849,13 +4151,7 @@ export function CompetitionForm({
           onClose={onClose}
           submitting={submitting}
           submitLabel={
-            partnerMode
-              ? competition
-                ? "SAVE PROPOSAL"
-                : "SUBMIT PROPOSAL"
-              : competition
-                ? "SAVE DRAFT"
-                : "CREATE DRAFT"
+            competition ? "SAVE PROPOSAL" : "SUBMIT PROPOSAL"
           }
         />
         {formError ? (

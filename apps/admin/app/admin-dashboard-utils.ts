@@ -44,40 +44,6 @@ export function formatQueueAge(value: string) {
   return `${Math.round(ageHours / 24)}d`;
 }
 
-export function getCompetitionDeadline(competition: Competition) {
-  const now = Date.now();
-  const stages =
-    competition.status === "draft"
-      ? [
-          [competition.registrationOpensAt, "Registration opens"],
-          [competition.startsAt, "Contest starts"],
-        ]
-      : competition.status === "registration"
-        ? [
-            [competition.registrationClosesAt, "Registration closes"],
-            [competition.startsAt, "Contest starts"],
-          ]
-        : [[competition.endsAt, "Contest ends"]];
-  const next = stages.find(([value]) => new Date(value).getTime() > now);
-  if (!next) {
-    return {
-      detail: "No future player deadline",
-      label: "COMPLETE",
-      tone: "routine",
-    };
-  }
-  const hours = Math.max(0, (new Date(next[0]).getTime() - now) / 3_600_000);
-  const label =
-    hours < 24
-      ? `${Math.max(1, Math.ceil(hours))}H`
-      : `${Math.ceil(hours / 24)}D`;
-  return {
-    detail: next[1],
-    label,
-    tone: hours <= 48 ? "urgent" : hours <= 168 ? "warning" : "routine",
-  };
-}
-
 export function getAuditChange(event: AuditEvent) {
   if (event.before || event.after) {
     return {

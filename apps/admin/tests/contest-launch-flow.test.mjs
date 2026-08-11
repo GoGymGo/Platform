@@ -1,24 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildTestContestSchedule,
   chooseSetupCompetition,
   getContestLaunchState,
-  getContestSetupLocks,
-  getNextContestSetupSection,
 } from "../app/contest-launch-flow.js";
-
-test("builds a same-day 30-minute contest test window", () => {
-  const schedule = buildTestContestSchedule(
-    new Date("2026-08-10T16:00:30.000Z"),
-  );
-
-  assert.equal(schedule.monthKey, "2026-08");
-  assert.equal(schedule.registrationOpensAt, "2026-08-10T16:00:30.000Z");
-  assert.equal(schedule.registrationClosesAt, "2026-08-10T16:15:00.000Z");
-  assert.equal(schedule.startsAt, "2026-08-10T16:15:00.000Z");
-  assert.equal(schedule.endsAt, "2026-08-10T16:45:00.000Z");
-});
 
 const region = {
   competitionEnabled: true,
@@ -97,22 +82,16 @@ test("explains a cancelled contest instead of silently advancing it", () => {
     [region],
     [gym],
   );
-  const locks = getContestSetupLocks(state);
-
   assert.match(state.blockedReason, /cancelled/i);
   assert.equal(state.completedSteps, 0);
-  assert.match(locks.rewards, /cancelled/i);
-  assert.match(locks.pilot, /cancelled/i);
-  assert.equal(getNextContestSetupSection(state), "competitions");
 });
 
-test("unlocks each setup section only after its prerequisite", () => {
+test("reports each setup prerequisite independently", () => {
   const draft = competition("draft");
   const noReward = getContestLaunchState(draft, [], [region], [gym]);
-  assert.equal(getContestSetupLocks(noReward).rewards, "");
-  assert.match(getContestSetupLocks(noReward).regions, /reward/i);
-  assert.match(getContestSetupLocks(noReward).pilot, /reward/i);
-  assert.equal(getNextContestSetupSection(noReward), "rewards");
+  assert.equal(noReward.operational, true);
+  assert.equal(noReward.rewardReady, false);
+  assert.equal(noReward.readyToPublish, false);
 
   const noQrGym = {
     ...gym,
@@ -125,10 +104,9 @@ test("unlocks each setup section only after its prerequisite", () => {
     [region],
     [noQrGym],
   );
-  assert.equal(getContestSetupLocks(noQr).pilot, "");
   assert.equal(noQr.gymAssigned, true);
   assert.equal(noQr.qrReady, false);
-  assert.equal(getNextContestSetupSection(noQr), "pilot");
+  assert.equal(noQr.readyToPublish, false);
 });
 
 test("keeps published contests out of the new-contest setup wizard", () => {

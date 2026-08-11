@@ -479,7 +479,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             <p>
               {assignmentComplete
                 ? "Continue directly to this contest's QR poster."
-                : "Choose the Partner gym where players will scan for this contest."}
+                : "Choose the Partner gym players will select with this contest's initial QR."}
             </p>
           </div>
           <span className="setup-context-tag">
@@ -737,15 +737,15 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
 
       <PilotTable
         defaultOpen
-        empty="No QR visits have been recorded."
-        eyebrow="QR VISITS"
+        empty="No location-verified gym visits have been recorded."
+        eyebrow="LOCATION CHECKS"
         headings={["Gym", "Started", "Completed", "Status"]}
         rows={props.sessions.map((session) => [
           session.gymName,
           formatDateTime(session.startedAt),
           session.completedAt
             ? formatDateTime(session.completedAt)
-            : "Missing exit scan",
+            : "Missing finish location check",
           session.incomplete ? "incomplete" : session.status,
         ])}
         title="Sessions + incomplete visits"

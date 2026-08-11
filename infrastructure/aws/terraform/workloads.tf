@@ -98,7 +98,10 @@ resource "aws_ecs_task_definition" "api" {
     operating_system_family = "LINUX"
   }
 
-  lifecycle { ignore_changes = [container_definitions] }
+  lifecycle {
+    ignore_changes       = [container_definitions]
+    replace_triggered_by = [aws_secretsmanager_secret.runtime["GOGYMGO_OWNER_EMAIL"]]
+  }
 }
 
 resource "aws_ecs_task_definition" "worker" {

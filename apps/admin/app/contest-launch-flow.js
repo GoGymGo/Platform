@@ -40,6 +40,7 @@ export function buildTestContestSchedule(referenceDate = new Date()) {
  * @param {string} preferredId
  */
 export function chooseSetupCompetition(competitions, preferredId) {
+  if (preferredId === "new") return null;
   return (
     competitions.find(
       (competition) =>

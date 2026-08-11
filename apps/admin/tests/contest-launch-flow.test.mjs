@@ -139,4 +139,5 @@ test("keeps published contests out of the new-contest setup wizard", () => {
     chooseSetupCompetition([competition("one", "registration")], "one"),
     null,
   );
+  assert.equal(chooseSetupCompetition([competition("two")], "new"), null);
 });

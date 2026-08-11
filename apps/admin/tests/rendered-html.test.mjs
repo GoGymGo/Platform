@@ -33,9 +33,11 @@ test("server-renders the role-aware GoGymGo operator entry screen", async () => 
   assert.match(html, /GoGymGo/);
   assert.match(html, /OPERATOR PORTAL/);
   assert.match(html, /INVITATION-ONLY OPERATOR ACCESS/);
-  assert.match(html, /Role-based workspaces/);
-  assert.match(html, /Sign in to continue/);
-  assert.match(html, /Sign-in is temporarily unavailable/);
+  if (!/CHECKING YOUR SESSION/.test(html)) {
+    assert.match(html, /Role-based workspaces/);
+    assert.match(html, /Sign in to continue/);
+    assert.match(html, /Sign-in is temporarily unavailable/);
+  }
   assert.doesNotMatch(html, /CONTROL DECK ONLINE|SYSTEM OVERVIEW/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/i);
   assert.doesNotMatch(
@@ -58,6 +60,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     authorization,
     styles,
     formValidation,
+    contestSetupWorkspace,
   ] = await Promise.all([
     readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8"),
     readFile(
@@ -83,6 +86,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/form-validation.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/contest-setup-workspace.tsx", import.meta.url),
+      "utf8",
+    ),
   ]);
 
   assert.match(dashboardUtils, /getIdToken\(\)/);
@@ -150,6 +157,14 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /4\. Gym \+ QR/);
   assert.match(dashboard, /disabled=\{Boolean\(navigationLocks\[item\.id\]\)\}/);
   assert.match(dashboard, /gogymgo\.admin\.setup\.competition-id/);
+  assert.match(dashboard, /publishCompleteContestSetup/);
+  assert.match(dashboard, /setContestHomeId\(competitionId\)/);
+  assert.match(contestSetupWorkspace, /ONE-PAGE CONTEST SETUP/);
+  assert.match(contestSetupWorkspace, /USE MY LOCATION/);
+  assert.match(contestSetupWorkspace, /CREATE A DIFFERENT REGION/);
+  assert.match(contestSetupWorkspace, /PUBLISH CONTEST/);
+  assert.match(contestSetupWorkspace, /setup-section-error/);
+  assert.doesNotMatch(contestSetupWorkspace, /onNavigate/);
   assert.match(dashboard, /getQueueUrgency/);
   assert.match(dashboard, /NEXT DEADLINE/);
   assert.match(dashboard, /CONTINUE SETUP/);

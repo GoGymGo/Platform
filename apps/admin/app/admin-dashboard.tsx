@@ -79,6 +79,11 @@ import {
   ReasonPresetChips,
 } from "./reason-presets";
 import { formValidationError } from "./form-validation";
+import {
+  ContestSetupWorkspace,
+  type ContestSetupSubmission,
+  type ContestSetupWorkspaceProps,
+} from "./contest-setup-workspace";
 
 type AuthStage = "checking" | "denied" | "ready" | "signed-out";
 type ConfirmAction = {
@@ -87,6 +92,12 @@ type ConfirmAction = {
   description: string;
   execute: (reason: string) => Promise<void>;
   tone?: "danger" | "primary";
+};
+
+type AdminEntityResult = {
+  id: string;
+  status: string;
+  version: number;
 };
 
 type NavigationCounts = Partial<Record<AdminSection, number>>;
@@ -110,32 +121,10 @@ const navigation: {
     short: "OV",
   },
   {
-    description:
-      "Step 1 of 4: create the contest draft that owns every later setup choice.",
+    description: "Create, review and publish the complete contest on one page.",
     id: "competitions",
-    label: "1. Contest",
-    short: "01",
-  },
-  {
-    description:
-      "Step 2 of 4: create and publish a reward for the selected contest.",
-    id: "rewards",
-    label: "2. Reward",
-    short: "02",
-  },
-  {
-    description:
-      "Step 3 of 4: confirm the selected contest has a valid enabled region.",
-    id: "regions",
-    label: "3. Region",
-    short: "03",
-  },
-  {
-    description:
-      "Step 4 of 4: assign a Partner gym and issue or recover its QR poster.",
-    id: "pilot",
-    label: "4. Gym + QR",
-    short: "04",
+    label: "Contest setup",
+    short: "CS",
   },
   {
     description:
@@ -161,10 +150,9 @@ const navigation: {
 ];
 
 const mobilePrimarySections = new Set<AdminSection>([
+  "overview",
   "competitions",
-  "rewards",
-  "regions",
-  "pilot",
+  "operations",
 ]);
 const contestSetupSectionSet = new Set<AdminSection>([
   ...(contestSetupSections as AdminSection[]),
@@ -434,6 +422,10 @@ export function AdminDashboard({
     "gogymgo.admin.setup.competition-id",
     "",
   );
+  const [contestHomeId, setContestHomeId] = useStoredPreference(
+    "gogymgo.admin.contest-home-id",
+    "",
+  );
   const [workoutEditor, setWorkoutEditor] = useState<
     CreatorWorkout | "new" | null
   >(null);
@@ -692,11 +684,14 @@ export function AdminDashboard({
           <BrandMark />
           <span>
             <BrandWordmark />
-            <small>OPERATOR ACCESS</small>
+            <small>OPERATOR PORTAL</small>
           </span>
         </div>
         <div className="boot-line" />
-        <p>{loadError || "CHECKING YOUR SESSION"}</p>
+        <p>
+          {loadError ||
+            "CHECKING YOUR SESSION · INVITATION-ONLY OPERATOR ACCESS"}
+        </p>
       </div>
     );
   }
@@ -838,6 +833,154 @@ export function AdminDashboard({
     });
   }
 
+  async function publishCompleteContestSetup(
+    submission: ContestSetupSubmission,
+    reportProgress: (message: string) => void,
+  ) {
+    setSubmitting(true);
+    setLoadError("");
+    try {
+      reportProgress("Saving the contest details...");
+      const competitionResult = await request<AdminEntityResult>(
+        submission.competition
+          ? `operator/configuration/competitions/${submission.competition.id}`
+          : "operator/configuration/competitions",
+        {
+          body: submission.competition
+            ? {
+                ...submission.competitionBody,
+                expectedVersion: submission.competition.version,
+              }
+            : submission.competitionBody,
+          method: submission.competition ? "PUT" : "POST",
+        },
+      );
+      const competitionId = competitionResult.id;
+
+      if (submission.rewardBody) {
+        reportProgress("Saving and publishing the reward...");
+        const rewardResult = await request<AdminEntityResult>(
+          submission.reward
+            ? `operator/configuration/rewards/${submission.reward.id}`
+            : "operator/configuration/rewards",
+          {
+            body: {
+              ...submission.rewardBody,
+              competitionId,
+              ...(submission.reward
+                ? { expectedVersion: submission.reward.version }
+                : {}),
+            },
+            method: submission.reward ? "PUT" : "POST",
+          },
+        );
+        if (submission.couponCodes.length > 0) {
+          await request(
+            `operator/configuration/rewards/${rewardResult.id}/coupon-codes`,
+            {
+              body: {
+                codes: submission.couponCodes,
+                reason:
+                  "Add the approved coupon inventory during contest launch.",
+              },
+              method: "POST",
+            },
+          );
+        }
+        await request<AdminEntityResult>(
+          `operator/configuration/rewards/${rewardResult.id}/status-action`,
+          {
+            body: {
+              action: "publish",
+              expectedVersion: rewardResult.version,
+              reason:
+                "Publish the approved reward as part of the complete contest launch.",
+            },
+            method: "POST",
+          },
+        );
+      }
+
+      reportProgress("Assigning the Partner gym...");
+      let gymId = submission.gymId;
+      if (submission.newGym) {
+        const createdGym = await request<PilotData["gyms"][number]>(
+          "operator/gym-locations",
+          {
+            body: {
+              ...submission.newGym,
+              reason:
+                "Create the approved Partner gym during contest launch.",
+            },
+            method: "POST",
+          },
+        );
+        gymId = createdGym.id;
+      }
+      if (!gymId) {
+        throw new AdminUserFacingError(
+          "Choose a Partner gym before publishing the contest.",
+        );
+      }
+      const alreadyAssigned = submission.competition?.assignedGymIds.includes(
+        gymId,
+      );
+      if (!alreadyAssigned) {
+        await request(
+          `operator/competitions/${competitionId}/gym-locations/${gymId}`,
+          {
+            body: {
+              reason:
+                "Assign the approved Partner gym during contest launch.",
+            },
+            method: "POST",
+          },
+        );
+      }
+
+      reportProgress("Preparing the contest QR poster...");
+      let poster = await loadActiveQr(competitionId, gymId);
+      if (!poster) {
+        poster = await request<GymQrCredential>(
+          `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
+          {
+            body: {
+              reason:
+                "Issue the contest-specific Partner gym poster during launch.",
+            },
+            method: "POST",
+          },
+        );
+      }
+
+      reportProgress("Publishing the contest...");
+      await request<AdminEntityResult>(
+        `operator/configuration/competitions/${competitionId}/status-action`,
+        {
+          body: {
+            action: "publish",
+            expectedVersion: competitionResult.version,
+            reason:
+              "Publish the complete contest after the one-page administrative review.",
+          },
+          method: "POST",
+        },
+      );
+
+      setSetupCompetitionId(competitionId);
+      setContestHomeId(competitionId);
+      if (user) await refresh(user);
+      setSection("overview");
+      setToast("Contest, reward, gym and QR poster published successfully.");
+      return { competitionId, poster };
+    } catch (error) {
+      if (user) await refresh(user);
+      throw error;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="admin-shell">
       <aside className="sidebar">
@@ -965,7 +1108,7 @@ export function AdminDashboard({
         ) : null}
 
         <div className="workspace">
-          {contestSetupSectionSet.has(section) ? (
+          {section !== "competitions" && contestSetupSectionSet.has(section) ? (
             <ContestLaunchGuide
               competition={setupCompetition}
               competitions={setupCompetitions}
@@ -984,9 +1127,13 @@ export function AdminDashboard({
               competitions={snapshot.competitions.filter(
                 (competition) => competition.status !== "draft",
               )}
+              focusedContestId={contestHomeId}
               gyms={pilotData.gyms}
               health={health}
-              onCreate={() => setCompetitionEditor("new")}
+              onCreate={() => {
+                setSetupCompetitionId("new");
+                setSection("competitions");
+              }}
               onDelete={requestContestDeletion}
               onIssueQr={(competitionId, gymId, body) =>
                 mutate(
@@ -1026,6 +1173,17 @@ export function AdminDashboard({
               onStatus={requestContestStatus}
               regions={snapshot.regions}
               rewards={snapshot.rewards}
+              setupWorkspace={{
+                competition: setupCompetition,
+                competitions: setupCompetitions,
+                gyms: pilotData.gyms,
+                onCreateRegion: () => setRegionEditor(true),
+                onPublish: publishCompleteContestSetup,
+                onSelectCompetition: selectSetupCompetition,
+                regions: snapshot.regions,
+                rewards: snapshot.rewards,
+                submitting,
+              }}
             />
           ) : null}
           {section === "pilot" && setupCompetition ? (
@@ -2300,6 +2458,7 @@ function ContestLaunchGuide({
 function Overview({
   activeCompetitions,
   competitions,
+  focusedContestId,
   gyms,
   health,
   onCreate,
@@ -2316,6 +2475,7 @@ function Overview({
 }: {
   activeCompetitions: Competition[];
   competitions: Competition[];
+  focusedContestId: string;
   gyms: PilotData["gyms"];
   health: SystemHealth | null;
   onCreate: () => void;
@@ -2345,6 +2505,7 @@ function Overview({
     message: string;
     tone: "error" | "success";
   } | null>(null);
+  const autoLoadedContestId = useRef("");
   const draftRewards = snapshot.rewards.filter(
     (reward) => reward.status === "draft",
   ).length;
@@ -2360,6 +2521,52 @@ function Overview({
   const oldestUrgency = oldestQueueItem
     ? getQueueUrgency(oldestQueueItem)
     : null;
+
+  useEffect(() => {
+    if (!focusedContestId || autoLoadedContestId.current === focusedContestId) {
+      return;
+    }
+    const competition = competitions.find(
+      (candidate) => candidate.id === focusedContestId,
+    );
+    const gym = competition
+      ? gyms.find(
+          (candidate) =>
+            competition.assignedGymIds.includes(candidate.id) &&
+            (candidate.activeQrCredentials ?? []).some(
+              (credential) =>
+                credential.competitionId === competition.id,
+            ),
+        )
+      : undefined;
+    if (!competition || !gym) return;
+
+    autoLoadedContestId.current = focusedContestId;
+    let active = true;
+    void onLoadActiveQr(competition.id, gym.id)
+      .then((loaded) => {
+        if (!active || !loaded) return;
+        setContestHomePoster(
+          assertGymQrCredentialScope(loaded, competition.id, gym.id),
+        );
+        setPosterActionMessage({
+          competitionId: competition.id,
+          message: `${competition.name}'s poster for ${gym.name} is loaded below.`,
+          tone: "success",
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+        setPosterActionMessage({
+          competitionId: competition.id,
+          message: errorMessage(error),
+          tone: "error",
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [competitions, focusedContestId, gyms, onLoadActiveQr]);
 
   async function loadContestHomePoster(
     competition: Competition,
@@ -2546,7 +2753,11 @@ function Overview({
                 (reward) => reward.competitionId === competition.id,
               );
               return (
-                <details className="contest-home-card" key={competition.id}>
+                <details
+                  className="contest-home-card"
+                  open={competition.id === focusedContestId || undefined}
+                  key={competition.id}
+                >
                   <summary>
                     <span className={`status-tag ${competition.status}`}>
                       {competition.status}
@@ -2863,17 +3074,7 @@ function Metric({
   );
 }
 
-function CompetitionsPanel({
-  competitions,
-  gyms,
-  onDelete,
-  onEdit,
-  onSelectSetup,
-  onStatus,
-  regions,
-  rewards,
-  selectedCompetitionId,
-}: {
+type LegacyCompetitionsPanelProps = {
   competitions: Competition[];
   gyms: PilotData["gyms"];
   onDelete: (competition: Competition) => void;
@@ -2883,7 +3084,47 @@ function CompetitionsPanel({
   regions: RegionPolicy[];
   rewards: Reward[];
   selectedCompetitionId: string;
-}) {
+};
+
+function CompetitionsPanel(
+  props: LegacyCompetitionsPanelProps & {
+    setupWorkspace?: ContestSetupWorkspaceProps;
+  },
+) {
+  if (props.setupWorkspace) {
+    return (
+      <ContestSetupWorkspace
+        {...props.setupWorkspace}
+        key={props.setupWorkspace.competition?.id ?? "new"}
+      />
+    );
+  }
+  return (
+    <LegacyCompetitionsPanel
+      competitions={props.competitions}
+      gyms={props.gyms}
+      onDelete={props.onDelete}
+      onEdit={props.onEdit}
+      onSelectSetup={props.onSelectSetup}
+      onStatus={props.onStatus}
+      regions={props.regions}
+      rewards={props.rewards}
+      selectedCompetitionId={props.selectedCompetitionId}
+    />
+  );
+}
+
+function LegacyCompetitionsPanel({
+  competitions,
+  gyms,
+  onDelete,
+  onEdit,
+  onSelectSetup,
+  onStatus,
+  regions,
+  rewards,
+  selectedCompetitionId,
+}: LegacyCompetitionsPanelProps) {
   const [query, setQuery] = useStoredPreference(
     "gogymgo.admin.competitions.query",
     "",

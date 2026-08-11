@@ -20,7 +20,10 @@ import {
 } from '@/components/reliability';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
-import { getWeeklyChallengeDisplayStatus } from '@/domain/competition';
+import {
+  canLoadWeeklyChallengePairing,
+  getWeeklyChallengeDisplayStatus
+} from '@/domain/competition';
 import { getPublicInitials } from '@/domain/profile';
 import type { StreakCounts } from '@/domain/streaks';
 import {
@@ -50,17 +53,22 @@ export default function SquadScreen() {
   const { profileImageUri, publicName } = useProfile();
   const { competition, competitionEntryStartDateKey, weeklyGoal } = useWorkoutProgress();
   const activePeriod = competition.currentPeriod;
+  const pairingDataEnabled = canLoadWeeklyChallengePairing({
+    hasCurrentPeriod: Boolean(activePeriod),
+    phase: competition.phase
+  });
+  const pairingRegionCode = pairingDataEnabled ? competitionRegionCode : '';
   const weeklyChallengePeriod = activePeriod?.index ?? 1;
   const eligiblePartnersQuery = useEligibleWeeklyChallengePartners(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegionCode,
+    pairingRegionCode,
     weeklyChallengePeriod
   );
   const requestsQuery = useWeeklyChallengeRequests(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegionCode,
+    pairingRegionCode,
     weeklyChallengePeriod
   );
   const requestPartner = useRequestWeeklyChallengePartner();
@@ -107,7 +115,7 @@ export default function SquadScreen() {
     ({ requestStatus }) => requestStatus !== 'pending'
   ) ?? (eligiblePartnersQuery.data ?? [])[0];
   const pairingRequired =
-    !isRemainderDayPhase && activePeriod?.availability !== 'matched';
+    pairingDataEnabled && activePeriod?.availability !== 'matched';
   const pairingActionRequired = pairingRequired && !acceptedPartnerAlias;
   const challengeState = acceptedPartnerAlias
     ? 'PARTNER CONFIRMED'

@@ -127,6 +127,16 @@ export type MonthlyCompetitionResult = {
   weeklyGoal: number;
 };
 
+export function canLoadWeeklyChallengePairing({
+  hasCurrentPeriod,
+  phase
+}: {
+  hasCurrentPeriod: boolean;
+  phase: CompetitionPhase;
+}): boolean {
+  return phase === 'scoring-period' && hasCurrentPeriod;
+}
+
 export type EvaluateMonthlyCompetitionInput = {
   competitionMonthKey: string;
   eligibleFromDateKey?: string;

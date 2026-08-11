@@ -154,15 +154,21 @@ export const environmentSchema = z
       });
     }
 
-    if (environment.NODE_ENV === 'production') {
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.RUNTIME_ROLE === 'api'
+    ) {
       if (!environment.GOGYMGO_OWNER_EMAIL) {
         context.addIssue({
           code: 'custom',
-          message: 'GOGYMGO_OWNER_EMAIL is required in production.',
+          message:
+            'GOGYMGO_OWNER_EMAIL is required for the production API runtime.',
           path: ['GOGYMGO_OWNER_EMAIL'],
         });
       }
+    }
 
+    if (environment.NODE_ENV === 'production') {
       const databaseHost = new URL(environment.DATABASE_URL).hostname
         .trim()
         .toLowerCase();

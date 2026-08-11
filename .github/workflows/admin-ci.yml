@@ -1,6 +1,8 @@
 name: Admin CI
 
 on:
+  schedule:
+    - cron: "17 16 * * 1"
   pull_request:
     paths:
       - "apps/admin/**"
@@ -39,3 +41,5 @@ jobs:
           node-version: 24
       - run: npm ci --ignore-scripts
       - run: npm run check --workspace @gogymgo/admin
+      - run: npm run audit:production-bundle --workspace @gogymgo/admin
+      - run: npm run audit:dependencies --workspace @gogymgo/admin

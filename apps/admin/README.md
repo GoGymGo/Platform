@@ -50,12 +50,21 @@ occupies port 3000.
 npm run lint
 npx tsc --noEmit
 npm test
-npm audit --omit=dev
+npm run audit:production-bundle
+npm run audit:dependencies
 ```
 
 `npm test` produces the deployable Vinext build and verifies the
 server-rendered entry screen plus the critical authorization and mutation
 safeguards.
+
+The production-bundle audit blocks deployment if the vulnerable `image-size`
+ICNS, HEIF, or JXL parser becomes reachable in the built admin artifact. The
+dependency audit separately reports the two upstream build-tool advisories and
+accepts only the dated exceptions in
+`config/dependency-audit-exceptions.json`. Those exceptions expire on September
+8, 2026, so the weekly Admin CI run will require an upgrade or a fresh security
+review instead of allowing them indefinitely.
 
 ## Backend contract
 

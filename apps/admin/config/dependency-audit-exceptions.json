@@ -1,0 +1,20 @@
+{
+  "exceptions": [
+    {
+      "advisoryId": 1138808,
+      "expiresOn": "2026-09-08",
+      "package": "image-size",
+      "reason": "The affected parser is present only in trusted build tooling through Metro and Vinext. The deployable admin bundle must pass audit:production-bundle, and no patched image-size release is available.",
+      "scope": "build-only",
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr"
+    },
+    {
+      "advisoryId": 1138809,
+      "expiresOn": "2026-09-08",
+      "package": "image-size",
+      "reason": "The affected parser is present only in trusted build tooling through Metro and Vinext. The deployable admin bundle must pass audit:production-bundle, and no patched image-size release is available.",
+      "scope": "build-only",
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq"
+    }
+  ]
+}

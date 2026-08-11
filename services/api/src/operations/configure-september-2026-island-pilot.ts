@@ -730,7 +730,7 @@ async function publishPublicLegalDocuments(
         locale: document.locale,
         ownerApprovalConfirmed: true,
         reason:
-          'Publish the exact public legal copy requested and approved by the GoGymGo owner on August 3, 2026.',
+          'Publish the exact public legal copy requested and approved by the GoGymGo owner on August 11, 2026.',
         receiptRequirement: document.receiptRequirement,
         title: document.title,
         version: document.version,

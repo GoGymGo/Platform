@@ -228,10 +228,10 @@
       "documentKey": "official_contest_rules",
       "jurisdictionCode": "GLOBAL",
       "locale": "en",
-      "version": "2026-08-11-public-beta-v2",
+      "version": "2026-08-11-public-beta-v3",
       "title": "OFFICIAL CONTEST RULES",
       "receiptRequirement": "none",
-      "effectiveAt": "2026-08-11T07:00:00.000Z",
+      "effectiveAt": "2026-08-11T17:18:56.905Z",
       "content": {
         "intro": "These Official Contest Rules govern the GoGymGo September 2026 Vancouver Island and Gulf Islands Challenge. No purchase is necessary. One $100 CAD cash prize is available. Participation means you agree to these Rules.",
         "sections": [
@@ -305,7 +305,7 @@
           },
           {
             "heading": "MINIMUM ENTRANTS, INTERRUPTION, OR CANCELLATION",
-            "body": "At least two eligible entrants are required. GoGymGo may cancel, suspend, postpone, or modify the contest where fraud, security failure, technical failure, legal restriction, natural event, partner-gym unavailability, or another circumstance outside reasonable control materially affects fair operation. Any change will be limited to what is reasonably necessary, communicated in the app or at https://gogymgo.com, and administered consistently with applicable law. If a fair draw remains possible, GoGymGo may draw from eligible entries received before the interruption."
+            "body": "At least one eligible entrant is required. GoGymGo may cancel, suspend, postpone, or modify the contest where fraud, security failure, technical failure, legal restriction, natural event, partner-gym unavailability, or another circumstance outside reasonable control materially affects fair operation. Any change will be limited to what is reasonably necessary, communicated in the app or at https://gogymgo.com, and administered consistently with applicable law. If a fair draw remains possible, GoGymGo may draw from eligible entries received before the interruption."
           },
           {
             "heading": "PRIVACY AND PUBLIC RESULTS",

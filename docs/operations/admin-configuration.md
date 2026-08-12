@@ -18,6 +18,16 @@ Competition publication requires a future registration close and start, a region
 
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, it instead cancels the competition, withdraws active enrollments, queues a neutral cancellation notification, and records an append-only audit event.
 
+After the contest end and its 15-minute workout completion period, the contest
+home exposes one **Finalize + publish results** confirmation. The dashboard
+generates a cryptographically random draw seed, commits the locked entrant
+snapshot through `POST /v1/operator/draws/lock`, then reveals that same seed
+through `POST /v1/operator/draws/:drawId/settle`. An interrupted publication
+keeps the pending reveal in the signed-in browser so the same audited draw can
+be resumed; do not clear browser storage while a contest says **Draw locked**.
+Successful settlement changes the contest to `settled` and makes its exact
+participant results available in the member Winners Circle.
+
 ## First administrator bootstrap
 
 There is deliberately no public role-grant endpoint. A user must verify their Firebase email and sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:

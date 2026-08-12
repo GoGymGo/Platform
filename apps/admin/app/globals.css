@@ -3018,6 +3018,44 @@ textarea[aria-invalid="true"] {
   line-height: 1.45;
 }
 
+.contest-results-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(255, 74, 201, 0.32);
+  border-radius: 6px 2px 6px 2px;
+  padding: 14px;
+  background: rgba(255, 74, 201, 0.045);
+}
+
+.contest-results-control > div {
+  display: grid;
+  gap: 5px;
+}
+
+.contest-results-control small {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.contest-results-control strong {
+  color: var(--pink);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.contest-results-control p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .contest-home-poster-controls {
   display: grid;
   gap: 10px;
@@ -3334,6 +3372,11 @@ textarea[aria-invalid="true"] {
 
   .contest-home-poster-row .inline-actions {
     display: grid;
+  }
+
+  .contest-results-control {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .panel-toolbar,

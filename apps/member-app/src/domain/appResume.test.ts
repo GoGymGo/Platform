@@ -54,33 +54,51 @@ test('optional invitation and Award failures never block Home', () => {
   );
 });
 
-test('resume prioritizes unfinished setup before every other task', () => {
+test('resume prioritizes an active workout before every other task', () => {
   assert.deepEqual(
     getAppResumeTarget({
       activeWorkout: true,
       activeWorkoutRoute: '/qr-scanner',
       pendingChallengeInvite: true,
       setupRoute: '/commitment?source=home',
-      unclaimedReward: true
-    }),
-    {
-      kind: 'setup',
-      route: '/commitment?source=home'
-    }
-  );
-});
-
-test('resume prioritizes an active workout after setup is complete', () => {
-  assert.deepEqual(
-    getAppResumeTarget({
-      activeWorkout: true,
-      pendingChallengeInvite: true,
-      setupRoute: null,
-      unclaimedReward: true
+      unclaimedReward: true,
+      unseenCompetitionResults: true
     }),
     {
       kind: 'active-workout',
       route: '/qr-scanner'
+    }
+  );
+});
+
+test('resume presents completed contest results before restarting setup', () => {
+  assert.deepEqual(
+    getAppResumeTarget({
+      activeWorkout: false,
+      pendingChallengeInvite: true,
+      setupRoute: '/region?source=home',
+      unclaimedReward: true,
+      unseenCompetitionResults: true
+    }),
+    {
+      kind: 'winners-circle',
+      route: '/winners-circle?auto=1'
+    }
+  );
+});
+
+test('resume returns to unfinished setup when there are no new results', () => {
+  assert.deepEqual(
+    getAppResumeTarget({
+      activeWorkout: false,
+      pendingChallengeInvite: true,
+      setupRoute: '/commitment?source=home',
+      unclaimedReward: true,
+      unseenCompetitionResults: false
+    }),
+    {
+      kind: 'setup',
+      route: '/commitment?source=home'
     }
   );
 });
@@ -91,7 +109,8 @@ test('resume sends a player to an unanswered Weekly Challenge invite', () => {
       activeWorkout: false,
       pendingChallengeInvite: true,
       setupRoute: null,
-      unclaimedReward: true
+      unclaimedReward: true,
+      unseenCompetitionResults: false
     }),
     {
       kind: 'pending-challenge-invite',
@@ -106,7 +125,8 @@ test('resume sends a player to an unclaimed reward after higher-priority work', 
       activeWorkout: false,
       pendingChallengeInvite: false,
       setupRoute: null,
-      unclaimedReward: true
+      unclaimedReward: true,
+      unseenCompetitionResults: false
     }),
     {
       kind: 'unclaimed-reward',
@@ -121,7 +141,8 @@ test('resume returns null when no task needs attention', () => {
       activeWorkout: false,
       pendingChallengeInvite: false,
       setupRoute: null,
-      unclaimedReward: false
+      unclaimedReward: false,
+      unseenCompetitionResults: false
     }),
     null
   );

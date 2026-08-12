@@ -2,7 +2,8 @@ export type AppResumeTargetKind =
   | 'active-workout'
   | 'pending-challenge-invite'
   | 'setup'
-  | 'unclaimed-reward';
+  | 'unclaimed-reward'
+  | 'winners-circle';
 
 export type AppResumeTarget = {
   kind: AppResumeTargetKind;
@@ -15,6 +16,7 @@ export type AppResumeState = {
   pendingChallengeInvite: boolean;
   setupRoute: string | null;
   unclaimedReward: boolean;
+  unseenCompetitionResults: boolean;
 };
 
 export type AppResumeRequestState = {
@@ -55,19 +57,27 @@ export function getAppResumeTarget({
   activeWorkoutRoute = '/qr-scanner',
   pendingChallengeInvite,
   setupRoute,
-  unclaimedReward
+  unclaimedReward,
+  unseenCompetitionResults
 }: AppResumeState): AppResumeTarget | null {
-  if (setupRoute) {
-    return {
-      kind: 'setup',
-      route: setupRoute
-    };
-  }
-
   if (activeWorkout) {
     return {
       kind: 'active-workout',
       route: activeWorkoutRoute
+    };
+  }
+
+  if (unseenCompetitionResults) {
+    return {
+      kind: 'winners-circle',
+      route: '/winners-circle?auto=1'
+    };
+  }
+
+  if (setupRoute) {
+    return {
+      kind: 'setup',
+      route: setupRoute
     };
   }
 

@@ -3268,6 +3268,32 @@
         "tags": ["competition results"]
       }
     },
+    "/v1/results/mine/latest": {
+      "get": {
+        "operationId": "getLatestParticipantResults",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ParticipantCompetitionResultsResponseDto"
+                    }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the latest ended competition and results for the authenticated participant",
+        "tags": ["competition results"]
+      }
+    },
     "/v1/creator-workouts": {
       "get": {
         "operationId": "listPublished",
@@ -6865,14 +6891,35 @@
           "expiresAt"
         ]
       },
-      "SettledCompetitionResponseDto": {
+      "CategoryLeaderboardRowDto": {
         "type": "object",
         "properties": {
-          "competitionName": { "type": "string" },
-          "monthKey": { "type": "string" },
-          "rewardCount": { "type": "number", "minimum": 0 }
+          "alias": { "type": "string" },
+          "categoryEntries": { "type": "number" },
+          "rank": { "type": "number" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "verifiedDays": { "type": "number" }
         },
-        "required": ["competitionName", "monthKey", "rewardCount"]
+        "required": [
+          "alias",
+          "categoryEntries",
+          "rank",
+          "streaks",
+          "verifiedDays"
+        ]
+      },
+      "CategoryLeaderboardDto": {
+        "type": "object",
+        "properties": {
+          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryLeaderboardRowDto"
+            }
+          }
+        },
+        "required": ["goal", "rows"]
       },
       "RewardWinnerResponseDto": {
         "type": "object",
@@ -6895,6 +6942,60 @@
           "rewardType",
           "streaks"
         ]
+      },
+      "ParticipantCompetitionResultsResponseDto": {
+        "type": "object",
+        "properties": {
+          "categoryLeaderboards": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CategoryLeaderboardDto" }
+          },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "endedAt": { "type": "string", "format": "date-time" },
+          "monthKey": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "participantGoalDays": {
+            "type": "number",
+            "maximum": 7,
+            "minimum": 1
+          },
+          "rewardWinners": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RewardWinnerResponseDto" }
+          },
+          "rewardCount": { "type": "number", "minimum": 0 },
+          "resultsStatus": { "type": "string", "enum": ["pending", "settled"] },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "categoryLeaderboards",
+          "competitionId",
+          "competitionName",
+          "endedAt",
+          "monthKey",
+          "regionCode",
+          "regionName",
+          "participantGoalDays",
+          "rewardWinners",
+          "rewardCount",
+          "resultsStatus",
+          "settledAt"
+        ]
+      },
+      "SettledCompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "competitionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "rewardCount": { "type": "number", "minimum": 0 }
+        },
+        "required": ["competitionName", "monthKey", "rewardCount"]
       },
       "CreatorWorkoutResponseDto": {
         "type": "object",
@@ -7364,36 +7465,6 @@
           "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
         },
         "required": ["asOfDate", "timezone", "streaks"]
-      },
-      "CategoryLeaderboardRowDto": {
-        "type": "object",
-        "properties": {
-          "alias": { "type": "string" },
-          "categoryEntries": { "type": "number" },
-          "rank": { "type": "number" },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "verifiedDays": { "type": "number" }
-        },
-        "required": [
-          "alias",
-          "categoryEntries",
-          "rank",
-          "streaks",
-          "verifiedDays"
-        ]
-      },
-      "CategoryLeaderboardDto": {
-        "type": "object",
-        "properties": {
-          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CategoryLeaderboardRowDto"
-            }
-          }
-        },
-        "required": ["goal", "rows"]
       },
       "CompetitionSessionSummaryDto": {
         "type": "object",

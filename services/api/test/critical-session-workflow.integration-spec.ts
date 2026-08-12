@@ -7,6 +7,7 @@ import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
+import { ResultsService } from '../src/modules/results/results.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
   createTestConfig,
@@ -103,6 +104,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let operatorUserId: string;
   let profiles: ProfilesService;
   let registrationFixtureSequence = 0;
+  let results: ResultsService;
   let sessions: SessionsService;
 
   beforeAll(async () => {
@@ -111,6 +113,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const idempotency = new IdempotencyService(database);
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
+    results = new ResultsService(database, profiles);
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
     competitions = new CompetitionsService(
       database,
@@ -406,6 +409,120 @@ describeWithDatabase('critical session and ledger workflow', () => {
       ),
     ).rejects.toMatchObject({
       response: { code: 'COMPETITION_REGISTRATION_CLOSED' },
+    });
+  });
+
+  it("returns pending and then exact settled results for the participant's ended contest", async () => {
+    const fixture = await seedRegistrationCompetition();
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'participant-results-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET status = 'active',
+           registration_opens_at = $1,
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(Date.now() - 90 * 60_000),
+        new Date(Date.now() - 70 * 60_000),
+        new Date(Date.now() - 60 * 60_000),
+        new Date(Date.now() - 16 * 60_000),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      results.getLatestParticipantResults(userPrincipal),
+    ).resolves.toMatchObject({
+      categoryLeaderboards: [],
+      competitionId: fixture.competitionId,
+      participantGoalDays: 3,
+      resultsStatus: 'pending',
+      rewardWinners: [],
+      settledAt: null,
+    });
+
+    const user = await profiles.ensureUser(userPrincipal, database.connection);
+    await profiles.getMe(userPrincipal);
+    await migrated.pool.query(
+      `UPDATE competition_progress
+       SET category_score = 7, verified_days = 1
+       WHERE competition_id = $1 AND user_id = $2`,
+      [fixture.competitionId, user.id],
+    );
+    const reward = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO reward_catalog_items
+         (competition_id, sponsor_name, title, description, reward_type,
+          status, inventory_total, display_order, version,
+          fulfillment_instructions)
+       VALUES ($1, 'GoGymGo', '$200 Cash', 'Participant result test reward',
+               'cash', 'published', 1, 1, 1, 'Contact GoGymGo to claim.')
+       RETURNING id`,
+      [fixture.competitionId],
+    );
+    const draw = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_draws
+         (competition_id, status, rules_version, seed_commitment, seed_reveal,
+          entrant_snapshot_hash, entrant_count, total_entries, locked_at,
+          settled_at)
+       VALUES ($1, 'settled', 'rules-v1', repeat('a', 64), repeat('b', 64),
+               repeat('c', 64), 1, 5, $2, $2)
+       RETURNING id`,
+      [fixture.competitionId, new Date()],
+    );
+    await migrated.pool.query(
+      `INSERT INTO reward_awards
+         (draw_id, reward_catalog_item_id, user_id, award_rank, status,
+          awarded_at, updated_at)
+       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)`,
+      [draw.rows[0].id, reward.rows[0].id, user.id, new Date()],
+    );
+    await migrated.pool.query(
+      `UPDATE competitions SET status = 'settled' WHERE id = $1`,
+      [fixture.competitionId],
+    );
+
+    await expect(
+      results.getLatestParticipantResults(userPrincipal),
+    ).resolves.toMatchObject({
+      categoryLeaderboards: [
+        {
+          goal: 3,
+          rows: [
+            {
+              categoryEntries: 7,
+              rank: 1,
+              verifiedDays: 1,
+            },
+          ],
+        },
+      ],
+      competitionId: fixture.competitionId,
+      participantGoalDays: 3,
+      resultsStatus: 'settled',
+      rewardCount: 1,
+      rewardWinners: [
+        {
+          awardRank: 1,
+          rewardTitle: '$200 Cash',
+          rewardType: 'cash',
+          sponsorName: 'GoGymGo',
+        },
+      ],
+      settledAt: expect.any(String),
     });
   });
 

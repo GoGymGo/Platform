@@ -225,6 +225,37 @@ export function createAppTourDataSource(): AppDataSource {
       periodIndex
     ) => [createWeeklyChallengeRequest(goalDays, periodIndex)],
     getMyRewardAwards: async () => awards,
+    getMyLatestCompetitionResults: async () => ({
+      categoryLeaderboards: [createLeaderboard(4)],
+      competitionId: 'app-tour-settled-competition',
+      competitionName: 'Previous GoGymGo Contest',
+      endedAt: nowIso(),
+      monthKey: previousMonthKey(),
+      participantGoalDays: 4,
+      regionCode: 'vancouver-island-gulf-islands-bc',
+      regionName: 'Vancouver Island + Gulf Islands',
+      resultsStatus: 'settled',
+      rewardCount: 2,
+      rewardWinners: [
+        {
+          alias: 'NORTH_STAR',
+          awardRank: 1,
+          rewardTitle: 'Recovery Pack',
+          rewardType: 'coupon',
+          sponsorName: 'Northline Wellness',
+          streaks: fixedStreaks
+        },
+        {
+          alias: 'MOVE_MORE',
+          awardRank: 2,
+          rewardTitle: 'Training Credit',
+          rewardType: 'coupon',
+          sponsorName: 'Northline Wellness',
+          streaks: { ...fixedStreaks, daily: 3 }
+        }
+      ],
+      settledAt: nowIso()
+    }),
     getMyStreaks: async () => ({
       asOfDate: todayKey(),
       streaks: fixedStreaks,
@@ -248,29 +279,6 @@ export function createAppTourDataSource(): AppDataSource {
         title: 'Recovery Pack'
       }
     ],
-    getRewardWinners: async () => [
-      {
-        alias: 'NORTH_STAR',
-        awardRank: 1,
-        rewardTitle: 'Recovery Pack',
-        rewardType: 'coupon',
-        sponsorName: 'Northline Wellness',
-        streaks: fixedStreaks
-      },
-      {
-        alias: 'MOVE_MORE',
-        awardRank: 2,
-        rewardTitle: 'Training Credit',
-        rewardType: 'coupon',
-        sponsorName: 'Northline Wellness',
-        streaks: { ...fixedStreaks, daily: 3 }
-      }
-    ],
-    getSettledCompetition: async () => ({
-      competitionName: 'Previous GoGymGo Contest',
-      monthKey: previousMonthKey(),
-      rewardCount: 2
-    }),
     planCreatorWorkout: async (workoutId, plannedDate, note) => ({
       creatorName: 'GoGymGo Coach',
       durationMinutes: 30,

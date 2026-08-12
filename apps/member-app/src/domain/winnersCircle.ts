@@ -1,30 +1,18 @@
 export function shouldAutoPresentWinnersCircle(
-  regionalDateKey: string,
-  lastSeenLoginMonthKey: string | null
+  presentationKey: string | null,
+  lastSeenPresentationKey: string | null
 ) {
-  const loginMonthKey = regionalDateKey.slice(0, 7);
-
-  return regionalDateKey.endsWith('-01') && lastSeenLoginMonthKey !== loginMonthKey;
+  return presentationKey !== null && presentationKey !== lastSeenPresentationKey;
 }
 
-export function getPreviousCompetitionMonthKey(loginMonthKey: string) {
-  const match = /^(\d{4})-(\d{2})$/.exec(loginMonthKey);
-
-  if (!match) {
-    throw new Error(`Invalid month key: ${loginMonthKey}`);
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-
-  if (month < 1 || month > 12) {
-    throw new Error(`Invalid month key: ${loginMonthKey}`);
-  }
-
-  const previousMonth = month === 1 ? 12 : month - 1;
-  const previousYear = month === 1 ? year - 1 : year;
-
-  return `${previousYear}-${String(previousMonth).padStart(2, '0')}`;
+export function getWinnersCirclePresentationKey({
+  competitionId,
+  resultsStatus
+}: {
+  competitionId: string;
+  resultsStatus: 'pending' | 'settled';
+}) {
+  return `${competitionId}:${resultsStatus}`;
 }
 
 export function formatCompetitionMonth(monthKey: string) {

@@ -1,23 +1,16 @@
-import {
-  getCompetitionMonthKey,
-  getCompetitionRegionDateKey
-} from '@/domain/competition';
 import { createUserStorage } from '@/services/storage/userStorage';
 
 const storageKey = '@gogymgo/winners-circle-seen';
 
+export async function getLastSeenWinnersCircle(
+  userId: string
+) {
+  return createUserStorage(userId).getItem(storageKey);
+}
+
 export async function markWinnersCircleSeen(
   userId: string,
-  timeZone: string,
-  now = new Date()
+  presentationKey: string
 ) {
-  const regionalDateKey = getCompetitionRegionDateKey(
-    now,
-    timeZone
-  );
-
-  await createUserStorage(userId).setItem(
-    storageKey,
-    getCompetitionMonthKey(regionalDateKey)
-  );
+  await createUserStorage(userId).setItem(storageKey, presentationKey);
 }

@@ -74,7 +74,7 @@ There is no local data source that can imitate production records.
 | Firebase account access                     | `state/auth.tsx`                                                        | Firebase ID token guard                                 | Connected                                                                                                                                      |
 | Alias and friend discovery                  | `data/socialRepository.ts`                                              | `GET/PATCH /v1/me`, social routes                       | Connected; UI term is **alias**, API field remains `screenName`                                                                                |
 | Friends and social challenges               | `data/socialRepository.ts`                                              | `/v1/social/*`                                          | Connected                                                                                                                                      |
-| Leaderboards, results, streaks, and rewards | `data/appData.ts`                                                       | leaderboards, results, streaks, rewards                 | Connected                                                                                                                                      |
+| Leaderboards, results, streaks, and rewards | `data/appData.ts`                                                       | leaderboards, `GET /v1/results/mine/latest`, streaks, rewards | Connected; an ended participant sees the pending audit once, then the exact settled contest, category champions, and reward winners once published |
 | Creator catalog, planning, and submission   | `data/appData.ts`                                                       | `/v1/creator-workouts/*`                                | Connected                                                                                                                                      |
 | Profile image                               | `data/accountSettingsRepository.ts`, `state/profile.tsx`                | `/v1/me/avatar*`                                        | Connected through exact-size signed upload, moderation state, private read URL, and removal                                                    |
 | Legal documents and receipts                | `data/accountReadinessRepository.ts`                                    | `/v1/legal-documents/current`, `/v1/me/legal-receipts*` | Connected; exact current bundle is displayed and receipted during registration                                                                 |
@@ -103,6 +103,7 @@ contract gate.
 - `GET /v1/rewards/catalog?region=&monthKey=`
 - `GET /v1/rewards/awards/me`
 - `POST /v1/rewards/awards/{awardId}/claim`
+- `GET /v1/results/mine/latest`
 - `POST /v1/operator/configuration/rewards`
 - `PUT /v1/operator/configuration/rewards/{rewardId}`
 - `POST /v1/operator/configuration/rewards/{rewardId}/coupon-codes`

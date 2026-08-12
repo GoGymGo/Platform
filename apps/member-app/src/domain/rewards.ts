@@ -1,5 +1,7 @@
 import type { StreakCounts } from '@/domain/streaks';
-export type RewardType = 'coupon' | 'physical';
+import type { CategoryLeaderboard } from '@/domain/leaderboard';
+
+export type RewardType = 'cash' | 'coupon' | 'physical';
 
 export type RewardCatalogItem = {
   competitionId: string;
@@ -45,10 +47,19 @@ export type RewardWinner = {
   streaks: StreakCounts;
 };
 
-export type SettledCompetitionSummary = {
+export type ParticipantCompetitionResults = {
   competitionName: string;
   monthKey: string;
   rewardCount: number;
+  categoryLeaderboards: readonly CategoryLeaderboard[];
+  competitionId: string;
+  endedAt: string;
+  participantGoalDays: number;
+  regionCode: string;
+  regionName: string;
+  resultsStatus: 'pending' | 'settled';
+  rewardWinners: readonly RewardWinner[];
+  settledAt: string | null;
 };
 
 export function rewardAvailabilityLabel(reward: RewardCatalogItem): string {

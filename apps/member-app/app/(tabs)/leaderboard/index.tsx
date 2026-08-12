@@ -1,89 +1,58 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import {
-  ScreenScrollView,
-  HUDBorderBox,
-  ScreenContainer,
-  TerminalText
-} from '@/components/cyber';
 import { InlineHelpButton } from '@/components/clarity';
 import { CompetitionHubNav } from '@/components/competitionHubNav';
-import { BrandScreenHeader } from '@/components/screenLayout';
+import { LeaderboardResultRow } from '@/components/contestLeaderboard';
+import {
+  HUDBorderBox,
+  ScreenContainer,
+  ScreenScrollView,
+  TerminalText
+} from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
 import { RecoverableError } from '@/components/reliability';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { UserAlias } from '@/components/streakRewards';
-import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
-import type { CategoryLeaderboardRow } from '@/data/appData';
 import { useCategoryLeaderboard, useMyStreaks } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
 import { getCompetitionRankLabel } from '@/domain/competition';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
-import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useProfile } from '@/state/profile';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
-const goalCategories = [1, 2, 3, 4, 5, 6, 7] as const satisfies readonly GoalCategory[];
-
-export default function LeaderboardScreen() {
+export default function ContestOverviewScreen() {
   const router = useRouter();
-  const { width: viewportWidth } = useWindowDimensions();
-  const compactRankings = viewportWidth < 360;
   const { user } = useAuth();
   const { competitionRegion } = useCompetitionRegion();
   const { publicName } = useProfile();
-  const { currentCompetition } = useSessionRegistrationAccess();
-  const podiumMultipliers = resolveCategoryPodiumMultipliers(
-    currentCompetition?.rules
-  );
-  const {
-    competition,
-    currentWeekVerified,
-    totalEntries,
-    weeklyGoal
-  } = useWorkoutProgress();
-  const [selectedGoal, setSelectedGoal] = useScreenMemory<GoalCategory | null>(
-    'leaderboard:selected-goal',
-    null
-  );
-  const [showCategoryPicker, setShowCategoryPicker] = useScreenMemory(
-    'leaderboard:category-picker',
-    false
-  );
+  const { competition, currentWeekVerified, totalEntries, weeklyGoal } =
+    useWorkoutProgress();
   const [showRankingRules, setShowRankingRules] = useScreenMemory(
     'leaderboard:ranking-rules',
     false
   );
-  const displayedGoal = selectedGoal ?? (weeklyGoal as GoalCategory);
-  const selectedLeaderboardQuery = useCategoryLeaderboard(displayedGoal);
-  const {
-    data: selectedLeaderboard,
-    isPending: leaderboardPending
-  } = selectedLeaderboardQuery;
-  const { data: myGoalLeaderboard } =
-    useCategoryLeaderboard(weeklyGoal as GoalCategory);
+  const myLeaderboardQuery = useCategoryLeaderboard(weeklyGoal as GoalCategory);
   const { data: streakSummary } = useMyStreaks();
   const competitionNotStarted = competition.phase === 'before-month';
-  const hasSettledWeek = competition.periodResults.some((period) => period.status === 'settled');
+  const hasSettledWeek = competition.periodResults.some(
+    (period) => period.status === 'settled'
+  );
   const categoryScore = competition.periodEntriesBeforePerfectMonth;
-  const standingsVisible = !competitionNotStarted;
-  const myGoalLeaderboardRows = Array.isArray(myGoalLeaderboard?.rows)
-    ? myGoalLeaderboard.rows
+  const myLeaderboardRows = Array.isArray(myLeaderboardQuery.data?.rows)
+    ? myLeaderboardQuery.data.rows
     : [];
-  const selectedLeaderboardRows = Array.isArray(selectedLeaderboard?.rows)
-    ? selectedLeaderboard.rows
-    : [];
-  const myRank = myGoalLeaderboardRows.find(
+  const myStanding = myLeaderboardRows.find(
     ({ alias }) => alias.toLowerCase() === publicName.toLowerCase()
-  )?.rank;
+  );
   const currentRankLabel = getCompetitionRankLabel({
     competitionNotStarted,
     hasSettledWeek,
-    rank: myRank
+    rank: myStanding?.rank
   });
   const challengeStatus = competitionNotStarted
     ? 'NOT STARTED'
@@ -103,12 +72,12 @@ export default function LeaderboardScreen() {
         stickyHeaderIndices={[1]}
       >
         <BrandScreenHeader
-          accessory={(
+          accessory={
             <InlineHelpButton
               label="Open contest guide"
               onPress={() => router.push('/how-it-works?from=leaderboard')}
             />
-          )}
+          }
           description="Track your rank, entries and Weekly Challenge."
           eyebrow={`${competitionRegion.label} // MONTHLY CONTEST`}
           title="REGIONAL CONTEST"
@@ -155,13 +124,20 @@ export default function LeaderboardScreen() {
               value={challengeStatus}
             />
           </View>
-          <TerminalText live="polite" tone="dim" uppercase={false} variant="caption">
+          <TerminalText
+            live="polite"
+            tone="dim"
+            uppercase={false}
+            variant="caption"
+          >
             {competitionNotStarted
               ? 'Rankings begin after the first scoring week.'
               : `Goal Score ${categoryScore} sets your rank. Entries set your Prize Draw odds.`}
           </TerminalText>
           <CompactTextButton
-            label={showRankingRules ? 'Hide ranking details' : 'How ranking works'}
+            label={
+              showRankingRules ? 'Hide ranking details' : 'How ranking works'
+            }
             onPress={() => setShowRankingRules((current) => !current)}
             tone={showRankingRules ? 'muted' : 'cyan'}
           />
@@ -169,123 +145,51 @@ export default function LeaderboardScreen() {
             <View style={styles.rankingRules}>
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Goal Score includes each settled week&apos;s 1x, 2x or 3x Weekly
-                Challenge result. Equal scores are resolved by verified
-                contest days, then the published audited tie-break.
+                Challenge result. Equal scores are resolved by verified contest
+                days, then the published audited tie-break.
               </TerminalText>
             </View>
           ) : null}
         </HUDBorderBox>
 
-        {standingsVisible ? <>
-        <View style={styles.categorySection}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showCategoryPicker }}
-            onPress={() => setShowCategoryPicker((current) => !current)}
-            style={({ pressed }) => [
-              styles.categoryPickerButton,
-              pressed ? styles.pressed : null
-            ]}
-          >
-            <View style={styles.categoryPickerCopy}>
-              <TerminalText tone="dim" variant="micro">
-                WEEKLY GOAL GROUP
-              </TerminalText>
-              <TerminalText glow tone="cyan" variant="body">
-                {displayedGoal}-DAY WEEKLY GOAL
-              </TerminalText>
-            </View>
-            <TerminalText glow tone="cyan" variant="micro">
-              {showCategoryPicker ? 'CLOSE' : 'CHANGE'}
-            </TerminalText>
-          </Pressable>
-          {showCategoryPicker ? (
-            <View accessibilityRole="radiogroup" style={styles.categorySelector}>
-              {goalCategories.map((goal) => {
-                const selected = goal === displayedGoal;
-
-                return (
-                  <Pressable
-                    aria-checked={selected}
-                    accessibilityLabel={`${goal}-day Weekly Goal group`}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    key={goal}
-                    onPress={() => {
-                      setSelectedGoal(goal);
-                      setShowCategoryPicker(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.categoryOption,
-                      selected ? styles.categoryOptionSelected : null,
-                      pressed ? styles.pressed : null
-                    ]}
-                  >
-                    <TerminalText glow={selected} tone={selected ? 'cyan' : 'dim'} variant="button">
-                      {goal}
-                    </TerminalText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
+        <View style={styles.positionHeading}>
+          <TerminalText glow tone="cyan" variant="label">
+            YOUR LEADERBOARD POSITION
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="caption">
+            Your current place in the {weeklyGoal}-day Weekly Goal group.
+          </TerminalText>
         </View>
 
-        <HUDBorderBox style={styles.topTenPanel} tone="cyan">
-          <View style={styles.topTenHeader}>
-            <View style={styles.topTenHeading}>
-              <TerminalText tone="cyan" variant="label">
-                TOP 10{' // '}{displayedGoal}-DAY GOAL
+        <HUDBorderBox style={styles.positionCard} tone="cyan">
+          {myLeaderboardQuery.isError ? (
+            <RecoverableError
+              body="Your current rank could not be loaded. Your contest progress and entries are unchanged."
+              onRetry={() => {
+                void recordFlowMetric(user?.uid, 'flow-retry', 'leaderboard');
+                void myLeaderboardQuery.refetch();
+              }}
+              retrying={myLeaderboardQuery.isFetching}
+              title="COULD NOT LOAD YOUR RANK"
+            />
+          ) : hasSettledWeek && myStanding ? (
+            <LeaderboardResultRow isCurrentUser row={myStanding} />
+          ) : (
+            <View style={styles.rankPending}>
+              <TerminalText live="polite" glow tone="cyan" variant="body">
+                {myLeaderboardQuery.isPending ? 'LOADING...' : currentRankLabel}
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                Top three earn 3x, 2x and 1.5x entry boosts.
+                Your individual position will update here after scoring settles.
               </TerminalText>
             </View>
-            <TerminalText tone="dim" variant="micro">
-              GOAL SCORE
-            </TerminalText>
-          </View>
-
-          <View style={styles.topTenList}>
-            {selectedLeaderboardQuery.isError ? (
-              <RecoverableError
-                body="The current Goal group could not be loaded. Your saved goal and rank are unchanged."
-                onRetry={() => {
-                  void recordFlowMetric(user?.uid, 'flow-retry', 'leaderboard');
-                  void selectedLeaderboardQuery.refetch();
-                }}
-                retrying={selectedLeaderboardQuery.isFetching}
-                title="COULD NOT LOAD STANDINGS"
-              />
-            ) : null}
-            {selectedLeaderboardRows.map((row) => (
-              <LeaderboardResultRow
-                compact={compactRankings}
-                isCurrentUser={row.alias.toLowerCase() === publicName.toLowerCase()}
-                key={row.rank}
-                multiplier={row.rank <= 3
-                  ? podiumMultipliers[row.rank as 1 | 2 | 3]
-                  : undefined}
-                row={row}
-              />
-            ))}
-            {!selectedLeaderboardQuery.isError &&
-            !leaderboardPending &&
-            selectedLeaderboardRows.length === 0 ? (
-              <HUDBorderBox style={styles.emptyStandings} tone="muted">
-                <TerminalText glow tone="amber" variant="label">
-                  STANDINGS NOT AVAILABLE YET
-                </TerminalText>
-                <TerminalText style={styles.emptyStandingsCopy} tone="muted" uppercase={false} variant="body">
-                  Live results will appear when this month&apos;s contest data is ready.
-                </TerminalText>
-              </HUDBorderBox>
-            ) : null}
-          </View>
-
+          )}
+          <CompactTextButton
+            label="VIEW LEADERBOARD / WINNERS ->"
+            onPress={() => router.push('/leaderboard/standings')}
+            tone="cyan"
+          />
         </HUDBorderBox>
-        </> : null}
-
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -302,66 +206,16 @@ function OverviewMetric({
 }) {
   return (
     <View style={styles.overviewMetric}>
-      <TerminalText glow style={styles.overviewValue} tone={tone} variant="body">
+      <TerminalText
+        glow
+        style={styles.overviewValue}
+        tone={tone}
+        variant="body"
+      >
         {value}
       </TerminalText>
       <TerminalText tone="dim" variant="micro">
         {label}
-      </TerminalText>
-    </View>
-  );
-}
-
-function LeaderboardResultRow({
-  compact,
-  isCurrentUser,
-  multiplier,
-  row
-}: {
-  compact: boolean;
-  isCurrentUser: boolean;
-  multiplier?: number;
-  row: CategoryLeaderboardRow;
-}) {
-  return (
-    <View style={[
-      styles.resultRow,
-      compact ? styles.resultRowCompact : null,
-      isCurrentUser ? styles.currentUserRow : null
-    ]}>
-      <TerminalText
-        glow={row.rank <= 3}
-        style={styles.rankText}
-        tone={row.rank <= 3 ? 'cyan' : 'muted'}
-        variant="label"
-      >
-        {String(row.rank).padStart(2, '0')}
-      </TerminalText>
-      <View style={styles.resultCopy}>
-        <UserAlias
-          alias={row.alias}
-          streaks={row.streaks}
-          style={[
-            styles.resultIdentity,
-            compact ? styles.resultIdentityCompact : null
-          ]}
-          textStyle={styles.resultName}
-        />
-        {isCurrentUser ? (
-          <TerminalText tone="cyan" variant="micro">
-            YOU
-          </TerminalText>
-        ) : null}
-      </View>
-      {multiplier ? (
-        <View style={styles.multiplierBadge}>
-          <TerminalText glow tone="pink" variant="micro">
-            {multiplier}X
-          </TerminalText>
-        </View>
-      ) : null}
-      <TerminalText glow={row.rank <= 3} style={styles.resultScore} tone="cyan" variant="body">
-        {row.categoryEntries}
       </TerminalText>
     </View>
   );
@@ -375,9 +229,12 @@ const styles = StyleSheet.create({
     paddingBottom: 132,
     backgroundColor: colors.transparent
   },
+  hubNav: {
+    marginBottom: spacing.lg
+  },
   myStandingCard: {
     gap: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
     padding: spacing.lg
   },
   standingHeader: {
@@ -411,163 +268,22 @@ const styles = StyleSheet.create({
   overviewValue: {
     fontFamily: fontFamilies.display
   },
-  hubNav: {
-    marginBottom: spacing.lg
-  },
-  categorySection: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg
-  },
-  categoryPickerButton: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderCyanButton,
-    borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
-  },
-  categoryPickerCopy: {
-    minWidth: 0,
-    flex: 1,
-    gap: 2
-  },
-  categorySelector: {
-    flexDirection: 'row',
-    gap: 4,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: colors.borderMuted,
-    borderRadius: 8,
-    backgroundColor: colors.panelAlpha70
-  },
-  categoryOption: {
-    minWidth: 0,
-    minHeight: 44,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 5
-  },
-  categoryOptionSelected: {
-    backgroundColor: colors.surfaceCyanActive
-  },
-  topTenPanel: {
-    gap: spacing.md,
-    padding: spacing.lg
-  },
-  topTenHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.md
-  },
-  topTenHeading: {
-    minWidth: 0,
-    flex: 1,
-    gap: spacing.xs
-  },
-  topTenList: {
-    borderTopWidth: 1,
-    borderColor: colors.borderCyanSubtle
-  },
-  emptyStandings: {
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    padding: spacing.lg
-  },
-  emptyStandingsCopy: {
-    fontFamily: fontFamilies.body
-  },
-  resultRow: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
-  },
-  resultRowCompact: {
-    minHeight: 72
-  },
-  currentUserRow: {
-    borderLeftWidth: 2,
-    borderLeftColor: colors.cyan,
-    backgroundColor: colors.surfaceCyanFaint
-  },
-  rankText: {
-    width: 28,
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  resultCopy: {
-    minWidth: 0,
-    flex: 1
-  },
-  resultIdentity: {
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs
-  },
-  resultIdentityCompact: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 2
-  },
-  resultName: {
-    flexShrink: 1,
-    fontFamily: fontFamilies.bodyStrong
-  },
-  multiplierBadge: {
-    minWidth: 38,
-    alignItems: 'center',
-    paddingVertical: 3,
-    paddingHorizontal: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.borderPinkStrong,
-    borderRadius: 5,
-    backgroundColor: colors.surfacePinkFaint
-  },
-  resultScore: {
-    width: 42,
-    textAlign: 'right'
-  },
   rankingRules: {
     gap: spacing.sm,
     paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.borderMuted
   },
-  winnersButton: {
-    marginTop: spacing.md
+  positionHeading: {
+    gap: spacing.xs,
+    marginBottom: spacing.md
   },
-  pressableCard: {
-    width: '100%'
-  },
-  drawCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  positionCard: {
     gap: spacing.md,
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderStyle: 'dashed'
+    padding: spacing.lg
   },
-  drawCopy: {
-    minWidth: 0,
-    flex: 1
-  },
-  drawTitle: {
-    marginTop: 2,
-    fontFamily: fontFamilies.display
-  },
-  pressed: {
-    opacity: 0.74,
-    transform: [{ scale: 0.99 }]
+  rankPending: {
+    gap: spacing.xs,
+    paddingVertical: spacing.md
   }
 });

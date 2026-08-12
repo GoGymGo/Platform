@@ -308,7 +308,11 @@ function auditFlowReliability() {
       'resume-started',
       'resume-completed',
       'OBJECTIVE',
-      'ACHIEVED THIS WEEK'
+      'ACHIEVED THIS WEEK',
+      'First workout recording opens',
+      'formatCompetitionOpeningDateTime',
+      'WINNERS FROM LAST CONTEST',
+      'isWinnersBannerVisible'
     ]],
     ['app/(tabs)/leaderboard/index.tsx', [
       'useScreenMemory',

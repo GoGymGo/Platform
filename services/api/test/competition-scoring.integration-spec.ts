@@ -1,6 +1,8 @@
 import { DatabaseService } from '../src/database/database.service';
+import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
+import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import {
   createTestConfig,
   type MigratedPostgisTestDatabase,
@@ -65,8 +67,8 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
           minimum_entrants, registration_opens_at, registration_closes_at,
           starts_at, ends_at)
        VALUES
-         ($1, '2026-07', 'Scoring Integration', 'active', 'rules-v1',
-          $2::jsonb, 100, '2026-06-01', '2026-07-01',
+         ($1, '2026-07', 'Scoring Integration', 'registration', 'rules-v1',
+          $2::jsonb, 2, '2026-06-01', '2026-07-01',
           '2026-07-01', '2026-08-01')
        RETURNING id`,
       [region.rows[0].id, JSON.stringify(rules)],
@@ -143,6 +145,16 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
     const enrollmentByUser = new Map(
       enrollments.rows.map((row) => [row.user_id, row.id]),
     );
+    const lifecycle = new CompetitionLifecycleService(
+      database,
+      {} as NotificationsService,
+      scoring,
+    );
+    await expect(lifecycle.processDueStarts()).resolves.toEqual({
+      activated: 1,
+      cancelled: 0,
+    });
+
     const userADates = [
       '2026-07-01',
       '2026-07-02',
@@ -202,18 +214,6 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
         userBDates,
       ],
     );
-    await migrated.pool.query(
-      `INSERT INTO competition_matches
-         (competition_id, period_index, period_start_date, period_end_date,
-          user_a_id, user_b_id, status)
-       VALUES ($1, 1, '2026-07-01', '2026-07-07', $2, $3, 'matched')`,
-      [
-        competitionId,
-        userAId < userBId ? userAId : userBId,
-        userAId < userBId ? userBId : userAId,
-      ],
-    );
-
     const ledger = new LedgerService();
     await database.connection.transaction().execute(async (transaction) => {
       for (const [userId, enrollmentId] of enrollmentByUser) {
@@ -278,8 +278,8 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
       ),
     ).toEqual(
       new Map([
-        [userAId, 515],
-        [userBId, 305],
+        [userAId, 785],
+        [userBId, 485],
       ]),
     );
 
@@ -304,19 +304,28 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
       enrollment: 2,
       perfect_month: 2,
       verified_session: userADates.length + userBDates.length,
-      weekly_match: 2,
+      weekly_match: 8,
     });
 
     const matches = await migrated.pool.query<{
       count: string;
+      paired: string;
+      periods: string;
       settled: string;
     }>(
       `SELECT count(*)::text,
+              count(*) FILTER (WHERE user_b_id IS NOT NULL)::text AS paired,
+              count(DISTINCT period_index)::text AS periods,
               count(*) FILTER (WHERE status = 'settled')::text AS settled
        FROM competition_matches
        WHERE competition_id = $1`,
       [competitionId],
     );
-    expect(matches.rows[0]).toEqual({ count: '7', settled: '7' });
+    expect(matches.rows[0]).toEqual({
+      count: '4',
+      paired: '4',
+      periods: '4',
+      settled: '4',
+    });
   });
 });

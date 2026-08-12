@@ -491,8 +491,8 @@ function MobileQrScannerModal() {
               </TerminalText>
             ) : null}
             <CyberButtonOutline
-              label="BACK TO TRAINING"
-              onPress={() => goBackOrReplace(router, '/session')}
+              label="BACK TO HOME"
+              onPress={() => router.replace('/home')}
             />
           </HUDBorderBox>
         ) : (
@@ -586,12 +586,14 @@ function MobileQrScannerModal() {
                 error
                   ? 'TRY AGAIN'
                   : result?.outcome === 'verified'
-                    ? 'BACK TO TRAINING'
+                    ? 'BACK TO HOME'
                     : 'CLOSE FOR NOW'
               }
               onPress={() => {
                 if (error) {
                   scanAgain();
+                } else if (result?.outcome === 'verified') {
+                  router.replace('/home');
                 } else {
                   goBackOrReplace(router, '/session');
                 }

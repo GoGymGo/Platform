@@ -332,7 +332,13 @@ export default function WinnersCircleScreen() {
               style={styles.closeButton}
               tone="cyan"
             />
-          ) : null}
+          ) : (
+            <CompactTextButton
+              label="BACK TO CURRENT LEADERBOARD ->"
+              onPress={() => router.replace('/leaderboard/standings')}
+              tone="cyan"
+            />
+          )}
         </ScreenScrollView>
       </ScreenContainer>
     </AuthGate>

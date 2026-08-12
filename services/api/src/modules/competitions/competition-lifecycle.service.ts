@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import { DatabaseService } from '../../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { resolveCompetitionStart } from './competition-lifecycle';
+import { CompetitionScoringService } from './competition-scoring.service';
 
 export interface CompetitionLifecycleResult {
   activated: number;
@@ -14,6 +15,7 @@ export class CompetitionLifecycleService {
   constructor(
     private readonly database: DatabaseService,
     private readonly notifications: NotificationsService,
+    private readonly scoring: CompetitionScoringService,
   ) {}
 
   async processDueStarts(limit = 50): Promise<CompetitionLifecycleResult> {
@@ -38,6 +40,7 @@ export class CompetitionLifecycleService {
               'configuration_version',
               'id',
               'minimum_entrants',
+              'month_key',
               'starts_at',
               'status',
             ])
@@ -80,6 +83,15 @@ export class CompetitionLifecycleService {
             .where('id', '=', competition.id)
             .where('status', '=', 'registration')
             .executeTakeFirstOrThrow();
+
+          if (nextStatus === 'active') {
+            await this.scoring.ensureWeeklyChallengeMatches(
+              transaction,
+              competition.id,
+              competition.month_key,
+              now,
+            );
+          }
 
           if (nextStatus === 'cancelled') {
             const enrollments = await transaction

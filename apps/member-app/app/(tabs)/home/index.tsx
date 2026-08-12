@@ -37,9 +37,12 @@ import {
   getGymVerificationHomeState,
   isMobileWebGymVerificationDevice
 } from '@/domain/mobileGymVerification';
+import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
 import {
+  formatCompetitionMonth,
   getWinnersCirclePresentationKey,
+  isWinnersBannerVisible,
   shouldAutoPresentWinnersCircle
 } from '@/domain/winnersCircle';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -91,6 +94,7 @@ export default function HomeScreen() {
     activeSession,
     competition,
     competitionRegion,
+    competitionTimeZone,
     currentWeekIndex,
     currentWeekVerified,
     prizeDrawEligible,
@@ -126,6 +130,12 @@ export default function HomeScreen() {
   const isBonusDayPhase = competition.phase === 'bonus-days';
   const competitionNotStarted = competition.phase === 'before-month';
   const competitionStartLabel = formatCampaignDate(`${competition.competitionMonthKey}-01`);
+  const competitionOpeningDateTime = currentCompetition
+    ? formatCompetitionOpeningDateTime(
+        currentCompetition.startsAt,
+        competitionTimeZone
+      )
+    : null;
   const [competitionYear, competitionMonth] = competition.competitionMonthKey.split('-').map(Number);
   const competitionStartMonth = new Intl.DateTimeFormat('en-CA', { month: 'long' }).format(
     new Date(competitionYear, competitionMonth - 1, 1, 12)
@@ -167,6 +177,12 @@ export default function HomeScreen() {
   );
   const resultsPresentationKey = latestCompetitionResults
     ? getWinnersCirclePresentationKey(latestCompetitionResults)
+    : null;
+  const showRecentWinnersBanner = latestCompetitionResults
+    ? isWinnersBannerVisible(latestCompetitionResults.endedAt)
+    : false;
+  const recentWinnersMonth = latestCompetitionResults
+    ? formatCompetitionMonth(latestCompetitionResults.monthKey)
     : null;
   const unseenCompetitionResults =
     lastSeenResultsKey !== undefined &&
@@ -426,6 +442,32 @@ export default function HomeScreen() {
           <ProfileAvatar imageUri={profileImageUri} initials={publicInitials} showStatus size={46} />
         </View>
 
+        {showRecentWinnersBanner && latestCompetitionResults && recentWinnersMonth ? (
+          <Pressable
+            accessibilityHint="Open the completed contest Winners Circle"
+            accessibilityLabel={`Winners from last contest, ${recentWinnersMonth}`}
+            accessibilityRole="button"
+            onPress={() => router.push('/winners-circle')}
+            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
+          >
+            <HUDBorderBox glow style={styles.recentWinnersBanner} tone="pink">
+              <View style={styles.recentWinnersCopy}>
+                <TerminalText glow tone="pink" variant="label">
+                  WINNERS FROM LAST CONTEST
+                </TerminalText>
+                <TerminalText tone="text" uppercase={false} variant="body">
+                  {latestCompetitionResults.resultsStatus === 'settled'
+                    ? `${recentWinnersMonth} results are in. See the Goal champions and prize-draw winners.`
+                    : `${recentWinnersMonth} results are being finalized. Check the Winners Circle for updates.`}
+                </TerminalText>
+              </View>
+              <TerminalText glow tone="pink" variant="button">
+                -&gt;
+              </TerminalText>
+            </HUDBorderBox>
+          </Pressable>
+        ) : null}
+
         {registered === '1' ? (
           <HUDBorderBox style={styles.registrationSuccess} tone="green">
             <View style={styles.registrationSuccessCopy}>
@@ -661,9 +703,11 @@ export default function HomeScreen() {
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
               Complete this step before starting a Verified workout.
             </TerminalText>
-          ) : workoutUnavailable ? (
+          ) : !activeSession && competitionOpeningDateTime ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              Verified contest workouts open when scoring begins on {competitionStartLabel}.
+              {workoutUnavailable
+                ? `First workout recording opens ${competitionOpeningDateTime}.`
+                : `Workout recording is open now. It opened ${competitionOpeningDateTime}.`}
             </TerminalText>
           ) : null}
           {!activeSession && !setupRequired ? (
@@ -941,6 +985,18 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg,
     padding: spacing.md
+  },
+  recentWinnersBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.md
+  },
+  recentWinnersCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: spacing.xs
   },
   registrationSuccessCopy: {
     flex: 1,

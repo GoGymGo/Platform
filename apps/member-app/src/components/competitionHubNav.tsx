@@ -18,13 +18,19 @@ export type CompetitionHubSection =
   | 'rewards';
 
 const sections: readonly {
+  accessibilityLabel?: string;
   key: CompetitionHubSection;
   label: string;
   route: Href;
 }[] = [
   { key: 'rankings', label: 'OVERVIEW', route: '/leaderboard' },
   { key: 'challenge', label: 'CHALLENGE', route: '/squad' },
-  { key: 'winners', label: 'WINNERS', route: '/winners-circle' },
+  {
+    accessibilityLabel: 'Leaderboard / Winners',
+    key: 'winners',
+    label: 'LEADERS\n/ WINNERS',
+    route: '/leaderboard/standings'
+  },
   { key: 'rewards', label: 'REWARDS', route: '/leaderboard/rewards' }
 ];
 
@@ -47,6 +53,7 @@ export function CompetitionHubNav({
         return (
           <Pressable
             aria-selected={selected}
+            accessibilityLabel={section.accessibilityLabel}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             key={section.key}
@@ -62,7 +69,7 @@ export function CompetitionHubNav({
             ]}
           >
             <TerminalText
-              numberOfLines={1}
+              numberOfLines={2}
               style={[styles.label, compact ? styles.labelCompact : null]}
               tone={selected ? 'cyan' : 'dim'}
               variant="micro"
@@ -87,7 +94,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     minWidth: 0,
-    minHeight: 44,
+    minHeight: 52,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -104,6 +111,7 @@ const styles = StyleSheet.create({
   },
   label: {
     width: '100%',
+    lineHeight: 14,
     textAlign: 'center'
   },
   labelCompact: {

@@ -24,6 +24,7 @@ import {
   parseCompetitionRules,
   type CompetitionRules,
 } from './competition-rules';
+import { buildAutomaticWeeklyChallengePairs } from './weekly-challenge-pairing';
 
 interface ScoringCompetition {
   id: string;
@@ -89,8 +90,28 @@ export class CompetitionScoringService {
 
     for (const row of competitions) {
       const competition = toScoringCompetition(row);
+      const periods = buildCompetitionPeriods(competition.monthKey);
+      await this.database.connection
+        .transaction()
+        .execute(async (transaction) => {
+          const activeCompetition = await transaction
+            .selectFrom('competitions')
+            .select('status')
+            .where('id', '=', competition.id)
+            .forUpdate()
+            .executeTakeFirst();
+          if (activeCompetition?.status === 'active') {
+            await this.ensureWeeklyChallengeMatches(
+              transaction,
+              competition.id,
+              competition.monthKey,
+              now,
+              periods,
+            );
+          }
+        });
       const regionalDateKey = dateKeyInTimezone(now, competition.timezone);
-      for (const period of buildCompetitionPeriods(competition.monthKey)) {
+      for (const period of periods) {
         if (settled >= settlementLimit) {
           return settled;
         }
@@ -155,6 +176,80 @@ export class CompetitionScoringService {
     await this.applyFinalAdjustments(transaction, competition);
   }
 
+  async ensureWeeklyChallengeMatches(
+    transaction: Transaction<Database>,
+    competitionId: string,
+    monthKey: string,
+    now: Date,
+    periods: readonly CompetitionPeriod[] = buildCompetitionPeriods(monthKey),
+  ): Promise<number> {
+    if (periods.length === 0) {
+      return 0;
+    }
+
+    const enrollments = await this.loadEnrollments(transaction, competitionId);
+    if (enrollments.length === 0) {
+      return 0;
+    }
+    const existingMatches = await transaction
+      .selectFrom('competition_matches')
+      .select(['period_index', 'user_a_id', 'user_b_id'])
+      .where('competition_id', '=', competitionId)
+      .where(
+        'period_index',
+        'in',
+        periods.map((period) => period.index),
+      )
+      .execute();
+    let created = 0;
+
+    for (const period of periods) {
+      const assignedUserIds = new Set<string>();
+      for (const match of existingMatches) {
+        if (match.period_index !== period.index) {
+          continue;
+        }
+        assignedUserIds.add(match.user_a_id);
+        if (match.user_b_id) {
+          assignedUserIds.add(match.user_b_id);
+        }
+      }
+
+      const automaticPairs = buildAutomaticWeeklyChallengePairs(
+        enrollments,
+        assignedUserIds,
+      );
+      for (const pair of automaticPairs) {
+        await transaction
+          .insertInto('competition_matches')
+          .values({
+            competition_id: competitionId,
+            created_at: now,
+            outcome: null,
+            period_end_date: period.endDateKey,
+            period_index: period.index,
+            period_start_date: period.startDateKey,
+            settled_at: null,
+            status: pair.userBId ? 'matched' : 'searching',
+            user_a_id: pair.userAId,
+            user_b_id: pair.userBId,
+          })
+          .executeTakeFirstOrThrow();
+        created += 1;
+      }
+
+      await transaction
+        .updateTable('weekly_challenge_requests')
+        .set({ responded_at: now, status: 'cancelled' })
+        .where('competition_id', '=', competitionId)
+        .where('period_index', '=', period.index)
+        .where('status', '=', 'pending')
+        .execute();
+    }
+
+    return created;
+  }
+
   private async settlePeriod(
     transaction: Transaction<Database>,
     competition: ScoringCompetition,
@@ -168,6 +263,14 @@ export class CompetitionScoringService {
     ) {
       return false;
     }
+
+    await this.ensureWeeklyChallengeMatches(
+      transaction,
+      competition.id,
+      competition.monthKey,
+      now,
+      [period],
+    );
 
     const enrollments = await this.loadEnrollments(transaction, competition.id);
     if (enrollments.length === 0) {

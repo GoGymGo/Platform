@@ -15,6 +15,7 @@ export default function LeaderboardLayout() {
       animation: reduceMotion ? 'none' : 'slide_from_right'
     }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="standings" />
       <Stack.Screen name="rewards" />
     </Stack>
   );

@@ -112,6 +112,7 @@ export interface components {
     OperatorSystemHealthResponseDto: { checkedAt: string; database: "ok"; queues: components['schemas']["OperatorQueueDepthsDto"]; worker: components['schemas']["OperatorWorkerHealthDto"] };
     OperatorWorkQueueItemDto: { createdAt: string; id: string; kind: "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "workout_session"; regionCode?: string; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code" };
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
+    ParticipantCompetitionResultsResponseDto: { categoryLeaderboards: Array<components['schemas']["CategoryLeaderboardDto"]>; competitionId: string; competitionName: string; endedAt: string; monthKey: string; participantGoalDays: number; regionCode: string; regionName: string; resultsStatus: "pending" | "settled"; rewardCount: number; rewardWinners: Array<components['schemas']["RewardWinnerResponseDto"]>; settledAt: string | null };
     PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
     PartnerCompetitionDto: { assignedGymIds: Array<string>; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string | null; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
     PartnerDashboardSnapshotDto: { competitions: Array<components['schemas']["PartnerCompetitionDto"]>; generatedAt: string; gyms: Array<components['schemas']["PartnerGymDto"]>; operator: components['schemas']["AdminDashboardIdentityDto"]; regions: Array<components['schemas']["AdminDashboardRegionDto"]>; sessions: Array<components['schemas']["OperatorGymSessionDto"]> };
@@ -604,6 +605,14 @@ export interface operations {
     parameters: Record<string, never>;
     responses: {
       "200": components['schemas']["HealthResponseDto"];
+    };
+  };
+  getLatestParticipantResults: {
+    method: "GET";
+    path: "/v1/results/mine/latest";
+    parameters: Record<string, never>;
+    responses: {
+      "200": components['schemas']["ParticipantCompetitionResultsResponseDto"] | null;
     };
   };
   getMatches: {
@@ -1436,6 +1445,9 @@ export interface paths {
   "/v1/regions": {
     get: operations["listRegions"];
   };
+  "/v1/results/mine/latest": {
+    get: operations["getLatestParticipantResults"];
+  };
   "/v1/results/reward-winners": {
     get: operations["getRewardWinners"];
   };
@@ -1615,6 +1627,7 @@ export type OperatorReasonDto = components['schemas']["OperatorReasonDto"];
 export type OperatorSystemHealthResponseDto = components['schemas']["OperatorSystemHealthResponseDto"];
 export type OperatorWorkQueueItemDto = components['schemas']["OperatorWorkQueueItemDto"];
 export type OperatorWorkerHealthDto = components['schemas']["OperatorWorkerHealthDto"];
+export type ParticipantCompetitionResultsResponseDto = components['schemas']["ParticipantCompetitionResultsResponseDto"];
 export type PartnerApplicationResponseDto = components['schemas']["PartnerApplicationResponseDto"];
 export type PartnerCompetitionDto = components['schemas']["PartnerCompetitionDto"];
 export type PartnerDashboardSnapshotDto = components['schemas']["PartnerDashboardSnapshotDto"];

@@ -41,6 +41,9 @@ const apiUrl = environment.EXPO_PUBLIC_API_URL ?? '';
 const browserTestPreviewEnabled =
   environment.EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW === 'true';
 const legalSource = readText('src/constants/legal.ts');
+const workoutVerificationSource = readText('src/config/workoutVerification.ts');
+const devicePresenceEnabled = capabilityEnabled('devicePresence');
+const heartRateEnabled = capabilityEnabled('heartRate');
 
 if (iosBundleId && !isProductionAppId(iosBundleId)) {
   issues.push('GOGYMGO_IOS_BUNDLE_ID must be a final reverse-domain identifier without dev/test markers');
@@ -147,10 +150,22 @@ if (
   );
 }
 if (!plugins.has('expo-location')) {
-  issues.push('expo-location must declare the one-time region permission copy');
+  issues.push('expo-location must declare the region and Partner gym permission copy');
 }
-if (!plugins.has('expo-local-authentication')) {
-  issues.push('expo-local-authentication must declare the device-presence permission copy');
+if (devicePresenceEnabled) {
+  if (!plugins.has('expo-local-authentication')) {
+    issues.push('expo-local-authentication must declare the device-presence permission copy');
+  }
+  if (!hasDependency('expo-local-authentication')) {
+    issues.push('expo-local-authentication is required when device-presence verification is enabled');
+  }
+} else {
+  if (plugins.has('expo-local-authentication')) {
+    issues.push('the pilot release must not declare an unused device-presence permission');
+  }
+  if (hasDependency('expo-local-authentication')) {
+    issues.push('the pilot release must not ship the disabled local-authentication runtime');
+  }
 }
 if (!hasDependency('expo-system-ui')) {
   issues.push('expo-system-ui is required to apply the configured Android dark appearance');
@@ -169,8 +184,6 @@ const expectedCollectedDataTypes = new Set([
   'NSPrivacyCollectedDataTypeEmailAddress',
   'NSPrivacyCollectedDataTypePhoneNumber',
   'NSPrivacyCollectedDataTypePhysicalAddress',
-  'NSPrivacyCollectedDataTypeHealth',
-  'NSPrivacyCollectedDataTypeFitness',
   'NSPrivacyCollectedDataTypeCoarseLocation',
   'NSPrivacyCollectedDataTypePhotosorVideos',
   'NSPrivacyCollectedDataTypeGameplayContent',
@@ -178,6 +191,10 @@ const expectedCollectedDataTypes = new Set([
   'NSPrivacyCollectedDataTypeUserID',
   'NSPrivacyCollectedDataTypeDeviceID'
 ]);
+if (heartRateEnabled) {
+  expectedCollectedDataTypes.add('NSPrivacyCollectedDataTypeHealth');
+  expectedCollectedDataTypes.add('NSPrivacyCollectedDataTypeFitness');
+}
 const configuredCollectedDataTypes = new Set(
   (privacyManifest?.NSPrivacyCollectedDataTypes ?? []).map(
     (entry) => entry.NSPrivacyCollectedDataType
@@ -186,6 +203,16 @@ const configuredCollectedDataTypes = new Set(
 for (const dataType of expectedCollectedDataTypes) {
   if (!configuredCollectedDataTypes.has(dataType)) {
     issues.push(`the iOS privacy manifest is missing ${dataType}`);
+  }
+}
+if (!heartRateEnabled) {
+  for (const dataType of [
+    'NSPrivacyCollectedDataTypeHealth',
+    'NSPrivacyCollectedDataTypeFitness'
+  ]) {
+    if (configuredCollectedDataTypes.has(dataType)) {
+      issues.push(`the pilot privacy manifest must not declare unused ${dataType}`);
+    }
   }
 }
 const requiredReasonCategories = new Set(
@@ -233,11 +260,12 @@ if (androidTargetSdk < 36) {
   issues.push('the Android production build must target API level 36 or newer');
 }
 
-const heartRateProvider = readText('src/config/workoutVerification.ts');
 const partnerGymProvider = readText('src/config/partnerGyms.ts');
 if (
-  heartRateProvider.includes('heartRateTelemetryAvailable = false') &&
-  partnerGymProvider.includes('verifiedPartnerGymCatalogAvailable = false')
+  !['devicePresence', 'heartRate', 'midSessionPresence', 'partnerGymQr'].some(
+    capabilityEnabled
+  ) &&
+  !partnerGymProvider.includes('verifiedPartnerGymCatalogAvailable = true')
 ) {
   issues.push(
     'at least one production workout verification provider must be connected before store release'
@@ -384,4 +412,10 @@ function readText(relativePath) {
 function hasDependency(name) {
   const packageJson = readJson('package.json');
   return Boolean(packageJson.dependencies?.[name]);
+}
+
+function capabilityEnabled(name) {
+  return new RegExp(`^\\s*${name}\\s*:\\s*true\\s*,?\\s*$`, 'm').test(
+    workoutVerificationSource
+  );
 }

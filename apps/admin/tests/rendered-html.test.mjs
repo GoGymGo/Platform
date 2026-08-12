@@ -162,9 +162,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(contestSetupWorkspace, /minimumEntrants: 1/);
   assert.match(
     contestSetupWorkspace,
-    /30 MINUTES \+ 15-MINUTE COMPLETION PERIOD/,
+    /AT LEAST 30 MINUTES/,
   );
-  assert.match(contestSetupWorkspace, /Start checks close 15 minutes/);
+  assert.match(contestSetupWorkspace, /Workouts must start before/);
+  assert.match(contestSetupWorkspace, /IN-PROGRESS WORKOUTS FINISH/);
+  assert.match(contestSetupWorkspace, /region&apos;s timezone/);
+  assert.match(dashboard, /WORKOUTS START/);
   assert.match(dashboard, /15-minute completion/);
   assert.doesNotMatch(contestSetupWorkspace, /name="minimumEntrants"/);
   assert.doesNotMatch(

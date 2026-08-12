@@ -43,7 +43,6 @@ import {
   adminRequest,
   authErrorMessage,
   compactObject,
-  defaultCompetitionDates,
   errorMessage,
   formatDate,
   formatDateTime,
@@ -64,6 +63,14 @@ import {
   chooseSetupCompetition,
   isContestReadyToPublish,
 } from "./contest-launch-flow";
+import {
+  contestWorkoutCutoffs,
+  defaultCompetitionDatesInZone,
+  defaultContestTimeZone,
+  formatContestDateTime,
+  toZonedDateTimeInput,
+  zonedDateTimeToIso,
+} from "./contest-schedule.js";
 import {
   assertGymQrCredentialScope,
   PilotOperationsPanel,
@@ -2399,6 +2406,11 @@ function Overview({
         ) : (
           <div className="contest-home-list">
             {competitions.map((competition) => {
+              const contestTimeZone =
+                snapshot.regions.find(
+                  (region) => region.id === competition.regionPolicyId,
+                )?.timezone ?? defaultContestTimeZone;
+              const workoutCutoffs = contestWorkoutCutoffs(competition.endsAt);
               const assignedGyms = gyms.filter((gym) =>
                 competition.assignedGymIds.includes(gym.id),
               );
@@ -2431,10 +2443,51 @@ function Overview({
                   <div className="contest-home-body">
                     <div className="competition-stats">
                       <div>
-                        <small>PLAYER WINDOW</small>
+                        <small>REGISTRATION</small>
                         <strong>
-                          {formatDate(competition.startsAt)} —{" "}
-                          {formatDate(competition.endsAt)}
+                          {formatContestDateTime(
+                            competition.registrationOpensAt,
+                            contestTimeZone,
+                          )} {" → "}
+                          {formatContestDateTime(
+                            competition.registrationClosesAt,
+                            contestTimeZone,
+                          )}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>CONTEST</small>
+                        <strong>
+                          {formatContestDateTime(
+                            competition.startsAt,
+                            contestTimeZone,
+                          )} {" → "}
+                          {formatContestDateTime(
+                            competition.endsAt,
+                            contestTimeZone,
+                          )}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>WORKOUTS START</small>
+                        <strong>
+                          {workoutCutoffs
+                            ? `BEFORE ${formatContestDateTime(
+                                workoutCutoffs.startBefore,
+                                contestTimeZone,
+                              )}`
+                            : "NOT SET"}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>IN-PROGRESS WORKOUTS FINISH</small>
+                        <strong>
+                          {workoutCutoffs
+                            ? `BEFORE ${formatContestDateTime(
+                                workoutCutoffs.completionDeadline,
+                                contestTimeZone,
+                              )}`
+                            : "NOT SET"}
                         </strong>
                       </div>
                       <div>
@@ -3974,12 +4027,18 @@ function CompetitionForm({
   regions: RegionPolicy[];
   submitting: boolean;
 }) {
-  const dates = defaultCompetitionDates();
   const [formError, setFormError] = useState("");
   const [selectedGymId, setSelectedGymId] = useState(
     gymLocationId ?? gyms?.[0]?.id ?? "",
   );
   const selectedGym = gyms?.find((gym) => gym.id === selectedGymId);
+  const selectedTimeZone =
+    regions.find(
+      (region) =>
+        region.id ===
+        (competition?.regionPolicyId ?? selectedGym?.regionPolicyId),
+    )?.timezone ?? defaultContestTimeZone;
+  const dates = defaultCompetitionDatesInZone(selectedTimeZone);
   const selectableRegions = selectedGym
     ? regions.filter((region) => region.id === selectedGym.regionPolicyId)
     : [];
@@ -3993,13 +4052,41 @@ function CompetitionForm({
     }
     const form = new FormData(event.currentTarget);
     try {
-      const startsAt = new Date(String(form.get("startsAt") ?? ""));
-      const endsAt = new Date(String(form.get("endsAt") ?? ""));
+      const regionPolicyId = String(form.get("regionPolicyId") ?? "");
+      const timeZone =
+        regions.find((region) => region.id === regionPolicyId)?.timezone ??
+        defaultContestTimeZone;
+      const parsedSchedule = {
+        endsAt: zonedDateTimeToIso(String(form.get("endsAt") ?? ""), timeZone),
+        registrationClosesAt: zonedDateTimeToIso(
+          String(form.get("registrationClosesAt") ?? ""),
+          timeZone,
+        ),
+        registrationOpensAt: zonedDateTimeToIso(
+          String(form.get("registrationOpensAt") ?? ""),
+          timeZone,
+        ),
+        startsAt: zonedDateTimeToIso(
+          String(form.get("startsAt") ?? ""),
+          timeZone,
+        ),
+      };
+      const registrationOpensAt = new Date(parsedSchedule.registrationOpensAt);
+      const registrationClosesAt = new Date(
+        parsedSchedule.registrationClosesAt,
+      );
+      const startsAt = new Date(parsedSchedule.startsAt);
+      const endsAt = new Date(parsedSchedule.endsAt);
       if (
-        Number.isNaN(startsAt.getTime()) ||
-        Number.isNaN(endsAt.getTime()) ||
-        endsAt.getTime() - startsAt.getTime() < 30 * 60 * 1_000
+        registrationOpensAt >= registrationClosesAt ||
+        registrationClosesAt > startsAt ||
+        startsAt >= endsAt
       ) {
+        throw new AdminUserFacingError(
+          "Use a valid schedule: registration opens, registration closes, contest starts, then contest ends.",
+        );
+      }
+      if (endsAt.getTime() - startsAt.getTime() < 30 * 60 * 1_000) {
         throw new AdminUserFacingError(
           "Allow at least 30 minutes for the workout. Eligible workouts receive 15 minutes after the contest ends to finish verification.",
         );
@@ -4011,7 +4098,7 @@ function CompetitionForm({
       if (goalDays.length === 0)
         throw new AdminUserFacingError("Add at least one Weekly Goal.");
       const body: Record<string, unknown> = {
-        endsAt: toIso(form, "endsAt"),
+        endsAt: parsedSchedule.endsAt,
         entrantCap: optionalNumber(form.get("entrantCap")),
         goalBrackets: [...new Set(goalDays)].map((goal) => ({
           goalDays: goal,
@@ -4022,12 +4109,12 @@ function CompetitionForm({
         monthKey: String(form.get("monthKey")),
         name: String(form.get("name")),
         reason: String(form.get("reason")),
-        regionPolicyId: String(form.get("regionPolicyId")),
-        registrationClosesAt: toIso(form, "registrationClosesAt"),
-        registrationOpensAt: toIso(form, "registrationOpensAt"),
+        regionPolicyId,
+        registrationClosesAt: parsedSchedule.registrationClosesAt,
+        registrationOpensAt: parsedSchedule.registrationOpensAt,
         rules: competition?.rules ?? defaultCompetitionRules,
         rulesVersion: competition?.rulesVersion ?? "partner-proposal-v1",
-        startsAt: toIso(form, "startsAt"),
+        startsAt: parsedSchedule.startsAt,
         ...(competition ? { expectedVersion: competition.version } : {}),
       };
       await onSubmit(body, competition);
@@ -4114,8 +4201,9 @@ function CompetitionForm({
           </Field>
           <Field label="REGISTRATION OPENS">
             <input
-              defaultValue={toLocalDateTime(
+              defaultValue={toZonedDateTimeInput(
                 competition?.registrationOpensAt ?? dates.registrationOpensAt,
+                selectedTimeZone,
               )}
               name="registrationOpensAt"
               required
@@ -4124,8 +4212,9 @@ function CompetitionForm({
           </Field>
           <Field label="REGISTRATION CLOSES">
             <input
-              defaultValue={toLocalDateTime(
+              defaultValue={toZonedDateTimeInput(
                 competition?.registrationClosesAt ?? dates.startsAt,
+                selectedTimeZone,
               )}
               name="registrationClosesAt"
               required
@@ -4134,8 +4223,9 @@ function CompetitionForm({
           </Field>
           <Field label="CONTEST STARTS">
             <input
-              defaultValue={toLocalDateTime(
+              defaultValue={toZonedDateTimeInput(
                 competition?.startsAt ?? dates.startsAt,
+                selectedTimeZone,
               )}
               name="startsAt"
               required
@@ -4144,8 +4234,9 @@ function CompetitionForm({
           </Field>
           <Field label="CONTEST ENDS">
             <input
-              defaultValue={toLocalDateTime(
+              defaultValue={toZonedDateTimeInput(
                 competition?.endsAt ?? dates.endsAt,
+                selectedTimeZone,
               )}
               name="endsAt"
               required
@@ -4153,7 +4244,7 @@ function CompetitionForm({
             />
             <small className="field-help">
               Workouts require 30 minutes and receive a 15-minute completion
-              period after the contest ends.
+              period after the contest ends. Times use {selectedTimeZone}.
             </small>
           </Field>
           <ReasonField

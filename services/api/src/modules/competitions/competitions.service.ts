@@ -30,7 +30,7 @@ import {
 } from './competition-calendar';
 import {
   availableRegistrationGoalDays,
-  isPublishedCompetitionJoinable,
+  competitionRegistrationAvailability,
 } from './competition-registration';
 import { parseCompetitionRules } from './competition-rules';
 import type {
@@ -164,6 +164,15 @@ export class CompetitionsService {
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.deleted_at', 'is', null)
           .where('competition.ends_at', '>', now)
+          .where((expression) =>
+            expression.or([
+              expression('current_enrollment.id', 'is not', null),
+              expression.and([
+                expression('competition.registration_opens_at', '<=', now),
+                expression('competition.registration_closes_at', '>', now),
+              ]),
+            ]),
+          )
           .orderBy(
             sql<number>`CASE WHEN current_enrollment.id IS NULL THEN 1 ELSE 0 END`,
           )
@@ -344,16 +353,23 @@ export class CompetitionsService {
             message: 'The competition was not found.',
           });
         }
-        if (
-          !isPublishedCompetitionJoinable({
-            endsAt: competition.ends_at,
-            now,
-            status: competition.status,
-          })
-        ) {
+        const registrationAvailability = competitionRegistrationAvailability({
+          endsAt: competition.ends_at,
+          now,
+          registrationClosesAt: competition.registration_closes_at,
+          registrationOpensAt: competition.registration_opens_at,
+          status: competition.status,
+        });
+        if (registrationAvailability !== 'open') {
           throw new ConflictException({
-            code: 'COMPETITION_REGISTRATION_CLOSED',
-            message: 'This competition is no longer available to join.',
+            code:
+              registrationAvailability === 'not_open'
+                ? 'COMPETITION_REGISTRATION_NOT_OPEN'
+                : 'COMPETITION_REGISTRATION_CLOSED',
+            message:
+              registrationAvailability === 'not_open'
+                ? 'Registration for this contest has not opened yet.'
+                : 'Registration for this contest is closed.',
           });
         }
         if (!request.legalReceiptBundleId) {

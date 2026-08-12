@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import type {
   Competition,
   GymLocation,
@@ -11,14 +11,18 @@ import type {
 import {
   AdminUserFacingError,
   compactObject,
-  defaultCompetitionDates,
   errorMessage,
-  optionalIso,
   optionalNumber,
   optionalString,
-  toIso,
-  toLocalDateTime,
 } from "./admin-dashboard-utils";
+import {
+  contestWorkoutCutoffsFromInput,
+  defaultCompetitionDatesInZone,
+  defaultContestTimeZone,
+  formatContestDateTime,
+  toZonedDateTimeInput,
+  zonedDateTimeToIso,
+} from "./contest-schedule.js";
 
 const defaultCompetitionRules = {
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
@@ -36,6 +40,13 @@ const defaultCompetitionRules = {
 };
 
 type SetupSection = "contest" | "region" | "review" | "reward";
+
+type ScheduleInputs = {
+  endsAt: string;
+  registrationClosesAt: string;
+  registrationOpensAt: string;
+  startsAt: string;
+};
 
 export type ContestSetupSubmission = {
   competition?: Competition;
@@ -97,6 +108,29 @@ function couponCodes(value: FormDataEntryValue | null): string[] {
         .filter(Boolean),
     ),
   ];
+}
+
+function optionalZonedIso(
+  value: FormDataEntryValue | null,
+  timeZone: string,
+) {
+  const normalized = optionalString(value);
+  if (!normalized) return undefined;
+  try {
+    return zonedDateTimeToIso(normalized, timeZone);
+  } catch (error) {
+    throw new AdminUserFacingError(
+      error instanceof Error ? error.message : "Enter a valid date and time.",
+    );
+  }
+}
+
+function formattedScheduleInput(value: string, timeZone: string) {
+  try {
+    return formatContestDateTime(zonedDateTimeToIso(value, timeZone), timeZone);
+  } catch {
+    return "Not set";
+  }
 }
 
 function distanceKilometres(
@@ -212,7 +246,6 @@ export function ContestSetupWorkspace({
   rewards,
   submitting,
 }: ContestSetupWorkspaceProps) {
-  const dates = useMemo(() => defaultCompetitionDates(), []);
   const contestRewards = rewards.filter(
     (reward) => reward.competitionId === competition?.id,
   );
@@ -227,6 +260,12 @@ export function ContestSetupWorkspace({
     competition?.regionPolicyId ??
     (enabledRegions.length === 1 ? enabledRegions[0]?.id : undefined) ??
     "";
+  const initialTimeZone =
+    enabledRegions.find((region) => region.id === initialRegionId)?.timezone ??
+    defaultContestTimeZone;
+  const [dates] = useState(() =>
+    defaultCompetitionDatesInZone(initialTimeZone),
+  );
   const initialAssignedGym = gyms.find(
     (gym) =>
       gym.active &&
@@ -244,6 +283,24 @@ export function ContestSetupWorkspace({
   const [rewardTitle, setRewardTitle] = useState(
     publishedReward?.title ?? editableReward?.title ?? "",
   );
+  const [schedule, setSchedule] = useState<ScheduleInputs>(() => ({
+    endsAt: toZonedDateTimeInput(
+      competition?.endsAt ?? dates.endsAt,
+      initialTimeZone,
+    ),
+    registrationClosesAt: toZonedDateTimeInput(
+      competition?.registrationClosesAt ?? dates.startsAt,
+      initialTimeZone,
+    ),
+    registrationOpensAt: toZonedDateTimeInput(
+      competition?.registrationOpensAt ?? dates.registrationOpensAt,
+      initialTimeZone,
+    ),
+    startsAt: toZonedDateTimeInput(
+      competition?.startsAt ?? dates.startsAt,
+      initialTimeZone,
+    ),
+  }));
   const [sectionErrors, setSectionErrors] = useState<
     Partial<Record<SetupSection, string>>
   >({});
@@ -256,10 +313,19 @@ export function ContestSetupWorkspace({
   const selectedRegion = enabledRegions.find(
     (region) => region.id === selectedRegionId,
   );
+  const selectedTimeZone = selectedRegion?.timezone ?? initialTimeZone;
+  const workoutCutoffs = contestWorkoutCutoffsFromInput(
+    schedule.endsAt,
+    selectedTimeZone,
+  );
   const regionGyms = gyms.filter(
     (gym) => gym.active && gym.regionPolicyId === selectedRegionId,
   ).sort((left, right) => left.name.localeCompare(right.name));
   const selectedGym = regionGyms.find((gym) => gym.id === selectedGymId);
+
+  function updateSchedule(field: keyof ScheduleInputs, value: string) {
+    setSchedule((current) => ({ ...current, [field]: value }));
+  }
 
   function useMyLocation() {
     setLocationIssue("");
@@ -320,27 +386,53 @@ export function ContestSetupWorkspace({
     if (goalDays.length === 0) {
       errors.contest = "Add at least one Weekly Goal from 1 to 7 days.";
     }
-    const registrationOpensAt = new Date(
-      String(formData.get("registrationOpensAt")),
-    );
-    const registrationClosesAt = new Date(
-      String(formData.get("registrationClosesAt")),
-    );
-    const startsAt = new Date(String(formData.get("startsAt")));
-    const endsAt = new Date(String(formData.get("endsAt")));
-    if (
-      [registrationOpensAt, registrationClosesAt, startsAt, endsAt].some(
-        (date) => Number.isNaN(date.getTime()),
-      ) ||
-      registrationOpensAt > registrationClosesAt ||
-      registrationClosesAt > startsAt ||
-      startsAt >= endsAt
-    ) {
+    let parsedSchedule: Record<keyof ScheduleInputs, string> | null = null;
+    let registrationOpensAt = new Date(Number.NaN);
+    let endsAt = new Date(Number.NaN);
+    try {
+      parsedSchedule = {
+        endsAt: zonedDateTimeToIso(
+          String(formData.get("endsAt")),
+          selectedTimeZone,
+        ),
+        registrationClosesAt: zonedDateTimeToIso(
+          String(formData.get("registrationClosesAt")),
+          selectedTimeZone,
+        ),
+        registrationOpensAt: zonedDateTimeToIso(
+          String(formData.get("registrationOpensAt")),
+          selectedTimeZone,
+        ),
+        startsAt: zonedDateTimeToIso(
+          String(formData.get("startsAt")),
+          selectedTimeZone,
+        ),
+      };
+      registrationOpensAt = new Date(parsedSchedule.registrationOpensAt);
+      const registrationClosesAt = new Date(
+        parsedSchedule.registrationClosesAt,
+      );
+      const startsAt = new Date(parsedSchedule.startsAt);
+      endsAt = new Date(parsedSchedule.endsAt);
+      if (
+        registrationOpensAt >= registrationClosesAt ||
+        registrationClosesAt > startsAt ||
+        startsAt >= endsAt
+      ) {
+        errors.contest =
+          "Use a valid schedule: registration opens, registration closes, contest starts, then contest ends.";
+      } else if (
+        endsAt.getTime() - startsAt.getTime() <
+        minimumContestDurationMs
+      ) {
+        errors.contest =
+          "Allow at least 30 minutes for the required workout. Players who start in time have 15 minutes after the contest ends to finish verification.";
+      }
+    } catch (error) {
       errors.contest =
-        "Use a valid schedule: registration opens, registration closes, contest starts, then contest ends.";
-    } else if (endsAt.getTime() - startsAt.getTime() < minimumContestDurationMs) {
-      errors.contest =
-        "Allow at least 30 minutes for the required workout. Players who start in time have 15 minutes after the contest ends to finish verification.";
+        error instanceof Error
+          ? error.message
+          : "Enter valid schedule times for the selected region.";
     }
     if (!selectedRegion) {
       errors.region = "Detect or choose an enabled contest region.";
@@ -383,7 +475,7 @@ export function ContestSetupWorkspace({
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
       native.firstInvalid?.focus({ preventScroll: true });
     }
-    return { errors, goalDays };
+    return { errors, goalDays, parsedSchedule };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -392,12 +484,12 @@ export function ContestSetupWorkspace({
     setProgress("");
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const { errors, goalDays } = validate(formElement, form);
-    if (Object.keys(errors).length > 0) return;
+    const { errors, goalDays, parsedSchedule } = validate(formElement, form);
+    if (Object.keys(errors).length > 0 || !parsedSchedule) return;
 
     try {
       const competitionBody = {
-        endsAt: toIso(form, "endsAt"),
+        endsAt: parsedSchedule.endsAt,
         entrantCap: optionalNumber(form.get("entrantCap")),
         goalBrackets: [...new Set(goalDays)].map((goal) => ({
           goalDays: goal,
@@ -410,17 +502,23 @@ export function ContestSetupWorkspace({
           ? "Update and publish the contest through the one-page launch review."
           : "Create and publish the contest through the one-page launch review.",
         regionPolicyId: selectedRegionId,
-        registrationClosesAt: toIso(form, "registrationClosesAt"),
-        registrationOpensAt: toIso(form, "registrationOpensAt"),
+        registrationClosesAt: parsedSchedule.registrationClosesAt,
+        registrationOpensAt: parsedSchedule.registrationOpensAt,
         rules: parseRules(String(form.get("rules"))),
         rulesVersion: String(form.get("rulesVersion")),
-        startsAt: toIso(form, "startsAt"),
+        startsAt: parsedSchedule.startsAt,
       };
       const rewardBody = publishedReward
         ? null
         : compactObject({
-            availableFrom: optionalIso(form.get("availableFrom")),
-            availableUntil: optionalIso(form.get("availableUntil")),
+            availableFrom: optionalZonedIso(
+              form.get("availableFrom"),
+              selectedTimeZone,
+            ),
+            availableUntil: optionalZonedIso(
+              form.get("availableUntil"),
+              selectedTimeZone,
+            ),
             claimUrl: optionalString(form.get("claimUrl")),
             description: String(form.get("description")).trim(),
             displayOrder: Number(form.get("displayOrder") || 0),
@@ -565,49 +663,67 @@ export function ContestSetupWorkspace({
               </SetupField>
               <SetupField label="REGISTRATION OPENS">
                 <input
-                  defaultValue={toLocalDateTime(
-                    competition?.registrationOpensAt ?? dates.registrationOpensAt,
-                  )}
                   name="registrationOpensAt"
+                  onChange={(event) =>
+                    updateSchedule("registrationOpensAt", event.target.value)
+                  }
                   required
                   type="datetime-local"
+                  value={schedule.registrationOpensAt}
                 />
               </SetupField>
               <SetupField label="REGISTRATION CLOSES">
                 <input
-                  defaultValue={toLocalDateTime(
-                    competition?.registrationClosesAt ?? dates.startsAt,
-                  )}
                   name="registrationClosesAt"
+                  onChange={(event) =>
+                    updateSchedule("registrationClosesAt", event.target.value)
+                  }
                   required
                   type="datetime-local"
+                  value={schedule.registrationClosesAt}
                 />
               </SetupField>
               <SetupField label="CONTEST STARTS">
                 <input
-                  defaultValue={toLocalDateTime(
-                    competition?.startsAt ?? dates.startsAt,
-                  )}
                   name="startsAt"
+                  onChange={(event) =>
+                    updateSchedule("startsAt", event.target.value)
+                  }
                   required
                   type="datetime-local"
+                  value={schedule.startsAt}
                 />
               </SetupField>
               <SetupField label="CONTEST ENDS">
                 <input
-                  defaultValue={toLocalDateTime(
-                    competition?.endsAt ?? dates.endsAt,
-                  )}
                   name="endsAt"
+                  onChange={(event) =>
+                    updateSchedule("endsAt", event.target.value)
+                  }
                   required
                   type="datetime-local"
+                  value={schedule.endsAt}
                 />
                 <small className="field-help">
-                  Workouts require 30 minutes. Start checks close 15 minutes
-                  before this time, and eligible workouts may finish during the
-                  15-minute completion period afterward.
+                  {workoutCutoffs ? (
+                    <>
+                      Workouts must start before {formatContestDateTime(
+                        workoutCutoffs.startBefore,
+                        selectedTimeZone,
+                      )} and in-progress workouts must finish before {formatContestDateTime(
+                        workoutCutoffs.completionDeadline,
+                        selectedTimeZone,
+                      )}.
+                    </>
+                  ) : (
+                    "Enter the contest end time to see the workout cutoffs."
+                  )}
                 </small>
               </SetupField>
+              <p className="setup-time-zone-note">
+                Schedule times use <strong>{selectedTimeZone}</strong>, the selected
+                region&apos;s timezone.
+              </p>
               <SetupField label="ENTRANT CAP (OPTIONAL)">
                 <input
                   defaultValue={competition?.entrantCap ?? ""}
@@ -806,7 +922,10 @@ export function ContestSetupWorkspace({
                       <input
                         defaultValue={
                           editableReward?.availableFrom
-                            ? toLocalDateTime(editableReward.availableFrom)
+                            ? toZonedDateTimeInput(
+                                editableReward.availableFrom,
+                                selectedTimeZone,
+                              )
                             : ""
                         }
                         name="availableFrom"
@@ -817,7 +936,10 @@ export function ContestSetupWorkspace({
                       <input
                         defaultValue={
                           editableReward?.availableUntil
-                            ? toLocalDateTime(editableReward.availableUntil)
+                            ? toZonedDateTimeInput(
+                                editableReward.availableUntil,
+                                selectedTimeZone,
+                              )
                             : ""
                         }
                         name="availableUntil"
@@ -986,8 +1108,51 @@ export function ContestSetupWorkspace({
                 <strong>{selectedGym?.name || "Not selected"}</strong>
               </div>
               <div>
-                <small>WORKOUT TIMING</small>
-                <strong>30 MINUTES + 15-MINUTE COMPLETION PERIOD</strong>
+                <small>REGISTRATION</small>
+                <strong>
+                  {formattedScheduleInput(
+                    schedule.registrationOpensAt,
+                    selectedTimeZone,
+                  )} {" → "}
+                  {formattedScheduleInput(
+                    schedule.registrationClosesAt,
+                    selectedTimeZone,
+                  )}
+                </strong>
+              </div>
+              <div>
+                <small>CONTEST</small>
+                <strong>
+                  {formattedScheduleInput(schedule.startsAt, selectedTimeZone)}
+                  {" → "}
+                  {formattedScheduleInput(schedule.endsAt, selectedTimeZone)}
+                </strong>
+              </div>
+              <div>
+                <small>WORKOUTS START</small>
+                <strong>
+                  {workoutCutoffs
+                    ? `BEFORE ${formatContestDateTime(
+                        workoutCutoffs.startBefore,
+                        selectedTimeZone,
+                      )}`
+                    : "NOT SET"}
+                </strong>
+              </div>
+              <div>
+                <small>IN-PROGRESS WORKOUTS FINISH</small>
+                <strong>
+                  {workoutCutoffs
+                    ? `BEFORE ${formatContestDateTime(
+                        workoutCutoffs.completionDeadline,
+                        selectedTimeZone,
+                      )}`
+                    : "NOT SET"}
+                </strong>
+              </div>
+              <div>
+                <small>WORKOUT REQUIREMENT</small>
+                <strong>AT LEAST 30 MINUTES</strong>
               </div>
             </div>
             {flowError ? (

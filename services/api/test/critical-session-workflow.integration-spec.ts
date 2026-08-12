@@ -325,6 +325,90 @@ describeWithDatabase('critical session and ledger workflow', () => {
     expect(cancelledSession.rows[0].status).toBe('cancelled');
   });
 
+  it('enforces registration open and close times for QR resolution and enrollment', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const now = Date.now();
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET registration_opens_at = $1,
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(now + 30 * 60_000),
+        new Date(now + 60 * 60_000),
+        new Date(now + 90 * 60_000),
+        new Date(now + 120 * 60_000),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'registration-window-not-open',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          gymPresence: fixture.gymPresence,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_REGISTRATION_NOT_OPEN' },
+    });
+
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET registration_opens_at = $1,
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(now - 60 * 60_000),
+        new Date(now - 30 * 60_000),
+        new Date(now + 30 * 60_000),
+        new Date(now + 60 * 60_000),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'registration-window-closed',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          gymPresence: fixture.gymPresence,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_REGISTRATION_CLOSED' },
+    });
+  });
+
   it('accepts evidence once and awards the verified day exactly once', async () => {
     const fixture = await seedRegistrationCompetition();
     await expect(

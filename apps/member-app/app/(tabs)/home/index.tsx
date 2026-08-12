@@ -326,11 +326,11 @@ export default function HomeScreen() {
     (mobileGymVerificationAvailable && registrationChecking) ||
     (mobileGymVerificationAvailable && !verificationPreferenceReady)
   ) {
-    return <ScreenLoadingState body="Checking your profile and contest registration." />;
+    return <ScreenLoadingState body="Checking your Contest." />;
   }
 
   if (resumeRequested && resumeLoading) {
-    return <ScreenLoadingState body="Finding the next unfinished task." />;
+    return <ScreenLoadingState body="Finding your next step." />;
   }
 
   return (
@@ -386,7 +386,7 @@ export default function HomeScreen() {
 
         {resumeRequested && resumeError ? (
           <RecoverableError
-            body="GoGymGo could not finish checking your contest registration. Retry the check, or continue to Home without losing any data."
+            body="We couldn&apos;t check your Contest. Try again or continue to Home."
             continueLabel="Continue to Home"
             onContinue={() => {
               resumeHandledRef.current = true;
@@ -441,20 +441,20 @@ export default function HomeScreen() {
                 {effectiveSetupRequired
                   ? setupMessage
                   : desktopSetupChecking
-                    ? 'Your account is ready. GoGymGo is loading the latest contest status.'
+                    ? 'Loading your Contest.'
                   : desktopSetupError
-                    ? 'GoGymGo could not refresh the contest status. You can still use Home, Calendar, Compete, Awards and your profile.'
+                    ? 'Contest status could not refresh. Other screens are still available.'
                   : desktopSetupPending
-                    ? 'Your account is ready. Contest registration and Verified workouts are completed on a phone or tablet.'
+                    ? 'Finish Contest setup on your phone or tablet.'
                   : !mobileGymVerificationAvailable
-                    ? 'Your contest status, Weekly Goal and Prize Draw Entries stay synced here. Verified workouts are completed on a phone or tablet.'
+                    ? 'Track your Weekly Goal and entries here. Verify workouts on your phone.'
                   : isBonusDayPhase
                   ? `Verify one workout on each remaining day to add ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} per day.`
                   : competitionNotStarted
                     ? 'Use a fresh gym location check when you start and finish each workout.'
                     : remainingSessions > 0
-                      ? `Complete ${remainingSessions} more Verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's Weekly Goal. Only one workout per calendar day counts.`
-                      : 'Weekly Goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
+                      ? `Complete ${remainingSessions} more workout ${remainingSessions === 1 ? 'day' : 'days'} this week. One per day counts.`
+                      : 'Weekly Goal hit. Check your Weekly Challenge bonus.'}
               </TerminalText>
               {showGoalProgress && competitionNotStarted ? (
                 <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
@@ -619,7 +619,7 @@ export default function HomeScreen() {
                   AWARD READY // {unclaimedReward.title}
                 </TerminalText>
                 <TerminalText tone="text" uppercase={false} variant="body">
-                  Claim it in My Awards. No payment setup is required.
+                  Open My Awards to claim it.
                 </TerminalText>
               </View>
               <TerminalText glow tone="pink" variant="button">
@@ -655,7 +655,7 @@ export default function HomeScreen() {
                     How the Contest works
                   </TerminalText>
                   <TerminalText tone="muted" uppercase={false} variant="caption">
-                    Weekly Goal, Verified workouts, Prize Draw Entries, rankings and Rewards.
+                    Goals, workouts, entries, rankings and Rewards.
                   </TerminalText>
                 </View>
                 <TerminalText tone="cyan" variant="button">
@@ -754,9 +754,9 @@ export default function HomeScreen() {
             <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
               {prizeDrawEligible
                 ? competitionNotStarted
-                  ? 'Your free Prize Draw Entry is secured now. Verified workouts begin earning Contest credit when scoring opens.'
-                  : `Your free Prize Draw Entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
-                : 'Your free Prize Draw Entry is secured and will carry into the next eligible regional draw.'}
+                  ? 'Your free Prize Draw entry is secured. Workouts count when scoring opens.'
+                  : `Your free entry is secured. Bonus Days add ${weeklyGoal} ${weeklyGoal === 1 ? 'entry' : 'entries'}; a Perfect Month earns 10x.`
+                : 'Your free entry will carry into the next eligible regional draw.'}
             </TerminalText>
 
             {featuredCreatorWorkout ? <Pressable

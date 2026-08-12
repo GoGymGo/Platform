@@ -92,6 +92,33 @@ describeWithDatabase('connected static QR pilot', () => {
     await expect(scanEventCount()).resolves.toBe(1);
   });
 
+  it('starts from the enrolled gym with fresh location and no QR credential', async () => {
+    await database.connection
+      .updateTable('gym_qr_credentials')
+      .set({
+        revocation_reason:
+          'The enrollment must not depend on a retained QR secret.',
+        revoked_at: new Date(),
+        revoked_by_user_id: userId,
+        status: 'revoked',
+      })
+      .where('gym_location_id', '=', gymId)
+      .execute();
+
+    const result = await gyms.scan(principal, 'enrolled-location-key', {
+      accuracyMeters: 10,
+      competitionId,
+      eventId: '10000000-0000-4000-8000-000000000091',
+      latitude: gymLatitude,
+      longitude: gymLongitude,
+    });
+
+    expect(result).toMatchObject({
+      gymLocationId: gymId,
+      outcome: 'started',
+    });
+  });
+
   it('serializes concurrent scans into one start and one early result', async () => {
     const results = await Promise.all([
       gyms.scan(principal, 'concurrent-a', scanRequest('concurrent-event-a')),
@@ -522,6 +549,8 @@ describeWithDatabase('connected static QR pilot', () => {
         competition_id: secondCompetition.id,
         enrolled_at: new Date(),
         goal_days: 3,
+        gym_credential_version: 2,
+        gym_location_id: gymId,
         region_verification_id: regionVerificationId,
         rules_acceptance_id: acceptance.id,
         status: 'active',
@@ -763,6 +792,14 @@ describeWithDatabase('connected static QR pilot', () => {
        RETURNING id`,
       [region.id, gymLongitude, gymLatitude],
     );
+    await database.connection
+      .updateTable('competition_enrollments')
+      .set({
+        gym_credential_version: 1,
+        gym_location_id: gym.rows[0].id,
+      })
+      .where('id', '=', enrollment.id)
+      .executeTakeFirstOrThrow();
     await database.connection
       .insertInto('gym_qr_credentials')
       .values({

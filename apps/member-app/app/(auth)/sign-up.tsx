@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
@@ -31,10 +31,12 @@ import {
   isGymScanContinuation
 } from '@/navigation/gymScanFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
+import { useAppTour } from '@/state/appTour';
 import { useAppData } from '@/data/appDataHooks';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
   const mobileGymVerificationAvailable =
     Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { challengeInvite, next } = useLocalSearchParams<{
@@ -81,6 +83,10 @@ export default function SignUpScreen() {
     password.length > 0 &&
     confirmPassword.length > 0;
 
+  if (!appTourActive && !challengeInvite && !gymScanContinuation) {
+    return <Redirect href="/join" />;
+  }
+
   async function submitEmailAccount() {
     const nextErrors = validateSignUpForm(email, password, confirmPassword);
     setErrors(nextErrors);
@@ -115,8 +121,8 @@ export default function SignUpScreen() {
   return (
     <AuthScreenShell
       description={gymScanContinuation
-        ? 'Your Partner gym selection is saved. Create your account, finish setup, and GoGymGo will return you to Start Workout.'
-        : 'Create one secure account for your Weekly Goal, Verified workouts and brand Rewards.'}
+        ? 'Create your account to continue with this gym.'
+        : 'Create your player account.'}
       eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'ACCOUNT SETUP'}
       onBack={() => router.replace(
         gymScanContinuation
@@ -200,7 +206,7 @@ export default function SignUpScreen() {
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
             {!emailAccountReady ? (
               <TerminalText style={styles.editorialCaption} tone="dim" uppercase={false} variant="caption">
-                Complete your email and both password fields to continue.
+                Complete all three fields.
               </TerminalText>
             ) : null}
             <FirstRunPrimaryButton
@@ -215,8 +221,7 @@ export default function SignUpScreen() {
                 uppercase={false}
                 variant="caption"
               >
-                Privacy and Terms are available now. You will review and accept
-                the current versions during onboarding.
+                Review Privacy and Terms. You&apos;ll accept them during setup.
               </TerminalText>
               <LegalDocumentLinks compact />
             </View>

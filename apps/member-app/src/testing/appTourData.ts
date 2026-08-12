@@ -368,7 +368,20 @@ AccountReadinessRepository {
       createCurrentCompetition(
         appTourCompetitionMonthKey,
         'VANCOUVER ISLAND + GULF ISLANDS'
-      )
+      ),
+    withdrawFromCompetition: async (competitionId) => {
+      const withdrawn = {
+        ...(enrollment ?? {
+          competitionId,
+          enrolledAt: nowIso(),
+          goalDays: 3,
+          id: appTourEnrollmentId
+        }),
+        status: 'withdrawn' as const
+      };
+      enrollment = null;
+      return withdrawn;
+    }
   };
 }
 

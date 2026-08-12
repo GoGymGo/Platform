@@ -169,6 +169,14 @@ export async function rememberGymScanResult(
   return nextPending;
 }
 
+export async function clearPendingGymScan(
+  dependencies: PendingGymScanDependencies = {}
+) {
+  const storage = dependencies.storage ?? AsyncStorage;
+  await storage.removeItem(pendingGymScanStorageKey);
+  notifyPendingGymScan(null);
+}
+
 function notifyPendingGymScan(pending: PendingGymScan | null) {
   for (const listener of pendingGymScanListeners) {
     listener(pending);

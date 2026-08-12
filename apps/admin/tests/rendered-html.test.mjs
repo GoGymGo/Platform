@@ -286,6 +286,20 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);
   assert.match(contestLaunchFlow, /competition\.assignedGymIds \?\? \[\]/);
   assert.match(contestLaunchFlow, /competition\.status !== "draft"/);
+  assert.match(
+    contestLaunchFlow,
+    /\["draft", "registration", "active"\]\.includes\(status\)/,
+  );
+  assert.match(
+    contestLaunchFlow,
+    /\["draft", "cancelled", "settled"\]\.includes\(status\)/,
+  );
+  assert.match(dashboard, /canCancelContest\(competition\.status\)/);
+  assert.match(
+    dashboard,
+    /canDeleteContestFromDashboard\(competition\.status\)/,
+  );
+  assert.match(dashboard, /Active workouts, rankings, and prize eligibility will close/);
   assert.doesNotMatch(contestLaunchFlow, /completedSteps|blockedReason/);
   assert.match(
     contestSetupWorkspace,

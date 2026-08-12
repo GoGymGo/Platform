@@ -133,7 +133,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await migrated?.stop();
   });
 
-  it('rejects a different contest poster when two contests share one gym', async () => {
+  it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {
     const fixture = await seedRegistrationCompetition();
     const source = await database.connection
       .selectFrom('competitions as competition')
@@ -144,29 +144,28 @@ describeWithDatabase('critical session and ledger workflow', () => {
       )
       .select([
         'assignment.gym_location_id',
-        'competition.ends_at',
         'competition.region_policy_id',
-        'competition.registration_closes_at',
         'competition.registration_opens_at',
         'competition.rules',
         'competition.rules_version',
-        'competition.starts_at',
       ])
       .where('competition.id', '=', fixture.competitionId)
       .executeTakeFirstOrThrow();
+    const laterContestStartsAt = new Date(Date.now() + 21 * 24 * 60 * 60_000);
+    const laterContestEndsAt = new Date(Date.now() + 28 * 24 * 60 * 60_000);
     const otherCompetition = await database.connection
       .insertInto('competitions')
       .values({
-        ends_at: source.ends_at,
+        ends_at: laterContestEndsAt,
         minimum_entrants: 1,
         month_key: '2030-02',
-        name: 'Different Contest At Same Gym',
+        name: 'Later Contest At Same Gym',
         region_policy_id: source.region_policy_id,
-        registration_closes_at: source.registration_closes_at,
+        registration_closes_at: new Date(Date.now() + 20 * 24 * 60 * 60_000),
         registration_opens_at: source.registration_opens_at,
         rules: source.rules,
         rules_version: source.rules_version,
-        starts_at: source.starts_at,
+        starts_at: laterContestStartsAt,
         status: 'registration',
       })
       .returning('id')
@@ -214,7 +213,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       competitions.resolveGymQrCompetition(userPrincipal, otherCredential),
     ).resolves.toMatchObject({
       id: otherCompetition.id,
-      name: 'Different Contest At Same Gym',
+      name: 'Later Contest At Same Gym',
     });
     await expect(
       competitions.resolveGymQrCompetition(
@@ -222,26 +221,6 @@ describeWithDatabase('critical session and ledger workflow', () => {
         fixture.gymPresence.credential,
       ),
     ).resolves.toMatchObject({ id: fixture.competitionId });
-    await competitions.enroll(
-      userPrincipal,
-      fixture.competitionId,
-      'existing-first-contest-enrollment',
-      {
-        ageEligibilityAttested: true,
-        goalDays: 3,
-        gymPresence: fixture.gymPresence,
-        legalReceiptBundleId: fixture.legalReceiptBundleId,
-        regionVerificationId: fixture.regionVerificationId,
-        rulesAccepted: true,
-      },
-    );
-    await expect(
-      competitions.getCurrentEnrollment(userPrincipal, otherCompetition.id),
-    ).resolves.toBeNull();
-    await expect(
-      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
-    ).resolves.toMatchObject({ competitionId: fixture.competitionId });
-
     await expect(
       competitions.enroll(
         userPrincipal,
@@ -259,6 +238,91 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toMatchObject({
       response: { code: 'GYM_QR_INVALID' },
     });
+
+    await competitions.enroll(
+      userPrincipal,
+      otherCompetition.id,
+      'existing-later-contest-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: {
+          ...fixture.gymPresence,
+          credential: otherCredential,
+        },
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await expect(competitions.getCurrent(userPrincipal)).resolves.toMatchObject(
+      {
+        id: otherCompetition.id,
+      },
+    );
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toMatchObject({ id: fixture.competitionId });
+
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'scanned-earlier-contest-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await expect(
+      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+    ).resolves.toMatchObject({ competitionId: fixture.competitionId });
+
+    const activeEnrollment = await migrated.pool.query<{
+      id: string;
+      user_id: string;
+    }>(
+      `SELECT id, user_id
+       FROM competition_enrollments
+       WHERE competition_id = $1 AND status = 'active'`,
+      [fixture.competitionId],
+    );
+    const activeSession = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at)
+       VALUES ($1, $2, $3, CURRENT_DATE, 'active', 'rules-v1', CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [
+        fixture.competitionId,
+        activeEnrollment.rows[0].id,
+        activeEnrollment.rows[0].user_id,
+      ],
+    );
+    await expect(
+      competitions.withdrawEnrollment(
+        userPrincipal,
+        fixture.competitionId,
+        'withdraw-scanned-earlier-contest',
+      ),
+    ).resolves.toMatchObject({
+      competitionId: fixture.competitionId,
+      status: 'withdrawn',
+    });
+    await expect(
+      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+    ).resolves.toBeNull();
+    const cancelledSession = await migrated.pool.query<{ status: string }>(
+      `SELECT status FROM workout_sessions WHERE id = $1`,
+      [activeSession.rows[0].id],
+    );
+    expect(cancelledSession.rows[0].status).toBe('cancelled');
   });
 
   it('accepts evidence once and awards the verified day exactly once', async () => {

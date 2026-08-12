@@ -3,6 +3,10 @@ import type {
   RewardCatalogStatus,
 } from '../../database/database.types';
 
+export function canCancelCompetition(status: CompetitionStatus): boolean {
+  return status === 'draft' || status === 'registration' || status === 'active';
+}
+
 export function canDeleteCompetition(status: CompetitionStatus): boolean {
   return status === 'draft' || status === 'cancelled' || status === 'settled';
 }

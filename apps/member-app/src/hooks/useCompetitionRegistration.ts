@@ -12,6 +12,7 @@ import { appTourCompetitionRegistrationEvidence } from '@/testing/appTourData';
 
 export function useCompetitionRegistration({
   defaultMonthKey,
+  enabled = true,
   gymQrCredential = null,
   gymQrScanKey = null,
   jurisdictionCode,
@@ -19,6 +20,7 @@ export function useCompetitionRegistration({
   regionVerification
 }: {
   defaultMonthKey: string;
+  enabled?: boolean;
   gymQrCredential?: string | null;
   gymQrScanKey?: number | null;
   jurisdictionCode: string;
@@ -31,10 +33,15 @@ export function useCompetitionRegistration({
     null,
     regionCode,
     gymQrCredential,
-    gymQrScanKey
+    gymQrScanKey,
+    enabled
   );
   const competition = publishedCompetition.data ?? null;
-  const currentEnrollment = useCurrentEnrollment(competition?.id ?? null, Boolean(gymQrCredential));
+  const currentEnrollment = useCurrentEnrollment(
+    competition?.id ?? null,
+    Boolean(gymQrCredential),
+    enabled
+  );
   const enrollInCompetition = useEnrollInCompetition();
   const competitionMonthKey = competition?.monthKey ?? defaultMonthKey;
 

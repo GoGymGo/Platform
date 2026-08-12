@@ -16,6 +16,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class GymScanRequestDto {
@@ -23,16 +24,33 @@ export class GymScanRequestDto {
   @IsUUID()
   eventId!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
-      'Gym credential saved during enrollment and reused automatically; it is not proof of a fresh QR capture.',
+      'Initial Partner gym QR credential. Required only while selecting the gym for enrollment.',
     minLength: 32,
     maxLength: 256,
     type: String,
   })
+  @ValidateIf(
+    (request: GymScanRequestDto) =>
+      request.credential !== undefined || !request.competitionId,
+  )
   @IsString()
   @Length(32, 256)
-  credential!: string;
+  credential?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Enrolled competition used to resolve the account-selected Partner gym for a fresh location-only workout check.',
+    format: 'uuid',
+    type: String,
+  })
+  @ValidateIf(
+    (request: GymScanRequestDto) =>
+      request.competitionId !== undefined || !request.credential,
+  )
+  @IsUUID()
+  competitionId?: string;
 
   @ApiProperty({ type: Number })
   @Type(() => Number)

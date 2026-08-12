@@ -61,10 +61,10 @@ export default function WelcomeScreen() {
 
             <View style={styles.heroCopy}>
               <TerminalText style={styles.valueProp} tone="text" variant="title">
-                Complete Verified workouts,
+                VERIFY WORKOUTS.
               </TerminalText>
               <TerminalText style={styles.valueBody} tone="muted" uppercase={false} variant="body">
-                compete in your region and earn chances to win brand rewards.
+                Earn chances to win in your region.
               </TerminalText>
             </View>
 
@@ -95,8 +95,7 @@ export default function WelcomeScreen() {
                 FREE ENTRY
               </TerminalText>
               <TerminalText style={styles.entryCopy} tone="muted" uppercase={false} variant="body">
-                Create your player account and receive one entry into the monthly
-                regional Prize Draw.
+                Create an account to receive one monthly Prize Draw entry.
               </TerminalText>
               <TerminalText style={styles.drawLabel} tone="pink" variant="label">
                 SPONSOR-FUNDED PRIZES + COUPON CODES

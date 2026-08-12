@@ -85,7 +85,7 @@ export interface components {
     GymLocationResponseDto: { active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
     GymQrCredentialResponseDto: { competitionId: string; competitionName: string; credentialVersion: number; gymLocationId: string; id: string; issuedAt: string; printablePosterSvg: string; qrPayload: string };
     GymQrReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniquePayloadCount: number };
-    GymScanRequestDto: { accuracyMeters: number; credential: string; eventId: string; latitude: number; longitude: number };
+    GymScanRequestDto: { accuracyMeters: number; competitionId?: string; credential?: string; eventId: string; latitude: number; longitude: number };
     GymScanResultDto: { credentialVersion?: number | null; expiresAt?: string | null; gymLocationId?: string | null; gymName?: string | null; minimumCompleteAt?: string | null; outcome: "started" | "too_early" | "verified" | "rejected"; rejectionReason?: string | null; remainingSeconds: number; serverTimestamp: string; sessionId?: string | null; startedAt?: string | null };
     HealthResponseDto: { service: string; status: "ok"; timestamp: string; uptimeSeconds: number };
     HeartRateReviewDto: { averageBpm: number | null; count: number; maximumBpm: number | null; minimumBpm: number | null; minimumRequiredCount: number; required: boolean; trustStates: Array<string> };
@@ -1166,6 +1166,14 @@ export interface operations {
       "200": components['schemas']["AdminLegalDocumentResponseDto"];
     };
   };
+  withdrawEnrollment: {
+    method: "POST";
+    path: "/v1/competitions/{competitionId}/enrollment/withdrawal";
+    parameters: { header: { "Idempotency-Key": string }; path: { competitionId: string } };
+    responses: {
+      "200": components['schemas']["EnrollmentResponseDto"];
+    };
+  };
 }
 
 export interface paths {
@@ -1180,6 +1188,9 @@ export interface paths {
   };
   "/v1/competitions/weekly-challenges/requests/{requestId}": {
     patch: operations["respondToWeeklyChallengeRequest"];
+  };
+  "/v1/competitions/{competitionId}/enrollment/withdrawal": {
+    post: operations["withdrawEnrollment"];
   };
   "/v1/competitions/{competitionId}/enrollments": {
     post: operations["enroll"];

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canCancelContest,
+  canDeleteContestFromDashboard,
   chooseSetupCompetition,
   isContestReadyToPublish,
 } from "../app/contest-launch-flow.js";
@@ -114,4 +116,20 @@ test("keeps published contests out of the new-contest setup wizard", () => {
     null,
   );
   assert.equal(chooseSetupCompetition([competition("two")], "new"), null);
+});
+
+test("keeps contest cancellation and dashboard deletion controls available", () => {
+  for (const status of ["draft", "registration", "active"]) {
+    assert.equal(canCancelContest(status), true);
+  }
+  for (const status of ["cancelled", "settling", "settled"]) {
+    assert.equal(canCancelContest(status), false);
+  }
+
+  for (const status of ["draft", "cancelled", "settled"]) {
+    assert.equal(canDeleteContestFromDashboard(status), true);
+  }
+  for (const status of ["registration", "active", "settling"]) {
+    assert.equal(canDeleteContestFromDashboard(status), false);
+  }
 });

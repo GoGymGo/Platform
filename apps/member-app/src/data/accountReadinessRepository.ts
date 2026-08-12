@@ -42,6 +42,9 @@ export type AccountReadinessRepository = {
   resolveCompetitionByGymQr: (
     credential: string
   ) => Promise<CurrentCompetition | null>;
+  withdrawFromCompetition: (
+    competitionId: string
+  ) => Promise<CompetitionEnrollment>;
 };
 
 export function createAccountReadinessRepository(
@@ -140,7 +143,14 @@ function createApiRepository(api: ApiClient): AccountReadinessRepository {
     >('/v1/competitions/resolve-gym-qr', {
       body: { credential },
       method: 'POST'
-    })
+    }),
+    withdrawFromCompetition: (competitionId) => api.request<CompetitionEnrollment>(
+      `/v1/competitions/${encodeURIComponent(competitionId)}/enrollment/withdrawal`,
+      {
+        idempotencyKey: createIdempotencyKey('competition-enrollment-withdrawal'),
+        method: 'POST'
+      }
+    )
   };
 }
 
@@ -157,7 +167,8 @@ function createUnavailableRepository(): AccountReadinessRepository {
     getCurrentLegalDocuments: async () => emptyLegalBundle,
     getLegalReceiptStatus: async () => emptyLegalReceipt,
     recordLegalReceipt: unavailable,
-    resolveCompetitionByGymQr: async () => null
+    resolveCompetitionByGymQr: async () => null,
+    withdrawFromCompetition: unavailable
   };
 }
 

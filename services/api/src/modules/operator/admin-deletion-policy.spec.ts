@@ -1,4 +1,5 @@
 import {
+  canCancelCompetition,
   canDeleteCompetition,
   canDeleteCreatorWorkout,
   canDeleteGym,
@@ -9,6 +10,15 @@ import {
 } from './admin-deletion-policy';
 
 describe('admin deletion policy', () => {
+  it('allows an operator to cancel a draft, open, or active contest', () => {
+    expect(canCancelCompetition('draft')).toBe(true);
+    expect(canCancelCompetition('registration')).toBe(true);
+    expect(canCancelCompetition('active')).toBe(true);
+    expect(canCancelCompetition('settling')).toBe(false);
+    expect(canCancelCompetition('settled')).toBe(false);
+    expect(canCancelCompetition('cancelled')).toBe(false);
+  });
+
   it('allows only terminal or disposable contest and reward records', () => {
     expect(canDeleteCompetition('draft')).toBe(true);
     expect(canDeleteCompetition('cancelled')).toBe(true);

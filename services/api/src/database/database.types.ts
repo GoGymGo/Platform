@@ -390,6 +390,8 @@ export interface CompetitionEnrollmentsTable {
   competition_id: string;
   user_id: string;
   goal_days: number;
+  gym_location_id: string | null;
+  gym_credential_version: number | null;
   region_verification_id: string;
   rules_acceptance_id: string;
   status: EnrollmentStatus;

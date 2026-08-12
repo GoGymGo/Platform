@@ -109,7 +109,7 @@ export default function LeaderboardScreen() {
               onPress={() => router.push('/how-it-works?from=leaderboard')}
             />
           )}
-          description="Track your standing, Prize Draw Entries and Weekly Challenge."
+          description="Track your rank, entries and Weekly Challenge."
           eyebrow={`${competitionRegion.label} // MONTHLY CONTEST`}
           title="REGIONAL CONTEST"
         />
@@ -158,7 +158,7 @@ export default function LeaderboardScreen() {
           <TerminalText live="polite" tone="dim" uppercase={false} variant="caption">
             {competitionNotStarted
               ? 'Rankings begin after the first scoring week.'
-              : `Goal Score ${categoryScore} sets your rank after each completed week. Prize Draw Entries set your winning odds.`}
+              : `Goal Score ${categoryScore} sets your rank. Entries set your Prize Draw odds.`}
           </TerminalText>
           <CompactTextButton
             label={showRankingRules ? 'Hide ranking details' : 'How ranking works'}
@@ -238,7 +238,7 @@ export default function LeaderboardScreen() {
                 TOP 10{' // '}{displayedGoal}-DAY GOAL
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                Top three finishers receive 3x, 2x and 1.5x Prize Draw Entry boosts.
+                Top three earn 3x, 2x and 1.5x entry boosts.
               </TerminalText>
             </View>
             <TerminalText tone="dim" variant="micro">

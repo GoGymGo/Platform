@@ -1260,6 +1260,40 @@
         "tags": ["competitions"]
       }
     },
+    "/v1/competitions/{competitionId}/enrollment/withdrawal": {
+      "post": {
+        "operationId": "withdrawEnrollment",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Withdraw the authenticated user from a contest",
+        "tags": ["competitions"]
+      }
+    },
     "/v1/competitions/{monthKey}/enrollment-count": {
       "get": {
         "operationId": "getEnrollmentCount",
@@ -6430,9 +6464,14 @@
           "eventId": { "type": "string", "format": "uuid" },
           "credential": {
             "type": "string",
-            "description": "Gym credential saved during enrollment and reused automatically; it is not proof of a fresh QR capture.",
+            "description": "Initial Partner gym QR credential. Required only while selecting the gym for enrollment.",
             "minLength": 32,
             "maxLength": 256
+          },
+          "competitionId": {
+            "type": "string",
+            "description": "Enrolled competition used to resolve the account-selected Partner gym for a fresh location-only workout check.",
+            "format": "uuid"
           },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
@@ -6442,13 +6481,7 @@
             "minimum": 0.1
           }
         },
-        "required": [
-          "eventId",
-          "credential",
-          "latitude",
-          "longitude",
-          "accuracyMeters"
-        ]
+        "required": ["eventId", "latitude", "longitude", "accuracyMeters"]
       },
       "GymScanResultDto": {
         "type": "object",

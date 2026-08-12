@@ -1,6 +1,6 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -14,6 +14,7 @@ import {
 } from '@/components/firstRun';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAppData } from '@/data/appDataHooks';
 import { useAuth } from '@/state/auth';
@@ -43,6 +44,8 @@ export default function JoinScreen() {
   const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
   const { social } = useAppData();
   const { user } = useAuth();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [redeemingInvite, setRedeemingInvite] = useState(false);
   const [showPartnerOptions, setShowPartnerOptions] = useState(false);
@@ -66,8 +69,7 @@ export default function JoinScreen() {
             HOW DO YOU WANT TO JOIN?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Players can create an account or sign in below. Sponsors and
-            Partner gym teams can use their dedicated application forms.
+            Players join below. Sponsors and gyms use the Partner options.
           </TerminalText>
         </View>
 
@@ -77,8 +79,7 @@ export default function JoinScreen() {
               FRIEND CHALLENGE INVITATION
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              You were invited to a private GoGymGo challenge. Sign in or create an
-              account, then accept the invitation.
+              Sign in or create an account to accept this challenge.
             </TerminalText>
             {user ? (
               <FirstRunPrimaryButton
@@ -108,11 +109,23 @@ export default function JoinScreen() {
             FOR PLAYERS
           </TerminalText>
           <FirstRunPrimaryButton
-            label="CREATE PLAYER ACCOUNT ->"
-            onPress={() => router.push(challengeInvite
-              ? { pathname: '/sign-up', params: { challengeInvite } }
-              : '/sign-up')}
+            disabled={!challengeInvite && !mobileGymVerificationAvailable}
+            label={challengeInvite ? 'CREATE PLAYER ACCOUNT ->' : 'SCAN GYM QR + CREATE ACCOUNT ->'}
+            onPress={() => router.push(
+              challengeInvite
+                ? { pathname: '/sign-up', params: { challengeInvite } }
+                : { pathname: '/qr-scanner', params: { enrollment: '1', next: 'sign-up' } }
+            )}
           />
+          {!challengeInvite && mobileGymVerificationAvailable ? (
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              Scan the gym poster. We&apos;ll match your Contest, then verify your region.
+            </TerminalText>
+          ) : !challengeInvite ? (
+            <TerminalText tone="amber" uppercase={false} variant="caption">
+              Open GoGymGo on your phone and scan the gym poster.
+            </TerminalText>
+          ) : null}
           <FirstRunSecondaryButton
             label="SIGN IN TO EXISTING ACCOUNT"
             onPress={() => router.push(challengeInvite

@@ -21,6 +21,24 @@ const rules: JsonValue = {
 };
 
 describe('AdminCompetitionConfigurationService publication', () => {
+  it('allows active competitions to be cancelled by an operator', () => {
+    const service = new AdminCompetitionConfigurationService(
+      {} as AdminAuthorizationService,
+      {} as IdempotencyService,
+      {} as NotificationsService,
+    );
+    const cancellable = service as unknown as {
+      assertCancellable(status: string): 'cancelled';
+    };
+
+    expect(cancellable.assertCancellable('draft')).toBe('cancelled');
+    expect(cancellable.assertCancellable('registration')).toBe('cancelled');
+    expect(cancellable.assertCancellable('active')).toBe('cancelled');
+    expect(() => cancellable.assertCancellable('settling')).toThrow(
+      'Only a draft, registration, or active competition can be cancelled.',
+    );
+  });
+
   it('enforces one entrant as the platform-wide start minimum', () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,

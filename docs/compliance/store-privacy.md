@@ -34,11 +34,12 @@ rewards.
 
 ## Precise location handling
 
-The app sends a foreground coordinate pair only when the player taps **Use My
-Location**. The API uses it inside the request transaction to test the point
-against active PostGIS competition boundaries. It stores the approved region,
-boundary version, and a `coordinatesRetained: false` marker. It does not store
-the coordinate pair. Historical region evidence is scrubbed by migration
+The app sends a foreground coordinate pair only when the player explicitly taps
+**Use My Location**, **Start Workout**, or **Finish Workout**. Region setup tests
+the point against active PostGIS competition boundaries. Workout checks test it
+against the Partner gym saved to the player's Contest enrollment. The API stores
+the approved region or gym-presence result, not the coordinate pair. Historical
+region evidence is scrubbed by migration
 `1784181600000_authoritative_region_verification.ts`.
 
 Apple defines collection as retaining off-device data longer than needed to
@@ -49,7 +50,7 @@ deployed infrastructure and production logging policy before submission.
 ## Data intentionally not collected
 
 - Camera frames, face geometry, Face ID data, voice, and microphone audio
-- Raw precise-location coordinates after the region request completes
+- Raw precise-location coordinates after a region or gym-presence request completes
 - Address-book contacts
 - Payment-card or bank-account information
 - Advertising identifiers or cross-app tracking data

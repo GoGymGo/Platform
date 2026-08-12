@@ -119,7 +119,7 @@ export function StreakRewards({ isLoading = false, style, summary }: StreakRewar
             GYM STREAK REWARDS
           </TerminalText>
           <TerminalText style={styles.description} tone="muted" uppercase={false} variant="body">
-            Your active verified streak, summarized in at most two time units.
+            Your current verified gym streak.
           </TerminalText>
         </View>
         <View style={styles.statusPill}>

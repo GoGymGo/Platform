@@ -111,6 +111,7 @@ describe('account readiness repository', () => {
     await account.getCurrentRegionVerification('vancouver-bc');
     await account.getCurrentEnrollment();
     await account.getCurrentEnrollment('40000000-0000-4000-8000-000000000001');
+    await account.withdrawFromCompetition('40000000-0000-4000-8000-000000000001');
 
     assert.deepEqual(requests.map(({ method, path }) => ({ method, path })), [
       { method: 'POST', path: '/v1/me/region-verifications' },
@@ -145,6 +146,10 @@ describe('account readiness repository', () => {
       {
         method: undefined,
         path: '/v1/competitions/current/enrollment?competitionId=40000000-0000-4000-8000-000000000001'
+      },
+      {
+        method: 'POST',
+        path: '/v1/competitions/40000000-0000-4000-8000-000000000001/enrollment/withdrawal'
       }
     ]);
     assert.deepEqual(requests[0].body, {
@@ -189,6 +194,10 @@ describe('account readiness repository', () => {
     );
     await assert.rejects(
       () => account.recordLegalReceipt(documents),
+      /not configured/i
+    );
+    await assert.rejects(
+      () => account.withdrawFromCompetition('40000000-0000-4000-8000-000000000001'),
       /not configured/i
     );
   });

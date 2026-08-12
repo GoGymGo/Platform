@@ -60,6 +60,17 @@ interface GymScanJson extends JsonObject {
   startedAt: string | null;
 }
 
+interface GymPresenceContext {
+  competition_id: string;
+  credential_version: number;
+  distance_meters: number;
+  gym_active: boolean;
+  gym_id: string;
+  gym_name: string;
+  radius_meters: number;
+  timezone: string;
+}
+
 interface DeletedGymJson extends JsonObject {
   id: string;
   status: 'deleted';
@@ -86,7 +97,10 @@ export class GymsService {
         key: idempotencyKey,
         request: {
           accuracyMeters: request.accuracyMeters,
-          credentialHash: hashOpaqueValue(request.credential),
+          competitionId: request.competitionId ?? null,
+          credentialHash: request.credential
+            ? hashOpaqueValue(request.credential)
+            : null,
           eventId: request.eventId,
           latitude: request.latitude,
           longitude: request.longitude,
@@ -97,48 +111,27 @@ export class GymsService {
         const user = await this.profiles.ensureUser(principal, transaction);
         this.profiles.requireVerifiedEmail(user);
         const now = new Date();
-        const tokenHash = hashOpaqueValue(request.credential);
         const clientEventHash = hashOpaqueValue(request.eventId);
 
         await sql`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`.execute(
           transaction,
         );
 
-        const credential = await transaction
-          .selectFrom('gym_qr_credentials as credential')
-          .innerJoin(
-            'gym_locations as gym',
-            'gym.id',
-            'credential.gym_location_id',
-          )
-          .innerJoin(
-            'region_policies as region',
-            'region.id',
-            'gym.region_policy_id',
-          )
-          .select([
-            'credential.competition_id',
-            'credential.credential_version',
-            'credential.status as credential_status',
-            'gym.active as gym_active',
-            'gym.id as gym_id',
-            'gym.name as gym_name',
-            'gym.radius_meters',
-            'region.timezone',
-            sql<number>`ST_Distance(
-              ${sql.ref('gym.coordinates')},
-              ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography
-            )`.as('distance_meters'),
-          ])
-          .where('credential.token_hash', '=', tokenHash)
-          .executeTakeFirst();
+        const credential = request.credential
+          ? await this.resolveQrGymPresence(transaction, request)
+          : await this.resolveEnrolledGymPresence(
+              transaction,
+              user.id,
+              request,
+            );
 
-        if (
-          !credential ||
-          credential.credential_status !== 'active' ||
-          !credential.competition_id
-        ) {
-          return this.rejected(now, 'invalid_or_revoked_credential');
+        if (!credential) {
+          return this.rejected(
+            now,
+            request.credential
+              ? 'invalid_or_revoked_credential'
+              : 'gym_selection_required',
+          );
         }
         if (!credential.gym_active) {
           return this.rejected(now, 'gym_inactive', credential);
@@ -197,6 +190,7 @@ export class GymsService {
           .where('competition.starts_at', '<=', now)
           .where('enrollment.user_id', '=', user.id)
           .where('enrollment.status', '=', 'active')
+          .where('enrollment.gym_location_id', '=', credential.gym_id)
           .executeTakeFirst();
         if (!enrollment) {
           return this.rejected(now, 'competition_unavailable', credential);
@@ -1411,6 +1405,93 @@ export class GymsService {
       .returning('id')
       .execute();
     return expired.length;
+  }
+
+  private async resolveQrGymPresence(
+    transaction: Transaction<Database>,
+    request: GymScanRequestDto,
+  ): Promise<GymPresenceContext | null> {
+    if (!request.credential) return null;
+
+    const resolved = await transaction
+      .selectFrom('gym_qr_credentials as credential')
+      .innerJoin('gym_locations as gym', 'gym.id', 'credential.gym_location_id')
+      .innerJoin(
+        'region_policies as region',
+        'region.id',
+        'gym.region_policy_id',
+      )
+      .select([
+        'credential.competition_id',
+        'credential.credential_version',
+        'gym.active as gym_active',
+        'gym.id as gym_id',
+        'gym.name as gym_name',
+        sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
+          'radius_meters',
+        ),
+        'region.timezone',
+        sql<number>`ST_Distance(
+          ${sql.ref('gym.coordinates')},
+          ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography
+        )`.as('distance_meters'),
+      ])
+      .where('credential.token_hash', '=', hashOpaqueValue(request.credential))
+      .where('credential.status', '=', 'active')
+      .executeTakeFirst();
+
+    if (!resolved?.competition_id) return null;
+    return {
+      ...resolved,
+      competition_id: resolved.competition_id,
+    };
+  }
+
+  private async resolveEnrolledGymPresence(
+    transaction: Transaction<Database>,
+    userId: string,
+    request: GymScanRequestDto,
+  ): Promise<GymPresenceContext | null> {
+    if (!request.competitionId) return null;
+
+    const resolved = await transaction
+      .selectFrom('competition_enrollments as enrollment')
+      .innerJoin('gym_locations as gym', 'gym.id', 'enrollment.gym_location_id')
+      .innerJoin(
+        'region_policies as region',
+        'region.id',
+        'gym.region_policy_id',
+      )
+      .innerJoin('competition_gym_locations as assignment', (join) =>
+        join
+          .onRef('assignment.competition_id', '=', 'enrollment.competition_id')
+          .onRef('assignment.gym_location_id', '=', 'gym.id'),
+      )
+      .select([
+        'enrollment.competition_id',
+        'enrollment.gym_credential_version as credential_version',
+        'gym.active as gym_active',
+        'gym.id as gym_id',
+        'gym.name as gym_name',
+        sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
+          'radius_meters',
+        ),
+        'region.timezone',
+        sql<number>`ST_Distance(
+          ${sql.ref('gym.coordinates')},
+          ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography
+        )`.as('distance_meters'),
+      ])
+      .where('enrollment.competition_id', '=', request.competitionId)
+      .where('enrollment.user_id', '=', userId)
+      .where('enrollment.status', '=', 'active')
+      .executeTakeFirst();
+
+    if (!resolved || resolved.credential_version === null) return null;
+    return {
+      ...resolved,
+      credential_version: resolved.credential_version,
+    };
   }
 
   private async recordScan(

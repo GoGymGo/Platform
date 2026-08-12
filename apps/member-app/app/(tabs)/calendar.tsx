@@ -138,8 +138,7 @@ export default function CalendarScreen() {
               SESSION IN PROGRESS
             </TerminalText>
             <TerminalText style={styles.activeSyncCopy} tone="muted" uppercase={false} variant="body">
-              Today will check off automatically when workout verification
-              finishes.
+              Today checks off when verification finishes.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -322,7 +321,7 @@ export default function CalendarScreen() {
                 </HUDBorderBox>
               ))}
               <TerminalText tone="dim" uppercase={false} variant="caption">
-                Planned videos are scheduling aids only. Start a Verified workout when you train.
+                Plans do not verify a workout. Start verification when you train.
               </TerminalText>
             </View>
           ) : null}
@@ -330,12 +329,12 @@ export default function CalendarScreen() {
 
         <TerminalText style={styles.actionHint} tone="dim" uppercase={false} variant="caption">
           {selectedDateIsFuture
-            ? creatorFeaturesEnabled
-              ? 'Plan a Creator workout for this day. Verified workouts count on the day you complete them.'
-              : 'Return on this day to start your own Verified workout.'
+              ? creatorFeaturesEnabled
+              ? 'Plan a workout for this day. Verify it when you train.'
+              : 'Return on this day to verify a workout.'
             : selectedDateIsPast
-              ? 'Add a personal log for this day, or return to today to start a Verified workout.'
-              : 'Personal logs track your history only. Start a Verified workout below for Contest credit.'}
+              ? 'Add a personal log, or return to today to verify a workout.'
+              : 'Personal logs track history only. Verify a workout for Contest credit.'}
         </TerminalText>
         <CyberButtonOutline
           disabled={selectedDateIsFuture}
@@ -361,14 +360,13 @@ export default function CalendarScreen() {
           <TerminalText style={styles.manualHelp} tone="muted" uppercase={false} variant="body">
             {selectedDateIsFuture
               ? 'Future workouts cannot be logged. Choose today or an earlier date.'
-              : 'Save a private record of your workout. Add a name, duration, exercises, sets or any notes you want to remember.'}
+              : 'Save a private name, duration, exercises, sets or notes.'}
           </TerminalText>
 
           {!selectedDateIsFuture ? (
             <HUDBorderBox style={styles.manualNotice} tone="muted">
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                Manual logs mark this calendar only. They do not verify a workout or
-                change your Weekly Goal, Goal Score or Prize Draw Entries.
+                Personal logs do not affect goals, scores or entries.
               </TerminalText>
             </HUDBorderBox>
           ) : null}

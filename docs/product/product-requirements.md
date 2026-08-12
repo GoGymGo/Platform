@@ -110,6 +110,12 @@ Registration requirements:
   approved.
 - The Weekly Goal is selected from 1-7 verified days and is immutable after
   enrollment because there is no goal-change endpoint in V1.
+- A player may withdraw from Profile. Withdrawal is irreversible for that
+  Contest, retains the historical record for Contest integrity, and immediately
+  ends active workouts, ranking, Weekly Challenge, and prize eligibility.
+- Profile offers a separate local-device reset that signs out and clears app
+  storage, app-accessible browser cookies, and caches. It does not delete the
+  account or authoritative server history.
 - The current competition, legal receipt, approved region verification, age
   attestation, and accepted rules must all agree before enrollment succeeds.
 - Successful registration returns directly to Home with a short confirmation

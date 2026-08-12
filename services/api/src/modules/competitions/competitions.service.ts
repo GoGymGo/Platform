@@ -53,6 +53,14 @@ interface EnrollmentJson extends JsonObject {
   status: 'active';
 }
 
+interface EnrollmentWithdrawalJson extends JsonObject {
+  competitionId: string;
+  enrolledAt: string;
+  goalDays: number;
+  id: string;
+  status: 'withdrawn';
+}
+
 interface WeeklyChallengeRequestJson extends JsonObject {
   id: string;
   competitionId: string;
@@ -154,6 +162,7 @@ export class CompetitionsService {
             ]),
           )
           .where('competition.status', 'in', ['registration', 'active'])
+          .where('competition.deleted_at', 'is', null)
           .where('competition.ends_at', '>', now)
           .orderBy(
             sql<number>`CASE WHEN current_enrollment.id IS NULL THEN 1 ELSE 0 END`,
@@ -182,8 +191,30 @@ export class CompetitionsService {
               'resolved_credential.competition_id',
               'competition.id',
             )
+            .innerJoin(
+              'competition_gym_locations as resolved_assignment',
+              (join) =>
+                join
+                  .onRef(
+                    'resolved_assignment.competition_id',
+                    '=',
+                    'competition.id',
+                  )
+                  .onRef(
+                    'resolved_assignment.gym_location_id',
+                    '=',
+                    'resolved_credential.gym_location_id',
+                  ),
+            )
+            .innerJoin(
+              'gym_locations as resolved_gym',
+              'resolved_gym.id',
+              'resolved_credential.gym_location_id',
+            )
             .where('resolved_credential.token_hash', '=', credentialHash)
-            .where('resolved_credential.status', '=', 'active');
+            .where('resolved_credential.status', '=', 'active')
+            .where('resolved_gym.active', '=', true)
+            .where('resolved_gym.deleted_at', 'is', null);
         }
         const competition = await competitionQuery.executeTakeFirst();
         if (!competition) {
@@ -569,6 +600,8 @@ export class CompetitionsService {
             competition_id: competition.id,
             enrolled_at: now,
             goal_days: request.goalDays,
+            gym_credential_version: gymPresence.credential_version,
+            gym_location_id: gymPresence.gym_id,
             region_verification_id: verification.id,
             rules_acceptance_id: acceptance.id,
             status: 'active',
@@ -603,6 +636,103 @@ export class CompetitionsService {
     );
 
     return result;
+  }
+
+  async withdrawEnrollment(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    idempotencyKey: string,
+  ): Promise<EnrollmentResponseDto> {
+    return this.idempotency.execute<EnrollmentWithdrawalJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { competitionId },
+        responseCode: 200,
+        scope: 'competition-enrollments:withdraw',
+      },
+      async (transaction) => {
+        const user = await this.profiles.ensureUser(principal, transaction);
+        const enrollment = await transaction
+          .selectFrom('competition_enrollments')
+          .select([
+            'competition_id',
+            'enrolled_at',
+            'goal_days',
+            'id',
+            'status',
+          ])
+          .where('competition_id', '=', competitionId)
+          .where('user_id', '=', user.id)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!enrollment) {
+          throw new NotFoundException({
+            code: 'COMPETITION_ENROLLMENT_NOT_FOUND',
+            message: 'No Contest enrollment was found to withdraw.',
+          });
+        }
+        if (enrollment.status === 'disqualified') {
+          throw new ConflictException({
+            code: 'COMPETITION_ENROLLMENT_DISQUALIFIED',
+            message:
+              'A disqualified Contest enrollment cannot be changed by the member.',
+          });
+        }
+
+        const now = new Date();
+        if (enrollment.status === 'active') {
+          await transaction
+            .updateTable('competition_enrollments')
+            .set({ status: 'withdrawn' })
+            .where('id', '=', enrollment.id)
+            .where('status', '=', 'active')
+            .executeTakeFirstOrThrow();
+          await transaction
+            .updateTable('workout_sessions')
+            .set({
+              completed_at: now,
+              status: 'cancelled',
+              updated_at: now,
+            })
+            .where('enrollment_id', '=', enrollment.id)
+            .where('status', '=', 'active')
+            .execute();
+          await transaction
+            .updateTable('weekly_challenge_requests')
+            .set({ responded_at: now, status: 'cancelled' })
+            .where('competition_id', '=', competitionId)
+            .where((expression) =>
+              expression.or([
+                expression('requester_user_id', '=', user.id),
+                expression('recipient_user_id', '=', user.id),
+              ]),
+            )
+            .where('status', 'in', ['accepted', 'pending'])
+            .execute();
+          await transaction
+            .updateTable('competition_matches')
+            .set({ settled_at: now, status: 'cancelled' })
+            .where('competition_id', '=', competitionId)
+            .where((expression) =>
+              expression.or([
+                expression('user_a_id', '=', user.id),
+                expression('user_b_id', '=', user.id),
+              ]),
+            )
+            .where('status', 'in', ['matched', 'searching'])
+            .execute();
+        }
+
+        return {
+          competitionId: enrollment.competition_id,
+          enrolledAt: enrollment.enrolled_at.toISOString(),
+          goalDays: enrollment.goal_days,
+          id: enrollment.id,
+          status: 'withdrawn',
+        };
+      },
+    );
   }
 
   async getEnrollmentCount(monthKey: string, region: string): Promise<number> {

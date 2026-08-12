@@ -55,11 +55,13 @@ export function useCurrentCompetition(
   expectedMonthKey: string | null,
   regionCode: string,
   gymQrCredential: string | null = null,
-  gymQrScanKey: number | null = null
+  gymQrScanKey: number | null = null,
+  enabled = true
 ) {
   const context = useAccountReadinessContext();
   return useQuery({
     enabled:
+      enabled &&
       context.enabled &&
       regionCode.length > 0 &&
       (expectedMonthKey === null || expectedMonthKey.length > 0),
@@ -78,11 +80,12 @@ export function useCurrentCompetition(
 
 export function useCurrentEnrollment(
   competitionId: string | null = null,
-  waitForCompetition = false
+  waitForCompetition = false,
+  enabled = true
 ) {
   const context = useAccountReadinessContext();
   return useQuery({
-    enabled: context.enabled && (!waitForCompetition || Boolean(competitionId)),
+    enabled: enabled && context.enabled && (!waitForCompetition || Boolean(competitionId)),
     queryFn: () => context.account.getCurrentEnrollment(competitionId ?? undefined),
     queryKey: competitionId
       ? [...context.queryKey, 'current-enrollment', competitionId]
@@ -107,6 +110,26 @@ export function useEnrollInCompetition() {
         [...context.queryKey, 'current-enrollment', enrollment.competitionId],
         enrollment
       );
+    }
+  });
+}
+
+export function useWithdrawFromCompetition() {
+  const context = useAccountReadinessContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (competitionId: string) =>
+      context.account.withdrawFromCompetition(competitionId),
+    onSuccess: (enrollment) => {
+      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], null);
+      queryClient.setQueryData(
+        [...context.queryKey, 'current-enrollment', enrollment.competitionId],
+        null
+      );
+      void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+      void queryClient.invalidateQueries({ queryKey: ['competition-matches'] });
+      void queryClient.invalidateQueries({ queryKey: ['weekly-challenge-partners'] });
+      void queryClient.invalidateQueries({ queryKey: ['weekly-challenge-requests'] });
     }
   });
 }

@@ -55,7 +55,7 @@ This audit maps the current Expo Router app to the North American privacy and bi
 
 ### Partner Gym Verification
 
-- STEP 1 WRITE: The initial Contest QR selects the Partner gym; workouts use fresh start and finish location checks without rescanning.
+- STEP 1 WRITE: A new player scans the initial Contest QR before account creation. Region eligibility uses a separate broad location check, and the selected Partner gym is stored on the Contest enrollment. Returning players use fresh start and finish location checks without rescanning, including on a new device.
 - STEP 2 NATIVE PURGE AUDIT: Covered by workspace purge command across `app` and `src`.
 - STEP 3 MANUAL TEST: Verify that Start Workout and Finish Workout each request a fresh location reading at the selected Partner gym.
 
@@ -67,7 +67,7 @@ This audit maps the current Expo Router app to the North American privacy and bi
 
 ### Profile
 
-- STEP 1 WRITE: Added settings rows linking to Privacy Policy, Terms of Service, and Biometric / Camera Consent.
+- STEP 1 WRITE: Added settings rows linking to Privacy Policy and Terms of Service, plus guarded Contest withdrawal and local-device reset actions. Withdrawal retains required Contest-integrity history while ending workout, ranking, pairing, and prize eligibility. Device reset signs out and removes app storage, accessible browser cookies, and caches without claiming to delete server data.
 - STEP 2 NATIVE PURGE AUDIT: Covered by workspace purge command across `app` and `src`.
 - STEP 3 MANUAL TEST: Verify that each legal settings row opens the matching native modal route and back/close returns to Profile.
 

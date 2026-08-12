@@ -18,18 +18,18 @@ import { goBackOrReplace } from '@/navigation/goBack';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const loopSteps = [
-  ['COMMIT', 'Choose 1-7 Verified workout days per week.'],
+  ['COMMIT', 'Choose 1-7 workout days per week.'],
   [
     'VERIFY',
-    'Select the Partner gym once, then verify your live location at workout start and finish.'
+    'Check your gym location when you start and finish.'
   ],
   [
     'BUILD ODDS',
-    'Earn Prize Draw Entries through consistency, teamwork and the Contest'
+    'Earn Prize Draw entries through workouts, teamwork and ranking.'
   ],
   [
     'CLAIM AWARD',
-    'If you win, your Award appears in My Awards with brand claim instructions. No bank account is needed.'
+    'Winners claim in My Awards.'
   ]
 ] as const;
 
@@ -100,7 +100,7 @@ export default function HowItWorksScreen() {
         />
 
         <BrandScreenHeader
-          description="A quick reference for Contest scoring, winning odds and brand Rewards."
+          description="See how to earn entries and claim Awards."
           eyebrow="CONTEST GUIDE"
           title="HOW THE CONTEST WORKS"
         />
@@ -155,17 +155,14 @@ export default function HowItWorksScreen() {
             01 // WEEKLY CHALLENGE BONUSES
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            You and your Weekly Challenge partner both hit the goal: 2X each. If they miss and
-            you complete one extra Verified workout, you earn 3X. When your Weekly Goal uses
-            every available day, 3X is automatic if they miss. Add the four settled
-            weekly results.
+            Both hit the goal: 2X each. If your partner misses, complete one extra workout for
+            3X. If your goal uses every available day, 3X applies automatically. Add all four weeks.
           </TerminalText>
           <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             02 // TOP THREE GOAL-GROUP FINISHERS
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Finishing first, second or third in your Weekly Goal group multiplies
-            the subtotal from your four Weekly Challenge results.
+            The top three multiply their four-week Weekly Challenge subtotal.
           </TerminalText>
           {categoryMultipliers.map((multiplier, index) => (
             <TerminalText
@@ -193,17 +190,15 @@ export default function HowItWorksScreen() {
             04 // PERFECT MONTH // FINAL 10X
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Hit your Weekly Goal in all four scoring weeks to earn the Perfect Month.
-            Its final 10X multiplies the combined Weekly Challenge subtotal, goal-group
-            bonus and any Bonus Day entries.
+            Hit all four weekly goals for a final 10X on Weekly Challenge, goal-group and Bonus
+            Day entries.
           </TerminalText>
           <View style={styles.exampleBlock}>
             <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
               EXAMPLE // 4-DAY GOAL
             </TerminalText>
             <TerminalText style={styles.exampleIntro} tone="muted" uppercase={false} variant="body">
-              You hit four Verified workout days in all four weeks, you and your Weekly
-              Challenge partner both hit each week, and you finish first in your goal group.
+              Hit four days in all four weeks. Your partner does too. Finish first in your group.
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
               Base month: 4 days x 4 weeks = 16
@@ -218,7 +213,7 @@ export default function HowItWorksScreen() {
               Perfect month: 96 x 10 = 960 entries
             </TerminalText>
             <TerminalText style={styles.exampleNote} tone="dim" uppercase={false} variant="body">
-              No Bonus Days are included in this example.
+              Bonus Days excluded.
             </TerminalText>
           </View>
         </HUDBorderBox> : null}

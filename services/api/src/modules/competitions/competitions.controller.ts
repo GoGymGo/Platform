@@ -129,6 +129,25 @@ export class CompetitionsController {
     );
   }
 
+  @Post(':competitionId/enrollment/withdrawal')
+  @ApiBearerAuth('firebase')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Withdraw the authenticated user from a contest',
+  })
+  @ApiOkResponse({ type: EnrollmentResponseDto })
+  withdrawEnrollment(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ): Promise<EnrollmentResponseDto> {
+    return this.competitions.withdrawEnrollment(
+      principal,
+      competitionId,
+      requireIdempotencyKey(idempotencyKey),
+    );
+  }
+
   @Get(':monthKey/enrollment-count')
   @Public()
   @ApiOperation({

@@ -45,12 +45,12 @@ function MobileSessionTabRoute() {
   } = useSessionRegistrationAccess();
 
   if (setupChecking) {
-    return <ScreenLoadingState body="Checking your contest setup." />;
+    return <ScreenLoadingState body="Checking your Contest." />;
   }
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your Contest setup could not be checked. Retry before starting a gym location check."
+        body="We couldn&apos;t check your Contest. Try again."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"
@@ -61,7 +61,7 @@ function MobileSessionTabRoute() {
   return (
     <ScreenContainer contentStyle={styles.screen}>
       <BrandScreenHeader
-        description="The gym selected during registration is reused automatically. A fresh 75-metre location check is required when you start and finish, with at least 30 minutes measured by server time. Workouts started in time may finish during the 15-minute completion period after the Contest ends."
+        description="Start and finish within 75 metres of your selected gym. Train for at least 30 minutes."
         eyebrow="PARTNER GYM PILOT"
         style={styles.header}
         title="VERIFY A GYM VISIT"
@@ -97,11 +97,10 @@ function MobileSessionTabRoute() {
             GYM LOCATION READY
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Check your live location to start the timer, then check it again when
-            Finish Workout unlocks. Workout verification uses fresh location checks.
+            Check your location to start. Check again when Finish unlocks.
           </TerminalText>
           <CyberButtonPrimary
-            label="CHECK GYM LOCATION ->"
+            label="START LOCATION CHECK ->"
             onPress={() => router.push('/qr-scanner')}
           />
         </HUDBorderBox>

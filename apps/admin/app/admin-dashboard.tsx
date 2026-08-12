@@ -59,6 +59,8 @@ import {
   type HttpMethod,
 } from "./admin-dashboard-utils";
 import {
+  canCancelContest,
+  canDeleteContestFromDashboard,
   chooseSetupCompetition,
   isContestReadyToPublish,
 } from "./contest-launch-flow";
@@ -758,7 +760,7 @@ export function AdminDashboard({
       description:
         action === "publish"
           ? `${competition.name} will become visible and joinable in the player app immediately.`
-          : `${competition.name} will be cancelled. This action is recorded in the audit history.`,
+          : `${competition.name} will stop immediately. Active workouts, rankings, and prize eligibility will close. Players will be notified, and you can then delete it from the dashboard.`,
       execute: (reason) =>
         mutate(
           action === "publish" ? "Contest published." : "Contest cancelled.",
@@ -2569,7 +2571,7 @@ function Overview({
                       />
                     ) : null}
                     <div className="card-actions">
-                      {competition.status === "registration" ? (
+                      {canCancelContest(competition.status) ? (
                         <button
                           className="danger-button"
                           onClick={() => onStatus(competition, "cancel")}
@@ -2578,7 +2580,7 @@ function Overview({
                           CANCEL CONTEST
                         </button>
                       ) : null}
-                      {["cancelled", "settled"].includes(competition.status) ? (
+                      {canDeleteContestFromDashboard(competition.status) ? (
                         <button
                           className="danger-button"
                           onClick={() => onDelete(competition)}

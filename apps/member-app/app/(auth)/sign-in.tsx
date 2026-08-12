@@ -78,7 +78,9 @@ export default function SignInScreen() {
     }
     if (result.isNewUser && mobileGymVerificationAvailable) {
       router.replace(
-        gymScanContinuation ? getGymScanPostAuthRoute(true) : '/region'
+        gymScanContinuation
+          ? getGymScanPostAuthRoute(true)
+          : { pathname: '/qr-scanner', params: { enrollment: '1', next: 'region' } }
       );
       return;
     }
@@ -171,8 +173,8 @@ export default function SignInScreen() {
   return (
     <AuthScreenShell
       description={gymScanContinuation
-        ? 'Your Partner gym selection is saved. Sign in and GoGymGo will take you directly to Start Workout.'
-        : 'Return to your Weekly Goal, Verified workouts and Prize Draw Entries.'}
+        ? 'Sign in to continue with this gym.'
+        : 'Sign in to continue your Contest.'}
       eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'SECURE ACCESS'}
       onBack={() => router.replace('/join')}
       title={gymScanContinuation ? 'SIGN IN TO CONTINUE' : 'WELCOME BACK'}
@@ -188,7 +190,7 @@ export default function SignInScreen() {
             {user.email ?? 'SIGNED-IN ACCOUNT'}
           </TerminalText>
           <FirstRunPrimaryButton
-            label="CONTINUE TO GOGYMGO ->"
+            label="CONTINUE ->"
             onPress={continueActiveSession}
           />
           <FirstRunSecondaryButton
@@ -211,8 +213,7 @@ export default function SignInScreen() {
                 onGooglePress={continueWithGoogle}
               />
               <TerminalText style={styles.editorialCaption} tone="muted" uppercase={false} variant="caption">
-                Continuing with Google or Apple creates an account when one does not
-                exist. New players review the account agreements during setup.
+                New here? Google or Apple will create your account.
               </TerminalText>
               <LegalDocumentLinks />
 
@@ -262,7 +263,7 @@ export default function SignInScreen() {
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
             {!emailSignInReady ? (
               <TerminalText style={styles.editorialCaption} tone="dim" uppercase={false} variant="caption">
-                Enter your email and password to continue.
+                Enter both fields.
               </TerminalText>
             ) : null}
             <FirstRunPrimaryButton

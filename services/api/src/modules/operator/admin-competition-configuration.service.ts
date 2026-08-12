@@ -15,6 +15,7 @@ import type {
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
+  canCancelCompetition,
   canDeleteCompetition,
   requiresExclusiveCompetitionSlot,
 } from './admin-deletion-policy';
@@ -369,13 +370,14 @@ export class AdminCompetitionConfigurationService {
         const nextStatus =
           input.action === CompetitionStatusAction.PUBLISH
             ? await this.assertPublishable(transaction, competition)
-            : this.assertCancellable(competition.status, competition.starts_at);
+            : this.assertCancellable(competition.status);
+        const changedAt = new Date();
         const updated = await transaction
           .updateTable('competitions')
           .set({
             configuration_version: sql<number>`configuration_version + 1`,
             status: nextStatus,
-            updated_at: new Date(),
+            updated_at: changedAt,
           })
           .where('id', '=', competitionId)
           .where('configuration_version', '=', input.expectedVersion)
@@ -385,10 +387,7 @@ export class AdminCompetitionConfigurationService {
           throw this.versionConflict();
         }
 
-        if (
-          nextStatus === 'cancelled' &&
-          competition.status === 'registration'
-        ) {
+        if (nextStatus === 'cancelled' && competition.status !== 'draft') {
           const enrollments = await transaction
             .selectFrom('competition_enrollments')
             .select(['id', 'user_id'])
@@ -400,6 +399,28 @@ export class AdminCompetitionConfigurationService {
             .set({ status: 'withdrawn' })
             .where('competition_id', '=', competitionId)
             .where('status', '=', 'active')
+            .execute();
+          await transaction
+            .updateTable('workout_sessions')
+            .set({
+              completed_at: changedAt,
+              status: 'cancelled',
+              updated_at: changedAt,
+            })
+            .where('competition_id', '=', competitionId)
+            .where('status', '=', 'active')
+            .execute();
+          await transaction
+            .updateTable('weekly_challenge_requests')
+            .set({ responded_at: changedAt, status: 'cancelled' })
+            .where('competition_id', '=', competitionId)
+            .where('status', 'in', ['accepted', 'pending'])
+            .execute();
+          await transaction
+            .updateTable('competition_matches')
+            .set({ settled_at: changedAt, status: 'cancelled' })
+            .where('competition_id', '=', competitionId)
+            .where('status', 'in', ['matched', 'searching'])
             .execute();
           for (const enrollment of enrollments) {
             await this.notifications.enqueue(
@@ -840,18 +861,12 @@ export class AdminCompetitionConfigurationService {
     return 'registration';
   }
 
-  private assertCancellable(
-    status: CompetitionStatus,
-    startsAt: Date,
-  ): 'cancelled' {
-    if (
-      status !== 'draft' &&
-      (status !== 'registration' || startsAt <= new Date())
-    ) {
+  private assertCancellable(status: CompetitionStatus): 'cancelled' {
+    if (!canCancelCompetition(status)) {
       throw new ConflictException({
         code: 'COMPETITION_CANNOT_BE_CANCELLED',
         message:
-          'Only a draft or not-yet-started registration can be cancelled.',
+          'Only a draft, registration, or active competition can be cancelled.',
       });
     }
     return 'cancelled';

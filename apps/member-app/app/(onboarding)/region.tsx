@@ -69,7 +69,7 @@ function MobileRegionScreen() {
     regionVerification?.status === 'verified' && Boolean(regionVerification.verificationId);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const permissionDeniedMessage =
-    'LOCATION ACCESS WAS NOT ALLOWED. ENABLE LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
+    'ALLOW LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
 
   async function checkDeviceLocation() {
     setVerificationState('checking');
@@ -122,7 +122,7 @@ function MobileRegionScreen() {
 
   async function joinRegionWaitlist() {
     if (!api || !user?.email || requestedRegion.trim().length < 2) {
-      setWaitlistError('Enter the city or region where you want GoGymGo to launch.');
+      setWaitlistError('Enter your city or region.');
       return;
     }
     setWaitlistBusy(true);
@@ -137,7 +137,7 @@ function MobileRegionScreen() {
       setWaitlistError(
         getUserFacingErrorMessage(
           error,
-          'Your Regional updates request could not be saved. Check your connection and try again.'
+          'Couldn\'t save your request. Try again.'
         )
       );
     } finally {
@@ -171,8 +171,8 @@ function MobileRegionScreen() {
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           {approvedRegionReady && !isProfileSource
-            ? `${competitionRegion.label} sets your contest, available rewards and local scoring time.`
-            : 'Your verified location sets your regional contest, available rewards and local scoring time.'}
+            ? `${competitionRegion.label} is your Contest region.`
+            : 'Use your location to find your Contest region.'}
         </TerminalText>
 
         {!approvedRegionReady || isProfileSource ? (
@@ -181,8 +181,7 @@ function MobileRegionScreen() {
               ONE-TIME LOCATION CHECK
             </TerminalText>
             <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
-              GoGymGo sends your location once for a secure region check. We save the approved
-              region—not your coordinates—and never track you in the background.
+              We check once, save only your region, and do not track you.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -223,7 +222,7 @@ function MobileRegionScreen() {
         ) : null}
         {verificationState === 'location-unavailable' ? (
           <AuthStatusNotice
-            message="YOUR LOCATION COULD NOT BE READ. CHECK DEVICE LOCATION SERVICES AND TRY AGAIN."
+            message="TURN ON DEVICE LOCATION, THEN TRY AGAIN."
             tone="amber"
           />
         ) : null}
@@ -233,9 +232,7 @@ function MobileRegionScreen() {
               OUTSIDE THE SEPTEMBER PILOT REGION
             </TerminalText>
             <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
-              The September pilot is available only on Vancouver Island and the supported Gulf
-              Islands. We will not place you in Toronto or show another region&apos;s sample
-              contest.
+              This Contest is limited to Vancouver Island and supported Gulf Islands.
             </TerminalText>
             <CyberButtonOutline
               label="TRY LOCATION AGAIN"
@@ -270,7 +267,7 @@ function MobileRegionScreen() {
         ) : null}
         {verificationState === 'service-error' ? (
           <AuthStatusNotice
-            message="REGION VERIFICATION COULD NOT BE COMPLETED. CHECK YOUR CONNECTION AND TRY AGAIN."
+            message="COULDN&apos;T VERIFY YOUR REGION. CHECK YOUR CONNECTION AND TRY AGAIN."
             tone="red"
           />
         ) : null}
@@ -309,8 +306,7 @@ function MobileRegionScreen() {
               uppercase={false}
               variant="caption"
             >
-              You will compete in {competitionRegion.label} and see rewards available for this
-              region.
+              You&apos;ll compete and see rewards in {competitionRegion.label}.
             </TerminalText>
           </HUDBorderBox>
         ) : null}

@@ -128,6 +128,7 @@ function MobileCommitmentScreen() {
   const [pendingGymScanHydrated, setPendingGymScanHydrated] = useState(false);
   const registration = useCompetitionRegistration({
     defaultMonthKey: defaultCompetitionMonthKey,
+    enabled: pendingGymScanHydrated,
     gymQrCredential: pendingGymScan?.credential ?? null,
     gymQrScanKey: pendingGymScan?.createdAt ?? null,
     jurisdictionCode,
@@ -143,8 +144,7 @@ function MobileCommitmentScreen() {
     (reward) => reward.competitionId === registration.competition?.id
   );
   const contestContextLoading =
-    (!pendingGymScanHydrated && !registration.alreadyEnrolled) ||
-    registration.competitionLoading;
+    !pendingGymScanHydrated || registration.competitionLoading;
   const categoryMultipliers = resolveCategoryPodiumMultipliers(registration.competition?.rules);
   const categoryOptions = [
     { label: 'NONE', value: 0 },
@@ -232,19 +232,13 @@ function MobileCommitmentScreen() {
   }, [user?.uid]);
 
   useEffect(() => {
-    if (isHomeSource && registration.alreadyEnrolled) {
+    if (pendingGymScanHydrated && isHomeSource && registration.alreadyEnrolled) {
       router.replace('/home');
     }
-  }, [isHomeSource, registration.alreadyEnrolled, router]);
+  }, [isHomeSource, pendingGymScanHydrated, registration.alreadyEnrolled, router]);
 
   useEffect(() => {
     let active = true;
-
-    if (registration.alreadyEnrolled) {
-      return () => {
-        active = false;
-      };
-    }
 
     void readPendingGymScan()
       .then((pending) => {
@@ -265,7 +259,7 @@ function MobileCommitmentScreen() {
     return () => {
       active = false;
     };
-  }, [appTourActive, registration.alreadyEnrolled]);
+  }, []);
 
   function selectWeeklyMatchResult(index: number, multiplier: WeeklyMatchMultiplier) {
     setWeeklyMatchMultipliers((current) =>
@@ -415,7 +409,7 @@ function MobileCommitmentScreen() {
           CHOOSE YOUR WEEKLY GOAL
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Choose a realistic number of workout days you can repeat each week.
+          Choose how many days you&apos;ll train each week.
         </TerminalText>
 
         {contestContextLoading ? (
@@ -425,8 +419,8 @@ function MobileCommitmentScreen() {
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="caption">
               {isGymScanSource
-                ? 'Matching this Partner gym QR with its Contest and available offers.'
-                : 'Loading the regional Contest and its available offers.'}
+                ? 'Matching this QR to its Contest.'
+                : 'Loading your Contest.'}
             </TerminalText>
           </HUDBorderBox>
         ) : registration.competition ? (
@@ -445,8 +439,8 @@ function MobileCommitmentScreen() {
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="caption">
               {pendingGymScan || registration.competitionError
-                ? 'This QR could not be matched with a Contest you can join. Scan the current poster at the Partner gym and try again.'
-                : 'There is no regional Contest available to join right now.'}
+                ? 'This QR doesn\'t match an open Contest. Scan the current poster.'
+                : 'No Contest is open in your region.'}
             </TerminalText>
             {pendingGymScan ? (
               <FirstRunSecondaryButton
@@ -536,10 +530,10 @@ function MobileCommitmentScreen() {
                 uppercase={false}
                 variant="caption"
               >
-                Earn more through consistency, teamwork and the Contest.
+                See how entries add up.
               </TerminalText>
               <FirstRunSecondaryButton
-                label="SEE HOW TO EARN MAXIMUM ENTRIES →"
+                label="VIEW ENTRY CALCULATOR →"
                 onPress={() => setShowCalculator(true)}
                 style={styles.bonusDetailsCta}
                 tone="amber"
@@ -561,8 +555,8 @@ function MobileCommitmentScreen() {
                 variant="body"
               >
                 {gymPresenceReady
-                  ? 'Accept the rules and lock this goal for the month.'
-                  : 'Select this Contest from its Partner gym QR before accepting the terms.'}
+                  ? 'Accept the rules to lock your goal.'
+                  : 'Scan this Contest\'s gym QR first.'}
               </TerminalText>
               <CompactTextButton
                 label="VIEW OFFICIAL CONTEST RULES"
@@ -577,8 +571,8 @@ function MobileCommitmentScreen() {
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
                   {gymPresenceReady
-                    ? 'Partner gym selected. When you confirm, GoGymGo will request a fresh location reading and verify that you are within 75 metres. Workout verification uses fresh location checks from here.'
-                    : 'Open the Contest from its Partner gym QR first. Keep location access on—you must be within 75 metres when you confirm.'}
+                    ? 'Gym selected. Confirm while you\'re within 75 metres.'
+                    : 'Scan this Contest\'s poster while you\'re at the gym.'}
                 </TerminalText>
                 {!registration.alreadyEnrolled ? (
                   !gymPresenceReady ? (
@@ -588,7 +582,7 @@ function MobileCommitmentScreen() {
                       label={
                         cameraPermissionBusy
                           ? 'OPENING CAMERA...'
-                          : 'SELECT GYM WITH QR ->'
+                          : 'SCAN CONTEST QR ->'
                       }
                       onPress={() => void openGymScanner()}
                       style={styles.scanCta}
@@ -625,7 +619,7 @@ function MobileCommitmentScreen() {
               ) : (
                 <FirstRunPrimaryButton
                   disabled={!registrationRequirementsAccepted || registration.busy}
-                  label={registration.busy ? 'CHECKING REGISTRATION...' : 'CONFIRM + REGISTER ->'}
+                  label={registration.busy ? 'JOINING CONTEST...' : 'JOIN CONTEST ->'}
                   onPress={() => void confirmWeeklyGoal()}
                   style={styles.topConfirmButton}
                 />
@@ -639,7 +633,7 @@ function MobileCommitmentScreen() {
             uppercase={false}
             variant="caption"
           >
-            Select your Weekly Goal to review and confirm the Contest agreement.
+            Select your Weekly Goal.
           </TerminalText>
         )}
       </ScreenScrollView>
@@ -824,7 +818,7 @@ function ContestEntryContext({
     <HUDBorderBox style={styles.contestContextCard} tone="cyan">
       <View style={styles.contestContextHeader}>
         <TerminalText tone="cyan" variant="label">
-          CONTEST YOU&apos;RE JOINING
+          YOUR CONTEST
         </TerminalText>
         {isQrSelected ? (
           <TerminalText tone="green" variant="micro">
@@ -868,20 +862,19 @@ function ContestEntryContext({
 
       <View style={styles.contestOffers}>
         <TerminalText tone="pink" variant="micro">
-          WHAT&apos;S OFFERED
+          REWARDS
         </TerminalText>
         {rewardsLoading ? (
           <TerminalText live="polite" tone="muted" uppercase={false} variant="caption">
-            Loading this Contest&apos;s offers...
+            Loading rewards...
           </TerminalText>
         ) : rewardsError ? (
           <TerminalText tone="muted" uppercase={false} variant="caption">
-            Offer details could not be loaded. You can still review the Contest rules before
-            confirming.
+            Rewards couldn&apos;t load. You can still join.
           </TerminalText>
         ) : rewards.length === 0 ? (
           <TerminalText tone="muted" uppercase={false} variant="caption">
-            Rewards for this Contest will be published soon.
+            Rewards coming soon.
           </TerminalText>
         ) : (
           <View style={styles.contestOfferList}>
@@ -925,8 +918,7 @@ function WeeklyMatchControl({
         1 // WEEKLY CHALLENGE RESULTS
       </TerminalText>
       <TerminalText tone="dim" uppercase={false} variant="caption">
-        Hit your goal for 1x. Both partners hit for 2x. Complete the available bonus condition for
-        3x. Miss your goal and that week earns 0.
+        Hit your goal: 1x. Both hit: 2x. Bonus condition: 3x. Miss: 0.
       </TerminalText>
       <View style={styles.weeklyMatchList}>
         {multipliers.map((selectedMultiplier, index) => (
@@ -1212,8 +1204,8 @@ function GymLocationVerificationProgress({
         variant="caption"
       >
         {locating
-          ? 'Hold steady while GoGymGo locks a fresh location signal and compares it with this Partner gym.'
-          : 'Gym presence confirmed. Saving your Weekly Goal and Contest entry.'}
+          ? 'Hold still while we verify this gym.'
+          : 'Gym confirmed. Joining Contest.'}
       </TerminalText>
     </HUDBorderBox>
   );

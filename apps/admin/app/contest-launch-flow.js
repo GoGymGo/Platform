@@ -57,3 +57,13 @@ export function isContestReadyToPublish(competition, rewards, regions, gyms) {
 
   return rewardReady && regionReady && assignedGyms.length > 0 && qrReady;
 }
+
+/** @param {Competition["status"]} status */
+export function canCancelContest(status) {
+  return ["draft", "registration", "active"].includes(status);
+}
+
+/** @param {Competition["status"]} status */
+export function canDeleteContestFromDashboard(status) {
+  return ["draft", "cancelled", "settled"].includes(status);
+}

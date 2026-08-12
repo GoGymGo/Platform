@@ -292,11 +292,11 @@ function auditFlowReliability() {
     ['app/(auth)/sign-in.tsx', [
       'getAuthenticatedHomeRoute',
       'emailSignInReady',
-      'Enter your email and password to continue.'
+      'Enter both fields.'
     ]],
     ['app/(auth)/sign-up.tsx', [
       'emailAccountReady',
-      'Complete your email and both password fields to continue.'
+      'Complete all three fields.'
     ]],
     ['app/(tabs)/_layout.tsx', [
       "title: 'Calendar'",
@@ -314,11 +314,11 @@ function auditFlowReliability() {
       'useScreenMemory',
       'memoryKey="leaderboard"',
       'RecoverableError',
-      'Prize Draw Entries set your winning odds.',
+      'Entries set your Prize Draw odds.',
       'Hide ranking details'
     ]],
     ['app/(tabs)/calendar.tsx', [
-      'Return on this day to start your own Verified workout.',
+      'Return on this day to verify a workout.',
       'RETURN TO TODAY TO START ->',
       "START TODAY'S VERIFIED WORKOUT ->",
       'function goToToday()'
@@ -370,8 +370,8 @@ function auditFlowReliability() {
       "day === 1 ? 'day' : 'days'} per week"
     ]],
     ['app/(onboarding)/how-it-works.tsx', [
-      'A quick reference for Contest scoring',
-      'No bank account is needed.'
+      'See how to earn entries and claim Awards.',
+      'Winners claim in My Awards.'
     ]],
     ['app/(onboarding)/identity.tsx', [
       'useScreenMemory',

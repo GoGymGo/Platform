@@ -4,6 +4,25 @@ This is the durable handoff for the gym-poster QR flow. Read it before publishin
 the browser member app at `app.gogymgo.com` or creating signed iOS and Android
 releases.
 
+## Browser-only pilot boundary
+
+The connected browser pilot may be published before native signing identifiers
+exist. That release uses the protected `Member Web Deployment` workflow and must
+pass, after building the exact export:
+
+```powershell
+npm.cmd run audit:browser-pilot-release --workspace @gogymgo/member-app -- dist
+```
+
+The pilot intentionally omits both native association files. A phone-camera QR
+still opens its `https://app.gogymgo.com/scan?credential=...` page in Safari or
+Chrome, where camera and foreground location permissions can be tested. Do not
+describe this as opening an installed app, and do not expect a closed browser to
+deliver the native 30-minute notification.
+
+The native requirements below remain mandatory for any signed iOS or Android
+release and do not block this explicitly browser-only pilot.
+
 ## What is already implemented
 
 - Gym posters use `https://app.gogymgo.com/scan?credential=...`.
@@ -95,11 +114,11 @@ Location is checked when the player submits Start Workout and Finish Workout. Th
 app does not continuously track the player or automatically boot them out when
 they move outside the radius.
 
-## Current release blocker
+## Current native-release blocker
 
 As of August 11, 2026, the code and build pipeline are prepared, but the final
 Apple Team ID, iOS bundle ID, Android package, and Android signing-certificate
 fingerprint have not been recorded in this repository. Native QR opening must not
 be described as live until those real values are configured, the association
 files are published, signed builds are installed, and the physical-device test
-passes.
+passes. This does not block the protected browser-only pilot described above.

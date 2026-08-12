@@ -57,6 +57,7 @@ jobs:
       EXPO_PUBLIC_ENABLE_APPLE_AUTH: "false"
       EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW: "false"
       EXPO_PUBLIC_ENABLE_GOOGLE_AUTH: "false"
+      GOGYMGO_BROWSER_ONLY_PILOT: "true"
     steps:
       - name: Validate protected environment configuration
         shell: bash
@@ -117,38 +118,7 @@ jobs:
           npm run build
           npm run audit:production-bundle -- dist
           npm run audit:demo-isolation
-          node <<'NODE'
-          const fs = require('node:fs');
-          const path = require('node:path');
-
-          function collect(directory) {
-            return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-              const fullPath = path.join(directory, entry.name);
-              return entry.isDirectory() ? collect(fullPath) : [fullPath];
-            });
-          }
-
-          const source = collect('dist')
-            .filter((file) => /\.(?:html|js|json)$/.test(file))
-            .map((file) => fs.readFileSync(file, 'utf8'))
-            .join('\n');
-          const expectedApi = process.env.EXPO_PUBLIC_API_URL;
-          const forbidden = [
-            'http://localhost:3000',
-            'http://127.0.0.1',
-            'https://127.0.0.1',
-            'trycloudflare.com'
-          ];
-
-          if (!source.includes(expectedApi)) {
-            throw new Error(`The export does not contain the configured API origin: ${expectedApi}`);
-          }
-          for (const marker of forbidden) {
-            if (source.includes(marker)) {
-              throw new Error(`The export contains forbidden endpoint marker: ${marker}`);
-            }
-          }
-          NODE
+          npm run audit:browser-pilot-release -- dist
 
       - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
@@ -182,6 +152,16 @@ jobs:
               --recursive \
               --cache-control 'public,max-age=31536000,immutable'
           fi
+          for key in \
+            .well-known/apple-app-site-association \
+            .well-known/assetlinks.json; do
+            if aws s3api head-object \
+              --bucket "$MEMBER_WEB_BUCKET" \
+              --key "$key" > /dev/null 2>&1; then
+              echo "Browser-only pilot must not publish ${key}." >&2
+              exit 1
+            fi
+          done
 
       - name: Invalidate and verify browser routes
         shell: bash
@@ -195,7 +175,7 @@ jobs:
           aws cloudfront wait invalidation-completed \
             --distribution-id "$MEMBER_WEB_DISTRIBUTION_ID" \
             --id "$invalidation_id"
-          for route in sign-up join demo; do
+          for route in sign-up join demo scan profile winners-circle; do
             curl --fail --show-error --silent \
               --retry 12 \
               --retry-all-errors \

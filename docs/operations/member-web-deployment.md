@@ -100,6 +100,13 @@ For a permanent release:
 7. verify sign-in, profile/region restoration, enrollment, reads and a
    non-destructive write with a staging Firebase account.
 
+The workflow builds the exact source commit and runs
+`audit:browser-pilot-release` before assuming the AWS deployment role. The audit
+requires the permanent HTTPS API origin, rejects browser-test and tunnel
+markers, verifies QR plus foreground-location pilot capabilities, and rejects
+native association files when signing identifiers are absent. The S3 publish
+step also removes and verifies the absence of stale association files.
+
 This browser deployment does not authorize or imply an iOS App Store, Google
 Play or native QR-link release.
 

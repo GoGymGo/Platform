@@ -279,19 +279,31 @@ jobs:
             echo "The worker failed to stabilize and was returned to zero tasks." >&2
             exit 1
           fi
-          worker_state="$(aws ecs describe-services \
-            --cluster "$ECS_CLUSTER" \
-            --services "$ECS_WORKER_SERVICE" \
-            --query 'services[0]' \
-            --output json)"
-          worker_actual_definition="$(jq -r '.taskDefinition' <<<"$worker_state")"
-          worker_rollout_state="$(jq -r '[.deployments[] | select(.status == "PRIMARY")][0].rolloutState // "UNKNOWN"' <<<"$worker_state")"
-          worker_desired_count="$(jq -r '.desiredCount' <<<"$worker_state")"
-          worker_running_count="$(jq -r '.runningCount' <<<"$worker_state")"
-          if [[ "$worker_actual_definition" != "$worker_definition" ||
-                "$worker_rollout_state" != "COMPLETED" ||
-                "$worker_desired_count" != "1" ||
-                "$worker_running_count" != "1" ]]; then
+          worker_rollout_complete=false
+          for attempt in {1..18}; do
+            worker_state="$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE" \
+              --query 'services[0]' \
+              --output json)"
+            worker_actual_definition="$(jq -r '.taskDefinition' <<<"$worker_state")"
+            worker_rollout_state="$(jq -r '[.deployments[] | select(.status == "PRIMARY")][0].rolloutState // "UNKNOWN"' <<<"$worker_state")"
+            worker_desired_count="$(jq -r '.desiredCount' <<<"$worker_state")"
+            worker_running_count="$(jq -r '.runningCount' <<<"$worker_state")"
+            if [[ "$worker_actual_definition" != "$worker_definition" ]]; then
+              break
+            fi
+            if [[ "$worker_rollout_state" == "COMPLETED" &&
+                  "$worker_desired_count" == "1" &&
+                  "$worker_running_count" == "1" ]]; then
+              worker_rollout_complete=true
+              break
+            fi
+            if [[ "$attempt" -lt 18 ]]; then
+              sleep 10
+            fi
+          done
+          if [[ "$worker_rollout_complete" != "true" ]]; then
             jq '{
               requestedTaskDefinition: $requested,
               actualTaskDefinition: .taskDefinition,
@@ -337,19 +349,31 @@ jobs:
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_API_SERVICE"
-          api_state="$(aws ecs describe-services \
-            --cluster "$ECS_CLUSTER" \
-            --services "$ECS_API_SERVICE" \
-            --query 'services[0]' \
-            --output json)"
-          api_actual_definition="$(jq -r '.taskDefinition' <<<"$api_state")"
-          api_rollout_state="$(jq -r '[.deployments[] | select(.status == "PRIMARY")][0].rolloutState // "UNKNOWN"' <<<"$api_state")"
-          api_desired_count="$(jq -r '.desiredCount' <<<"$api_state")"
-          api_running_count="$(jq -r '.runningCount' <<<"$api_state")"
-          if [[ "$api_actual_definition" != "$api_definition" ||
-                "$api_rollout_state" != "COMPLETED" ||
-                "$api_desired_count" != "1" ||
-                "$api_running_count" != "1" ]]; then
+          api_rollout_complete=false
+          for attempt in {1..18}; do
+            api_state="$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_API_SERVICE" \
+              --query 'services[0]' \
+              --output json)"
+            api_actual_definition="$(jq -r '.taskDefinition' <<<"$api_state")"
+            api_rollout_state="$(jq -r '[.deployments[] | select(.status == "PRIMARY")][0].rolloutState // "UNKNOWN"' <<<"$api_state")"
+            api_desired_count="$(jq -r '.desiredCount' <<<"$api_state")"
+            api_running_count="$(jq -r '.runningCount' <<<"$api_state")"
+            if [[ "$api_actual_definition" != "$api_definition" ]]; then
+              break
+            fi
+            if [[ "$api_rollout_state" == "COMPLETED" &&
+                  "$api_desired_count" == "1" &&
+                  "$api_running_count" == "1" ]]; then
+              api_rollout_complete=true
+              break
+            fi
+            if [[ "$attempt" -lt 18 ]]; then
+              sleep 10
+            fi
+          done
+          if [[ "$api_rollout_complete" != "true" ]]; then
             jq '{
               requestedTaskDefinition: $requested,
               actualTaskDefinition: .taskDefinition,

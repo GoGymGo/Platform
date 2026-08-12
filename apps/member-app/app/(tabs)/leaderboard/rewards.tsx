@@ -34,6 +34,7 @@ export default function RewardMarketplaceScreen() {
   );
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const { competition } = useWorkoutProgress();
+  const hasVerifiedRegion = Boolean(regionVerification?.regionCode);
   const rewardsQuery = useRewardCatalog(
     regionVerification?.regionCode ?? '',
     competition.competitionMonthKey
@@ -83,7 +84,17 @@ export default function RewardMarketplaceScreen() {
           </TerminalText>
         </HUDBorderBox> : null}
 
-        {rewardsQuery.isError ? (
+        {!hasVerifiedRegion ? (
+          <HUDBorderBox style={styles.emptyCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
+              REGION SETUP REQUIRED
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              Complete Contest setup on a phone or tablet to confirm your region and
+              load its available Brand Rewards.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : rewardsQuery.isError ? (
           <RecoverableError
             body="The regional reward catalog could not be loaded. Retry without leaving the marketplace."
             onRetry={() => {

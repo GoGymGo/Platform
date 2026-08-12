@@ -1,6 +1,7 @@
 import { createUserStorage } from '@/services/storage/userStorage';
 import { creatorFeaturesEnabled } from '@/config/features';
 import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { devicePresenceConsentVersion } from '@/domain/accountSettings';
 
 export { devicePresenceConsentVersion as biometricCameraConsentVersion } from '@/domain/accountSettings';
@@ -30,6 +31,12 @@ export function getPreferenceOwnerId(userId: string | null | undefined) {
 }
 
 const defaultVerificationPreference: VerificationPreference = {
+  method: 'partnerGymQr',
+  sourceKey: 'partnerGymQr',
+  sourceLabel: 'PARTNER GYM LOCATION'
+};
+
+const heartRateVerificationPreference: VerificationPreference = {
   method: 'heartRate',
   sourceKey: 'heartRateDevice',
   sourceLabel: 'HEART-RATE DEVICE'
@@ -38,9 +45,18 @@ const defaultVerificationPreference: VerificationPreference = {
 function getSupportedVerificationPreference(
   preference: VerificationPreference
 ): VerificationPreference {
-  return preference.method === 'partnerGymQr' && !verifiedPartnerGymCatalogAvailable
-    ? defaultVerificationPreference
-    : preference;
+  if (preference.method === 'heartRate' && !heartRateTelemetryAvailable) {
+    return defaultVerificationPreference;
+  }
+  if (preference.method === 'partnerGymQr' && !verifiedPartnerGymCatalogAvailable) {
+    return heartRateTelemetryAvailable
+      ? heartRateVerificationPreference
+      : defaultVerificationPreference;
+  }
+  if (preference.method === 'partnerGymQr') {
+    return defaultVerificationPreference;
+  }
+  return preference;
 }
 
 export function isBiometricCameraConsentCurrent(value: string | null) {
@@ -139,7 +155,7 @@ export async function getVerificationPreference(userId: string): Promise<Verific
         return {
           method: 'partnerGymQr',
           sourceKey: 'partnerGymQr',
-          sourceLabel: 'PARTNER GYM QR'
+          sourceLabel: 'PARTNER GYM LOCATION'
         };
       }
 
@@ -153,6 +169,10 @@ export async function getVerificationPreference(userId: string): Promise<Verific
           defaultVerificationPreference.method
         )
       ]);
+    }
+
+    if (savedMethod === 'heartRate' && heartRateTelemetryAvailable) {
+      return heartRateVerificationPreference;
     }
 
     return defaultVerificationPreference;
@@ -176,8 +196,11 @@ export async function savePreferredVerificationMethod(
   userId: string,
   method: PreferredVerificationMethod
 ) {
-  const supportedMethod =
-    method === 'partnerGymQr' && !verifiedPartnerGymCatalogAvailable ? 'heartRate' : method;
+  const supportedMethod = getSupportedVerificationPreference(
+    method === 'partnerGymQr'
+      ? defaultVerificationPreference
+      : heartRateVerificationPreference
+  ).method;
   const currentPreference = await getVerificationPreference(userId);
   await saveVerificationPreference(
     userId,
@@ -187,9 +210,9 @@ export async function savePreferredVerificationMethod(
         ? {
             method: supportedMethod,
             sourceKey: 'partnerGymQr',
-            sourceLabel: 'PARTNER GYM QR'
+            sourceLabel: 'PARTNER GYM LOCATION'
           }
-        : defaultVerificationPreference
+        : heartRateVerificationPreference
   );
 }
 

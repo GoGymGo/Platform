@@ -18,34 +18,49 @@ Competition publication requires a future registration close and start, a region
 
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, it instead cancels the competition, withdraws active enrollments, queues a neutral cancellation notification, and records an append-only audit event.
 
+After the contest end and its 15-minute workout completion period, the contest
+home exposes one **Finalize + publish results** confirmation. The dashboard
+generates a cryptographically random draw seed, commits the locked entrant
+snapshot through `POST /v1/operator/draws/lock`, then reveals that same seed
+through `POST /v1/operator/draws/:drawId/settle`. An interrupted publication
+keeps the pending reveal in the signed-in browser so the same audited draw can
+be resumed; do not clear browser storage while a contest says **Draw locked**.
+Successful settlement changes the contest to `settled` and makes its exact
+participant results available in the member Winners Circle.
+
 ## First administrator bootstrap
 
 There is deliberately no public role-grant endpoint. A user must verify their Firebase email and sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:
 
-The first production administrator is deliberately restricted to
-`s1ck5ense123@gmail.com`.
+The first production administrator is deliberately restricted to the owner
+identity stored as `GOGYMGO_OWNER_EMAIL` in the protected runtime secret manager.
 
 ```powershell
-$env:BOOTSTRAP_ADMIN_EMAIL='s1ck5ense123@gmail.com'
+$env:GOGYMGO_OWNER_EMAIL='<protected owner email>'
+$env:BOOTSTRAP_ADMIN_EMAIL=$env:GOGYMGO_OWNER_EMAIL
 $env:BOOTSTRAP_ADMIN_REASON='<approved change-ticket reason>'
 $env:CONFIRM_BOOTSTRAP_ADMIN='yes'
 npm.cmd run admin:bootstrap --workspace @gogymgo/api
 ```
 
-`DATABASE_URL` must already come from the runtime secret manager. Do not place any of these values in source control, shell scripts, CI logs, or Expo environment variables. The command resolves the already-created database user by email, is idempotent and records `user.admin_bootstrapped` in the append-only operator audit ledger.
+`DATABASE_URL` and `GOGYMGO_OWNER_EMAIL` must already come from the runtime
+secret manager. Do not place any of these values in source control, shell
+scripts, CI logs, or Expo environment variables. The command resolves the
+already-created database user by email, is idempotent and records
+`user.admin_bootstrapped` in the append-only operator audit ledger.
 
-Publishing a legal document is additionally restricted to this owner email and
-requires explicit approval of the exact immutable version. Unapproved legacy
-documents are not returned by the member legal API.
+Publishing a legal document is additionally restricted to this configured
+owner identity and requires explicit approval of the exact immutable version.
+Unapproved legacy documents are not returned by the member legal API.
 
 After the first bootstrap, role administration should be implemented as a separate, dual-approval security workflow before additional administrators are delegated. Do not broaden the configuration endpoints to grant roles.
 
 ## Issuing operator logins
 
-Dashboard logins are issued directly by GoGymGo only to approved gym owners and
-GoGymGo regional directors. The admin surface has no registration flow and does
-not accept Google or Apple sign-in. The API also rejects operator requests when
-the Firebase token's sign-in provider is anything other than `password`.
+Operator logins are issued directly by GoGymGo only to approved gym owners and
+GoGymGo staff. The portal has no registration flow and does not accept Google or
+Apple sign-in. The API also rejects portal requests when the Firebase token's
+sign-in provider is anything other than `password`.
 
 For each approved operator, a production owner must:
 
@@ -55,15 +70,34 @@ For each approved operator, a production owner must:
    verified operator email. Do not reuse a member or shared team account.
 3. Deliver the initial credentials through an approved private channel and
    require the operator to sign in once so the database identity is created.
-4. Grant the database `admin` role only through the audited infrastructure
-   workflow. Never add a public role-grant endpoint or trust Firebase token
-   claims as the authorization source.
-5. Confirm a normal member account receives `ADMIN_REQUIRED`, while the new
-   operator can enter, and retain that evidence with the access approval.
+4. For GoGymGo staff, grant the database `admin` role only through the audited
+   infrastructure workflow. For a partner, run the scoped assignment command
+   below and never grant `admin`. Never add a public role-grant endpoint or
+   trust Firebase token claims as the authorization source.
+5. Confirm a normal member account is denied, a partner can retrieve only its
+   assigned gyms, and a GoGymGo administrator can enter the full console. Retain
+   that evidence with the access approval.
 
-The current console is a full-administration surface. Do not issue a login to
-someone who is authorized for only one gym or one region until scoped operator
-permissions are implemented and reviewed.
+The `admin` role always opens the full-administration surface and must never be
+used for a gym-scoped operator. Gym partners use `gym_partner_admin` or
+`gym_partner_staff` plus an active per-gym assignment. Provision or revoke that
+assignment from a trusted administrative environment:
+
+```powershell
+$env:PARTNER_OPERATOR_EMAIL='<verified partner email>'
+$env:PARTNER_GYM_LOCATION_ID='<assigned gym UUID>'
+$env:PARTNER_ACCESS_LEVEL='admin' # or staff
+$env:PARTNER_ACCESS_ACTION='grant' # or revoke
+$env:PARTNER_ACCESS_REASON='<approved access-ticket reason>'
+$env:CONFIRM_PARTNER_ACCESS='yes'
+npm.cmd run partner:access --workspace @gogymgo/api
+```
+
+The partner must first sign in once with the GoGymGo-issued Firebase password
+account so the database identity exists. The command is transactional, updates
+the authoritative database roles, and records the assignment change in the
+append-only operator audit ledger. Partner competition proposals are always gym
+scoped and remain drafts until a GoGymGo administrator publishes them.
 
 ## Deployment checks
 

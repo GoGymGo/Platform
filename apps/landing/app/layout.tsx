@@ -5,7 +5,6 @@ import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
 import { AppLink } from "./components/AppLink";
 import { DesktopNavigation } from "./components/DesktopNavigation";
 import { MobileNavigation } from "./components/MobileNavigation";
-import { HashScrollManager } from "./components/HashScrollManager";
 import { PublicSiteAnalytics } from "./components/PublicSiteAnalytics";
 import { siteLinks } from "./site-links";
 import "./globals.css";
@@ -29,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
       : `Join the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`;
   const socialDescription =
     campaignState.phase === "ended"
-      ? "The September 2026 beta has ended. Review the pilot and request future regional updates."
-      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute verified partner-gym workouts. One ${septemberCampaign.reward} reward.`;
+      ? "The September 2026 beta has ended. Review the pilot and request future Regional updates."
+      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. One ${septemberCampaign.reward} Reward.`;
 
   return {
     metadataBase,
@@ -45,7 +44,7 @@ export async function generateMetadata(): Promise<Metadata> {
       "fitness challenges",
       "verified workouts",
       "gym rewards",
-      "fitness competition",
+      "fitness contest",
     ],
     openGraph: {
       title: "GoGymGo — Make consistency count",
@@ -73,7 +72,7 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: "/",
     },
     icons: {
-      icon: "/mark.png",
+      icon: "/mark.svg",
     },
     manifest: "/manifest.webmanifest",
   };
@@ -163,11 +162,9 @@ export default function RootLayout({
                 data-analytics-event="regional_updates_click"
                 href={siteLinks.regionalUpdates}
               >
-                Regional updates
+                Regional launch updates
               </Link>
-              {/* A full navigation lets the responsive hash target settle reliably. */}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a href="/#competition-scoring">How the competition works</a>
+              <Link href="/#how-it-works">How GoGymGo works</Link>
             </div>
             <div>
               <p className="footer-label">EXPLORE</p>
@@ -176,9 +173,9 @@ export default function RootLayout({
               </AppLink>
               <Link
                 data-analytics-event="brand_partnership_click"
-                href={siteLinks.partners}
+                href={siteLinks.brands}
               >
-                Partner with GoGymGo
+                Fitness brand partnerships
               </Link>
               <Link href={siteLinks.faq}>Frequently asked questions</Link>
               <Link href={siteLinks.contact}>Contact</Link>
@@ -186,11 +183,18 @@ export default function RootLayout({
             <div>
               <p className="footer-label">LEGAL & ACCESS</p>
               <AppLink href={siteLinks.privacy}>Privacy Policy</AppLink>
+              <Link href={siteLinks.accountDeletion}>Account deletion</Link>
               <AppLink href={siteLinks.terms}>Terms of Service</AppLink>
               <AppLink href={siteLinks.officialRules}>
                 Official Contest Rules
               </AppLink>
               <Link href={siteLinks.accessibility}>Accessibility</Link>
+              <AppLink
+                destinationLabel="opens the GoGymGo admin dashboard"
+                href={siteLinks.adminDashboard}
+              >
+                Admin dashboard
+              </AppLink>
             </div>
           </div>
           <div className="shell footer-bottom">
@@ -200,7 +204,6 @@ export default function RootLayout({
             </AppLink>
           </div>
         </footer>
-        <HashScrollManager />
         <PublicSiteAnalytics />
       </body>
     </html>

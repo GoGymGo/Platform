@@ -1,4 +1,7 @@
 import {
+  canCompleteGymSession,
+  canStartGymSession,
+  competitionCompletionDeadline,
   gymScanPolicy,
   hashOpaqueValue,
   isAcceptableLocationAccuracy,
@@ -18,6 +21,18 @@ describe('static gym QR scan policy', () => {
   it('accepts the exact geofence boundary and rejects the first point outside', () => {
     expect(isWithinGymGeofence(75, 75)).toBe(true);
     expect(isWithinGymGeofence(75.001, 75)).toBe(false);
+  });
+
+  it('accepts an accurate reading whose uncertainty overlaps the gym boundary', () => {
+    expect(isWithinGymGeofence(105, 75, 30)).toBe(true);
+    expect(isWithinGymGeofence(105.001, 75, 30)).toBe(false);
+    expect(isWithinGymGeofence(125, 75, 50)).toBe(true);
+    expect(isWithinGymGeofence(125.001, 75, 50)).toBe(false);
+  });
+
+  it('caps coarse location uncertainty instead of rejecting a nearby centre point', () => {
+    expect(isWithinGymGeofence(125, 75, 100_000)).toBe(true);
+    expect(isWithinGymGeofence(125.001, 75, 100_000)).toBe(false);
   });
 
   it('rejects poor accuracy readings', () => {
@@ -62,5 +77,39 @@ describe('static gym QR scan policy', () => {
         startedAt,
       }),
     ).toEqual({ outcome: 'rejected', reason: 'session_expired' });
+  });
+
+  it('keeps the 30-minute minimum and provides a 15-minute completion grace period', () => {
+    const endsAt = new Date('2026-09-01T18:00:00.000Z');
+
+    expect(competitionCompletionDeadline(endsAt)).toEqual(
+      new Date('2026-09-01T18:15:00.000Z'),
+    );
+    expect(
+      canStartGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T17:44:59.999Z'),
+      }),
+    ).toBe(true);
+    expect(
+      canStartGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T17:45:00.000Z'),
+      }),
+    ).toBe(false);
+    expect(
+      canCompleteGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T18:14:59.999Z'),
+        startedAt: new Date('2026-09-01T17:45:00.000Z'),
+      }),
+    ).toBe(true);
+    expect(
+      canCompleteGymSession({
+        competitionEndsAt: endsAt,
+        now: new Date('2026-09-01T18:15:00.000Z'),
+        startedAt: new Date('2026-09-01T17:45:00.000Z'),
+      }),
+    ).toBe(false);
   });
 });

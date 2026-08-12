@@ -16,6 +16,23 @@ const principal: AuthenticatedPrincipal = {
 describe('AdminAuthorizationService', () => {
   const transaction = {} as Transaction<Database>;
 
+  function transactionWithAssignments(
+    assignments: { access_level: 'admin' | 'staff'; gym_location_id: string }[],
+  ): Transaction<Database> {
+    const query = {
+      execute: jest.fn().mockResolvedValue(assignments),
+      orderBy: jest.fn(),
+      select: jest.fn(),
+      where: jest.fn(),
+    };
+    query.select.mockReturnValue(query);
+    query.where.mockReturnValue(query);
+    query.orderBy.mockReturnValue(query);
+    return {
+      selectFrom: jest.fn().mockReturnValue(query),
+    } as unknown as Transaction<Database>;
+  }
+
   it('rejects social-provider sessions for the operator console', async () => {
     const ensureUser = jest.fn();
     const profiles = {
@@ -63,5 +80,76 @@ describe('AdminAuthorizationService', () => {
     await expect(service.requireAdmin(principal, transaction)).resolves.toBe(
       admin,
     );
+  });
+
+  it('resolves a gym partner only from matching database roles and assignments', async () => {
+    const partner = {
+      email: 'partner@example.com',
+      id: 'partner-1',
+      roles: ['gym_partner_admin'],
+    };
+    const profiles = {
+      ensureUser: jest.fn().mockResolvedValue(partner),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.resolvePortalAccess(
+        principal,
+        transactionWithAssignments([
+          { access_level: 'admin', gym_location_id: 'gym-1' },
+          { access_level: 'staff', gym_location_id: 'gym-2' },
+        ]),
+      ),
+    ).resolves.toEqual({
+      assignments: [
+        { accessLevel: 'admin', gymLocationId: 'gym-1' },
+        { accessLevel: 'staff', gymLocationId: 'gym-2' },
+      ],
+      kind: 'gym_partner',
+      user: partner,
+    });
+  });
+
+  it('denies partner roles that have no active gym assignment', async () => {
+    const profiles = {
+      ensureUser: jest.fn().mockResolvedValue({
+        id: 'partner-1',
+        roles: ['gym_partner_staff'],
+      }),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.resolvePortalAccess(principal, transactionWithAssignments([])),
+    ).rejects.toMatchObject({
+      response: { code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED' },
+    });
+  });
+
+  it('enforces per-gym management level for partner actions', async () => {
+    const profiles = {
+      ensureUser: jest.fn().mockResolvedValue({
+        id: 'partner-1',
+        roles: ['gym_partner_staff'],
+      }),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.requireGymAccess(
+        principal,
+        transactionWithAssignments([
+          { access_level: 'staff', gym_location_id: 'gym-1' },
+        ]),
+        'gym-1',
+        'admin',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_SCOPE_FORBIDDEN' },
+    });
   });
 });

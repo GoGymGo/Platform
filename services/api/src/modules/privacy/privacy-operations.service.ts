@@ -30,7 +30,7 @@ export class PrivacyOperationsService {
   private readonly pseudonymizer?: PrivacyPseudonymizer;
 
   constructor(
-    private readonly config: ConfigService<Environment, true>,
+    config: ConfigService<Environment, true>,
     private readonly exportBuilder: PrivacyExportBuilder,
     private readonly repository: PrivacyOperationsRepository,
     @Inject(ACCOUNT_IDENTITY_ADMIN)

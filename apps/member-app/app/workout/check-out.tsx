@@ -1,8 +1,7 @@
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
@@ -10,9 +9,11 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { sessionTimeScale } from '@/config/runtime';
+import { legacyTimedWorkoutFlowAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { getSessionElapsedSeconds } from '@/domain/workoutProgress';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
@@ -32,6 +33,14 @@ function formatClock(totalSeconds: number) {
 }
 
 export default function CheckOutScreen() {
+  if (!legacyTimedWorkoutFlowAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <LegacyCheckOutScreen />;
+}
+
+function LegacyCheckOutScreen() {
   const router = useRouter();
   const { activeSession } = useWorkoutProgress();
   const {
@@ -82,7 +91,7 @@ export default function CheckOutScreen() {
           label: 'PRESENCE',
           value: activeSession?.presenceCheckRequired ? 'PASS' : 'NOT REQUIRED'
         },
-        { label: 'GYM QR', value: 'READY' }
+        { label: 'GYM LOCATION', value: 'READY' }
       ];
 
   if (!activeSession || !checkoutReady) {
@@ -91,10 +100,10 @@ export default function CheckOutScreen() {
         actionLabel={activeSession ? 'RETURN TO WORKOUT' : 'START A WORKOUT'}
         body={
           !activeSession
-            ? 'Start a verified session before opening check-out.'
+            ? 'Start a Verified workout before opening the finish location check.'
             : activeSession.verificationMethod === 'heartRate' && !heartRateReady
               ? 'Wait for the required heart-rate evidence to finish uploading.'
-              : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before check-out.`
+              : `The ${formatClock(activeSession.minimumSessionSeconds)} timer minimum${activeSession.presenceCheckRequired ? ' and automatic presence check' : ''} must pass before completion verification.`
         }
         onAction={() => {
           if (activeSession) {
@@ -121,6 +130,11 @@ export default function CheckOutScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
+      <OnboardingHeader
+        label="WORKOUT COMPLETION VERIFICATION"
+        onBack={() => goBackOrReplace(router, '/workout/active')}
+        step="FINISH"
+      />
       <WorkoutFlowProgress stage="complete" style={styles.workoutProgress} />
 
       <View style={styles.centerContent}>
@@ -132,14 +146,14 @@ export default function CheckOutScreen() {
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
           {formatClock(activeSession.minimumSessionSeconds)} COMPLETE
         </TerminalText>
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           VERIFY + FINISH
         </TerminalText>
 
         <View style={styles.metricRow}>
           {metrics.map((metric) => (
             <HUDBorderBox key={metric.label} style={styles.metricCard} tone="cyan">
-              <TerminalText glow style={styles.metricValue} tone="cyan" variant="body">
+              <TerminalText style={styles.metricValue} tone="cyan" variant="body">
                 {metric.value}
               </TerminalText>
               <TerminalText style={styles.metricLabel} tone="muted" variant="micro">
@@ -177,11 +191,6 @@ export default function CheckOutScreen() {
         </TerminalText>
       ) : null}
 
-      <CyberButtonOutline
-        label="BACK"
-        onPress={() => goBackOrReplace(router, '/workout/active')}
-        style={styles.backButton}
-      />
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -193,7 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.lg

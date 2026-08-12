@@ -4,18 +4,17 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { CompactTextButton } from '@/components/onboarding';
+import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
 import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
-import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import { fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 import {
   getVerificationPreference,
@@ -42,24 +41,23 @@ const verificationOptions: readonly VerificationOption[] = [
   },
   {
     available: verifiedPartnerGymCatalogAvailable,
-    body: 'Available after verified partner gyms and signed QR credentials are published.',
+    body: 'Use the gym selected during registration. The server verifies a fresh location at workout start and finish, plus the session time.',
     method: 'partnerGymQr',
     route: '/qr-scanner',
-    title: 'PARTNER GYM QR'
+    title: 'PARTNER GYM LOCATION'
   }
 ];
 
 export default function WorkoutMethodScreen() {
   const router = useRouter();
-  const { active: appTourActive } = useAppTour();
   const { user } = useAuth();
   const preferenceOwnerId = getPreferenceOwnerId(user?.uid);
-  const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('heartRate');
-  const [preferredSourceLabel, setPreferredSourceLabel] = useState('HEART-RATE DEVICE');
+  const [preferredMethod, setPreferredMethod] = useState<PreferredVerificationMethod>('partnerGymQr');
+  const [preferredSourceLabel, setPreferredSourceLabel] = useState('PARTNER GYM LOCATION');
   const [showVerificationRules, setShowVerificationRules] = useState(false);
   const orderedOptions = useMemo(
     () =>
-      [...verificationOptions].sort(
+      verificationOptions.filter(({ available }) => available).sort(
         (left, right) =>
           Number(right.method === preferredMethod) - Number(left.method === preferredMethod)
       ),
@@ -96,19 +94,21 @@ export default function WorkoutMethodScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <OnboardingHeader
+          label="WORKOUT SETUP"
+          onBack={() => goBackOrReplace(router, '/session' as Href)}
+          step="VERIFICATION"
+        />
         <WorkoutFlowProgress stage="device" style={styles.workoutProgress} />
-        <View style={styles.header}>
-          <TerminalText glow tone="cyan" variant="label">
-            WORKOUT VERIFICATION
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            HOW WILL YOU CHECK IN?
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Use fresh location readings at your selected Partner gym to start and finish your Verified workout."
+          eyebrow="WORKOUT VERIFICATION"
+          title="VERIFY YOUR WORKOUT"
+        />
 
         <View style={styles.optionList}>
           {orderedOptions.map((option) => {
-            const available = option.available || appTourActive;
+            const available = option.available;
             return (
               <Pressable
                 accessibilityRole="button"
@@ -122,19 +122,14 @@ export default function WorkoutMethodScreen() {
                   pressed ? styles.pressed : null
                 ]}
               >
-                <HUDBorderBox
-                  glow={available}
-                  style={styles.optionCard}
-                  tone={available ? 'cyan' : 'muted'}
-                >
+                <HUDBorderBox style={styles.optionCard} tone={available ? 'cyan' : 'muted'}>
                   <View style={styles.optionCopy}>
                     {option.method === preferredMethod ? (
-                      <TerminalText glow tone="green" variant="micro">
+                      <TerminalText tone="green" variant="micro">
                         {`${available ? 'YOUR DEFAULT' : 'SAVED PREFERENCE'} // ${preferredSourceLabel}`}
                       </TerminalText>
                     ) : null}
                     <TerminalText
-                      glow={available}
                       style={styles.optionTitle}
                       tone={available ? 'cyan' : 'dim'}
                       variant="body"
@@ -151,11 +146,10 @@ export default function WorkoutMethodScreen() {
                     </TerminalText>
                   </View>
                   <TerminalText
-                    glow={available}
                     tone={available ? 'cyan' : 'dim'}
                     variant="button"
                   >
-                    {available ? '->' : 'Unavailable'}
+                    {available ? '→' : 'Unavailable'}
                   </TerminalText>
                 </HUDBorderBox>
               </Pressable>
@@ -164,49 +158,27 @@ export default function WorkoutMethodScreen() {
         </View>
 
         <CompactTextButton
-          label={showVerificationRules ? 'Hide check-in details' : 'Why is this required?'}
+          label={showVerificationRules ? 'Hide verification details' : 'Why is this required?'}
           onPress={() => setShowVerificationRules((current) => !current)}
           tone={showVerificationRules ? 'muted' : 'cyan'}
         />
         {showVerificationRules ? (
           <HUDBorderBox style={styles.noteCard} tone="muted">
             <TerminalText style={styles.noteCopy} tone="muted" uppercase={false} variant="body">
-              Every workout includes a start check, mid-workout verification and completion check.
+              Your initial Contest QR selects the Partner gym once. After that, GoGymGo checks a fresh location reading at workout start and finish, plus the server timer, before awarding a Verified workout.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
 
-        <CyberButtonOutline
-          label="BACK"
-          onPress={() => goBackOrReplace(router, '/session' as Href)}
-          style={styles.backButton}
-        />
       </ScreenScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.screenX,
-    paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  },
+  content: brandScreenStyles.content,
   workoutProgress: {
     marginBottom: spacing.xl
-  },
-  title: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34,
-    textAlign: 'center'
   },
   optionList: {
     gap: spacing.md

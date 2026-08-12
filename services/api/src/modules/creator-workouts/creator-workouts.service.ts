@@ -61,6 +61,7 @@ export class CreatorWorkoutsService {
         'video_url',
         'workout_style',
       ])
+      .where('deleted_at', 'is', null)
       .where('published', '=', true)
       .where('published_at', 'is not', null)
       .where('published_at', '<=', new Date())
@@ -200,6 +201,7 @@ export class CreatorWorkoutsService {
             'workout_style',
           ])
           .where('id', '=', workoutId)
+          .where('deleted_at', 'is', null)
           .where('published', '=', true)
           .executeTakeFirst();
         if (!workout) {

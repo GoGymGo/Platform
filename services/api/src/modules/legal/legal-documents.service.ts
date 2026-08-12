@@ -271,6 +271,7 @@ export class LegalDocumentsService {
           .limit(1)
           .as('latest_state'),
       )
+      .where('document.deleted_at', 'is', null)
       .where('document.jurisdiction_code', 'in', hierarchy)
       .where('document.locale', '=', locale)
       .where('document.effective_at', '<=', now)

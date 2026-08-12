@@ -13,8 +13,6 @@ import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { isCompetitionBonusDay } from '@/domain/competition';
-import { shouldShowCreatorInvite } from '@/state/onboardingPreferences';
-import { useAuth } from '@/state/auth';
 import {
   type CompleteWorkoutResult,
   useWorkoutProgress
@@ -28,7 +26,6 @@ function formatClock(totalSeconds: number) {
 
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const {
     activeSession,
     completeActiveWorkout,
@@ -38,7 +35,6 @@ export default function WorkoutCompleteScreen() {
     currentWeekVerified,
     sessionActionError,
     totalEntries,
-    verifiedSessionCount,
     weeklyGoal
   } = useWorkoutProgress();
   const didCompleteSession = useRef(false);
@@ -47,7 +43,6 @@ export default function WorkoutCompleteScreen() {
   const [minimumSessionSeconds] = useState(
     () => activeSession?.minimumSessionSeconds ?? null
   );
-  const [wasFirstVerifiedWorkout] = useState(() => verifiedSessionCount === 0);
   const [completionResult, setCompletionResult] = useState<
     CompleteWorkoutResult | 'pending' | 'submission-failed'
   >('pending');
@@ -81,17 +76,7 @@ export default function WorkoutCompleteScreen() {
     completionResult === 'completed' && completedOnBonusDay ? weeklyGoal : 0;
   const competitionNotStarted = competition.phase === 'before-month';
 
-  const continueFromCompletion = async () => {
-    if (
-      completionResult === 'completed' &&
-      wasFirstVerifiedWorkout &&
-      user &&
-      await shouldShowCreatorInvite(user.uid)
-    ) {
-      router.replace('/creator/apply?source=first-workout' as Href);
-      return;
-    }
-
+  const continueFromCompletion = () => {
     router.replace('/home');
   };
 
@@ -99,7 +84,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="START A WORKOUT"
-        body="A session must pass the server-set timer and evidence requirements before competition credit can be awarded."
+        body="A workout must pass the server-set timer and evidence requirements before contest credit can be awarded."
         onAction={() => router.replace('/session' as Href)}
         title="WORKOUT NOT STARTED"
       />
@@ -115,11 +100,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="RETURN TO WORKOUT"
-        body={
-          completionResult === 'heart-rate-evidence-not-met'
-            ? 'The required heart-rate evidence has not finished uploading. Return to the workout and try again.'
-            : `The session could not be completed because the ${minimumSessionSeconds ? formatClock(minimumSessionSeconds) : 'server-set'} timer or a required presence check did not pass.`
-        }
+        body={`The workout could not be completed because the ${minimumSessionSeconds ? formatClock(minimumSessionSeconds) : 'server-set'} timer or required verification evidence was incomplete.`}
         onAction={() => router.replace('/session' as Href)}
         title="ACTION NEEDED"
       />
@@ -141,7 +122,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="GO TO HOME"
-        body="Your workout and evidence were submitted successfully. Competition credit and entries will appear only after server review approves the session."
+        body="Your workout and evidence were submitted successfully. Contest credit and entries will appear only after server review approves the workout."
         onAction={() => router.replace('/home')}
         title="IN REVIEW"
       />
@@ -152,7 +133,7 @@ export default function WorkoutCompleteScreen() {
     return (
       <SessionUnavailable
         actionLabel="GO TO HOME"
-        body="The submitted workout did not meet the competition's server-side duration or evidence requirements, so no credit or entries were awarded."
+        body="The submitted workout did not meet the contest's server-side duration or evidence requirements, so no credit or entries were awarded."
         onAction={() => router.replace('/home')}
         title="NOT ELIGIBLE"
       />
@@ -190,23 +171,23 @@ export default function WorkoutCompleteScreen() {
         <TerminalText glow style={styles.eyebrow} tone="green" variant="label">
           COMPLETE
         </TerminalText>
-        <TerminalText glow style={styles.title} tone={entriesAwarded > 0 ? 'pink' : 'green'} variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           {completionResult === 'completed'
             ? entriesAwarded > 0
               ? `+${entriesAwarded} BONUS DAY PRIZE DRAW ${entriesAwarded === 1 ? 'ENTRY' : 'ENTRIES'}`
               : competitionNotStarted
                 ? 'PERSONAL WORKOUT VERIFIED'
                 : 'WORKOUT CREDIT SECURED'
-            : 'SESSION ALREADY LOGGED TODAY'}
+            : 'WORKOUT ALREADY LOGGED TODAY'}
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           {completionResult === 'completed'
             ? entriesAwarded > 0
-              ? `Today is a Bonus Day. This verified workout adds ${entriesAwarded} Prize Draw ${entriesAwarded === 1 ? 'Entry' : 'Entries'}, equal to your Weekly Goal.`
+              ? `Today is a Bonus Day. This Verified workout adds ${entriesAwarded} Prize Draw ${entriesAwarded === 1 ? 'Entry' : 'Entries'}, equal to your Weekly Goal.`
               : competitionNotStarted
-                ? 'Today is checked off in your Workout Calendar. Competition scoring has not opened yet, so this session does not add competition credit.'
-                : 'Today is checked off. This verified workout counts toward your current scoring week; entries settle when the week closes.'
-            : 'Today remains checked off, but a second verified session on the same day does not create another verified day or entry award.'}
+                ? 'Today is checked off in your Workout Calendar. Contest scoring has not opened yet, so this workout does not add contest credit.'
+                : 'Today is checked off. This Verified workout counts toward your current scoring week; entries settle when the week closes.'
+            : 'Today remains checked off, but a second Verified workout on the same day does not create another verified day or entry award.'}
         </TerminalText>
 
         <HUDBorderBox style={styles.progressCard} tone="cyan">
@@ -218,7 +199,7 @@ export default function WorkoutCompleteScreen() {
                   ? 'PRE-COMP VERIFIED'
                 : `WEEK ${currentWeekIndex ?? 1} PROGRESS`}
             </TerminalText>
-            <TerminalText glow tone="cyan" variant="label">
+            <TerminalText tone="cyan" variant="label">
               {currentWeekVerified} OF {weeklyGoal} {weeklyGoal === 1 ? 'DAY' : 'DAYS'}
             </TerminalText>
           </View>
@@ -234,16 +215,16 @@ export default function WorkoutCompleteScreen() {
             {competition.phase === 'bonus-days'
               ? `Each verified Bonus Day workout adds ${weeklyGoal} ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before a Perfect Month 10x.`
               : competitionNotStarted
-                ? 'This session builds your personal workout history only. Competition credit begins when scoring opens.'
+                ? 'This workout builds your personal workout history only. Contest credit begins when scoring opens.'
               : remainingSessions > 0
-                ? `Complete ${remainingSessions} more verified ${remainingSessions === 1 ? 'session' : 'sessions'} to hit this week's goal.`
+                ? `Complete ${remainingSessions} more Verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal.`
                 : 'Weekly Goal hit. Your Weekly Challenge multiplier is ready to settle.'}
           </TerminalText>
         </HUDBorderBox>
 
         <View style={styles.statsRow}>
           <HUDBorderBox style={styles.statCard} tone="cyan">
-            <TerminalText glow style={styles.statValue} tone="cyan" variant="body">
+            <TerminalText style={styles.statValue} tone="cyan" variant="body">
               {currentStreak}
             </TerminalText>
             <TerminalText style={styles.statLabel} tone="muted" variant="micro">
@@ -251,7 +232,7 @@ export default function WorkoutCompleteScreen() {
             </TerminalText>
           </HUDBorderBox>
           <HUDBorderBox style={styles.statCard} tone="cyan">
-            <TerminalText glow style={styles.statValue} tone="cyan" variant="body">
+            <TerminalText style={styles.statValue} tone="cyan" variant="body">
               {totalEntries}
             </TerminalText>
             <TerminalText style={styles.statLabel} tone="muted" variant="micro">
@@ -261,9 +242,7 @@ export default function WorkoutCompleteScreen() {
         </View>
 
         <CyberButtonPrimary
-          label={completionResult === 'completed' && wasFirstVerifiedWorkout
-            ? 'Continue'
-            : 'Go to Home'}
+          label="GO TO HOME"
           onPress={continueFromCompletion}
         />
 
@@ -277,7 +256,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.screenX,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   screen: {
     flexGrow: 1,
@@ -285,7 +264,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.xl
@@ -341,8 +320,7 @@ const styles = StyleSheet.create({
     borderRadius: 4
   },
   progressBarDone: {
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.cyan
   },
   progressBarOpen: {
     backgroundColor: colors.whiteAlpha08

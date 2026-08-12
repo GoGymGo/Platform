@@ -98,7 +98,11 @@ resource "aws_ecs_task_definition" "api" {
     operating_system_family = "LINUX"
   }
 
-  lifecycle { ignore_changes = [container_definitions] }
+  lifecycle {
+    create_before_destroy = true
+    ignore_changes        = [container_definitions]
+    replace_triggered_by  = [aws_iam_role_policy.ecs_execution]
+  }
 }
 
 resource "aws_ecs_task_definition" "worker" {
@@ -192,7 +196,7 @@ resource "aws_ecs_task_definition" "migration" {
 resource "aws_ecs_service" "api" {
   cluster                            = aws_ecs_cluster.main.id
   deployment_maximum_percent         = 200
-  deployment_minimum_healthy_percent = var.api_desired_count == 0 ? 0 : 100
+  deployment_minimum_healthy_percent = 100
   desired_count                      = var.api_desired_count
   enable_execute_command             = false
   force_new_deployment               = false
@@ -233,7 +237,7 @@ resource "aws_ecs_service" "api" {
 resource "aws_ecs_service" "worker" {
   cluster                            = aws_ecs_cluster.main.id
   deployment_maximum_percent         = 200
-  deployment_minimum_healthy_percent = var.worker_desired_count == 0 ? 0 : 100
+  deployment_minimum_healthy_percent = 100
   desired_count                      = var.worker_desired_count
   enable_execute_command             = false
   launch_type                        = "FARGATE"

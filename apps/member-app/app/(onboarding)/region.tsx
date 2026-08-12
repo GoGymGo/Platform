@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 
@@ -6,15 +6,20 @@ import { AccountLegalAgreement } from '@/components/accountLegalAgreement';
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
 import {
   CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
-  ScreenContainer,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
+import {
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
 import { OnboardingHeader } from '@/components/onboarding';
+import { getUserFacingErrorMessage } from '@/components/reliability';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { submitRegionWaitlist } from '@/data/regionWaitlistRepository';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { ApiError } from '@/services/api/client';
@@ -34,19 +39,25 @@ type VerificationState =
   | 'unsupported-region';
 
 export default function RegionScreen() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
+  }
+
+  return <MobileRegionScreen />;
+}
+
+function MobileRegionScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const { api } = useApi();
   const { user } = useAuth();
   const { source } = useLocalSearchParams<{ source?: string }>();
-  const {
-    competitionRegion,
-    regionVerification,
-    verifyCompetitionRegion
-  } = useCompetitionRegion();
+  const { competitionRegion, regionVerification, verifyCompetitionRegion } = useCompetitionRegion();
   const createRegionVerification = useCreateRegionVerification();
-  const [verificationState, setVerificationState] =
-    useState<VerificationState>('idle');
+  const [verificationState, setVerificationState] = useState<VerificationState>('idle');
   const [requestedRegion, setRequestedRegion] = useState('');
   const [waitlistBusy, setWaitlistBusy] = useState(false);
   const [waitlistJoined, setWaitlistJoined] = useState(false);
@@ -55,11 +66,10 @@ export default function RegionScreen() {
   const isHomeSource = source === 'home';
   const isGymScanSource = source === 'gym-scan';
   const approvedRegionReady =
-    regionVerification?.status === 'verified' &&
-    Boolean(regionVerification.verificationId);
+    regionVerification?.status === 'verified' && Boolean(regionVerification.verificationId);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const permissionDeniedMessage =
-    'LOCATION ACCESS WAS NOT ALLOWED. ENABLE LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
+    'ALLOW LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
 
   async function checkDeviceLocation() {
     setVerificationState('checking');
@@ -84,7 +94,9 @@ export default function RegionScreen() {
 
     const result = await verifyCompetitionRegionWithDeviceLocation();
     if (result.status !== 'location-read') {
-      setVerificationState(result.status);
+      setVerificationState(
+        result.status === 'mobile-required' ? 'location-unavailable' : result.status
+      );
       return;
     }
 
@@ -110,7 +122,7 @@ export default function RegionScreen() {
 
   async function joinRegionWaitlist() {
     if (!api || !user?.email || requestedRegion.trim().length < 2) {
-      setWaitlistError('Enter the city or region where you want GoGymGo to launch.');
+      setWaitlistError('Enter your city or region.');
       return;
     }
     setWaitlistBusy(true);
@@ -123,9 +135,10 @@ export default function RegionScreen() {
       setWaitlistJoined(true);
     } catch (error) {
       setWaitlistError(
-        error instanceof Error
-          ? error.message
-          : 'The regional waitlist could not be updated. Try again.'
+        getUserFacingErrorMessage(
+          error,
+          'Couldn\'t save your request. Try again.'
+        )
       );
     } finally {
       setWaitlistBusy(false);
@@ -133,7 +146,7 @@ export default function RegionScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -141,31 +154,25 @@ export default function RegionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
-          label={isProfileSource ? 'COMPETITION REGION' : 'REGION + AGREEMENTS'}
-          onBack={() => goBackOrReplace(
-            router,
-            isProfileSource ? '/profile' : isHomeSource ? '/home' : '/join'
-          )}
+          label={isProfileSource ? 'CONTEST REGION' : 'REGION + AGREEMENTS'}
+          onBack={() =>
+            goBackOrReplace(router, isProfileSource ? '/profile' : isHomeSource ? '/home' : '/join')
+          }
           progress={isProfileSource ? 100 : 50}
           step={isProfileSource ? 'PROFILE' : 'SETUP // 1 OF 2'}
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           {isProfileSource
             ? 'REVERIFY YOUR REGION'
             : approvedRegionReady
               ? 'REGION VERIFIED'
               : 'VERIFY YOUR REGION'}
         </TerminalText>
-        <TerminalText
-          style={styles.body}
-          tone="muted"
-          uppercase={false}
-          variant="body"
-        >
+        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           {approvedRegionReady && !isProfileSource
-            ? `${competitionRegion.label} sets your competition, available rewards and local scoring time.`
-            : 'Your verified location sets your regional competition, available rewards and local scoring time.'}
+            ? `${competitionRegion.label} is your Contest region.`
+            : 'Use your location to find your Contest region.'}
         </TerminalText>
 
         {!approvedRegionReady || isProfileSource ? (
@@ -173,10 +180,8 @@ export default function RegionScreen() {
             <TerminalText tone="cyan" variant="label">
               ONE-TIME LOCATION CHECK
             </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              GoGymGo sends your location once for a secure region check. We
-              save the approved region—not your coordinates—and never track you
-              in the background.
+            <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
+              We check once, save only your region, and do not track you.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -188,7 +193,7 @@ export default function RegionScreen() {
                 <TerminalText tone="dim" variant="label">
                   CURRENT VERIFIED REGION
                 </TerminalText>
-                <TerminalText tone="text" variant="body">
+                <TerminalText style={styles.bodyCopy} tone="text" variant="body">
                   {competitionRegion.label}
                 </TerminalText>
               </View>
@@ -200,7 +205,7 @@ export default function RegionScreen() {
         ) : null}
 
         {!approvedRegionReady || isProfileSource ? (
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             disabled={verificationState === 'checking'}
             label={
               verificationState === 'checking'
@@ -213,35 +218,29 @@ export default function RegionScreen() {
         ) : null}
 
         {verificationState === 'permission-denied' ? (
-          <AuthStatusNotice
-            message={permissionDeniedMessage}
-            tone="amber"
-          />
+          <AuthStatusNotice message={permissionDeniedMessage} tone="amber" />
         ) : null}
         {verificationState === 'location-unavailable' ? (
           <AuthStatusNotice
-            message="YOUR LOCATION COULD NOT BE READ. CHECK DEVICE LOCATION SERVICES AND TRY AGAIN."
+            message="TURN ON DEVICE LOCATION, THEN TRY AGAIN."
             tone="amber"
           />
         ) : null}
         {verificationState === 'unsupported-region' ? (
-          <HUDBorderBox glow style={styles.waitlistCard} tone="amber">
-            <TerminalText glow tone="amber" variant="label">
-              LOCATION NOT VERIFIED
+          <HUDBorderBox style={styles.waitlistCard} tone="amber">
+            <TerminalText tone="amber" variant="label">
+              OUTSIDE THE SEPTEMBER PILOT REGION
             </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              We could not confirm that this device is inside Vancouver Island
-              or a supported Gulf Island. Check that your browser or device
-              location is enabled and accurate, then try again. If you are
-              outside the pilot area, join the regional waitlist below.
+            <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
+              This Contest is limited to Vancouver Island and supported Gulf Islands.
             </TerminalText>
             <CyberButtonOutline
               label="TRY LOCATION AGAIN"
               onPress={() => void checkDeviceLocation()}
             />
             {waitlistJoined ? (
-              <TerminalText live="polite" glow tone="green" variant="label">
-                REGIONAL WAITLIST CONFIRMED
+              <TerminalText live="polite" tone="green" variant="label">
+                REGIONAL UPDATES CONFIRMED
               </TerminalText>
             ) : (
               <>
@@ -255,12 +254,10 @@ export default function RegionScreen() {
                   placeholder="Example: Nanaimo, BC"
                   value={requestedRegion}
                 />
-                {waitlistError ? (
-                  <AuthStatusNotice message={waitlistError} tone="red" />
-                ) : null}
-                <CyberButtonPrimary
+                {waitlistError ? <AuthStatusNotice message={waitlistError} tone="red" /> : null}
+                <FirstRunPrimaryButton
                   disabled={waitlistBusy}
-                  label={waitlistBusy ? 'JOINING WAITLIST...' : 'JOIN REGIONAL WAITLIST ->'}
+                  label={waitlistBusy ? 'SAVING REQUEST...' : 'GET REGIONAL UPDATES ->'}
                   onPress={() => void joinRegionWaitlist()}
                   tone="amber"
                 />
@@ -270,13 +267,13 @@ export default function RegionScreen() {
         ) : null}
         {verificationState === 'service-error' ? (
           <AuthStatusNotice
-            message="REGION VERIFICATION COULD NOT BE COMPLETED. CHECK YOUR CONNECTION AND TRY AGAIN."
+            message="COULDN&apos;T VERIFY YOUR REGION. CHECK YOUR CONNECTION AND TRY AGAIN."
             tone="red"
           />
         ) : null}
 
         {verificationState === 'permission-denied' ? (
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             label={Platform.OS === 'web' ? 'RETRY AFTER ALLOWING' : 'OPEN DEVICE SETTINGS'}
             onPress={() => {
               if (Platform.OS === 'web') {
@@ -289,29 +286,33 @@ export default function RegionScreen() {
         ) : null}
 
         {approvedRegionReady ? (
-          <HUDBorderBox glow style={styles.verifiedCard} tone="green">
+          <HUDBorderBox style={styles.verifiedCard} tone="green">
             <View style={styles.resultRow}>
               <View style={styles.resultCopy}>
                 <TerminalText tone="green" variant="label">
                   VERIFIED REGION
                 </TerminalText>
-                <TerminalText glow tone="cyan" variant="title">
+                <TerminalText tone="cyan" variant="title">
                   {competitionRegion.label}
                 </TerminalText>
               </View>
-              <TerminalText glow tone="green" variant="label">
+              <TerminalText tone="green" variant="label">
                 VERIFIED
               </TerminalText>
             </View>
-            <TerminalText tone="muted" uppercase={false} variant="caption">
-              You will compete in {competitionRegion.label} and see rewards
-              available for this region.
+            <TerminalText
+              style={styles.captionCopy}
+              tone="muted"
+              uppercase={false}
+              variant="caption"
+            >
+              You&apos;ll compete and see rewards in {competitionRegion.label}.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
 
         {approvedRegionReady && !isProfileSource ? (
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             disabled={verificationState === 'checking'}
             label={
               verificationState === 'checking'
@@ -325,26 +326,24 @@ export default function RegionScreen() {
         {approvedRegionReady && !isProfileSource ? (
           <AccountLegalAgreement
             jurisdictionCode={jurisdictionCode}
-            onComplete={() => router.replace(
-              isHomeSource
-                ? '/commitment?source=home'
-                : isGymScanSource
-                  ? '/commitment?source=gym-scan'
-                  : '/commitment'
-            )}
+            onComplete={() =>
+              router.replace(
+                isHomeSource
+                  ? '/commitment?source=home'
+                  : isGymScanSource
+                    ? '/commitment?source=gym-scan'
+                    : '/commitment'
+              )
+            }
           />
         ) : null}
       </ScreenScrollView>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
 function getApiErrorCode(error: unknown) {
-  if (
-    !(error instanceof ApiError) ||
-    !error.body ||
-    typeof error.body !== 'object'
-  ) {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== 'object') {
     return null;
   }
   const body = error.body as {
@@ -361,20 +360,35 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     gap: spacing.md,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   title: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.screenTitle,
     lineHeight: 34,
-    textAlign: 'center'
+    paddingLeft: 14,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   body: {
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
+    marginBottom: spacing.sm,
+    paddingLeft: 16,
+    fontFamily: fontFamilies.ui,
+    fontSize: 16,
+    lineHeight: 24
+  },
+  bodyCopy: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
+  },
+  captionCopy: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   privacyCard: {
     gap: spacing.sm,

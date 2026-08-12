@@ -1,17 +1,20 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
-  ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import {
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useAppData } from '@/data/appDataHooks';
 import { useAuth } from '@/state/auth';
@@ -41,12 +44,14 @@ export default function JoinScreen() {
   const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
   const { social } = useAppData();
   const { user } = useAuth();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [redeemingInvite, setRedeemingInvite] = useState(false);
   const [showPartnerOptions, setShowPartnerOptions] = useState(false);
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -60,26 +65,24 @@ export default function JoinScreen() {
         />
 
         <View style={styles.header}>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
+          <TerminalText style={styles.title} tone="text" variant="title">
             HOW DO YOU WANT TO JOIN?
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Players can create an account or sign in below. Sponsors and
-            partner-gym teams can use their dedicated application forms.
+            Players join below. Sponsors and gyms use the Partner options.
           </TerminalText>
         </View>
 
         {challengeInvite ? (
-          <HUDBorderBox glow style={styles.inviteCard} tone="pink">
-            <TerminalText glow tone="pink" variant="label">
+          <HUDBorderBox style={styles.inviteCard} tone="pink">
+            <TerminalText tone="pink" variant="label">
               FRIEND CHALLENGE INVITATION
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              You were invited to a private GoGymGo challenge. Sign in or create an
-              account, then accept the invitation.
+              Sign in or create an account to accept this challenge.
             </TerminalText>
             {user ? (
-              <CyberButtonPrimary
+              <FirstRunPrimaryButton
                 disabled={redeemingInvite}
                 label={redeemingInvite ? 'ACCEPTING...' : 'ACCEPT CHALLENGE ->'}
                 onPress={() => {
@@ -105,13 +108,25 @@ export default function JoinScreen() {
           <TerminalText tone="dim" variant="label">
             FOR PLAYERS
           </TerminalText>
-          <CyberButtonPrimary
-            label="CREATE PLAYER ACCOUNT ->"
-            onPress={() => router.push(challengeInvite
-              ? { pathname: '/sign-up', params: { challengeInvite } }
-              : '/sign-up')}
+          <FirstRunPrimaryButton
+            disabled={!challengeInvite && !mobileGymVerificationAvailable}
+            label={challengeInvite ? 'CREATE PLAYER ACCOUNT ->' : 'SCAN GYM QR + CREATE ACCOUNT ->'}
+            onPress={() => router.push(
+              challengeInvite
+                ? { pathname: '/sign-up', params: { challengeInvite } }
+                : { pathname: '/qr-scanner', params: { enrollment: '1', next: 'sign-up' } }
+            )}
           />
-          <CyberButtonOutline
+          {!challengeInvite && mobileGymVerificationAvailable ? (
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              Scan the gym poster. We&apos;ll match your Contest, then verify your region.
+            </TerminalText>
+          ) : !challengeInvite ? (
+            <TerminalText tone="amber" uppercase={false} variant="caption">
+              Open GoGymGo on your phone and scan the gym poster.
+            </TerminalText>
+          ) : null}
+          <FirstRunSecondaryButton
             label="SIGN IN TO EXISTING ACCOUNT"
             onPress={() => router.push(challengeInvite
               ? { pathname: '/sign-in', params: { challengeInvite } }
@@ -120,7 +135,7 @@ export default function JoinScreen() {
         </View>
 
         <View style={styles.section}>
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             label={showPartnerOptions ? 'HIDE PARTNER OPTIONS' : 'PARTNER WITH GOGYMGO'}
             onPress={() => setShowPartnerOptions((visible) => !visible)}
           />
@@ -150,7 +165,7 @@ export default function JoinScreen() {
           />
         </View>
       </ScreenScrollView>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
@@ -169,15 +184,15 @@ function JoinApplicationOption({
     >
       <HUDBorderBox style={styles.optionRow} tone="cyan">
         <View style={styles.optionCopy}>
-          <TerminalText glow tone="cyan" variant="micro">
+          <TerminalText tone="cyan" variant="micro">
             {option.category}
           </TerminalText>
           <TerminalText tone="text" variant="body">
             {option.label}
           </TerminalText>
         </View>
-        <TerminalText glow tone="cyan" variant="button">
-          {'->'}
+        <TerminalText tone="cyan" uppercase={false} variant="button">
+          {'→'}
         </TerminalText>
       </HUDBorderBox>
     </Pressable>
@@ -188,25 +203,33 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     gap: spacing.xl,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   header: {
     gap: spacing.sm,
-    alignItems: 'center'
+    paddingLeft: 14,
+    paddingVertical: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   title: {
     fontFamily: fontFamilies.display,
-    textAlign: 'center'
+    lineHeight: 30
   },
   body: {
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
+    fontFamily: fontFamilies.ui,
+    fontSize: 16,
+    lineHeight: 24
   },
   section: {
-    gap: spacing.md
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.borderCyanSubtle
   },
   inviteCard: {
     gap: spacing.md,

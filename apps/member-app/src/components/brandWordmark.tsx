@@ -4,10 +4,15 @@ import { colors, fontFamilies, fontSizes, textGlow } from '@/constants/theme';
 
 type GoGymGoWordmarkProps = {
   compact?: boolean;
+  glow?: boolean;
   style?: StyleProp<TextStyle>;
 };
 
-export function GoGymGoWordmark({ compact = false, style }: GoGymGoWordmarkProps) {
+export function GoGymGoWordmark({
+  compact = false,
+  glow = false,
+  style
+}: GoGymGoWordmarkProps) {
   return (
     <Text
       accessibilityLabel="GoGymGo"
@@ -15,9 +20,9 @@ export function GoGymGoWordmark({ compact = false, style }: GoGymGoWordmarkProps
       maxFontSizeMultiplier={1.5}
       style={[styles.wordmark, compact ? styles.compact : null, style]}
     >
-      <Text style={styles.cyan}>GO</Text>
-      <Text style={styles.pink}>GYM</Text>
-      <Text style={styles.cyan}>GO</Text>
+      <Text style={[styles.cyan, glow ? textGlow.cyan : null]}>GO</Text>
+      <Text style={[styles.pink, glow ? textGlow.pink : null]}>GYM</Text>
+      <Text style={[styles.cyan, glow ? textGlow.cyan : null]}>GO</Text>
     </Text>
   );
 }
@@ -35,11 +40,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7
   },
   cyan: {
-    color: colors.cyan,
-    ...textGlow.cyan
+    color: colors.cyan
   },
   pink: {
-    color: colors.pink,
-    ...textGlow.pink
+    color: colors.pink
   }
 });

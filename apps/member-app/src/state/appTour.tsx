@@ -7,12 +7,12 @@ import {
   type PropsWithChildren
 } from 'react';
 import { useGlobalSearchParams, usePathname } from 'expo-router';
-import { Platform } from 'react-native';
 
 import {
   browserTestPreviewBuildEnabled,
   browserTestPreviewEnabled
 } from '@/config/browserTestPreview';
+import { isDemoPath, isDemoSearch } from '@/config/demoMode';
 
 export type AppTourScenario =
   | 'new-player'
@@ -23,10 +23,9 @@ export type AppTourScenario =
 
 type AppTourContextValue = {
   active: boolean;
-  demoActive: boolean;
-  enterDemo: (scenario?: AppTourScenario) => void;
   enterTour: (scenario?: AppTourScenario) => void;
   exitTour: () => void;
+  publicDemo: boolean;
   scenario: AppTourScenario;
 };
 
@@ -40,64 +39,57 @@ export function AppTourProvider({ children }: PropsWithChildren) {
     tourScenario?: string | string[];
   }>();
   const requestedScenario = parseScenario(firstParam(params.tourScenario));
+  const publicDemoRequested =
+    isDemoPath(pathname) || isDemoSearch(firstParam(params.demo));
   const browserPreviewLanding =
     browserTestPreviewBuildEnabled && pathname === '/';
-  const browserTourRequested =
-    browserTestPreviewEnabled &&
+  const tourRequested =
+    publicDemoRequested ||
     (
-      pathname === '/app-tour' ||
-      pathname === '/test-preview' ||
-      browserPreviewLanding ||
-      firstParam(params.appTour) === '1'
+      browserTestPreviewEnabled &&
+      (
+        pathname === '/app-tour' ||
+        pathname === '/test-preview' ||
+        browserPreviewLanding ||
+        firstParam(params.appTour) === '1'
+      )
     );
-  const publicDemoRequested =
-    Platform.OS === 'web' &&
-    (pathname === '/demo' || firstParam(params.demo) === '1');
-  const [active, setActive] = useState(browserTourRequested);
-  const [demoActive, setDemoActive] = useState(publicDemoRequested);
+  const [active, setActive] = useState(tourRequested);
+  const [publicDemoActive, setPublicDemoActive] = useState(publicDemoRequested);
   const [scenario, setScenario] = useState<AppTourScenario>(
     requestedScenario ?? (browserPreviewLanding ? 'new-player' : 'ready')
   );
-  const effectiveDemoActive = demoActive || publicDemoRequested;
-  const effectiveActive = active || browserTourRequested || effectiveDemoActive;
-  const effectiveScenario = effectiveDemoActive
-    ? scenario
-    : requestedScenario ?? scenario;
-
-  const enterDemo = useCallback((nextScenario: AppTourScenario = 'ready') => {
-    if (Platform.OS !== 'web') {
-      return;
-    }
-
-    setScenario(nextScenario);
-    setDemoActive(true);
-  }, []);
+  const effectivePublicDemo = publicDemoActive || publicDemoRequested;
+  const effectiveActive = active || tourRequested || effectivePublicDemo;
+  const effectiveScenario = requestedScenario ?? scenario;
 
   const enterTour = useCallback((nextScenario: AppTourScenario = 'ready') => {
-    if (!browserTestPreviewEnabled) {
+    if (!browserTestPreviewEnabled && !publicDemoRequested) {
       return;
     }
 
+    if (publicDemoRequested) {
+      setPublicDemoActive(true);
+    }
     setScenario(nextScenario);
     setActive(true);
-  }, []);
+  }, [publicDemoRequested]);
 
   const exitTour = useCallback(() => {
     setActive(false);
-    setDemoActive(false);
+    setPublicDemoActive(false);
     setScenario('ready');
   }, []);
 
   const value = useMemo(
     () => ({
       active: effectiveActive,
-      demoActive: effectiveDemoActive,
-      enterDemo,
       enterTour,
       exitTour,
+      publicDemo: effectivePublicDemo,
       scenario: effectiveScenario
     }),
-    [effectiveActive, effectiveDemoActive, effectiveScenario, enterDemo, enterTour, exitTour]
+    [effectiveActive, effectivePublicDemo, effectiveScenario, enterTour, exitTour]
   );
 
   return (

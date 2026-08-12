@@ -1,5 +1,11 @@
 import type { Href } from 'expo-router';
 
+import {
+  devicePresenceVerificationAvailable,
+  heartRateTelemetryAvailable,
+  legacyTimedWorkoutFlowAvailable,
+  midSessionPresenceVerificationAvailable
+} from '@/config/workoutVerification';
 import type { AppTourScenario } from '@/state/appTour';
 
 export type AppTourRoute = {
@@ -37,8 +43,7 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
     title: 'OPTIONAL SETUP',
     routes: [
       { label: 'Public Alias', route: '/identity' },
-      { label: 'Workout Device', route: '/verification?source=workout' },
-      { label: 'Competition Guide', route: '/how-it-works' }
+      { label: 'Contest Guide', route: '/how-it-works' }
     ]
   },
   {
@@ -62,32 +67,44 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
     title: 'WORKOUT FLOW',
     routes: [
       { label: 'Choose Method', route: '/workout/method' },
-      { label: 'Heart-Rate Check-In', route: '/workout/check-in' },
-      { label: 'Partner Gym QR', route: '/qr-scanner' },
-      {
-        label: 'Partner Gym Presence',
-        route: '/workout/identity-check?qrPayload=gogymgo:gym:entry:app-tour'
-      },
-      {
-        label: 'Active Timer',
-        route: '/workout/active',
-        scenario: 'active-workout'
-      },
-      {
-        label: 'Presence Check',
-        route: '/workout/ping',
-        scenario: 'presence-check'
-      },
-      {
-        label: 'Presence Confirmed',
-        route: '/workout/ping-success',
-        scenario: 'workout-complete'
-      },
-      {
-        label: 'Check-Out',
-        route: '/workout/check-out',
-        scenario: 'workout-complete'
-      },
+      ...(heartRateTelemetryAvailable
+        ? [{ label: 'Heart-Rate Verification', route: '/workout/check-in' }]
+        : []),
+      { label: 'Gym Location', route: '/qr-scanner' },
+      ...(devicePresenceVerificationAvailable
+        ? [{
+            label: 'Partner Gym Presence',
+            route: '/workout/identity-check?qrPayload=gogymgo:gym:entry:app-tour'
+          }]
+        : []),
+      ...(legacyTimedWorkoutFlowAvailable
+        ? [{
+            label: 'Active Timer',
+            route: '/workout/active',
+            scenario: 'active-workout' as AppTourScenario
+          }]
+        : []),
+      ...(midSessionPresenceVerificationAvailable
+        ? [
+            {
+              label: 'Presence Check',
+              route: '/workout/ping',
+              scenario: 'presence-check' as AppTourScenario
+            },
+            {
+              label: 'Presence Confirmed',
+              route: '/workout/ping-success',
+              scenario: 'workout-complete' as AppTourScenario
+            }
+          ]
+        : []),
+      ...(legacyTimedWorkoutFlowAvailable
+        ? [{
+            label: 'Completion Verification',
+            route: '/workout/check-out',
+            scenario: 'workout-complete' as AppTourScenario
+          }]
+        : []),
       {
         label: 'Workout Complete',
         route: '/workout/complete',
@@ -110,24 +127,49 @@ export const appTourRouteGroups: readonly AppTourRouteGroup[] = [
   {
     title: 'RULES + PRIVACY',
     routes: [
-      { label: 'Competition Rules', route: '/commitment-rules' },
+      { label: 'Contest Rules', route: '/commitment-rules' },
       { label: 'Official Contest Rules', route: '/official-rules' },
       { label: 'Bonus Rules', route: '/bonus-rules' },
       { label: 'Privacy Policy', route: '/privacy-policy' },
       { label: 'Terms of Service', route: '/terms-of-service' },
-      { label: 'Consent Settings', route: '/consent-settings' },
-      { label: 'Presence Notice', route: '/biometric-camera-consent' }
+      ...(devicePresenceVerificationAvailable
+        ? [
+            { label: 'Consent Settings', route: '/consent-settings' },
+            { label: 'Presence Notice', route: '/biometric-camera-consent' }
+          ]
+        : [])
     ]
   }
 ];
 
 export const appTourRoutes = appTourRouteGroups.flatMap(({ routes }) => routes);
 
-export function buildAppTourHref(route: AppTourRoute): Href {
+const publicDemoRouteNames = new Set([
+  '/home',
+  '/calendar',
+  '/leaderboard',
+  '/winners-circle',
+  '/leaderboard/rewards',
+  '/rewards/awards',
+  '/squad',
+  '/squad/social',
+  '/profile',
+  '/workouts'
+]);
+
+export const publicDemoRoutes = appTourRoutes.filter(({ route }) =>
+  publicDemoRouteNames.has(route)
+);
+
+export function buildAppTourHref(
+  route: AppTourRoute,
+  mode: 'demo' | 'review' = 'review'
+): Href {
   const scenario = route.scenario ?? 'ready';
   const join = route.route.includes('?') ? '&' : '?';
+  const modeParam = mode === 'demo' ? 'demo=1' : 'appTour=1';
 
-  return `${route.route}${join}appTour=1&tourScenario=${scenario}` as Href;
+  return `${route.route}${join}${modeParam}&tourScenario=${scenario}` as Href;
 }
 
 export function findAppTourRouteIndex(pathname: string) {

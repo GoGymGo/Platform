@@ -5,11 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { sql } from 'kysely';
 import type { Kysely, Selectable, Transaction } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
-import { normalizeDateKey } from '../../database/date-key';
 import { DatabaseService } from '../../database/database.service';
 import type {
   Database,
@@ -21,6 +20,7 @@ import type {
   SocialChallengeType,
   UsersTable,
 } from '../../database/database.types';
+import { normalizeDateKey } from '../../database/date-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -44,6 +44,12 @@ import type {
   SocialRelationship,
   UserSearchResultDto,
 } from './dto/social.dto';
+import { socialChallengeDateWindow } from './social-challenge-window';
+import {
+  contactDestinationHint,
+  normalizeContactDestination,
+  socialInvitationHash,
+} from './social-contact';
 
 type DatabaseExecutor = Kysely<Database> | Transaction<Database>;
 
@@ -58,46 +64,6 @@ interface StreakCountsJson extends JsonObject {
   monthly: number;
   weekly: number;
   yearly: number;
-}
-
-function normalizeContactDestination(
-  channel: 'email' | 'phone',
-  value: string,
-) {
-  const trimmed = value.trim();
-  if (channel === 'email') {
-    const email = trimmed.toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new BadRequestException({
-        code: 'CHALLENGE_CONTACT_EMAIL_INVALID',
-        message: 'Enter a valid email address.',
-      });
-    }
-    return email;
-  }
-  const phone = trimmed.replace(/[\s().-]/g, '');
-  if (!/^\+?[1-9]\d{7,14}$/.test(phone)) {
-    throw new BadRequestException({
-      code: 'CHALLENGE_CONTACT_PHONE_INVALID',
-      message: 'Enter a phone number with country code.',
-    });
-  }
-  return phone.startsWith('+') ? phone : `+${phone}`;
-}
-
-function contactDestinationHint(
-  channel: 'email' | 'phone',
-  destination: string,
-) {
-  if (channel === 'email') {
-    const [local, domain] = destination.split('@');
-    return `${local.slice(0, 1)}***@${domain}`;
-  }
-  return `•••${destination.slice(-4)}`;
-}
-
-function sha256(value: string) {
-  return createHash('sha256').update(value).digest('hex');
 }
 
 interface FriendRequestJson extends JsonObject {
@@ -176,28 +142,6 @@ interface ChallengeCheckInJson extends JsonObject {
   checkInId: string;
   eligibleDate: string;
   source: 'manual' | 'verified_workout';
-}
-
-export function socialChallengeDateWindow(
-  challenges: readonly {
-    end_date: Date | string;
-    start_date: Date | string;
-  }[],
-): { endDate: string; startDate: string } | null {
-  if (challenges.length === 0) return null;
-
-  const startDates = challenges.map(({ start_date }) =>
-    normalizeDateKey(start_date),
-  );
-  const endDates = challenges.map(({ end_date }) => normalizeDateKey(end_date));
-  return {
-    endDate: endDates.reduce((latest, value) =>
-      value > latest ? value : latest,
-    ),
-    startDate: startDates.reduce((earliest, value) =>
-      value < earliest ? value : earliest,
-    ),
-  };
 }
 
 @Injectable()
@@ -969,13 +913,13 @@ export class SocialService {
             claimed_at: null,
             claimed_by_user_id: null,
             created_at: now,
-            destination_hash: sha256(`${token}:${destination}`),
+            destination_hash: socialInvitationHash(`${token}:${destination}`),
             destination_hint: contactDestinationHint(
               input.channel,
               destination,
             ),
             expires_at: expiresAt,
-            invite_token_hash: sha256(token),
+            invite_token_hash: socialInvitationHash(token),
             inviter_user_id: user.id,
             status: 'pending',
           })
@@ -998,7 +942,7 @@ export class SocialService {
     idempotencyKey: string,
     token: string,
   ): Promise<ChallengeInvitationResponseDto> {
-    const tokenHash = sha256(token.trim());
+    const tokenHash = socialInvitationHash(token.trim());
     return this.idempotency.execute<ChallengeInvitationJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,

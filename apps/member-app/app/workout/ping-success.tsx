@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
 import {
@@ -9,10 +9,19 @@ import {
 } from '@/components/cyber';
 import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
+import { midSessionPresenceVerificationAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function PingSuccessScreen() {
+  if (!midSessionPresenceVerificationAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <MidSessionPresenceSuccessScreen />;
+}
+
+function MidSessionPresenceSuccessScreen() {
   const router = useRouter();
   const { activeSession } = useWorkoutProgress();
 
@@ -52,7 +61,7 @@ export default function PingSuccessScreen() {
       </TerminalText>
 
       <CyberButtonPrimary
-        label="BACK TO SESSION ->"
+        label="BACK TO SESSION"
         onPress={() => router.replace('/workout/active')}
       />
     </ScreenContainer>
@@ -66,7 +75,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.screenX,
     paddingVertical: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   workoutProgress: {
     marginBottom: spacing.xxl

@@ -13,10 +13,9 @@ import type {
 import type { CategoryLeaderboard } from '@/domain/leaderboard';
 import type {
   ClaimedReward,
+  ParticipantCompetitionResults,
   RewardAward,
-  RewardCatalogItem,
-  RewardWinner,
-  SettledCompetitionSummary
+  RewardCatalogItem
 } from '@/domain/rewards';
 import type { StreakSummary } from '@/domain/streaks';
 import type { ApiClient } from '@/services/api/client';
@@ -62,13 +61,12 @@ export type AppDataSource = {
     periodIndex: number
   ) => Promise<readonly WeeklyChallengeRequest[]>;
   getMyRewardAwards: () => Promise<readonly RewardAward[]>;
+  getMyLatestCompetitionResults: () => Promise<ParticipantCompetitionResults | null>;
   getMyStreaks: () => Promise<StreakSummary | null>;
   getRewardCatalog: (
     regionCode: string,
     monthKey?: string
   ) => Promise<readonly RewardCatalogItem[]>;
-  getRewardWinners: () => Promise<readonly RewardWinner[]>;
-  getSettledCompetition: () => Promise<SettledCompetitionSummary | null>;
   planCreatorWorkout: (
     workoutId: string,
     plannedDate: string,
@@ -108,9 +106,9 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
       { idempotencyKey, method: 'POST' }
     ),
-    getCategoryLeaderboard: (goal) => api.request<CategoryLeaderboard>(
+    getCategoryLeaderboard: (goal) => api.request<unknown>(
       `/v1/leaderboards/current?goal=${goal}`
-    ),
+    ).then((response) => normalizeCategoryLeaderboard(response, goal)),
     getCompetitionMatches: (competitionMonthKey, weeklyGoal, regionCode) =>
       api.request<readonly CompetitionMatch[]>(
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
@@ -149,6 +147,10 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     getMyRewardAwards: () => api.request<readonly RewardAward[]>(
       '/v1/rewards/awards/me'
     ),
+    getMyLatestCompetitionResults: () =>
+      api.request<ParticipantCompetitionResults | null>(
+        '/v1/results/mine/latest'
+      ),
     getMyStreaks: () => api.request<StreakSummary>('/v1/streaks/me'),
     getRewardCatalog: (regionCode, monthKey) => {
       const query = new URLSearchParams({ region: regionCode });
@@ -158,15 +160,6 @@ function createApiDataSource(api: ApiClient): AppDataSource {
         { authenticated: false }
       );
     },
-    getRewardWinners: () => api.request<readonly RewardWinner[]>(
-      '/v1/results/reward-winners',
-      { authenticated: false }
-    ),
-    getSettledCompetition: () =>
-      api.request<SettledCompetitionSummary | null>(
-        '/v1/results/settled-competition',
-        { authenticated: false }
-      ),
     planCreatorWorkout: (workoutId, plannedDate, note) =>
       api.request<CreatorWorkoutPlan, { note?: string; plannedDate: string }>(
         `/v1/creator-workouts/${encodeURIComponent(workoutId)}/plans`,
@@ -228,6 +221,43 @@ function createApiDataSource(api: ApiClient): AppDataSource {
   };
 }
 
+function normalizeCategoryLeaderboard(
+  response: unknown,
+  requestedGoal: GoalCategory
+): CategoryLeaderboard | null {
+  if (!isRecord(response) || !Array.isArray(response.rows)) {
+    return null;
+  }
+
+  return {
+    goal: requestedGoal,
+    rows: response.rows.filter(isCategoryLeaderboardRow)
+  };
+}
+
+function isCategoryLeaderboardRow(
+  value: unknown
+): value is CategoryLeaderboard['rows'][number] {
+  return isRecord(value) &&
+    typeof value.alias === 'string' &&
+    isFiniteNumber(value.categoryEntries) &&
+    isFiniteNumber(value.rank) &&
+    isRecord(value.streaks) &&
+    isFiniteNumber(value.streaks.daily) &&
+    isFiniteNumber(value.streaks.monthly) &&
+    isFiniteNumber(value.streaks.weekly) &&
+    isFiniteNumber(value.streaks.yearly) &&
+    isFiniteNumber(value.verifiedDays);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 function createUnavailableDataSource(): AppDataSource {
   const unavailable = () => Promise.reject(
     new Error('The GoGymGo API is not configured.')
@@ -243,10 +273,9 @@ function createUnavailableDataSource(): AppDataSource {
     getEligibleWeeklyChallengePartners: async () => [],
     getWeeklyChallengeRequests: async () => [],
     getMyRewardAwards: async () => [],
+    getMyLatestCompetitionResults: async () => null,
     getMyStreaks: async () => null,
     getRewardCatalog: async () => [],
-    getRewardWinners: async () => [],
-    getSettledCompetition: async () => null,
     planCreatorWorkout: unavailable,
     requestWeeklyChallengePartner: unavailable,
     respondToWeeklyChallengeRequest: unavailable,

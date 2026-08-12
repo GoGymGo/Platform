@@ -3,12 +3,18 @@ import {
   Equals,
   IsBoolean,
   IsInt,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
+  IsString,
   IsUUID,
   IsIn,
   IsOptional,
+  Length,
   Matches,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type {
@@ -104,10 +110,10 @@ export class CompetitionResponseDto {
   @ApiProperty({ isArray: true, type: Number })
   goalDays!: number[];
 
-  @ApiProperty({ minimum: 2, type: Number })
+  @ApiProperty({ minimum: 1, type: Number })
   minimumEntrants!: number;
 
-  @ApiProperty({ minimum: 2, nullable: true, type: Number })
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
   entrantCap!: number | null;
 
   @ApiProperty({ format: 'date-time', type: String })
@@ -135,6 +141,44 @@ export class CurrentCompetitionQueryDto {
   region?: string;
 }
 
+export class ResolveGymQrCompetitionDto {
+  @ApiProperty({ maxLength: 256, minLength: 32, type: String })
+  @IsString()
+  @Length(32, 256)
+  credential!: string;
+}
+
+export class CurrentEnrollmentQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  competitionId?: string;
+}
+
+export class EnrollmentGymPresenceDto {
+  @ApiProperty({ maxLength: 256, minLength: 32, type: String })
+  @IsString()
+  @Length(32, 256)
+  credential!: string;
+
+  @ApiProperty({ maximum: 90, minimum: -90, type: Number })
+  @Type(() => Number)
+  @IsLatitude()
+  latitude!: number;
+
+  @ApiProperty({ maximum: 180, minimum: -180, type: Number })
+  @Type(() => Number)
+  @IsLongitude()
+  longitude!: number;
+
+  @ApiProperty({ maximum: 100_000, minimum: 0.1, type: Number })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.1)
+  @Max(100_000)
+  accuracyMeters!: number;
+}
+
 export class CreateEnrollmentDto {
   @ApiProperty({ maximum: 7, minimum: 1, type: Number })
   @IsInt()
@@ -159,6 +203,11 @@ export class CreateEnrollmentDto {
   @Equals(true)
   @IsBoolean()
   ageEligibilityAttested!: true;
+
+  @ApiProperty({ type: EnrollmentGymPresenceDto })
+  @Type(() => EnrollmentGymPresenceDto)
+  @ValidateNested()
+  gymPresence!: EnrollmentGymPresenceDto;
 }
 
 export class EnrollmentResponseDto {

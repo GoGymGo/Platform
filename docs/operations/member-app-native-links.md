@@ -1,13 +1,8 @@
 # Member app QR-link deployment checklist
 
-This is the durable handoff for having gym-poster QR links open an installed iOS
-or Android app. Read it before generating native domain-association files or
-creating signed iOS and Android releases.
-
-The connected browser app at `app.gogymgo.com` is an independent release
-channel. It can be published without native signing identifiers by following
-[`member-web-deployment.md`](member-web-deployment.md). In that state, poster QR
-codes open the browser flow and the build omits the two native association files.
+This is the durable handoff for the gym-poster QR flow. Read it before publishing
+the browser member app at `app.gogymgo.com` or creating signed iOS and Android
+releases.
 
 ## What is already implemented
 
@@ -21,7 +16,7 @@ codes open the browser flow and the build omits the two native association files
 - The server remains authoritative for the workout timer, gym assignment,
   geofence checks, and final verification.
 
-## Values required before native-link production deployment
+## Values required before production deployment
 
 Never guess or publish placeholders for these values:
 
@@ -35,7 +30,7 @@ Never guess or publish placeholders for these values:
 The iOS bundle ID and Android package must match the apps registered in Firebase,
 the signed native builds, and the values used to generate the association files.
 
-## Required order for native QR handoff
+## Required order of operations
 
 1. Finalize the Apple and Android app identifiers and register the native apps.
 2. Obtain the Apple Team ID and the SHA-256 fingerprint for each signing
@@ -55,9 +50,8 @@ the signed native builds, and the values used to generate the association files.
    apps/member-app/dist/.well-known/assetlinks.json
    ```
 
-6. Publish that exact validated association-enabled web build to the provider
-   serving `app.gogymgo.com`. This updates native handoff metadata and is
-   separate from ordinary browser-only releases.
+6. Publish that exact validated web build to the provider serving
+   `app.gogymgo.com`.
 7. Confirm both public URLs return HTTP 200, JSON content, and no authentication
    or redirect:
 
@@ -83,14 +77,16 @@ Test all of these before announcing the QR flow:
 1. New player scans, creates an account, completes setup, and reaches Start
    Workout without rescanning.
 2. Returning signed-out player scans, signs in, and reaches Start Workout.
-3. Signed-in player scans and starts the server-authoritative timer.
-4. Player scans the same poster after the minimum duration and reaches Finish
-   Workout.
-5. A scan submitted outside the configured gym radius is rejected by the server.
+3. Signed-in player uses a fresh start location check and starts the
+   server-authoritative timer.
+4. Player uses a fresh finish location check after the minimum duration and
+   reaches Finish Workout.
+5. A location check submitted outside the configured gym radius is rejected by
+   the server.
 6. The browser fallback still works when no native app is installed.
 7. With native notification permission enabled, the installed app sends a local
-   reminder when the server's 30-minute minimum is reached and opens the scanner
-   when the reminder is tapped.
+   reminder when the server's 30-minute minimum is reached and opens the gym
+   location screen when the reminder is tapped.
 8. The browser build shows the completion banner while open and immediately when
    reopened. Do not claim that a fully closed browser tab will notify the player;
    that requires a separately deployed web-push service.
@@ -99,12 +95,11 @@ Location is checked when the player submits Start Workout and Finish Workout. Th
 app does not continuously track the player or automatically boot them out when
 they move outside the radius.
 
-## Current native release blocker
+## Current release blocker
 
-As of August 5, 2026, the code and build pipeline are prepared, but the final
+As of August 11, 2026, the code and build pipeline are prepared, but the final
 Apple Team ID, iOS bundle ID, Android package, and Android signing-certificate
-fingerprint have not been recorded in this repository. This blocks signed native
-releases and installed-app QR opening; it does not block a browser-only member
-release. Native QR opening must not be described as live until those real values
-are configured, the association files are published, signed builds are
-installed, and the physical-device test passes.
+fingerprint have not been recorded in this repository. Native QR opening must not
+be described as live until those real values are configured, the association
+files are published, signed builds are installed, and the physical-device test
+passes.

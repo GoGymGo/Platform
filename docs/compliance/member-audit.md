@@ -13,7 +13,7 @@ This audit maps the current Expo Router app to the North American privacy and bi
 - `app/(modals)/privacy-policy.tsx`: native Privacy Policy modal.
 - `app/(modals)/terms-of-service.tsx`: native Terms of Service modal.
 - `app/(modals)/biometric-camera-consent.tsx`: native Biometric / Camera Consent modal.
-- `app/(modals)/qr-scanner.tsx`: temporary QR camera view, required camera consent checkbox before scan CTA.
+- `app/(modals)/qr-scanner.tsx`: one-time QR camera view for gym selection plus start and finish location-check controls.
 - `app/workout/check-in.tsx`: session-start Face ID/local biometric check, required consent checkbox before scan CTA.
 - `app/workout/identity-check.tsx`: partner-gym QR identity confirmation, required consent checkbox before continue CTA.
 - `app/workout/ping.tsx`: random mid-session Face ID/local biometric ping, required consent checkbox before ping CTA.
@@ -53,21 +53,21 @@ This audit maps the current Expo Router app to the North American privacy and bi
 - STEP 2 NATIVE PURGE AUDIT: Covered by workspace purge command across `app` and `src`.
 - STEP 3 MANUAL TEST: Verify that first-workout device selection saves the default and continues directly to check-in; device-presence consent is then requested at the moment of use.
 
-### QR Scanner
+### Partner Gym Verification
 
-- STEP 1 WRITE: Added required Biometric / Camera Consent banner before the entry or exit QR scan CTA.
+- STEP 1 WRITE: A new player scans the initial Contest QR before account creation. Region eligibility uses a separate broad location check, and the selected Partner gym is stored on the Contest enrollment. Returning players use fresh start and finish location checks without rescanning, including on a new device.
 - STEP 2 NATIVE PURGE AUDIT: Covered by workspace purge command across `app` and `src`.
-- STEP 3 MANUAL TEST: Verify that checking the consent box updates local state and enables `SCAN ENTRY QR - CONTINUE ->` or `SCAN EXIT QR - FINISH ->`.
+- STEP 3 MANUAL TEST: Verify that Start Workout and Finish Workout each request a fresh location reading at the selected Partner gym.
 
 ### Workout Checkpoints
 
 - STEP 1 WRITE: Added required Biometric / Camera Consent banners to check-in, partner-gym identity-check, random ping, and check-out.
 - STEP 2 NATIVE PURGE AUDIT: Covered by workspace purge command across `app` and `src`.
-- STEP 3 MANUAL TEST: Verify that each screen keeps its scan or continue CTA disabled until the local consent checkbox is checked, then preserves the existing route transition.
+- STEP 3 MANUAL TEST: Verify that each enabled checkpoint keeps its continue CTA disabled until the local consent checkbox is checked, then preserves the existing route transition.
 
 ### Profile
 
-- STEP 1 WRITE: Added settings rows linking to Privacy Policy, Terms of Service, and Biometric / Camera Consent.
+- STEP 1 WRITE: Added settings rows linking to Privacy Policy and Terms of Service, plus guarded Contest withdrawal and local-device reset actions. Withdrawal retains required Contest-integrity history while ending workout, ranking, pairing, and prize eligibility. Device reset signs out and removes app storage, accessible browser cookies, and caches without claiming to delete server data.
 - STEP 2 NATIVE PURGE AUDIT: Covered by workspace purge command across `app` and `src`.
 - STEP 3 MANUAL TEST: Verify that each legal settings row opens the matching native modal route and back/close returns to Profile.
 

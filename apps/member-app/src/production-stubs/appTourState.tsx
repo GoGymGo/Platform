@@ -9,10 +9,9 @@ export type AppTourScenario =
 
 const inactiveAppTour = {
   active: false,
-  demoActive: false,
-  enterDemo: (_scenario: AppTourScenario = 'ready') => undefined,
   enterTour: (_scenario: AppTourScenario = 'ready') => undefined,
   exitTour: () => undefined,
+  publicDemo: false,
   scenario: 'ready' as AppTourScenario
 };
 

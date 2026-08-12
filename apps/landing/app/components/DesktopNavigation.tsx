@@ -9,26 +9,19 @@ export function DesktopNavigation() {
 
   return (
     <nav aria-label="Primary navigation" className="desktop-navigation">
-      {primaryNavigationItems.map((item) => {
-        const ariaCurrent =
-          "currentPath" in item && pathname === item.currentPath
-            ? "page"
-            : undefined;
-
-        return item.href.startsWith("/#") ? (
-          <a aria-current={ariaCurrent} href={item.href} key={item.href}>
-            {item.label}
-          </a>
-        ) : (
-          <Link
-            aria-current={ariaCurrent}
-            href={item.href}
-            key={item.href}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
+      {primaryNavigationItems.map((item) => (
+        <Link
+          aria-current={
+            "currentPath" in item && pathname === item.currentPath
+              ? "page"
+              : undefined
+          }
+          href={item.href}
+          key={item.href}
+        >
+          {item.label}
+        </Link>
+      ))}
     </nav>
   );
 }

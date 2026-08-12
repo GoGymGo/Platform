@@ -30,6 +30,19 @@ export function isGymScanCredential(value: string) {
   return value.length >= 32 && value.length <= 256;
 }
 
+export function normalizeGymScanAccuracyMeters(accuracyMeters: number | null) {
+  if (accuracyMeters === null || !Number.isFinite(accuracyMeters)) {
+    return null;
+  }
+
+  const roundedUp = Math.ceil(accuracyMeters * 1_000) / 1_000;
+  return Math.min(1_000, Math.max(0.1, roundedUp));
+}
+
+export function isGymLocationAccuracyValidationMessage(message: string) {
+  return /(?:gymPresence\.)?accuracyMeters\s+must\s+be/i.test(message);
+}
+
 export function getGymScanRemainingSeconds(
   minimumCompleteAt: string | null | undefined,
   fallbackSeconds: number,

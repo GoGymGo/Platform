@@ -11,12 +11,13 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableError } from '@/components/reliability';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import {
   creatorFeaturePausedMessage,
   creatorFeatureStatusLabel,
   creatorFeaturesEnabled
 } from '@/config/features';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts } from '@/data/appDataHooks';
 import type { CreatorWorkout } from '@/domain/creatorWorkouts';
 import { getCreatorWorkoutsReturnTarget } from '@/navigation/creatorWorkouts';
@@ -50,16 +51,13 @@ export default function WorkoutsScreen() {
           memoryKey="creator-workouts"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <TerminalText glow tone="cyan" variant="label">
-              FOLLOW ALONG // {competitionRegion.label}
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              CREATOR WORKOUTS
-            </TerminalText>
-          </View>
-          <HUDBorderBox glow style={styles.infoNote} tone="amber">
-            <TerminalText glow style={styles.infoMark} tone="amber" variant="label">
+          <BrandScreenHeader
+            description="Follow-along sessions become contest progress only after a verified gym workout."
+            eyebrow={`FOLLOW ALONG // ${competitionRegion.label}`}
+            title="CREATOR WORKOUTS"
+          />
+          <HUDBorderBox style={styles.infoNote} tone="amber">
+            <TerminalText style={styles.infoMark} tone="amber" variant="label">
               {creatorFeatureStatusLabel}
             </TerminalText>
             <TerminalText style={styles.infoCopy} tone="muted" uppercase={false} variant="body">
@@ -67,7 +65,7 @@ export default function WorkoutsScreen() {
             </TerminalText>
           </HUDBorderBox>
           <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
-            <TerminalText glow tone="pink" variant="label">
+            <TerminalText tone="pink" variant="label">
               CREATOR STUDIO
             </TerminalText>
             <TerminalText style={styles.creatorSubmitCopy} tone="muted" uppercase={false} variant="body">
@@ -98,17 +96,14 @@ export default function WorkoutsScreen() {
         memoryKey="creator-workouts"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <TerminalText glow tone="cyan" variant="label">
-            FOLLOW ALONG // {competitionRegion.label}
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            CREATOR WORKOUTS
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Choose a regional follow-along session, then verify the workout at an eligible gym."
+          eyebrow={`FOLLOW ALONG // ${competitionRegion.label}`}
+          title="CREATOR WORKOUTS"
+        />
 
         <HUDBorderBox style={styles.infoNote} tone="cyan">
-          <TerminalText glow style={styles.infoMark} tone="cyan" variant="label">
+          <TerminalText style={styles.infoMark} tone="cyan" variant="label">
             INFO
           </TerminalText>
           <TerminalText style={styles.infoCopy} tone="cyan" uppercase={false} variant="body">
@@ -149,14 +144,14 @@ export default function WorkoutsScreen() {
         </View>
 
         <HUDBorderBox style={styles.creatorSubmitCard} tone="pink">
-          <TerminalText glow tone="pink" variant="label">
+          <TerminalText tone="pink" variant="label">
             CREATOR STUDIO
           </TerminalText>
           <TerminalText style={styles.creatorSubmitCopy} tone="muted" uppercase={false} variant="body">
             Approved creators can submit hosted workout videos for review, including brand and AI-assisted adaptation permissions.
           </TerminalText>
           <CyberButtonPrimary
-            label="SUBMIT A CREATOR VIDEO ->"
+            label="SUBMIT A CREATOR VIDEO"
             onPress={() => router.push('/creator/submit')}
             tone="pink"
           />
@@ -192,16 +187,16 @@ function WorkoutCard({
       )}
       style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
     >
-      <HUDBorderBox glow style={styles.workoutCard} tone="cyan">
+      <HUDBorderBox style={styles.workoutCard} tone="cyan">
         <View style={[styles.workoutPreview, styles.workoutPreviewActive]}>
           <View style={styles.badgeRow}>
             <HUDBorderBox style={styles.creatorBadge} tone="cyan">
-              <TerminalText glow tone="cyan" variant="micro">
+              <TerminalText tone="cyan" variant="micro">
                 CREATOR
               </TerminalText>
             </HUDBorderBox>
             <HUDBorderBox style={styles.featuredBadge} tone="cyan">
-              <TerminalText glow tone="cyan" variant="micro">
+              <TerminalText tone="cyan" variant="micro">
                 FEATURED
               </TerminalText>
             </HUDBorderBox>
@@ -214,7 +209,6 @@ function WorkoutCard({
             />
           </View>
           <TerminalText
-            glow
             style={styles.previewStyle}
             tone="cyan"
             variant="micro"
@@ -253,20 +247,7 @@ function WorkoutCard({
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    marginBottom: spacing.lg
-  },
-  title: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.display
-  },
+  content: brandScreenStyles.tabContent,
   infoNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -336,8 +317,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderCyanStrong,
     borderRadius: 23,
-    backgroundColor: colors.surfaceCyanProgress,
-    ...cyberGlow.cyan
+    backgroundColor: colors.surfaceCyanProgress
   },
   previewStyle: {
     marginTop: spacing.sm,

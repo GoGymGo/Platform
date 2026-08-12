@@ -13,8 +13,10 @@ export declare const brandColors: Readonly<{
 }>;
 
 export declare const brandFonts: Readonly<{
-  display: 'Orbitron';
-  mono: 'Share Tech Mono';
+  body: '"Segoe UI", Arial, sans-serif';
+  bodyStrong: '"Segoe UI", Arial, sans-serif';
+  display: 'Orbitron-Bold';
+  mono: 'ShareTechMono-Regular';
 }>;
 
 export declare const brandAssets: Readonly<{
@@ -22,7 +24,5 @@ export declare const brandAssets: Readonly<{
   markVector: 'assets/logos/mark.svg';
   wordmark: 'assets/logos/wordmark.svg';
   orbitronBold: 'assets/fonts/Orbitron-Bold.ttf';
-  rajdhaniMedium: 'assets/fonts/Rajdhani-Medium.ttf';
-  rajdhaniSemiBold: 'assets/fonts/Rajdhani-SemiBold.ttf';
   shareTechMonoRegular: 'assets/fonts/ShareTechMono-Regular.ttf';
 }>;

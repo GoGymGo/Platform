@@ -2,17 +2,6 @@ name: API CI
 
 on:
   pull_request:
-    paths:
-      - "services/api/**"
-      - "infrastructure/gcp/terraform/**"
-      - "infrastructure/aws/terraform/**"
-      - "infrastructure/aws/firebase-wif/**"
-      - "infrastructure/local/**"
-      - "packages/contracts/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/api-ci.yml"
-      - ".github/workflows/deployment.yml"
   push:
     branches: [main]
     paths:
@@ -35,16 +24,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
+  api-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
-      - uses: hashicorp/setup-terraform@v4.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.15.8
           terraform_wrapper: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           cache: npm
           cache-dependency-path: package-lock.json
@@ -59,7 +48,7 @@ jobs:
       - run: terraform -chdir=infrastructure/aws/terraform validate
       - run: terraform -chdir=infrastructure/aws/terraform test
       - run: bash infrastructure/aws/firebase-wif/test.sh
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           exit-code: "1"
           format: table
@@ -67,7 +56,7 @@ jobs:
           scan-ref: infrastructure/gcp/terraform
           scan-type: config
           severity: HIGH,CRITICAL
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           exit-code: "1"
           format: table

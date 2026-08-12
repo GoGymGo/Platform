@@ -1,7 +1,37 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createAppTourAccountReadinessRepository } from './appTourData';
+import { extractGymScanCredential } from '@/domain/gymScan';
+
+import {
+  createAppTourAccountReadinessRepository,
+  createAppTourGymQrPayload,
+  createAppTourPendingGymScan,
+  createAppTourStartedGymLocationResult,
+  createAppTourVerifiedGymLocationResult
+} from './appTourData';
+
+test('App Tour QR payloads pass through the production scanner contract', () => {
+  for (const mode of ['entry', 'exit'] as const) {
+    const payload = createAppTourGymQrPayload(mode);
+    assert.equal(extractGymScanCredential(payload), payload);
+  }
+});
+
+test('App Tour gym-location fixtures keep preview state outside production screens', () => {
+  const now = Date.parse('2026-09-10T18:00:00.000Z');
+  const active = createAppTourPendingGymScan('active-workout', now);
+  const verified = createAppTourVerifiedGymLocationResult(now);
+  const started = createAppTourStartedGymLocationResult(now);
+
+  assert.equal(active.activeSession?.gymName, 'SKYGATE');
+  assert.equal(active.activeSession?.minimumCompleteAt, '2026-09-10T18:22:00.000Z');
+  assert.equal(verified.outcome, 'verified');
+  assert.equal(started.outcome, 'started');
+  assert.equal(started.remainingSeconds, 30 * 60);
+  assert.equal(verified.gymName, 'SKYGATE');
+  assert.equal(verified.remainingSeconds, 0);
+});
 
 test('new-player App Tour starts onboarding without completed setup', async () => {
   const account = createAppTourAccountReadinessRepository('new-player');
@@ -9,6 +39,10 @@ test('new-player App Tour starts onboarding without completed setup', async () =
   assert.equal(await account.getCurrentRegionVerification(), null);
   assert.equal(await account.getCurrentEnrollment(), null);
   assert.equal((await account.getLegalReceiptStatus()).complete, false);
+  assert.equal(
+    (await account.getCurrentCompetition(undefined, 'preview-region'))?.monthKey,
+    '2026-09'
+  );
 });
 
 test('new-player App Tour records each onboarding milestone in memory', async () => {
@@ -44,6 +78,12 @@ test('new-player App Tour records each onboarding milestone in memory', async ()
   const enrollment = await account.enrollInCompetition(competition.id, {
     ageEligibilityAttested: true,
     goalDays: 4,
+    gymPresence: {
+      accuracyMeters: 5,
+      credential: 'app-tour-gym-credential-000000000001',
+      latitude: 49.2827,
+      longitude: -123.1207
+    },
     legalReceiptBundleId: legalReceipt.receiptBundleId,
     regionVerificationId: verification.id,
     rulesAccepted: true

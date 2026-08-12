@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
 import {
@@ -15,12 +16,19 @@ import { ProfileAvatar } from '@/components/profileAvatar';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useMyStreaks } from '@/data/appDataHooks';
+import {
+  useCurrentEnrollment,
+  useWithdrawFromCompetition
+} from '@/data/accountReadinessHooks';
 import { getPublicInitials } from '@/domain/profile';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
 import { useAuth } from '@/state/auth';
 import { useProfile } from '@/state/profile';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
+import { clearLocalAppData } from '@/services/localAppReset';
+import { clearPendingGymScan } from '@/services/pendingGymScan';
 
 type ProfileStat = {
   accent: 'cyan' | 'green' | 'pink';
@@ -45,7 +53,7 @@ function getSettingsRows(): SettingsGroups {
   return {
     preferences: [
       {
-        title: 'HOW THE COMPETITION WORKS',
+        title: 'HOW THE CONTEST WORKS',
         subtitle: 'GOALS, ENTRIES, RANKINGS AND REWARDS',
         tone: 'muted',
         route: '/how-it-works?from=profile' as Href
@@ -82,9 +90,14 @@ function getSettingsRows(): SettingsGroups {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { signOutUser, user } = useAuth();
   const { publicName } = useProfile();
   const { data: streakSummary } = useMyStreaks();
+  const currentEnrollment = useCurrentEnrollment();
+  const withdrawFromCompetition = useWithdrawFromCompetition();
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const publicInitials = getPublicInitials(publicName);
   const {
@@ -96,6 +109,10 @@ export default function ProfileScreen() {
   } = useWorkoutProgress();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string>();
+  const [accountActionMessage, setAccountActionMessage] = useState<string>();
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmWithdrawal, setConfirmWithdrawal] = useState(false);
+  const [resettingApp, setResettingApp] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showCompetitionSettings, setShowCompetitionSettings] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
@@ -134,6 +151,40 @@ export default function ProfileScreen() {
     }
   }
 
+  async function performWithdrawal() {
+    const enrollment = currentEnrollment.data;
+    if (!enrollment) return;
+
+    setAccountActionMessage(undefined);
+    try {
+      await withdrawFromCompetition.mutateAsync(enrollment.competitionId);
+      await clearPendingGymScan();
+      setConfirmWithdrawal(false);
+      setAccountActionMessage(
+        'WITHDRAWAL COMPLETE. CONTEST ACCESS AND PRIZE ELIGIBILITY ARE CLOSED.'
+      );
+    } catch {
+      setAccountActionMessage('WITHDRAWAL COULD NOT BE COMPLETED. TRY AGAIN.');
+    }
+  }
+
+  async function performAppReset() {
+    setResettingApp(true);
+    setAccountActionMessage(undefined);
+    try {
+      await signOutUser();
+      await clearPendingGymScan();
+      await clearLocalAppData();
+      queryClient.clear();
+      router.replace('/');
+    } catch {
+      setAccountActionMessage(
+        'RESET FAILED. CLOSE THE APP AND TRY AGAIN.'
+      );
+      setResettingApp(false);
+    }
+  }
+
   async function updateNotifications(enabled: boolean) {
     setNotificationBusy(true);
     setNotificationMessage(undefined);
@@ -160,20 +211,21 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileHeader}>
-          <ProfileAvatar
-            imageUri={profileImageUri}
-            initials={publicInitials}
-            showStatus={Boolean(user?.emailVerified)}
-          />
-          <UserAlias
-            alias={publicName}
-            glow
-            streaks={streakSummary?.streaks}
-            style={styles.profileAlias}
-            textStyle={styles.profileName}
-            tone="cyan"
-            variant="title"
-          />
+          <View style={styles.profileIdentityRow}>
+            <UserAlias
+              alias={publicName}
+              streaks={streakSummary?.streaks}
+              style={styles.profileAlias}
+              textStyle={styles.profileName}
+              tone="text"
+              variant="title"
+            />
+            <ProfileAvatar
+              imageUri={profileImageUri}
+              initials={publicInitials}
+              showStatus={Boolean(user?.emailVerified)}
+            />
+          </View>
           <CyberButtonOutline
             label={showProfileEditor ? 'DONE EDITING' : 'EDIT PROFILE'}
             onPress={() => setShowProfileEditor((current) => !current)}
@@ -283,10 +335,11 @@ export default function ProfileScreen() {
         />
         {showCompetitionSettings ? (
           <>
+            {mobileGymVerificationAvailable ? (
             <HUDBorderBox style={styles.regionCard} tone="cyan">
               <View style={styles.regionCopy}>
                 <TerminalText tone="dim" variant="label">
-                  COMPETITION REGION
+                  CONTEST REGION
                 </TerminalText>
                 <TerminalText glow tone="cyan" variant="body">
                   {competitionRegion.label}
@@ -308,6 +361,7 @@ export default function ProfileScreen() {
                 style={styles.regionButton}
               />
             </HUDBorderBox>
+            ) : null}
 
             <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
               WORKOUT PREFERENCE
@@ -322,7 +376,7 @@ export default function ProfileScreen() {
               aria-checked={remindersEnabled}
               aria-disabled={notificationBusy}
               accessibilityHint="Turn Weekly Goal, Weekly Challenge and Bonus Day alerts on or off"
-              accessibilityLabel="Competition reminders"
+              accessibilityLabel="Contest reminders"
               accessibilityRole="switch"
               accessibilityState={{
                 checked: remindersEnabled,
@@ -343,7 +397,7 @@ export default function ProfileScreen() {
                     tone={remindersEnabled ? 'cyan' : 'text'}
                     variant="body"
                   >
-                    COMPETITION REMINDERS
+                    CONTEST REMINDERS
                   </TerminalText>
                   <TerminalText tone="muted" variant="caption">
                     WEEKLY GOAL, WEEKLY CHALLENGE AND BONUS DAY ALERTS
@@ -388,6 +442,87 @@ export default function ProfileScreen() {
               <SettingsItem key={row.title} row={row} />
             ))}
           </HUDBorderBox>
+        ) : null}
+
+        <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
+          ACCOUNT & CONTEST
+        </TerminalText>
+        {currentEnrollment.data ? (
+          <HUDBorderBox style={styles.accountActionCard} tone="red">
+            <TerminalText tone="red" variant="label">
+              WITHDRAW FROM CONTEST
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              Ends workouts, ranking and prize eligibility. You can&apos;t re-enter; your Contest
+              record remains.
+            </TerminalText>
+            {confirmWithdrawal ? (
+              <View style={styles.confirmActions}>
+                <CyberButtonOutline
+                  disabled={withdrawFromCompetition.isPending}
+                  label="KEEP MY ENTRY"
+                  onPress={() => setConfirmWithdrawal(false)}
+                  style={styles.confirmButton}
+                />
+                <CyberButtonOutline
+                  disabled={withdrawFromCompetition.isPending}
+                  label={
+                    withdrawFromCompetition.isPending
+                      ? 'WITHDRAWING...'
+                      : 'CONFIRM WITHDRAWAL'
+                  }
+                  onPress={() => void performWithdrawal()}
+                  style={styles.confirmButton}
+                  tone="red"
+                />
+              </View>
+            ) : (
+              <CyberButtonOutline
+                label="WITHDRAW FROM THIS CONTEST"
+                onPress={() => setConfirmWithdrawal(true)}
+                tone="red"
+              />
+            )}
+          </HUDBorderBox>
+        ) : null}
+
+        <HUDBorderBox style={styles.accountActionCard} tone="muted">
+          <TerminalText tone="text" variant="label">
+            RESET APP ON THIS DEVICE
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            Signs out and clears this device. Your account and Contest history stay saved.
+          </TerminalText>
+          {confirmReset ? (
+            <View style={styles.confirmActions}>
+              <CyberButtonOutline
+                disabled={resettingApp}
+                label="CANCEL"
+                onPress={() => setConfirmReset(false)}
+                style={styles.confirmButton}
+              />
+              <CyberButtonOutline
+                disabled={resettingApp}
+                label={resettingApp ? 'RESETTING...' : 'CONFIRM RESET & SIGN OUT'}
+                onPress={() => void performAppReset()}
+                style={styles.confirmButton}
+                tone="red"
+              />
+            </View>
+          ) : (
+            <CyberButtonOutline
+              label="RESET APP & SIGN OUT"
+              onPress={() => setConfirmReset(true)}
+              tone="red"
+            />
+          )}
+        </HUDBorderBox>
+
+        {accountActionMessage ? (
+          <AuthStatusNotice
+            message={accountActionMessage}
+            tone={accountActionMessage.includes('COULD NOT') ? 'red' : 'green'}
+          />
         ) : null}
 
         {signOutError ? <AuthStatusNotice message={signOutError} tone="red" /> : null}
@@ -465,21 +600,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   sectionToggle: {
     marginBottom: spacing.md
   },
   profileHeader: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     marginBottom: 22
+  },
+  profileIdentityRow: {
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingLeft: 14,
+    paddingVertical: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   profileName: {
     fontFamily: fontFamilies.display
   },
   profileAlias: {
-    justifyContent: 'center',
-    marginTop: spacing.md
+    minWidth: 0,
+    flex: 1,
+    justifyContent: 'center'
   },
   editProfileButton: {
     width: '100%',
@@ -577,6 +724,18 @@ const styles = StyleSheet.create({
   },
   legalCard: {
     marginTop: spacing.sm
+  },
+  accountActionCard: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.lg
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: spacing.sm
+  },
+  confirmButton: {
+    flex: 1
   },
   notificationCard: {
     flexDirection: 'row',

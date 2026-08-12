@@ -2,12 +2,12 @@ import { IdempotencyService } from '../src/common/idempotency/idempotency.servic
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
+import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
-import { devicePresenceConsentVersion } from '../src/modules/legal/verification-consent';
-import { VerificationConsentsService } from '../src/modules/legal/verification-consents.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
+import { ResultsService } from '../src/modules/results/results.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
   createTestConfig,
@@ -84,6 +84,12 @@ const competitionRules = {
 
 interface CompetitionFixture {
   competitionId: string;
+  gymPresence: {
+    accuracyMeters: number;
+    credential: string;
+    latitude: number;
+    longitude: number;
+  };
   legalReceiptBundleId: string;
   regionVerificationId: string;
 }
@@ -97,8 +103,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let legalDocuments: LegalDocumentsService;
   let operatorUserId: string;
   let profiles: ProfilesService;
+  let registrationFixtureSequence = 0;
+  let results: ResultsService;
   let sessions: SessionsService;
-  let verificationConsents: VerificationConsentsService;
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
@@ -106,27 +113,16 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const idempotency = new IdempotencyService(database);
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
+    results = new ResultsService(database, profiles);
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
-    verificationConsents = new VerificationConsentsService(
-      database,
-      idempotency,
-      profiles,
-    );
     competitions = new CompetitionsService(
       database,
       idempotency,
       ledger,
       legalDocuments,
-      verificationConsents,
       profiles,
     );
-    sessions = new SessionsService(
-      database,
-      idempotency,
-      ledger,
-      profiles,
-      verificationConsents,
-    );
+    sessions = new SessionsService(database, idempotency, ledger, profiles);
     const operator = await profiles.ensureUser(
       operatorPrincipal,
       database.connection,
@@ -140,6 +136,396 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await migrated?.stop();
   });
 
+  it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const source = await database.connection
+      .selectFrom('competitions as competition')
+      .innerJoin(
+        'competition_gym_locations as assignment',
+        'assignment.competition_id',
+        'competition.id',
+      )
+      .select([
+        'assignment.gym_location_id',
+        'competition.region_policy_id',
+        'competition.registration_opens_at',
+        'competition.rules',
+        'competition.rules_version',
+      ])
+      .where('competition.id', '=', fixture.competitionId)
+      .executeTakeFirstOrThrow();
+    const laterContestStartsAt = new Date(Date.now() + 21 * 24 * 60 * 60_000);
+    const laterContestEndsAt = new Date(Date.now() + 28 * 24 * 60 * 60_000);
+    const otherCompetition = await database.connection
+      .insertInto('competitions')
+      .values({
+        ends_at: laterContestEndsAt,
+        minimum_entrants: 1,
+        month_key: '2030-02',
+        name: 'Later Contest At Same Gym',
+        region_policy_id: source.region_policy_id,
+        registration_closes_at: new Date(Date.now() + 20 * 24 * 60 * 60_000),
+        registration_opens_at: source.registration_opens_at,
+        rules: source.rules,
+        rules_version: source.rules_version,
+        starts_at: laterContestStartsAt,
+        status: 'registration',
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('competition_goal_brackets')
+      .values({
+        competition_id: otherCompetition.id,
+        created_at: new Date(),
+        goal_days: 3,
+        label: 'Three days',
+      })
+      .execute();
+    await database.connection
+      .insertInto('competition_gym_locations')
+      .values({
+        competition_id: otherCompetition.id,
+        created_at: new Date(),
+        gym_location_id: source.gym_location_id,
+      })
+      .execute();
+    const otherCredential =
+      'different-contest-same-gym-credential-000000000001';
+    const latestCredential = await database.connection
+      .selectFrom('gym_qr_credentials')
+      .select((expression) =>
+        expression.fn.max<number>('credential_version').as('version'),
+      )
+      .where('gym_location_id', '=', source.gym_location_id)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('gym_qr_credentials')
+      .values({
+        competition_id: otherCompetition.id,
+        credential_version: Number(latestCredential.version ?? 0) + 1,
+        gym_location_id: source.gym_location_id,
+        issued_by_user_id: operatorUserId,
+        qr_payload: `https://app.gogymgo.com/scan?credential=${otherCredential}`,
+        status: 'active',
+        token_hash: hashOpaqueValue(otherCredential),
+      })
+      .execute();
+
+    await expect(
+      competitions.resolveGymQrCompetition(userPrincipal, otherCredential),
+    ).resolves.toMatchObject({
+      id: otherCompetition.id,
+      name: 'Later Contest At Same Gym',
+    });
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toMatchObject({ id: fixture.competitionId });
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        otherCompetition.id,
+        'wrong-contest-poster-enrollment',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          gymPresence: fixture.gymPresence,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_QR_INVALID' },
+    });
+
+    await competitions.enroll(
+      userPrincipal,
+      otherCompetition.id,
+      'existing-later-contest-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: {
+          ...fixture.gymPresence,
+          credential: otherCredential,
+        },
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await expect(competitions.getCurrent(userPrincipal)).resolves.toMatchObject(
+      {
+        id: otherCompetition.id,
+      },
+    );
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toMatchObject({ id: fixture.competitionId });
+
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'scanned-earlier-contest-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await expect(
+      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+    ).resolves.toMatchObject({ competitionId: fixture.competitionId });
+
+    const activeEnrollment = await migrated.pool.query<{
+      id: string;
+      user_id: string;
+    }>(
+      `SELECT id, user_id
+       FROM competition_enrollments
+       WHERE competition_id = $1 AND status = 'active'`,
+      [fixture.competitionId],
+    );
+    const activeSession = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at)
+       VALUES ($1, $2, $3, CURRENT_DATE, 'active', 'rules-v1', CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [
+        fixture.competitionId,
+        activeEnrollment.rows[0].id,
+        activeEnrollment.rows[0].user_id,
+      ],
+    );
+    await expect(
+      competitions.withdrawEnrollment(
+        userPrincipal,
+        fixture.competitionId,
+        'withdraw-scanned-earlier-contest',
+      ),
+    ).resolves.toMatchObject({
+      competitionId: fixture.competitionId,
+      status: 'withdrawn',
+    });
+    await expect(
+      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+    ).resolves.toBeNull();
+    const cancelledSession = await migrated.pool.query<{ status: string }>(
+      `SELECT status FROM workout_sessions WHERE id = $1`,
+      [activeSession.rows[0].id],
+    );
+    expect(cancelledSession.rows[0].status).toBe('cancelled');
+  });
+
+  it('enforces registration open and close times for QR resolution and enrollment', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const now = Date.now();
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET registration_opens_at = $1,
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(now + 30 * 60_000),
+        new Date(now + 60 * 60_000),
+        new Date(now + 90 * 60_000),
+        new Date(now + 120 * 60_000),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'registration-window-not-open',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          gymPresence: fixture.gymPresence,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_REGISTRATION_NOT_OPEN' },
+    });
+
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET registration_opens_at = $1,
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(now - 60 * 60_000),
+        new Date(now - 30 * 60_000),
+        new Date(now + 30 * 60_000),
+        new Date(now + 60 * 60_000),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      competitions.enroll(
+        userPrincipal,
+        fixture.competitionId,
+        'registration-window-closed',
+        {
+          ageEligibilityAttested: true,
+          goalDays: 3,
+          gymPresence: fixture.gymPresence,
+          legalReceiptBundleId: fixture.legalReceiptBundleId,
+          regionVerificationId: fixture.regionVerificationId,
+          rulesAccepted: true,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'COMPETITION_REGISTRATION_CLOSED' },
+    });
+  });
+
+  it("returns pending and then exact settled results for the participant's ended contest", async () => {
+    const fixture = await seedRegistrationCompetition();
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'participant-results-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET status = 'active',
+           registration_opens_at = $1,
+           registration_closes_at = $2,
+           starts_at = $3,
+           ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(Date.now() - 90 * 60_000),
+        new Date(Date.now() - 70 * 60_000),
+        new Date(Date.now() - 60 * 60_000),
+        new Date(Date.now() - 16 * 60_000),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      results.getLatestParticipantResults(userPrincipal),
+    ).resolves.toMatchObject({
+      categoryLeaderboards: [],
+      competitionId: fixture.competitionId,
+      participantGoalDays: 3,
+      resultsStatus: 'pending',
+      rewardWinners: [],
+      settledAt: null,
+    });
+
+    const user = await profiles.ensureUser(userPrincipal, database.connection);
+    await profiles.getMe(userPrincipal);
+    await migrated.pool.query(
+      `UPDATE competition_progress
+       SET category_score = 7, verified_days = 1
+       WHERE competition_id = $1 AND user_id = $2`,
+      [fixture.competitionId, user.id],
+    );
+    const reward = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO reward_catalog_items
+         (competition_id, sponsor_name, title, description, reward_type,
+          status, inventory_total, display_order, version,
+          fulfillment_instructions)
+       VALUES ($1, 'GoGymGo', '$200 Cash', 'Participant result test reward',
+               'cash', 'published', 1, 1, 1, 'Contact GoGymGo to claim.')
+       RETURNING id`,
+      [fixture.competitionId],
+    );
+    const draw = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_draws
+         (competition_id, status, rules_version, seed_commitment, seed_reveal,
+          entrant_snapshot_hash, entrant_count, total_entries, locked_at,
+          settled_at)
+       VALUES ($1, 'settled', 'rules-v1', repeat('a', 64), repeat('b', 64),
+               repeat('c', 64), 1, 5, $2, $2)
+       RETURNING id`,
+      [fixture.competitionId, new Date()],
+    );
+    await migrated.pool.query(
+      `INSERT INTO reward_awards
+         (draw_id, reward_catalog_item_id, user_id, award_rank, status,
+          awarded_at, updated_at)
+       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)`,
+      [draw.rows[0].id, reward.rows[0].id, user.id, new Date()],
+    );
+    await migrated.pool.query(
+      `UPDATE competitions SET status = 'settled' WHERE id = $1`,
+      [fixture.competitionId],
+    );
+
+    await expect(
+      results.getLatestParticipantResults(userPrincipal),
+    ).resolves.toMatchObject({
+      categoryLeaderboards: [
+        {
+          goal: 3,
+          rows: [
+            {
+              categoryEntries: 7,
+              rank: 1,
+              verifiedDays: 1,
+            },
+          ],
+        },
+      ],
+      competitionId: fixture.competitionId,
+      participantGoalDays: 3,
+      resultsStatus: 'settled',
+      rewardCount: 1,
+      rewardWinners: [
+        {
+          awardRank: 1,
+          rewardTitle: '$200 Cash',
+          rewardType: 'cash',
+          sponsorName: 'GoGymGo',
+        },
+      ],
+      settledAt: expect.any(String),
+    });
+  });
+
   it('accepts evidence once and awards the verified day exactly once', async () => {
     const fixture = await seedRegistrationCompetition();
     await expect(
@@ -150,6 +536,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         {
           ageEligibilityAttested: true,
           goalDays: 3,
+          gymPresence: fixture.gymPresence,
           legalReceiptBundleId: fixture.legalReceiptBundleId,
           regionVerificationId: fixture.regionVerificationId,
           rulesAccepted: true,
@@ -162,23 +549,22 @@ describeWithDatabase('critical session and ledger workflow', () => {
       competitions.enroll(
         userPrincipal,
         fixture.competitionId,
-        'session-workflow-consent-required',
+        'session-workflow-outside-gym',
         {
           ageEligibilityAttested: true,
           goalDays: 3,
+          gymPresence: {
+            ...fixture.gymPresence,
+            latitude: fixture.gymPresence.latitude + 0.01,
+          },
           legalReceiptBundleId: fixture.legalReceiptBundleId,
           regionVerificationId: fixture.regionVerificationId,
           rulesAccepted: true,
         },
       ),
     ).rejects.toMatchObject({
-      response: { code: 'DEVICE_PRESENCE_CONSENT_REQUIRED' },
+      response: { code: 'OUTSIDE_GYM_GEOFENCE' },
     });
-    await setVerificationConsent(
-      userPrincipal,
-      true,
-      'session-workflow-consent-granted',
-    );
     const enrollment = await competitions.enroll(
       userPrincipal,
       fixture.competitionId,
@@ -186,6 +572,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       {
         ageEligibilityAttested: true,
         goalDays: 3,
+        gymPresence: fixture.gymPresence,
         legalReceiptBundleId: fixture.legalReceiptBundleId,
         regionVerificationId: fixture.regionVerificationId,
         rulesAccepted: true,
@@ -199,6 +586,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         {
           ageEligibilityAttested: true,
           goalDays: 3,
+          gymPresence: fixture.gymPresence,
           legalReceiptBundleId: fixture.legalReceiptBundleId,
           regionVerificationId: fixture.regionVerificationId,
           rulesAccepted: true,
@@ -206,26 +594,6 @@ describeWithDatabase('critical session and ledger workflow', () => {
       ),
     ).resolves.toEqual(enrollment);
     await activateCompetition(fixture.competitionId);
-
-    await setVerificationConsent(
-      userPrincipal,
-      false,
-      'session-workflow-consent-withdrawn',
-    );
-    await expect(
-      sessions.create(
-        userPrincipal,
-        'session-workflow-withdrawn-consent-create',
-        { competitionId: fixture.competitionId },
-      ),
-    ).rejects.toMatchObject({
-      response: { code: 'DEVICE_PRESENCE_CONSENT_REQUIRED' },
-    });
-    await setVerificationConsent(
-      userPrincipal,
-      true,
-      'session-workflow-consent-restored',
-    );
 
     const abandoned = await sessions.create(
       userPrincipal,
@@ -580,6 +948,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
           {
             ageEligibilityAttested: true,
             goalDays: 3,
+            gymPresence: fixture.gymPresence,
             legalReceiptBundleId: user.legalReceiptBundleId,
             regionVerificationId: user.regionVerificationId,
             rulesAccepted: true,
@@ -615,6 +984,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const originalRequest = {
       ageEligibilityAttested: true as const,
       goalDays: 3,
+      gymPresence: fixture.gymPresence,
       legalReceiptBundleId: winner.legalReceiptBundleId,
       regionVerificationId: winner.regionVerificationId,
       rulesAccepted: true as const,
@@ -734,6 +1104,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
 
   async function seedRegistrationCompetition(): Promise<CompetitionFixture> {
     const now = Date.now();
+    const fixtureSequence = ++registrationFixtureSequence;
     const user = await profiles.ensureUser(userPrincipal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(
       userPrincipal,
@@ -745,7 +1116,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
           timezone, language_codes, minimum_age, competition_enabled,
            boundary_version, policy_version, boundary, valid_from)
        VALUES
-         ('critical-session-region', 'CA', 'BC', 'Critical Session Region',
+         ($2, 'CA', 'BC', 'Critical Session Region',
            'CAD', 'America/Vancouver', ARRAY['en-CA'], 19, TRUE,
           'boundary-v1', 'policy-v1',
           ST_GeogFromText(
@@ -753,7 +1124,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
           ),
           $1)
        RETURNING id`,
-      [new Date(now - 24 * 60 * 60_000)],
+      [
+        new Date(now - 24 * 60 * 60_000),
+        `critical-session-region-${fixtureSequence}`,
+      ],
     );
     const verification = await migrated.pool.query<{ id: string }>(
       `INSERT INTO region_verifications
@@ -792,8 +1166,42 @@ describeWithDatabase('critical session and ledger workflow', () => {
        VALUES ($1, 3, 'Three days')`,
       [competition.rows[0].id],
     );
+    const gymCredential = `critical-session-gym-credential-${fixtureSequence
+      .toString()
+      .padStart(8, '0')}`;
+    const gym = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO gym_locations
+         (region_policy_id, name, address, coordinates, radius_meters, active)
+       VALUES ($1, 'Critical Session Gym', '100 Test Street',
+               ST_SetSRID(ST_MakePoint(-123.1207, 49.2827), 4326)::geography,
+               75, TRUE)
+       RETURNING id`,
+      [region.rows[0].id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO gym_qr_credentials
+         (competition_id, gym_location_id, credential_version, token_hash, status, issued_by_user_id)
+       VALUES ($1, $2, 1, $3, 'active', $4)`,
+      [
+        competition.rows[0].id,
+        gym.rows[0].id,
+        hashOpaqueValue(gymCredential),
+        operatorUserId,
+      ],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_gym_locations (competition_id, gym_location_id)
+       VALUES ($1, $2)`,
+      [competition.rows[0].id, gym.rows[0].id],
+    );
     return {
       competitionId: competition.rows[0].id,
+      gymPresence: {
+        accuracyMeters: 5,
+        credential: gymCredential,
+        latitude: 49.2827,
+        longitude: -123.1207,
+      },
       legalReceiptBundleId,
       regionVerificationId: verification.rows[0].id,
     };
@@ -801,6 +1209,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
 
   async function seedCappedCompetition(): Promise<{
     competitionId: string;
+    gymPresence: CompetitionFixture['gymPresence'];
     users: readonly [
       {
         legalReceiptBundleId: string;
@@ -841,11 +1250,6 @@ describeWithDatabase('critical session and ledger workflow', () => {
       const legalReceiptBundleId = await acceptCurrentLegalBundle(
         principal,
         `critical-capped-legal-${principal.firebaseUid}`,
-      );
-      await setVerificationConsent(
-        principal,
-        true,
-        `critical-capped-consent-${principal.firebaseUid}`,
       );
       const verification = await migrated.pool.query<{ id: string }>(
         `INSERT INTO region_verifications
@@ -891,6 +1295,32 @@ describeWithDatabase('critical session and ledger workflow', () => {
        VALUES ($1, 3, 'Three days'), ($1, 4, 'Four days')`,
       [competition.rows[0].id],
     );
+    const gymCredential = 'critical-capped-gym-credential-000000001';
+    const gym = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO gym_locations
+         (region_policy_id, name, address, coordinates, radius_meters, active)
+       VALUES ($1, 'Critical Capped Gym', '200 Test Street',
+               ST_SetSRID(ST_MakePoint(-123.1207, 49.2827), 4326)::geography,
+               75, TRUE)
+       RETURNING id`,
+      [region.rows[0].id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO gym_qr_credentials
+         (competition_id, gym_location_id, credential_version, token_hash, status, issued_by_user_id)
+       VALUES ($1, $2, 1, $3, 'active', $4)`,
+      [
+        competition.rows[0].id,
+        gym.rows[0].id,
+        hashOpaqueValue(gymCredential),
+        operatorUserId,
+      ],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_gym_locations (competition_id, gym_location_id)
+       VALUES ($1, $2)`,
+      [competition.rows[0].id, gym.rows[0].id],
+    );
     await migrated.pool.query(
       `INSERT INTO users (firebase_uid, email_verified)
        SELECT 'capped-seeded-user-' || sequence::text, TRUE
@@ -931,6 +1361,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     return {
       competitionId: competition.rows[0].id,
+      gymPresence: {
+        accuracyMeters: 5,
+        credential: gymCredential,
+        latitude: 49.2827,
+        longitude: -123.1207,
+      },
       users: users as [
         {
           legalReceiptBundleId: string;
@@ -1022,22 +1458,6 @@ describeWithDatabase('critical session and ledger workflow', () => {
       },
     );
     return status.receiptBundleId!;
-  }
-
-  async function setVerificationConsent(
-    principal: AuthenticatedPrincipal,
-    accepted: boolean,
-    idempotencyKey: string,
-  ): Promise<void> {
-    const status = await verificationConsents.setStatus(
-      principal,
-      idempotencyKey,
-      {
-        accepted,
-        consentVersion: devicePresenceConsentVersion,
-      },
-    );
-    expect(status.accepted).toBe(accepted);
   }
 
   async function activateCompetition(competitionId: string): Promise<void> {

@@ -1,5 +1,5 @@
-import { type Href, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Redirect, type Href, useRouter } from 'expo-router';
+import { Platform, StyleSheet } from 'react-native';
 
 import {
   CyberButtonPrimary,
@@ -9,12 +9,25 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableScreenError } from '@/components/reliability';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { BrandScreenHeader } from '@/components/screenLayout';
+import { colors, spacing } from '@/constants/theme';
 import { getWorkoutAccessMode } from '@/domain/workoutAccess';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function SessionTabRoute() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
+  }
+
+  return <MobileSessionTabRoute />;
+}
+
+function MobileSessionTabRoute() {
   const router = useRouter();
   const { competition } = useWorkoutProgress();
   const verifiedWorkoutUnavailable = getWorkoutAccessMode(
@@ -32,12 +45,12 @@ export default function SessionTabRoute() {
   } = useSessionRegistrationAccess();
 
   if (setupChecking) {
-    return <ScreenLoadingState body="Checking your competition setup." />;
+    return <ScreenLoadingState body="Checking your Contest." />;
   }
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before scanning a gym poster."
+        body="We couldn&apos;t check your Contest. Try again."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"
@@ -47,23 +60,16 @@ export default function SessionTabRoute() {
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <TerminalText glow tone="cyan" variant="label">
-          SEPTEMBER QR PILOT
-        </TerminalText>
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          VERIFY A GYM VISIT
-        </TerminalText>
-        <TerminalText style={styles.helper} tone="muted" uppercase={false} variant="body">
-          Scan the same static GoGymGo poster when you enter and after at least
-          30 minutes. Server time and a live 75-metre location check determine
-          whether the workout day is verified.
-        </TerminalText>
-      </View>
+      <BrandScreenHeader
+        description="Start and finish within 75 metres of your selected gym. Train for at least 30 minutes."
+        eyebrow="PARTNER GYM PILOT"
+        style={styles.header}
+        title="VERIFY A GYM VISIT"
+      />
 
       {!setupReady ? (
-        <HUDBorderBox glow style={styles.notice} tone="amber">
-          <TerminalText glow tone="amber" variant="label">
+        <HUDBorderBox style={styles.notice} tone="amber">
+          <TerminalText tone="amber" variant="label">
             FINISH SETUP
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
@@ -78,24 +84,23 @@ export default function SessionTabRoute() {
         </HUDBorderBox>
       ) : verifiedWorkoutUnavailable ? (
         <HUDBorderBox style={styles.notice} tone="muted">
-          <TerminalText glow tone="amber" variant="label">
-            COMPETITION NOT STARTED
+          <TerminalText tone="amber" variant="label">
+            CONTEST NOT STARTED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            QR-verified sessions unlock when the September competition begins.
+            Verified workouts unlock when the September Contest begins.
           </TerminalText>
         </HUDBorderBox>
       ) : (
-        <HUDBorderBox glow style={styles.notice} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
-            STATIC QR READY
+        <HUDBorderBox style={styles.notice} tone="cyan">
+          <TerminalText tone="cyan" variant="label">
+            GYM LOCATION READY
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Missing the exit scan earns no competition credit. A gym poster may
-            be replaced by an administrator; revoked posters are rejected.
+            Check your location to start. Check again when Finish unlocks.
           </TerminalText>
           <CyberButtonPrimary
-            label="SCAN GYM QR ->"
+            label="START LOCATION CHECK ->"
             onPress={() => router.push('/qr-scanner')}
           />
         </HUDBorderBox>
@@ -107,26 +112,12 @@ export default function SessionTabRoute() {
 const styles = StyleSheet.create({
   screen: {
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.xxl,
+    paddingTop: spacing.sm,
     paddingBottom: 78,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   header: {
-    alignItems: 'center',
     marginBottom: spacing.xxl
-  },
-  title: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34,
-    textAlign: 'center'
-  },
-  helper: {
-    maxWidth: 410,
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   },
   notice: {
     gap: spacing.md,

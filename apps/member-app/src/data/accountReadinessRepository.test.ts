@@ -93,6 +93,12 @@ describe('account readiness repository', () => {
       {
         ageEligibilityAttested: true,
         goalDays: 4,
+        gymPresence: {
+          accuracyMeters: 8,
+          credential: 'partner-gym-credential-000000000001',
+          latitude: 49.2827,
+          longitude: -123.1207
+        },
         legalReceiptBundleId: '20000000-0000-4000-8000-000000000001',
         regionVerificationId: '30000000-0000-4000-8000-000000000002',
         rulesAccepted: true
@@ -100,8 +106,12 @@ describe('account readiness repository', () => {
     );
     await account.getCurrentCompetition('2026-08', 'vancouver-bc');
     await account.getCurrentCompetition(undefined, 'vancouver-bc');
+    await account.resolveCompetitionByGymQr('partner-gym-credential-000000000001');
     await account.getCurrentRegionVerification();
     await account.getCurrentRegionVerification('vancouver-bc');
+    await account.getCurrentEnrollment();
+    await account.getCurrentEnrollment('40000000-0000-4000-8000-000000000001');
+    await account.withdrawFromCompetition('40000000-0000-4000-8000-000000000001');
 
     assert.deepEqual(requests.map(({ method, path }) => ({ method, path })), [
       { method: 'POST', path: '/v1/me/region-verifications' },
@@ -118,18 +128,50 @@ describe('account readiness repository', () => {
         path: '/v1/competitions/current?region=vancouver-bc'
       },
       {
+        method: 'POST',
+        path: '/v1/competitions/resolve-gym-qr'
+      },
+      {
         method: undefined,
         path: '/v1/me/region-verifications/current'
       },
       {
         method: undefined,
         path: '/v1/me/region-verifications/current?regionCode=vancouver-bc'
+      },
+      {
+        method: undefined,
+        path: '/v1/competitions/current/enrollment'
+      },
+      {
+        method: undefined,
+        path: '/v1/competitions/current/enrollment?competitionId=40000000-0000-4000-8000-000000000001'
+      },
+      {
+        method: 'POST',
+        path: '/v1/competitions/40000000-0000-4000-8000-000000000001/enrollment/withdrawal'
       }
     ]);
     assert.deepEqual(requests[0].body, {
       latitude: 49.2827,
       longitude: -123.1207,
       method: 'device_location'
+    });
+    assert.deepEqual(requests[1].body, {
+      ageEligibilityAttested: true,
+      goalDays: 4,
+      gymPresence: {
+        accuracyMeters: 8,
+        credential: 'partner-gym-credential-000000000001',
+        latitude: 49.2827,
+        longitude: -123.1207
+      },
+      legalReceiptBundleId: '20000000-0000-4000-8000-000000000001',
+      regionVerificationId: '30000000-0000-4000-8000-000000000002',
+      rulesAccepted: true
+    });
+    assert.deepEqual(requests[4].body, {
+      credential: 'partner-gym-credential-000000000001'
     });
   });
 
@@ -146,8 +188,16 @@ describe('account readiness repository', () => {
     assert.equal(competition, null);
     assert.equal(await account.getCurrentEnrollment(), null);
     assert.equal(await account.getCurrentRegionVerification(), null);
+    assert.equal(
+      await account.resolveCompetitionByGymQr('partner-gym-credential-000000000001'),
+      null
+    );
     await assert.rejects(
       () => account.recordLegalReceipt(documents),
+      /not configured/i
+    );
+    await assert.rejects(
+      () => account.withdrawFromCompetition('40000000-0000-4000-8000-000000000001'),
       /not configured/i
     );
   });

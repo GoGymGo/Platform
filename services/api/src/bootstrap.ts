@@ -1,6 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
+import * as classTransformer from 'class-transformer';
+import * as classValidator from 'class-validator';
 import helmet from 'helmet';
 import { ApiExceptionFilter } from './common/http/api-exception.filter';
 import { setupOpenApi } from './common/openapi/openapi';
@@ -28,6 +30,8 @@ export function configureApplication(app: INestApplication): void {
       forbidUnknownValues: true,
       transform: true,
       transformOptions: { enableImplicitConversion: false },
+      transformerPackage: classTransformer,
+      validatorPackage: classValidator,
       whitelist: true,
     }),
   );

@@ -15,6 +15,7 @@ import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { parseCompetitionRules } from '../competitions/competition-rules';
 import { LedgerService } from '../ledger/ledger.service';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
+import { canDeleteGym } from '../operator/admin-deletion-policy';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   CashFulfillmentRecordDto,
@@ -34,10 +35,14 @@ import type {
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import {
+  canCompleteGymSession,
+  canStartGymSession,
+  competitionCompletionDeadline,
   gymScanPolicy,
   hashOpaqueValue,
   isAcceptableLocationAccuracy,
   isMatchingSessionCredential,
+  isWithinGymGeofence,
   resolveActiveSessionScan,
 } from './gym-scan-policy';
 
@@ -53,6 +58,22 @@ interface GymScanJson extends JsonObject {
   serverTimestamp: string;
   sessionId: string | null;
   startedAt: string | null;
+}
+
+interface GymPresenceContext {
+  competition_id: string;
+  credential_version: number;
+  distance_meters: number;
+  gym_active: boolean;
+  gym_id: string;
+  gym_name: string;
+  radius_meters: number;
+  timezone: string;
+}
+
+interface DeletedGymJson extends JsonObject {
+  id: string;
+  status: 'deleted';
 }
 
 @Injectable()
@@ -76,7 +97,10 @@ export class GymsService {
         key: idempotencyKey,
         request: {
           accuracyMeters: request.accuracyMeters,
-          credentialHash: hashOpaqueValue(request.credential),
+          competitionId: request.competitionId ?? null,
+          credentialHash: request.credential
+            ? hashOpaqueValue(request.credential)
+            : null,
           eventId: request.eventId,
           latitude: request.latitude,
           longitude: request.longitude,
@@ -87,52 +111,43 @@ export class GymsService {
         const user = await this.profiles.ensureUser(principal, transaction);
         this.profiles.requireVerifiedEmail(user);
         const now = new Date();
-        const tokenHash = hashOpaqueValue(request.credential);
         const clientEventHash = hashOpaqueValue(request.eventId);
 
         await sql`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`.execute(
           transaction,
         );
 
-        const credential = await transaction
-          .selectFrom('gym_qr_credentials as credential')
-          .innerJoin(
-            'gym_locations as gym',
-            'gym.id',
-            'credential.gym_location_id',
-          )
-          .innerJoin(
-            'region_policies as region',
-            'region.id',
-            'gym.region_policy_id',
-          )
-          .select([
-            'credential.credential_version',
-            'credential.status as credential_status',
-            'gym.active as gym_active',
-            'gym.id as gym_id',
-            'gym.name as gym_name',
-            'gym.radius_meters',
-            'region.timezone',
-            sql<boolean>`ST_DWithin(
-              ${sql.ref('gym.coordinates')},
-              ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography,
-              ${sql.ref('gym.radius_meters')}
-            )`.as('within_geofence'),
-          ])
-          .where('credential.token_hash', '=', tokenHash)
-          .executeTakeFirst();
+        const credential = request.credential
+          ? await this.resolveQrGymPresence(transaction, request)
+          : await this.resolveEnrolledGymPresence(
+              transaction,
+              user.id,
+              request,
+            );
 
-        if (!credential || credential.credential_status !== 'active') {
-          return this.rejected(now, 'invalid_or_revoked_credential');
+        if (!credential) {
+          return this.rejected(
+            now,
+            request.credential
+              ? 'invalid_or_revoked_credential'
+              : 'gym_selection_required',
+          );
         }
         if (!credential.gym_active) {
           return this.rejected(now, 'gym_inactive', credential);
         }
-        if (!isAcceptableLocationAccuracy(request.accuracyMeters)) {
+        const withinGeofence = isWithinGymGeofence(
+          credential.distance_meters,
+          credential.radius_meters,
+          request.accuracyMeters,
+        );
+        if (
+          !withinGeofence &&
+          !isAcceptableLocationAccuracy(request.accuracyMeters)
+        ) {
           return this.rejected(now, 'inaccurate_location', credential);
         }
-        if (!credential.within_geofence) {
+        if (!withinGeofence) {
           return this.rejected(now, 'outside_geofence', credential);
         }
 
@@ -146,6 +161,7 @@ export class GymsService {
           return this.rejected(now, 'replayed_event', credential);
         }
 
+        const credentialCompetitionId = credential.competition_id;
         const enrollment = await transaction
           .selectFrom('competition_gym_locations as eligible_gym')
           .innerJoin(
@@ -159,18 +175,22 @@ export class GymsService {
             'competition.id',
           )
           .select([
+            'competition.ends_at',
             'competition.id as competition_id',
             'competition.rules',
             'competition.rules_version',
+            'competition.status as competition_status',
             'enrollment.goal_days',
             'enrollment.id as enrollment_id',
           ])
           .where('eligible_gym.gym_location_id', '=', credential.gym_id)
-          .where('competition.status', '=', 'active')
+          .where('eligible_gym.competition_id', '=', credentialCompetitionId)
+          .where('competition.id', '=', credentialCompetitionId)
+          .where('competition.status', 'in', ['active', 'settling'])
           .where('competition.starts_at', '<=', now)
-          .where('competition.ends_at', '>', now)
           .where('enrollment.user_id', '=', user.id)
           .where('enrollment.status', '=', 'active')
+          .where('enrollment.gym_location_id', '=', credential.gym_id)
           .executeTakeFirst();
         if (!enrollment) {
           return this.rejected(now, 'competition_unavailable', credential);
@@ -198,8 +218,29 @@ export class GymsService {
           .executeTakeFirst();
 
         if (!active) {
+          if (
+            enrollment.competition_status !== 'active' ||
+            !canStartGymSession({
+              competitionEndsAt: enrollment.ends_at,
+              now,
+            })
+          ) {
+            return this.rejected(
+              now,
+              now < enrollment.ends_at
+                ? 'insufficient_completion_time'
+                : 'competition_unavailable',
+              credential,
+            );
+          }
+          const competitionDeadline = competitionCompletionDeadline(
+            enrollment.ends_at,
+          );
           const expiresAt = new Date(
-            now.getTime() + gymScanPolicy.sessionExpiryMilliseconds,
+            Math.min(
+              now.getTime() + gymScanPolicy.sessionExpiryMilliseconds,
+              competitionDeadline.getTime(),
+            ),
           );
           const session = await transaction
             .insertInto('workout_sessions')
@@ -279,7 +320,48 @@ export class GymsService {
             active,
           );
         }
+        if (
+          !canCompleteGymSession({
+            competitionEndsAt: enrollment.ends_at,
+            now,
+            startedAt: active.started_at,
+          })
+        ) {
+          await transaction
+            .updateTable('workout_sessions')
+            .set({
+              completed_at: now,
+              status: 'cancelled',
+              updated_at: now,
+              verification_summary: {
+                outcome: 'competition_completion_grace_expired',
+                verificationMode: 'static_qr',
+              },
+            })
+            .where('id', '=', active.id)
+            .where('status', '=', 'active')
+            .executeTakeFirstOrThrow();
+          await this.recordScan(transaction, {
+            clientEventHash,
+            credentialVersion: credential.credential_version,
+            gymLocationId: credential.gym_id,
+            outcome: 'rejected',
+            scanType: 'exit',
+            serverTimestamp: now,
+            sessionId: active.id,
+            userId: user.id,
+          });
+          return this.rejected(
+            now,
+            'completion_grace_expired',
+            credential,
+            active,
+          );
+        }
 
+        // Finish requests reuse the gym credential saved during enrollment.
+        // Completion relies on the fresh geofence reading above and server time;
+        // the API does not receive or require evidence of another camera scan.
         const expiresAt = active.expires_at!;
         const resolution = resolveActiveSessionScan({
           expiresAt,
@@ -399,8 +481,19 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        await this.adminAuthorization.requireAdmin(principal, transaction);
-        const gyms = await this.gymLocationQuery(transaction).execute();
+        const access = await this.adminAuthorization.resolvePortalAccess(
+          principal,
+          transaction,
+        );
+        let query = this.gymLocationQuery(transaction);
+        if (access.kind === 'gym_partner') {
+          query = query.where(
+            'gym.id',
+            'in',
+            access.assignments.map((assignment) => assignment.gymLocationId),
+          );
+        }
+        const gyms = await query.execute();
         return gyms.map((gym) => this.mapGymLocation(gym));
       });
   }
@@ -422,7 +515,7 @@ export class GymsService {
           .insertInto('gym_locations')
           .values({
             active: true,
-            address: input.address.trim(),
+            address: input.address?.trim() ?? '',
             coordinates: sql`ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)::geography`,
             created_at: now,
             name: input.name.trim(),
@@ -439,7 +532,7 @@ export class GymsService {
           entityType: 'gym_locations',
           nextState: {
             active: true,
-            address: input.address.trim(),
+            address: input.address?.trim() ?? '',
             name: input.name.trim(),
             radiusMeters: input.radiusMeters,
             regionPolicyId: input.regionPolicyId,
@@ -471,7 +564,7 @@ export class GymsService {
           .updateTable('gym_locations')
           .set({
             active: input.active,
-            address: input.address.trim(),
+            address: input.address?.trim() ?? '',
             coordinates: sql`ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)::geography`,
             name: input.name.trim(),
             radius_meters: input.radiusMeters,
@@ -495,8 +588,94 @@ export class GymsService {
       });
   }
 
+  deleteGymLocation(
+    principal: AuthenticatedPrincipal,
+    gymId: string,
+    requestId: string,
+    reason: string,
+  ): Promise<{ id: string; status: 'deleted' }> {
+    return this.idempotency.execute<DeletedGymJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: { gymId, reason },
+        scope: `admin-gym-locations:${gymId}:delete`,
+      },
+      async (transaction) => {
+        const admin = await this.adminAuthorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const gym = await transaction
+          .selectFrom('gym_locations')
+          .selectAll()
+          .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!gym) {
+          throw new NotFoundException({
+            code: 'GYM_LOCATION_NOT_FOUND',
+            message: 'The gym location was not found.',
+          });
+        }
+        if (!canDeleteGym(gym.active)) {
+          throw new ConflictException({
+            code: 'GYM_DELETE_REQUIRES_INACTIVE',
+            message: 'Deactivate the gym before deleting it.',
+          });
+        }
+
+        const deletedAt = new Date();
+        await transaction
+          .updateTable('gym_qr_credentials')
+          .set({
+            revocation_reason: 'Gym deleted from the admin dashboard.',
+            revoked_at: deletedAt,
+            revoked_by_user_id: admin.id,
+            status: 'revoked',
+          })
+          .where('gym_location_id', '=', gymId)
+          .where('status', '=', 'active')
+          .execute();
+        await transaction
+          .updateTable('gym_partner_assignments')
+          .set({ active: false, updated_at: deletedAt })
+          .where('gym_location_id', '=', gymId)
+          .where('active', '=', true)
+          .execute();
+        const deleted = await transaction
+          .updateTable('gym_locations')
+          .set({ deleted_at: deletedAt, updated_at: deletedAt })
+          .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await this.adminAuthorization.audit(transaction, {
+          action: 'gym_location.deleted',
+          actorUserId: admin.id,
+          entityId: gymId,
+          entityType: 'gym_locations',
+          nextState: {
+            deletedAt: deletedAt.toISOString(),
+            status: 'deleted',
+          },
+          previousState: {
+            active: gym.active,
+            name: gym.name,
+            regionPolicyId: gym.region_policy_id,
+          },
+          reason,
+          requestId,
+        });
+        return { id: deleted.id, status: 'deleted' };
+      },
+    );
+  }
+
   issueCredential(
     principal: AuthenticatedPrincipal,
+    competitionId: string,
     gymId: string,
     requestId: string,
     reason: string,
@@ -504,14 +683,17 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        const admin = await this.adminAuthorization.requireAdmin(
+        const operator = await this.adminAuthorization.requireGymAccess(
           principal,
           transaction,
+          gymId,
+          'admin',
         );
         const gym = await transaction
           .selectFrom('gym_locations')
           .select(['active', 'id', 'name'])
           .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
           .forUpdate()
           .executeTakeFirst();
         if (!gym) {
@@ -526,15 +708,56 @@ export class GymsService {
             message: 'A QR poster cannot be issued for an inactive gym.',
           });
         }
+        const competition = await transaction
+          .selectFrom('competition_gym_locations as assignment')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'assignment.competition_id',
+          )
+          .innerJoin(
+            'region_policies as region',
+            'region.id',
+            'competition.region_policy_id',
+          )
+          .select([
+            'competition.ends_at',
+            'competition.id',
+            'competition.name',
+            'competition.registration_opens_at',
+            'competition.starts_at',
+            'competition.status',
+            'region.metro_name as region_name',
+            'region.timezone',
+          ])
+          .where('assignment.competition_id', '=', competitionId)
+          .where('assignment.gym_location_id', '=', gym.id)
+          .where('competition.deleted_at', 'is', null)
+          .executeTakeFirst();
+        if (!competition) {
+          throw new ConflictException({
+            code: 'CONTEST_GYM_ASSIGNMENT_REQUIRED',
+            message:
+              'Assign this gym to the selected contest before issuing its poster.',
+          });
+        }
+        if (!['draft', 'registration', 'active'].includes(competition.status)) {
+          throw new ConflictException({
+            code: 'COMPETITION_NOT_CONFIGURABLE',
+            message:
+              'QR posters can be issued only for a draft, registration, or active contest.',
+          });
+        }
         const now = new Date();
         await transaction
           .updateTable('gym_qr_credentials')
           .set({
             revocation_reason: 'Superseded by a newly issued QR poster.',
             revoked_at: now,
-            revoked_by_user_id: admin.id,
+            revoked_by_user_id: operator.user.id,
             status: 'revoked',
           })
+          .where('competition_id', '=', competition.id)
           .where('gym_location_id', '=', gym.id)
           .where('status', '=', 'active')
           .execute();
@@ -547,13 +770,16 @@ export class GymsService {
           .executeTakeFirstOrThrow();
         const credentialVersion = Number(latest.version ?? 0) + 1;
         const token = randomBytes(32).toString('base64url');
+        const qrPayload = `https://app.gogymgo.com/scan?credential=${encodeURIComponent(token)}`;
         const credential = await transaction
           .insertInto('gym_qr_credentials')
           .values({
+            competition_id: competition.id,
             credential_version: credentialVersion,
             gym_location_id: gym.id,
             issued_at: now,
-            issued_by_user_id: admin.id,
+            issued_by_user_id: operator.user.id,
+            qr_payload: qrPayload,
             status: 'active',
             token_hash: hashOpaqueValue(token),
           })
@@ -561,22 +787,28 @@ export class GymsService {
           .executeTakeFirstOrThrow();
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_qr_credential.issued',
-          actorUserId: admin.id,
+          actorUserId: operator.user.id,
           entityId: credential.id,
           entityType: 'gym_qr_credentials',
-          nextState: { credentialVersion, gymLocationId: gym.id },
+          nextState: {
+            competitionId: competition.id,
+            credentialVersion,
+            gymLocationId: gym.id,
+          },
           previousState: null,
           reason,
           requestId,
         });
-        const qrPayload = `https://app.gogymgo.com/scan?credential=${encodeURIComponent(token)}`;
         return {
+          competitionId: competition.id,
+          competitionName: competition.name,
           credentialVersion,
           gymLocationId: gym.id,
           id: credential.id,
           issuedAt: credential.issued_at.toISOString(),
           printablePosterSvg: await this.buildPosterSvg(
             gym.name,
+            competition,
             qrPayload,
             credentialVersion,
           ),
@@ -585,8 +817,91 @@ export class GymsService {
       });
   }
 
+  getActiveCredential(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    gymId: string,
+  ): Promise<GymQrCredentialResponseDto | null> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.adminAuthorization.requireGymAccess(
+          principal,
+          transaction,
+          gymId,
+          'admin',
+        );
+        const credential = await transaction
+          .selectFrom('gym_locations as gym')
+          .innerJoin(
+            'gym_qr_credentials as credential',
+            'credential.gym_location_id',
+            'gym.id',
+          )
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'credential.competition_id',
+          )
+          .innerJoin(
+            'region_policies as region',
+            'region.id',
+            'competition.region_policy_id',
+          )
+          .select([
+            'competition.ends_at',
+            'competition.id as competition_id',
+            'competition.name as competition_name',
+            'competition.registration_opens_at',
+            'competition.starts_at',
+            'credential.credential_version',
+            'credential.id',
+            'credential.issued_at',
+            'credential.qr_payload',
+            'gym.id as gym_location_id',
+            'gym.name as gym_name',
+            'region.metro_name as region_name',
+            'region.timezone',
+          ])
+          .where('gym.id', '=', gymId)
+          .where('competition.id', '=', competitionId)
+          .where('competition.deleted_at', 'is', null)
+          .where('gym.deleted_at', 'is', null)
+          .where('gym.active', '=', true)
+          .where('credential.status', '=', 'active')
+          .executeTakeFirst();
+        if (!credential?.qr_payload) {
+          return null;
+        }
+        return {
+          competitionId: credential.competition_id,
+          competitionName: credential.competition_name,
+          credentialVersion: credential.credential_version,
+          gymLocationId: credential.gym_location_id,
+          id: credential.id,
+          issuedAt: credential.issued_at.toISOString(),
+          printablePosterSvg: await this.buildPosterSvg(
+            credential.gym_name,
+            {
+              ends_at: credential.ends_at,
+              id: credential.competition_id,
+              name: credential.competition_name,
+              registration_opens_at: credential.registration_opens_at,
+              region_name: credential.region_name,
+              starts_at: credential.starts_at,
+              timezone: credential.timezone,
+            },
+            credential.qr_payload,
+            credential.credential_version,
+          ),
+          qrPayload: credential.qr_payload,
+        };
+      });
+  }
+
   revokeCredential(
     principal: AuthenticatedPrincipal,
+    competitionId: string,
     gymId: string,
     requestId: string,
     reason: string,
@@ -594,9 +909,11 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        const admin = await this.adminAuthorization.requireAdmin(
+        const operator = await this.adminAuthorization.requireGymAccess(
           principal,
           transaction,
+          gymId,
+          'admin',
         );
         const now = new Date();
         const credential = await transaction
@@ -604,9 +921,10 @@ export class GymsService {
           .set({
             revocation_reason: reason.trim(),
             revoked_at: now,
-            revoked_by_user_id: admin.id,
+            revoked_by_user_id: operator.user.id,
             status: 'revoked',
           })
+          .where('competition_id', '=', competitionId)
           .where('gym_location_id', '=', gymId)
           .where('status', '=', 'active')
           .returning(['credential_version', 'id'])
@@ -619,11 +937,12 @@ export class GymsService {
         }
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_qr_credential.revoked',
-          actorUserId: admin.id,
+          actorUserId: operator.user.id,
           entityId: credential.id,
           entityType: 'gym_qr_credentials',
           nextState: { status: 'revoked' },
           previousState: {
+            competitionId,
             credentialVersion: credential.credential_version,
             status: 'active',
           },
@@ -655,14 +974,36 @@ export class GymsService {
             'gym.region_policy_id',
             'competition.region_policy_id',
           )
-          .select(['competition.id as competition_id', 'gym.id as gym_id'])
+          .select([
+            'competition.id as competition_id',
+            'competition.status as competition_status',
+            'gym.active as gym_active',
+            'gym.id as gym_id',
+          ])
           .where('competition.id', '=', competitionId)
+          .where('competition.deleted_at', 'is', null)
           .where('gym.id', '=', gymId)
+          .where('gym.deleted_at', 'is', null)
           .executeTakeFirst();
         if (!pair) {
           throw new BadRequestException({
             code: 'COMPETITION_GYM_REGION_MISMATCH',
             message: 'The gym and competition must belong to the same region.',
+          });
+        }
+        if (
+          !['draft', 'registration', 'active'].includes(pair.competition_status)
+        ) {
+          throw new ConflictException({
+            code: 'COMPETITION_NOT_OPERATIONAL',
+            message:
+              'Partner gyms can be assigned only to draft, registration, or active contests.',
+          });
+        }
+        if (!pair.gym_active) {
+          throw new ConflictException({
+            code: 'GYM_LOCATION_INACTIVE',
+            message: 'Only an active Partner gym can be assigned to a contest.',
           });
         }
         await transaction
@@ -837,9 +1178,12 @@ export class GymsService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
-        await this.adminAuthorization.requireAdmin(principal, transaction);
+        const access = await this.adminAuthorization.resolvePortalAccess(
+          principal,
+          transaction,
+        );
         const now = new Date();
-        const sessions = await transaction
+        let query = transaction
           .selectFrom('workout_sessions as session')
           .innerJoin(
             'gym_locations as gym',
@@ -856,9 +1200,15 @@ export class GymsService {
             'session.status',
           ])
           .where('session.verification_mode', '=', 'static_qr')
-          .orderBy('session.started_at', 'desc')
-          .limit(500)
-          .execute();
+          .orderBy('session.started_at', 'desc');
+        if (access.kind === 'gym_partner') {
+          query = query.where(
+            'gym.id',
+            'in',
+            access.assignments.map((assignment) => assignment.gymLocationId),
+          );
+        }
+        const sessions = await query.limit(500).execute();
         return sessions.map((session) => ({
           completedAt: session.completed_at?.toISOString() ?? null,
           gymLocationId: session.gym_id,
@@ -1018,6 +1368,23 @@ export class GymsService {
 
   async expireIncompleteSessions(): Promise<number> {
     const now = new Date();
+    const due = await this.database.connection
+      .selectFrom('workout_sessions as session')
+      .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'session.competition_id',
+      )
+      .select('session.id')
+      .where('session.status', '=', 'active')
+      .where((expression) =>
+        expression.or([
+          expression('session.expires_at', '<=', now),
+          sql<boolean>`${sql.ref('competition.ends_at')} + INTERVAL '15 minutes' < ${now}`,
+        ]),
+      )
+      .execute();
+    if (due.length === 0) return 0;
     const expired = await this.database.connection
       .updateTable('workout_sessions')
       .set({
@@ -1029,12 +1396,102 @@ export class GymsService {
           verificationMode: 'static_qr',
         },
       })
-      .where('verification_mode', '=', 'static_qr')
       .where('status', '=', 'active')
-      .where('expires_at', '<=', now)
+      .where(
+        'id',
+        'in',
+        due.map((session) => session.id),
+      )
       .returning('id')
       .execute();
     return expired.length;
+  }
+
+  private async resolveQrGymPresence(
+    transaction: Transaction<Database>,
+    request: GymScanRequestDto,
+  ): Promise<GymPresenceContext | null> {
+    if (!request.credential) return null;
+
+    const resolved = await transaction
+      .selectFrom('gym_qr_credentials as credential')
+      .innerJoin('gym_locations as gym', 'gym.id', 'credential.gym_location_id')
+      .innerJoin(
+        'region_policies as region',
+        'region.id',
+        'gym.region_policy_id',
+      )
+      .select([
+        'credential.competition_id',
+        'credential.credential_version',
+        'gym.active as gym_active',
+        'gym.id as gym_id',
+        'gym.name as gym_name',
+        sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
+          'radius_meters',
+        ),
+        'region.timezone',
+        sql<number>`ST_Distance(
+          ${sql.ref('gym.coordinates')},
+          ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography
+        )`.as('distance_meters'),
+      ])
+      .where('credential.token_hash', '=', hashOpaqueValue(request.credential))
+      .where('credential.status', '=', 'active')
+      .executeTakeFirst();
+
+    if (!resolved?.competition_id) return null;
+    return {
+      ...resolved,
+      competition_id: resolved.competition_id,
+    };
+  }
+
+  private async resolveEnrolledGymPresence(
+    transaction: Transaction<Database>,
+    userId: string,
+    request: GymScanRequestDto,
+  ): Promise<GymPresenceContext | null> {
+    if (!request.competitionId) return null;
+
+    const resolved = await transaction
+      .selectFrom('competition_enrollments as enrollment')
+      .innerJoin('gym_locations as gym', 'gym.id', 'enrollment.gym_location_id')
+      .innerJoin(
+        'region_policies as region',
+        'region.id',
+        'gym.region_policy_id',
+      )
+      .innerJoin('competition_gym_locations as assignment', (join) =>
+        join
+          .onRef('assignment.competition_id', '=', 'enrollment.competition_id')
+          .onRef('assignment.gym_location_id', '=', 'gym.id'),
+      )
+      .select([
+        'enrollment.competition_id',
+        'enrollment.gym_credential_version as credential_version',
+        'gym.active as gym_active',
+        'gym.id as gym_id',
+        'gym.name as gym_name',
+        sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
+          'radius_meters',
+        ),
+        'region.timezone',
+        sql<number>`ST_Distance(
+          ${sql.ref('gym.coordinates')},
+          ST_SetSRID(ST_MakePoint(${request.longitude}, ${request.latitude}), 4326)::geography
+        )`.as('distance_meters'),
+      ])
+      .where('enrollment.competition_id', '=', request.competitionId)
+      .where('enrollment.user_id', '=', userId)
+      .where('enrollment.status', '=', 'active')
+      .executeTakeFirst();
+
+    if (!resolved || resolved.credential_version === null) return null;
+    return {
+      ...resolved,
+      credential_version: resolved.credential_version,
+    };
   }
 
   private async recordScan(
@@ -1139,13 +1596,28 @@ export class GymsService {
         'region.id',
         'gym.region_policy_id',
       )
-      .leftJoin('gym_qr_credentials as credential', (join) =>
-        join
-          .onRef('credential.gym_location_id', '=', 'gym.id')
-          .on('credential.status', '=', 'active'),
-      )
       .select([
-        'credential.credential_version as active_credential_version',
+        sql<number | null>`(
+          SELECT MAX(credential.credential_version)::integer
+          FROM gym_qr_credentials AS credential
+          WHERE credential.gym_location_id = gym.id
+            AND credential.status = 'active'
+        )`.as('active_credential_version'),
+        sql<
+          Array<{ competitionId: string; credentialVersion: number }>
+        >`COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'competitionId', credential.competition_id,
+              'credentialVersion', credential.credential_version
+            )
+            ORDER BY credential.credential_version DESC
+          )
+          FROM gym_qr_credentials AS credential
+          WHERE credential.gym_location_id = gym.id
+            AND credential.status = 'active'
+            AND credential.competition_id IS NOT NULL
+        ), '[]'::json)`.as('active_qr_credentials'),
         'gym.active',
         'gym.address',
         'gym.created_at',
@@ -1161,7 +1633,8 @@ export class GymsService {
         sql<number>`ST_X(${sql.ref('gym.coordinates')}::geometry)`.as(
           'longitude',
         ),
-      ]);
+      ])
+      .where('gym.deleted_at', 'is', null);
   }
 
   private async getGymLocation(
@@ -1183,6 +1656,10 @@ export class GymsService {
   private mapGymLocation(gym: {
     active: boolean;
     active_credential_version: number | null;
+    active_qr_credentials: Array<{
+      competitionId: string;
+      credentialVersion: number;
+    }>;
     address: string;
     created_at: Date;
     id: string;
@@ -1197,6 +1674,7 @@ export class GymsService {
     return {
       active: gym.active,
       activeCredentialVersion: gym.active_credential_version,
+      activeQrCredentials: gym.active_qr_credentials,
       address: gym.address,
       createdAt: gym.created_at.toISOString(),
       id: gym.id,
@@ -1262,6 +1740,15 @@ export class GymsService {
 
   private async buildPosterSvg(
     gymName: string,
+    competition: {
+      ends_at: Date;
+      id: string;
+      name: string;
+      registration_opens_at: Date;
+      region_name: string;
+      starts_at: Date;
+      timezone: string;
+    },
     qrPayload: string,
     credentialVersion: number,
   ): Promise<string> {
@@ -1280,15 +1767,37 @@ export class GymsService {
     if (!qrViewBox) {
       throw new Error('The QR renderer did not return an SVG viewBox.');
     }
-    const safeName = gymName
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&apos;');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="GoGymGo QR poster for ${safeName}">
-  <title>GoGymGo $100 September Challenge at ${safeName}</title>
-  <desc>Scan the QR code and sign up for the $100 September Challenge. Scan in, train for at least 30 minutes and scan the same poster again to finish.</desc>
+    const escapeXml = (value: string) =>
+      value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+    const safeGymName = escapeXml(gymName);
+    const safeContestName = escapeXml(competition.name);
+    const safeContestDisplayName = escapeXml(
+      competition.name.length > 34
+        ? `${competition.name.slice(0, 31)}...`
+        : competition.name,
+    );
+    const safeRegionName = escapeXml(competition.region_name.toUpperCase());
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: competition.timezone,
+      year: 'numeric',
+    });
+    const registrationDate = dateFormatter
+      .format(competition.registration_opens_at)
+      .toUpperCase();
+    const contestStarts = dateFormatter
+      .format(competition.starts_at)
+      .toUpperCase();
+    const contestEnds = dateFormatter.format(competition.ends_at).toUpperCase();
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="${safeContestName} QR poster for ${safeGymName}">
+  <title>${safeContestName} at ${safeGymName}</title>
+  <desc>This poster is valid only for ${safeContestName}. Scan once to join and select this gym. Workout start and finish use fresh location checks.</desc>
   <rect width="1000" height="1400" fill="#05090b"/>
   <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
 
@@ -1297,21 +1806,21 @@ export class GymsService {
     <text x="500" y="124" text-anchor="middle" font-family="Orbitron, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="2"><tspan fill="#34E5E8">GO</tspan><tspan fill="#FF2D9B">GYM</tspan><tspan fill="#34E5E8">GO</tspan></text>
   </g>
 
-  <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">SEPTEMBER 2026 - VANCOUVER ISLAND + GULF ISLANDS</text>
-  <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE AND SIGN UP FOR THE</text>
-  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="53" font-weight="700">$100 SEPTEMBER CHALLENGE.</text>
+  <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">${safeRegionName}</text>
+  <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE TO JOIN</text>
+  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="44" font-weight="700">${safeContestDisplayName}</text>
 
   <rect x="160" y="345" width="680" height="680" rx="34" fill="#fff"/>
-  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open the GoGymGo challenge">
+  <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open ${safeContestName}">
     ${qrBody}
   </svg>
 
-  <text x="500" y="1084" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="38" font-weight="700">${safeName}</text>
-  <text x="500" y="1130" text-anchor="middle" fill="#34E5E8" font-family="Share Tech Mono, monospace" font-size="25" letter-spacing="2">SCAN IN  &gt;  TRAIN 30+ MIN  &gt;  SCAN OUT</text>
+  <text x="500" y="1084" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="38" font-weight="700">${safeGymName}</text>
+  <text x="500" y="1130" text-anchor="middle" fill="#34E5E8" font-family="Share Tech Mono, monospace" font-size="21" letter-spacing="1">SCAN ONCE  &gt;  LOCATION IN  &gt;  TRAIN 30+ MIN  &gt;  LOCATION OUT</text>
   <line x1="100" y1="1165" x2="900" y2="1165" stroke="#173A46" stroke-width="2"/>
 
-  <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION OPENS AUGUST 1  |  CHALLENGE SEPTEMBER 1-30, 2026</text>
-  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">ONE $100 CAD REWARD  |  FREE TO ENTER  |  NO PURCHASE REQUIRED  |  AGE 19+</text>
+  <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION ${registrationDate}  |  CONTEST ${contestStarts} - ${contestEnds}</text>
+  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">CONTEST-SPECIFIC POSTER  |  FREE TO ENTER  |  NO PURCHASE REQUIRED</text>
   <text x="500" y="1288" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">Choose a 1-7 day weekly goal. Complete it to earn Prize Draw Entries.</text>
   <text x="500" y="1324" text-anchor="middle" fill="#96AAB0" font-family="Share Tech Mono, monospace" font-size="16">Location access is required. Entries improve odds but do not guarantee the reward.</text>
   <text x="500" y="1358" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="16">Official Rules and eligibility apply - GOGYMGO.COM</text>

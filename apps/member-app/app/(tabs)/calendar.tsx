@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 
 import {
   ScreenScrollView,
@@ -10,10 +10,11 @@ import {
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { ScreenBackButton } from '@/components/onboarding';
+import { OnboardingHeader } from '@/components/onboarding';
 import { creatorFeaturesEnabled } from '@/config/features';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useCreatorWorkoutPlans } from '@/data/appDataHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -29,6 +30,8 @@ const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { width: viewportWidth } = useWindowDimensions();
   const compactCalendar = viewportWidth < 360;
   const {
@@ -123,28 +126,19 @@ export default function CalendarScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.header, compactCalendar ? styles.headerCompact : null]}>
-          <View style={styles.headerLead}>
-            <ScreenBackButton onPress={() => goBackOrReplace(router, '/home')} />
-            <View style={styles.headerCopy}>
-              <TerminalText glow tone="cyan" variant="label">
-                PERSONAL + VERIFIED HISTORY
-              </TerminalText>
-              <TerminalText glow style={styles.title} tone="cyan" variant="title">
-                WORKOUT CALENDAR
-              </TerminalText>
-            </View>
-          </View>
-        </View>
+        <OnboardingHeader
+          label="WORKOUT CALENDAR"
+          onBack={() => goBackOrReplace(router, '/home')}
+          step="PERSONAL + VERIFIED HISTORY"
+        />
 
         {activeSession ? (
-          <HUDBorderBox glow style={styles.activeSyncCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="micro">
+          <HUDBorderBox style={styles.activeSyncCard} tone="cyan">
+            <TerminalText tone="cyan" variant="micro">
               SESSION IN PROGRESS
             </TerminalText>
             <TerminalText style={styles.activeSyncCopy} tone="muted" uppercase={false} variant="body">
-              Today will check off automatically when checkout verifies the
-              session.
+              Today checks off when verification finishes.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -158,6 +152,36 @@ export default function CalendarScreen() {
           <StatCard label="PERSONAL STREAK" tone="green" value={String(currentStreak)} />
         </View>
 
+        <HUDBorderBox style={styles.primaryActionCard} tone="cyan">
+          <View style={styles.primaryActionCopy}>
+            <TerminalText tone="cyan" variant="micro">
+              SELECTED // {selectedDateIsToday ? 'TODAY' : selectedDateIsFuture ? 'UPCOMING' : 'PAST'}
+            </TerminalText>
+            <TerminalText tone="text" uppercase={false} variant="body">
+              {selectedDateLabel}
+            </TerminalText>
+          </View>
+          {selectedDateIsFuture && creatorFeaturesEnabled ? (
+            <CyberButtonPrimary
+              label="PLAN A CREATOR WORKOUT ->"
+              onPress={() => router.push(
+                `/workouts?source=calendar&plannedDate=${selectedDateKey}` as Href
+              )}
+              tone="amber"
+            />
+          ) : !selectedDateIsFuture && selectedDateIsPast ? (
+            <CyberButtonPrimary
+              label="RETURN TO TODAY TO START ->"
+              onPress={goToToday}
+            />
+          ) : !selectedDateIsFuture && mobileGymVerificationAvailable ? (
+            <CyberButtonPrimary
+              label="START TODAY'S VERIFIED WORKOUT ->"
+              onPress={() => router.push('/session' as Href)}
+            />
+          ) : null}
+        </HUDBorderBox>
+
         <HUDBorderBox style={styles.calendarCard} tone="cyan">
           <View style={styles.calendarHeader}>
             <View style={styles.monthControls}>
@@ -167,11 +191,11 @@ export default function CalendarScreen() {
                 onPress={() => changeMonth(-1)}
                 style={({ pressed }) => [styles.monthButton, pressed ? styles.pressed : null]}
               >
-                <TerminalText glow tone="cyan" variant="button">
-                  {'<'}
+                <TerminalText tone="cyan" uppercase={false} variant="button">
+                  {'←'}
                 </TerminalText>
               </Pressable>
-              <TerminalText glow style={styles.monthLabel} tone="cyan" variant="label">
+              <TerminalText style={styles.monthLabel} tone="cyan" variant="label">
                 {monthLabel}
               </TerminalText>
               <Pressable
@@ -180,8 +204,8 @@ export default function CalendarScreen() {
                 onPress={() => changeMonth(1)}
                 style={({ pressed }) => [styles.monthButton, pressed ? styles.pressed : null]}
               >
-                <TerminalText glow tone="cyan" variant="button">
-                  {'>'}
+                <TerminalText tone="cyan" uppercase={false} variant="button">
+                  {'→'}
                 </TerminalText>
               </Pressable>
             </View>
@@ -205,8 +229,8 @@ export default function CalendarScreen() {
             </Pressable>
             <TerminalText style={styles.calendarStatus} tone="dim" uppercase={false} variant="micro">
               {competitionNotStarted
-                ? 'Verified sessions build your history until competition scoring opens.'
-                : 'Verified sessions can earn competition credit.'}
+                ? 'Verified workouts build your history until Contest scoring opens.'
+                : 'Verified workouts can earn Contest credit.'}
             </TerminalText>
           </View>
 
@@ -297,7 +321,7 @@ export default function CalendarScreen() {
                 </HUDBorderBox>
               ))}
               <TerminalText tone="dim" uppercase={false} variant="caption">
-                Planned videos are scheduling aids only. Start a verified session when you train.
+                Plans do not verify a workout. Start verification when you train.
               </TerminalText>
             </View>
           ) : null}
@@ -305,12 +329,12 @@ export default function CalendarScreen() {
 
         <TerminalText style={styles.actionHint} tone="dim" uppercase={false} variant="caption">
           {selectedDateIsFuture
-            ? creatorFeaturesEnabled
-              ? 'Plan a creator workout for this day. Verified sessions count on the day you complete them.'
-              : 'Return on this day to start your own verified workout.'
+              ? creatorFeaturesEnabled
+              ? 'Plan a workout for this day. Verify it when you train.'
+              : 'Return on this day to verify a workout.'
             : selectedDateIsPast
-              ? 'Add a personal log for this day, or return to today to start a verified workout.'
-              : 'Personal logs track your history only. Start a verified workout below for competition credit.'}
+              ? 'Add a personal log, or return to today to verify a workout.'
+              : 'Personal logs track history only. Verify a workout for Contest credit.'}
         </TerminalText>
         <CyberButtonOutline
           disabled={selectedDateIsFuture}
@@ -336,14 +360,13 @@ export default function CalendarScreen() {
           <TerminalText style={styles.manualHelp} tone="muted" uppercase={false} variant="body">
             {selectedDateIsFuture
               ? 'Future workouts cannot be logged. Choose today or an earlier date.'
-              : 'Save a private record of your workout. Add a name, duration, exercises, sets or any notes you want to remember.'}
+              : 'Save a private name, duration, exercises, sets or notes.'}
           </TerminalText>
 
           {!selectedDateIsFuture ? (
             <HUDBorderBox style={styles.manualNotice} tone="muted">
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                Manual logs mark this calendar only. They do not verify a workout or
-                change your Weekly Goal, Goal Score or Prize Draw Entries.
+                Personal logs do not affect goals, scores or entries.
               </TerminalText>
             </HUDBorderBox>
           ) : null}
@@ -404,28 +427,6 @@ export default function CalendarScreen() {
           />
         </HUDBorderBox> : null}
 
-        {selectedDateIsFuture && creatorFeaturesEnabled ? (
-          <CyberButtonPrimary
-            label="PLAN A CREATOR WORKOUT ->"
-            onPress={() => router.push(
-              `/workouts?source=calendar&plannedDate=${selectedDateKey}` as Href
-            )}
-            style={styles.sessionButton}
-            tone="amber"
-          />
-        ) : !selectedDateIsFuture && selectedDateIsPast ? (
-          <CyberButtonPrimary
-            label="RETURN TO TODAY TO START ->"
-            onPress={goToToday}
-            style={styles.sessionButton}
-          />
-        ) : !selectedDateIsFuture ? (
-          <CyberButtonPrimary
-            label="START TODAY'S VERIFIED WORKOUT ->"
-            onPress={() => router.push('/session' as Href)}
-            style={styles.sessionButton}
-          />
-        ) : null}
       </ScreenScrollView>
     </ScreenContainer>
   );
@@ -545,7 +546,7 @@ function WorkoutLogRow({ log }: { log: WorkoutLog }) {
       </View>
       <View style={styles.logFooter}>
         <TerminalText tone="dim" variant="micro">
-          {isVerified ? 'VERIFIED SESSION' : 'MANUAL LOG'}
+          {isVerified ? 'VERIFIED WORKOUT' : 'MANUAL LOG'}
         </TerminalText>
         <TerminalText
           glow={isVerified}
@@ -569,34 +570,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.lg
-  },
-  headerCopy: {
-    flex: 1
-  },
-  headerLead: {
-    minWidth: 0,
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md
-  },
-  headerCompact: {
-    alignItems: 'stretch',
-    flexDirection: 'column'
-  },
-  title: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34
+    backgroundColor: colors.transparent
   },
   streakBadge: {
     width: 116,
@@ -625,6 +599,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: spacing.md
+  },
+  primaryActionCard: {
+    gap: spacing.md,
+    padding: spacing.md
+  },
+  primaryActionCopy: {
+    gap: spacing.xs
   },
   statCard: {
     flex: 1,
@@ -882,9 +863,6 @@ const styles = StyleSheet.create({
   saveButton: {
     minHeight: 48,
     paddingVertical: spacing.md
-  },
-  sessionButton: {
-    marginBottom: spacing.lg
   },
   pressed: {
     opacity: 0.74,

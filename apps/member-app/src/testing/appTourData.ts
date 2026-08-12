@@ -1,3 +1,5 @@
+import type { GymScanResultDto } from '@gogymgo/contracts';
+
 import type { AccountReadinessRepository } from '@/data/accountReadinessRepository';
 import type { AccountSettingsRepository } from '@/data/accountSettingsRepository';
 import type { AppDataSource } from '@/data/appData';
@@ -36,6 +38,7 @@ import type {
 } from '@/domain/social';
 import type { AccountProfile, PublicIdentity } from '@/domain/profile';
 import type { PersistedActiveWorkoutSession } from '@/domain/workoutProgress';
+import type { PendingGymScan } from '@/services/pendingGymScan';
 import type { AuthenticatedUser } from '@/state/auth';
 import type { AppTourScenario } from '@/state/appTour';
 
@@ -46,7 +49,14 @@ const appTourRegionVerificationId = '10000000-0000-4000-8000-000000000004';
 const appTourLegalBundleId = '10000000-0000-4000-8000-000000000005';
 const appTourUserId = 'app-tour-player';
 export const appTourAuthToken = 'app-tour-token';
+const appTourCompetitionMonthKey = '2026-09';
 export const appTourCompetitionRegistrationEvidence = {
+  gymPresence: {
+    accuracyMeters: 5,
+    credential: 'app-tour-gym-credential-000000000001',
+    latitude: 49.2827,
+    longitude: -123.1207
+  },
   legalReceiptBundleId: 'app-tour-legal-receipt',
   regionVerificationId: 'app-tour-region-verification'
 } as const;
@@ -77,7 +87,70 @@ export const appTourUser: AuthenticatedUser = {
 export type AppTourQrMode = 'entry' | 'exit';
 
 export function createAppTourGymQrPayload(mode: AppTourQrMode) {
-  return `gogymgo:gym:${mode}:app-tour`;
+  return `app-tour-gym-${mode}-credential-000000000001`;
+}
+
+export function createAppTourPendingGymScan(
+  scenario: AppTourScenario,
+  now = Date.now()
+): PendingGymScan {
+  const workoutActive = scenario === 'active-workout' || scenario === 'presence-check';
+  const elapsedSeconds = scenario === 'presence-check' ? 31 * 60 : 8 * 60;
+  const startedAt = now - elapsedSeconds * 1000;
+
+  return {
+    activeSession: workoutActive
+      ? {
+          expiresAt: new Date(startedAt + 4 * 60 * 60 * 1000).toISOString(),
+          gymName: 'SKYGATE',
+          minimumCompleteAt: new Date(startedAt + 30 * 60 * 1000).toISOString(),
+          sessionId: 'app-tour-gym-session',
+          startedAt: new Date(startedAt).toISOString()
+        }
+      : null,
+    competitionId: 'app-tour-competition',
+    credential: createAppTourGymQrPayload('entry'),
+    credentialValidUntil: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: now
+  };
+}
+
+export function createAppTourVerifiedGymLocationResult(
+  now = Date.now()
+): GymScanResultDto {
+  const startedAt = now - 31 * 60 * 1000;
+
+  return {
+    credentialVersion: 1,
+    expiresAt: new Date(startedAt + 4 * 60 * 60 * 1000).toISOString(),
+    gymLocationId: 'app-tour-gym',
+    gymName: 'SKYGATE',
+    minimumCompleteAt: new Date(startedAt + 30 * 60 * 1000).toISOString(),
+    outcome: 'verified',
+    rejectionReason: null,
+    remainingSeconds: 0,
+    serverTimestamp: new Date(now).toISOString(),
+    sessionId: 'app-tour-gym-session',
+    startedAt: new Date(startedAt).toISOString()
+  };
+}
+
+export function createAppTourStartedGymLocationResult(
+  now = Date.now()
+): GymScanResultDto {
+  return {
+    credentialVersion: 1,
+    expiresAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
+    gymLocationId: 'app-tour-gym',
+    gymName: 'SKYGATE',
+    minimumCompleteAt: new Date(now + 30 * 60 * 1000).toISOString(),
+    outcome: 'started',
+    rejectionReason: null,
+    remainingSeconds: 30 * 60,
+    serverTimestamp: new Date(now).toISOString(),
+    sessionId: 'app-tour-gym-session',
+    startedAt: new Date(now).toISOString()
+  };
 }
 
 export function isAppTourGymQrPayload(
@@ -152,6 +225,37 @@ export function createAppTourDataSource(): AppDataSource {
       periodIndex
     ) => [createWeeklyChallengeRequest(goalDays, periodIndex)],
     getMyRewardAwards: async () => awards,
+    getMyLatestCompetitionResults: async () => ({
+      categoryLeaderboards: [createLeaderboard(4)],
+      competitionId: 'app-tour-settled-competition',
+      competitionName: 'Previous GoGymGo Contest',
+      endedAt: nowIso(),
+      monthKey: previousMonthKey(),
+      participantGoalDays: 4,
+      regionCode: 'vancouver-island-gulf-islands-bc',
+      regionName: 'Vancouver Island + Gulf Islands',
+      resultsStatus: 'settled',
+      rewardCount: 2,
+      rewardWinners: [
+        {
+          alias: 'NORTH_STAR',
+          awardRank: 1,
+          rewardTitle: 'Recovery Pack',
+          rewardType: 'coupon',
+          sponsorName: 'Northline Wellness',
+          streaks: fixedStreaks
+        },
+        {
+          alias: 'MOVE_MORE',
+          awardRank: 2,
+          rewardTitle: 'Training Credit',
+          rewardType: 'coupon',
+          sponsorName: 'Northline Wellness',
+          streaks: { ...fixedStreaks, daily: 3 }
+        }
+      ],
+      settledAt: nowIso()
+    }),
     getMyStreaks: async () => ({
       asOfDate: todayKey(),
       streaks: fixedStreaks,
@@ -160,7 +264,7 @@ export function createAppTourDataSource(): AppDataSource {
     getRewardCatalog: async (region, monthKey = currentMonthKey()) => [
       {
         competitionId: appTourCompetitionId,
-        competitionName: 'Monthly GoGymGo Competition',
+        competitionName: 'Monthly GoGymGo Contest',
         description: 'A recovery-focused coupon reward for active GoGymGo players.',
         id: 'app-tour-reward',
         imageUrl: null,
@@ -175,29 +279,6 @@ export function createAppTourDataSource(): AppDataSource {
         title: 'Recovery Pack'
       }
     ],
-    getRewardWinners: async () => [
-      {
-        alias: 'NORTH_STAR',
-        awardRank: 1,
-        rewardTitle: 'Recovery Pack',
-        rewardType: 'coupon',
-        sponsorName: 'Northline Wellness',
-        streaks: fixedStreaks
-      },
-      {
-        alias: 'MOVE_MORE',
-        awardRank: 2,
-        rewardTitle: 'Training Credit',
-        rewardType: 'coupon',
-        sponsorName: 'Northline Wellness',
-        streaks: { ...fixedStreaks, daily: 3 }
-      }
-    ],
-    getSettledCompetition: async () => ({
-      competitionName: 'Previous GoGymGo Competition',
-      monthKey: previousMonthKey(),
-      rewardCount: 2
-    }),
     planCreatorWorkout: async (workoutId, plannedDate, note) => ({
       creatorName: 'GoGymGo Coach',
       durationMinutes: 30,
@@ -270,7 +351,7 @@ AccountReadinessRepository {
     },
     getCurrentCompetition: async (expectedMonthKey) =>
       createCurrentCompetition(
-        expectedMonthKey ?? nowIso().slice(0, 7),
+        expectedMonthKey ?? appTourCompetitionMonthKey,
         'VANCOUVER ISLAND + GULF ISLANDS'
       ),
     getCurrentEnrollment: async () => enrollment,
@@ -290,6 +371,24 @@ AccountReadinessRepository {
         receiptBundleId: appTourLegalBundleId
       };
       return legalReceipt;
+    },
+    resolveCompetitionByGymQr: async () =>
+      createCurrentCompetition(
+        appTourCompetitionMonthKey,
+        'VANCOUVER ISLAND + GULF ISLANDS'
+      ),
+    withdrawFromCompetition: async (competitionId) => {
+      const withdrawn = {
+        ...(enrollment ?? {
+          competitionId,
+          enrolledAt: nowIso(),
+          goalDays: 3,
+          id: appTourEnrollmentId
+        }),
+        status: 'withdrawn' as const
+      };
+      enrollment = null;
+      return withdrawn;
     }
   };
 }
@@ -560,9 +659,9 @@ function createCurrentCompetition(
     entrantCap: null,
     goalDays: [1, 2, 3, 4, 5, 6, 7],
     id: appTourCompetitionId,
-    minimumEntrants: 100,
+    minimumEntrants: 1,
     monthKey,
-    name: `${regionName} Monthly Competition`,
+    name: `${regionName} Monthly Contest`,
     regionCode: 'vancouver-island-gulf-islands-bc',
     regionName,
     registrationClosesAt: end,
@@ -617,7 +716,7 @@ function createLegalBundle(
           intro: 'This sample notice explains how the browser preview behaves.',
           sections: [
             {
-              body: 'Preview agreements stay in this browser and do not create real competition entries.',
+              body: 'Preview agreements stay in this browser and do not create real contest entries.',
               heading: 'Browser preview'
             }
           ]
@@ -637,7 +736,7 @@ function createLegalBundle(
           intro: 'These sample terms support the browser preview experience.',
           sections: [
             {
-              body: 'Preview actions are local and are not real competition entries.',
+              body: 'Preview actions are local and are not real contest entries.',
               heading: 'Browser preview'
             }
           ]

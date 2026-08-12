@@ -44,7 +44,7 @@ automatically.
   task, with separate runtime roles and no direct inbound task access;
 - one internet-facing HTTPS Application Load Balancer and ACM certificate;
 - one immutable ECR repository, three private encrypted S3 buckets, one KMS key,
-  five application secret containers plus the RDS-managed master secret;
+  six application secret containers plus the RDS-managed master secret;
 - one CloudFront distribution with a private S3 origin and a low-cost SPA route
   function for the browser member app;
 - CloudWatch logs, five alarms, and one monthly AWS Budget;
@@ -59,17 +59,17 @@ Estimate captured 2026-08-02 in USD, using 730 hours/month and AWS on-demand
 prices for Canada Central. It excludes taxes, Cloudflare/Firebase charges,
 meaningful internet egress, and unusual log, request, or storage volume.
 
-| Component                                          | Active staging estimate | Basis                                          |
-| -------------------------------------------------- | ----------------------: | ---------------------------------------------- |
-| Two Fargate tasks                                  |                  $19.82 | 0.25 vCPU and 0.5 GB each                      |
-| Application Load Balancer                          |     $18.07 plus LCU use | $0.02475/hour; pilot LCU use should be low     |
-| Four public IPv4 addresses                         |                  $14.60 | two ALB plus two task addresses at $0.005/hour |
-| RDS `db.t4g.micro`                                 |                  $13.14 | $0.018/hour                                    |
-| 20 GB RDS GP3                                      |                   $2.54 | $0.127/GB-month                                |
-| Six Secrets Manager secrets                        |             about $2.40 | five runtime plus one RDS-managed secret       |
-| One customer-managed KMS key                       |             about $1.00 | requests are additional                        |
-| ECR, S3, CloudFront, logs, alarms, and backups    |                  $3-$10 | low-volume pilot allowance                     |
-| **Active staging total**                           | **about $75-$90/month** | before tax and material egress                 |
+| Component                                      | Active staging estimate | Basis                                          |
+| ---------------------------------------------- | ----------------------: | ---------------------------------------------- |
+| Two Fargate tasks                              |                  $19.82 | 0.25 vCPU and 0.5 GB each                      |
+| Application Load Balancer                      |     $18.07 plus LCU use | $0.02475/hour; pilot LCU use should be low     |
+| Four public IPv4 addresses                     |                  $14.60 | two ALB plus two task addresses at $0.005/hour |
+| RDS `db.t4g.micro`                             |                  $13.14 | $0.018/hour                                    |
+| 20 GB RDS GP3                                  |                   $2.54 | $0.127/GB-month                                |
+| Seven Secrets Manager secrets                  |             about $2.80 | six runtime plus one RDS-managed secret        |
+| One customer-managed KMS key                   |             about $1.00 | requests are additional                        |
+| ECR, S3, CloudFront, logs, alarms, and backups |                  $3-$10 | low-volume pilot allowance                     |
+| **Active staging total**                       | **about $75-$90/month** | before tax and material egress                 |
 
 Starting production with `db.t4g.small`, one API task, and one worker task is
 approximately **$90-$110/month**. Enabling Multi-AZ, NAT Gateways, more tasks, or

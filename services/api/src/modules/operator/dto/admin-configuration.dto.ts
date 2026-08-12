@@ -108,6 +108,11 @@ export class GoalBracketDto {
 }
 
 export class CreateCompetitionDraftDto extends OperatorReasonDto {
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  gymLocationId?: string;
+
   @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
   regionPolicyId!: string;
@@ -130,15 +135,16 @@ export class CreateCompetitionDraftDto extends OperatorReasonDto {
   @IsObject()
   rules!: Record<string, unknown>;
 
-  @ApiProperty({ minimum: 2, type: Number })
+  @ApiProperty({ maximum: 1, minimum: 1, type: Number })
   @IsInt()
-  @Min(2)
+  @Min(1)
+  @Max(1)
   minimumEntrants!: number;
 
-  @ApiPropertyOptional({ minimum: 2, nullable: true, type: Number })
+  @ApiPropertyOptional({ minimum: 1, nullable: true, type: Number })
   @IsOptional()
   @IsInt()
-  @Min(2)
+  @Min(1)
   entrantCap?: number | null;
 
   @ApiProperty({ format: 'date-time', type: String })
@@ -187,6 +193,21 @@ export class CompetitionStatusActionDto extends OperatorReasonDto {
   @IsInt()
   @Min(1)
   expectedVersion!: number;
+}
+
+export class DeleteVersionedAdminEntityDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
+
+export class AdminDeletedEntityResponseDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ enum: ['deleted'], type: String })
+  status!: 'deleted';
 }
 
 export class CreateCreatorWorkoutDto extends OperatorReasonDto {

@@ -6,15 +6,15 @@ import { useAppTour } from '@/state/appTour';
 const browserPreviewRules: LegalDocument = {
   effectiveDate: 'BROWSER PREVIEW',
   intro:
-    'No live prize competition is open in this preview. This screen lets testers review the contest-rules experience with sample information.',
+    'No live prize contest is open in this preview. This screen lets testers review the contest-rules experience with sample information.',
   sections: [
     {
       body: 'Weekly Goals, entries, rankings and rewards shown in the browser preview are sample data and do not create eligibility or a real-world prize claim.',
       heading: 'PREVIEW ACTIVITY'
     },
     {
-      body: 'Official rules will identify the operator, eligible regions, dates, prizes, odds, entry method and winner process before any live competition opens.',
-      heading: 'BEFORE A LIVE COMPETITION'
+      body: 'Official rules will identify the operator, eligible regions, dates, prizes, odds, entry method and winner process before any live contest opens.',
+      heading: 'BEFORE A LIVE CONTEST'
     }
   ],
   title: 'CONTEST RULES PREVIEW'

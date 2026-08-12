@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import {
   AuthConfigurationNotice,
@@ -9,10 +9,10 @@ import {
   AuthTextField
 } from '@/components/auth';
 import {
-  CyberButtonPrimary,
   HUDBorderBox,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunPrimaryButton } from '@/components/firstRun';
 import { LegalDocumentLinks } from '@/components/legal';
 import { SocialAuthButtons } from '@/components/socialAuthButtons';
 import {
@@ -22,7 +22,8 @@ import {
   type AuthFormErrors
 } from '@/domain/auth';
 import { useSocialAuthFlow } from '@/hooks/useSocialAuthFlow';
-import { colors, spacing } from '@/constants/theme';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   getGymScanPostAuthRoute,
   gymScanAuthNext,
@@ -30,15 +31,20 @@ import {
   isGymScanContinuation
 } from '@/navigation/gymScanFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
+import { useAppTour } from '@/state/appTour';
 import { useAppData } from '@/data/appDataHooks';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { challengeInvite, next } = useLocalSearchParams<{
     challengeInvite?: string;
     next?: string;
   }>();
-  const gymScanContinuation = isGymScanContinuation(next);
+  const gymScanContinuation =
+    mobileGymVerificationAvailable && isGymScanContinuation(next);
   const { social } = useAppData();
   const {
     appleSignInAvailable,
@@ -59,7 +65,7 @@ export default function SignUpScreen() {
     router.replace(
       gymScanContinuation
         ? getGymScanPostAuthRoute(result.isNewUser)
-        : result.isNewUser
+        : result.isNewUser && mobileGymVerificationAvailable
           ? '/region'
           : '/home'
     );
@@ -76,6 +82,10 @@ export default function SignUpScreen() {
     email.trim().length > 0 &&
     password.length > 0 &&
     confirmPassword.length > 0;
+
+  if (!appTourActive && !challengeInvite && !gymScanContinuation) {
+    return <Redirect href="/join" />;
+  }
 
   async function submitEmailAccount() {
     const nextErrors = validateSignUpForm(email, password, confirmPassword);
@@ -96,7 +106,9 @@ export default function SignUpScreen() {
             ? `challenge:${challengeInvite}`
             : gymScanContinuation
               ? gymScanSetupNext
-              : 'region'
+              : mobileGymVerificationAvailable
+                ? 'region'
+                : 'home'
         }
       });
     } catch (error) {
@@ -109,9 +121,9 @@ export default function SignUpScreen() {
   return (
     <AuthScreenShell
       description={gymScanContinuation
-        ? 'Your gym scan is saved. Create your account, finish setup, and GoGymGo will return you to Start Workout.'
-        : 'Create one secure account for your Weekly Goal, verified workouts and brand rewards.'}
-      eyebrow={gymScanContinuation ? 'GYM SCAN SAVED' : 'ACCOUNT SETUP'}
+        ? 'Create your account to continue with this gym.'
+        : 'Create your player account.'}
+      eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'ACCOUNT SETUP'}
       onBack={() => router.replace(
         gymScanContinuation
           ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
@@ -193,11 +205,11 @@ export default function SignUpScreen() {
             {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
             {socialError ? <AuthStatusNotice message={socialError} tone="red" /> : null}
             {!emailAccountReady ? (
-              <TerminalText tone="dim" uppercase={false} variant="caption">
-                Complete your email and both password fields to continue.
+              <TerminalText style={styles.editorialCaption} tone="dim" uppercase={false} variant="caption">
+                Complete all three fields.
               </TerminalText>
             ) : null}
-            <CyberButtonPrimary
+            <FirstRunPrimaryButton
               disabled={busy || !firebaseConfigured || !emailAccountReady}
               label={submitting ? 'CREATING ACCOUNT...' : 'CREATE SECURE ACCOUNT ->'}
               onPress={submitEmailAccount}
@@ -209,8 +221,7 @@ export default function SignUpScreen() {
                 uppercase={false}
                 variant="caption"
               >
-                Privacy and Terms are available now. You will review and accept
-                the current versions during onboarding.
+                Review Privacy and Terms. You&apos;ll accept them during setup.
               </TerminalText>
               <LegalDocumentLinks compact />
             </View>
@@ -234,7 +245,15 @@ const styles = StyleSheet.create({
     gap: spacing.xs
   },
   legalNotice: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center'
+  },
+  editorialCaption: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   divider: {
     flexDirection: 'row',

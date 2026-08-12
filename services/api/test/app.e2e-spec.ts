@@ -217,6 +217,12 @@ describe('platform foundation (e2e)', () => {
       .send({
         ageEligibilityAttested: true,
         goalDays: 3,
+        gymPresence: {
+          accuracyMeters: 5,
+          credential: 'partner-gym-credential-000000000001',
+          latitude: 49.2827,
+          longitude: -123.1207,
+        },
         legalReceiptBundleId: '30000000-0000-4000-8000-000000000003',
         regionVerificationId: '20000000-0000-4000-8000-000000000002',
         rulesAccepted: true,

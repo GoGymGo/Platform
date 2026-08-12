@@ -53,6 +53,25 @@ for (const marker of forbiddenMarkers) {
 if (!fs.existsSync(path.join(exportRoot, 'index.html'))) {
   issues.push('index.html is missing');
 }
+const buildManifestPath = path.join(
+  exportRoot,
+  'browser-test-preview-build.json'
+);
+if (!fs.existsSync(buildManifestPath)) {
+  issues.push('browser-test-preview-build.json is missing; use export:web-test-preview');
+} else {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(buildManifestPath, 'utf8'));
+    if (
+      manifest.browserTestPreviewEnabled !== true ||
+      manifest.cacheCleared !== true
+    ) {
+      issues.push('browser preview build manifest does not confirm an enabled, cache-cleared export');
+    }
+  } catch {
+    issues.push('browser-test-preview-build.json is invalid');
+  }
+}
 
 if (issues.length > 0) {
   console.error('Browser preview audit failed:');

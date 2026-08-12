@@ -13,77 +13,42 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
-import {
-  useCategoryLeaderboards,
-  useRewardWinners,
-  useSettledCompetition
-} from '@/data/appDataHooks';
-import { goalCategories } from '@/domain/campaignEconomics';
-import {
-  getCompetitionMonthKey,
-  getCompetitionRegionDateKey
-} from '@/domain/competition';
+import { useMyLatestCompetitionResults } from '@/data/appDataHooks';
 import {
   formatCompetitionMonth,
-  getPreviousCompetitionMonthKey
+  getWinnersCirclePresentationKey
 } from '@/domain/winnersCircle';
 import { markWinnersCircleSeen } from '@/services/winnersCircle';
 import { useAuth } from '@/state/auth';
-import { useCompetitionRegion } from '@/state/competitionRegion';
-import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function WinnersCircleScreen() {
   const router = useRouter();
   const { auto } = useLocalSearchParams<{ auto?: string }>();
   const { user } = useAuth();
-  const { competitionRegion } = useCompetitionRegion();
-  const { weeklyGoal } = useWorkoutProgress();
   const [closing, setClosing] = useState(false);
   const [selectedResults, setSelectedResults] = useState<'categories' | 'rewards'>('categories');
   const [showAllCategories, setShowAllCategories] = useState(false);
   const isAutomaticLoginView = auto === '1';
-  const regionalDateKey = getCompetitionRegionDateKey(
-    new Date(),
-    competitionRegion.timeZone
-  );
-  const completedMonthKey = getPreviousCompetitionMonthKey(
-    getCompetitionMonthKey(regionalDateKey)
-  );
   const {
-    data: settledCompetitionResult,
-    isError: settledCompetitionError,
-    isPending: settledCompetitionPending,
-    refetch: refetchSettledCompetition
-  } =
-    useSettledCompetition();
-  const {
-    data: categoryLeaderboardResults = [],
-    isError: categoryResultsError,
-    isPending: categoryResultsPending,
-    refetch: refetchCategoryResults
-  } =
-    useCategoryLeaderboards(goalCategories);
-  const {
-    data: rewardWinnerResults = [],
-    isError: rewardResultsError,
-    isPending: rewardResultsPending,
-    refetch: refetchRewardResults
-  } =
-    useRewardWinners();
-  const resultsUnavailable =
-    settledCompetitionError || categoryResultsError || rewardResultsError;
-  const settledCompetition = settledCompetitionResult;
-  const categoryLeaderboards = categoryLeaderboardResults;
-  const rewardWinners = rewardWinnerResults;
+    data: participantResults,
+    isError: resultsUnavailable,
+    isPending: resultsPending,
+    refetch: refetchResults
+  } = useMyLatestCompetitionResults();
+  const categoryLeaderboards = participantResults?.categoryLeaderboards ?? [];
+  const rewardWinners = participantResults?.rewardWinners ?? [];
   const categoryChampions = [...categoryLeaderboards]
     .reverse()
     .flatMap((leaderboard) => {
       const winner = leaderboard?.rows[0];
       return winner ? [{ goal: leaderboard.goal, winner }] : [];
     });
-  const currentCategoryChampion = categoryChampions.find(({ goal }) => goal === weeklyGoal);
+  const currentCategoryChampion = categoryChampions.find(
+    ({ goal }) => goal === participantResults?.participantGoalDays
+  );
   const visibleCategoryChampions = showAllCategories
     ? categoryChampions
     : currentCategoryChampion
@@ -94,8 +59,11 @@ export default function WinnersCircleScreen() {
     setClosing(true);
 
     try {
-      if (user) {
-        await markWinnersCircleSeen(user.uid, competitionRegion.timeZone);
+      if (user && participantResults) {
+        await markWinnersCircleSeen(
+          user.uid,
+          getWinnersCirclePresentationKey(participantResults)
+        );
       }
     } finally {
       router.replace(isAutomaticLoginView ? '/home' : '/leaderboard');
@@ -103,11 +71,7 @@ export default function WinnersCircleScreen() {
     }
   }
 
-  if (
-    settledCompetitionPending ||
-    categoryResultsPending ||
-    (settledCompetitionResult && rewardResultsPending)
-  ) {
+  if (resultsPending) {
     return (
       <AuthGate>
         <ScreenLoadingState
@@ -131,11 +95,7 @@ export default function WinnersCircleScreen() {
             </TerminalText>
             <CyberButtonPrimary
               label="TRY AGAIN"
-              onPress={() => void Promise.all([
-                refetchSettledCompetition(),
-                refetchCategoryResults(),
-                refetchRewardResults()
-              ])}
+              onPress={() => void refetchResults()}
               tone="red"
             />
           </HUDBorderBox>
@@ -144,7 +104,7 @@ export default function WinnersCircleScreen() {
     );
   }
 
-  if (!settledCompetition) {
+  if (!participantResults) {
     return (
       <AuthGate>
         <ScreenContainer contentStyle={styles.unavailableScreen}>
@@ -159,7 +119,7 @@ export default function WinnersCircleScreen() {
               Weekly Goal champions and brand reward winners will appear here after results are audited.
             </TerminalText>
             <CyberButtonPrimary
-              label={isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'VIEW COMPETITION'}
+              label={isAutomaticLoginView ? 'ENTER GOGYMGO ->' : 'VIEW CONTEST'}
               onPress={() => router.replace(isAutomaticLoginView ? '/home' : '/leaderboard')}
               style={styles.closeButton}
             />
@@ -168,6 +128,35 @@ export default function WinnersCircleScreen() {
       </AuthGate>
     );
   }
+
+  if (participantResults.resultsStatus === 'pending') {
+    return (
+      <AuthGate>
+        <ScreenContainer contentStyle={styles.unavailableScreen}>
+          <HUDBorderBox glow style={styles.unavailableCard} tone="amber">
+            <TerminalText glow tone="amber" variant="label">
+              RESULTS UNDER REVIEW
+            </TerminalText>
+            <TerminalText glow style={styles.unavailableTitle} tone="cyan" variant="title">
+              {participantResults.competitionName}
+            </TerminalText>
+            <TerminalText style={styles.unavailableCopy} tone="muted" uppercase={false} variant="body">
+              Your Contest is complete. GoGymGo is finalizing the audited results and will show your placement and reward here as soon as they are published.
+            </TerminalText>
+            <CyberButtonPrimary
+              disabled={closing}
+              label={closing ? 'SAVING...' : 'CONTINUE TO HOME ->'}
+              onPress={closeWinnersCircle}
+              style={styles.closeButton}
+              tone="cyan"
+            />
+          </HUDBorderBox>
+        </ScreenContainer>
+      </AuthGate>
+    );
+  }
+
+  const completedMonthKey = participantResults.monthKey;
 
   return (
     <AuthGate>
@@ -180,25 +169,16 @@ export default function WinnersCircleScreen() {
         >
           <CompetitionHubNav active="winners" style={styles.hubNav} />
 
-          <View style={styles.header}>
-            <TerminalText glow tone="pink" variant="label">
-              {`MONTHLY RESULTS // ${competitionRegion.label}`}
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="pink" variant="title">
-              WINNERS CIRCLE
-            </TerminalText>
-            <TerminalText style={styles.month} tone="text" variant="body">
-              {formatCompetitionMonth(completedMonthKey)}
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              Celebrate the seven Weekly Goal champions and the players
-              selected for physical prizes and coupon codes in the regional draw.
-            </TerminalText>
-          </View>
+          <BrandScreenHeader
+            accent="pink"
+            description={`${formatCompetitionMonth(completedMonthKey)}. See the Weekly Goal champions and every player selected in the regional prize draw.`}
+            eyebrow={`FINAL RESULTS // ${participantResults.regionName}`}
+            title="WINNERS CIRCLE"
+          />
 
-          <HUDBorderBox glow style={styles.summaryCard} tone="pink">
+          <HUDBorderBox style={styles.summaryCard} tone="pink">
             <View style={styles.summaryMetric}>
-              <TerminalText glow tone="pink" variant="value">
+              <TerminalText tone="pink" variant="value">
                 {categoryChampions.length}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
@@ -207,8 +187,8 @@ export default function WinnersCircleScreen() {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryMetric}>
-              <TerminalText glow tone="pink" variant="value">
-                {settledCompetition.rewardCount.toLocaleString()}
+              <TerminalText tone="pink" variant="value">
+                {participantResults.rewardCount.toLocaleString()}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
                 REWARD WINNERS
@@ -232,7 +212,7 @@ export default function WinnersCircleScreen() {
           {selectedResults === 'categories' ? (
             <>
               <View style={styles.sectionHeader}>
-                <TerminalText glow tone="cyan" variant="label">
+                <TerminalText tone="cyan" variant="label">
                   GOAL CHAMPIONS
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
@@ -250,7 +230,7 @@ export default function WinnersCircleScreen() {
                     ]}
                   >
                     <View style={styles.goalBadge}>
-                      <TerminalText glow tone="cyan" variant="body">
+                      <TerminalText tone="cyan" variant="body">
                         {goal}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
@@ -268,7 +248,7 @@ export default function WinnersCircleScreen() {
                       </TerminalText>
                     </View>
                     <View style={styles.scoreBlock}>
-                      <TerminalText glow tone="cyan" variant="body">
+                      <TerminalText tone="cyan" variant="body">
                         {winner.categoryEntries}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
@@ -287,7 +267,7 @@ export default function WinnersCircleScreen() {
           ) : (
             <>
               <View style={styles.sectionHeader}>
-                <TerminalText glow tone="pink" variant="label">
+                <TerminalText tone="pink" variant="label">
                   PRIZE DRAW WINNERS
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
@@ -295,7 +275,7 @@ export default function WinnersCircleScreen() {
                 </TerminalText>
               </View>
 
-              <HUDBorderBox glow style={styles.resultsPanel} tone="pink">
+              <HUDBorderBox style={styles.resultsPanel} tone="pink">
                 {rewardWinners.map((winner, index) => (
                   <View
                     key={`${winner.awardRank}:${winner.alias}`}
@@ -319,11 +299,15 @@ export default function WinnersCircleScreen() {
                         textStyle={styles.winnerName}
                       />
                       <TerminalText tone="dim" variant="micro">
-                        {winner.rewardType === 'coupon' ? 'COUPON WINNER' : 'PHYSICAL PRIZE WINNER'}
+                        {winner.rewardType === 'coupon'
+                          ? 'COUPON WINNER'
+                          : winner.rewardType === 'cash'
+                            ? 'CASH PRIZE WINNER'
+                            : 'PHYSICAL PRIZE WINNER'}
                       </TerminalText>
                     </View>
                     <View style={styles.rewardName}>
-                      <TerminalText glow tone="pink" variant="body">
+                      <TerminalText tone="pink" variant="body">
                         {winner.rewardTitle}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
@@ -334,7 +318,7 @@ export default function WinnersCircleScreen() {
                 ))}
                 <TerminalText style={styles.rewardFooter} tone="dim" uppercase={false} variant="caption">
                   Showing {rewardWinners.length} of{' '}
-                  {settledCompetition.rewardCount.toLocaleString()} reward winners.
+                  {participantResults.rewardCount.toLocaleString()} reward winners.
                 </TerminalText>
               </HUDBorderBox>
             </>
@@ -375,7 +359,7 @@ function ResultTab({
         pressed ? styles.pressed : null
       ]}
     >
-      <TerminalText glow={selected} tone={selected ? 'cyan' : 'muted'} variant="micro">
+      <TerminalText tone={selected ? 'cyan' : 'muted'} variant="micro">
         {label}
       </TerminalText>
     </Pressable>
@@ -387,7 +371,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.screenX,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   unavailableCard: {
     gap: spacing.md,
@@ -399,25 +383,9 @@ const styles = StyleSheet.create({
   unavailableCopy: {
     fontFamily: fontFamilies.body
   },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
+  content: brandScreenStyles.content,
   hubNav: {
     marginBottom: spacing.lg
-  },
-  header: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg
-  },
-  title: {
-    fontFamily: fontFamilies.display
-  },
-  month: {
-    fontFamily: fontFamilies.display
   },
   summaryCard: {
     flexDirection: 'row',

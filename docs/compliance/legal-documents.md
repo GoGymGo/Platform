@@ -21,7 +21,7 @@ For a request such as `CA-BC`, the resolver chooses the newest effective publish
 
 ## Mobile receipt workflow
 
-1. Before the account legal step, fetch `GET /v1/legal-documents/current?jurisdictionCode=CA-BC&locale=en-CA`.
+1. Before the account legal step, fetch `GET /v1/legal-documents/current?jurisdictionCode=CA-BC&locale=en` for the current English public bundle. Locale resolution is exact, so a future `en-CA` bundle must be published before clients request `en-CA`.
 2. Render the returned titles and content. Do not claim that bundled app copy is current unless its document IDs and SHA-256 values match the server bundle.
 3. Use the returned `receiptRequirement` to distinguish affirmative agreement from notice acknowledgment. Do not relabel an acknowledgment as consent.
 4. Submit every receipt-required document atomically to `POST /v1/me/legal-receipts` with the returned `bundleSha256`, document IDs, content digests, and exact actions. The API supplies the authoritative acceptance time.

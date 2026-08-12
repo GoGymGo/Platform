@@ -13,12 +13,14 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { RecoverableScreenError } from '@/components/reliability';
+import { OnboardingHeader } from '@/components/onboarding';
+import { brandScreenStyles } from '@/components/screenLayout';
 import {
   creatorFeaturePausedMessage,
   creatorFeatureStatusLabel,
   creatorFeaturesEnabled
 } from '@/config/features';
-import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
+import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useCreatorWorkouts, usePlanCreatorWorkout } from '@/data/appDataHooks';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
@@ -35,7 +37,7 @@ const ruleItems: readonly RuleItem[] = [
     body: 'Creator features are based on GoGymGo selection and verified completions, not YouTube views.'
   },
   { body: 'GoGymGo controls stay outside the hosted video player.' },
-  { body: 'Users earn entries only after an approved gym QR entry and exit.' }
+  { body: 'Users earn entries only after approved start and finish gym-location checks.' }
 ];
 
 export default function WorkoutDetailScreen() {
@@ -111,7 +113,7 @@ export default function WorkoutDetailScreen() {
   if (setupError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before starting this workout."
+        body="Your contest setup could not be checked. Retry before starting this workout."
         onRetry={() => void retrySetup()}
         retrying={setupRetrying}
         title="COULD NOT CHECK SETUP"
@@ -180,18 +182,13 @@ export default function WorkoutDetailScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/workouts')}
-            style={styles.backButton}
-          />
-          <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-            CREATOR WORKOUT // {competitionRegion.label}
-          </TerminalText>
-        </View>
+        <OnboardingHeader
+          label="CREATOR WORKOUT"
+          onBack={() => goBackOrReplace(router, '/workouts')}
+          step={competitionRegion.label}
+        />
 
-        <HUDBorderBox glow style={styles.creatorHeader} tone="cyan">
+        <HUDBorderBox style={styles.creatorHeader} tone="cyan">
           <View style={styles.creatorAvatar}>
             <TerminalText style={styles.creatorAvatarText} tone="dim" variant="button">
               {creatorInitials(workout.creatorName)}
@@ -215,7 +212,7 @@ export default function WorkoutDetailScreen() {
         >
           <View style={styles.youtubePlayer}>
             <View style={styles.youtubePlay}>
-              <TerminalText glow tone="text" variant="micro">
+              <TerminalText tone="text" variant="micro">
                 PLAY
               </TerminalText>
             </View>
@@ -235,11 +232,11 @@ export default function WorkoutDetailScreen() {
 
         <TerminalText style={styles.startHelper} tone="cyan" uppercase={false} variant="body">
           Start your verified GoGymGo session first, then play the video. The video alone does not
-          count as a verified workout.
+          count as a Verified workout.
         </TerminalText>
 
         <CyberButtonPrimary
-          label={setupReady ? 'START VERIFIED SESSION ->' : setupActionLabel}
+          label={setupReady ? 'START VERIFIED WORKOUT ->' : setupActionLabel}
           onPress={() => {
             const route = setupReady ? workoutStartRoute : setupRoute;
             if (route) {
@@ -251,7 +248,7 @@ export default function WorkoutDetailScreen() {
         />
 
         <HUDBorderBox style={styles.planningCard} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             ADD TO WORKOUT CALENDAR
           </TerminalText>
           <TerminalText style={styles.planningCopy} tone="muted" uppercase={false} variant="body">
@@ -311,7 +308,7 @@ export default function WorkoutDetailScreen() {
           <View style={styles.rulesList}>
             {ruleItems.map((rule) => (
               <View key={rule.body} style={styles.ruleRow}>
-                <TerminalText glow tone="cyan" variant="micro">
+                <TerminalText tone="cyan" variant="micro">
                   OK
                 </TerminalText>
                 <TerminalText style={styles.ruleText} tone="muted" uppercase={false} variant="body">
@@ -361,7 +358,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.screenX,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   unavailableCard: {
     padding: spacing.xxl
@@ -377,28 +374,7 @@ const styles = StyleSheet.create({
   unavailableAction: {
     marginTop: spacing.xl
   },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md
-  },
-  backButton: {
-    width: 96,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
-  headerLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal
-  },
+  content: brandScreenStyles.tabContent,
   creatorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -411,8 +387,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radii.lg,
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.cyan
   },
   creatorAvatarText: {
     color: colors.textOnPrimary,

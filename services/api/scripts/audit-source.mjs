@@ -178,6 +178,10 @@ const authModule = await readFile(
   join(root, 'src/modules/auth/auth.module.ts'),
   'utf8',
 );
+const pilotConfiguration = await readFile(
+  join(root, 'src/operations/configure-september-2026-island-pilot.ts'),
+  'utf8',
+);
 const workloadsTerraform = await readFile(
   join(platformRoot, 'infrastructure/gcp/terraform/workloads.tf'),
   'utf8',
@@ -327,6 +331,15 @@ if (
 ) {
   violations.push(
     'the production authentication module must expose only Firebase verification',
+  );
+}
+if (
+  !pilotConfiguration.includes(
+    '`publish-${document.documentKey}-${document.version}`',
+  )
+) {
+  violations.push(
+    'public legal publication idempotency keys must track each document version',
   );
 }
 for (const marker of [

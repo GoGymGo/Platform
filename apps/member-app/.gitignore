@@ -1,5 +1,5 @@
 .expo/
-.expo-shared/
+.expo-*/
 .firebase/
 node_modules/
 dist/

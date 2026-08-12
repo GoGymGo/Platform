@@ -7,8 +7,9 @@
 - Competition: September 1, 2026 00:00 through October 1, 2026 00:00
 - Verification: approved static gym QR, live location, 75 m radius
 - Minimum session: 30 minutes using server time
-- Session expiry: four hours
-- Minimum entrants: two
+- Completion period: 15 minutes after the competition ends for workouts started in time
+- Session expiry: the earlier of four hours or the completion-period deadline
+- Minimum entrants: one
 - Reward: one $100 CAD cash reward sponsored by GoGymGo
 - Daily limit: one verified competition day per local calendar date
 
@@ -24,17 +25,18 @@ npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 
 1. Apply all migrations and deploy the same image digest to the API and worker.
 2. Configure the production-shaped regional boundary.
-3. Have `s1ck5ense123@gmail.com` verify email and sign in once, then run the
-   audited administrator bootstrap.
+3. Have the configured GoGymGo owner verify email and sign in once, then run
+   the audited administrator bootstrap.
 4. Create the real condo gym with its verified name, street address and measured
    coordinates; keep the radius at 75 m.
 5. Assign the gym to the September competition, issue the poster and print it.
 6. Run the protected pilot configuration to publish the owner-approved Privacy,
    Terms and Official Contest Rules version. Unapproved versions are never served.
 7. Reset testing-era onboarding with the explicit reset command.
-8. Use two real accounts to complete email, location, legal, age, goal and join.
-9. At the condo, complete one 30-minute entry/exit scan and verify a missing-exit
-   test earns no credit.
+8. Use one real account to complete email, location, legal, age, goal and join.
+9. At the condo, complete one 30-minute workout with start and finish location
+   checks, verify finishing during the 15-minute completion period still counts,
+   and verify a missing-finish test earns no credit.
 10. Rehearse draw settlement and the audited $100 cash handoff record.
 11. Only after the legal, gym, reward and UAT gates pass, rerun the command with
     `PUBLISH_PILOT_COMPETITION=yes` to open registration.

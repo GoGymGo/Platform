@@ -17,6 +17,17 @@ const optionalUrl = z.preprocess(
   z.string().url().optional(),
 );
 
+const optionalEmail = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase())
+    .optional(),
+);
+
 const optionalSecret = z.preprocess(
   (value) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -72,6 +83,7 @@ export const environmentSchema = z
     FIREBASE_PROJECT_ID: optionalTrimmedString,
     FIREBASE_SERVICE_ACCOUNT_JSON: optionalTrimmedString,
     FIREBASE_AUTH_EMULATOR_HOST: optionalTrimmedString,
+    GOGYMGO_OWNER_EMAIL: optionalEmail,
     DATABASE_URL: z
       .string()
       .url()
@@ -140,6 +152,20 @@ export const environmentSchema = z
         message: 'FIREBASE_PROJECT_ID is required in production.',
         path: ['FIREBASE_PROJECT_ID'],
       });
+    }
+
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.RUNTIME_ROLE === 'api'
+    ) {
+      if (!environment.GOGYMGO_OWNER_EMAIL) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'GOGYMGO_OWNER_EMAIL is required for the production API runtime.',
+          path: ['GOGYMGO_OWNER_EMAIL'],
+        });
+      }
     }
 
     if (environment.NODE_ENV === 'production') {

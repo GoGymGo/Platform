@@ -7,29 +7,29 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/contact" },
   description:
-    "Find the right GoGymGo contact path for regional launch updates, gym and brand partnerships, public-site feedback, or member-app support.",
+    "Find the right GoGymGo contact path for regional launch updates, fitness brand partnerships, or member-app support.",
   title: "Contact",
 };
 
 const contactPaths = [
   {
     analyticsEvent: "regional_updates_click",
-    copy: "Join the free regional update list for launch and availability news. This does not register you for a competition.",
+    copy: "Join the free regional update list for launch and availability news. This does not register you for a contest.",
     href: `${siteLinks.gymGoers}#gym-form`,
     label: "OPEN REGIONAL UPDATE FORM",
     title: "Gym-goer updates",
   },
   {
     analyticsEvent: "brand_partnership_click",
-    copy: "Gym operators can request a location review, while fitness brands can propose rewards or regional campaigns.",
-    href: siteLinks.partnerApplication,
+    copy: "Tell us about the region, timing, inventory, and campaign model your fitness brand is exploring.",
+    href: `${siteLinks.brands}#brand-form`,
     label: "OPEN PARTNERSHIP FORM",
-    title: "Gym and brand partnerships",
+    title: "Fitness brand partnerships",
   },
   {
     analyticsEvent: "member_app_click",
     appBound: true,
-    copy: "Account, eligibility, legal-document, workout, or competition support belongs inside the member experience where the relevant state is available.",
+    copy: "Account, eligibility, legal-document, workout, or contest support belongs inside the member experience where the relevant state is available.",
     href: siteLinks.memberApp,
     label: "OPEN THE MEMBER APP",
     title: "Existing member support",
@@ -94,7 +94,7 @@ export default function ContactPage() {
             <p>
               Use this form for the public website only. Include the affected
               page and enough detail to reproduce the issue. Account,
-              competition, and workout support remains inside the member app.
+              contest, and workout support remains inside the member app.
             </p>
           </div>
           <PublicSiteFeedbackForm />

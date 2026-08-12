@@ -31,6 +31,7 @@ export type GoalBracket = {
 };
 
 export type Competition = {
+  assignedGymIds: string[];
   endsAt: string;
   enrollmentCount: number;
   entrantCap: number | null;
@@ -109,6 +110,8 @@ export type LegalDocument = {
 export type AuditEvent = {
   action: string;
   actorEmail: string | null;
+  after?: Record<string, unknown> | null;
+  before?: Record<string, unknown> | null;
   createdAt: string;
   entityId: string;
   entityType: string;
@@ -129,6 +132,17 @@ export type DashboardSnapshot = {
   legalDocuments: LegalDocument[];
   regions: RegionPolicy[];
   rewards: Reward[];
+};
+
+export type OperatorPortalAccess = {
+  assignments: {
+    accessLevel: "admin" | "staff";
+    gymLocationId: string;
+  }[];
+  email: string;
+  id: string;
+  portal: "gogymgo" | "partner";
+  roles: string[];
 };
 
 export type WorkQueueItem = {
@@ -168,7 +182,6 @@ export type AdminSection =
   | "operations"
   | "audit";
 import type {
-  CashFulfillmentRecordDto,
   GymLocationResponseDto,
   GymQrCredentialResponseDto,
   OperatorAuditHistoryDto,
@@ -178,7 +191,6 @@ import type {
   RegionWaitlistEntryDto,
 } from "@gogymgo/contracts";
 
-export type CashFulfillment = CashFulfillmentRecordDto;
 export type GymLocation = GymLocationResponseDto;
 export type GymQrCredential = GymQrCredentialResponseDto;
 export type GymSession = OperatorGymSessionDto;
@@ -186,3 +198,22 @@ export type InterestSubmission = OperatorInterestSubmissionDto;
 export type PartnerApplication = OperatorPartnerApplicationDto;
 export type PilotAuditEvent = OperatorAuditHistoryDto;
 export type RegionWaitlistEntry = RegionWaitlistEntryDto;
+
+export type PartnerGym = GymLocation & {
+  accessLevel: "admin" | "staff";
+};
+
+export type PartnerCompetition = Competition & {
+  gymLocationId: string;
+  gymName: string;
+  proposedByUserId: string | null;
+};
+
+export type PartnerDashboardSnapshot = {
+  competitions: PartnerCompetition[];
+  generatedAt: string;
+  gyms: PartnerGym[];
+  operator: DashboardSnapshot["admin"];
+  regions: RegionPolicy[];
+  sessions: GymSession[];
+};

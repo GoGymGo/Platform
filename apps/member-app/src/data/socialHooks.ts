@@ -68,14 +68,6 @@ export function useRegionalChallengeDiscovery(regionCode: string) {
   });
 }
 
-export function useUpdateScreenName() {
-  const context = useSocialContext();
-  return useSocialMutation(
-    (screenName: string) => context.social.updateScreenName(normalizeScreenName(screenName)),
-    context.queryKey
-  );
-}
-
 export function useSendFriendRequest() {
   const context = useSocialContext();
   return useSocialMutation(

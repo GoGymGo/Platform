@@ -10,10 +10,16 @@ import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminRegionConfigurationService } from './admin-region-configuration.service';
 import { AdminWorkoutConfigurationService } from './admin-workout-configuration.service';
 import { OperatorController } from './operator.controller';
+import { OperatorPortalController } from './operator-portal.controller';
+import { OperatorPortalService } from './operator-portal.service';
 import { OperatorService } from './operator.service';
 
 @Module({
-  controllers: [AdminConfigurationController, OperatorController],
+  controllers: [
+    AdminConfigurationController,
+    OperatorController,
+    OperatorPortalController,
+  ],
   imports: [
     AdminAuthorizationModule,
     DrawsModule,
@@ -26,6 +32,7 @@ import { OperatorService } from './operator.service';
     AdminDashboardService,
     AdminRegionConfigurationService,
     AdminWorkoutConfigurationService,
+    OperatorPortalService,
     OperatorService,
   ],
 })

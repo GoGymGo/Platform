@@ -12,9 +12,13 @@ import {
   TerminalText
 } from '@/components/cyber';
 import {
+  getUserFacingErrorMessage,
+  InlineLoadingState,
   RecoverableError,
   useAccessibilityAnnouncement
 } from '@/components/reliability';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useClaimReward, useMyRewardAwards } from '@/data/appDataHooks';
 import type { ClaimedReward, RewardAward } from '@/domain/rewards';
@@ -22,7 +26,7 @@ import { goBackOrReplace } from '@/navigation/goBack';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
 
-export default function MyRewardsScreen() {
+export default function MyAwardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const awardsQuery = useMyRewardAwards();
@@ -70,47 +74,39 @@ export default function MyRewardsScreen() {
           memoryKey="my-rewards"
           showsVerticalScrollIndicator={false}
         >
-          <CyberButtonOutline
-            label="BACK TO MARKETPLACE"
-            onPress={() => goBackOrReplace(router, '/leaderboard/rewards')}
-            style={styles.backButton}
+          <OnboardingHeader
+            label="AWARDS"
+            onBack={() => goBackOrReplace(router, '/leaderboard/rewards')}
+            step="MY ACCOUNT"
           />
-          <View style={styles.header}>
-            <TerminalText glow tone="pink" variant="label">
-              CONTEST REWARDS
-            </TerminalText>
-            <TerminalText glow style={styles.title} tone="cyan" variant="title">
-              MY REWARDS
-            </TerminalText>
-            <TerminalText tone="muted" uppercase={false} variant="body">
-              Claim physical-prize instructions or securely reveal an awarded coupon
-              code. GoGymGo will never ask for banking information.
-            </TerminalText>
-          </View>
+          <BrandScreenHeader
+            accent="pink"
+            description="Claim an Award to reveal physical-prize instructions or an awarded coupon code. GoGymGo will never ask for banking information."
+            eyebrow="CONTEST AWARDS"
+            title="MY AWARDS"
+          />
 
           {claimedReward ? <ClaimResult reward={claimedReward} /> : null}
 
           {awardsQuery.isError ? (
             <RecoverableError
-              body="Your reward list could not be loaded. Retry to check for awards; no claim data has been lost."
+              body="Your Award list could not be loaded. Retry to check for Awards; no claim data has been lost."
               onRetry={() => {
                 void recordFlowMetric(user?.uid, 'flow-retry', 'my-rewards');
                 void awardsQuery.refetch();
               }}
               retrying={awardsQuery.isFetching}
-              title="COULD NOT LOAD REWARDS"
+              title="COULD NOT LOAD AWARDS"
             />
           ) : isPending ? (
-            <TerminalText live="polite" style={styles.empty} tone="muted" variant="label">
-              LOADING YOUR REWARDS...
-            </TerminalText>
+            <InlineLoadingState label="Loading your Awards..." />
           ) : awards.length === 0 ? (
             <HUDBorderBox style={styles.emptyCard} tone="muted">
               <TerminalText glow tone="muted" variant="label">
-                NO REWARDS YET
+                NO AWARDS YET
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
-                When you win a physical prize or coupon code, it will appear here.
+                When a Reward is awarded to you, the Award will appear here.
               </TerminalText>
             </HUDBorderBox>
           ) : (
@@ -131,7 +127,10 @@ export default function MyRewardsScreen() {
           )}
           {claim.error ? (
             <RecoverableError
-              body={claim.error.message}
+              body={getUserFacingErrorMessage(
+                claim.error,
+                'Your Award could not be claimed. It is still available; try again.'
+              )}
               onRetry={retryClaim}
               retrying={claim.isPending}
               title="CLAIM DID NOT COMPLETE"
@@ -156,8 +155,8 @@ function AwardCard({
 }) {
   const claimable = award.status === 'awarded' || award.status === 'claimed';
   return (
-    <HUDBorderBox glow style={styles.awardCard} tone="pink">
-      <TerminalText glow tone="pink" variant="micro">
+    <HUDBorderBox style={styles.awardCard} tone="pink">
+      <TerminalText tone="pink" variant="micro">
         #{award.awardRank} {' // '}
         {award.rewardType === 'coupon' ? 'COUPON CODE' : 'PHYSICAL PRIZE'}
       </TerminalText>
@@ -173,10 +172,10 @@ function AwardCard({
       {claimable ? (
         <CyberButtonPrimary
           accessibilityHint={award.status === 'claimed'
-            ? 'Review the claim details for this reward'
-            : 'Reveal the claim instructions for this reward'}
+            ? 'Review the claim details for this Award'
+            : 'Reveal the claim instructions for this Award'}
           disabled={disabled}
-          label={busy ? 'Claiming...' : award.status === 'claimed' ? 'View claim' : 'Claim reward'}
+          label={busy ? 'Claiming...' : award.status === 'claimed' ? 'View claim' : 'Claim Award'}
           onPress={onClaim}
           style={styles.claimButton}
           tone="pink"
@@ -202,12 +201,12 @@ function getAwardStatusLabel(status: RewardAward['status']) {
 }
 
 function ClaimResult({ reward }: { reward: ClaimedReward }) {
-  useAccessibilityAnnouncement(`${reward.title} reward claimed.`);
+  useAccessibilityAnnouncement(`${reward.title} Award claimed.`);
 
   return (
     <HUDBorderBox glow style={styles.claimResult} tone="green">
       <TerminalText glow tone="green" variant="label">
-        REWARD CLAIMED
+        AWARD CLAIMED
       </TerminalText>
       <TerminalText style={styles.awardTitle} tone="text" variant="body">
         {reward.title}
@@ -227,7 +226,7 @@ function ClaimResult({ reward }: { reward: ClaimedReward }) {
       ) : null}
       {reward.claimUrl ? (
         <CyberButtonOutline
-          label="Open sponsor claim page"
+          label="OPEN SPONSOR REWARD PAGE"
           onPress={() => void Linking.openURL(reward.claimUrl!)}
           tone="green"
         />
@@ -237,15 +236,7 @@ function ClaimResult({ reward }: { reward: ClaimedReward }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    padding: spacing.xl,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  backButton: { alignSelf: 'flex-start', minHeight: 44, marginBottom: spacing.xl },
-  header: { gap: spacing.sm, marginBottom: spacing.xl },
-  title: { fontFamily: fontFamilies.display },
+  content: brandScreenStyles.content,
   awards: { gap: spacing.lg },
   awardCard: { gap: spacing.sm, padding: spacing.lg },
   awardTitle: { fontFamily: fontFamilies.display },

@@ -86,11 +86,11 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.source_commit }}
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
@@ -110,6 +110,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          owner_secret_count="$(aws ecs describe-task-definition \
+            --task-definition "$ECS_API_TASK_DEFINITION" \
+            | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "GOGYMGO_OWNER_EMAIL")] | length')"
+          if [[ "$owner_secret_count" != "1" ]]; then
+            echo "${ECS_API_TASK_DEFINITION} must map GOGYMGO_OWNER_EMAIL exactly once." >&2
+            exit 1
+          fi
           for task_definition in \
             "$ECS_API_TASK_DEFINITION" \
             "$ECS_WORKER_TASK_DEFINITION"; do
@@ -123,7 +130,7 @@ jobs:
           done
 
       - id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
       - id: image
         name: Build the exact source commit
@@ -155,7 +162,7 @@ jobs:
             node_modules/node-pg-migrate/bin/node-pg-migrate.js --help > /dev/null
           echo "tag=${image_tag}" >> "$GITHUB_OUTPUT"
 
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           exit-code: "1"
           format: table
@@ -272,6 +279,42 @@ jobs:
             echo "The worker failed to stabilize and was returned to zero tasks." >&2
             exit 1
           fi
+          worker_rollout_complete=false
+          for attempt in {1..18}; do
+            worker_state="$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE" \
+              --query 'services[0]' \
+              --output json)"
+            worker_actual_definition="$(jq -r '.taskDefinition' <<<"$worker_state")"
+            worker_rollout_state="$(jq -r '[.deployments[] | select(.status == "PRIMARY")][0].rolloutState // "UNKNOWN"' <<<"$worker_state")"
+            worker_desired_count="$(jq -r '.desiredCount' <<<"$worker_state")"
+            worker_running_count="$(jq -r '.runningCount' <<<"$worker_state")"
+            if [[ "$worker_actual_definition" != "$worker_definition" ]]; then
+              break
+            fi
+            if [[ "$worker_rollout_state" == "COMPLETED" &&
+                  "$worker_desired_count" == "1" &&
+                  "$worker_running_count" == "1" ]]; then
+              worker_rollout_complete=true
+              break
+            fi
+            if [[ "$attempt" -lt 18 ]]; then
+              sleep 10
+            fi
+          done
+          if [[ "$worker_rollout_complete" != "true" ]]; then
+            jq '{
+              requestedTaskDefinition: $requested,
+              actualTaskDefinition: .taskDefinition,
+              desiredCount,
+              runningCount,
+              primaryDeployment: ([.deployments[] | select(.status == "PRIMARY")][0]),
+              recentEvents: [.events[0:10][]?.message]
+            }' --arg requested "$worker_definition" <<<"$worker_state"
+            echo "The worker rolled back or did not reach the requested task definition." >&2
+            exit 1
+          fi
 
       - name: Deploy the API with circuit-breaker rollback
         shell: bash
@@ -306,6 +349,42 @@ jobs:
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_API_SERVICE"
+          api_rollout_complete=false
+          for attempt in {1..18}; do
+            api_state="$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_API_SERVICE" \
+              --query 'services[0]' \
+              --output json)"
+            api_actual_definition="$(jq -r '.taskDefinition' <<<"$api_state")"
+            api_rollout_state="$(jq -r '[.deployments[] | select(.status == "PRIMARY")][0].rolloutState // "UNKNOWN"' <<<"$api_state")"
+            api_desired_count="$(jq -r '.desiredCount' <<<"$api_state")"
+            api_running_count="$(jq -r '.runningCount' <<<"$api_state")"
+            if [[ "$api_actual_definition" != "$api_definition" ]]; then
+              break
+            fi
+            if [[ "$api_rollout_state" == "COMPLETED" &&
+                  "$api_desired_count" == "1" &&
+                  "$api_running_count" == "1" ]]; then
+              api_rollout_complete=true
+              break
+            fi
+            if [[ "$attempt" -lt 18 ]]; then
+              sleep 10
+            fi
+          done
+          if [[ "$api_rollout_complete" != "true" ]]; then
+            jq '{
+              requestedTaskDefinition: $requested,
+              actualTaskDefinition: .taskDefinition,
+              desiredCount,
+              runningCount,
+              primaryDeployment: ([.deployments[] | select(.status == "PRIMARY")][0]),
+              recentEvents: [.events[0:10][]?.message]
+            }' --arg requested "$api_definition" <<<"$api_state"
+            echo "The API rolled back or did not reach the requested task definition." >&2
+            exit 1
+          fi
 
       - name: Verify API and worker readiness
         shell: bash
@@ -374,7 +453,7 @@ jobs:
             exit 1
           fi
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}

@@ -4,6 +4,7 @@ import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { AuthGate } from '@/components/auth';
 import { colors, fontFamilies } from '@/constants/theme';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 
 const tabScreenOptions = {
   headerShown: false,
@@ -11,20 +12,21 @@ const tabScreenOptions = {
   tabBarInactiveTintColor: colors.dim,
   tabBarStyle: {
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 430 : undefined,
+    maxWidth: Platform.OS === 'web' ? 960 : undefined,
     alignSelf: 'center',
     height: 78,
     paddingTop: 8,
     paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceCyanActive,
-    backgroundColor: colors.background
+    backgroundColor: colors.panel
   },
   tabBarLabelStyle: {
     width: '100%',
     fontFamily: fontFamilies.terminal,
-    fontSize: 9,
-    letterSpacing: 0.2,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 0.1,
     textAlign: 'center',
     textTransform: 'uppercase'
   },
@@ -42,6 +44,9 @@ const tabScreenOptions = {
 } as const;
 
 export default function TabsLayout() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
   return (
     <AuthGate>
       <View style={styles.layout}>
@@ -69,6 +74,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="session"
             options={{
+              href: mobileGymVerificationAvailable ? undefined : null,
               title: 'Train',
               tabBarAccessibilityLabel: 'Training tab',
               tabBarIcon: ({ color, focused }) => (
@@ -80,7 +86,7 @@ export default function TabsLayout() {
             name="leaderboard"
             options={{
               title: 'Compete',
-              tabBarAccessibilityLabel: 'Competition tab',
+              tabBarAccessibilityLabel: 'Contest tab',
               tabBarIcon: ({ color, focused, size }) => (
                 <Ionicons color={color} name={focused ? 'trophy' : 'trophy-outline'} size={size} />
               )

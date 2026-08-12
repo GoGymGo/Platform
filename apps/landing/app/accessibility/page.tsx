@@ -17,9 +17,9 @@ export default function AccessibilityPage() {
           <p className="eyebrow">ACCESSIBILITY // PUBLIC SITE</p>
           <h1>GoGymGo should be understandable and usable.</h1>
           <p>
-            We target WCAG 2.2 Level AA for the public GoGymGo website and test
-            common journeys with keyboards, screen readers, browser zoom,
-            reduced motion, and mobile and desktop layouts.
+            We are working to make the public GoGymGo experience usable with
+            keyboards, screen readers, browser zoom, reduced motion, and common
+            mobile and desktop layouts.
           </p>
         </header>
 
@@ -35,14 +35,12 @@ export default function AccessibilityPage() {
             </ul>
           </section>
           <section>
-            <h2>Accessibility target and known limitations</h2>
+            <h2>Ongoing improvement</h2>
             <p>
-              WCAG 2.2 Level AA is our current target, not a formal conformance
-              claim. This statement covers the public marketing site only. The
-              member app, demo, and app-hosted legal pages are separate
-              experiences with their own interaction and device requirements.
-              Please report any difficulty with display type, focus order,
-              motion, navigation, or form feedback.
+              Accessibility is reviewed as content, forms, regional rules, and
+              product journeys change. This statement describes the public
+              marketing site; the member app has its own interaction and device
+              requirements.
             </p>
           </section>
           <section>
@@ -52,8 +50,8 @@ export default function AccessibilityPage() {
               of interactions such as app-link clicks, FAQ opens, and the first
               use of a public form. These measurement events contain only the
               event name, public page path, and time. They do not store cookies,
-              identifiers, form values, precise location, or member-app
-              activity.
+              identifiers, eligibility-check answers, form values, precise
+              location, or member-app activity.
             </p>
           </section>
           <section>
@@ -71,7 +69,7 @@ export default function AccessibilityPage() {
               REPORT AN ACCESSIBILITY BARRIER →
             </Link>
           </section>
-          <p className="fine-print">Last reviewed August 4, 2026.</p>
+          <p className="fine-print">Last updated August 3, 2026.</p>
         </div>
       </div>
     </main>

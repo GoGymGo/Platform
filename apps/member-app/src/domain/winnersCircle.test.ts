@@ -3,20 +3,25 @@ import { describe, it } from 'node:test';
 
 import {
   formatCompetitionMonth,
-  getPreviousCompetitionMonthKey,
+  getWinnersCirclePresentationKey,
   shouldAutoPresentWinnersCircle
 } from './winnersCircle';
 
 describe('Winners Circle presentation', () => {
-  it('opens once on the first regional day of a login month', () => {
-    assert.equal(shouldAutoPresentWinnersCircle('2026-08-01', null), true);
-    assert.equal(shouldAutoPresentWinnersCircle('2026-08-01', '2026-08'), false);
-    assert.equal(shouldAutoPresentWinnersCircle('2026-08-02', null), false);
-  });
+  it('opens each pending or settled result state once', () => {
+    const pending = getWinnersCirclePresentationKey({
+      competitionId: 'contest-1',
+      resultsStatus: 'pending'
+    });
+    const settled = getWinnersCirclePresentationKey({
+      competitionId: 'contest-1',
+      resultsStatus: 'settled'
+    });
 
-  it('resolves the completed competition month across a year boundary', () => {
-    assert.equal(getPreviousCompetitionMonthKey('2026-08'), '2026-07');
-    assert.equal(getPreviousCompetitionMonthKey('2026-01'), '2025-12');
+    assert.equal(shouldAutoPresentWinnersCircle(pending, null), true);
+    assert.equal(shouldAutoPresentWinnersCircle(pending, pending), false);
+    assert.equal(shouldAutoPresentWinnersCircle(settled, pending), true);
+    assert.equal(shouldAutoPresentWinnersCircle(null, pending), false);
   });
 
   it('formats the completed month for the winner announcement', () => {

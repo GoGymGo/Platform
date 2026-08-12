@@ -41,15 +41,15 @@ async function submitInterest(
     }),
   });
 
-  let body: { error?: unknown } = {};
+  let body: { error?: string } = {};
   try {
-    body = (await response.json()) as { error?: unknown };
+    body = (await response.json()) as { error?: string };
   } catch {
     // Some upstream failures have no JSON body. Keep the message user-safe.
   }
 
   if (!response.ok) {
-    throw new Error(readErrorMessage(body.error, fallbackError));
+    throw new Error(body.error ?? fallbackError);
   }
 }
 
@@ -68,15 +68,15 @@ async function submitRegionalUpdates(
     }),
   });
 
-  let body: { error?: unknown } = {};
+  let body: { error?: string } = {};
   try {
-    body = (await response.json()) as { error?: unknown };
+    body = (await response.json()) as { error?: string };
   } catch {
     // Some upstream failures have no JSON body. Keep the message user-safe.
   }
 
   if (!response.ok) {
-    throw new Error(readErrorMessage(body.error, fallbackError));
+    throw new Error(body.error ?? fallbackError);
   }
 }
 
@@ -161,9 +161,10 @@ export function GymGoerForm() {
       setState("success");
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "We couldn’t save your information. Please try again.",
+        readErrorMessage(
+          cause,
+          "We couldn’t save your information. Please try again.",
+        ),
       );
       setState("error");
     }
@@ -240,7 +241,7 @@ export function GymGoerForm() {
         {state === "submitting" ? "SAVING…" : "GET REGIONAL UPDATES →"}
       </button>
       <p className="fine-print" id="gym-form-note">
-        This free update list does not create an app account or competition
+        This free update list does not create an app account or contest
         entry, and it does not guarantee launch availability in your region.
       </p>
     </form>
@@ -270,9 +271,10 @@ export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }
       setState("success");
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "We couldn’t save your partnership request. Please try again.",
+        readErrorMessage(
+          cause,
+          "We couldn’t save your partnership request. Please try again.",
+        ),
       );
       setState("error");
     }
@@ -285,14 +287,14 @@ export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }
   return (
     <form
       aria-busy={state === "submitting"}
-      aria-describedby="partner-form-note"
+      aria-describedby="brand-form-note"
       className="interest-form"
       data-analytics-form="brand_form_start"
       onSubmit={onSubmit}
     >
       <fieldset className="form-section">
         <legend>
-          <span>01</span> CONTACT &amp; ORGANIZATION
+          <span>01</span> CONTACT &amp; COMPANY
         </legend>
         <div className="field-grid">
         <div className="field">
@@ -348,7 +350,7 @@ export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }
 
       <fieldset className="form-section">
         <legend>
-          <span>02</span> PARTNERSHIP FIT
+          <span>02</span> CAMPAIGN FIT
         </legend>
         <div className="field-grid">
           <div className="field">
@@ -373,22 +375,21 @@ export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }
                 Select one
               </option>
               <option value="regional-sponsor">Regional campaign sponsor</option>
-              <option value="brand-partnership">Fitness brand / reward partner</option>
-              <option value="brand-rewards">Product or prize inventory</option>
+              <option value="brand-rewards">Product or coupon inventory</option>
               <option value="creator-campaign">Creator workout campaign</option>
-              <option value="gym-partnership">Gym operator / partner location</option>
+              <option value="gym-partnership">Partner gym network</option>
               <option value="explore">Explore the right fit</option>
             </select>
           </div>
         </div>
 
         <div className="field">
-          <label htmlFor="message">PARTNERSHIP DETAILS (OPTIONAL)</label>
+          <label htmlFor="message">CAMPAIGN DETAILS (OPTIONAL)</label>
           <textarea
             id="message"
             maxLength={1200}
             name="message"
-            placeholder="Share your gym locations, member experience, preferred timing, region, inventory, fulfillment plan, or reporting needs."
+            placeholder="Share your preferred timing, audience, region, inventory, budget range, fulfillment plan, or reporting needs."
           />
         </div>
       </fieldset>
@@ -432,7 +433,7 @@ export function BrandForm({ defaultInterest = "" }: { defaultInterest?: string }
           ? "SENDING…"
           : "REQUEST A PARTNERSHIP REVIEW →"}
       </button>
-      <p className="fine-print" id="partner-form-note">
+      <p className="fine-print" id="brand-form-note">
         Submitting this form does not create a campaign or agreement. Placements,
         rewards, creative, reporting, claims, and regional terms require review
         and written approval.

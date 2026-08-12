@@ -36,7 +36,7 @@ export async function scheduleGymScanCompletionReminder({
   await cancelGymScanCompletionReminder();
   await Notifications.scheduleNotificationAsync({
     content: {
-      body: `Your 30-minute minimum${gymName ? ` at ${gymName}` : ''} is complete. Return to the poster and scan again to finish.`,
+      body: `Your 30-minute minimum${gymName ? ` at ${gymName}` : ''} is complete. Return to the gym and verify your location to finish.`,
       data: {
         owner: reminderOwner,
         route: '/qr-scanner',

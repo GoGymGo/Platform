@@ -7,7 +7,7 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/faq" },
   description:
-    "Answers about GoGymGo September beta eligibility, regional updates, Weekly Goals, verified workouts, rewards, gyms, and brand partnerships.",
+    "Answers about GoGymGo September beta eligibility, Regional updates, Weekly Goals, Verified workouts, Rewards, and brand partnerships.",
   title: "Frequently asked questions",
 };
 
@@ -17,7 +17,7 @@ const questions = [
       <p>
         Eligible gym-goers must be age {septemberCampaign.minimumAge}+ and
         located within {septemberCampaign.regionName}. The app confirms location,
-        current legal documents, competition availability, and other enrollment
+        current legal documents, contest availability, and other enrollment
         requirements before registration succeeds.
       </p>
     ),
@@ -43,9 +43,9 @@ const questions = [
   {
     answer: (
       <p>
-        The competition runs from {septemberCampaign.competitionWindow}.
-        Registration opens when the competition is published and can remain
-        available until the competition ends, reaches an entrant cap, or is
+        The contest runs from {septemberCampaign.competitionWindow}.
+        Registration opens when the contest is published and can remain
+        available until the contest ends, reaches an entrant cap, or is
         cancelled. The app shows the authoritative current status.
       </p>
     ),
@@ -55,7 +55,7 @@ const questions = [
     answer: (
       <p>
         No. The regional update list only gives GoGymGo permission to email you
-        about availability. September competition registration happens inside
+        about availability. September contest registration happens inside
         the member app.
       </p>
     ),
@@ -65,7 +65,7 @@ const questions = [
     answer: (
       <p>
         Joining is free and no purchase is required. Eligibility, regional
-        rules, published competition terms, and approved partner-gym access
+        rules, published Contest terms, and approved Partner gym access
         still apply. Read the{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
         before joining.
@@ -78,19 +78,20 @@ const questions = [
       <p>
         Only a gym displaying an active GoGymGo partner poster can support this
         verification flow. The member app is authoritative for current partner
-        availability. A scan at an ordinary gym or from an inactive poster does
-        not qualify.
+        availability. Only the initial Contest QR from an active Partner gym
+        poster can select the gym for location verification.
       </p>
     ),
-    question: "Which gyms count as approved partner gyms?",
+    question: "Which gyms count as approved Partner gyms?",
   },
   {
     answer: (
       <p>
-        At an approved partner gym, scan the gym’s active poster on entry with a
-        fresh eligible location reading. After at least 30 minutes, scan the
-        same poster again. The server reviews the submitted evidence before
-        awarding verified credit.
+        Scan the active Contest QR once to select the Partner gym. For each
+        workout, use Start Workout for a fresh location check, train for at
+        least 30 minutes, then use Finish Workout for another fresh location
+        check. The server reviews both location checks before awarding verified
+        credit.
       </p>
     ),
     question: "How is a workout verified?",
@@ -98,11 +99,10 @@ const questions = [
   {
     answer: (
       <p>
-        Your Weekly Goal is the number of verified workout days you commit to in
+        Your Weekly Goal is the number of Verified workout days you commit to in
         each scoring week. September participants choose from{" "}
         {septemberCampaign.weeklyGoalRange}, and the selection is locked after
-        enrollment. Complete that goal to bank the week’s Prize Draw Entries; a
-        higher completed goal earns more base entries.
+        enrollment.
       </p>
     ),
     question: "What is a Weekly Goal?",
@@ -110,59 +110,17 @@ const questions = [
   {
     answer: (
       <p>
-        Goal Score counts approved gym days: one approved workout per regional
-        calendar day adds {septemberCampaign.goalScorePerVerifiedDay} point.
-        Prize Draw Entries are separate and are banked only after you complete
-        the Weekly Goal you selected.
-      </p>
-    ),
-    question: "How are Goal Score and Prize Draw Entries different?",
-  },
-  {
-    answer: (
-      <p>
-        If you miss your selected Weekly Goal, that scoring week settles at zero
-        Prize Draw Entries. Approved days still remain part of your Goal Score,
-        but they do not create settled entries for a missed week.
-      </p>
-    ),
-    question: "What happens if I miss a Weekly Goal?",
-  },
-  {
-    answer: (
-      <p>
-        Complete your selected goal in all {septemberCampaign.scoringWeekCount}
-        scoring weeks to unlock the {septemberCampaign.perfectMonthMultiplier}×
-        Perfect Month multiplier on eligible entries after settlement. More
-        entries improve relative odds but never guarantee the reward.
-      </p>
-    ),
-    question: "How does the Perfect Month multiplier work?",
-  },
-  {
-    answer: (
-      <p>
         The September pilot has one {septemberCampaign.reward} cash reward
-        sponsored by {septemberCampaign.rewardSponsor}. Verified activity can
-        affect Prize Draw Entries, but having more entries never guarantees the
-        reward. An audited draw determines the reward winner after results
-        settle. The published{" "}
+        sponsored by {septemberCampaign.rewardSponsor}. Verified workouts add
+        Prize Draw Entries under the published scoring rules, but category
+        placement never guarantees the reward. An audited draw determines the
+        reward winner after results settle. The published{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
         control
         if any summary differs.
       </p>
     ),
     question: "What can September participants win?",
-  },
-  {
-    answer: (
-      <p>
-        Gym operators can request a review for one or more locations. GoGymGo
-        reviews the region, poster placement, member flow, operating support,
-        and verification requirements before any location is activated.
-      </p>
-    ),
-    question: "How can a gym become a partner?",
   },
   {
     answer: (
@@ -186,12 +144,12 @@ const faqGroups = [
   {
     id: "workouts",
     label: "WORKOUTS & WEEKLY GOALS",
-    questions: questions.slice(5, 11),
+    questions: questions.slice(5, 8),
   },
   {
     id: "rewards",
     label: "REWARDS & PARTNERSHIPS",
-    questions: questions.slice(11),
+    questions: questions.slice(8),
   },
 ] as const;
 
@@ -208,7 +166,7 @@ export default function FaqPage() {
           <h1>Frequently asked questions</h1>
           <p>
             Start here for the difference between September registration,
-            regional updates, verified workouts, rewards, and partnerships.
+            Regional updates, Verified workouts, Rewards, and partnerships.
           </p>
         </header>
 
@@ -274,7 +232,7 @@ export default function FaqPage() {
             <Link
               className="button button-secondary"
               data-analytics-event="brand_partnership_click"
-              href={siteLinks.partners}
+              href={siteLinks.brands}
             >
               EXPLORE PARTNERSHIPS →
             </Link>

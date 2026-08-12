@@ -1,14 +1,15 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader } from '@/components/screenLayout';
+import { colors, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 
@@ -23,29 +24,20 @@ export default function GymCompetitionScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/squad')}
-            style={styles.backButton}
-          />
-          <View style={styles.headerCopy}>
-            <TerminalText tone="dim" variant="label">
-              PARTNER GYM
-            </TerminalText>
-            <TerminalText glow style={styles.headerTitle} tone="cyan" variant="title">
-              GYM COMPETITION
-            </TerminalText>
-          </View>
-        </View>
+        <OnboardingHeader
+          label="GYM CONTEST"
+          onBack={() => goBackOrReplace(router, '/squad')}
+          step="PARTNER GYM"
+        />
+        <BrandScreenHeader
+          description="Partner gym Contests and location-verified workouts will appear here when participating Partner gyms are ready."
+          eyebrow="PARTNER GYM"
+          title="GYM CONTEST"
+        />
 
         <HUDBorderBox style={styles.unavailableCard} tone="muted">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             PARTNER GYMS AREN&apos;T AVAILABLE IN {competitionRegion.label} YET
-          </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
-            Verified gym competitions and QR check-ins will appear here when
-            participating locations are ready.
           </TerminalText>
         </HUDBorderBox>
       </ScreenScrollView>
@@ -59,25 +51,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg
-  },
-  backButton: {
-    width: 96,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
-  headerCopy: {
-    flex: 1
-  },
-  headerTitle: {
-    marginTop: 2,
-    fontFamily: fontFamilies.display
+    backgroundColor: colors.transparent
   },
   unavailableCard: {
     gap: spacing.sm,

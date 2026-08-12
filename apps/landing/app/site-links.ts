@@ -1,26 +1,43 @@
+const configuredMemberAppOrigin =
+  process.env.NEXT_PUBLIC_MEMBER_APP_ORIGIN?.trim();
+const memberAppOrigin = (
+  configuredMemberAppOrigin || "https://app.gogymgo.com"
+).replace(/\/+$/, "");
+const configuredAdminDashboardOrigin =
+  process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_ORIGIN?.trim();
+const adminDashboardOrigin = (
+  configuredAdminDashboardOrigin ||
+  "https://gogymgo-admin-control.wilson-1212.chatgpt.site"
+).replace(/\/+$/, "");
+
 export const siteLinks = {
+  accountData: `${memberAppOrigin}/account-data`,
+  accountDeletion: "/account-deletion",
   accessibility: "/accessibility",
+  adminDashboard: adminDashboardOrigin,
   brandPartnerApplication: "/partners?interest=brand#partner-form",
+  brands: "/brands",
   contact: "/contact",
-  demo: "https://app.gogymgo.com/demo",
+  demo: `${memberAppOrigin}/demo`,
   faq: "/faq",
+  forgotPassword: `${memberAppOrigin}/forgot-password`,
   gymPartnerApplication: "/partners?interest=gym#partner-form",
   gymGoers: "/gym-goers",
   home: "/",
-  memberApp: "https://app.gogymgo.com/",
-  officialRules: "https://app.gogymgo.com/official-rules",
+  memberApp: `${memberAppOrigin}/join`,
+  officialRules: `${memberAppOrigin}/official-rules`,
   partnerApplication: "/partners#partner-form",
   partners: "/partners",
-  privacy: "https://app.gogymgo.com/privacy-policy",
+  privacy: `${memberAppOrigin}/privacy-policy`,
   publicSiteHelp: "/contact#public-site-help",
   regionalUpdates: "/gym-goers#gym-form",
-  terms: "https://app.gogymgo.com/terms-of-service",
+  terms: `${memberAppOrigin}/terms-of-service`,
 } as const;
 
 export const primaryNavigationItems = [
   {
-    href: "/#competition-scoring",
-    label: "HOW COMPETITION WORKS",
+    href: "/#how-it-works",
+    label: "HOW IT WORKS",
   },
   {
     currentPath: "/gym-goers",
@@ -28,9 +45,9 @@ export const primaryNavigationItems = [
     label: "GYM GOERS",
   },
   {
-    currentPath: "/partners",
-    href: siteLinks.partners,
-    label: "PARTNERS",
+    currentPath: "/brands",
+    href: siteLinks.brands,
+    label: "FITNESS BRANDS",
   },
   {
     currentPath: "/faq",

@@ -8,12 +8,15 @@ import { sql, type Transaction } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { Database, JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import { canDeleteCreatorWorkout } from './admin-deletion-policy';
 import { AdminAuthorizationService } from './admin-authorization.service';
 import {
+  type AdminDeletedEntityResponseDto,
   CreatorWorkoutStatusAction,
   type AdminEntityResponseDto,
   type CreateCreatorWorkoutDto,
   type CreatorWorkoutStatusActionDto,
+  type DeleteVersionedAdminEntityDto,
   type UpdateCreatorWorkoutDto,
 } from './dto/admin-configuration.dto';
 
@@ -21,6 +24,11 @@ interface AdminWorkoutJson extends JsonObject {
   id: string;
   status: 'draft' | 'published';
   version: number;
+}
+
+interface DeletedWorkoutJson extends JsonObject {
+  id: string;
+  status: 'deleted';
 }
 
 @Injectable()
@@ -110,6 +118,7 @@ export class AdminWorkoutConfigurationService {
           .selectFrom('creator_workouts')
           .selectAll()
           .where('id', '=', workoutId)
+          .where('deleted_at', 'is', null)
           .forUpdate()
           .executeTakeFirst();
         if (!current) {
@@ -190,6 +199,7 @@ export class AdminWorkoutConfigurationService {
           .selectFrom('creator_workouts')
           .selectAll()
           .where('id', '=', workoutId)
+          .where('deleted_at', 'is', null)
           .forUpdate()
           .executeTakeFirst();
         if (!current) {
@@ -250,6 +260,81 @@ export class AdminWorkoutConfigurationService {
           requestId: idempotencyKey,
         });
         return this.response(workout);
+      },
+    );
+  }
+
+  delete(
+    principal: AuthenticatedPrincipal,
+    workoutId: string,
+    idempotencyKey: string,
+    input: DeleteVersionedAdminEntityDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.idempotency.execute<DeletedWorkoutJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { ...input, workoutId },
+        scope: `admin-creator-workouts:${workoutId}:delete`,
+      },
+      async (transaction) => {
+        const admin = await this.authorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const workout = await transaction
+          .selectFrom('creator_workouts')
+          .selectAll()
+          .where('id', '=', workoutId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!workout) {
+          throw new NotFoundException({
+            code: 'CREATOR_WORKOUT_NOT_FOUND',
+            message: 'The creator workout was not found.',
+          });
+        }
+        this.assertVersion(workout.version, input.expectedVersion);
+        if (!canDeleteCreatorWorkout(workout.published)) {
+          throw new ConflictException({
+            code: 'CREATOR_WORKOUT_DELETE_REQUIRES_UNPUBLISHED',
+            message: 'Unpublish the workout before deleting it.',
+          });
+        }
+
+        const deletedAt = new Date();
+        const deleted = await transaction
+          .updateTable('creator_workouts')
+          .set({
+            deleted_at: deletedAt,
+            updated_at: deletedAt,
+            version: sql<number>`version + 1`,
+          })
+          .where('id', '=', workoutId)
+          .where('version', '=', input.expectedVersion)
+          .where('deleted_at', 'is', null)
+          .returning('id')
+          .executeTakeFirst();
+        if (!deleted) throw this.versionConflict();
+        await this.authorization.audit(transaction, {
+          action: 'creator_workout.deleted',
+          actorUserId: admin.id,
+          entityId: workoutId,
+          entityType: 'creator_workouts',
+          nextState: {
+            deletedAt: deletedAt.toISOString(),
+            status: 'deleted',
+          },
+          previousState: {
+            published: workout.published,
+            title: workout.title,
+            version: workout.version,
+          },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return { id: deleted.id, status: 'deleted' };
       },
     );
   }

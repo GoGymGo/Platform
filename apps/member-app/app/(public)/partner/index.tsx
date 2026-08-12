@@ -2,13 +2,14 @@ import { type Href, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
-  CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   ScreenScrollView,
   TerminalText
 } from '@/components/cyber';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
+import { spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 const partnerOptions = [
@@ -18,7 +19,7 @@ const partnerOptions = [
     title: 'APPLY AS A SPONSOR'
   },
   {
-    body: 'Request verified entry and exit QR codes for your gym location.',
+    body: 'Request a Contest QR that lets players select and location-verify your gym.',
     route: '/gym/register' as Href,
     title: 'REGISTER A PARTNER GYM'
   }
@@ -31,27 +32,19 @@ export default function PartnerScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={brandScreenStyles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/profile')}
-            style={styles.backButton}
-          />
-          <TerminalText glow tone="cyan" variant="label">
-            PARTNER PORTAL
-          </TerminalText>
-        </View>
-
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          PARTNER WITH GOGYMGO
-        </TerminalText>
-        <TerminalText style={styles.intro} tone="muted" uppercase={false} variant="body">
-          Apply to sponsor a regional campaign or register a verified partner
-          gym location.
-        </TerminalText>
+        <OnboardingHeader
+          label="PARTNER PORTAL"
+          onBack={() => goBackOrReplace(router, '/profile')}
+          step="APPLICATIONS"
+        />
+        <BrandScreenHeader
+          description="Apply to sponsor a regional campaign or register a verified Partner gym location."
+          eyebrow="SPONSORS + GYMS"
+          title="PARTNER WITH GOGYMGO"
+        />
 
         <View style={styles.optionList}>
           {partnerOptions.map((option) => (
@@ -63,7 +56,7 @@ export default function PartnerScreen() {
               >
                 <HUDBorderBox style={styles.optionCard} tone="cyan">
                   <View style={styles.optionCopy}>
-                    <TerminalText glow tone="cyan" variant="label">
+                    <TerminalText tone="cyan" variant="label">
                       {option.title}
                     </TerminalText>
                     <TerminalText tone="muted" uppercase={false} variant="body">
@@ -71,7 +64,7 @@ export default function PartnerScreen() {
                     </TerminalText>
                   </View>
                   <TerminalText tone="cyan" variant="button">
-                    {'->'}
+                    {'→'}
                   </TerminalText>
                 </HUDBorderBox>
               </Pressable>
@@ -83,29 +76,6 @@ export default function PartnerScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md
-  },
-  backButton: {
-    width: 104
-  },
-  title: {
-    marginTop: spacing.xxl,
-    fontFamily: fontFamilies.display
-  },
-  intro: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.body
-  },
   optionList: {
     gap: spacing.md,
     marginTop: spacing.xl

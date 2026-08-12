@@ -16,6 +16,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class GymScanRequestDto {
@@ -23,10 +24,33 @@ export class GymScanRequestDto {
   @IsUUID()
   eventId!: string;
 
-  @ApiProperty({ minLength: 32, maxLength: 256, type: String })
+  @ApiPropertyOptional({
+    description:
+      'Initial Partner gym QR credential. Required only while selecting the gym for enrollment.',
+    minLength: 32,
+    maxLength: 256,
+    type: String,
+  })
+  @ValidateIf(
+    (request: GymScanRequestDto) =>
+      request.credential !== undefined || !request.competitionId,
+  )
   @IsString()
   @Length(32, 256)
-  credential!: string;
+  credential?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Enrolled competition used to resolve the account-selected Partner gym for a fresh location-only workout check.',
+    format: 'uuid',
+    type: String,
+  })
+  @ValidateIf(
+    (request: GymScanRequestDto) =>
+      request.competitionId !== undefined || !request.credential,
+  )
+  @IsUUID()
+  competitionId?: string;
 
   @ApiProperty({ type: Number })
   @Type(() => Number)
@@ -38,11 +62,11 @@ export class GymScanRequestDto {
   @IsLongitude()
   longitude!: number;
 
-  @ApiProperty({ maximum: 1_000, minimum: 0.1, type: Number })
+  @ApiProperty({ maximum: 100_000, minimum: 0.1, type: Number })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0.1)
-  @Max(1_000)
+  @Max(100_000)
   accuracyMeters!: number;
 }
 
@@ -91,10 +115,11 @@ export class CreateGymLocationDto {
   @Length(2, 160)
   name!: string;
 
-  @ApiProperty({ maxLength: 500, minLength: 5, type: String })
+  @ApiPropertyOptional({ maxLength: 500, type: String })
+  @IsOptional()
   @IsString()
-  @Length(5, 500)
-  address!: string;
+  @MaxLength(500)
+  address?: string;
 
   @ApiProperty({ type: Number })
   @Type(() => Number)
@@ -156,11 +181,22 @@ export class GymLocationResponseDto {
   @ApiProperty({ nullable: true, type: Number })
   activeCredentialVersion!: number | null;
 
+  @ApiProperty({ isArray: true, type: () => ActiveGymQrCredentialDto })
+  activeQrCredentials!: ActiveGymQrCredentialDto[];
+
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 
   @ApiProperty({ format: 'date-time', type: String })
   updatedAt!: string;
+}
+
+export class ActiveGymQrCredentialDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ type: Number })
+  credentialVersion!: number;
 }
 
 export class GymQrCredentialResponseDto {
@@ -169,6 +205,12 @@ export class GymQrCredentialResponseDto {
 
   @ApiProperty({ format: 'uuid', type: String })
   gymLocationId!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ type: String })
+  competitionName!: string;
 
   @ApiProperty({ type: Number })
   credentialVersion!: number;

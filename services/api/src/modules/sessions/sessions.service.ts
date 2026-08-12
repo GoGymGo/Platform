@@ -18,7 +18,11 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { parseCompetitionRules } from '../competitions/competition-rules';
 import { LedgerService } from '../ledger/ledger.service';
-import { VerificationConsentsService } from '../legal/verification-consents.service';
+import {
+  canStartGymSession,
+  competitionCompletionDeadline,
+  gymScanPolicy,
+} from '../gyms/gym-scan-policy';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
   AppendSessionEventDto,
@@ -86,7 +90,6 @@ export class SessionsService {
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
     private readonly profiles: ProfilesService,
-    private readonly verificationConsents: VerificationConsentsService,
   ) {}
 
   async create(
@@ -141,19 +144,18 @@ export class SessionsService {
               'An active enrollment is required to start a competition session.',
           });
         }
-        await this.verificationConsents.assertActiveDevicePresenceConsent(
-          transaction,
-          user.id,
-        );
         if (
           enrollment.competition_status !== 'active' ||
           now < enrollment.starts_at ||
-          now > enrollment.ends_at
+          !canStartGymSession({
+            competitionEndsAt: enrollment.ends_at,
+            now,
+          })
         ) {
           throw new ConflictException({
             code: 'COMPETITION_NOT_ACTIVE',
             message:
-              'The competition is not currently accepting workout sessions.',
+              'The competition is not currently accepting workout starts.',
           });
         }
 
@@ -171,6 +173,13 @@ export class SessionsService {
           });
         }
 
+        const expiresAt = new Date(
+          Math.min(
+            now.getTime() + gymScanPolicy.sessionExpiryMilliseconds,
+            competitionCompletionDeadline(enrollment.ends_at).getTime(),
+          ),
+        );
+
         const session = await transaction
           .insertInto('workout_sessions')
           .values({
@@ -181,6 +190,7 @@ export class SessionsService {
             created_at: now,
             eligible_date: dateKeyInTimezone(now, enrollment.timezone),
             enrollment_id: enrollment.enrollment_id,
+            expires_at: expiresAt,
             policy_version: enrollment.rules_version,
             started_at: now,
             status: 'active',
@@ -328,10 +338,12 @@ export class SessionsService {
             'session.competition_id',
           )
           .select([
+            'competition.ends_at',
             'competition.rules',
             'session.competition_id',
             'session.eligible_date',
             'session.id',
+            'session.expires_at',
             'session.policy_version',
             'session.started_at',
             'session.status',
@@ -353,6 +365,41 @@ export class SessionsService {
         }
 
         const completedAt = new Date();
+        const completionDeadline = competitionCompletionDeadline(
+          session.ends_at,
+        );
+        if (
+          completedAt >= completionDeadline ||
+          (session.expires_at !== null && completedAt >= session.expires_at)
+        ) {
+          await transaction
+            .updateTable('workout_sessions')
+            .set({
+              completed_at: completedAt,
+              status: 'cancelled',
+              updated_at: completedAt,
+              verification_summary: {
+                clientCompletedAt: request.clientCompletedAt ?? null,
+                eligibleForReview: false,
+                outcome: 'competition_completion_grace_expired',
+                violations: ['competition_completion_grace_expired'],
+              },
+            })
+            .where('id', '=', session.id)
+            .where('status', '=', 'active')
+            .executeTakeFirstOrThrow();
+          return {
+            completedAt: completedAt.toISOString(),
+            competitionId: session.competition_id,
+            eligibleDate: normalizeDateKey(session.eligible_date),
+            eligibleForReview: false,
+            id: session.id,
+            policyVersion: session.policy_version,
+            startedAt: session.started_at.toISOString(),
+            status: 'cancelled',
+            violations: ['competition_completion_grace_expired'],
+          };
+        }
         const events = await transaction
           .selectFrom('session_events')
           .select(['event_type', 'occurred_at'])

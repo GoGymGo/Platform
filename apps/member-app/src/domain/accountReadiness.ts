@@ -101,6 +101,12 @@ export type CompetitionEnrollment = {
 export type CreateCompetitionEnrollmentInput = {
   ageEligibilityAttested: true;
   goalDays: number;
+  gymPresence: {
+    accuracyMeters: number;
+    credential: string;
+    latitude: number;
+    longitude: number;
+  };
   legalReceiptBundleId: string;
   regionVerificationId: string;
   rulesAccepted: true;

@@ -1,6 +1,6 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenLoadingState,
@@ -18,10 +18,12 @@ import {
   useAccessibilityAnnouncement
 } from '@/components/reliability';
 import { StreakRewards, UserAlias } from '@/components/streakRewards';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import {
   useCompetitionEnrollmentCount,
   useCreatorWorkouts,
+  useMyLatestCompetitionResults,
   useMyRewardAwards,
   useMyStreaks,
   useWeeklyChallengeRequests
@@ -31,11 +33,20 @@ import {
   getAppResumeTarget
 } from '@/domain/appResume';
 import { getPublicInitials } from '@/domain/profile';
+import {
+  getGymVerificationHomeState,
+  isMobileWebGymVerificationDevice
+} from '@/domain/mobileGymVerification';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
+import {
+  getWinnersCirclePresentationKey,
+  shouldAutoPresentWinnersCircle
+} from '@/domain/winnersCircle';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { recordFlowMetric } from '@/services/flowMetrics';
+import { getLastSeenWinnersCircle } from '@/services/winnersCircle';
 import { useAuth } from '@/state/auth';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useProfile } from '@/state/profile';
@@ -59,6 +70,8 @@ function formatCampaignDate(dateKey: string) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { goalDays, registered, resume } = useLocalSearchParams<{
     goalDays?: string;
     registered?: string;
@@ -129,6 +142,16 @@ export default function HomeScreen() {
   );
   const rewardAwardsQuery = useMyRewardAwards();
   const { data: rewardAwards = [] } = rewardAwardsQuery;
+  const latestResultsQuery = useMyLatestCompetitionResults();
+  const latestCompetitionResults = latestResultsQuery.data ?? null;
+  const [seenResultsState, setSeenResultsState] = useState<{
+    key: string | null;
+    userId: string;
+  } | null>(null);
+  const lastSeenResultsKey =
+    user && seenResultsState?.userId === user.uid
+      ? seenResultsState.key
+      : undefined;
   const weeklyChallengeRequestsQuery = useWeeklyChallengeRequests(
     competition.competitionMonthKey,
     weeklyGoal,
@@ -139,6 +162,15 @@ export default function HomeScreen() {
   const currentEntrants = currentEntrantsData ?? null;
   const unclaimedReward = rewardAwards.find((award) => award.status === 'awarded');
   const featuredCreatorWorkout = creatorWorkouts[0] ?? null;
+  const completedContestWithoutReplacement = Boolean(
+    latestCompetitionResults && !currentCompetition
+  );
+  const resultsPresentationKey = latestCompetitionResults
+    ? getWinnersCirclePresentationKey(latestCompetitionResults)
+    : null;
+  const unseenCompetitionResults =
+    lastSeenResultsKey !== undefined &&
+    shouldAutoPresentWinnersCircle(resultsPresentationKey, lastSeenResultsKey);
   const minimumEntrants = currentCompetition?.minimumEntrants ?? null;
   const launchConfirmed =
     currentEntrants !== null &&
@@ -174,7 +206,29 @@ export default function HomeScreen() {
     activeSession: activeSession !== null,
     registrationReady
   });
-  const setupRequired = workoutEntryTarget === 'setup';
+  const activeWorkoutRoute =
+    activeSession?.verificationMethod === 'heartRate' && heartRateTelemetryAvailable
+    ? '/workout/active'
+    : '/qr-scanner';
+  const setupRequired =
+    workoutEntryTarget === 'setup' && !completedContestWithoutReplacement;
+  const gymVerificationHome = getGymVerificationHomeState({
+    mobileGymVerificationAvailable,
+    resume,
+    setupChecking: registrationChecking,
+    setupError: registrationError,
+    setupRequired
+  });
+  const desktopSetupChecking = gymVerificationHome.desktopSetupChecking;
+  const desktopSetupError = gymVerificationHome.desktopSetupError;
+  const desktopSetupPending = gymVerificationHome.desktopSetupPending;
+  const effectiveSetupRequired = gymVerificationHome.setupRequired;
+  const showGoalProgress =
+    !completedContestWithoutReplacement &&
+    !effectiveSetupRequired &&
+    !desktopSetupChecking &&
+    !desktopSetupError &&
+    !desktopSetupPending;
   const registeredGoal = Number(goalDays);
   const successGoal = Number.isInteger(registeredGoal) && registeredGoal > 0
     ? registeredGoal
@@ -189,26 +243,37 @@ export default function HomeScreen() {
     setupStep === 'region'
       ? 'VERIFY YOUR REGION'
       : setupStep === 'agreements'
-        ? 'REVIEW + CONTINUE'
+        ? 'REVIEW AGREEMENTS'
         : 'CHOOSE YOUR WEEKLY GOAL';
-  const resumeRequested = resume === '1';
+  const resumeRequested = gymVerificationHome.resumeRequested;
   const pendingChallengeInvite = (weeklyChallengeRequestsQuery.data ?? [])
     .some(({ direction }) => direction === 'incoming');
   const immediateResumeTarget = getAppResumeTarget({
-    activeWorkout: activeSession !== null,
+    activeWorkout: mobileGymVerificationAvailable && activeSession !== null,
+    activeWorkoutRoute,
     pendingChallengeInvite: false,
-    setupRoute: setupRoute ?? null,
+    setupRoute: mobileGymVerificationAvailable ? setupRoute ?? null : null,
+    unseenCompetitionResults,
     unclaimedReward: false
   });
+  const urgentResumeTarget =
+    mobileGymVerificationAvailable && activeSession !== null
+      ? immediateResumeTarget
+      : null;
+  const resultsDecisionLoading =
+    latestResultsQuery.isLoading ||
+    (latestCompetitionResults !== null && lastSeenResultsKey === undefined);
   const secondaryResumeLoading =
-    !immediateResumeTarget &&
+    !urgentResumeTarget &&
     (
+      resultsDecisionLoading ||
       weeklyChallengeRequestsQuery.isLoading ||
       rewardAwardsQuery.isLoading
     );
   const secondaryResumeError =
-    !immediateResumeTarget &&
+    !urgentResumeTarget &&
     (
+      latestResultsQuery.isError ||
       weeklyChallengeRequestsQuery.isError ||
       rewardAwardsQuery.isError
     );
@@ -216,8 +281,8 @@ export default function HomeScreen() {
     error: resumeError,
     loading: resumeLoading
   } = getAppResumeRequestStatus({
-    hasImmediateTarget: immediateResumeTarget !== null,
-    registrationError,
+    hasImmediateTarget: urgentResumeTarget !== null,
+    registrationError: registrationError || latestResultsQuery.isError,
     registrationLoading: registrationChecking,
     secondaryError: secondaryResumeError,
     secondaryLoading: secondaryResumeLoading
@@ -228,6 +293,21 @@ export default function HomeScreen() {
       ? `Weekly Goal set to ${successGoal} ${successGoal === 1 ? 'day' : 'days'}.`
       : null
   );
+
+  useEffect(() => {
+    let mounted = true;
+    if (!user) return;
+    void getLastSeenWinnersCircle(user.uid)
+      .then((value) => {
+        if (mounted) setSeenResultsState({ key: value, userId: user.uid });
+      })
+      .catch(() => {
+        if (mounted) setSeenResultsState({ key: null, userId: user.uid });
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (registered !== '1' || goalMetricRecordedRef.current) {
@@ -252,9 +332,14 @@ export default function HomeScreen() {
     }
 
     const target = getAppResumeTarget({
-      activeWorkout: activeSession !== null,
+      activeWorkout: mobileGymVerificationAvailable && activeSession !== null,
+      activeWorkoutRoute,
       pendingChallengeInvite,
-      setupRoute: setupRoute ?? null,
+      setupRoute:
+        mobileGymVerificationAvailable && !completedContestWithoutReplacement
+          ? setupRoute ?? null
+          : null,
+      unseenCompetitionResults,
       unclaimedReward: Boolean(unclaimedReward)
     });
     resumeHandledRef.current = true;
@@ -265,12 +350,16 @@ export default function HomeScreen() {
     router.replace((target?.route ?? '/home') as Href);
   }, [
     activeSession,
+    activeWorkoutRoute,
+    completedContestWithoutReplacement,
+    mobileGymVerificationAvailable,
     pendingChallengeInvite,
     resumeError,
     resumeLoading,
     resumeRequested,
     router,
     setupRoute,
+    unseenCompetitionResults,
     unclaimedReward,
     user?.uid
   ]);
@@ -281,6 +370,7 @@ export default function HomeScreen() {
     try {
       await Promise.all([
         retryRegistration(),
+        latestResultsQuery.refetch(),
         weeklyChallengeRequestsQuery.refetch(),
         rewardAwardsQuery.refetch()
       ]);
@@ -292,14 +382,15 @@ export default function HomeScreen() {
   if (
     !profileReady ||
     !progressReady ||
-    registrationChecking ||
-    !verificationPreferenceReady
+    latestResultsQuery.isLoading ||
+    (mobileGymVerificationAvailable && registrationChecking) ||
+    (mobileGymVerificationAvailable && !verificationPreferenceReady)
   ) {
-    return <ScreenLoadingState body="Checking your profile and competition registration." />;
+    return <ScreenLoadingState body="Checking your Contest." />;
   }
 
   if (resumeRequested && resumeLoading) {
-    return <ScreenLoadingState body="Finding the next unfinished task." />;
+    return <ScreenLoadingState body="Finding your next step." />;
   }
 
   return (
@@ -312,18 +403,23 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <TerminalText glow tone="cyan" variant="label">
-              {setupRequired
+            <TerminalText tone="cyan" variant="label">
+              {effectiveSetupRequired
                 ? 'SETUP INCOMPLETE'
+                : desktopSetupChecking
+                  ? 'ACCOUNT READY // SYNCING CONTEST STATUS'
+                : desktopSetupError
+                  ? 'ACCOUNT READY // CONTEST STATUS UNAVAILABLE'
+                : desktopSetupPending
+                  ? 'ACCOUNT READY // MOBILE CONTEST SETUP PENDING'
                 : 'ACCOUNT READY // ' + competitionRegion}
             </TerminalText>
             <UserAlias
               accessibilityRole="text"
               alias={publicName}
-              glow
               streaks={streakSummary?.streaks}
               textStyle={styles.username}
-              tone="cyan"
+              tone="text"
               variant="title"
             />
           </View>
@@ -331,9 +427,9 @@ export default function HomeScreen() {
         </View>
 
         {registered === '1' ? (
-          <HUDBorderBox glow style={styles.registrationSuccess} tone="green">
+          <HUDBorderBox style={styles.registrationSuccess} tone="green">
             <View style={styles.registrationSuccessCopy}>
-              <TerminalText glow tone="green" variant="label">
+              <TerminalText tone="green" variant="label">
                 WEEKLY GOAL SET // {successGoal} {successGoal === 1 ? 'DAY' : 'DAYS'}
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="body">
@@ -350,7 +446,7 @@ export default function HomeScreen() {
 
         {resumeRequested && resumeError ? (
           <RecoverableError
-            body="GoGymGo could not finish checking your setup, invitations and rewards. Retry the check, or continue to Home without losing any data."
+            body="We couldn&apos;t check your Contest. Try again or continue to Home."
             continueLabel="Continue to Home"
             onContinue={() => {
               resumeHandledRef.current = true;
@@ -364,48 +460,84 @@ export default function HomeScreen() {
         ) : null}
 
         <HUDBorderBox
-          glow
           style={styles.commitmentCard}
-          tone={setupRequired ? 'amber' : 'cyan'}
+          tone={
+            completedContestWithoutReplacement
+              ? latestCompetitionResults?.resultsStatus === 'settled'
+                ? 'pink'
+                : 'amber'
+              : effectiveSetupRequired
+                ? 'amber'
+                : 'cyan'
+          }
         >
           <View style={styles.commitmentHeader}>
             <View style={styles.commitmentTitleBlock}>
               <TerminalText
-                glow
-                tone={setupRequired ? 'amber' : 'cyan'}
+                tone={effectiveSetupRequired ? 'amber' : 'cyan'}
                 variant="label"
               >
-                {setupRequired
+                {completedContestWithoutReplacement
+                  ? latestCompetitionResults?.resultsStatus === 'settled'
+                    ? 'RESULTS PUBLISHED'
+                    : 'FINALIZING RESULTS'
+                  : effectiveSetupRequired
                   ? setupEyebrow
+                  : desktopSetupChecking
+                    ? 'SYNCING CONTEST STATUS'
+                  : desktopSetupError
+                    ? 'CONTEST STATUS UNAVAILABLE'
+                  : desktopSetupPending
+                    ? 'CONTINUE ON MOBILE'
                   : isBonusDayPhase
                   ? 'BONUS DAYS 29-31'
                   : competitionNotStarted
-                    ? 'UPCOMING COMPETITION'
+                    ? 'UPCOMING CONTEST'
                     : `WEEK ${currentWeekIndex ?? 1} // ${completedSessions > 0 ? 'IN MOTION' : 'READY'}`}
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
-                {setupRequired
+                {completedContestWithoutReplacement
+                  ? 'YOUR CONTEST IS COMPLETE'
+                  : effectiveSetupRequired
                   ? setupTitle
+                  : desktopSetupChecking
+                    ? 'LOADING YOUR CONTEST'
+                  : desktopSetupError
+                    ? 'YOUR ACCOUNT IS STILL AVAILABLE'
+                  : desktopSetupPending
+                    ? 'FINISH CONTEST SETUP ON A PHONE OR TABLET'
                   : isBonusDayPhase
                   ? `ADD ${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} PER DAY`
                   : competitionNotStarted
                     ? 'YOUR WEEKLY GOAL IS SET'
                     : verifiedSessionCount > 0
                       ? 'KEEP BUILDING YOUR WEEK'
-                      : 'START YOUR FIRST SESSION'}
+                      : 'START YOUR FIRST WORKOUT'}
               </TerminalText>
               <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
-                {setupRequired
+                {completedContestWithoutReplacement
+                  ? latestCompetitionResults?.resultsStatus === 'settled'
+                    ? 'Your placement and any prize-draw award are ready in the Winners Circle.'
+                    : 'Your result is saved. GoGymGo is completing the audited draw before publishing the Winners Circle.'
+                  : effectiveSetupRequired
                   ? setupMessage
+                  : desktopSetupChecking
+                    ? 'Loading your Contest.'
+                  : desktopSetupError
+                    ? 'Contest status could not refresh. Other screens are still available.'
+                  : desktopSetupPending
+                    ? 'Finish Contest setup on your phone or tablet.'
+                  : !mobileGymVerificationAvailable
+                    ? 'Track your Weekly Goal and entries here. Verify workouts on your phone.'
                   : isBonusDayPhase
-                  ? `Verify one workout on each remaining day to add ${weeklyGoal} prize draw ${weeklyGoal === 1 ? 'entry' : 'entries'} per day.`
+                  ? `Verify one workout on each remaining day to add ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'} per day.`
                   : competitionNotStarted
-                    ? 'Scan the approved gym QR when you arrive and again after 30 minutes.'
+                    ? 'Use a fresh gym location check when you start and finish each workout.'
                     : remainingSessions > 0
-                      ? `Complete ${remainingSessions} more verified workout ${remainingSessions === 1 ? 'day' : 'days'} to hit this week's goal. Only one workout per calendar day counts.`
-                      : 'Weekly goal hit. Check your Weekly Challenge to see whether a 2x or 3x bonus is active.'}
+                      ? `Complete ${remainingSessions} more workout ${remainingSessions === 1 ? 'day' : 'days'} this week. One per day counts.`
+                      : 'Weekly Goal hit. Check your Weekly Challenge bonus.'}
               </TerminalText>
-              {!setupRequired && competitionNotStarted ? (
+              {showGoalProgress && competitionNotStarted ? (
                 <TerminalText glow style={styles.scoringStartWarning} tone="amber" variant="body">
                   SCORING STARTS {competitionStartMonth.toUpperCase()} 1ST 12:00AM.
                 </TerminalText>
@@ -413,13 +545,23 @@ export default function HomeScreen() {
             </View>
             <View style={styles.multiplierBlock}>
               <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
-                {setupRequired
+                {completedContestWithoutReplacement
+                  ? 'DONE'
+                  : effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
                   ? '--'
                   : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
               </TerminalText>
               <TerminalText tone="muted" variant="micro">
-                {setupRequired
-                  ? 'NEXT STEP'
+                {completedContestWithoutReplacement
+                  ? latestCompetitionResults?.resultsStatus === 'settled'
+                    ? 'RESULTS READY'
+                    : 'UNDER REVIEW'
+                  : effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
+                  ? desktopSetupChecking
+                    ? 'SYNCING'
+                    : desktopSetupError
+                      ? 'CHECK LATER'
+                      : 'NEXT STEP'
                   : competitionNotStarted
                   ? 'DAY GOAL'
                    : liveMultiplier === 3
@@ -431,13 +573,13 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {!setupRequired ? (
+          {showGoalProgress ? (
             <View
               accessible
               accessibilityLabel={
                 isBonusDayPhase
-                  ? `Weekly goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Weekly scoring is complete.`
-                  : `Weekly goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Achieved: ${completedSessions} of ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} this week.`
+                  ? `Weekly Goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Weekly scoring is complete.`
+                  : `Weekly Goal objective: ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} per week. Achieved: ${completedSessions} of ${weeklyGoal} ${weeklyGoal === 1 ? 'day' : 'days'} this week.`
               }
               style={styles.goalProgressSummary}
             >
@@ -466,7 +608,7 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
-          {!setupRequired ? <View style={styles.weekDots}>
+          {showGoalProgress ? <View style={styles.weekDots}>
             {Array.from({ length: weeklyGoal }, (_, index) => (
               <View
                 key={index}
@@ -478,6 +620,22 @@ export default function HomeScreen() {
             ))}
           </View> : null}
 
+          {completedContestWithoutReplacement ? (
+            <CyberButtonPrimary
+              label={
+                latestCompetitionResults?.resultsStatus === 'settled'
+                  ? 'VIEW WINNERS CIRCLE'
+                  : 'VIEW RESULTS STATUS'
+              }
+              onPress={() => router.push('/winners-circle')}
+              tone={
+                latestCompetitionResults?.resultsStatus === 'settled'
+                  ? 'pink'
+                  : 'cyan'
+              }
+            />
+          ) : gymVerificationHome.showWorkoutActions ? (
+          <>
           <CyberButtonPrimary
             disabled={!setupRequired && workoutUnavailable && !activeSession}
             label={setupRequired
@@ -485,7 +643,7 @@ export default function HomeScreen() {
               : activeSession
                ? 'Return to workout'
                : workoutUnavailable
-                 ? `VERIFIED WORKOUTS START ${competitionStartMonth.toUpperCase()} 1`
+                 ? 'VERIFIED WORKOUTS NOT YET OPEN'
                  : 'Start workout'}
             onPress={() => {
               if (workoutEntryTarget === 'setup' && setupRoute) {
@@ -494,29 +652,31 @@ export default function HomeScreen() {
               }
               router.push(
                 workoutEntryTarget === 'active-session'
-                  ? '/workout/active'
+                  ? activeWorkoutRoute
                   : workoutStartRoute
               );
             }}
           />
           {setupRequired ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              Complete this step before starting a verified workout.
+              Complete this step before starting a Verified workout.
             </TerminalText>
           ) : workoutUnavailable ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              Verified competition workouts open when scoring begins on {competitionStartLabel}.
+              Verified contest workouts open when scoring begins on {competitionStartLabel}.
             </TerminalText>
           ) : null}
           {!activeSession && !setupRequired ? (
             <TerminalText style={styles.defaultMethod} tone="muted" uppercase={false} variant="caption">
               {verificationPreferenceSaved
                 ? `Pilot verification: ${verificationPreference.sourceLabel}.`
-                : 'Scan the approved gym QR to start a verified workout.'}
+                : 'Check your location at the selected Partner gym to start a Verified workout.'}
             </TerminalText>
           ) : null}
+          </>
+          ) : null}
 
-          {!setupRequired && competitionNotStarted ? (
+          {!effectiveSetupRequired && competitionNotStarted ? (
             <View style={styles.launchStatus}>
               <View style={styles.launchHeader}>
                 <TerminalText tone="dim" variant="micro">
@@ -538,7 +698,7 @@ export default function HomeScreen() {
               </View>
               <TerminalText tone={launchConfirmed ? 'green' : 'muted'} uppercase={false} variant="caption">
                 {launchConfirmed
-                  ? 'Competition launch confirmed.'
+                  ? 'Contest launch confirmed.'
                   : entrantsNeeded === null
                     ? 'The registration total could not be loaded. Check again later.'
                     : `${entrantsNeeded} more ${entrantsNeeded === 1 ? 'player is' : 'players are'} needed to launch.`}
@@ -549,7 +709,7 @@ export default function HomeScreen() {
 
         {unclaimedReward ? (
           <Pressable
-            accessibilityHint="Open My Rewards to claim this award"
+            accessibilityHint="Open My Awards to claim this Award"
             accessibilityRole="button"
             onPress={() => router.push('/rewards/awards')}
             style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
@@ -557,10 +717,10 @@ export default function HomeScreen() {
             <HUDBorderBox glow style={styles.rewardAlert} tone="pink">
               <View style={styles.rewardAlertCopy}>
                 <TerminalText glow tone="pink" variant="label">
-                  REWARD READY // {unclaimedReward.title}
+                  AWARD READY // {unclaimedReward.title}
                 </TerminalText>
                 <TerminalText tone="text" uppercase={false} variant="body">
-                  Claim it in My Rewards. No payment setup is required.
+                  Open My Awards to claim it.
                 </TerminalText>
               </View>
               <TerminalText glow tone="pink" variant="button">
@@ -593,10 +753,10 @@ export default function HomeScreen() {
                     QUICK REFERENCE
                   </TerminalText>
                   <TerminalText tone="text" uppercase={false} variant="body">
-                    How the competition works
+                    How the Contest works
                   </TerminalText>
                   <TerminalText tone="muted" uppercase={false} variant="caption">
-                    Goal, verified workouts, entries, rankings and rewards.
+                    Goals, workouts, entries, rankings and Rewards.
                   </TerminalText>
                 </View>
                 <TerminalText tone="cyan" variant="button">
@@ -695,9 +855,9 @@ export default function HomeScreen() {
             <TerminalText style={styles.oddsNote} tone="muted" uppercase={false} variant="body">
               {prizeDrawEligible
                 ? competitionNotStarted
-                  ? 'Your free prize draw entry is secured now. Verified workouts begin earning competition credit when scoring opens.'
-                  : `Your free prize draw entry is secured. Verified workout days build weekly credit; each Bonus Day 29-31 adds your ${weeklyGoal}-entry goal value before a Perfect Month 10x.`
-                : 'Your free prize draw entry is secured and will carry into the next eligible regional draw.'}
+                  ? 'Your free Prize Draw entry is secured. Workouts count when scoring opens.'
+                  : `Your free entry is secured. Bonus Days add ${weeklyGoal} ${weeklyGoal === 1 ? 'entry' : 'entries'}; a Perfect Month earns 10x.`
+                : 'Your free entry will carry into the next eligible regional draw.'}
             </TerminalText>
 
             {featuredCreatorWorkout ? <Pressable
@@ -748,13 +908,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    paddingLeft: 14,
+    paddingVertical: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   headerCopy: {
     flex: 1,

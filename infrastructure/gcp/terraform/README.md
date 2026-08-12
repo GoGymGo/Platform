@@ -49,9 +49,10 @@ Before the first workload deployment:
 
 1. Create a least-privilege PostgreSQL login outside Terraform and grant it only the application database privileges required by migrations/runtime.
 2. Build `DATABASE_URL` with the Cloud SQL private IP from `terraform output cloud_sql_private_ip`, require TLS, and add it as the first version of the output secret ID `DATABASE_URL`.
-3. Add a random 32-byte base64 value to `REWARD_CODE_ENCRYPTION_KEY`; mount it only into the API workload.
-4. Add at least 32 random characters to the pseudonymization-key secret before enabling privacy operations, and add Expo credentials only when notifications are enabled.
-5. Grant the release identity Cloud Run developer, job executor, Artifact Registry reader, and service-account user permissions only on this environment's resources. The API and worker use separate runtime roles and receive different secret mounts; do not merge their service accounts for convenience.
+3. Store the approved owner identity in `GOGYMGO_OWNER_EMAIL`; mount it only into the API workload.
+4. Add a random 32-byte base64 value to `REWARD_CODE_ENCRYPTION_KEY`; mount it only into the API workload.
+5. Add at least 32 random characters to the pseudonymization-key secret before enabling privacy operations, and add Expo credentials only when notifications are enabled.
+6. Grant the release identity Cloud Run developer, job executor, Artifact Registry reader, and service-account user permissions only on this environment's resources. The API and worker use separate runtime roles and receive different secret mounts; do not merge their service accounts for convenience.
 
 Enabling `privacy_operations_enabled`, `profile_media_enabled`, or `push_notifications_enabled` adds the corresponding secret mounts or access grants. Keep each flag false until the feature's staging/UAT checklist passes. Profile media grants the API conditional object-create and object-read roles only under the `avatars/` prefix; cleanup remains worker-only.
 

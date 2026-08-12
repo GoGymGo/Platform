@@ -11,6 +11,7 @@ locals {
   runtime_secret_ids = {
     DATABASE_URL                 = "${local.name}-database-url"
     EXPO_PUSH_ACCESS_TOKEN       = "${local.name}-expo-push-access-token"
+    GOGYMGO_OWNER_EMAIL          = "${local.name}-owner-email"
     PRIVACY_PSEUDONYMIZATION_KEY = "${local.name}-privacy-pseudonymization-key"
     REWARD_CODE_ENCRYPTION_KEY   = "${local.name}-reward-code-encryption-key"
   }
@@ -60,6 +61,7 @@ locals {
 
   api_secret_environment = {
     DATABASE_URL               = local.runtime_secret_ids.DATABASE_URL
+    GOGYMGO_OWNER_EMAIL        = local.runtime_secret_ids.GOGYMGO_OWNER_EMAIL
     REWARD_CODE_ENCRYPTION_KEY = local.runtime_secret_ids.REWARD_CODE_ENCRYPTION_KEY
   }
 

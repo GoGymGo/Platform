@@ -12,6 +12,7 @@ import {
 import { CompetitionHubNav } from '@/components/competitionHubNav';
 import { CompactTextButton } from '@/components/onboarding';
 import { RecoverableError } from '@/components/reliability';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useRewardCatalog } from '@/data/appDataHooks';
 import {
@@ -33,6 +34,7 @@ export default function RewardMarketplaceScreen() {
   );
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const { competition } = useWorkoutProgress();
+  const hasVerifiedRegion = Boolean(regionVerification?.regionCode);
   const rewardsQuery = useRewardCatalog(
     regionVerification?.regionCode ?? '',
     competition.competitionMonthKey
@@ -51,23 +53,19 @@ export default function RewardMarketplaceScreen() {
         <CompetitionHubNav active="rewards" style={styles.hubNav} />
         <View style={styles.myRewardsRow}>
           <CompactTextButton
-            label="MY REWARDS ->"
+            label="MY AWARDS ->"
             onPress={() => router.push('/rewards/awards')}
             tone="pink"
           />
         </View>
 
         <View style={styles.intro}>
-          <TerminalText glow tone="pink" variant="label">
-            {competitionRegion.label}{' // '}{competition.competitionMonthKey}
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            REWARD MARKETPLACE
-          </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
-            Browse the physical prizes and coupon codes available in this region.
-            Prize Draw Entries set your chances; no payment account is required.
-          </TerminalText>
+          <BrandScreenHeader
+            accent="pink"
+            description="Browse the physical prizes and coupon codes available in this region. Prize Draw Entries set your chances; no payment account is required."
+            eyebrow={`${competitionRegion.label} // ${competition.competitionMonthKey}`}
+            title="REWARD MARKETPLACE"
+          />
           <CompactTextButton
             label={showWinnerDetails ? 'HIDE WINNER DETAILS' : 'HOW WINNERS ARE SELECTED'}
             onPress={() => setShowWinnerDetails((current) => !current)}
@@ -76,17 +74,27 @@ export default function RewardMarketplaceScreen() {
         </View>
 
         {showWinnerDetails ? <HUDBorderBox style={styles.entryNote} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
-            HOW WINNERS ARE MATCHED
+          <TerminalText tone="cyan" variant="label">
+            HOW REWARDS ARE AWARDED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
             At settlement, the verified draw selects one winner for each available
-            reward unit. Every selected player receives the exact item shown in their
-            reward award.
+            Reward unit. Every selected player receives the exact item shown in their
+            Award.
           </TerminalText>
         </HUDBorderBox> : null}
 
-        {rewardsQuery.isError ? (
+        {!hasVerifiedRegion ? (
+          <HUDBorderBox style={styles.emptyCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
+              REGION SETUP REQUIRED
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              Complete Contest setup on a phone or tablet to confirm your region and
+              load its available Brand Rewards.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : rewardsQuery.isError ? (
           <RecoverableError
             body="The regional reward catalog could not be loaded. Retry without leaving the marketplace."
             onRetry={() => {
@@ -102,11 +110,11 @@ export default function RewardMarketplaceScreen() {
           </TerminalText>
         ) : rewards.length === 0 ? (
           <HUDBorderBox style={styles.emptyCard} tone="muted">
-            <TerminalText glow tone="muted" variant="label">
+            <TerminalText tone="muted" variant="label">
               REWARDS PUBLISHING SOON
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Brand rewards for this regional contest have not been published yet.
+              Brand Rewards for this regional Contest have not been published yet.
             </TerminalText>
           </HUDBorderBox>
         ) : (
@@ -123,7 +131,7 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
   const inStock = reward.inventoryRemaining > 0;
   const tone = reward.rewardType === 'coupon' ? 'cyan' : 'pink';
   return (
-    <HUDBorderBox glow={inStock} style={styles.rewardCard} tone={inStock ? tone : 'muted'}>
+    <HUDBorderBox style={styles.rewardCard} tone={inStock ? tone : 'muted'}>
       {reward.imageUrl ? (
         <Image
           accessibilityLabel={`${reward.title} reward image`}
@@ -148,7 +156,7 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
             />
           </View>
           <View style={styles.visualCopy}>
-            <TerminalText glow tone={inStock ? tone : 'muted'} variant="label">
+            <TerminalText tone={inStock ? tone : 'muted'} variant="label">
               {reward.sponsorName}
             </TerminalText>
             <TerminalText tone="muted" variant="micro">
@@ -159,7 +167,7 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
       )}
       <View style={styles.rewardCopy}>
         <View style={styles.rewardMeta}>
-          <TerminalText glow tone={tone} variant="micro">
+          <TerminalText tone={tone} variant="micro">
             {reward.rewardType === 'coupon' ? 'COUPON CODE' : 'PHYSICAL PRIZE'}
           </TerminalText>
           <TerminalText tone={inStock ? 'green' : 'muted'} variant="micro">
@@ -194,7 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   hubNav: {
     marginBottom: spacing.sm
@@ -204,7 +212,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg
   },
   intro: { gap: spacing.sm, marginBottom: spacing.lg },
-  title: { fontFamily: fontFamilies.display },
   entryNote: { gap: spacing.sm, marginBottom: spacing.xl, padding: spacing.lg },
   grid: { gap: spacing.lg },
   rewardCard: { overflow: 'hidden', padding: 0, borderRadius: radii.lg },

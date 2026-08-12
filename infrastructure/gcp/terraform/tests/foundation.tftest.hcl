@@ -46,7 +46,7 @@ run "safe_foundation_defaults" {
   }
 
   assert {
-    condition     = length(google_secret_manager_secret_iam_member.api) == 2 && length(google_secret_manager_secret_iam_member.worker) == 1
+    condition     = length(google_secret_manager_secret_iam_member.api) == 3 && length(google_secret_manager_secret_iam_member.worker) == 1
     error_message = "Disabled features must not grant access to their unused secrets."
   }
 
@@ -72,7 +72,7 @@ run "feature_gates_mount_only_enabled_secrets" {
   }
 
   assert {
-    condition     = length(google_secret_manager_secret_iam_member.api) == 2 && length(google_secret_manager_secret_iam_member.worker) == 3
+    condition     = length(google_secret_manager_secret_iam_member.api) == 3 && length(google_secret_manager_secret_iam_member.worker) == 3
     error_message = "Enabled providers must mount only the secrets required by each runtime."
   }
 
@@ -82,7 +82,7 @@ run "feature_gates_mount_only_enabled_secrets" {
   }
 
   assert {
-    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && !contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
+    condition     = contains(keys(local.api_secret_environment), "GOGYMGO_OWNER_EMAIL") && !contains(keys(local.worker_secret_environment), "GOGYMGO_OWNER_EMAIL") && !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && !contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
     error_message = "API-only and worker-only secrets must remain isolated."
   }
 

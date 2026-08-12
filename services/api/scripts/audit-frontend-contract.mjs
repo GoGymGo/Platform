@@ -64,6 +64,7 @@ const requiredOperations = [
   ['get', '/v1/rewards/catalog'],
   ['get', '/v1/rewards/awards/me'],
   ['post', '/v1/rewards/awards/{awardId}/claim'],
+  ['get', '/v1/results/mine/latest'],
   ['get', '/v1/results/reward-winners'],
   ['get', '/v1/results/settled-competition'],
   ['post', '/v1/partner-applications/creators'],
@@ -118,6 +119,11 @@ const requiredResponseSchemas = [
   ['get', '/v1/rewards/catalog', 'RewardCatalogItemResponseDto'],
   ['get', '/v1/rewards/awards/me', 'RewardAwardResponseDto'],
   ['post', '/v1/rewards/awards/{awardId}/claim', 'ClaimRewardResponseDto'],
+  [
+    'get',
+    '/v1/results/mine/latest',
+    'ParticipantCompetitionResultsResponseDto',
+  ],
   ['get', '/v1/results/reward-winners', 'RewardWinnerResponseDto'],
   ['get', '/v1/results/settled-competition', 'SettledCompetitionResponseDto'],
   ['get', '/v1/creator-workouts', 'CreatorWorkoutResponseDto'],
@@ -145,6 +151,20 @@ const requiredSchemaProperties = {
     'sponsorName',
     'status',
     'title',
+  ],
+  ParticipantCompetitionResultsResponseDto: [
+    'categoryLeaderboards',
+    'competitionId',
+    'competitionName',
+    'endedAt',
+    'monthKey',
+    'participantGoalDays',
+    'regionCode',
+    'regionName',
+    'resultsStatus',
+    'rewardCount',
+    'rewardWinners',
+    'settledAt',
   ],
   CompetitionProgressResponseDto: [
     'categoryScore',
@@ -384,6 +404,7 @@ const nullableResponses = [
   ['get', '/v1/competitions/current'],
   ['get', '/v1/competitions/current/enrollment'],
   ['get', '/v1/leaderboards/current'],
+  ['get', '/v1/results/mine/latest'],
   ['get', '/v1/results/settled-competition'],
 ];
 

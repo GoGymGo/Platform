@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
 } from '@/components/cyber';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -29,19 +30,19 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '01',
     title: 'JOIN WHILE PUBLISHED',
-    body: 'Once a regional competition is published, eligible players may join before it starts or at any time while it is active. Enrollment closes when the competition ends, reaches its entrant cap, or is cancelled.',
+    body: 'Once a regional contest is published, eligible players may join before it starts or at any time while it is active. Enrollment closes when the contest ends, reaches its entrant cap, or is cancelled.',
     tone: 'cyan'
   },
   {
     index: '02',
     title: 'REGIONAL MINIMUM TO LAUNCH',
-    body: 'The regional competition launches only after its published minimum number of eligible players registers.',
+    body: 'The regional contest launches only after its published minimum number of eligible players registers.',
     tone: 'cyan'
   },
   {
     index: '03',
     title: 'PICK YOUR DAYS',
-    body: 'Choose 1 to 7 verified workout days per week for the month.',
+    body: 'Choose 1 to 7 Verified workout days per week for the month.',
     tone: 'cyan'
   },
   {
@@ -53,7 +54,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '05',
     title: 'VERIFY SESSIONS',
-    body: 'Scan the same approved gym QR on entry and exit. Both scans require live location within the gym geofence.',
+    body: 'The initial Contest QR selects your Partner gym. Each workout requires a fresh live-location check at start and finish within that gym\'s geofence, at least 30 minutes of server time, and completion no later than 15 minutes after the Contest ends.',
     tone: 'cyan'
   },
   {
@@ -65,7 +66,7 @@ const commitmentRules: readonly CommitmentRule[] = [
   {
     index: '07',
     title: 'MAKE-UP 3X BONUS',
-    body: 'If your Weekly Challenge partner misses, complete one extra verified workout before the scoring week closes to earn the 3x Weekly Challenge Bonus.',
+    body: 'If your Weekly Challenge partner misses, complete one extra Verified workout before the scoring week closes to earn the 3x Weekly Challenge Bonus.',
     tone: 'pink'
   },
   {
@@ -106,7 +107,7 @@ export default function CommitmentRulesModal() {
     rule.index === '02' && currentCompetition
       ? {
           ...rule,
-          body: `At least ${currentCompetition.minimumEntrants.toLocaleString()} eligible players across the region must register before this competition can launch.`,
+          body: `At least ${currentCompetition.minimumEntrants.toLocaleString()} eligible players across the region must register before this contest can launch.`,
           title: `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS TO LAUNCH`
         }
       : rule.index === '09'
@@ -117,21 +118,18 @@ export default function CommitmentRulesModal() {
       : rule.index === '10'
         ? {
             ...rule,
-            body: `This competition offers only the Bonus Days that exist after day 28. Each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}, equal to your selected Weekly Goal, before the Perfect Month 10x.`
+            body: `This contest offers only the Bonus Days that exist after day 28. Each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}, equal to your selected Weekly Goal, before the Perfect Month 10x.`
           }
         : rule
   );
 
   return (
     <ScreenContainer contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <TerminalText glow style={styles.headerLabel} tone="cyan" variant="label">
-          WEEKLY GOAL RULES
-        </TerminalText>
-        <CyberButtonOutline
-          label="CLOSE"
-          onPress={() => goBackOrReplace(router, '/commitment')}
-          style={styles.closeButton}
+      <View style={styles.nav}>
+        <OnboardingHeader
+          label="WEEKLY GOAL RULES"
+          onBack={() => goBackOrReplace(router, '/commitment')}
+          step="CONTEST"
         />
       </View>
 
@@ -140,30 +138,24 @@ export default function CommitmentRulesModal() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            LOCK YOUR{'\n'}MONTH CLEARLY.
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Choose any published Weekly Goal. If the competition has already
-            started, your eligible scoring begins when enrollment is confirmed.
-            Registration remains available until the competition ends, reaches
-            its entrant cap, or is cancelled.
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Choose any published Weekly Goal. Your eligible scoring begins when enrollment is confirmed."
+          eyebrow="WEEKLY GOAL"
+          title="CHOOSE YOUR GOAL CLEARLY"
+        />
 
         <HUDBorderBox style={styles.atGlanceCard} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             RULES AT A GLANCE
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            1. Choose a goal of 1-7 verified workout days per week.
+            1. Choose a Weekly Goal of 1-7 Verified workout days per week.
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            2. Only one verified workout per calendar day counts.
+            2. Only one Verified workout per calendar day counts.
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            3. Hit all four weekly goals to earn the Perfect Month bonus.
+            3. Hit all four Weekly Goals to earn the Perfect Month bonus.
           </TerminalText>
         </HUDBorderBox>
 
@@ -178,17 +170,17 @@ export default function CommitmentRulesModal() {
           ))}
         </View>
 
-        <HUDBorderBox glow style={styles.summaryCard} tone="cyan">
+        <HUDBorderBox style={styles.summaryCard} tone="cyan">
           <TerminalText style={styles.summaryLabel} tone="muted" variant="label">
             REGIONAL LAUNCH
           </TerminalText>
-          <TerminalText glow style={styles.summaryValue} tone="cyan" variant="title">
+          <TerminalText style={styles.summaryValue} tone="cyan" variant="title">
             {currentCompetition
               ? `${currentCompetition.minimumEntrants.toLocaleString()} PLAYERS REQUIRED`
               : 'REGIONAL MINIMUM PENDING'}
           </TerminalText>
           <TerminalText style={styles.summaryCopy} tone="muted" uppercase={false} variant="body">
-            Registration remains open until the published competition ends
+            Registration remains open until the published contest ends
             {currentCompetition?.entrantCap == null
               ? '.'
               : ` or until the ${currentCompetition.entrantCap.toLocaleString()}-player cap is reached.`}
@@ -196,7 +188,7 @@ export default function CommitmentRulesModal() {
         </HUDBorderBox>
 
         <CyberButtonPrimary
-          label="BACK TO WEEKLY GOAL ->"
+          label="BACK TO WEEKLY GOAL"
           onPress={() => goBackOrReplace(router, '/commitment')}
         />
       </ScreenScrollView>
@@ -220,18 +212,18 @@ function RuleRow({
       onPress={onToggle}
       style={({ pressed }) => pressed ? styles.rulePressed : null}
     >
-      <HUDBorderBox glow={expanded && rule.tone === 'pink'} style={styles.ruleRow} tone={rule.tone}>
+      <HUDBorderBox style={styles.ruleRow} tone={rule.tone}>
         <View style={styles.ruleIndexBox}>
-          <TerminalText glow tone={rule.tone} variant="label">
+          <TerminalText tone={rule.tone} variant="label">
             {rule.index}
           </TerminalText>
         </View>
         <View style={styles.ruleCopy}>
           <View style={styles.ruleTitleRow}>
-            <TerminalText glow style={styles.ruleTitle} tone={rule.tone} variant="label">
+            <TerminalText style={styles.ruleTitle} tone={rule.tone} variant="label">
               {rule.title}
             </TerminalText>
-            <TerminalText glow tone={rule.tone} variant="button">
+            <TerminalText tone={rule.tone} variant="button">
               {expanded ? '-' : '+'}
             </TerminalText>
           </View>
@@ -249,46 +241,13 @@ function RuleRow({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+  nav: {
     paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderCyanSubtle
+    paddingTop: spacing.sm
   },
-  headerLabel: {
-    flex: 1,
-    fontFamily: fontFamilies.terminal
-  },
-  closeButton: {
-    width: 104,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
-  content: {
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl
-  },
-  hero: {
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
-  },
+  content: brandScreenStyles.content,
   rulesList: {
     gap: spacing.md,
     marginBottom: spacing.lg

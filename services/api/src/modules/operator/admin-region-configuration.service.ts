@@ -2,25 +2,34 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import { canDeleteRegionPolicy } from './admin-deletion-policy';
 import {
   assertTimezone,
   parseMultiPolygon,
 } from './admin-configuration.validation';
 import { AdminAuthorizationService } from './admin-authorization.service';
 import type {
+  AdminDeletedEntityResponseDto,
   AdminRegionPolicyResponseDto,
   CreateRegionPolicyDto,
 } from './dto/admin-configuration.dto';
+import type { OperatorReasonDto } from './dto/operator.dto';
 
 interface RegionPolicyJson extends JsonObject {
   code: string;
   id: string;
   policyVersion: string;
+}
+
+interface DeletedRegionJson extends JsonObject {
+  id: string;
+  status: 'deleted';
 }
 
 @Injectable()
@@ -137,6 +146,99 @@ export class AdminRegionConfigurationService {
           id: policy.id,
           policyVersion: policy.policy_version,
         };
+      },
+    );
+  }
+
+  delete(
+    principal: AuthenticatedPrincipal,
+    regionPolicyId: string,
+    idempotencyKey: string,
+    input: OperatorReasonDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.idempotency.execute<DeletedRegionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { reason: input.reason, regionPolicyId },
+        scope: `admin-region-policies:${regionPolicyId}:delete`,
+      },
+      async (transaction) => {
+        const admin = await this.authorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const region = await transaction
+          .selectFrom('region_policies')
+          .selectAll()
+          .where('id', '=', regionPolicyId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!region) {
+          throw new NotFoundException({
+            code: 'REGION_POLICY_NOT_FOUND',
+            message: 'The region policy was not found.',
+          });
+        }
+        const now = new Date();
+        if (
+          !canDeleteRegionPolicy({
+            competitionEnabled: region.competition_enabled,
+            now,
+            validTo: region.valid_to,
+          })
+        ) {
+          throw new ConflictException({
+            code: 'REGION_POLICY_DELETE_REQUIRES_RETIRED',
+            message:
+              'Only disabled or expired regional policies can be deleted from the dashboard.',
+          });
+        }
+        const [competition, gym] = await Promise.all([
+          transaction
+            .selectFrom('competitions')
+            .select('id')
+            .where('region_policy_id', '=', regionPolicyId)
+            .where('deleted_at', 'is', null)
+            .executeTakeFirst(),
+          transaction
+            .selectFrom('gym_locations')
+            .select('id')
+            .where('region_policy_id', '=', regionPolicyId)
+            .where('deleted_at', 'is', null)
+            .executeTakeFirst(),
+        ]);
+        if (competition || gym) {
+          throw new ConflictException({
+            code: 'REGION_POLICY_DELETE_HAS_DEPENDENCIES',
+            message:
+              "Delete the region's retired contests and inactive gyms before deleting this policy.",
+          });
+        }
+
+        const deleted = await transaction
+          .updateTable('region_policies')
+          .set({ deleted_at: now })
+          .where('id', '=', regionPolicyId)
+          .where('deleted_at', 'is', null)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await this.authorization.audit(transaction, {
+          action: 'region_policy.deleted',
+          actorUserId: admin.id,
+          entityId: regionPolicyId,
+          entityType: 'region_policies',
+          nextState: { deletedAt: now.toISOString(), status: 'deleted' },
+          previousState: {
+            code: region.code,
+            competitionEnabled: region.competition_enabled,
+            policyVersion: region.policy_version,
+          },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return { id: deleted.id, status: 'deleted' };
       },
     );
   }

@@ -5,6 +5,7 @@ import { AppState, Platform, StyleSheet, View } from 'react-native';
 import { CyberButtonOutline, CyberButtonPrimary, HUDBorderBox, TerminalText } from '@/components/cyber';
 import { spacing } from '@/constants/theme';
 import { isGymScanCompletionReady } from '@/domain/gymScan';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import {
   cancelGymScanCompletionReminder,
   scheduleGymScanCompletionReminder
@@ -17,6 +18,17 @@ import {
 import { useAuth } from '@/state/auth';
 
 export function GymScanCompletionPrompt() {
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable) {
+    return null;
+  }
+
+  return <MobileGymScanCompletionPrompt />;
+}
+
+function MobileGymScanCompletionPrompt() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
@@ -74,7 +86,7 @@ export function GymScanCompletionPrompt() {
       return;
     }
     const previousTitle = document.title;
-    document.title = 'Time to scan again | GoGymGo';
+    document.title = 'Time to finish your workout | GoGymGo';
     return () => {
       document.title = previousTitle;
     };
@@ -97,12 +109,12 @@ export function GymScanCompletionPrompt() {
           30 MINUTES COMPLETE
         </TerminalText>
         <TerminalText tone="text" uppercase={false} variant="body">
-          Return to {activeSession.gymName ?? 'the same gym poster'} and scan again
-          to finish and verify your workout.
+          Return to {activeSession.gymName ?? 'your selected Partner gym'} and verify
+          your live location to finish the workout.
         </TerminalText>
         <View style={styles.actions}>
           <CyberButtonPrimary
-            label="SCAN TO FINISH ->"
+            label="VERIFY LOCATION TO FINISH ->"
             onPress={() => router.push('/qr-scanner')}
             style={styles.primaryAction}
           />

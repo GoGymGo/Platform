@@ -1,13 +1,26 @@
-import { Redirect, Slot } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
-import { useAppTour } from '@/state/appTour';
+import { colors } from '@/constants/theme';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 
-export default function RetiredWorkoutFlowRedirect() {
-  const { demoActive } = useAppTour();
+export default function WorkoutFlowLayout() {
+  const reduceMotion = useReducedMotionPreference();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
 
-  if (demoActive) {
-    return <Slot />;
+  if (!mobileGymVerificationAvailable) {
+    return <Redirect href="/home" />;
   }
 
-  return <Redirect href="/session" />;
+  return (
+    <Stack
+      screenOptions={{
+        animation: reduceMotion ? 'none' : 'slide_from_right',
+        contentStyle: { backgroundColor: colors.background },
+        headerShown: false
+      }}
+    />
+  );
 }

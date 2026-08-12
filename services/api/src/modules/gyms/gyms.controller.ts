@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -16,6 +17,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
@@ -44,7 +46,7 @@ import {
 } from './dto/gym.dto';
 import { GymsService } from './gyms.service';
 
-@ApiTags('gym scans')
+@ApiTags('gym location checks')
 @ApiBearerAuth('firebase')
 @Controller('gym-scans')
 export class GymScansController {
@@ -53,7 +55,8 @@ export class GymScansController {
   @Post()
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({
-    summary: 'Start, check, or complete a static-QR gym session',
+    summary:
+      'Start, check, or complete a Partner-gym location-verified session',
   })
   @ApiOkResponse({ type: GymScanResultDto })
   scan(
@@ -146,17 +149,17 @@ export class GymOperatorController {
     );
   }
 
-  @Post('gym-locations/:gymId/qr-credentials')
+  @Delete('gym-locations/:gymId')
   @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOperation({ summary: 'Issue a printable static QR poster' })
-  @ApiCreatedResponse({ type: GymQrCredentialResponseDto })
-  issueCredential(
+  @ApiOperation({ summary: 'Delete an inactive gym from the admin dashboard' })
+  @ApiOkResponse({ type: Object })
+  deleteGym(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: OperatorReasonDto,
-  ): Promise<GymQrCredentialResponseDto> {
-    return this.gyms.issueCredential(
+  ): Promise<{ id: string; status: 'deleted' }> {
+    return this.gyms.deleteGymLocation(
       principal,
       gymId,
       requireIdempotencyKey(idempotencyKey),
@@ -164,18 +167,58 @@ export class GymOperatorController {
     );
   }
 
-  @Post('gym-locations/:gymId/qr-credentials/revoke')
+  @Post('competitions/:competitionId/gym-locations/:gymId/qr-credentials')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Issue a printable static QR poster' })
+  @ApiCreatedResponse({ type: GymQrCredentialResponseDto })
+  issueCredential(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
+    @Param('gymId', ParseUUIDPipe) gymId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: OperatorReasonDto,
+  ): Promise<GymQrCredentialResponseDto> {
+    return this.gyms.issueCredential(
+      principal,
+      competitionId,
+      gymId,
+      requireIdempotencyKey(idempotencyKey),
+      input.reason,
+    );
+  }
+
+  @Get('competitions/:competitionId/gym-locations/:gymId/qr-credentials/active')
+  @ApiOperation({ summary: 'Recover the active printable static QR poster' })
+  @ApiOkResponse({
+    schema: {
+      allOf: [{ $ref: getSchemaPath(GymQrCredentialResponseDto) }],
+      nullable: true,
+    },
+  })
+  getActiveCredential(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
+    @Param('gymId', ParseUUIDPipe) gymId: string,
+  ): Promise<GymQrCredentialResponseDto | null> {
+    return this.gyms.getActiveCredential(principal, competitionId, gymId);
+  }
+
+  @Post(
+    'competitions/:competitionId/gym-locations/:gymId/qr-credentials/revoke',
+  )
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Revoke a gym QR poster' })
   @ApiOkResponse({ type: Object })
   revokeCredential(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: OperatorReasonDto,
   ): Promise<{ id: string; status: 'revoked' }> {
     return this.gyms.revokeCredential(
       principal,
+      competitionId,
       gymId,
       requireIdempotencyKey(idempotencyKey),
       input.reason,
@@ -203,7 +246,9 @@ export class GymOperatorController {
   }
 
   @Get('gym-sessions')
-  @ApiOperation({ summary: 'List complete and incomplete QR visits' })
+  @ApiOperation({
+    summary: 'List complete and incomplete location-verified gym visits',
+  })
   @ApiOkResponse({ isArray: true, type: OperatorGymSessionDto })
   listGymSessions(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,

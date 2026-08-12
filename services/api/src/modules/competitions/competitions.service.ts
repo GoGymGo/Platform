@@ -4,15 +4,19 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import type { Database, JsonObject } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import { normalizeDateKey } from '../../database/date-key';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import {
+  hashOpaqueValue,
+  isAcceptableLocationAccuracy,
+  isWithinGymGeofence,
+} from '../gyms/gym-scan-policy';
 import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
-import { VerificationConsentsService } from '../legal/verification-consents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import {
   calculateStreaks,
@@ -26,7 +30,7 @@ import {
 } from './competition-calendar';
 import {
   availableRegistrationGoalDays,
-  isPublishedCompetitionJoinable,
+  competitionRegistrationAvailability,
 } from './competition-registration';
 import { parseCompetitionRules } from './competition-rules';
 import type {
@@ -47,6 +51,14 @@ interface EnrollmentJson extends JsonObject {
   goalDays: number;
   id: string;
   status: 'active';
+}
+
+interface EnrollmentWithdrawalJson extends JsonObject {
+  competitionId: string;
+  enrolledAt: string;
+  goalDays: number;
+  id: string;
+  status: 'withdrawn';
 }
 
 interface WeeklyChallengeRequestJson extends JsonObject {
@@ -76,13 +88,31 @@ export class CompetitionsService {
     private readonly idempotency: IdempotencyService,
     private readonly ledger: LedgerService,
     private readonly legalDocuments: LegalDocumentsService,
-    private readonly verificationConsents: VerificationConsentsService,
     private readonly profiles: ProfilesService,
   ) {}
 
-  async getCurrent(
+  getCurrent(
     principal: AuthenticatedPrincipal,
     query: CurrentCompetitionQueryDto = {},
+  ): Promise<CompetitionResponseDto | null> {
+    return this.findCurrentCompetition(principal, query);
+  }
+
+  resolveGymQrCompetition(
+    principal: AuthenticatedPrincipal,
+    credential: string,
+  ): Promise<CompetitionResponseDto | null> {
+    return this.findCurrentCompetition(
+      principal,
+      {},
+      hashOpaqueValue(credential),
+    );
+  }
+
+  private async findCurrentCompetition(
+    principal: AuthenticatedPrincipal,
+    query: CurrentCompetitionQueryDto,
+    credentialHash?: string,
   ): Promise<CompetitionResponseDto | null> {
     return this.database.connection
       .transaction()
@@ -100,6 +130,12 @@ export class CompetitionsService {
             'region_policies as region',
             'region.id',
             'competition.region_policy_id',
+          )
+          .leftJoin('competition_enrollments as current_enrollment', (join) =>
+            join
+              .onRef('current_enrollment.competition_id', '=', 'competition.id')
+              .on('current_enrollment.user_id', '=', user.id)
+              .on('current_enrollment.status', '=', 'active'),
           )
           .select([
             'competition.ends_at',
@@ -126,8 +162,22 @@ export class CompetitionsService {
             ]),
           )
           .where('competition.status', 'in', ['registration', 'active'])
+          .where('competition.deleted_at', 'is', null)
           .where('competition.ends_at', '>', now)
-          .orderBy('competition.starts_at');
+          .where((expression) =>
+            expression.or([
+              expression('current_enrollment.id', 'is not', null),
+              expression.and([
+                expression('competition.registration_opens_at', '<=', now),
+                expression('competition.registration_closes_at', '>', now),
+              ]),
+            ]),
+          )
+          .orderBy(
+            sql<number>`CASE WHEN current_enrollment.id IS NULL THEN 1 ELSE 0 END`,
+          )
+          .orderBy('competition.starts_at')
+          .orderBy('competition.id');
         if (query.monthKey) {
           assertMonthKey(query.monthKey);
           competitionQuery = competitionQuery.where(
@@ -142,6 +192,38 @@ export class CompetitionsService {
             '=',
             query.region,
           );
+        }
+        if (credentialHash) {
+          competitionQuery = competitionQuery
+            .innerJoin(
+              'gym_qr_credentials as resolved_credential',
+              'resolved_credential.competition_id',
+              'competition.id',
+            )
+            .innerJoin(
+              'competition_gym_locations as resolved_assignment',
+              (join) =>
+                join
+                  .onRef(
+                    'resolved_assignment.competition_id',
+                    '=',
+                    'competition.id',
+                  )
+                  .onRef(
+                    'resolved_assignment.gym_location_id',
+                    '=',
+                    'resolved_credential.gym_location_id',
+                  ),
+            )
+            .innerJoin(
+              'gym_locations as resolved_gym',
+              'resolved_gym.id',
+              'resolved_credential.gym_location_id',
+            )
+            .where('resolved_credential.token_hash', '=', credentialHash)
+            .where('resolved_credential.status', '=', 'active')
+            .where('resolved_gym.active', '=', true)
+            .where('resolved_gym.deleted_at', 'is', null);
         }
         const competition = await competitionQuery.executeTakeFirst();
         if (!competition) {
@@ -180,12 +262,13 @@ export class CompetitionsService {
 
   async getCurrentEnrollment(
     principal: AuthenticatedPrincipal,
+    competitionId?: string,
   ): Promise<EnrollmentResponseDto | null> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        const enrollment = await transaction
+        let enrollmentQuery = transaction
           .selectFrom('competition_enrollments as enrollment')
           .innerJoin(
             'competitions as competition',
@@ -204,7 +287,15 @@ export class CompetitionsService {
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.ends_at', '>', new Date())
           .orderBy('competition.starts_at')
-          .executeTakeFirst();
+          .orderBy('competition.id');
+        if (competitionId) {
+          enrollmentQuery = enrollmentQuery.where(
+            'competition.id',
+            '=',
+            competitionId,
+          );
+        }
+        const enrollment = await enrollmentQuery.executeTakeFirst();
 
         return enrollment
           ? {
@@ -235,6 +326,13 @@ export class CompetitionsService {
           legalReceiptBundleId: request.legalReceiptBundleId ?? null,
           regionVerificationId: request.regionVerificationId,
           rulesAccepted: request.rulesAccepted,
+          gymPresence: {
+            accuracyMeters: request.gymPresence.accuracyMeters,
+            credentialHash: hashOpaqueValue(request.gymPresence.credential),
+            locationHash: hashOpaqueValue(
+              `${request.gymPresence.latitude}:${request.gymPresence.longitude}`,
+            ),
+          },
         },
         responseCode: 201,
         scope: 'competition-enrollments:create',
@@ -255,16 +353,23 @@ export class CompetitionsService {
             message: 'The competition was not found.',
           });
         }
-        if (
-          !isPublishedCompetitionJoinable({
-            endsAt: competition.ends_at,
-            now,
-            status: competition.status,
-          })
-        ) {
+        const registrationAvailability = competitionRegistrationAvailability({
+          endsAt: competition.ends_at,
+          now,
+          registrationClosesAt: competition.registration_closes_at,
+          registrationOpensAt: competition.registration_opens_at,
+          status: competition.status,
+        });
+        if (registrationAvailability !== 'open') {
           throw new ConflictException({
-            code: 'COMPETITION_REGISTRATION_CLOSED',
-            message: 'This competition is no longer available to join.',
+            code:
+              registrationAvailability === 'not_open'
+                ? 'COMPETITION_REGISTRATION_NOT_OPEN'
+                : 'COMPETITION_REGISTRATION_CLOSED',
+            message:
+              registrationAvailability === 'not_open'
+                ? 'Registration for this contest has not opened yet.'
+                : 'Registration for this contest is closed.',
           });
         }
         if (!request.legalReceiptBundleId) {
@@ -317,6 +422,85 @@ export class CompetitionsService {
             id: existingEnrollment.id,
             status: 'active',
           };
+        }
+
+        const gymPresence = await transaction
+          .selectFrom('gym_qr_credentials as credential')
+          .innerJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'credential.gym_location_id',
+          )
+          .select([
+            'credential.competition_id',
+            'credential.credential_version',
+            'credential.status as credential_status',
+            'gym.active as gym_active',
+            'gym.id as gym_id',
+            'gym.name as gym_name',
+            sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
+              'presence_radius_meters',
+            ),
+            sql<number>`ST_Distance(
+              ${sql.ref('gym.coordinates')},
+              ST_SetSRID(ST_MakePoint(${request.gymPresence.longitude}, ${request.gymPresence.latitude}), 4326)::geography
+            )`.as('distance_meters'),
+          ])
+          .where(
+            'credential.token_hash',
+            '=',
+            hashOpaqueValue(request.gymPresence.credential),
+          )
+          .executeTakeFirst();
+        if (
+          !gymPresence ||
+          gymPresence.credential_status !== 'active' ||
+          gymPresence.competition_id !== competition.id
+        ) {
+          throw new UnprocessableEntityException({
+            code: 'GYM_QR_INVALID',
+            message: `Scan the active ${competition.name} QR poster at a Partner gym to confirm your gym location for enrollment.`,
+          });
+        }
+        if (!gymPresence.gym_active) {
+          throw new ConflictException({
+            code: 'GYM_INACTIVE',
+            message: 'This Partner gym is not currently active.',
+          });
+        }
+        const withinGeofence = isWithinGymGeofence(
+          gymPresence.distance_meters,
+          gymPresence.presence_radius_meters,
+          request.gymPresence.accuracyMeters,
+        );
+        if (
+          !withinGeofence &&
+          !isAcceptableLocationAccuracy(request.gymPresence.accuracyMeters)
+        ) {
+          throw new UnprocessableEntityException({
+            code: 'GYM_LOCATION_INACCURATE',
+            message:
+              'Your location is not accurate enough to confirm gym presence. Move closer to the poster or a window, then try again.',
+          });
+        }
+        if (!withinGeofence) {
+          throw new UnprocessableEntityException({
+            code: 'OUTSIDE_GYM_GEOFENCE',
+            message: `You must be within ${gymPresence.presence_radius_meters} metres of ${gymPresence.gym_name} to enroll.`,
+          });
+        }
+        const eligibleGym = await transaction
+          .selectFrom('competition_gym_locations')
+          .select('gym_location_id')
+          .where('competition_id', '=', competition.id)
+          .where('gym_location_id', '=', gymPresence.gym_id)
+          .executeTakeFirst();
+        if (!eligibleGym) {
+          throw new UnprocessableEntityException({
+            code: 'GYM_NOT_ELIGIBLE_FOR_COMPETITION',
+            message:
+              'This Partner gym is not eligible for the current regional Contest.',
+          });
         }
 
         const [bracket, verification, enrollmentCount] = await Promise.all([
@@ -399,10 +583,6 @@ export class CompetitionsService {
           `${verification.country_code}-${verification.subdivision_code}`,
           request.legalReceiptBundleId,
         );
-        await this.verificationConsents.assertActiveDevicePresenceConsent(
-          transaction,
-          user.id,
-        );
 
         const acceptance = await transaction
           .insertInto('competition_rule_acceptances')
@@ -413,6 +593,9 @@ export class CompetitionsService {
             competition_id: competition.id,
             metadata: {
               contestType: 'brand_rewards',
+              gymCredentialVersion: gymPresence.credential_version,
+              gymLocationId: gymPresence.gym_id,
+              presenceVerification: 'gym_qr_geofence',
               source: 'mobile',
             },
             rules_version: competition.rules_version,
@@ -433,6 +616,8 @@ export class CompetitionsService {
             competition_id: competition.id,
             enrolled_at: now,
             goal_days: request.goalDays,
+            gym_credential_version: gymPresence.credential_version,
+            gym_location_id: gymPresence.gym_id,
             region_verification_id: verification.id,
             rules_acceptance_id: acceptance.id,
             status: 'active',
@@ -467,6 +652,103 @@ export class CompetitionsService {
     );
 
     return result;
+  }
+
+  async withdrawEnrollment(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    idempotencyKey: string,
+  ): Promise<EnrollmentResponseDto> {
+    return this.idempotency.execute<EnrollmentWithdrawalJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { competitionId },
+        responseCode: 200,
+        scope: 'competition-enrollments:withdraw',
+      },
+      async (transaction) => {
+        const user = await this.profiles.ensureUser(principal, transaction);
+        const enrollment = await transaction
+          .selectFrom('competition_enrollments')
+          .select([
+            'competition_id',
+            'enrolled_at',
+            'goal_days',
+            'id',
+            'status',
+          ])
+          .where('competition_id', '=', competitionId)
+          .where('user_id', '=', user.id)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!enrollment) {
+          throw new NotFoundException({
+            code: 'COMPETITION_ENROLLMENT_NOT_FOUND',
+            message: 'No Contest enrollment was found to withdraw.',
+          });
+        }
+        if (enrollment.status === 'disqualified') {
+          throw new ConflictException({
+            code: 'COMPETITION_ENROLLMENT_DISQUALIFIED',
+            message:
+              'A disqualified Contest enrollment cannot be changed by the member.',
+          });
+        }
+
+        const now = new Date();
+        if (enrollment.status === 'active') {
+          await transaction
+            .updateTable('competition_enrollments')
+            .set({ status: 'withdrawn' })
+            .where('id', '=', enrollment.id)
+            .where('status', '=', 'active')
+            .executeTakeFirstOrThrow();
+          await transaction
+            .updateTable('workout_sessions')
+            .set({
+              completed_at: now,
+              status: 'cancelled',
+              updated_at: now,
+            })
+            .where('enrollment_id', '=', enrollment.id)
+            .where('status', '=', 'active')
+            .execute();
+          await transaction
+            .updateTable('weekly_challenge_requests')
+            .set({ responded_at: now, status: 'cancelled' })
+            .where('competition_id', '=', competitionId)
+            .where((expression) =>
+              expression.or([
+                expression('requester_user_id', '=', user.id),
+                expression('recipient_user_id', '=', user.id),
+              ]),
+            )
+            .where('status', 'in', ['accepted', 'pending'])
+            .execute();
+          await transaction
+            .updateTable('competition_matches')
+            .set({ settled_at: now, status: 'cancelled' })
+            .where('competition_id', '=', competitionId)
+            .where((expression) =>
+              expression.or([
+                expression('user_a_id', '=', user.id),
+                expression('user_b_id', '=', user.id),
+              ]),
+            )
+            .where('status', 'in', ['matched', 'searching'])
+            .execute();
+        }
+
+        return {
+          competitionId: enrollment.competition_id,
+          enrolledAt: enrollment.enrolled_at.toISOString(),
+          goalDays: enrollment.goal_days,
+          id: enrollment.id,
+          status: 'withdrawn',
+        };
+      },
+    );
   }
 
   async getEnrollmentCount(monthKey: string, region: string): Promise<number> {

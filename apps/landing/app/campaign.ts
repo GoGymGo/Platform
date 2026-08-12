@@ -8,16 +8,13 @@ export const septemberCampaign = {
   endDate: "October 1, 2026 at 12:00 a.m. PDT",
   minimumAge: 19,
   minimumSessionMinutes: 30,
-  goalScorePerVerifiedDay: 1,
-  perfectMonthMultiplier: 10,
   regionName: "Vancouver Island + Gulf Islands",
   registrationLabel: "REGISTRATION OPEN",
   registrationNote:
-    "The app confirms current availability. Registration can close when the competition ends, reaches an entrant cap, or is cancelled.",
+    "The app confirms current availability. Registration can close when the Contest ends, reaches an entrant cap, or is cancelled.",
   reward: "$100 CAD",
   rewardSponsor: "GoGymGo",
   startDate: "September 1, 2026 at 12:00 a.m. PDT",
-  scoringWeekCount: 4,
   supportedIslands: [
     "Denman Island",
     "Ballenas-Winchelsea",
@@ -36,8 +33,6 @@ export const septemberCampaign = {
   weeklyGoalRange: "1–7 days",
 } as const;
 
-export type SeptemberCampaignPhase = "registration" | "active" | "ended";
-
 export function getSeptemberCampaignState(now = new Date()) {
   const currentTime = now.getTime();
   const startTime = Date.parse(septemberCampaign.competitionStartAt);
@@ -48,7 +43,7 @@ export function getSeptemberCampaignState(now = new Date()) {
       phase: "ended" as const,
       primaryAction: "regionalUpdates" as const,
       primaryLabel: "GET REGIONAL UPDATES",
-      statusLabel: "COMPETITION ENDED",
+      statusLabel: "CONTEST ENDED",
     };
   }
 
@@ -57,7 +52,7 @@ export function getSeptemberCampaignState(now = new Date()) {
       phase: "active" as const,
       primaryAction: "memberApp" as const,
       primaryLabel: "CHECK CURRENT AVAILABILITY",
-      statusLabel: "COMPETITION ACTIVE",
+      statusLabel: "CONTEST ACTIVE",
     };
   }
 

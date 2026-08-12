@@ -67,6 +67,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_ecs_service.api.deployment_minimum_healthy_percent == 100 && aws_ecs_service.worker.deployment_minimum_healthy_percent == 100
+    error_message = "API and worker rollouts must preserve their healthy task while a replacement starts."
+  }
+
+  assert {
     condition     = length(aws_ecs_service.api.load_balancer) == 0
     error_message = "The bootstrap API service must not attach an unassociated target group before an HTTPS certificate and listener exist."
   }
@@ -74,6 +79,11 @@ run "safe_isolated_foundation" {
   assert {
     condition     = local.api_environment.PRIVATE_OBJECT_STORAGE_PROVIDER == "aws-s3" && local.api_environment.AWS_REGION == "ca-central-1"
     error_message = "AWS tasks must select the S3 adapter explicitly."
+  }
+
+  assert {
+    condition     = contains(keys(local.api_secret_environment), "GOGYMGO_OWNER_EMAIL") && !contains(keys(local.worker_secret_environment), "GOGYMGO_OWNER_EMAIL")
+    error_message = "Only the API task may receive the protected owner identity."
   }
 
   assert {
@@ -103,7 +113,7 @@ run "feature_secrets_remain_role_scoped" {
   }
 
   assert {
-    condition     = length(local.api_secret_environment) == 3 && length(local.worker_secret_environment) == 5
+    condition     = length(local.api_secret_environment) == 4 && length(local.worker_secret_environment) == 5
     error_message = "API-only and worker-only secret injection must remain isolated."
   }
 

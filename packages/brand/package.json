@@ -6,11 +6,12 @@
   "exports": {
     ".": "./src/index.js",
     "./tokens": "./src/tokens.js",
+    "./web.css": "./src/web.css",
     "./assets/*": "./assets/*"
   },
   "types": "./src/index.d.ts",
   "scripts": {
     "build": "node scripts/validate.mjs",
-    "check": "node scripts/validate.mjs"
+    "check": "node scripts/validate.mjs && node scripts/audit-consumers.mjs"
   }
 }

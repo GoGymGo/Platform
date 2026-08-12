@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import {
   AuthConfigurationNotice,
@@ -8,13 +8,16 @@ import {
   AuthStatusNotice
 } from '@/components/auth';
 import {
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
   TerminalText
 } from '@/components/cyber';
+import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { getAuthErrorMessage } from '@/domain/auth';
-import { spacing } from '@/constants/theme';
+import {
+  getAuthenticatedHomeRoute,
+  isMobileWebGymVerificationDevice
+} from '@/domain/mobileGymVerification';
+import { fontFamilies, spacing } from '@/constants/theme';
 import {
   gymScanAuthNext,
   gymScanSetupNext,
@@ -27,6 +30,8 @@ import { useAuth } from '@/state/auth';
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { next } = useLocalSearchParams<{ next?: string }>();
   const {
     firebaseConfigured,
@@ -41,6 +46,10 @@ export default function VerifyEmailScreen() {
   const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
   const polling = useRef(false);
   const continueAfterVerification = useCallback(() => {
+    if (!mobileGymVerificationAvailable && !challengeInvite) {
+      router.replace(getAuthenticatedHomeRoute(false));
+      return;
+    }
     router.replace(
       challengeInvite
         ? { pathname: '/join', params: { challengeInvite } }
@@ -54,9 +63,9 @@ export default function VerifyEmailScreen() {
             ? '/identity'
             : next === 'profile'
               ? '/profile'
-              : '/home?resume=1'
+              : getAuthenticatedHomeRoute(mobileGymVerificationAvailable)
     );
-  }, [challengeInvite, next, router]);
+  }, [challengeInvite, mobileGymVerificationAvailable, next, router]);
 
   useEffect(() => {
     if (appTourActive || !user || user.emailVerified) {
@@ -147,20 +156,20 @@ export default function VerifyEmailScreen() {
       description={appTourActive
         ? 'This preview simulates the email-verification step without sending a message.'
         : next === gymScanAuthNext || next === gymScanSetupNext
-          ? 'Your gym scan is saved. Verify your email and GoGymGo will continue your workout setup automatically.'
-          : 'Verify the email attached to your GoGymGo account before entering competition flows.'}
+          ? 'Your Partner gym selection is saved. Verify your email and GoGymGo will continue your workout setup automatically.'
+          : 'Verify the email attached to your GoGymGo account before entering contest flows.'}
       eyebrow={next === gymScanAuthNext || next === gymScanSetupNext
-        ? 'GYM SCAN SAVED'
+        ? 'PARTNER GYM SAVED'
         : 'ACCOUNT SECURITY'}
       title="CHECK YOUR EMAIL"
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
       {!user ? (
         <HUDBorderBox style={styles.panel} tone="amber">
-          <TerminalText tone="muted" uppercase={false} variant="body">
+          <TerminalText style={styles.panelBody} tone="muted" uppercase={false} variant="body">
             Sign in first so GoGymGo can check the correct email account.
           </TerminalText>
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             label="GO TO SIGN IN"
             onPress={() => router.replace(
               next === gymScanAuthNext || next === gymScanSetupNext
@@ -171,19 +180,19 @@ export default function VerifyEmailScreen() {
         </HUDBorderBox>
       ) : (
         <HUDBorderBox style={styles.panel} tone="cyan">
-          <TerminalText glow tone="cyan" variant="label">
+          <TerminalText tone="cyan" variant="label">
             VERIFICATION SENT TO
           </TerminalText>
-          <TerminalText tone="text" uppercase={false} variant="body">
+          <TerminalText style={styles.panelBody} tone="text" uppercase={false} variant="body">
             {user.email ?? 'YOUR ACCOUNT EMAIL'}
           </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
+          <TerminalText style={styles.panelBody} tone="muted" uppercase={false} variant="body">
             {appTourActive
               ? 'Choose Continue Demo to confirm the sample account and proceed to region setup.'
               : 'Open the verification email and confirm the address. This screen continues automatically when verification is complete.'}
           </TerminalText>
           {message ? <AuthStatusNotice message={message} tone={messageTone} /> : null}
-          <CyberButtonPrimary
+          <FirstRunPrimaryButton
             disabled={Boolean(busyAction)}
             label={busyAction === 'check'
               ? 'CHECKING...'
@@ -193,13 +202,13 @@ export default function VerifyEmailScreen() {
             onPress={checkVerification}
           />
           {!appTourActive ? (
-            <CyberButtonOutline
+            <FirstRunSecondaryButton
               disabled={Boolean(busyAction)}
               label={busyAction === 'resend' ? 'SENDING...' : 'RESEND EMAIL'}
               onPress={resendVerification}
             />
           ) : null}
-          <CyberButtonOutline
+          <FirstRunSecondaryButton
             disabled={Boolean(busyAction)}
             label={busyAction === 'signout' ? 'SIGNING OUT...' : 'USE ANOTHER ACCOUNT'}
             onPress={exitAccount}
@@ -215,5 +224,10 @@ const styles = StyleSheet.create({
   panel: {
     gap: spacing.md,
     padding: spacing.lg
+  },
+  panelBody: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
   }
 });

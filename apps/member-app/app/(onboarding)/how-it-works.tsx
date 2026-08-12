@@ -10,6 +10,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -17,15 +18,18 @@ import { goBackOrReplace } from '@/navigation/goBack';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const loopSteps = [
-  ['COMMIT', 'Choose 1-7 verified workout days per week.'],
-  ['VERIFY', 'Scan the approved gym QR on entry and again after 30 minutes.'],
+  ['COMMIT', 'Choose 1-7 workout days per week.'],
   [
-    'BUILD ODDS',
-    'Earn prize draw entries through consistency, teamwork and competition'
+    'VERIFY',
+    'Check your gym location when you start and finish.'
   ],
   [
-    'CLAIM REWARD',
-    'If you win, your physical prize or coupon code appears in My Rewards with brand claim instructions. No bank account is needed.'
+    'BUILD ODDS',
+    'Earn Prize Draw entries through workouts, teamwork and ranking.'
+  ],
+  [
+    'CLAIM AWARD',
+    'Winners claim in My Awards.'
   ]
 ] as const;
 
@@ -51,7 +55,7 @@ export default function HowItWorksScreen() {
       : from === 'commitment'
         ? 'Back to Weekly Goal ->'
         : from === 'leaderboard'
-          ? 'Back to Competition ->'
+          ? 'Back to Contest ->'
           : from === 'challenge'
             ? 'Back to Weekly Challenge ->'
             : from === 'home'
@@ -86,25 +90,24 @@ export default function HowItWorksScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={brandScreenStyles.content}
         showsVerticalScrollIndicator={false}
       >
         <OnboardingHeader
           label="REFERENCE"
           onBack={returnToSource}
-          step="COMPETITION GUIDE"
+          step="CONTEST GUIDE"
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          HOW THE COMPETITION WORKS
-        </TerminalText>
-        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          A quick reference for competition scoring, winning odds and brand rewards.
-        </TerminalText>
+        <BrandScreenHeader
+          description="See how to earn entries and claim Awards."
+          eyebrow="CONTEST GUIDE"
+          title="HOW THE CONTEST WORKS"
+        />
 
         <HUDBorderBox style={styles.flowSummary} tone="cyan">
           <TerminalText tone="cyan" uppercase={false} variant="caption">
-            Choose goal → Verify workouts → Earn entries → Improve odds → Claim rewards
+            Choose Weekly Goal → Verify workouts → Earn Prize Draw Entries → Improve odds → Claim Award
           </TerminalText>
         </HUDBorderBox>
 
@@ -144,25 +147,22 @@ export default function HowItWorksScreen() {
           ))}
         </View>
 
-        {showBonusDetails ? <HUDBorderBox glow style={styles.bonusPanel} tone="cyan">
-          <TerminalText glow style={styles.panelHeading} tone="cyan" variant="label">
+        {showBonusDetails ? <HUDBorderBox style={styles.bonusPanel} tone="cyan">
+          <TerminalText style={styles.panelHeading} tone="cyan" variant="label">
             SCORING ORDER
           </TerminalText>
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             01 // WEEKLY CHALLENGE BONUSES
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            You and your Weekly Challenge partner both hit the goal: 2X each. If they miss and
-            you complete one extra verified workout, you earn 3X. When your goal uses
-            every available day, 3X is automatic if they miss. Add the four settled
-            weekly results.
+            Both hit the goal: 2X each. If your partner misses, complete one extra workout for
+            3X. If your goal uses every available day, 3X applies automatically. Add all four weeks.
           </TerminalText>
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             02 // TOP THREE GOAL-GROUP FINISHERS
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Finishing first, second or third in your Weekly Goal group multiplies
-            the subtotal from your four Weekly Challenge results.
+            The top three multiply their four-week Weekly Challenge subtotal.
           </TerminalText>
           {categoryMultipliers.map((multiplier, index) => (
             <TerminalText
@@ -175,7 +175,7 @@ export default function HowItWorksScreen() {
               {`${index + 1}${index === 0 ? 'st' : index === 1 ? 'nd' : 'rd'} place: ${multiplier}X your Weekly Challenge subtotal`}
             </TerminalText>
           ))}
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
               03 // BONUS DAYS 29-31
           </TerminalText>
           <TerminalText
@@ -186,21 +186,19 @@ export default function HowItWorksScreen() {
           >
             {`When the month has days 29-31, each verified Bonus Day adds ${weeklyGoal} Prize Draw ${weeklyGoal === 1 ? 'Entry' : 'Entries'}.`}
           </TerminalText>
-          <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+          <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             04 // PERFECT MONTH // FINAL 10X
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
-            Hit your weekly goal in all four scoring weeks to earn the Perfect Month.
-            Its final 10X multiplies the combined Weekly Challenge subtotal, goal-group
-            bonus and any Bonus Day entries.
+            Hit all four weekly goals for a final 10X on Weekly Challenge, goal-group and Bonus
+            Day entries.
           </TerminalText>
           <View style={styles.exampleBlock}>
-            <TerminalText glow style={styles.sectionHeading} tone="cyan" variant="label">
+            <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
               EXAMPLE // 4-DAY GOAL
             </TerminalText>
             <TerminalText style={styles.exampleIntro} tone="muted" uppercase={false} variant="body">
-              You hit four verified workout days in all four weeks, you and your Weekly
-              Challenge partner both hit each week, and you finish first in your goal group.
+              Hit four days in all four weeks. Your partner does too. Finish first in your group.
             </TerminalText>
             <TerminalText style={styles.exampleStep} tone="text" uppercase={false} variant="body">
               Base month: 4 days x 4 weeks = 16
@@ -215,7 +213,7 @@ export default function HowItWorksScreen() {
               Perfect month: 96 x 10 = 960 entries
             </TerminalText>
             <TerminalText style={styles.exampleNote} tone="dim" uppercase={false} variant="body">
-              No Bonus Days are included in this example.
+              Bonus Days excluded.
             </TerminalText>
           </View>
         </HUDBorderBox> : null}
@@ -230,28 +228,6 @@ export default function HowItWorksScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  title: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle,
-    lineHeight: 34,
-    textAlign: 'center'
-  },
-  body: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.control,
-    lineHeight: 23,
-    paddingHorizontal: spacing.sm,
-    textAlign: 'center'
-  },
   loopList: {
     marginTop: spacing.xl,
     gap: spacing.sm

@@ -11,7 +11,7 @@ describe('app data boundary', () => {
     assert.deepEqual(await unavailable.getCreatorWorkouts('vancouver-bc'), []);
     assert.deepEqual(await unavailable.getRewardCatalog('toronto'), []);
     assert.deepEqual(await unavailable.getMyRewardAwards(), []);
-    assert.deepEqual(await unavailable.getRewardWinners(), []);
+    assert.equal(await unavailable.getMyLatestCompetitionResults(), null);
     assert.equal(await unavailable.getCategoryLeaderboard(4), null);
     assert.deepEqual(
       await unavailable.getCompetitionMatches('2026-08', 4, 'toronto-on'),
@@ -22,7 +22,6 @@ describe('app data boundary', () => {
       null
     );
     assert.equal(await unavailable.getMyStreaks(), null);
-    assert.equal(await unavailable.getSettledCompetition(), null);
     await assert.rejects(
       () => unavailable.planCreatorWorkout('workout-id', '2026-07-16'),
       /API is not configured/i
@@ -76,6 +75,61 @@ describe('app data boundary', () => {
 
     assert.equal(requestedPath, '/v1/streaks/me');
     assert.equal(streaks?.streaks.weekly, 4);
+  });
+
+  it('loads participant results from the authenticated API boundary', async () => {
+    let requestedPath = '';
+    let requestedOptions: ApiRequestOptions<never> | undefined;
+    const api: ApiClient = {
+      request: <TResponse, TBody = never>(
+        path: string,
+        options?: ApiRequestOptions<TBody>
+      ) => {
+        requestedPath = path;
+        requestedOptions = options as ApiRequestOptions<never> | undefined;
+        return Promise.resolve(null) as Promise<TResponse>;
+      }
+    };
+
+    await createAppDataSource('api', api).getMyLatestCompetitionResults();
+
+    assert.equal(requestedPath, '/v1/results/mine/latest');
+    assert.notEqual(requestedOptions?.authenticated, false);
+  });
+
+  it('treats a malformed leaderboard response as unavailable', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve({ goal: 4 }) as Promise<TResponse>
+    };
+
+    const leaderboard = await createAppDataSource('api', api)
+      .getCategoryLeaderboard(4);
+
+    assert.equal(leaderboard, null);
+  });
+
+  it('filters malformed leaderboard rows at the API boundary', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve({
+        goal: 4,
+        rows: [
+          {
+            alias: 'GG-TEST',
+            categoryEntries: 12,
+            rank: 1,
+            streaks: { daily: 1, monthly: 0, weekly: 1, yearly: 0 },
+            verifiedDays: 3
+          },
+          { alias: null, rank: 2 }
+        ]
+      }) as Promise<TResponse>
+    };
+
+    const leaderboard = await createAppDataSource('api', api)
+      .getCategoryLeaderboard(4);
+
+    assert.equal(leaderboard?.goal, 4);
+    assert.deepEqual(leaderboard?.rows.map(({ alias }) => alias), ['GG-TEST']);
   });
 
 });

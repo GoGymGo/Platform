@@ -74,6 +74,19 @@ for (const filePath of sourceFiles) {
     }
   }
 
+  if (/Rajdhani/i.test(sourceText)) {
+    issues.push(`${relativePath}: retired Rajdhani font reference`);
+  }
+
+  if (relativePath !== 'app/_layout.tsx') {
+    const fontMatch = sourceText.match(
+      /\b(?:Orbitron-Bold|ShareTechMono-Regular)\b/
+    );
+    if (fontMatch) {
+      issues.push(`${relativePath}: raw brand font registration ${fontMatch[0]}`);
+    }
+  }
+
   if (
     relativePath !== 'src/navigation/goBack.ts' &&
     /\brouter\.back\s*\(/.test(sourceText)
@@ -105,6 +118,7 @@ for (const route of literalRoutes) {
 
 auditRouteReturnPaths(path.join(projectRoot, 'app'));
 auditAppTourCoverage(path.join(projectRoot, 'app'));
+auditDesignSystemCoverage(path.join(projectRoot, 'app'));
 auditAppTourProductionBoundary();
 auditFlowReliability();
 auditAuthoritativeRegionBoundary();
@@ -177,6 +191,7 @@ function reportNode(node, relativePath, message) {
 function auditRouteReturnPaths(appDirectory) {
   const entryRouteExemptions = new Set([
     'app/(onboarding)/welcome.tsx',
+    'app/demo.tsx',
     'app/index.tsx',
     'app/scan.tsx'
   ]);
@@ -205,8 +220,8 @@ function auditRouteReturnPaths(appDirectory) {
       issues.push(`${relativePath}: route has no detected in-app return path`);
     }
 
-    if (relativePath === 'app/(tabs)/calendar.tsx' && !sourceText.includes('ScreenBackButton')) {
-      issues.push(`${relativePath}: calendar requires the shared screen back control`);
+    if (relativePath === 'app/(tabs)/calendar.tsx' && !sourceText.includes('OnboardingHeader')) {
+      issues.push(`${relativePath}: calendar requires the shared compact screen header`);
     }
   }
 }
@@ -232,8 +247,8 @@ function auditAppTourCoverage(appDirectory) {
     ['/workouts/[workoutId]', '/workouts/app-tour-workout']
   ]);
 
-  for (const route of collectRouteNames(appDirectory)) {
-    if (routeExemptions.has(route)) {
+  for (const { filePath, route } of collectRouteEntries(appDirectory)) {
+    if (routeExemptions.has(route) || isRedirectOnlyRoute(filePath)) {
       continue;
     }
 
@@ -244,16 +259,44 @@ function auditAppTourCoverage(appDirectory) {
   }
 }
 
+function auditDesignSystemCoverage(appDirectory) {
+  const designSystemMarkers = [
+    "@/constants/theme",
+    "@/components/auth",
+    "@/components/connectedLegalDocumentScreen",
+    "@/components/creatorApplicationScreen",
+    "@/components/cyber",
+    "@/components/firstRun",
+    "@/components/legal",
+    "@/components/onboarding",
+    "@/components/screenLayout",
+    "@/demo/PublicDemoScreen",
+    "@/testing/AppTourScreen",
+    "./(onboarding)/welcome"
+  ];
+
+  for (const { filePath, route } of collectRouteEntries(appDirectory)) {
+    if (isRedirectOnlyRoute(filePath)) {
+      continue;
+    }
+
+    const sourceText = fs.readFileSync(filePath, 'utf8');
+    if (!designSystemMarkers.some((marker) => sourceText.includes(marker))) {
+      issues.push(`${route}: screen bypasses the shared GoGymGo design system`);
+    }
+  }
+}
+
 function auditFlowReliability() {
   const requirements = new Map([
     ['app/(auth)/sign-in.tsx', [
-      '/home?resume=1',
+      'getAuthenticatedHomeRoute',
       'emailSignInReady',
-      'Enter your email and password to continue.'
+      'Enter both fields.'
     ]],
     ['app/(auth)/sign-up.tsx', [
       'emailAccountReady',
-      'Complete your email and both password fields to continue.'
+      'Complete all three fields.'
     ]],
     ['app/(tabs)/_layout.tsx', [
       "title: 'Calendar'",
@@ -271,11 +314,11 @@ function auditFlowReliability() {
       'useScreenMemory',
       'memoryKey="leaderboard"',
       'RecoverableError',
-      'Prize Draw Entries set your winning odds.',
+      'Entries set your Prize Draw odds.',
       'Hide ranking details'
     ]],
     ['app/(tabs)/calendar.tsx', [
-      'Return on this day to start your own verified workout.',
+      'Return on this day to verify a workout.',
       'RETURN TO TODAY TO START ->',
       "START TODAY'S VERIFIED WORKOUT ->",
       'function goToToday()'
@@ -327,8 +370,8 @@ function auditFlowReliability() {
       "day === 1 ? 'day' : 'days'} per week"
     ]],
     ['app/(onboarding)/how-it-works.tsx', [
-      'A quick reference for competition scoring',
-      'No bank account is needed.'
+      'See how to earn entries and claim Awards.',
+      'Winners claim in My Awards.'
     ]],
     ['app/(onboarding)/identity.tsx', [
       'useScreenMemory',
@@ -344,13 +387,22 @@ function auditFlowReliability() {
       'allowFontScaling: true',
       'minHeight: 54'
     ]],
+    ['src/components/firstRun.tsx', [
+      'CyberButtonPrimary',
+      'CyberButtonOutline'
+    ]],
+    ['src/components/auth.tsx', ['ScreenBackButton']],
     ['src/components/clarity.tsx', ['GUIDE', 'minWidth: 72']],
     ['src/components/competitionHubNav.tsx', [
       'aria-selected={selected}',
       'accessibilityState={{ selected }}',
       'if (!selected)'
     ]],
-    ['src/components/onboarding.tsx', ['minHeight: 44']],
+    ['src/components/onboarding.tsx', [
+      'minHeight: 44',
+      'useWindowDimensions',
+      'numberOfLines={1}'
+    ]],
     ['src/components/socialChallenges.tsx', [
       'ChallengeBuilderStep',
       'STEP {builderStepIndex + 1} OF',
@@ -456,15 +508,18 @@ function auditAppTourProductionBoundary() {
   if (!stateSource.includes('browserTestPreviewEnabled &&')) {
     issues.push('src/state/appTour.tsx: test preview activation must use the shared availability guard');
   }
-  if (!stateSource.includes('if (!browserTestPreviewEnabled)')) {
+  if (
+    !stateSource.includes(
+      'if (!browserTestPreviewEnabled && !publicDemoRequested)'
+    )
+  ) {
     issues.push('src/state/appTour.tsx: enterTour must reject unavailable preview activation');
   }
   for (const marker of [
-    "Platform.OS === 'web'",
-    "pathname === '/demo'",
-    "firstParam(params.demo) === '1'",
-    'enterDemo',
-    'demoActive'
+    'isDemoPath(pathname)',
+    'isDemoSearch(firstParam(params.demo))',
+    'publicDemoRequested',
+    'publicDemo: effectivePublicDemo'
   ]) {
     if (!stateSource.includes(marker)) {
       issues.push(`src/state/appTour.tsx: public Demo activation is missing ${marker}`);
@@ -502,7 +557,7 @@ function auditAppTourProductionBoundary() {
     issues.push('metro.config.js: production module aliases must be selected from the Metro development flag');
   }
   if (
-    !metroSource.includes('publicWebDemoModules') ||
+    !metroSource.includes('publicDemoWebModules') ||
     !metroSource.includes('keepPublicWebDemo')
   ) {
     issues.push('metro.config.js: public Demo data must remain available only to production web exports');
@@ -671,6 +726,14 @@ function auditAuthoritativeSessionRulesBoundary() {
       'app/(modals)/qr-scanner.tsx: pilot QR status must use the authoritative scan endpoint and server remaining time'
     );
   }
+  if (
+    !qrScanner.includes("autofocus={Platform.OS === 'web' ? 'on' : 'off'}") ||
+    !qrScanner.includes('facing="back"')
+  ) {
+    issues.push(
+      'app/(modals)/qr-scanner.tsx: QR scanning must use the rear camera with continuous platform-appropriate focus'
+    );
+  }
 }
 
 function collectSourceFiles(directory) {
@@ -699,6 +762,10 @@ function collectRoutePatterns(appDirectory) {
 }
 
 function collectRouteNames(appDirectory) {
+  return collectRouteEntries(appDirectory).map(({ route }) => route);
+}
+
+function collectRouteEntries(appDirectory) {
   return collectSourceFiles(appDirectory)
     .filter((filePath) => {
       const fileName = path.basename(filePath);
@@ -713,8 +780,33 @@ function collectRouteNames(appDirectory) {
         .split('/')
         .filter((segment) => !/^\(.+\)$/.test(segment))
         .filter((segment) => segment !== 'index');
-      return `/${segments.join('/')}`.replace(/\/$/, '') || '/';
+      return {
+        filePath,
+        route: `/${segments.join('/')}`.replace(/\/$/, '') || '/'
+      };
     });
+}
+
+function isRedirectOnlyRoute(filePath) {
+  const sourceText = fs.readFileSync(filePath, 'utf8');
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const jsxTags = new Set();
+
+  function collectJsxTags(node) {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      jsxTags.add(node.tagName.getText(sourceFile));
+    }
+    ts.forEachChild(node, collectJsxTags);
+  }
+
+  collectJsxTags(sourceFile);
+  return jsxTags.size === 1 && jsxTags.has('Redirect');
 }
 
 function normalizeRoute(route) {

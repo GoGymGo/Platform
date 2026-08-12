@@ -31,6 +31,7 @@ export class AdminDashboardService {
           regions,
           competitions,
           goalBrackets,
+          competitionGyms,
           enrollmentCounts,
           rewardCounts,
           rewards,
@@ -58,6 +59,7 @@ export class AdminDashboardService {
               'valid_from',
               'valid_to',
             ])
+            .where('deleted_at', 'is', null)
             .orderBy('created_at', 'desc')
             .execute(),
           transaction
@@ -85,12 +87,25 @@ export class AdminDashboardService {
               'region.code as region_code',
               'region.metro_name as region_name',
             ])
+            .where('competition.deleted_at', 'is', null)
             .orderBy('competition.starts_at', 'desc')
             .execute(),
           transaction
             .selectFrom('competition_goal_brackets')
             .select(['competition_id', 'goal_days', 'label'])
             .orderBy('goal_days', 'asc')
+            .execute(),
+          transaction
+            .selectFrom('competition_gym_locations as assignment')
+            .innerJoin(
+              'gym_locations as gym',
+              'gym.id',
+              'assignment.gym_location_id',
+            )
+            .select(['assignment.competition_id', 'assignment.gym_location_id'])
+            .where('gym.deleted_at', 'is', null)
+            .orderBy('assignment.competition_id')
+            .orderBy('assignment.gym_location_id')
             .execute(),
           transaction
             .selectFrom('competition_enrollments')
@@ -110,6 +125,7 @@ export class AdminDashboardService {
                 'published_count',
               ),
             ])
+            .where('deleted_at', 'is', null)
             .groupBy('competition_id')
             .execute(),
           transaction
@@ -138,6 +154,8 @@ export class AdminDashboardService {
               'reward.version',
               'competition.name as competition_name',
             ])
+            .where('reward.deleted_at', 'is', null)
+            .where('competition.deleted_at', 'is', null)
             .orderBy('reward.updated_at', 'desc')
             .execute(),
           transaction
@@ -154,11 +172,13 @@ export class AdminDashboardService {
           transaction
             .selectFrom('creator_workouts')
             .selectAll()
+            .where('deleted_at', 'is', null)
             .orderBy('updated_at', 'desc')
             .execute(),
           transaction
             .selectFrom('legal_documents')
             .selectAll()
+            .where('deleted_at', 'is', null)
             .orderBy('effective_at', 'desc')
             .execute(),
           transaction
@@ -199,6 +219,13 @@ export class AdminDashboardService {
         const enrollmentsByCompetition = new Map(
           enrollmentCounts.map((row) => [row.competition_id, row.count]),
         );
+        const gymsByCompetition = new Map<string, string[]>();
+        for (const assignment of competitionGyms) {
+          const existing =
+            gymsByCompetition.get(assignment.competition_id) ?? [];
+          existing.push(assignment.gym_location_id);
+          gymsByCompetition.set(assignment.competition_id, existing);
+        }
         const rewardsByCompetition = new Map(
           rewardCounts.map((row) => [
             row.competition_id,
@@ -239,6 +266,7 @@ export class AdminDashboardService {
               goalsByCompetition,
               enrollmentsByCompetition,
               rewardsByCompetition,
+              gymsByCompetition,
             ),
           ),
           creatorWorkouts: creatorWorkouts.map((workout) => ({
@@ -346,9 +374,11 @@ export class AdminDashboardService {
     goalsByCompetition: Map<string, { goalDays: number; label: string }[]>,
     enrollmentsByCompetition: Map<string, number>,
     rewardsByCompetition: Map<string, { published: number; total: number }>,
+    gymsByCompetition: Map<string, string[]>,
   ): AdminDashboardCompetitionDto {
     const rewardCount = rewardsByCompetition.get(competition.id);
     return {
+      assignedGymIds: gymsByCompetition.get(competition.id) ?? [],
       endsAt: competition.ends_at.toISOString(),
       enrollmentCount: enrollmentsByCompetition.get(competition.id) ?? 0,
       entrantCap: competition.entrant_cap,

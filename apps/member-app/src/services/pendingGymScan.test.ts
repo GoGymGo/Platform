@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   pendingGymScanMaxAgeMs,
   readPendingGymScan,
+  rememberCompetitionGymAccess,
   rememberGymScanCredential,
   rememberGymScanResult
 } from './pendingGymScan';
@@ -42,6 +43,67 @@ describe('pending gym scan storage', () => {
     assert.equal(
       await readPendingGymScan({
         now: () => startedAt + pendingGymScanMaxAgeMs + 1,
+        storage
+      }),
+      null
+    );
+  });
+
+  it('keeps the selected gym available through the enrolled competition', async () => {
+    const storage = createMemoryStorage();
+    await rememberCompetitionGymAccess(
+      {
+        competitionId: 'competition-1',
+        credential,
+        credentialValidUntil: '2026-10-01T07:00:00.000Z'
+      },
+      { now: () => startedAt, storage }
+    );
+
+    const stored = await readPendingGymScan({
+      now: () => startedAt + pendingGymScanMaxAgeMs + 1,
+      storage
+    });
+    assert.equal(stored?.competitionId, 'competition-1');
+    assert.equal(stored?.credential, credential);
+
+    assert.equal(
+      await readPendingGymScan({
+        now: () => Date.parse('2026-10-01T07:00:00.001Z'),
+        storage
+      }),
+      null
+    );
+  });
+
+  it('keeps enrolled gym access through the 15-minute completion grace period', async () => {
+    const storage = createMemoryStorage();
+    await rememberCompetitionGymAccess(
+      {
+        competitionId: 'competition-1',
+        credential,
+        credentialValidUntil: '2026-09-01T17:20:00.000Z'
+      },
+      { now: () => startedAt, storage }
+    );
+    await rememberGymScanCredential(credential, {
+      now: () => Date.parse('2026-09-01T17:04:59.000Z'),
+      storage
+    });
+
+    assert.equal(
+      (
+        await readPendingGymScan({
+          now: () => Date.parse('2026-09-01T17:19:59.999Z'),
+          storage
+        })
+      )?.credential,
+      credential
+    );
+
+    assert.equal(
+      await readPendingGymScan({
+        now: () => Date.parse('2026-09-01T17:20:00.000Z'),
         storage
       }),
       null
@@ -88,5 +150,57 @@ describe('pending gym scan storage', () => {
       dependencies
     );
     assert.equal(await readPendingGymScan(dependencies), null);
+  });
+
+  it('clears the active workout but keeps enrolled gym access after verification', async () => {
+    const storage = createMemoryStorage();
+    const dependencies = { now: () => startedAt, storage };
+    await rememberCompetitionGymAccess(
+      {
+        competitionId: 'competition-1',
+        credential,
+        credentialValidUntil: '2026-10-01T07:00:00.000Z'
+      },
+      dependencies
+    );
+    await rememberGymScanResult(
+      credential,
+      {
+        credentialVersion: 1,
+        expiresAt: '2026-09-01T21:00:00.000Z',
+        gymLocationId: 'gym-1',
+        gymName: 'SkyGate',
+        minimumCompleteAt: '2026-09-01T17:30:00.000Z',
+        outcome: 'started',
+        rejectionReason: null,
+        remainingSeconds: 1800,
+        serverTimestamp: '2026-09-01T17:00:00.000Z',
+        sessionId: 'session-1',
+        startedAt: '2026-09-01T17:00:00.000Z'
+      },
+      dependencies
+    );
+    await rememberGymScanResult(
+      credential,
+      {
+        credentialVersion: 1,
+        expiresAt: null,
+        gymLocationId: 'gym-1',
+        gymName: 'SkyGate',
+        minimumCompleteAt: null,
+        outcome: 'verified',
+        rejectionReason: null,
+        remainingSeconds: 0,
+        serverTimestamp: '2026-09-01T17:31:00.000Z',
+        sessionId: 'session-1',
+        startedAt: '2026-09-01T17:00:00.000Z'
+      },
+      dependencies
+    );
+
+    const stored = await readPendingGymScan(dependencies);
+    assert.equal(stored?.activeSession, null);
+    assert.equal(stored?.competitionId, 'competition-1');
+    assert.equal(stored?.credential, credential);
   });
 });

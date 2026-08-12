@@ -11,7 +11,7 @@ import {
   getRegistrationGoalOptions
 } from './competitionEnrollment';
 
-const enrollmentPolicy = { maximumEntrants: null, minimumEntrants: 2 } as const;
+const enrollmentPolicy = { maximumEntrants: null, minimumEntrants: 1 } as const;
 
 describe('competition enrollment', () => {
   it('builds the complete competition window', () => {
@@ -41,9 +41,9 @@ describe('competition enrollment', () => {
     );
   });
 
-  it('confirms launch at the two-entrant pilot minimum without closing enrollment', () => {
+  it('confirms launch at the single-entrant test minimum without closing enrollment', () => {
     const summary = buildCompetitionEnrollmentSummary('2026-07', enrollmentPolicy);
-    const status = evaluateCompetitionEnrollment(summary, 2, '2026-07-20');
+    const status = evaluateCompetitionEnrollment(summary, 1, '2026-07-20');
 
     assert.equal(status.launchConfirmed, true);
     assert.equal(status.phase, 'competition-active');
@@ -53,7 +53,7 @@ describe('competition enrollment', () => {
   it('supports an optional sponsor-advised entrant cap', () => {
     const summary = buildCompetitionEnrollmentSummary('2026-07', {
       maximumEntrants: 2_500,
-      minimumEntrants: 2
+      minimumEntrants: 1
     });
     const status = evaluateCompetitionEnrollment(summary, 2_500, '2026-07-20');
 
@@ -103,14 +103,14 @@ describe('competition enrollment', () => {
     });
   });
 
-  it('rejects a launch minimum below two entrants', () => {
+  it('rejects a launch minimum below one entrant', () => {
     assert.throws(
       () =>
         buildCompetitionEnrollmentSummary('2026-07', {
           maximumEntrants: null,
-          minimumEntrants: 1
+          minimumEntrants: 0
         }),
-      /at least 2/i
+      /at least 1/i
     );
   });
 

@@ -259,6 +259,48 @@
         "tags": ["operator-configuration"]
       }
     },
+    "/v1/operator/configuration/region-policies/{regionPolicyId}": {
+      "delete": {
+        "operationId": "deleteRegionPolicy",
+        "parameters": [
+          {
+            "name": "regionPolicyId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OperatorReasonDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeletedEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Delete a retired regional policy from the admin dashboard",
+        "tags": ["operator-configuration"]
+      }
+    },
     "/v1/operator/configuration/competitions": {
       "post": {
         "operationId": "createCompetition",
@@ -338,6 +380,48 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Replace a versioned competition draft",
+        "tags": ["operator-configuration"]
+      },
+      "delete": {
+        "operationId": "deleteCompetition",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteVersionedAdminEntityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeletedEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Delete a terminal competition from the admin dashboard",
         "tags": ["operator-configuration"]
       }
     },
@@ -464,6 +548,48 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Replace an unpublished creator workout",
+        "tags": ["operator-configuration"]
+      },
+      "delete": {
+        "operationId": "deleteWorkout",
+        "parameters": [
+          {
+            "name": "workoutId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteVersionedAdminEntityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeletedEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Delete an unpublished workout from the admin dashboard",
         "tags": ["operator-configuration"]
       }
     },
@@ -948,6 +1074,48 @@
         "tags": ["operator"]
       }
     },
+    "/v1/operator/access": {
+      "get": {
+        "operationId": "getAccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorPortalAccessDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Resolve the server-authoritative operator portal",
+        "tags": ["operator portal"]
+      }
+    },
+    "/v1/operator/partner-dashboard": {
+      "get": {
+        "operationId": "getPartnerDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerDashboardSnapshotDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return a gym-scoped partner workspace snapshot",
+        "tags": ["operator portal"]
+      }
+    },
     "/v1/competitions/current": {
       "get": {
         "operationId": "getCurrent",
@@ -985,10 +1153,51 @@
         "tags": ["competitions"]
       }
     },
+    "/v1/competitions/resolve-gym-qr": {
+      "post": {
+        "operationId": "resolveGymQrCompetition",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveGymQrCompetitionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/CompetitionResponseDto" }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Resolve the joinable competition encoded by a gym QR poster",
+        "tags": ["competitions"]
+      }
+    },
     "/v1/competitions/current/enrollment": {
       "get": {
         "operationId": "getCurrentEnrollment",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -1048,6 +1257,40 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Enroll the authenticated eligible user in a goal bracket",
+        "tags": ["competitions"]
+      }
+    },
+    "/v1/competitions/{competitionId}/enrollment/withdrawal": {
+      "post": {
+        "operationId": "withdrawEnrollment",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Withdraw the authenticated user from a contest",
         "tags": ["competitions"]
       }
     },
@@ -1498,6 +1741,50 @@
         "tags": ["operator-configuration"]
       }
     },
+    "/v1/operator/configuration/legal-documents/{legalDocumentId}": {
+      "delete": {
+        "operationId": "delete",
+        "parameters": [
+          {
+            "name": "legalDocumentId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeletedEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Delete a withdrawn legal version from the admin dashboard",
+        "tags": ["operator-configuration"]
+      }
+    },
     "/v1/me/verification-consents/device-presence": {
       "get": {
         "operationId": "getStatus",
@@ -1678,6 +1965,48 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Replace a draft contest reward",
+        "tags": ["operator-rewards"]
+      },
+      "delete": {
+        "operationId": "delete",
+        "parameters": [
+          {
+            "name": "rewardId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteVersionedAdminEntityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeletedEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Delete an inactive reward from the admin dashboard",
         "tags": ["operator-rewards"]
       }
     },
@@ -2113,12 +2442,54 @@
         "security": [{ "firebase": [] }],
         "summary": "Update or deactivate a gym geofence",
         "tags": ["operator gyms and pilot"]
+      },
+      "delete": {
+        "operationId": "deleteGym",
+        "parameters": [
+          {
+            "name": "gymId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OperatorReasonDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "type": "object" } }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Delete an inactive gym from the admin dashboard",
+        "tags": ["operator gyms and pilot"]
       }
     },
-    "/v1/operator/gym-locations/{gymId}/qr-credentials": {
+    "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials": {
       "post": {
         "operationId": "issueCredential",
         "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
           {
             "name": "gymId",
             "required": true,
@@ -2157,10 +2528,55 @@
         "tags": ["operator gyms and pilot"]
       }
     },
-    "/v1/operator/gym-locations/{gymId}/qr-credentials/revoke": {
+    "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/active": {
+      "get": {
+        "operationId": "getActiveCredential",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "gymId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GymQrCredentialResponseDto"
+                    }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Recover the active printable static QR poster",
+        "tags": ["operator gyms and pilot"]
+      }
+    },
+    "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/revoke": {
       "post": {
         "operationId": "revokeCredential",
         "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
           {
             "name": "gymId",
             "required": true,
@@ -2261,7 +2677,7 @@
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "List complete and incomplete QR visits",
+        "summary": "List complete and incomplete location-verified gym visits",
         "tags": ["operator gyms and pilot"]
       }
     },
@@ -2405,8 +2821,8 @@
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "Start, check, or complete a static-QR gym session",
-        "tags": ["gym scans"]
+        "summary": "Start, check, or complete a Partner-gym location-verified session",
+        "tags": ["gym location checks"]
       }
     },
     "/v1/region-waitlist": {
@@ -2849,6 +3265,32 @@
           }
         },
         "summary": "Return the latest settled reward contest summary",
+        "tags": ["competition results"]
+      }
+    },
+    "/v1/results/mine/latest": {
+      "get": {
+        "operationId": "getLatestParticipantResults",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ParticipantCompetitionResultsResponseDto"
+                    }
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return the latest ended competition and results for the authenticated participant",
         "tags": ["competition results"]
       }
     },
@@ -3858,6 +4300,10 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
+          "assignedGymIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
@@ -3885,6 +4331,7 @@
         },
         "required": [
           "id",
+          "assignedGymIds",
           "regionPolicyId",
           "regionCode",
           "regionName",
@@ -4169,6 +4616,21 @@
         },
         "required": ["id", "code", "policyVersion"]
       },
+      "OperatorReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+        },
+        "required": ["reason"]
+      },
+      "AdminDeletedEntityResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["deleted"] }
+        },
+        "required": ["id", "status"]
+      },
       "GoalBracketDto": {
         "type": "object",
         "properties": {
@@ -4181,13 +4643,14 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "gymLocationId": { "type": "string", "format": "uuid" },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
           "rulesVersion": { "type": "string", "maxLength": 64 },
           "rules": { "type": "object" },
-          "minimumEntrants": { "type": "number", "minimum": 2 },
-          "entrantCap": { "type": "number", "minimum": 2, "nullable": true },
+          "minimumEntrants": { "type": "number", "maximum": 1, "minimum": 1 },
+          "entrantCap": { "type": "number", "minimum": 1, "nullable": true },
           "registrationOpensAt": { "type": "string", "format": "date-time" },
           "registrationClosesAt": { "type": "string", "format": "date-time" },
           "startsAt": { "type": "string", "format": "date-time" },
@@ -4225,13 +4688,14 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "gymLocationId": { "type": "string", "format": "uuid" },
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "monthKey": { "type": "string", "example": "2026-08" },
           "name": { "type": "string", "maxLength": 160 },
           "rulesVersion": { "type": "string", "maxLength": 64 },
           "rules": { "type": "object" },
-          "minimumEntrants": { "type": "number", "minimum": 2 },
-          "entrantCap": { "type": "number", "minimum": 2, "nullable": true },
+          "minimumEntrants": { "type": "number", "maximum": 1, "minimum": 1 },
+          "entrantCap": { "type": "number", "minimum": 1, "nullable": true },
           "registrationOpensAt": { "type": "string", "format": "date-time" },
           "registrationClosesAt": { "type": "string", "format": "date-time" },
           "startsAt": { "type": "string", "format": "date-time" },
@@ -4266,6 +4730,14 @@
           "expectedVersion": { "type": "number", "minimum": 1 }
         },
         "required": ["reason", "action", "expectedVersion"]
+      },
+      "DeleteVersionedAdminEntityDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "expectedVersion"]
       },
       "CreateCreatorWorkoutDto": {
         "type": "object",
@@ -4649,6 +5121,201 @@
         },
         "required": ["reason", "decision"]
       },
+      "OperatorPortalAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "accessLevel": { "type": "string", "enum": ["admin", "staff"] },
+          "gymLocationId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["accessLevel", "gymLocationId"]
+      },
+      "OperatorPortalAccessDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "portal": { "type": "string", "enum": ["gogymgo", "partner"] },
+          "roles": { "type": "array", "items": { "type": "string" } },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorPortalAssignmentDto"
+            }
+          }
+        },
+        "required": ["id", "email", "portal", "roles", "assignments"]
+      },
+      "ActiveGymQrCredentialDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": { "type": "string", "format": "uuid" },
+          "credentialVersion": { "type": "number" }
+        },
+        "required": ["competitionId", "credentialVersion"]
+      },
+      "PartnerGymDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "regionCode": { "type": "string" },
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "radiusMeters": { "type": "number" },
+          "active": { "type": "boolean" },
+          "activeCredentialVersion": { "type": "number", "nullable": true },
+          "activeQrCredentials": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActiveGymQrCredentialDto" }
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "accessLevel": { "type": "string", "enum": ["admin", "staff"] }
+        },
+        "required": [
+          "id",
+          "regionPolicyId",
+          "regionCode",
+          "name",
+          "address",
+          "latitude",
+          "longitude",
+          "radiusMeters",
+          "active",
+          "activeCredentialVersion",
+          "activeQrCredentials",
+          "createdAt",
+          "updatedAt",
+          "accessLevel"
+        ]
+      },
+      "OperatorGymSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "gymLocationId": { "type": "string", "format": "uuid" },
+          "gymName": { "type": "string" },
+          "status": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "incomplete": { "type": "boolean" }
+        },
+        "required": [
+          "id",
+          "gymLocationId",
+          "gymName",
+          "status",
+          "startedAt",
+          "completedAt",
+          "incomplete"
+        ]
+      },
+      "PartnerCompetitionDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "assignedGymIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "regionPolicyId": { "type": "string", "format": "uuid" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 },
+          "rulesVersion": { "type": "string" },
+          "rules": { "type": "object" },
+          "minimumEntrants": { "type": "number" },
+          "entrantCap": { "type": "number", "nullable": true },
+          "enrollmentCount": { "type": "number" },
+          "rewardCount": { "type": "number" },
+          "publishedRewardCount": { "type": "number" },
+          "goalBrackets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardGoalBracketDto"
+            }
+          },
+          "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "registrationClosesAt": { "type": "string", "format": "date-time" },
+          "startsAt": { "type": "string", "format": "date-time" },
+          "endsAt": { "type": "string", "format": "date-time" },
+          "gymLocationId": { "type": "string", "format": "uuid" },
+          "gymName": { "type": "string" },
+          "proposedByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "assignedGymIds",
+          "regionPolicyId",
+          "regionCode",
+          "regionName",
+          "monthKey",
+          "name",
+          "status",
+          "version",
+          "rulesVersion",
+          "rules",
+          "minimumEntrants",
+          "entrantCap",
+          "enrollmentCount",
+          "rewardCount",
+          "publishedRewardCount",
+          "goalBrackets",
+          "registrationOpensAt",
+          "registrationClosesAt",
+          "startsAt",
+          "endsAt",
+          "gymLocationId",
+          "gymName",
+          "proposedByUserId"
+        ]
+      },
+      "PartnerDashboardSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/AdminDashboardIdentityDto"
+          },
+          "gyms": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PartnerGymDto" }
+          },
+          "sessions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OperatorGymSessionDto" }
+          },
+          "competitions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PartnerCompetitionDto" }
+          },
+          "regions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminDashboardRegionDto" }
+          },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "operator",
+          "gyms",
+          "sessions",
+          "competitions",
+          "regions",
+          "generatedAt"
+        ]
+      },
       "CategoryPodiumMultipliersResponseDto": {
         "type": "object",
         "properties": {
@@ -4715,8 +5382,8 @@
             "$ref": "#/components/schemas/CompetitionRulesResponseDto"
           },
           "goalDays": { "type": "array", "items": { "type": "number" } },
-          "minimumEntrants": { "type": "number", "minimum": 2 },
-          "entrantCap": { "type": "number", "minimum": 2, "nullable": true },
+          "minimumEntrants": { "type": "number", "minimum": 1 },
+          "entrantCap": { "type": "number", "minimum": 1, "nullable": true },
           "registrationOpensAt": { "type": "string", "format": "date-time" },
           "registrationClosesAt": { "type": "string", "format": "date-time" },
           "startsAt": { "type": "string", "format": "date-time" },
@@ -4754,6 +5421,27 @@
         },
         "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
       },
+      "ResolveGymQrCompetitionDto": {
+        "type": "object",
+        "properties": {
+          "credential": { "type": "string", "maxLength": 256, "minLength": 32 }
+        },
+        "required": ["credential"]
+      },
+      "EnrollmentGymPresenceDto": {
+        "type": "object",
+        "properties": {
+          "credential": { "type": "string", "maxLength": 256, "minLength": 32 },
+          "latitude": { "type": "number", "maximum": 90, "minimum": -90 },
+          "longitude": { "type": "number", "maximum": 180, "minimum": -180 },
+          "accuracyMeters": {
+            "type": "number",
+            "maximum": 100000,
+            "minimum": 0.1
+          }
+        },
+        "required": ["credential", "latitude", "longitude", "accuracyMeters"]
+      },
       "CreateEnrollmentDto": {
         "type": "object",
         "properties": {
@@ -4761,14 +5449,18 @@
           "regionVerificationId": { "type": "string", "format": "uuid" },
           "legalReceiptBundleId": { "type": "string", "format": "uuid" },
           "rulesAccepted": { "type": "boolean", "enum": [true] },
-          "ageEligibilityAttested": { "type": "boolean", "enum": [true] }
+          "ageEligibilityAttested": { "type": "boolean", "enum": [true] },
+          "gymPresence": {
+            "$ref": "#/components/schemas/EnrollmentGymPresenceDto"
+          }
         },
         "required": [
           "goalDays",
           "regionVerificationId",
           "legalReceiptBundleId",
           "rulesAccepted",
-          "ageEligibilityAttested"
+          "ageEligibilityAttested",
+          "gymPresence"
         ]
       },
       "EnrollmentCountResponseDto": {
@@ -5588,6 +6280,10 @@
           "radiusMeters": { "type": "number" },
           "active": { "type": "boolean" },
           "activeCredentialVersion": { "type": "number", "nullable": true },
+          "activeQrCredentials": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActiveGymQrCredentialDto" }
+          },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" }
         },
@@ -5602,6 +6298,7 @@
           "radiusMeters",
           "active",
           "activeCredentialVersion",
+          "activeQrCredentials",
           "createdAt",
           "updatedAt"
         ]
@@ -5611,7 +6308,7 @@
         "properties": {
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "maxLength": 160, "minLength": 2 },
-          "address": { "type": "string", "maxLength": 500, "minLength": 5 },
+          "address": { "type": "string", "maxLength": 500 },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
           "radiusMeters": {
@@ -5625,7 +6322,6 @@
         "required": [
           "regionPolicyId",
           "name",
-          "address",
           "latitude",
           "longitude",
           "radiusMeters",
@@ -5637,7 +6333,7 @@
         "properties": {
           "regionPolicyId": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "maxLength": 160, "minLength": 2 },
-          "address": { "type": "string", "maxLength": 500, "minLength": 5 },
+          "address": { "type": "string", "maxLength": 500 },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
           "radiusMeters": {
@@ -5652,7 +6348,6 @@
         "required": [
           "regionPolicyId",
           "name",
-          "address",
           "latitude",
           "longitude",
           "radiusMeters",
@@ -5660,18 +6355,13 @@
           "active"
         ]
       },
-      "OperatorReasonDto": {
-        "type": "object",
-        "properties": {
-          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
-        },
-        "required": ["reason"]
-      },
       "GymQrCredentialResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "gymLocationId": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
           "credentialVersion": { "type": "number" },
           "qrPayload": { "type": "string" },
           "printablePosterSvg": { "type": "string" },
@@ -5680,6 +6370,8 @@
         "required": [
           "id",
           "gymLocationId",
+          "competitionId",
+          "competitionName",
           "credentialVersion",
           "qrPayload",
           "printablePosterSvg",
@@ -5692,31 +6384,6 @@
           "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
         },
         "required": ["reason"]
-      },
-      "OperatorGymSessionDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "gymLocationId": { "type": "string", "format": "uuid" },
-          "gymName": { "type": "string" },
-          "status": { "type": "string" },
-          "startedAt": { "type": "string", "format": "date-time" },
-          "completedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "incomplete": { "type": "boolean" }
-        },
-        "required": [
-          "id",
-          "gymLocationId",
-          "gymName",
-          "status",
-          "startedAt",
-          "completedAt",
-          "incomplete"
-        ]
       },
       "RegionWaitlistEntryDto": {
         "type": "object",
@@ -5821,22 +6488,26 @@
         "type": "object",
         "properties": {
           "eventId": { "type": "string", "format": "uuid" },
-          "credential": { "type": "string", "minLength": 32, "maxLength": 256 },
+          "credential": {
+            "type": "string",
+            "description": "Initial Partner gym QR credential. Required only while selecting the gym for enrollment.",
+            "minLength": 32,
+            "maxLength": 256
+          },
+          "competitionId": {
+            "type": "string",
+            "description": "Enrolled competition used to resolve the account-selected Partner gym for a fresh location-only workout check.",
+            "format": "uuid"
+          },
           "latitude": { "type": "number" },
           "longitude": { "type": "number" },
           "accuracyMeters": {
             "type": "number",
-            "maximum": 1000,
+            "maximum": 100000,
             "minimum": 0.1
           }
         },
-        "required": [
-          "eventId",
-          "credential",
-          "latitude",
-          "longitude",
-          "accuracyMeters"
-        ]
+        "required": ["eventId", "latitude", "longitude", "accuracyMeters"]
       },
       "GymScanResultDto": {
         "type": "object",
@@ -6220,14 +6891,35 @@
           "expiresAt"
         ]
       },
-      "SettledCompetitionResponseDto": {
+      "CategoryLeaderboardRowDto": {
         "type": "object",
         "properties": {
-          "competitionName": { "type": "string" },
-          "monthKey": { "type": "string" },
-          "rewardCount": { "type": "number", "minimum": 0 }
+          "alias": { "type": "string" },
+          "categoryEntries": { "type": "number" },
+          "rank": { "type": "number" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "verifiedDays": { "type": "number" }
         },
-        "required": ["competitionName", "monthKey", "rewardCount"]
+        "required": [
+          "alias",
+          "categoryEntries",
+          "rank",
+          "streaks",
+          "verifiedDays"
+        ]
+      },
+      "CategoryLeaderboardDto": {
+        "type": "object",
+        "properties": {
+          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryLeaderboardRowDto"
+            }
+          }
+        },
+        "required": ["goal", "rows"]
       },
       "RewardWinnerResponseDto": {
         "type": "object",
@@ -6250,6 +6942,60 @@
           "rewardType",
           "streaks"
         ]
+      },
+      "ParticipantCompetitionResultsResponseDto": {
+        "type": "object",
+        "properties": {
+          "categoryLeaderboards": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CategoryLeaderboardDto" }
+          },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "endedAt": { "type": "string", "format": "date-time" },
+          "monthKey": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "regionName": { "type": "string" },
+          "participantGoalDays": {
+            "type": "number",
+            "maximum": 7,
+            "minimum": 1
+          },
+          "rewardWinners": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RewardWinnerResponseDto" }
+          },
+          "rewardCount": { "type": "number", "minimum": 0 },
+          "resultsStatus": { "type": "string", "enum": ["pending", "settled"] },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "categoryLeaderboards",
+          "competitionId",
+          "competitionName",
+          "endedAt",
+          "monthKey",
+          "regionCode",
+          "regionName",
+          "participantGoalDays",
+          "rewardWinners",
+          "rewardCount",
+          "resultsStatus",
+          "settledAt"
+        ]
+      },
+      "SettledCompetitionResponseDto": {
+        "type": "object",
+        "properties": {
+          "competitionName": { "type": "string" },
+          "monthKey": { "type": "string" },
+          "rewardCount": { "type": "number", "minimum": 0 }
+        },
+        "required": ["competitionName", "monthKey", "rewardCount"]
       },
       "CreatorWorkoutResponseDto": {
         "type": "object",
@@ -6719,36 +7465,6 @@
           "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
         },
         "required": ["asOfDate", "timezone", "streaks"]
-      },
-      "CategoryLeaderboardRowDto": {
-        "type": "object",
-        "properties": {
-          "alias": { "type": "string" },
-          "categoryEntries": { "type": "number" },
-          "rank": { "type": "number" },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "verifiedDays": { "type": "number" }
-        },
-        "required": [
-          "alias",
-          "categoryEntries",
-          "rank",
-          "streaks",
-          "verifiedDays"
-        ]
-      },
-      "CategoryLeaderboardDto": {
-        "type": "object",
-        "properties": {
-          "goal": { "type": "number", "maximum": 7, "minimum": 1 },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CategoryLeaderboardRowDto"
-            }
-          }
-        },
-        "required": ["goal", "rows"]
       },
       "CompetitionSessionSummaryDto": {
         "type": "object",

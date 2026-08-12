@@ -18,7 +18,7 @@ export const privacyPolicy: LegalDocument = {
   sections: [
     {
       heading: 'BROWSER PREVIEW',
-      body: 'Preview agreements stay in this browser and do not create real accounts, competition entries or prize eligibility.'
+      body: 'Preview agreements stay in this browser and do not create real accounts, contest entries or prize eligibility.'
     },
     {
       heading: 'SAMPLE INFORMATION',
@@ -34,7 +34,7 @@ export const termsOfService: LegalDocument = {
   sections: [
     {
       heading: 'BROWSER PREVIEW',
-      body: 'Preview actions are local demonstrations and are not real competition entries, purchases or prize claims.'
+      body: 'Preview actions are local demonstrations and are not real contest entries, purchases or prize claims.'
     },
     {
       heading: 'SAFE TESTING',
@@ -46,15 +46,15 @@ export const termsOfService: LegalDocument = {
 export const officialContestRules: LegalDocument = {
   title: 'Contest Rules Preview',
   effectiveDate: 'BROWSER PREVIEW',
-  intro: 'No live prize competition is open in this preview. This screen lets testers review the contest-rules experience with sample information.',
+  intro: 'No live prize contest is open in this preview. This screen lets testers review the contest-rules experience with sample information.',
   sections: [
     {
       heading: 'PREVIEW ACTIVITY',
       body: 'Weekly goals, entries, rankings and rewards shown in the browser preview are sample data and do not create eligibility or a real-world prize claim.'
     },
     {
-      heading: 'BEFORE A LIVE COMPETITION',
-      body: 'Official rules will identify the operator, eligible regions, dates, prizes, odds, entry method and winner process before any live competition opens.'
+      heading: 'BEFORE A LIVE CONTEST',
+      body: 'Official rules will identify the operator, eligible regions, dates, prizes, odds, entry method and winner process before any live contest opens.'
     }
   ]
 };
@@ -66,7 +66,7 @@ export const biometricCameraConsent: LegalDocument = {
   sections: [
     {
       heading: 'WHAT THE PREVIEW DOES',
-      body: 'The preview simulates device confirmation and partner-gym QR steps without collecting biometric information or opening the camera.'
+      body: 'The preview simulates device confirmation and the initial Partner gym QR selection without collecting biometric information or opening the camera.'
     },
     {
       heading: 'WHAT IS NOT COLLECTED',

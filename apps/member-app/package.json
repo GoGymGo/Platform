@@ -4,17 +4,19 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "build": "expo export --platform web --output-dir dist && node scripts/write-app-link-associations.mjs dist",
+    "build": "expo export --platform web --output-dir dist --clear && node scripts/write-app-link-associations.mjs dist",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "node --max-old-space-size=512 ./node_modules/expo/bin/cli start --web",
+    "preview": "node scripts/serve-spa.mjs dist",
+    "web": "node --max-old-space-size=512 ../../node_modules/expo/bin/cli start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test": "tsx --test src/config/demoMode.test.ts src/data/gymScanRepository.test.ts src/demo/demoRoutes.test.ts src/domain/accountSetup.test.ts src/domain/appResume.test.ts src/domain/gymScan.test.ts src/domain/workoutAccess.test.ts src/domain/workoutProgress.test.ts src/domain/competition.test.ts src/domain/competitionEnrollment.test.ts src/domain/campaignEconomics.test.ts src/domain/commitmentProjection.test.ts src/domain/winnersCircle.test.ts src/domain/auth.test.ts src/domain/profile.test.ts src/domain/social.test.ts src/domain/streakBadges.test.ts src/domain/sponsorApplication.test.ts src/domain/creatorApplication.test.ts src/domain/gymRegistration.test.ts src/config/api.test.ts src/config/competition.test.ts src/config/regions.test.ts src/constants/legal.test.ts src/data/appData.test.ts src/data/accountReadinessRepository.test.ts src/data/accountSettingsRepository.test.ts src/data/sessionRepository.test.ts src/data/socialRepository.test.ts src/state/onboardingPreferences.test.ts src/services/api/client.test.ts src/services/flowMetrics.test.ts src/services/pendingGymScan.test.ts src/services/storage/userStorage.test.ts src/navigation/goBack.test.ts src/navigation/creatorWorkouts.test.ts src/navigation/gymScanFlow.test.ts src/testing/appTourData.test.ts src/testing/appTourRoutes.test.ts",
+    "test": "tsx --test src/config/demoMode.test.ts src/data/gymScanRepository.test.ts src/domain/accountSetup.test.ts src/domain/appResume.test.ts src/domain/gymScan.test.ts src/domain/mobileGymVerification.test.ts src/domain/workoutAccess.test.ts src/domain/workoutProgress.test.ts src/domain/competition.test.ts src/domain/competitionEnrollment.test.ts src/domain/competitionTiming.test.ts src/domain/campaignEconomics.test.ts src/domain/commitmentProjection.test.ts src/domain/winnersCircle.test.ts src/domain/auth.test.ts src/domain/profile.test.ts src/domain/social.test.ts src/domain/streakBadges.test.ts src/domain/sponsorApplication.test.ts src/domain/creatorApplication.test.ts src/domain/gymRegistration.test.ts src/config/api.test.ts src/config/competition.test.ts src/config/regions.test.ts src/constants/legal.test.ts src/data/appData.test.ts src/data/accountReadinessRepository.test.ts src/data/accountSettingsRepository.test.ts src/data/sessionRepository.test.ts src/data/socialRepository.test.ts src/state/onboardingPreferences.test.ts src/services/api/client.test.ts src/services/flowMetrics.test.ts src/services/gymScanLocationSampling.test.ts src/services/localAppReset.test.ts src/services/pendingGymScan.test.ts src/services/storage/userStorage.test.ts src/navigation/goBack.test.ts src/navigation/creatorWorkouts.test.ts src/navigation/gymScanFlow.test.ts src/testing/appTourData.test.ts src/testing/appTourRoutes.test.ts",
     "audit:api-routes": "node scripts/audit-api-routes.mjs",
     "audit:app-links": "node scripts/audit-app-links.mjs",
     "audit:demo-isolation": "node scripts/audit-demo-isolation.mjs",
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "audit:production-bundle": "node scripts/audit-production-bundle.mjs",
     "audit:web-test-preview": "node scripts/audit-browser-test-preview.mjs dist",
     "audit:release": "node scripts/audit-release.mjs",
@@ -23,36 +25,34 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run audit:api-routes && npm run audit:app-links && npm run audit:demo-isolation && npm run audit:source"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.9",
+    "@expo/vector-icons": "^15.0.2",
     "@gogymgo/brand": "*",
     "@gogymgo/contracts": "*",
-    "@expo-google-fonts/rajdhani": "^0.4.1",
-    "@expo/metro-runtime": "~57.0.3",
-    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/react-query": "^5.90.19",
-    "expo": "~57.0.10",
+    "expo": "~57.0.12",
     "expo-apple-authentication": "~57.0.1",
-    "expo-asset": "~57.0.3",
+    "expo-asset": "~57.0.9",
     "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.9",
     "expo-crypto": "~57.0.1",
-    "expo-dev-client": "~57.0.10",
+    "expo-dev-client": "~57.0.11",
     "expo-font": "~57.0.0",
     "expo-haptics": "~57.0.1",
-    "expo-image-manipulator": "~57.0.7",
-    "expo-image-picker": "~57.0.7",
+    "expo-image-manipulator": "~57.0.9",
+    "expo-image-picker": "~57.0.9",
     "expo-keep-awake": "~57.0.1",
     "expo-linking": "~57.0.5",
-    "expo-local-authentication": "~57.0.2",
-    "expo-location": "~57.0.7",
-    "expo-notifications": "~57.0.8",
-    "expo-router": "~57.0.10",
-    "expo-splash-screen": "~57.0.5",
+    "expo-location": "~57.0.9",
+    "expo-notifications": "~57.0.10",
+    "expo-router": "~57.0.12",
+    "expo-splash-screen": "~57.0.6",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.2",
     "firebase": "^12.16.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "react-native": "0.86.2",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-nitro-google-signin": "^0.8.2",
@@ -71,12 +71,13 @@
     "tsx": "^4.20.6",
     "typescript": "~6.0.3"
   },
-  "overrides": {
-    "xcode": {
-      "uuid": "11.1.1"
-    }
-  },
   "expo": {
+    "install": {
+      "exclude": [
+        "react",
+        "react-dom"
+      ]
+    },
     "doctor": {
       "reactNativeDirectoryCheck": {
         "exclude": [

@@ -4,6 +4,21 @@ import type { Database, JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { ProfilesService } from '../profiles/profiles.service';
 
+export type PortalAccess =
+  | {
+      kind: 'platform_admin';
+      assignments: [];
+      user: Awaited<ReturnType<ProfilesService['ensureUser']>>;
+    }
+  | {
+      kind: 'gym_partner';
+      assignments: {
+        accessLevel: 'admin' | 'staff';
+        gymLocationId: string;
+      }[];
+      user: Awaited<ReturnType<ProfilesService['ensureUser']>>;
+    };
+
 @Injectable()
 export class AdminAuthorizationService {
   constructor(private readonly profiles: ProfilesService) {}
@@ -12,15 +27,7 @@ export class AdminAuthorizationService {
     principal: AuthenticatedPrincipal,
     transaction: Transaction<Database>,
   ) {
-    if (principal.signInProvider !== 'password') {
-      throw new ForbiddenException({
-        code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
-        message:
-          'Use the email and password credentials issued directly by GoGymGo.',
-      });
-    }
-    const user = await this.profiles.ensureUser(principal, transaction);
-    this.profiles.requireVerifiedEmail(user);
+    const user = await this.requirePasswordUser(principal, transaction);
     if (!user.roles.includes('admin')) {
       throw new ForbiddenException({
         code: 'ADMIN_REQUIRED',
@@ -28,6 +35,88 @@ export class AdminAuthorizationService {
       });
     }
     return user;
+  }
+
+  async resolvePortalAccess(
+    principal: AuthenticatedPrincipal,
+    transaction: Transaction<Database>,
+  ): Promise<PortalAccess> {
+    const user = await this.requirePasswordUser(principal, transaction);
+    if (user.roles.includes('admin')) {
+      return { assignments: [], kind: 'platform_admin', user };
+    }
+
+    const partnerAdmin = user.roles.includes('gym_partner_admin');
+    const partnerStaff = user.roles.includes('gym_partner_staff');
+    if (!partnerAdmin && !partnerStaff) {
+      throw new ForbiddenException({
+        code: 'OPERATOR_PORTAL_ACCESS_REQUIRED',
+        message: 'A GoGymGo or gym-partner role is required for this portal.',
+      });
+    }
+
+    const assignments = await transaction
+      .selectFrom('gym_partner_assignments')
+      .select(['access_level', 'gym_location_id'])
+      .where('user_id', '=', user.id)
+      .where('active', '=', true)
+      .orderBy('gym_location_id')
+      .execute();
+    const authorizedAssignments = assignments
+      .filter(
+        (assignment) =>
+          (assignment.access_level === 'admin' && partnerAdmin) ||
+          (assignment.access_level === 'staff' &&
+            (partnerAdmin || partnerStaff)),
+      )
+      .map((assignment) => ({
+        accessLevel: assignment.access_level,
+        gymLocationId: assignment.gym_location_id,
+      }));
+    if (authorizedAssignments.length === 0) {
+      throw new ForbiddenException({
+        code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED',
+        message: 'This partner account is not assigned to an active gym.',
+      });
+    }
+    return { assignments: authorizedAssignments, kind: 'gym_partner', user };
+  }
+
+  async requirePartnerPortal(
+    principal: AuthenticatedPrincipal,
+    transaction: Transaction<Database>,
+  ): Promise<Extract<PortalAccess, { kind: 'gym_partner' }>> {
+    const access = await this.resolvePortalAccess(principal, transaction);
+    if (access.kind !== 'gym_partner') {
+      throw new ForbiddenException({
+        code: 'GYM_PARTNER_ACCESS_REQUIRED',
+        message: 'A gym-partner account is required for this workspace.',
+      });
+    }
+    return access;
+  }
+
+  async requireGymAccess(
+    principal: AuthenticatedPrincipal,
+    transaction: Transaction<Database>,
+    gymLocationId: string,
+    minimumAccess: 'admin' | 'staff' = 'staff',
+  ): Promise<PortalAccess> {
+    const access = await this.resolvePortalAccess(principal, transaction);
+    if (access.kind === 'platform_admin') return access;
+    const assignment = access.assignments.find(
+      (candidate) => candidate.gymLocationId === gymLocationId,
+    );
+    if (
+      !assignment ||
+      (minimumAccess === 'admin' && assignment.accessLevel !== 'admin')
+    ) {
+      throw new ForbiddenException({
+        code: 'GYM_SCOPE_FORBIDDEN',
+        message: 'This account cannot manage the requested gym.',
+      });
+    }
+    return access;
   }
 
   async audit(
@@ -57,5 +146,21 @@ export class AdminAuthorizationService {
         request_id: input.requestId,
       })
       .executeTakeFirstOrThrow();
+  }
+
+  private async requirePasswordUser(
+    principal: AuthenticatedPrincipal,
+    transaction: Transaction<Database>,
+  ) {
+    if (principal.signInProvider !== 'password') {
+      throw new ForbiddenException({
+        code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
+        message:
+          'Use the email and password credentials issued directly by GoGymGo.',
+      });
+    }
+    const user = await this.profiles.ensureUser(principal, transaction);
+    this.profiles.requireVerifiedEmail(user);
+    return user;
   }
 }

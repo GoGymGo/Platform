@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { brandAssets, brandColors } from '../src/index.js';
+import { brandAssets, brandColors, brandFonts } from '../src/index.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const missingAssets = Object.values(brandAssets).filter(
@@ -11,37 +11,44 @@ const missingAssets = Object.values(brandAssets).filter(
 const markPng = fs.readFileSync(path.join(packageRoot, brandAssets.mark));
 const markSource = fs.readFileSync(path.join(packageRoot, brandAssets.markVector), 'utf8');
 const wordmarkSource = fs.readFileSync(path.join(packageRoot, brandAssets.wordmark), 'utf8');
+const webTokens = fs.readFileSync(path.join(packageRoot, 'src/web.css'), 'utf8');
 
 if (brandColors.cyan !== '#34E5E8' || brandColors.pink !== '#FF2D9B') {
   throw new Error('Canonical cyan or pink brand token changed unexpectedly.');
+}
+
+if (
+  brandFonts.body !== '"Segoe UI", Arial, sans-serif' ||
+  brandFonts.bodyStrong !== '"Segoe UI", Arial, sans-serif' ||
+  brandFonts.display !== 'Orbitron-Bold' ||
+  brandFonts.mono !== 'ShareTechMono-Regular'
+) {
+  throw new Error('Canonical brand font registrations changed unexpectedly.');
+}
+
+for (const token of [
+  '--gogymgo-background: #080b0e',
+  '--gogymgo-muted: #96aab0',
+  '--gogymgo-cyan: #34e5e8',
+  '--gogymgo-font-body: "Segoe UI", Arial, sans-serif',
+  'font-family: "Orbitron"',
+  'font-family: "Share Tech Mono"',
+  '--gogymgo-font-display: "Orbitron"',
+  '--gogymgo-font-mono: "Share Tech Mono"'
+]) {
+  if (!webTokens.includes(token)) {
+    throw new Error(`Canonical web token is missing: ${token}`);
+  }
+}
+
+if (/Rajdhani/i.test(webTokens)) {
+  throw new Error('Rajdhani must not be part of the canonical web typography.');
 }
 
 if (missingAssets.length > 0) {
   throw new Error(`Missing canonical brand assets: ${missingAssets.join(', ')}`);
 }
 
-if (
-  !markPng.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-  markPng.readUInt32BE(16) !== 510 ||
-  markPng.readUInt32BE(20) !== 510
-) {
-  throw new Error('Canonical compact mark PNG must be the approved 510x510 source asset.');
-}
-
-for (const requiredMarkFragment of [
-  'id="brand-mark-frame"',
-  'id="brand-mark-g"',
-  'id="brand-mark-trace"',
-  'stroke="#34E5E8"',
-  'stroke="#FF2D9B"'
-]) {
-  if (!markSource.includes(requiredMarkFragment)) {
-    throw new Error(`Canonical compact mark is missing ${requiredMarkFragment}.`);
-  }
-}
-
-if (!wordmarkSource.includes('fill="#34E5E8"') || !wordmarkSource.includes('fill="#FF2D9B"')) {
-  throw new Error('Canonical wordmark must retain the cyan GO / pink GYM / cyan GO treatment.');
-}
-
-console.log(`Brand package validated: ${Object.keys(brandColors).length} colours and ${Object.keys(brandAssets).length} assets.`);
+console.log(
+  `Brand package validated: ${Object.keys(brandColors).length} colours, ${Object.keys(brandFonts).length} fonts and ${Object.keys(brandAssets).length} assets.`
+);

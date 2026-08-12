@@ -127,6 +127,16 @@ export type MonthlyCompetitionResult = {
   weeklyGoal: number;
 };
 
+export function canLoadWeeklyChallengePairing({
+  hasCurrentPeriod,
+  phase
+}: {
+  hasCurrentPeriod: boolean;
+  phase: CompetitionPhase;
+}): boolean {
+  return phase === 'scoring-period' && hasCurrentPeriod;
+}
+
 export type EvaluateMonthlyCompetitionInput = {
   competitionMonthKey: string;
   eligibleFromDateKey?: string;
@@ -344,6 +354,18 @@ export function getCompetitionRegionDateKey(date: Date, timeZone: string) {
   return `${values.get('year')}-${values.get('month')}-${values.get('day')}`;
 }
 
+export function formatCompetitionOpeningDateTime(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'long',
+    timeZone,
+    timeZoneName: 'short',
+    year: 'numeric'
+  }).format(new Date(value));
+}
+
 export function isCompetitionBonusDay(dateKey: string) {
   const monthKey = getCompetitionMonthKey(dateKey);
 
@@ -488,13 +510,13 @@ function formatMonthDay(monthKey: string, day: number) {
 
 function parseMonthKey(monthKey: string) {
   if (!/^\d{4}-\d{2}$/.test(monthKey)) {
-    throw new Error(`Invalid competition month key: ${monthKey}`);
+    throw new Error(`Invalid contest month key: ${monthKey}`);
   }
 
   const [year, month] = monthKey.split('-').map(Number);
 
   if (month < 1 || month > 12) {
-    throw new Error(`Invalid competition month key: ${monthKey}`);
+    throw new Error(`Invalid contest month key: ${monthKey}`);
   }
 
   return { month, year };

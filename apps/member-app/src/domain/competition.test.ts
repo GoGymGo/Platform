@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 
 import {
   buildCompetitionCalendar,
+  canLoadWeeklyChallengePairing,
   evaluateMonthlyCompetition,
+  formatCompetitionOpeningDateTime,
   getCompetitionRankLabel,
   getCompetitionRegionDateKey,
   getCurrentWeekProgress,
@@ -15,6 +17,16 @@ import {
 import { buildCompetitionReminders } from './competitionReminders';
 
 describe('monthly competition scoring', () => {
+  it('formats the exact location-check opening time in the Contest region', () => {
+    assert.equal(
+      formatCompetitionOpeningDateTime(
+        '2026-09-01T07:00:00.000Z',
+        'America/Vancouver'
+      ),
+      'September 1, 2026 at 12:00 a.m. PDT'
+    );
+  });
+
   it('creates four seven-day periods and separate leftover bonus days', () => {
     const calendar = buildCompetitionCalendar('2026-07');
 
@@ -323,6 +335,37 @@ describe('competition clarity labels', () => {
         isRemainderDayPhase: true
       }),
       'COMPLETE'
+    );
+  });
+
+  it('loads Weekly Challenge pairing only during an active scoring period', () => {
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: false,
+        phase: 'before-month'
+      }),
+      false
+    );
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: true,
+        phase: 'scoring-period'
+      }),
+      true
+    );
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: false,
+        phase: 'scoring-period'
+      }),
+      false
+    );
+    assert.equal(
+      canLoadWeeklyChallengePairing({
+        hasCurrentPeriod: true,
+        phase: 'bonus-days'
+      }),
+      false
     );
   });
 });

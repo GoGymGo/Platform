@@ -50,22 +50,6 @@
             ]
           },
           {
-            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeHealth",
-            "NSPrivacyCollectedDataTypeLinked": true,
-            "NSPrivacyCollectedDataTypeTracking": false,
-            "NSPrivacyCollectedDataTypePurposes": [
-              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
-            ]
-          },
-          {
-            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeFitness",
-            "NSPrivacyCollectedDataTypeLinked": true,
-            "NSPrivacyCollectedDataTypeTracking": false,
-            "NSPrivacyCollectedDataTypePurposes": [
-              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
-            ]
-          },
-          {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCoarseLocation",
             "NSPrivacyCollectedDataTypeLinked": true,
             "NSPrivacyCollectedDataTypeTracking": false,
@@ -198,27 +182,21 @@
         "expo-camera",
         {
           "barcodeScannerEnabled": true,
-          "cameraPermission": "GoGymGo uses your camera only to scan entry and exit QR codes at participating partner gyms.",
+          "cameraPermission": "GoGymGo uses your camera only to select a participating Partner gym from its Contest QR code.",
           "recordAudioAndroid": false
-        }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "GoGymGo uses device authentication to confirm that the account holder is present during a verified workout."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "GoGymGo uses your location once to place you in the correct regional competition. GoGymGo does not track your location in the background."
+          "locationWhenInUsePermission": "GoGymGo uses your location to confirm your Contest region and verify that workouts start and finish at your selected Partner gym. GoGymGo does not track your location in the background."
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "GoGymGo lets you choose an optional profile image for your public profile.",
-          "cameraPermission": "GoGymGo uses your camera only to scan entry and exit QR codes at participating partner gyms.",
+          "cameraPermission": "GoGymGo uses your camera only to select a participating Partner gym from its Contest QR code.",
           "microphonePermission": false
         }
       ]

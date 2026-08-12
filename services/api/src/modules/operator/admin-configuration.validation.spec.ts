@@ -78,6 +78,25 @@ describe('admin configuration validation', () => {
     ).toThrow(BadRequestException);
   });
 
+  it('accepts a same-day 30-minute test contest and rejects shorter windows', () => {
+    const testSchedule = {
+      endsAt: '2026-08-10T17:30:00.000Z',
+      registrationClosesAt: '2026-08-10T17:00:00.000Z',
+      registrationOpensAt: '2026-08-10T16:45:00.000Z',
+      startsAt: '2026-08-10T17:00:00.000Z',
+    };
+
+    expect(parseCompetitionSchedule(testSchedule).endsAt).toEqual(
+      new Date(testSchedule.endsAt),
+    );
+    expect(() =>
+      parseCompetitionSchedule({
+        ...testSchedule,
+        endsAt: '2026-08-10T17:29:59.999Z',
+      }),
+    ).toThrow(BadRequestException);
+  });
+
   it('accepts only the supported rules schema and unique brackets', () => {
     expect(parseAdminCompetitionRules(validRules)).toEqual(validRules);
     expect(() =>

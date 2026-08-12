@@ -18,6 +18,7 @@ import {
 } from '@/config/features';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
 import { DataCollectionNotice } from '@/components/legal';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import {
   hasCreatorApplicationErrors,
@@ -62,7 +63,7 @@ export default function CreatorApplicationScreen() {
       <ScreenContainer>
         <ScreenScrollView
           bounces={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={brandScreenStyles.content}
           showsVerticalScrollIndicator={false}
         >
           <OnboardingHeader
@@ -75,11 +76,12 @@ export default function CreatorApplicationScreen() {
             progress={38}
             step="CREATOR APPLICATION"
           />
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            APPLY AS A CREATOR
-          </TerminalText>
-          <HUDBorderBox glow style={styles.form} tone="amber">
-            <TerminalText glow tone="amber" variant="label">
+          <BrandScreenHeader
+            eyebrow="CREATOR APPLICATION"
+            title="APPLY AS A CREATOR"
+          />
+          <HUDBorderBox style={styles.form} tone="amber">
+            <TerminalText tone="amber" variant="label">
               {creatorFeatureStatusLabel}
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
@@ -143,7 +145,7 @@ export default function CreatorApplicationScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={brandScreenStyles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -158,13 +160,11 @@ export default function CreatorApplicationScreen() {
           step="CREATOR APPLICATION"
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          APPLY AS A CREATOR
-        </TerminalText>
-        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Share your region, creator profile and one sample workout. Approved creators receive the
-          complete publishing and content-rights process.
-        </TerminalText>
+        <BrandScreenHeader
+          description="Share your region, creator profile and one sample workout. Approved creators receive the complete publishing and content-rights process."
+          eyebrow="CREATOR APPLICATION"
+          title="APPLY AS A CREATOR"
+        />
 
         <CompactTextButton
           label={showRequirements ? 'HIDE CREATOR REQUIREMENTS' : 'VIEW CREATOR REQUIREMENTS'}
@@ -175,7 +175,7 @@ export default function CreatorApplicationScreen() {
           <View style={styles.requirements}>
             {requirements.map((requirement, index) => (
               <View key={requirement} style={styles.requirementRow}>
-                <TerminalText glow tone="cyan" variant="micro">
+                <TerminalText tone="cyan" variant="micro">
                   {String(index + 1).padStart(2, '0')}
                 </TerminalText>
                 <TerminalText style={styles.requirementText} tone="text" variant="body">
@@ -227,7 +227,7 @@ export default function CreatorApplicationScreen() {
               tone="green"
             />
           ) : null}
-          <DataCollectionNotice message="We use the region, profile and sample-workout links to review this creator request, prevent misuse and contact the signed-in applicant about the review. They are not used to award competition credit." />
+          <DataCollectionNotice message="We use the region, profile and sample-workout links to review this creator request, prevent misuse and contact the signed-in applicant about the review. They are not used to award contest credit." />
           <CyberButtonPrimary
             disabled={submitting || submitted}
             label={
@@ -259,22 +259,6 @@ export default function CreatorApplicationScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    gap: spacing.lg,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
-  },
   requirements: {
     borderTopWidth: 1,
     borderColor: colors.borderMuted

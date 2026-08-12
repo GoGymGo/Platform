@@ -35,7 +35,10 @@ describeWithDatabase('connected static QR pilot', () => {
   let database: DatabaseService;
   let migrated: MigratedPostgisTestDatabase;
   let gyms: GymsService;
+  let competitionId: string;
   let gymId: string;
+  let regionId: string;
+  let regionVerificationId: string;
   let userId: string;
 
   beforeAll(async () => {
@@ -89,6 +92,33 @@ describeWithDatabase('connected static QR pilot', () => {
     await expect(scanEventCount()).resolves.toBe(1);
   });
 
+  it('starts from the enrolled gym with fresh location and no QR credential', async () => {
+    await database.connection
+      .updateTable('gym_qr_credentials')
+      .set({
+        revocation_reason:
+          'The enrollment must not depend on a retained QR secret.',
+        revoked_at: new Date(),
+        revoked_by_user_id: userId,
+        status: 'revoked',
+      })
+      .where('gym_location_id', '=', gymId)
+      .execute();
+
+    const result = await gyms.scan(principal, 'enrolled-location-key', {
+      accuracyMeters: 10,
+      competitionId,
+      eventId: '10000000-0000-4000-8000-000000000091',
+      latitude: gymLatitude,
+      longitude: gymLongitude,
+    });
+
+    expect(result).toMatchObject({
+      gymLocationId: gymId,
+      outcome: 'started',
+    });
+  });
+
   it('serializes concurrent scans into one start and one early result', async () => {
     const results = await Promise.all([
       gyms.scan(principal, 'concurrent-a', scanRequest('concurrent-event-a')),
@@ -101,9 +131,14 @@ describeWithDatabase('connected static QR pilot', () => {
   });
 
   it('rejects poor accuracy, revoked credentials and replayed client events', async () => {
+    const inaccuratePoint = await projectedPoint(125.5);
     await expect(
       gyms.scan(principal, 'accuracy-key', {
-        ...scanRequest('accuracy-event'),
+        ...scanRequest(
+          'accuracy-event',
+          inaccuratePoint.latitude,
+          inaccuratePoint.longitude,
+        ),
         accuracyMeters: 50.01,
       }),
     ).resolves.toMatchObject({
@@ -147,8 +182,39 @@ describeWithDatabase('connected static QR pilot', () => {
     });
   });
 
-  it('accepts the 75 m boundary and rejects a point just outside it', async () => {
-    const point = await projectedPoint(75);
+  it('caps coarse location uncertainty without expanding the maximum allowance', async () => {
+    const nearby = await projectedPoint(125);
+    await expect(
+      gyms.scan(principal, 'coarse-nearby-key', {
+        ...scanRequest(
+          'coarse-nearby-event',
+          nearby.latitude,
+          nearby.longitude,
+        ),
+        accuracyMeters: 100_000,
+      }),
+    ).resolves.toMatchObject({ outcome: 'started' });
+
+    await database.connection.deleteFrom('gym_scan_events').execute();
+    await database.connection.deleteFrom('workout_sessions').execute();
+    const tooFar = await projectedPoint(125.5);
+    await expect(
+      gyms.scan(principal, 'coarse-too-far-key', {
+        ...scanRequest(
+          'coarse-too-far-event',
+          tooFar.latitude,
+          tooFar.longitude,
+        ),
+        accuracyMeters: 100_000,
+      }),
+    ).resolves.toMatchObject({
+      outcome: 'rejected',
+      rejectionReason: 'inaccurate_location',
+    });
+  });
+
+  it('uses reported accuracy at the 75 m geofence boundary', async () => {
+    const point = await projectedPoint(85);
     await expect(
       gyms.scan(
         principal,
@@ -159,7 +225,7 @@ describeWithDatabase('connected static QR pilot', () => {
 
     await database.connection.deleteFrom('gym_scan_events').execute();
     await database.connection.deleteFrom('workout_sessions').execute();
-    const outside = await projectedPoint(75.5);
+    const outside = await projectedPoint(85.5);
     await expect(
       gyms.scan(
         principal,
@@ -201,6 +267,42 @@ describeWithDatabase('connected static QR pilot', () => {
     expect(ledger).toHaveLength(1);
   });
 
+  it('requires a fresh in-gym location to finish without another QR capture', async () => {
+    const started = await gyms.scan(
+      principal,
+      'location-finish-start',
+      scanRequest('location-finish-start-event'),
+    );
+    await database.connection
+      .updateTable('workout_sessions')
+      .set({ started_at: new Date(Date.now() - 31 * 60_000) })
+      .where('id', '=', started.sessionId!)
+      .execute();
+
+    const outside = await projectedPoint(85.5);
+    await expect(
+      gyms.scan(
+        principal,
+        'location-finish-outside',
+        scanRequest(
+          'location-finish-outside-event',
+          outside.latitude,
+          outside.longitude,
+        ),
+      ),
+    ).resolves.toMatchObject({
+      outcome: 'rejected',
+      rejectionReason: 'outside_geofence',
+    });
+    await expect(
+      gyms.scan(
+        principal,
+        'location-finish-inside',
+        scanRequest('location-finish-inside-event'),
+      ),
+    ).resolves.toMatchObject({ outcome: 'verified', remainingSeconds: 0 });
+  });
+
   it('requires the same static credential version for entry and exit', async () => {
     const started = await gyms.scan(
       principal,
@@ -222,6 +324,7 @@ describeWithDatabase('connected static QR pilot', () => {
     const replacement = await database.connection
       .insertInto('gym_qr_credentials')
       .values({
+        competition_id: competitionId,
         credential_version: 2,
         gym_location_id: gymId,
         issued_at: new Date(),
@@ -290,6 +393,227 @@ describeWithDatabase('connected static QR pilot', () => {
       .executeTakeFirstOrThrow();
     expect(session.status).toBe('cancelled');
     await expect(scanEventCount()).resolves.toBe(2);
+  });
+
+  it('verifies a 30-minute workout during the 15-minute completion period', async () => {
+    const started = await gyms.scan(
+      principal,
+      'grace-finish-start',
+      scanRequest('grace-finish-start-event'),
+    );
+    const now = Date.now();
+    try {
+      await database.connection
+        .updateTable('workout_sessions')
+        .set({ started_at: new Date(now - 31 * 60_000) })
+        .where('id', '=', started.sessionId!)
+        .execute();
+      await database.connection
+        .updateTable('competitions')
+        .set({ ends_at: new Date(now - 5 * 60_000) })
+        .where('id', '=', competitionId)
+        .execute();
+
+      await expect(
+        gyms.scan(
+          principal,
+          'grace-finish-exit',
+          scanRequest('grace-finish-exit-event'),
+        ),
+      ).resolves.toMatchObject({ outcome: 'verified', remainingSeconds: 0 });
+    } finally {
+      await database.connection
+        .updateTable('competitions')
+        .set({ ends_at: new Date(Date.now() + 24 * 60 * 60_000) })
+        .where('id', '=', competitionId)
+        .execute();
+    }
+  });
+
+  it('rejects starts that cannot reach 30 minutes before the completion deadline', async () => {
+    try {
+      await database.connection
+        .updateTable('competitions')
+        .set({ ends_at: new Date(Date.now() + 14 * 60_000) })
+        .where('id', '=', competitionId)
+        .execute();
+
+      await expect(
+        gyms.scan(principal, 'late-start-key', scanRequest('late-start-event')),
+      ).resolves.toMatchObject({
+        outcome: 'rejected',
+        rejectionReason: 'insufficient_completion_time',
+      });
+    } finally {
+      await database.connection
+        .updateTable('competitions')
+        .set({ ends_at: new Date(Date.now() + 24 * 60 * 60_000) })
+        .where('id', '=', competitionId)
+        .execute();
+    }
+  });
+
+  it('cancels an unfinished workout after the completion period ends', async () => {
+    const started = await gyms.scan(
+      principal,
+      'expired-grace-start',
+      scanRequest('expired-grace-start-event'),
+    );
+    const now = Date.now();
+    try {
+      await database.connection
+        .updateTable('workout_sessions')
+        .set({ started_at: new Date(now - 31 * 60_000) })
+        .where('id', '=', started.sessionId!)
+        .execute();
+      await database.connection
+        .updateTable('competitions')
+        .set({ ends_at: new Date(now - 16 * 60_000) })
+        .where('id', '=', competitionId)
+        .execute();
+
+      await expect(
+        gyms.scan(
+          principal,
+          'expired-grace-exit',
+          scanRequest('expired-grace-exit-event'),
+        ),
+      ).resolves.toMatchObject({
+        outcome: 'rejected',
+        rejectionReason: 'completion_grace_expired',
+      });
+      await expect(
+        database.connection
+          .selectFrom('workout_sessions')
+          .select('status')
+          .where('id', '=', started.sessionId!)
+          .executeTakeFirstOrThrow(),
+      ).resolves.toMatchObject({ status: 'cancelled' });
+    } finally {
+      await database.connection
+        .updateTable('competitions')
+        .set({ ends_at: new Date(Date.now() + 24 * 60 * 60_000) })
+        .where('id', '=', competitionId)
+        .execute();
+    }
+  });
+
+  it('keeps two active contest posters at one gym and scans into the poster contest', async () => {
+    const now = Date.now();
+    const original = await database.connection
+      .selectFrom('competitions')
+      .select(['rules', 'rules_version'])
+      .where('id', '=', competitionId)
+      .executeTakeFirstOrThrow();
+    const secondCompetition = await database.connection
+      .insertInto('competitions')
+      .values({
+        ends_at: new Date(now + 48 * 60 * 60_000),
+        minimum_entrants: 1,
+        month_key: '2026-10',
+        name: 'Second Same Gym Competition',
+        region_policy_id: regionId,
+        registration_closes_at: new Date(now - 2 * 60 * 60_000),
+        registration_opens_at: new Date(now - 48 * 60 * 60_000),
+        rules: original.rules,
+        rules_version: original.rules_version,
+        starts_at: new Date(now - 60 * 60_000),
+        status: 'active',
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('competition_goal_brackets')
+      .values({
+        competition_id: secondCompetition.id,
+        created_at: new Date(),
+        goal_days: 3,
+        label: '3 DAYS / WEEK',
+      })
+      .execute();
+    const acceptance = await database.connection
+      .insertInto('competition_rule_acceptances')
+      .values({
+        accepted_at: new Date(),
+        age_eligibility_attested: true,
+        competition_id: secondCompetition.id,
+        metadata: {},
+        rules_version: original.rules_version,
+        user_id: userId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const enrollment = await database.connection
+      .insertInto('competition_enrollments')
+      .values({
+        competition_id: secondCompetition.id,
+        enrolled_at: new Date(),
+        goal_days: 3,
+        gym_credential_version: 2,
+        gym_location_id: gymId,
+        region_verification_id: regionVerificationId,
+        rules_acceptance_id: acceptance.id,
+        status: 'active',
+        user_id: userId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('competition_progress')
+      .values({
+        category_score: 0,
+        competition_id: secondCompetition.id,
+        enrollment_id: enrollment.id,
+        goal_days: 3,
+        prize_draw_entries: 1,
+        updated_at: new Date(),
+        user_id: userId,
+        verified_days: 0,
+      })
+      .execute();
+    await database.connection
+      .insertInto('competition_gym_locations')
+      .values({
+        competition_id: secondCompetition.id,
+        created_at: new Date(),
+        gym_location_id: gymId,
+      })
+      .execute();
+    const secondCredential = 'second-contest-same-gym-credential';
+    await database.connection
+      .insertInto('gym_qr_credentials')
+      .values({
+        competition_id: secondCompetition.id,
+        credential_version: 2,
+        gym_location_id: gymId,
+        issued_at: new Date(),
+        issued_by_user_id: userId,
+        status: 'active',
+        token_hash: hashOpaqueValue(secondCredential),
+      })
+      .execute();
+
+    const result = await gyms.scan(principal, 'second-contest-scan', {
+      ...scanRequest('second-contest-event'),
+      credential: secondCredential,
+    });
+    expect(result.outcome).toBe('started');
+    const session = await database.connection
+      .selectFrom('workout_sessions')
+      .select('competition_id')
+      .where('id', '=', result.sessionId!)
+      .executeTakeFirstOrThrow();
+    expect(session.competition_id).toBe(secondCompetition.id);
+
+    const activePosters = await database.connection
+      .selectFrom('gym_qr_credentials')
+      .select('competition_id')
+      .where('gym_location_id', '=', gymId)
+      .where('status', '=', 'active')
+      .execute();
+    expect(
+      new Set(activePosters.map((poster) => poster.competition_id)),
+    ).toEqual(new Set([competitionId, secondCompetition.id]));
   });
 
   function scanRequest(
@@ -362,6 +686,7 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    regionId = region.id;
     const now = Date.now();
     const rules = {
       categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
@@ -381,7 +706,7 @@ describeWithDatabase('connected static QR pilot', () => {
       .insertInto('competitions')
       .values({
         ends_at: new Date(now + 24 * 60 * 60_000),
-        minimum_entrants: 2,
+        minimum_entrants: 1,
         month_key: '2026-09',
         name: 'QR Integration Competition',
         region_policy_id: region.id,
@@ -394,6 +719,7 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    competitionId = competition.id;
     await database.connection
       .insertInto('competition_goal_brackets')
       .values({
@@ -418,6 +744,7 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    regionVerificationId = verification.id;
     const acceptance = await database.connection
       .insertInto('competition_rule_acceptances')
       .values({
@@ -466,8 +793,17 @@ describeWithDatabase('connected static QR pilot', () => {
       [region.id, gymLongitude, gymLatitude],
     );
     await database.connection
+      .updateTable('competition_enrollments')
+      .set({
+        gym_credential_version: 1,
+        gym_location_id: gym.rows[0].id,
+      })
+      .where('id', '=', enrollment.id)
+      .executeTakeFirstOrThrow();
+    await database.connection
       .insertInto('gym_qr_credentials')
       .values({
+        competition_id: competition.id,
         credential_version: 1,
         gym_location_id: gym.rows[0].id,
         issued_at: new Date(),

@@ -1,6 +1,6 @@
 export const competitionEnrollmentRules = {
   maximumWeeklyGoal: 7,
-  minimumEntrants: 2
+  minimumEntrants: 1
 } as const;
 
 export type CompetitionEnrollmentPolicy = {
@@ -159,7 +159,7 @@ function validatePolicy(policy: CompetitionEnrollmentPolicy) {
     !Number.isFinite(policy.minimumEntrants) ||
     policy.minimumEntrants < competitionEnrollmentRules.minimumEntrants
   ) {
-    throw new Error('Competition enrollment requires at least 2 entrants.');
+    throw new Error('Contest enrollment requires at least 1 entrant.');
   }
 
   if (
@@ -167,7 +167,7 @@ function validatePolicy(policy: CompetitionEnrollmentPolicy) {
     (!Number.isFinite(policy.maximumEntrants) ||
       policy.maximumEntrants < policy.minimumEntrants)
   ) {
-    throw new Error('Competition entrant cap must be at least the launch minimum.');
+    throw new Error('Contest entrant cap must be at least the launch minimum.');
   }
 
 }
@@ -198,13 +198,13 @@ function validateDateKey(dateKey: string) {
 
 function parseMonthKey(monthKey: string) {
   if (!/^\d{4}-\d{2}$/.test(monthKey)) {
-    throw new Error(`Invalid competition month key: ${monthKey}`);
+    throw new Error(`Invalid contest month key: ${monthKey}`);
   }
 
   const [year, month] = monthKey.split('-').map(Number);
 
   if (month < 1 || month > 12) {
-    throw new Error(`Invalid competition month key: ${monthKey}`);
+    throw new Error(`Invalid contest month key: ${monthKey}`);
   }
 
   return { month, year };

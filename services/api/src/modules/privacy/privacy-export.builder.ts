@@ -99,6 +99,11 @@ export class PrivacyExportBuilder {
             'competition.id',
             'enrollment.competition_id',
           )
+          .leftJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'enrollment.gym_location_id',
+          )
           .select([
             'enrollment.id',
             'enrollment.goal_days',
@@ -110,6 +115,8 @@ export class PrivacyExportBuilder {
             'competition.rules_version',
             'competition.starts_at',
             'competition.ends_at',
+            'gym.id as gym_location_id',
+            'gym.name as gym_name',
           ])
           .where('enrollment.user_id', '=', job.userId)
           .orderBy('enrollment.enrolled_at')

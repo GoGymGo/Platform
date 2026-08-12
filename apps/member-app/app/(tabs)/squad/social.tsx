@@ -14,8 +14,12 @@ import {
 import { AuthTextField } from '@/components/auth';
 import {
   ActionFeedback,
+  getUserFacingErrorMessage,
+  InlineLoadingState,
   RecoverableError
 } from '@/components/reliability';
+import { OnboardingHeader } from '@/components/onboarding';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { ChallengeHub } from '@/components/socialChallenges';
 import { UserAlias } from '@/components/streakRewards';
 import {
@@ -114,6 +118,13 @@ export default function SocialChallengesScreen() {
     regionalChallengesQuery
   ]
     .some(({ isLoading }) => isLoading);
+  const initialLoading = loading && [
+    profileQuery.data,
+    friendsQuery.data,
+    requestsQuery.data,
+    challengesQuery.data,
+    regionalChallengesQuery.data
+  ].some((data) => data === undefined);
   const dataError = profileQuery.error ?? friendsQuery.error ??
     requestsQuery.error ?? challengesQuery.error ??
     regionalChallengesQuery.error ?? searchQuery.error;
@@ -220,7 +231,7 @@ export default function SocialChallengesScreen() {
   const checkIn = async (challenge: SocialChallenge) => {
     try {
       await challengeCheckIn.mutateAsync(challenge.id);
-      setFeedback({ message: `Today's ${challenge.activityLabel.toLowerCase()} check-in was recorded.`, tone: 'green' });
+      setFeedback({ message: `Today's ${challenge.activityLabel.toLowerCase()} Challenge check-in was recorded.`, tone: 'green' });
     } catch (mutationError) {
       setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
     }
@@ -239,32 +250,20 @@ export default function SocialChallengesScreen() {
           memoryKey="social-challenges"
           showsVerticalScrollIndicator={false}
         >
-        <Pressable
-          accessibilityLabel="Back to Squad"
-          accessibilityRole="button"
-          onPress={() => goBackOrReplace(router, '/squad')}
-          style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-        >
-          <TerminalText glow tone="cyan" variant="button">
-            {'<'} SQUAD
-          </TerminalText>
-        </Pressable>
-
-        <View style={styles.header}>
-          <TerminalText glow tone="pink" variant="label">
-            FRIENDS + LOCAL ACTIVITIES
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            CHALLENGE YOUR CREW
-          </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="body">
-            Challenge a friend to a monthly goal, or join a scheduled activity challenge in your region.
-          </TerminalText>
-        </View>
+        <OnboardingHeader
+          label="FRIENDS + CHALLENGES"
+          onBack={() => goBackOrReplace(router, '/squad')}
+          step="SOCIAL"
+        />
+        <BrandScreenHeader
+          description="Challenge a friend to a monthly goal, or join a scheduled activity challenge in your region."
+          eyebrow="FRIENDS + LOCAL ACTIVITIES"
+          title="CHALLENGE YOUR CREW"
+        />
 
         {mode === 'unavailable' ? (
           <StatusCard
-            message="The social service is offline. Connect Firebase and the GoGymGo API to use friends and challenges."
+            message="Friends and Challenges are temporarily unavailable. Check your connection and try again."
             tone="amber"
           />
         ) : null}
@@ -301,35 +300,29 @@ export default function SocialChallengesScreen() {
           />
         ) : null}
 
-        <SocialSectionTabs
+        {initialLoading ? (
+          <InlineLoadingState label="Loading friends and challenges..." />
+        ) : null}
+
+        {!initialLoading ? <SocialSectionTabs
           activeSection={activeSection}
           challengeCount={challenges.length}
           friendCount={friends.length}
           requestCount={incomingRequests.length}
           onSelect={setActiveSection}
-        />
+        /> : null}
 
-        {activeSection === 'friends' ? (
+        {!initialLoading && activeSection === 'friends' ? (
           <>
-        <Section eyebrow="YOUR IDENTITY" title="YOUR ALIAS">
-          <TerminalText style={styles.sectionCopy} tone="muted" uppercase={false} variant="body">
-            Your alias is used throughout GoGymGo and is how friends find you. Aliases are case-insensitive.
-          </TerminalText>
-          {profileQuery.data ? (
-            <UserAlias
-              alias={profileQuery.data.screenName}
-              prefix="@"
-              streaks={profileQuery.data.streaks}
-            />
+        <Section
+          eyebrow={friends.length === 0 ? 'GET CONNECTED' : 'DISCOVERY'}
+          title={friends.length === 0 ? 'FIND YOUR FIRST FRIEND' : 'FIND FRIENDS'}
+        >
+          {friends.length === 0 ? (
+            <TerminalText style={styles.sectionCopy} tone="muted" uppercase={false} variant="body">
+              Search by GoGymGo Alias. They choose whether to accept, and your email or phone number is never shown.
+            </TerminalText>
           ) : null}
-          <CyberButtonPrimary
-            disabled={mode === 'unavailable' || profileQuery.isLoading}
-            label="EDIT ALIAS"
-            onPress={() => router.push('/identity?source=social')}
-          />
-        </Section>
-
-        <Section eyebrow="DISCOVERY" title="FIND FRIENDS">
           <AuthTextField
             autoCapitalize="characters"
             autoCorrect={false}
@@ -357,13 +350,31 @@ export default function SocialChallengesScreen() {
             />
           ))}
           {searchQuery.data && searchQuery.data.length === 0 ? (
-            <EmptyState>No aliases matched that search.</EmptyState>
+            <EmptyState>No Aliases matched that search.</EmptyState>
           ) : null}
+        </Section>
+
+        <Section eyebrow="YOUR IDENTITY" title="YOUR ALIAS">
+          <TerminalText style={styles.sectionCopy} tone="muted" uppercase={false} variant="body">
+            Friends find you by this case-insensitive Alias. You can change it without exposing your account details.
+          </TerminalText>
+          {profileQuery.data ? (
+            <UserAlias
+              alias={profileQuery.data.screenName}
+              prefix="@"
+              streaks={profileQuery.data.streaks}
+            />
+          ) : null}
+          <CyberButtonPrimary
+            disabled={mode === 'unavailable' || profileQuery.isLoading}
+            label="EDIT ALIAS"
+            onPress={() => router.push('/identity?source=social')}
+          />
         </Section>
           </>
         ) : null}
 
-        {activeSection === 'requests' ? (
+        {!initialLoading && activeSection === 'requests' ? (
           <Section eyebrow="CONSENT QUEUE" title="FRIEND REQUESTS">
           {incomingRequests.length > 0 ? (
             <TerminalText tone="cyan" variant="micro">INCOMING</TerminalText>
@@ -404,7 +415,7 @@ export default function SocialChallengesScreen() {
           </Section>
         ) : null}
 
-        {activeSection === 'friends' ? (
+        {!initialLoading && activeSection === 'friends' ? (
           <Section eyebrow="CONNECTED" title={`FRIENDS // ${friends.length}`}>
           <View style={styles.friendGrid}>
             {friends.map((friend) => (
@@ -415,12 +426,12 @@ export default function SocialChallengesScreen() {
             ))}
           </View>
           {friends.length === 0 ? (
-            <EmptyState>Accept a friend request before sending challenge invitations.</EmptyState>
+            <EmptyState>Search by Alias above and send a request. Challenge invitations unlock after they accept.</EmptyState>
           ) : null}
           </Section>
         ) : null}
 
-        {activeSection === 'challenges' ? (
+        {!initialLoading && activeSection === 'challenges' ? (
           <ChallengeHub
             busy={
               createChallenge.isPending ||
@@ -444,10 +455,8 @@ export default function SocialChallengesScreen() {
             regionCode={regionCode}
           />
         ) : null}
-        {loading ? (
-          <TerminalText style={styles.loading} tone="dim" variant="micro">
-            LOADING SOCIAL DATA...
-          </TerminalText>
+        {loading && !initialLoading ? (
+          <InlineLoadingState label="Refreshing friends and challenges..." />
         ) : null}
         </ScreenScrollView>
       </KeyboardAvoidingView>
@@ -636,7 +645,10 @@ function useDebouncedValue(value: string, delay: number) {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'That action could not be completed.';
+  return getUserFacingErrorMessage(
+    error,
+    'That action could not be completed. Check your connection and try again.'
+  );
 }
 
 const compactButtonToneStyles = {
@@ -667,29 +679,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   sponsorRail: {
     marginBottom: spacing.lg
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyanButton,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surfaceCyanGhost
-  },
-  header: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.screenTitle
   },
   statusCard: {
     marginBottom: spacing.lg,
@@ -815,10 +808,6 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     paddingVertical: spacing.sm,
-    textAlign: 'center'
-  },
-  loading: {
-    marginTop: spacing.lg,
     textAlign: 'center'
   }
 });

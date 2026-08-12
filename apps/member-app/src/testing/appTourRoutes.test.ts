@@ -4,13 +4,15 @@ import test from 'node:test';
 import {
   appTourRoutes,
   buildAppTourHref,
-  findAppTourRouteIndex
+  findAppTourRouteIndex,
+  publicDemoRoutes
 } from './appTourRoutes';
 
 test('App Tour routes are unique and resolve to stable screen positions', () => {
   const routeNames = appTourRoutes.map(({ route }) => route);
 
   assert.equal(new Set(routeNames).size, routeNames.length);
+  assert.equal(routeNames.some((route) => route.startsWith('/verification')), false);
   assert.equal(findAppTourRouteIndex('/sign-up'), routeNames.indexOf('/sign-up'));
   assert.equal(
     findAppTourRouteIndex('/workouts/app-tour-workout'),
@@ -19,22 +21,49 @@ test('App Tour routes are unique and resolve to stable screen positions', () => 
   assert.equal(findAppTourRouteIndex(['', 'not-a-screen'].join('/')), -1);
 });
 
-test('App Tour links preserve route parameters and apply the required scenario', () => {
-  const verifiedPresenceRoute = appTourRoutes.find(
-    ({ route }) => route === '/workout/ping-success'
+test('the public demo exposes the first ten reviewed product destinations', () => {
+  assert.equal(publicDemoRoutes.length, 10);
+  assert.deepEqual(
+    publicDemoRoutes.map(({ route }) => route),
+    [
+      '/home',
+      '/calendar',
+      '/leaderboard',
+      '/winners-circle',
+      '/leaderboard/rewards',
+      '/rewards/awards',
+      '/squad',
+      '/squad/social',
+      '/profile',
+      '/workouts'
+    ]
   );
-  const gymPresenceRoute = appTourRoutes.find(
-    ({ route }) => route.startsWith('/workout/identity-check?')
+});
+
+test('the pilot tour hides version 2 verification and permission routes', () => {
+  const routeNames = appTourRoutes.map(({ route }) => route);
+
+  assert.equal(routeNames.includes('/workout/check-in'), false);
+  assert.equal(routeNames.includes('/workout/active'), false);
+  assert.equal(routeNames.includes('/workout/ping'), false);
+  assert.equal(routeNames.includes('/workout/ping-success'), false);
+  assert.equal(routeNames.some((route) => route.startsWith('/workout/identity-check?')), false);
+  assert.equal(routeNames.includes('/consent-settings'), false);
+  assert.equal(routeNames.includes('/biometric-camera-consent'), false);
+});
+
+test('App Tour links preserve route parameters and apply the required mode', () => {
+  const verifyEmailRoute = appTourRoutes.find(
+    ({ route }) => route === '/verify-email?next=region'
   );
 
-  assert.ok(verifiedPresenceRoute);
-  assert.ok(gymPresenceRoute);
+  assert.ok(verifyEmailRoute);
   assert.equal(
-    buildAppTourHref(verifiedPresenceRoute),
-    '/workout/ping-success?appTour=1&tourScenario=workout-complete'
+    buildAppTourHref(verifyEmailRoute),
+    '/verify-email?next=region&appTour=1&tourScenario=ready'
   );
   assert.equal(
-    buildAppTourHref(gymPresenceRoute),
-    '/workout/identity-check?qrPayload=gogymgo:gym:entry:app-tour&appTour=1&tourScenario=ready'
+    buildAppTourHref(verifyEmailRoute, 'demo'),
+    '/verify-email?next=region&demo=1&tourScenario=ready'
   );
 });

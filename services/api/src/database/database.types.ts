@@ -232,6 +232,7 @@ export interface RegionPoliciesTable {
   boundary: unknown;
   valid_from: Timestamp;
   valid_to: NullableTimestamp;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
 }
 
@@ -300,6 +301,7 @@ export interface CompetitionsTable {
   registration_closes_at: Timestamp;
   starts_at: Timestamp;
   ends_at: Timestamp;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -339,6 +341,7 @@ export interface LegalDocumentsTable {
     string | null | undefined,
     string | null
   >;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
 }
 
@@ -387,6 +390,8 @@ export interface CompetitionEnrollmentsTable {
   competition_id: string;
   user_id: string;
   goal_days: number;
+  gym_location_id: string | null;
+  gym_credential_version: number | null;
   region_verification_id: string;
   rules_acceptance_id: string;
   status: EnrollmentStatus;
@@ -455,15 +460,39 @@ export interface GymLocationsTable {
   coordinates: unknown;
   radius_meters: number;
   active: boolean;
+  deleted_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export type GymPartnerAccessLevel = 'admin' | 'staff';
+
+export interface GymPartnerAssignmentsTable {
+  user_id: string;
+  gym_location_id: string;
+  access_level: GymPartnerAccessLevel;
+  active: boolean;
+  assigned_by_user_id: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface PartnerCompetitionProposalsTable {
+  competition_id: string;
+  gym_location_id: string;
+  month_key: string;
+  proposed_by_user_id: string;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
 
 export interface GymQrCredentialsTable {
   id: Generated<string>;
+  competition_id: string | null;
   gym_location_id: string;
   credential_version: number;
   token_hash: string;
+  qr_payload: string | null;
   status: GymQrCredentialStatus;
   issued_by_user_id: string;
   issued_at: Timestamp;
@@ -566,6 +595,7 @@ export interface RewardCatalogItemsTable {
   available_from: NullableTimestamp;
   available_until: NullableTimestamp;
   version: number;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -725,6 +755,7 @@ export interface CreatorWorkoutsTable {
   region_codes: string[];
   published: boolean;
   published_at: NullableTimestamp;
+  deleted_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
   version: Generated<number>;
@@ -793,6 +824,7 @@ export interface Database {
   entry_ledger: EntryLedgerTable;
   friend_requests: FriendRequestsTable;
   friendships: FriendshipsTable;
+  gym_partner_assignments: GymPartnerAssignmentsTable;
   gym_locations: GymLocationsTable;
   gym_qr_credentials: GymQrCredentialsTable;
   gym_scan_events: GymScanEventsTable;
@@ -807,6 +839,7 @@ export interface Database {
   operator_audit_events: OperatorAuditEventsTable;
   notification_deliveries: NotificationDeliveriesTable;
   partner_applications: PartnerApplicationsTable;
+  partner_competition_proposals: PartnerCompetitionProposalsTable;
   privacy_request_events: PrivacyRequestEventsTable;
   privacy_requests: PrivacyRequestsTable;
   profile_media: ProfileMediaTable;

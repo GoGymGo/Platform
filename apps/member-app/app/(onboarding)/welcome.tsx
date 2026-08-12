@@ -1,16 +1,18 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
-  CyberButtonOutline,
-  CyberButtonPrimary,
   HUDBorderBox,
-  ScreenContainer,
   TerminalText
 } from '@/components/cyber';
-import { GoGymGoWordmark } from '@/components/brandWordmark';
-import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
+import {
+  FirstRunBrandRail,
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
+import { colors, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 
 type Accent = 'cyan';
 
@@ -40,72 +42,69 @@ const welcomeSteps: readonly WelcomeStep[] = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { width: viewportWidth } = useWindowDimensions();
-  const compactLogo = viewportWidth < 360;
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-
+        <FirstRunBrandRail />
         <View style={styles.introStack}>
-          <View style={styles.statusRail}>
-            <View style={styles.onlineDot} />
-            <TerminalText glow tone="cyan" variant="label">
-              SYSTEM ONLINE // REGISTRATION OPEN
+            <View style={styles.statusRail}>
+              <View style={styles.onlineDot} />
+              <TerminalText tone="green" variant="label">
+                SYSTEM ONLINE // REGISTRATION OPEN
+              </TerminalText>
+            </View>
+
+            <View style={styles.heroCopy}>
+              <TerminalText style={styles.valueProp} tone="text" variant="title">
+                VERIFY WORKOUTS.
+              </TerminalText>
+              <TerminalText style={styles.valueBody} tone="muted" uppercase={false} variant="body">
+                Earn chances to win in your region.
+              </TerminalText>
+            </View>
+
+            <HUDBorderBox style={styles.stepStrip} tone="cyan">
+              {welcomeSteps.map((step) => (
+                <WelcomeStepCell key={step.index} step={step} />
+              ))}
+            </HUDBorderBox>
+
+            <TerminalText style={styles.sponsorLine} tone="pink" variant="label">
+              FREE TO PLAY // FUNDED BY SPONSORS
             </TerminalText>
-          </View>
 
-          <View style={styles.logoShell}>
-            <GoGymGoWordmark compact={compactLogo} />
-          </View>
+            <View style={styles.primaryActions}>
+              <FirstRunPrimaryButton
+                label="GET STARTED ->"
+                onPress={() => router.push('/join')}
+              />
+              <FirstRunSecondaryButton
+                accessibilityHint="Open the returning player sign-in screen"
+                label="SIGN IN"
+                onPress={() => router.push('/sign-in')}
+              />
+            </View>
 
-          <TerminalText style={styles.valueProp} tone="text" uppercase={false} variant="body">
-            Complete verified workouts, compete in your region and earn chances
-            to win brand rewards.
-          </TerminalText>
-
-          <HUDBorderBox style={styles.stepStrip} tone="cyan">
-            {welcomeSteps.map((step) => (
-              <WelcomeStepCell key={step.index} step={step} />
-            ))}
-          </HUDBorderBox>
-
-          <TerminalText style={styles.sponsorLine} tone="dim" variant="label">
-            FREE TO PLAY // FUNDED BY SPONSORS
-          </TerminalText>
-
-          <View style={styles.primaryActions}>
-            <CyberButtonPrimary
-              label="GET STARTED ->"
-              onPress={() => router.push('/join')}
-            />
-            <CyberButtonOutline
-              accessibilityHint="Open the returning player sign-in screen"
-              label="SIGN IN"
-              onPress={() => router.push('/sign-in')}
-            />
-          </View>
-
-          <HUDBorderBox glow style={styles.entryPanel} tone="cyan">
-            <TerminalText glow style={styles.entryTitle} tone="pink" variant="value">
-              FREE ENTRY
-            </TerminalText>
-            <TerminalText style={styles.entryCopy} tone="muted" uppercase={false} variant="body">
-              Create your player account and receive one entry into the monthly
-              regional prize draw.
-            </TerminalText>
-            <TerminalText style={styles.drawLabel} tone="cyan" variant="label">
-              SPONSOR-FUNDED PRIZES + COUPON CODES
-            </TerminalText>
-          </HUDBorderBox>
+            <HUDBorderBox style={styles.entryPanel} tone="pink">
+              <TerminalText style={styles.entryTitle} tone="pink" variant="value">
+                FREE ENTRY
+              </TerminalText>
+              <TerminalText style={styles.entryCopy} tone="muted" uppercase={false} variant="body">
+                Create an account to receive one monthly Prize Draw entry.
+              </TerminalText>
+              <TerminalText style={styles.drawLabel} tone="pink" variant="label">
+                SPONSOR-FUNDED PRIZES + COUPON CODES
+              </TerminalText>
+            </HUDBorderBox>
 
         </View>
       </ScreenScrollView>
-    </ScreenContainer>
+    </FirstRunScreen>
   );
 }
 
@@ -114,7 +113,7 @@ function WelcomeStepCell({ step }: { step: WelcomeStep }) {
 
   return (
     <View style={styles.stepCell}>
-      <TerminalText glow style={styles.stepNumber} tone={tone} variant="label">
+      <TerminalText style={styles.stepNumber} tone={tone} variant="label">
         {step.index}
       </TerminalText>
       <TerminalText style={styles.stepTitle} tone="text" variant="micro">
@@ -127,11 +126,10 @@ function WelcomeStepCell({ step }: { step: WelcomeStep }) {
 const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
-    alignItems: 'center',
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   sponsorBanner: {
     marginBottom: spacing.lg
@@ -140,38 +138,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: 9,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyanMedium,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceCyanWhisper
+    paddingVertical: spacing.xs
   },
   onlineDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.cyan,
-    ...cyberGlow.cyan
+    backgroundColor: colors.green
   },
   introStack: {
     width: '100%',
-    alignItems: 'center',
-    gap: spacing.lg
+    gap: spacing.xl
   },
-  logoShell: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg
+  heroCopy: {
+    gap: spacing.md,
+    paddingLeft: 14,
+    paddingVertical: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   valueProp: {
-    maxWidth: 350,
-    paddingHorizontal: spacing.sm,
-    fontFamily: fontFamilies.bodyStrong,
-    fontSize: fontSizes.body,
-    lineHeight: 22,
-    textAlign: 'center'
+    maxWidth: 390,
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.screenTitle,
+    lineHeight: 34
+  },
+  valueBody: {
+    maxWidth: 390,
+    fontFamily: fontFamilies.ui,
+    fontSize: 17,
+    lineHeight: 25
   },
   primaryActions: {
     width: '100%',
@@ -182,7 +178,8 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceCyanGhost
   },
   stepCell: {
     flex: 1,
@@ -203,7 +200,7 @@ const styles = StyleSheet.create({
   },
   entryPanel: {
     alignItems: 'stretch',
-    paddingVertical: 24,
+    paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xl,
     gap: spacing.sm
   },
@@ -214,8 +211,9 @@ const styles = StyleSheet.create({
   entryCopy: {
     maxWidth: 310,
     alignSelf: 'center',
-    fontFamily: fontFamilies.body,
-    lineHeight: 21,
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23,
     textAlign: 'center'
   },
   drawLabel: {

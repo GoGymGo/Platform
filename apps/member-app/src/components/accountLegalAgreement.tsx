@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
-import { CyberButtonPrimary, HUDBorderBox, TerminalText } from '@/components/cyber';
+import { HUDBorderBox, TerminalText } from '@/components/cyber';
+import { FirstRunPrimaryButton } from '@/components/firstRun';
 import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
-import { spacing } from '@/constants/theme';
+import { getUserFacingErrorMessage } from '@/components/reliability';
+import { fontFamilies, spacing } from '@/constants/theme';
 import {
   useCurrentLegalDocuments,
   useLegalReceiptStatus,
@@ -56,35 +58,32 @@ export function AccountLegalAgreement({
       }
       onComplete();
     } catch (error) {
-      setSubmissionError(
-        error instanceof Error ? error.message : 'Your agreements could not be recorded. Try again.'
-      );
+      setSubmissionError(getUserFacingErrorMessage(
+        error,
+        'Your agreements could not be recorded. Review your connection and try again.'
+      ));
     }
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.heading}>
-        <TerminalText glow tone="cyan" variant="label">
+        <TerminalText tone="cyan" variant="label">
           ACCOUNT AGREEMENTS
         </TerminalText>
-        <TerminalText tone="muted" uppercase={false} variant="body">
+        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           Review these once for your verified region. We will ask again only when a required
           document changes.
         </TerminalText>
       </View>
 
-      <HUDBorderBox
-        glow={legalReceiptCurrent}
-        style={styles.panel}
-        tone={legalReceiptCurrent ? 'green' : 'muted'}
-      >
+      <HUDBorderBox style={styles.panel} tone={legalReceiptCurrent ? 'green' : 'muted'}>
         <View style={styles.panelHeader}>
           <TerminalText tone="text" variant="label">
             PRIVACY + TERMS
           </TerminalText>
           {legalReceiptCurrent ? (
-            <TerminalText glow tone="green" variant="micro">
+            <TerminalText tone="green" variant="micro">
               ACCEPTED
             </TerminalText>
           ) : null}
@@ -116,14 +115,14 @@ export function AccountLegalAgreement({
 
       {submissionError ? <AuthStatusNotice message={submissionError} tone="red" /> : null}
 
-      <CyberButtonPrimary
+      <FirstRunPrimaryButton
         disabled={!canContinue}
         label={
           recordLegalReceipt.isPending
             ? 'SAVING AGREEMENTS...'
             : legalReceiptCurrent
               ? 'CONTINUE TO WEEKLY GOAL ->'
-              : 'AGREE & CONTINUE ->'
+              : 'AGREE & CHOOSE WEEKLY GOAL ->'
         }
         onPress={() => void saveAndContinue()}
       />
@@ -139,6 +138,11 @@ const styles = StyleSheet.create({
   heading: {
     gap: spacing.xs,
     paddingHorizontal: spacing.xs
+  },
+  body: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
   },
   panel: {
     gap: spacing.md,

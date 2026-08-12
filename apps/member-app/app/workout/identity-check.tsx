@@ -1,8 +1,7 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenLoadingState,
@@ -12,9 +11,12 @@ import {
 } from '@/components/cyber';
 import { RecoverableScreenError } from '@/components/reliability';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
-import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { devicePresenceVerificationAvailable } from '@/config/workoutVerification';
+import { fontFamilies, spacing } from '@/constants/theme';
 import { isGoGymGoPartnerCode } from '@/domain/partnerGymQr';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
@@ -25,6 +27,14 @@ import { useAppTour } from '@/state/appTour';
 import { isAppTourGymQrPayload } from '@/testing/appTourData';
 
 export default function IdentityCheckScreen() {
+  if (!devicePresenceVerificationAvailable) {
+    return <Redirect href="/qr-scanner" />;
+  }
+
+  return <DevicePresenceCheckScreen />;
+}
+
+function DevicePresenceCheckScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const { qrPayload } = useLocalSearchParams<{ qrPayload?: string }>();
@@ -69,21 +79,21 @@ export default function IdentityCheckScreen() {
   ) {
     return (
       <SessionUnavailable
-        body="Scan a partner-gym entry QR before the device presence check."
+        body="Select a Partner gym from its Contest QR before the device presence check."
         onAction={() => router.replace('/qr-scanner')}
-        title="ENTRY QR REQUIRED"
+        title="PARTNER GYM REQUIRED"
       />
     );
   }
 
   if (registrationChecking) {
-    return <ScreenLoadingState body="Checking your competition registration." />;
+    return <ScreenLoadingState body="Checking your contest registration." />;
   }
 
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before confirming the partner-gym entry."
+        body="Your Contest setup could not be checked. Retry before confirming the Partner gym entry."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"
@@ -113,33 +123,24 @@ export default function IdentityCheckScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
-      <View style={styles.header}>
-        <CyberButtonOutline
-          label="BACK"
-          onPress={() => goBackOrReplace(router, '/qr-scanner')}
-          style={styles.backButton}
-        />
-        <TerminalText glow tone="cyan" variant="label">
-          WORKOUT CHECK-IN
-        </TerminalText>
-      </View>
+      <OnboardingHeader
+        label="WORKOUT VERIFICATION"
+        onBack={() => goBackOrReplace(router, '/qr-scanner')}
+        step="PARTNER GYM"
+      />
       <WorkoutFlowProgress stage="start" style={styles.workoutProgress} />
+      <BrandScreenHeader
+        description="Confirm your presence with your phone's secure prompt."
+        eyebrow="LOCAL PRESENCE CHECK"
+        title="CONFIRM IT IS REALLY YOU"
+      />
 
       <View style={styles.centerContent}>
-        <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
-          <TerminalText glow style={styles.scanIcon} tone="cyan" variant="value">
+        <HUDBorderBox style={styles.scanFrame} tone="cyan">
+          <TerminalText style={styles.scanIcon} tone="cyan" variant="value">
             ID
           </TerminalText>
         </HUDBorderBox>
-        <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
-          LOCAL PRESENCE CHECK
-        </TerminalText>
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
-          CONFIRM IT IS REALLY YOU
-        </TerminalText>
-        <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Confirm your presence with your phone&apos;s secure prompt.
-        </TerminalText>
       </View>
 
       <BiometricCameraConsentBanner
@@ -174,25 +175,7 @@ export default function IdentityCheckScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.sm
-  },
-  backButton: {
-    width: 96,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
+  screen: brandScreenStyles.content,
   workoutProgress: {
     marginBottom: spacing.sm
   },
@@ -209,26 +192,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 0,
     borderRadius: 20,
-    marginBottom: spacing.md,
-    ...cyberGlow.cyan
+    marginBottom: spacing.md
   },
   scanIcon: {
     fontFamily: fontFamilies.display
-  },
-  eyebrow: {
-    marginBottom: 10,
-    fontFamily: fontFamilies.terminal
-  },
-  title: {
-    maxWidth: 300,
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    maxWidth: 290,
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   },
   cameraConsent: {
     marginBottom: spacing.md

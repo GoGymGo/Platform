@@ -1,5 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, type StyleProp, View, type ViewStyle } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  type StyleProp,
+  View,
+  type ViewStyle
+} from 'react-native';
 
 import { TerminalText } from '@/components/cyber';
 import { colors, spacing } from '@/constants/theme';
@@ -29,6 +36,8 @@ export function CompetitionHubNav({
   style?: StyleProp<ViewStyle>;
 }) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const compact = width <= 340;
 
   return (
     <View accessibilityRole="tablist" style={[styles.container, style]}>
@@ -53,8 +62,8 @@ export function CompetitionHubNav({
             ]}
           >
             <TerminalText
-              glow={selected}
-              style={styles.label}
+              numberOfLines={1}
+              style={[styles.label, compact ? styles.labelCompact : null]}
               tone={selected ? 'cyan' : 'dim'}
               variant="micro"
             >
@@ -74,7 +83,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderMuted,
-    backgroundColor: colors.background
+    backgroundColor: colors.panelAlpha84
   },
   tab: {
     minWidth: 0,
@@ -96,5 +105,10 @@ const styles = StyleSheet.create({
   label: {
     width: '100%',
     textAlign: 'center'
+  },
+  labelCompact: {
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: 0.4
   }
 });

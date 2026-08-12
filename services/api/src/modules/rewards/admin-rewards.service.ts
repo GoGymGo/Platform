@@ -13,6 +13,11 @@ import type {
 } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
+import { canDeleteReward } from '../operator/admin-deletion-policy';
+import type {
+  AdminDeletedEntityResponseDto,
+  DeleteVersionedAdminEntityDto,
+} from '../operator/dto/admin-configuration.dto';
 import {
   type AddRewardCouponCodesDto,
   type AddedCouponCodesResponseDto,
@@ -34,6 +39,11 @@ interface AdminRewardJson extends JsonObject {
 interface AddedCodesJson extends JsonObject {
   added: number;
   rewardId: string;
+}
+
+interface DeletedRewardJson extends JsonObject {
+  id: string;
+  status: 'deleted';
 }
 
 @Injectable()
@@ -305,6 +315,71 @@ export class AdminRewardsService {
     );
   }
 
+  delete(
+    principal: AuthenticatedPrincipal,
+    rewardId: string,
+    idempotencyKey: string,
+    input: DeleteVersionedAdminEntityDto,
+  ): Promise<AdminDeletedEntityResponseDto> {
+    return this.idempotency.execute<DeletedRewardJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { ...input, rewardId },
+        scope: `admin-rewards:${rewardId}:delete`,
+      },
+      async (transaction) => {
+        const admin = await this.authorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const reward = await this.getForUpdate(transaction, rewardId);
+        this.assertVersion(reward.version, input.expectedVersion);
+        if (!canDeleteReward(reward.status)) {
+          throw new ConflictException({
+            code: 'REWARD_DELETE_REQUIRES_INACTIVE_STATUS',
+            message:
+              'Only draft or archived rewards can be deleted from the dashboard.',
+          });
+        }
+
+        const deletedAt = new Date();
+        const deleted = await transaction
+          .updateTable('reward_catalog_items')
+          .set({
+            deleted_at: deletedAt,
+            updated_at: deletedAt,
+            version: sql<number>`version + 1`,
+          })
+          .where('id', '=', rewardId)
+          .where('version', '=', input.expectedVersion)
+          .where('deleted_at', 'is', null)
+          .returning('id')
+          .executeTakeFirst();
+        if (!deleted) throw this.versionConflict();
+        await this.authorization.audit(transaction, {
+          action: 'reward.deleted',
+          actorUserId: admin.id,
+          entityId: rewardId,
+          entityType: 'reward_catalog_items',
+          nextState: {
+            deletedAt: deletedAt.toISOString(),
+            status: 'deleted',
+          },
+          previousState: {
+            competitionId: reward.competition_id,
+            status: reward.status,
+            title: reward.title,
+            version: reward.version,
+          },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return { id: deleted.id, status: 'deleted' };
+      },
+    );
+  }
+
   addCouponCodes(
     principal: AuthenticatedPrincipal,
     rewardId: string,
@@ -407,6 +482,7 @@ export class AdminRewardsService {
       .selectFrom('reward_catalog_items')
       .selectAll()
       .where('id', '=', rewardId)
+      .where('deleted_at', 'is', null)
       .forUpdate()
       .executeTakeFirst();
     if (!reward) {
@@ -426,6 +502,7 @@ export class AdminRewardsService {
       .selectFrom('competitions')
       .select(['id', 'status'])
       .where('id', '=', competitionId)
+      .where('deleted_at', 'is', null)
       .executeTakeFirst();
     if (!competition) {
       throw new NotFoundException({
@@ -466,6 +543,7 @@ export class AdminRewardsService {
         .select('id')
         .where('competition_id', '=', competitionId)
         .where('status', '=', 'published')
+        .where('deleted_at', 'is', null)
         .where('id', '!=', rewardId)
         .executeTakeFirst();
       if (!replacement) {

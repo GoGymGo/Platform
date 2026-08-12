@@ -27,7 +27,7 @@ export function AppTourQrSimulator({
         BROWSER PREVIEW QR
       </TerminalText>
       <TerminalText tone="muted" uppercase={false} variant="body">
-        Use a sample partner-gym code without opening the camera.
+        Use a sample Partner gym code without opening the camera.
       </TerminalText>
       <CyberButtonPrimary
         disabled={scanLocked}

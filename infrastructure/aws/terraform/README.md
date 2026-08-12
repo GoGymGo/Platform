@@ -85,9 +85,12 @@ placed in Terraform variables or state. Before starting ECS tasks:
 2. Store a hostname-verifying `DATABASE_URL` with `sslmode=verify-full` for that
    login in the output `DATABASE_URL` secret. The production image trusts the
    checksum-pinned Amazon RDS root CA bundle for Canada Central.
-3. Store a random base64-encoded 32-byte value in
+3. Store the approved owner identity in `GOGYMGO_OWNER_EMAIL`. This value is
+   mounted only into the API task and must not be committed or placed in
+   Terraform state.
+4. Store a random base64-encoded 32-byte value in
    `REWARD_CODE_ENCRYPTION_KEY`.
-4. Configure Google workload identity federation for Firebase access from AWS.
+5. Configure Google workload identity federation for Firebase access from AWS.
    Store the generated AWS external-account configuration JSON in the existing
    `FIREBASE_SERVICE_ACCOUNT_JSON` secret. The API validates its Google endpoints,
    provider audience, and project-scoped service-account URL, then exchanges the
@@ -96,7 +99,7 @@ placed in Terraform variables or state. Before starting ECS tasks:
    not attempt to use EC2 instance metadata from Fargate. A long-lived
    service-account key remains a compatibility path only and requires an explicit
    exception approval and rotation plan.
-5. Populate optional worker secrets only when the related feature is approved.
+6. Populate optional worker secrets only when the related feature is approved.
 
 The application continues using environment-specific Firebase Authentication
 for the first AWS release. Migrating identities to Cognito is explicitly out of

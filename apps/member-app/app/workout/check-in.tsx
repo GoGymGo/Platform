@@ -1,10 +1,9 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
   ScreenLoadingState,
   ScreenScrollView,
-  CyberButtonOutline,
   CyberButtonPrimary,
   HUDBorderBox,
   ScreenContainer,
@@ -15,10 +14,12 @@ import {
   useAccessibilityAnnouncement
 } from '@/components/reliability';
 import { BiometricCameraConsentBanner } from '@/components/legal';
+import { OnboardingHeader } from '@/components/onboarding';
 import { SessionUnavailable } from '@/components/session';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
-import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
+import { fontFamilies, spacing } from '@/constants/theme';
 import { useBiometricCameraConsent } from '@/hooks/useBiometricCameraConsent';
 import { usePresenceVerification } from '@/hooks/usePresenceVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
@@ -27,6 +28,14 @@ import { useAppTour } from '@/state/appTour';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function CheckInScreen() {
+  if (!heartRateTelemetryAvailable) {
+    return <Redirect href="/workout/method" />;
+  }
+
+  return <HeartRateCheckInScreen />;
+}
+
+function HeartRateCheckInScreen() {
   const router = useRouter();
   const { active: appTourActive } = useAppTour();
   const { deviceSaved } = useLocalSearchParams<{ deviceSaved?: string }>();
@@ -61,7 +70,7 @@ export default function CheckInScreen() {
     return (
       <SessionUnavailable
         actionLabel="BACK TO TRAIN"
-        body="Heart-rate telemetry is not connected in this build, so a verified session cannot start yet."
+        body="Heart-rate telemetry is not connected in this build, so a Verified workout cannot start yet."
         onAction={() => router.replace('/session')}
         title="DEVICE CONNECTION REQUIRED"
       />
@@ -79,13 +88,13 @@ export default function CheckInScreen() {
   }
 
   if (registrationChecking) {
-    return <ScreenLoadingState body="Checking your competition registration." />;
+    return <ScreenLoadingState body="Checking your contest registration." />;
   }
 
   if (registrationError) {
     return (
       <RecoverableScreenError
-        body="Your competition setup could not be checked. Retry before starting a verified workout."
+        body="Your Contest setup could not be checked. Retry before starting a Verified workout."
         onRetry={() => void retryRegistration()}
         retrying={registrationRetrying}
         title="COULD NOT CHECK SETUP"
@@ -115,17 +124,17 @@ export default function CheckInScreen() {
         contentContainerStyle={styles.screen}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <CyberButtonOutline
-            label="BACK"
-            onPress={() => goBackOrReplace(router, '/session')}
-            style={styles.backButton}
-          />
-          <TerminalText glow tone="cyan" variant="label">
-            WORKOUT CHECK-IN
-          </TerminalText>
-        </View>
+        <OnboardingHeader
+          label="WORKOUT VERIFICATION"
+          onBack={() => goBackOrReplace(router, '/session')}
+          step="START"
+        />
         <WorkoutFlowProgress stage="start" style={styles.workoutProgress} />
+        <BrandScreenHeader
+          description="Use your phone's secure prompt. GoGymGo receives only pass or fail."
+          eyebrow="LOCAL PRESENCE CHECK"
+          title="VERIFY IT'S YOU TO START"
+        />
 
         {deviceSaved === '1' ? (
           <HUDBorderBox style={styles.savedDeviceNotice} tone="green">
@@ -139,20 +148,11 @@ export default function CheckInScreen() {
         ) : null}
 
         <View style={styles.centerContent}>
-          <HUDBorderBox glow style={styles.scanFrame} tone="cyan">
-            <TerminalText glow style={styles.scanIcon} tone="cyan" variant="value">
+          <HUDBorderBox style={styles.scanFrame} tone="cyan">
+            <TerminalText style={styles.scanIcon} tone="cyan" variant="value">
               ID
             </TerminalText>
           </HUDBorderBox>
-          <TerminalText glow style={styles.eyebrow} tone="cyan" variant="label">
-            LOCAL PRESENCE CHECK
-          </TerminalText>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            {"VERIFY IT'S YOU TO START"}
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Use your phone&apos;s secure prompt. GoGymGo receives only pass or fail.
-          </TerminalText>
         </View>
 
         <BiometricCameraConsentBanner
@@ -187,25 +187,7 @@ export default function CheckInScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.md
-  },
-  backButton: {
-    width: 96,
-    minHeight: 44,
-    paddingVertical: spacing.sm
-  },
+  screen: brandScreenStyles.content,
   workoutProgress: {
     marginBottom: spacing.sm
   },
@@ -227,26 +209,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 0,
     borderRadius: 20,
-    marginBottom: spacing.md,
-    ...cyberGlow.cyan
+    marginBottom: spacing.md
   },
   scanIcon: {
     fontFamily: fontFamilies.display
-  },
-  eyebrow: {
-    marginBottom: 10,
-    fontFamily: fontFamilies.terminal
-  },
-  title: {
-    maxWidth: 300,
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    maxWidth: 290,
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
   },
   cameraConsent: {
     marginBottom: spacing.md

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildUpstreamUrl } from "./upstream-url.mjs";
 
 type RouteContext = {
   params: Promise<{ path: string[] }>;
@@ -30,8 +31,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const target = new URL(`${baseUrl}/${path.map(encodeURIComponent).join("/")}`);
-  target.search = request.nextUrl.search;
+  const target = buildUpstreamUrl(baseUrl, path, request.nextUrl.search);
   const authorization = request.headers.get("authorization");
   const idempotencyKey = request.headers.get("idempotency-key");
   const contentType = request.headers.get("content-type");
@@ -69,5 +69,9 @@ export function POST(request: NextRequest, context: RouteContext) {
 }
 
 export function PUT(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
+}
+
+export function DELETE(request: NextRequest, context: RouteContext) {
   return proxy(request, context);
 }

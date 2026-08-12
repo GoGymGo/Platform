@@ -44,7 +44,7 @@ The generated GeoJSON is stored at
   cancelled
 - Competition: September 1 at 12:00 a.m. PDT through October 1 at 12:00 a.m.
   PDT
-- Minimum entrants: 2
+- Minimum entrants: 1
 - Entrant cap: none
 - Weekly goals: one through seven days
 - Minimum verified session: 30 minutes
@@ -53,8 +53,9 @@ The generated GeoJSON is stored at
 - Presence check: not used in the pilot
 - Partner-gym QR: required
 - Gym geofence: 75 m with a 50 m maximum accepted accuracy reading
-- Static QR flow: scan on entry and scan the same poster after 30 minutes
-- Session expiry: four hours; a missing exit earns no credit
+- Contest QR flow: scan once to select the Partner gym, then use fresh start and finish location checks around the 30-minute workout
+- Completion period: a workout started in time may finish up to 15 minutes after the competition ends
+- Session expiry: the earlier of four hours or the completion-period deadline; a missing finish location check earns no credit
 - Reward: one $100 CAD cash reward sponsored by GoGymGo
 
 The competition remains a draft until at least one real, in-stock reward has

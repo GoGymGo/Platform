@@ -12,6 +12,7 @@ import {
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
 import { DataCollectionNotice } from '@/components/legal';
+import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
@@ -69,7 +70,7 @@ export default function GymRegistrationScreen() {
     <ScreenContainer>
       <ScreenScrollView
         bounces={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={brandScreenStyles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -80,20 +81,16 @@ export default function GymRegistrationScreen() {
           step="QR CODE REQUEST"
         />
 
-        <View style={styles.header}>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            REGISTER A GYM
-          </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Request a GoGymGo entry and exit QR-code set for one gym location. We review the
-            location and manager details before activation.
-          </TerminalText>
-        </View>
+        <BrandScreenHeader
+          description="Request one GoGymGo Contest QR for a gym location. Players use it once to select the gym, then verify workouts with live location."
+          eyebrow="PARTNER GYM"
+          title="REGISTER A GYM"
+        />
 
         <View style={styles.processList}>
           <ProcessRow index="01" text="SUBMIT ONE GYM LOCATION" />
           <ProcessRow index="02" text="GOGYMGO REVIEWS THE LOCATION" />
-          <ProcessRow index="03" text="APPROVED GYMS RECEIVE ENTRY + EXIT QR CODES" />
+          <ProcessRow index="03" text="APPROVED GYMS RECEIVE A CONTEST QR" />
         </View>
 
         <HUDBorderBox style={styles.form} tone="cyan">
@@ -139,7 +136,7 @@ export default function GymRegistrationScreen() {
             <AuthStatusNotice message={submissionError} tone="red" />
           ) : submitted ? (
             <AuthStatusNotice
-              message="GYM QR REQUEST RECORDED. GOGYMGO WILL VERIFY THIS LOCATION BEFORE ISSUING OR ACTIVATING ANY QR CODES."
+              message="GYM QR REQUEST RECORDED. GOGYMGO WILL VERIFY THIS LOCATION BEFORE ISSUING OR ACTIVATING THE CONTEST QR."
               tone="green"
             />
           ) : null}
@@ -151,7 +148,7 @@ export default function GymRegistrationScreen() {
                 ? 'REQUEST RECORDED'
                 : submitting
                   ? 'RECORDING...'
-                  : 'REQUEST GYM QR CODES ->'
+                  : 'REQUEST GYM QR ->'
             }
             onPress={submitRequest}
           />
@@ -164,7 +161,7 @@ export default function GymRegistrationScreen() {
 function ProcessRow({ index, text }: { index: string; text: string }) {
   return (
     <View style={styles.processRow}>
-      <TerminalText glow tone="cyan" variant="micro">
+      <TerminalText tone="cyan" variant="micro">
         {index}
       </TerminalText>
       <TerminalText style={styles.processText} tone="text" variant="body">
@@ -175,26 +172,6 @@ function ProcessRow({ index, text }: { index: string; text: string }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    gap: spacing.lg,
-    paddingHorizontal: spacing.screenX,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
-  },
-  header: {
-    gap: spacing.sm,
-    alignItems: 'center'
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    textAlign: 'center'
-  },
-  body: {
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
-  },
   processList: {
     borderTopWidth: 1,
     borderColor: colors.borderCyanSubtle

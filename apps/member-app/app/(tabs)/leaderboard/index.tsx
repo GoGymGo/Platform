@@ -9,11 +9,12 @@ import {
 } from '@/components/cyber';
 import { InlineHelpButton } from '@/components/clarity';
 import { CompetitionHubNav } from '@/components/competitionHubNav';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { CompactTextButton } from '@/components/onboarding';
 import { RecoverableError } from '@/components/reliability';
 import { UserAlias } from '@/components/streakRewards';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, fontFamilies, spacing } from '@/constants/theme';
 import type { CategoryLeaderboardRow } from '@/data/appData';
 import { useCategoryLeaderboard, useMyStreaks } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
@@ -70,7 +71,13 @@ export default function LeaderboardScreen() {
   const hasSettledWeek = competition.periodResults.some((period) => period.status === 'settled');
   const categoryScore = competition.periodEntriesBeforePerfectMonth;
   const standingsVisible = !competitionNotStarted;
-  const myRank = myGoalLeaderboard?.rows.find(
+  const myGoalLeaderboardRows = Array.isArray(myGoalLeaderboard?.rows)
+    ? myGoalLeaderboard.rows
+    : [];
+  const selectedLeaderboardRows = Array.isArray(selectedLeaderboard?.rows)
+    ? selectedLeaderboard.rows
+    : [];
+  const myRank = myGoalLeaderboardRows.find(
     ({ alias }) => alias.toLowerCase() === publicName.toLowerCase()
   )?.rank;
   const currentRankLabel = getCompetitionRankLabel({
@@ -95,27 +102,21 @@ export default function LeaderboardScreen() {
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]}
       >
-        <View style={styles.header}>
-          <View style={styles.headerTopLine}>
-            <TerminalText glow tone="cyan" variant="label">
-              {competitionRegion.label}{' // MONTHLY COMPETITION'}
-            </TerminalText>
+        <BrandScreenHeader
+          accessory={(
             <InlineHelpButton
-              label="Open competition guide"
+              label="Open contest guide"
               onPress={() => router.push('/how-it-works?from=leaderboard')}
             />
-          </View>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            REGIONAL COMPETITION
-          </TerminalText>
-          <TerminalText style={styles.intro} tone="muted" uppercase={false} variant="body">
-            Track your standing, Prize Draw Entries and Weekly Challenge.
-          </TerminalText>
-        </View>
+          )}
+          description="Track your rank, entries and Weekly Challenge."
+          eyebrow={`${competitionRegion.label} // MONTHLY CONTEST`}
+          title="REGIONAL CONTEST"
+        />
 
         <CompetitionHubNav active="rankings" style={styles.hubNav} />
 
-        <HUDBorderBox glow style={styles.myStandingCard} tone="cyan">
+        <HUDBorderBox style={styles.myStandingCard} tone="cyan">
           <View style={styles.standingHeader}>
             <View style={styles.standingIdentity}>
               <TerminalText tone="dim" variant="label">
@@ -128,7 +129,7 @@ export default function LeaderboardScreen() {
                 uppercase={false}
               />
             </View>
-            <TerminalText glow tone="cyan" variant="label">
+            <TerminalText tone="cyan" variant="label">
               {weeklyGoal}-DAY GOAL GROUP
             </TerminalText>
           </View>
@@ -157,7 +158,7 @@ export default function LeaderboardScreen() {
           <TerminalText live="polite" tone="dim" uppercase={false} variant="caption">
             {competitionNotStarted
               ? 'Rankings begin after the first scoring week.'
-              : `Goal Score ${categoryScore} sets your rank after each completed week. Prize Draw Entries set your winning odds.`}
+              : `Goal Score ${categoryScore} sets your rank. Entries set your Prize Draw odds.`}
           </TerminalText>
           <CompactTextButton
             label={showRankingRules ? 'Hide ranking details' : 'How ranking works'}
@@ -169,7 +170,7 @@ export default function LeaderboardScreen() {
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Goal Score includes each settled week&apos;s 1x, 2x or 3x Weekly
                 Challenge result. Equal scores are resolved by verified
-                competition days, then the published audited tie-break.
+                contest days, then the published audited tie-break.
               </TerminalText>
             </View>
           ) : null}
@@ -230,14 +231,14 @@ export default function LeaderboardScreen() {
           ) : null}
         </View>
 
-        <HUDBorderBox glow style={styles.topTenPanel} tone="cyan">
+        <HUDBorderBox style={styles.topTenPanel} tone="cyan">
           <View style={styles.topTenHeader}>
             <View style={styles.topTenHeading}>
-              <TerminalText glow tone="cyan" variant="label">
+              <TerminalText tone="cyan" variant="label">
                 TOP 10{' // '}{displayedGoal}-DAY GOAL
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                Top three finishers receive 3x, 2x and 1.5x Prize Draw Entry boosts.
+                Top three earn 3x, 2x and 1.5x entry boosts.
               </TerminalText>
             </View>
             <TerminalText tone="dim" variant="micro">
@@ -257,7 +258,7 @@ export default function LeaderboardScreen() {
                 title="COULD NOT LOAD STANDINGS"
               />
             ) : null}
-            {selectedLeaderboard?.rows.map((row) => (
+            {selectedLeaderboardRows.map((row) => (
               <LeaderboardResultRow
                 compact={compactRankings}
                 isCurrentUser={row.alias.toLowerCase() === publicName.toLowerCase()}
@@ -268,13 +269,15 @@ export default function LeaderboardScreen() {
                 row={row}
               />
             ))}
-            {!selectedLeaderboardQuery.isError && !leaderboardPending && !selectedLeaderboard ? (
+            {!selectedLeaderboardQuery.isError &&
+            !leaderboardPending &&
+            selectedLeaderboardRows.length === 0 ? (
               <HUDBorderBox style={styles.emptyStandings} tone="muted">
                 <TerminalText glow tone="amber" variant="label">
                   STANDINGS NOT AVAILABLE YET
                 </TerminalText>
                 <TerminalText style={styles.emptyStandingsCopy} tone="muted" uppercase={false} variant="body">
-                  Live results will appear when this month&apos;s competition data is ready.
+                  Live results will appear when this month&apos;s contest data is ready.
                 </TerminalText>
               </HUDBorderBox>
             ) : null}
@@ -370,26 +373,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg
-  },
-  headerTopLine: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md
-  },
-  title: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.titleXl,
-    lineHeight: 31
-  },
-  intro: {
-    fontFamily: fontFamilies.body
+    backgroundColor: colors.transparent
   },
   myStandingCard: {
     gap: spacing.md,

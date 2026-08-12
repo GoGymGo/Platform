@@ -84,7 +84,9 @@ export function AppDataProvider({ children }: PropsWithChildren) {
   );
   useEffect(() => {
     if (appTourActive) {
-      queryClient.clear();
+      // Reset sample data when the scenario changes while keeping active
+      // observers attached so direct demo routes refetch instead of hanging.
+      void queryClient.resetQueries();
     }
   }, [appTourActive, appTourScenario, queryClient]);
   const mode: AppDataMode = appTourActive ? 'tour' : api ? 'api' : 'unavailable';
@@ -119,7 +121,10 @@ export function AppDataProvider({ children }: PropsWithChildren) {
     [api, appTourActive, mode]
   );
   const apiQueriesEnabled = mode !== 'unavailable';
-  const authenticatedQueriesEnabled = apiQueriesEnabled && Boolean(user);
+  // Tour repositories are isolated and provide their own sample identity. A
+  // demo deep link must not wait for Firebase auth or its queries stay pending.
+  const authenticatedQueriesEnabled =
+    apiQueriesEnabled && (appTourActive || Boolean(user));
   const value = useMemo(
     () => ({
       account,
@@ -189,17 +194,6 @@ export function useCategoryLeaderboard(goal: GoalCategory) {
     enabled: authenticatedQueriesEnabled,
     queryFn: () => source.getCategoryLeaderboard(goal),
     queryKey: ['leaderboard', goal]
-  });
-}
-
-export function useCategoryLeaderboards(goals: readonly GoalCategory[]) {
-  const { authenticatedQueriesEnabled, source } = useAppData();
-  return useQuery({
-    enabled: authenticatedQueriesEnabled,
-    queryFn: () => Promise.all(
-      goals.map((goal) => source.getCategoryLeaderboard(goal))
-    ),
-    queryKey: ['leaderboards', goals.join('|')]
   });
 }
 
@@ -378,6 +372,16 @@ export function useMyRewardAwards() {
   });
 }
 
+export function useMyLatestCompetitionResults() {
+  const { authenticatedQueriesEnabled, source } = useAppData();
+  const { user } = useAuth();
+  return useQuery({
+    enabled: authenticatedQueriesEnabled,
+    queryFn: () => source.getMyLatestCompetitionResults(),
+    queryKey: ['my-latest-competition-results', user?.uid ?? 'anonymous']
+  });
+}
+
 export function useMyStreaks() {
   const { authenticatedQueriesEnabled, source } = useAppData();
   const { user } = useAuth();
@@ -394,24 +398,6 @@ export function useRewardCatalog(regionCode: string, monthKey?: string) {
     enabled: apiQueriesEnabled && regionCode.length > 0,
     queryFn: () => source.getRewardCatalog(regionCode, monthKey),
     queryKey: ['reward-catalog', regionCode, monthKey ?? 'current']
-  });
-}
-
-export function useRewardWinners() {
-  const { apiQueriesEnabled, source } = useAppData();
-  return useQuery({
-    enabled: apiQueriesEnabled,
-    queryFn: () => source.getRewardWinners(),
-    queryKey: ['reward-winners']
-  });
-}
-
-export function useSettledCompetition() {
-  const { apiQueriesEnabled, source } = useAppData();
-  return useQuery({
-    enabled: apiQueriesEnabled,
-    queryFn: () => source.getSettledCompetition(),
-    queryKey: ['settled-competition']
   });
 }
 

@@ -1,4 +1,4 @@
-import { socialChallengeDateWindow } from './social.service';
+import { socialChallengeDateWindow } from './social-challenge-window';
 
 describe('social challenge query bounds', () => {
   it('covers only the earliest start through the latest end date', () => {

@@ -11,6 +11,7 @@ import {
 } from '@/components/cyber';
 import { FirstVisitTip, InlineHelpButton } from '@/components/clarity';
 import { CompetitionHubNav } from '@/components/competitionHubNav';
+import { BrandScreenHeader } from '@/components/screenLayout';
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
 import {
@@ -19,7 +20,10 @@ import {
 } from '@/components/reliability';
 import { UserAlias } from '@/components/streakRewards';
 import { colors, cyberGlow, fontFamilies, spacing } from '@/constants/theme';
-import { getWeeklyChallengeDisplayStatus } from '@/domain/competition';
+import {
+  canLoadWeeklyChallengePairing,
+  getWeeklyChallengeDisplayStatus
+} from '@/domain/competition';
 import { getPublicInitials } from '@/domain/profile';
 import type { StreakCounts } from '@/domain/streaks';
 import {
@@ -49,17 +53,22 @@ export default function SquadScreen() {
   const { profileImageUri, publicName } = useProfile();
   const { competition, competitionEntryStartDateKey, weeklyGoal } = useWorkoutProgress();
   const activePeriod = competition.currentPeriod;
+  const pairingDataEnabled = canLoadWeeklyChallengePairing({
+    hasCurrentPeriod: Boolean(activePeriod),
+    phase: competition.phase
+  });
+  const pairingRegionCode = pairingDataEnabled ? competitionRegionCode : '';
   const weeklyChallengePeriod = activePeriod?.index ?? 1;
   const eligiblePartnersQuery = useEligibleWeeklyChallengePartners(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegionCode,
+    pairingRegionCode,
     weeklyChallengePeriod
   );
   const requestsQuery = useWeeklyChallengeRequests(
     competition.competitionMonthKey,
     weeklyGoal,
-    competitionRegionCode,
+    pairingRegionCode,
     weeklyChallengePeriod
   );
   const requestPartner = useRequestWeeklyChallengePartner();
@@ -106,7 +115,7 @@ export default function SquadScreen() {
     ({ requestStatus }) => requestStatus !== 'pending'
   ) ?? (eligiblePartnersQuery.data ?? [])[0];
   const pairingRequired =
-    !isRemainderDayPhase && activePeriod?.availability !== 'matched';
+    pairingDataEnabled && activePeriod?.availability !== 'matched';
   const pairingActionRequired = pairingRequired && !acceptedPartnerAlias;
   const challengeState = acceptedPartnerAlias
     ? 'PARTNER CONFIRMED'
@@ -145,20 +154,16 @@ export default function SquadScreen() {
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]}
       >
-        <View style={styles.header}>
-          <View style={styles.headerTopLine}>
-            <TerminalText glow tone="cyan" variant="label">
-              {challengeState}
-            </TerminalText>
+        <BrandScreenHeader
+          accessory={(
             <InlineHelpButton
-              label="Open competition guide"
+              label="Open contest guide"
               onPress={() => router.push('/how-it-works?from=challenge')}
             />
-          </View>
-          <TerminalText glow style={styles.title} tone="cyan" variant="title">
-            {activePeriod ? `WEEK ${activePeriod.index} CHALLENGE` : 'WEEKLY CHALLENGE'}
-          </TerminalText>
-        </View>
+          )}
+          eyebrow={challengeState}
+          title={activePeriod ? `WEEK ${activePeriod.index} CHALLENGE` : 'WEEKLY CHALLENGE'}
+        />
 
         <CompetitionHubNav active="challenge" style={styles.hubNav} />
 
@@ -198,8 +203,8 @@ export default function SquadScreen() {
         ) : null}
 
         {!pairingDataError && !pairingDataLoading && incomingRequest && pairingActionRequired ? (
-          <HUDBorderBox glow style={styles.partnerRequestCard} tone="amber">
-            <TerminalText glow tone="amber" variant="label">
+          <HUDBorderBox style={styles.partnerRequestCard} tone="amber">
+            <TerminalText tone="amber" variant="label">
               RESPOND TO INVITE
             </TerminalText>
             <View style={styles.partnerIdentity}>
@@ -292,7 +297,7 @@ export default function SquadScreen() {
         />
 
         {activePeriod ? (
-          <HUDBorderBox glow style={styles.pactCard} tone="cyan">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
             <View style={styles.matchupRow}>
               <PlayerBlock
                 initials={getPublicInitials(publicName)}
@@ -340,18 +345,18 @@ export default function SquadScreen() {
             </View>
           </HUDBorderBox>
         ) : isRemainderDayPhase ? (
-          <HUDBorderBox glow style={styles.pactCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
               DAYS 29-{bonusEndDay}
             </TerminalText>
             <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
               Weekly Challenges are complete. Each verified Bonus Day adds {weeklyGoal}{' '}
-              prize draw {weeklyGoal === 1 ? 'entry' : 'entries'} before the Perfect Month 10x.
+              Prize Draw {weeklyGoal === 1 ? 'Entry' : 'Entries'} before the Perfect Month 10x.
             </TerminalText>
           </HUDBorderBox>
         ) : (
-          <HUDBorderBox glow style={styles.pactCard} tone="cyan">
-            <TerminalText glow tone="cyan" variant="label">
+          <HUDBorderBox style={styles.pactCard} tone="cyan">
+            <TerminalText tone="cyan" variant="label">
               {acceptedPartnerAlias ? 'PARTNER READY' : 'FIRST ELIGIBLE WEEK'}
             </TerminalText>
             <TerminalText style={styles.pendingDate} tone="text" variant="title">
@@ -385,7 +390,7 @@ export default function SquadScreen() {
             {showBonusDetails ? (
               <TerminalText style={styles.forfeitCopy} tone="muted" uppercase={false} variant="body">
                 Both players hit the goal: 2x each. If your partner misses, one
-                extra verified workout upgrades your week to 3x. The upgrade is
+                extra Verified workout upgrades your week to 3x. The upgrade is
                 automatic when no extra workout day is available.
               </TerminalText>
             ) : null}
@@ -489,7 +494,7 @@ function PairingMoreOptions({
           />
           {showRules ? (
             <TerminalText style={styles.partnerRequestCopy} tone="muted" uppercase={false} variant="caption">
-              Partners must be in the same regional competition with the same Weekly Goal.
+              Partners must be in the same regional contest with the same Weekly Goal.
               An invite becomes active only after it is accepted.
             </TerminalText>
           ) : null}
@@ -555,7 +560,7 @@ function getMatchNote(
   weeklyGoal: number
 ) {
   if (period.availability === 'solo') {
-    return `No compatible partner was available. Hit ${weeklyGoal} verified workout days for the standard 1x result.`;
+    return `No compatible partner was available. Hit ${weeklyGoal} Verified workout days for the standard 1x result.`;
   }
 
   if (period.userGoalMet && period.opponentGoalMet) {
@@ -565,11 +570,11 @@ function getMatchNote(
   if (period.userGoalMet && period.bonusWorkoutCompleted) {
     return weeklyGoal === 7
       ? 'Your seven-day goal is complete. 3x activates automatically if your partner misses.'
-      : 'Your extra verified workout is complete. 3x is ready if your partner misses.';
+      : 'Your extra Verified workout is complete. 3x is ready if your partner misses.';
   }
 
   if (period.userGoalMet) {
-    return `Your ${weeklyGoal}-day goal is complete. Add one more verified workout to unlock 3x if your partner misses.`;
+    return `Your ${weeklyGoal}-day Weekly Goal is complete. Add one more Verified workout to unlock 3x if your partner misses.`;
   }
 
   const remaining = weeklyGoal - period.userVerifiedCount;
@@ -663,17 +668,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: 132,
-    backgroundColor: colors.background
-  },
-  header: {
-    marginBottom: spacing.lg
-  },
-  headerTopLine: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md
+    backgroundColor: colors.transparent
   },
   hubNav: {
     marginBottom: spacing.lg
@@ -683,10 +678,6 @@ const styles = StyleSheet.create({
   },
   firstVisitTip: {
     marginBottom: spacing.lg
-  },
-  title: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.display
   },
   pactCard: {
     marginBottom: spacing.lg,

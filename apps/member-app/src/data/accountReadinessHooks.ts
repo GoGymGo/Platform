@@ -51,30 +51,45 @@ export function useCreateRegionVerification() {
   });
 }
 
-export function useCurrentCompetition(expectedMonthKey: string | null, regionCode: string) {
+export function useCurrentCompetition(
+  expectedMonthKey: string | null,
+  regionCode: string,
+  gymQrCredential: string | null = null,
+  gymQrScanKey: number | null = null,
+  enabled = true
+) {
   const context = useAccountReadinessContext();
   return useQuery({
     enabled:
+      enabled &&
       context.enabled &&
       regionCode.length > 0 &&
       (expectedMonthKey === null || expectedMonthKey.length > 0),
     queryFn: () =>
-      context.account.getCurrentCompetition(expectedMonthKey ?? undefined, regionCode),
+      gymQrCredential
+        ? context.account.resolveCompetitionByGymQr(gymQrCredential)
+        : context.account.getCurrentCompetition(expectedMonthKey ?? undefined, regionCode),
     queryKey: [
       ...context.queryKey,
       'current-competition',
-      expectedMonthKey ?? 'published',
+      gymQrCredential ? `gym-qr-${gymQrScanKey ?? 'pending'}` : (expectedMonthKey ?? 'published'),
       regionCode
     ]
   });
 }
 
-export function useCurrentEnrollment() {
+export function useCurrentEnrollment(
+  competitionId: string | null = null,
+  waitForCompetition = false,
+  enabled = true
+) {
   const context = useAccountReadinessContext();
   return useQuery({
-    enabled: context.enabled,
-    queryFn: () => context.account.getCurrentEnrollment(),
-    queryKey: [...context.queryKey, 'current-enrollment']
+    enabled: enabled && context.enabled && (!waitForCompetition || Boolean(competitionId)),
+    queryFn: () => context.account.getCurrentEnrollment(competitionId ?? undefined),
+    queryKey: competitionId
+      ? [...context.queryKey, 'current-enrollment', competitionId]
+      : [...context.queryKey, 'current-enrollment']
   });
 }
 
@@ -89,8 +104,33 @@ export function useEnrollInCompetition() {
       competitionId: string;
       input: CreateCompetitionEnrollmentInput;
     }) => context.account.enrollInCompetition(competitionId, input),
-    onSuccess: (enrollment) =>
-      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], enrollment)
+    onSuccess: (enrollment) => {
+      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], enrollment);
+      queryClient.setQueryData(
+        [...context.queryKey, 'current-enrollment', enrollment.competitionId],
+        enrollment
+      );
+    }
+  });
+}
+
+export function useWithdrawFromCompetition() {
+  const context = useAccountReadinessContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (competitionId: string) =>
+      context.account.withdrawFromCompetition(competitionId),
+    onSuccess: (enrollment) => {
+      queryClient.setQueryData([...context.queryKey, 'current-enrollment'], null);
+      queryClient.setQueryData(
+        [...context.queryKey, 'current-enrollment', enrollment.competitionId],
+        null
+      );
+      void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+      void queryClient.invalidateQueries({ queryKey: ['competition-matches'] });
+      void queryClient.invalidateQueries({ queryKey: ['weekly-challenge-partners'] });
+      void queryClient.invalidateQueries({ queryKey: ['weekly-challenge-requests'] });
+    }
   });
 }
 

@@ -1,7 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Camera } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Animated,
+  Easing,
   findNodeHandle,
   Modal,
   Platform,
@@ -13,34 +16,53 @@ import {
 } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
+import { HUDBorderBox, ScreenScrollView, TerminalText } from '@/components/cyber';
 import {
-  CyberButtonOutline,
-  CyberButtonPrimary,
-  HUDBorderBox,
-  ScreenContainer,
-  ScreenScrollView,
-  TerminalText
-} from '@/components/cyber';
+  FirstRunPrimaryButton,
+  FirstRunScreen,
+  FirstRunSecondaryButton
+} from '@/components/firstRun';
 import { LegalConsentCheckbox } from '@/components/legal';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { getUserFacingErrorMessage } from '@/components/reliability';
+import { SessionUnavailable } from '@/components/session';
 import { resolveCategoryPodiumMultipliers } from '@/config/competition';
-import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { colors, cyberGlow, fontFamilies, fontSizes, spacing } from '@/constants/theme';
+import { useRewardCatalog } from '@/data/appDataHooks';
+import { gymLocationAccuracyWarning } from '@/constants/gymScan';
 import {
   calculateWeeklyMatchEntries,
   type WeeklyMatchMultiplier
 } from '@/domain/campaignEconomics';
 import { getCompetitionMonthKey, getCompetitionRegionDateKey } from '@/domain/competition';
+import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
+import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import type { RewardCatalogItem } from '@/domain/rewards';
 import {
   buildRemainderDayOptions,
+  calculateMaximumCommitmentEntries,
   calculateMonthAwareCommitmentWeight,
   calculateRemainderDayEntries,
   getCompetitionRemainderDayCount,
   type RemainderDayCount
 } from '@/domain/commitmentProjection';
+import type {
+  CreateCompetitionEnrollmentInput,
+  CurrentCompetition
+} from '@/domain/accountReadiness';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { useCompetitionRegistration } from '@/hooks/useCompetitionRegistration';
 import { useReducedMotionPreference } from '@/hooks/useReducedMotionPreference';
 import { clearScreenMemory, useScreenMemory } from '@/hooks/useScreenMemory';
+import { ApiError } from '@/services/api/client';
+import { readGymScanLocation } from '@/services/gymScanLocation';
+import {
+  readPendingGymScan,
+  rememberCompetitionGymAccess,
+  type PendingGymScan
+} from '@/services/pendingGymScan';
+import { useAppTour } from '@/state/appTour';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 import { recordFlowMetric } from '@/services/flowMetrics';
@@ -55,10 +77,41 @@ const matchOptions = [
 ] as const;
 const defaultWeeklyMatchMultipliers: readonly WeeklyMatchMultiplier[] = [1, 1, 1, 1];
 type CategoryRank = 0 | 1 | 2 | 3;
+type ConfirmationPhase = 'idle' | 'locating' | 'registering';
+
+function formatContestWindowDate(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric',
+    month: 'long',
+    timeZone,
+    year: 'numeric'
+  }).format(new Date(value));
+}
 
 export default function CommitmentScreen() {
   const router = useRouter();
+  const { active: appTourActive } = useAppTour();
+  const mobileGymVerificationAvailable =
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
+
+  if (!mobileGymVerificationAvailable && !appTourActive) {
+    return (
+      <SessionUnavailable
+        actionLabel="BACK TO HOME"
+        body="Contest gym selection and live-location confirmation must be completed in GoGymGo on a phone or tablet."
+        onAction={() => router.replace('/home')}
+        title="PHONE OR TABLET REQUIRED"
+      />
+    );
+  }
+
+  return <MobileCommitmentScreen />;
+}
+
+function MobileCommitmentScreen() {
+  const router = useRouter();
   const reduceMotion = useReducedMotionPreference();
+  const { active: appTourActive } = useAppTour();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const { user } = useAuth();
   const isHomeSource = source === 'home';
@@ -69,20 +122,30 @@ export default function CommitmentScreen() {
     new Date(),
     competitionRegion.timeZone
   );
-  const defaultCompetitionMonthKey = getCompetitionMonthKey(
-    registrationReferenceDateKey
-  );
+  const defaultCompetitionMonthKey = getCompetitionMonthKey(registrationReferenceDateKey);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
+  const [pendingGymScan, setPendingGymScan] = useState<PendingGymScan | null>(null);
+  const [pendingGymScanHydrated, setPendingGymScanHydrated] = useState(false);
   const registration = useCompetitionRegistration({
     defaultMonthKey: defaultCompetitionMonthKey,
+    enabled: pendingGymScanHydrated,
+    gymQrCredential: pendingGymScan?.credential ?? null,
+    gymQrScanKey: pendingGymScan?.createdAt ?? null,
     jurisdictionCode,
     regionCode: regionVerification?.regionCode ?? '',
     regionVerification
   });
   const upcomingCompetitionMonthKey = registration.competitionMonthKey;
-  const categoryMultipliers = resolveCategoryPodiumMultipliers(
-    registration.competition?.rules
+  const rewardsQuery = useRewardCatalog(
+    registration.competition?.regionCode ?? '',
+    registration.competition?.monthKey
   );
+  const contestRewards = (rewardsQuery.data ?? []).filter(
+    (reward) => reward.competitionId === registration.competition?.id
+  );
+  const contestContextLoading =
+    !pendingGymScanHydrated || registration.competitionLoading;
+  const categoryMultipliers = resolveCategoryPodiumMultipliers(registration.competition?.rules);
   const categoryOptions = [
     { label: 'NONE', value: 0 },
     {
@@ -98,22 +161,17 @@ export default function CommitmentScreen() {
       value: 3
     }
   ] as const;
-  const publishedGoalOptions = registration.competition?.goalDays?.filter(
-    (day) => dayOptions.includes(day as (typeof dayOptions)[number])
+  const publishedGoalOptions = registration.competition?.goalDays?.filter((day) =>
+    dayOptions.includes(day as (typeof dayOptions)[number])
   );
   const availableGoalOptions =
-    publishedGoalOptions && publishedGoalOptions.length > 0
-      ? publishedGoalOptions
-      : dayOptions;
+    publishedGoalOptions && publishedGoalOptions.length > 0 ? publishedGoalOptions : dayOptions;
   const maximumSelectableGoal = Math.max(...availableGoalOptions);
   const draftKey = `weekly-goal:${user?.uid ?? 'anonymous'}:${upcomingCompetitionMonthKey}`;
   const [days, setDays] = useScreenMemory(`${draftKey}:days`, () =>
     Math.min(weeklyGoal, maximumSelectableGoal)
   );
-  const [goalSelected, setGoalSelected] = useScreenMemory(
-    `${draftKey}:selected`,
-    false
-  );
+  const [goalSelected, setGoalSelected] = useScreenMemory(`${draftKey}:selected`, false);
   const [weeklyMatchMultipliers, setWeeklyMatchMultipliers] = useScreenMemory<
     readonly WeeklyMatchMultiplier[]
   >(`${draftKey}:match-results`, defaultWeeklyMatchMultipliers);
@@ -127,6 +185,11 @@ export default function CommitmentScreen() {
   const [ageEligibilityAttested, setAgeEligibilityAttested] = useState(false);
   const [competitionRulesAccepted, setCompetitionRulesAccepted] = useState(false);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [cameraPermissionBusy, setCameraPermissionBusy] = useState(false);
+  const [gymPresenceStatus, setGymPresenceStatus] = useState<'checking' | 'missing' | 'ready'>(
+    'checking'
+  );
+  const [confirmationPhase, setConfirmationPhase] = useState<ConfirmationPhase>('idle');
   const calculatorDialogRef = useRef<View>(null);
   const baseMonthEntries = days * 4;
   const weeklyMatchEntries = calculateWeeklyMatchEntries(days, weeklyMatchMultipliers);
@@ -153,17 +216,50 @@ export default function CommitmentScreen() {
     upcomingCompetitionMonthKey,
     { categoryPodiumMultipliers: categoryMultipliers }
   );
+  const maximumDrawEntries = calculateMaximumCommitmentEntries(days, upcomingCompetitionMonthKey, {
+    categoryPodiumMultipliers: categoryMultipliers
+  });
   const competitionDayCount = 28 + maximumRemainderDays;
   const remainderHelper =
     maximumRemainderDays === 0
-      ? 'This competition has no Bonus Days after the four scoring weeks.'
+      ? 'This Contest has no Bonus Days after the four scoring weeks.'
       : selectedBonusDays > 0
         ? `${selectedBonusDays} selected x your ${days}-day goal = ${remainderDayEntries} ${remainderDayEntries === 1 ? 'entry' : 'entries'}. A Perfect Month multiplies these Bonus Day entries by 10.`
-        : `This ${competitionDayCount}-day competition has ${maximumRemainderDays} Bonus ${maximumRemainderDays === 1 ? 'Day' : 'Days'} after day 28. Each verified Bonus Day is worth your ${days}-day goal before 10x.`;
+        : `This ${competitionDayCount}-day Contest has ${maximumRemainderDays} Bonus ${maximumRemainderDays === 1 ? 'Day' : 'Days'} after day 28. Each verified Bonus Day is worth your ${days}-day Weekly Goal before 10x.`;
 
   useEffect(() => {
     void recordFlowMetric(user?.uid, 'weekly-goal-viewed', 'weekly-goal');
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (pendingGymScanHydrated && isHomeSource && registration.alreadyEnrolled) {
+      router.replace('/home');
+    }
+  }, [isHomeSource, pendingGymScanHydrated, registration.alreadyEnrolled, router]);
+
+  useEffect(() => {
+    let active = true;
+
+    void readPendingGymScan()
+      .then((pending) => {
+        if (active) {
+          setPendingGymScan(pending);
+          setGymPresenceStatus(pending ? 'ready' : 'missing');
+          setPendingGymScanHydrated(true);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPendingGymScan(null);
+          setGymPresenceStatus('missing');
+          setPendingGymScanHydrated(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function selectWeeklyMatchResult(index: number, multiplier: WeeklyMatchMultiplier) {
     setWeeklyMatchMultipliers((current) =>
@@ -178,15 +274,80 @@ export default function CommitmentScreen() {
     setShowCalculator(false);
   }
 
+  async function openGymScanner() {
+    if (cameraPermissionBusy) return;
+    setConfirmationError(null);
+    setCameraPermissionBusy(true);
+
+    try {
+      if (!appTourActive) {
+        const permission = await Camera.getCameraPermissionsAsync();
+        if (!permission.granted && permission.canAskAgain) {
+          await Camera.requestCameraPermissionsAsync();
+        }
+      }
+    } catch {
+      // The scanner has the full permission recovery UI if the native prompt fails.
+    } finally {
+      setCameraPermissionBusy(false);
+      router.push('/qr-scanner?enrollment=1');
+    }
+  }
+
   async function confirmWeeklyGoal() {
     setConfirmationError(null);
     if (!goalSelected || !ageEligibilityAttested || !competitionRulesAccepted) {
-      setConfirmationError('Review and accept the competition agreement.');
+      setConfirmationError('Review and accept the Contest agreement.');
       return;
     }
 
     try {
-      const enrollmentResult = await registration.register(days);
+      setConfirmationPhase(
+        !appTourActive && !registration.alreadyEnrolled ? 'locating' : 'registering'
+      );
+      let gymPresence: CreateCompetitionEnrollmentInput['gymPresence'] | undefined;
+      let confirmedGymScan: PendingGymScan | null = null;
+      if (!appTourActive && !registration.alreadyEnrolled) {
+        const pendingScan = await readPendingGymScan();
+        if (!pendingScan) {
+          setGymPresenceStatus('missing');
+          setConfirmationError(
+            'Scan the active QR poster at a Partner gym before confirming registration.'
+          );
+          return;
+        }
+        confirmedGymScan = pendingScan;
+        const location = await readGymScanLocation();
+        if (location.status !== 'location-read') {
+          setConfirmationError(
+            location.status === 'permission-denied'
+              ? 'Location access is required to confirm you are within 75 metres of the Partner gym. Allow location, then try again.'
+              : 'Your live location could not be read. Check location services at the gym, then try again.'
+          );
+          return;
+        }
+        gymPresence = {
+          accuracyMeters: location.accuracyMeters,
+          credential: pendingScan.credential,
+          latitude: location.latitude,
+          longitude: location.longitude
+        };
+      }
+      setConfirmationPhase('registering');
+      const enrollmentResult = await registration.register(days, gymPresence);
+      if (confirmedGymScan && registration.competition) {
+        try {
+          await rememberCompetitionGymAccess({
+            competitionId: registration.competition.id,
+            credential: confirmedGymScan.credential,
+            credentialValidUntil: getWorkoutCompletionDeadline(
+              registration.competition.endsAt
+            ).toISOString()
+          });
+        } catch {
+          // Enrollment remains authoritative if device storage becomes unavailable.
+        }
+      }
       setWeeklyGoal(enrollmentResult.goalDays, upcomingCompetitionMonthKey);
       [
         'days',
@@ -197,8 +358,12 @@ export default function CommitmentScreen() {
         'bonus-days',
         'calculator-open'
       ].forEach((key) => clearScreenMemory(`${draftKey}:${key}`));
-      if (isGymScanSource) {
-        router.replace('/qr-scanner?posterScan=1');
+      const selectedContestAcceptsWorkouts =
+        registration.competition?.status === 'active' &&
+        Date.now() >= Date.parse(registration.competition.startsAt) &&
+        Date.now() < Date.parse(registration.competition.endsAt);
+      if (isGymScanSource && selectedContestAcceptsWorkouts) {
+        router.replace('/qr-scanner');
       } else {
         router.replace({
           pathname: '/home',
@@ -209,16 +374,18 @@ export default function CommitmentScreen() {
         });
       }
     } catch (error) {
-      setConfirmationError(
-        error instanceof Error ? error.message : 'Registration could not be completed. Try again.'
-      );
+      setConfirmationError(getRegistrationErrorMessage(error));
+    } finally {
+      setConfirmationPhase('idle');
     }
   }
 
-  const registrationRequirementsAccepted = ageEligibilityAttested && competitionRulesAccepted;
+  const gymPresenceReady = registration.alreadyEnrolled || gymPresenceStatus === 'ready';
+  const registrationRequirementsAccepted =
+    ageEligibilityAttested && competitionRulesAccepted && gymPresenceReady;
 
   return (
-    <ScreenContainer>
+    <FirstRunScreen>
       <ScreenScrollView
         bounces={false}
         contentContainerStyle={styles.content}
@@ -228,38 +395,71 @@ export default function CommitmentScreen() {
       >
         <OnboardingHeader
           label="WEEKLY GOAL"
-          onBack={() => goBackOrReplace(
-            router,
-            isHomeSource
-              ? '/home'
-              : isGymScanSource
-                ? '/region?source=gym-scan'
-                : '/region'
-          )}
+          onBack={() =>
+            goBackOrReplace(
+              router,
+              isHomeSource ? '/home' : isGymScanSource ? '/region?source=gym-scan' : '/region'
+            )
+          }
           progress={100}
           step="SETUP // 2 OF 2"
         />
 
-        <TerminalText glow style={styles.title} tone="cyan" variant="title">
+        <TerminalText style={styles.title} tone="text" variant="title">
           CHOOSE YOUR WEEKLY GOAL
         </TerminalText>
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-          Choose a realistic number of workout days you can repeat each week.
+          Choose how many days you&apos;ll train each week.
         </TerminalText>
 
-        <HUDBorderBox style={styles.joinWindowNotice} tone="muted">
-          <TerminalText tone="cyan" variant="label">
-            SEPTEMBER COMPETITION
-          </TerminalText>
-          <TerminalText tone="muted" uppercase={false} variant="caption">
-            Registration is now open. Enrol by choosing how many workout days
-            you’ll commit to each week.
-          </TerminalText>
-        </HUDBorderBox>
+        {contestContextLoading ? (
+          <HUDBorderBox style={styles.contestContextCard} tone="muted">
+            <TerminalText live="polite" tone="cyan" variant="label">
+              LOADING CONTEST DETAILS...
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              {isGymScanSource
+                ? 'Matching this QR to its Contest.'
+                : 'Loading your Contest.'}
+            </TerminalText>
+          </HUDBorderBox>
+        ) : registration.competition ? (
+          <ContestEntryContext
+            isQrSelected={Boolean(pendingGymScan)}
+            rewards={contestRewards}
+            rewardsError={rewardsQuery.isError}
+            rewardsLoading={rewardsQuery.isPending}
+            timeZone={competitionRegion.timeZone}
+            competition={registration.competition}
+          />
+        ) : (
+          <HUDBorderBox style={styles.contestContextError} tone="amber">
+            <TerminalText tone="amber" variant="label">
+              CONTEST DETAILS UNAVAILABLE
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="caption">
+              {pendingGymScan || registration.competitionError
+                ? 'This QR doesn\'t match an open Contest. Scan the current poster.'
+                : 'No Contest is open in your region.'}
+            </TerminalText>
+            {pendingGymScan ? (
+              <FirstRunSecondaryButton
+                disabled={cameraPermissionBusy}
+                label={cameraPermissionBusy ? 'OPENING CAMERA...' : 'SCAN CURRENT CONTEST QR'}
+                onPress={() => void openGymScanner()}
+                style={styles.contextRetryButton}
+                tone="amber"
+              />
+            ) : null}
+          </HUDBorderBox>
+        )}
 
         <View accessibilityRole="radiogroup" style={styles.dayPicker}>
           {dayOptions.map((day) => {
-            const available = availableGoalOptions.includes(day);
+            const available =
+              Boolean(registration.competition) &&
+              !contestContextLoading &&
+              availableGoalOptions.includes(day);
 
             return (
               <Pressable
@@ -307,7 +507,7 @@ export default function CommitmentScreen() {
         {goalSelected ? (
           <HUDBorderBox style={styles.goalSummary} tone="cyan">
             <View style={styles.goalSummaryItem}>
-              <TerminalText glow style={styles.goalSummaryValue} tone="cyan" variant="title">
+              <TerminalText style={styles.goalSummaryValue} tone="cyan" variant="title">
                 {days}
               </TerminalText>
               <TerminalText tone="dim" variant="micro">
@@ -316,29 +516,26 @@ export default function CommitmentScreen() {
             </View>
             <View style={styles.goalSummaryDivider} />
             <View style={styles.goalSummaryItem}>
-              <TerminalText glow style={styles.goalSummaryValue} tone="green" variant="title">
-                {days}
+              <TerminalText style={styles.goalSummaryValue} tone="pink" variant="title">
+                {maximumDrawEntries.toLocaleString()}
               </TerminalText>
               <TerminalText tone="dim" variant="micro">
-                ENTRIES / HIT WEEK
-              </TerminalText>
-            </View>
-            <View style={styles.goalSummaryDivider} />
-            <View style={styles.goalSummaryItem}>
-              <TerminalText glow style={styles.goalSummaryValue} tone="pink" variant="title">
-                {baseMonthEntries}
-              </TerminalText>
-              <TerminalText tone="dim" variant="micro">
-                FOUR-WEEK BASE
+                MAXIMUM DRAW ENTRIES
               </TerminalText>
             </View>
             <View style={styles.bonusSummary}>
-              <TerminalText tone="muted" uppercase={false} variant="caption">
-                Earn more through consistency, teamwork and competition.
+              <TerminalText
+                style={styles.editorialCaption}
+                tone="muted"
+                uppercase={false}
+                variant="caption"
+              >
+                See how entries add up.
               </TerminalText>
-              <CompactTextButton
-                label="VIEW BONUS DETAILS"
+              <FirstRunSecondaryButton
+                label="VIEW ENTRY CALCULATOR →"
                 onPress={() => setShowCalculator(true)}
+                style={styles.bonusDetailsCta}
                 tone="amber"
               />
             </View>
@@ -348,37 +545,86 @@ export default function CommitmentScreen() {
         {goalSelected ? (
           <>
             <HUDBorderBox style={styles.registrationConsent} tone="muted">
-              <TerminalText glow tone="cyan" variant="label">
+              <TerminalText tone="cyan" variant="label">
                 CONFIRM YOUR {days}-DAY GOAL
               </TerminalText>
-              <TerminalText tone="muted" uppercase={false} variant="body">
-                Accept the rules and lock this goal for the month.
+              <TerminalText
+                style={styles.editorialBody}
+                tone="muted"
+                uppercase={false}
+                variant="body"
+              >
+                {gymPresenceReady
+                  ? 'Accept the rules to lock your goal.'
+                  : 'Scan this Contest\'s gym QR first.'}
               </TerminalText>
               <CompactTextButton
                 label="VIEW OFFICIAL CONTEST RULES"
                 onPress={() => router.push('/official-rules')}
               />
-              <LegalConsentCheckbox
-                checked={competitionRulesAccepted}
-                label={`I accept the competition rules and lock my ${days}-day weekly goal.`}
-                onToggle={() => setCompetitionRulesAccepted((current) => !current)}
-              />
-              <LegalConsentCheckbox
-                checked={ageEligibilityAttested}
-                label="I meet the minimum age for my verified region."
-                onToggle={() => setAgeEligibilityAttested((current) => !current)}
-              />
+              <HUDBorderBox
+                style={styles.presenceConfirmation}
+                tone={gymPresenceReady ? 'cyan' : 'amber'}
+              >
+                <TerminalText tone={gymPresenceReady ? 'cyan' : 'amber'} variant="micro">
+                  GYM LOCATION CHECK
+                </TerminalText>
+                <TerminalText tone="muted" uppercase={false} variant="caption">
+                  {gymPresenceReady
+                    ? 'Gym selected. Confirm while you\'re within 75 metres.'
+                    : 'Scan this Contest\'s poster while you\'re at the gym.'}
+                </TerminalText>
+                {!registration.alreadyEnrolled ? (
+                  !gymPresenceReady ? (
+                    <FirstRunPrimaryButton
+                      accessibilityHint="Requests camera access and opens the Partner gym QR scanner for initial gym selection."
+                      disabled={cameraPermissionBusy}
+                      label={
+                        cameraPermissionBusy
+                          ? 'OPENING CAMERA...'
+                          : 'SCAN CONTEST QR ->'
+                      }
+                      onPress={() => void openGymScanner()}
+                      style={styles.scanCta}
+                      tone="amber"
+                    />
+                  ) : null
+                ) : null}
+              </HUDBorderBox>
+              {gymPresenceReady ? (
+                <>
+                  <LegalConsentCheckbox
+                    checked={competitionRulesAccepted}
+                    label={`I accept the Contest rules and lock my ${days}-day Weekly Goal.`}
+                    onToggle={() => setCompetitionRulesAccepted((current) => !current)}
+                  />
+                  <LegalConsentCheckbox
+                    checked={ageEligibilityAttested}
+                    label="I meet the minimum age for my verified region."
+                    onToggle={() => setAgeEligibilityAttested((current) => !current)}
+                  />
+                </>
+              ) : null}
               {confirmationError ? (
                 <AuthStatusNotice message={confirmationError} tone="red" />
               ) : null}
             </HUDBorderBox>
 
-            <CyberButtonPrimary
-              disabled={!registrationRequirementsAccepted || registration.busy}
-              label={registration.busy ? 'CHECKING REGISTRATION...' : 'CONFIRM + REGISTER ->'}
-              onPress={() => void confirmWeeklyGoal()}
-              style={styles.topConfirmButton}
-            />
+            {gymPresenceReady ? (
+              confirmationPhase !== 'idle' ? (
+                <GymLocationVerificationProgress
+                  phase={confirmationPhase}
+                  reduceMotion={reduceMotion}
+                />
+              ) : (
+                <FirstRunPrimaryButton
+                  disabled={!registrationRequirementsAccepted || registration.busy}
+                  label={registration.busy ? 'JOINING CONTEST...' : 'JOIN CONTEST ->'}
+                  onPress={() => void confirmWeeklyGoal()}
+                  style={styles.topConfirmButton}
+                />
+              )
+            ) : null}
           </>
         ) : (
           <TerminalText
@@ -387,7 +633,7 @@ export default function CommitmentScreen() {
             uppercase={false}
             variant="caption"
           >
-            Select your weekly goal to review and confirm the competition agreement.
+            Select your Weekly Goal.
           </TerminalText>
         )}
       </ScreenScrollView>
@@ -413,7 +659,7 @@ export default function CommitmentScreen() {
         visible={showCalculator}
       >
         <View style={styles.calculatorModalOverlay}>
-          <HUDBorderBox glow style={styles.calculatorModalDialog} tone="cyan">
+          <HUDBorderBox style={styles.calculatorModalDialog} tone="cyan">
             <View
               accessibilityLabel="Scoring calculator"
               accessibilityViewIsModal
@@ -422,10 +668,10 @@ export default function CommitmentScreen() {
               tabIndex={-1}
             >
               <View style={styles.calculatorModalHeader}>
-                <TerminalText glow tone="cyan" variant="label">
+                <TerminalText tone="cyan" variant="label">
                   SCORING CALCULATOR
                 </TerminalText>
-                <CyberButtonOutline
+                <FirstRunSecondaryButton
                   label="EXIT"
                   onPress={closeCalculator}
                   style={styles.calculatorExitButton}
@@ -444,7 +690,6 @@ export default function CommitmentScreen() {
                     </TerminalText>
                     <TerminalText
                       accessibilityRole="text"
-                      glow
                       style={styles.baseProjectionValue}
                       tone="cyan"
                       variant="title"
@@ -458,8 +703,8 @@ export default function CommitmentScreen() {
                   </TerminalText>
                 </HUDBorderBox>
 
-                <HUDBorderBox glow style={styles.calculationPanel} tone="cyan">
-                  <TerminalText glow tone="cyan" variant="label">
+                <HUDBorderBox style={styles.calculationPanel} tone="cyan">
+                  <TerminalText tone="cyan" variant="label">
                     HOW SCORING WORKS
                   </TerminalText>
                   <TerminalText
@@ -500,7 +745,7 @@ export default function CommitmentScreen() {
 
                   <View style={styles.toggleRow}>
                     <View style={styles.toggleCopy}>
-                      <TerminalText glow tone="cyan" variant="label">
+                      <TerminalText tone="cyan" variant="label">
                         4 // PERFECT MONTH
                       </TerminalText>
                       <TerminalText tone="muted" variant="caption">
@@ -532,7 +777,7 @@ export default function CommitmentScreen() {
                     <TerminalText tone="muted" variant="label">
                       PROJECTED TOTAL
                     </TerminalText>
-                    <TerminalText glow style={styles.resultValue} tone="pink" variant="display">
+                    <TerminalText style={styles.resultValue} tone="pink" variant="display">
                       {projection.drawWeight.toLocaleString()}
                     </TerminalText>
                     <TerminalText tone="dim" variant="micro">
@@ -545,7 +790,116 @@ export default function CommitmentScreen() {
           </HUDBorderBox>
         </View>
       </Modal>
-    </ScreenContainer>
+    </FirstRunScreen>
+  );
+}
+
+function ContestEntryContext({
+  competition,
+  isQrSelected,
+  rewards,
+  rewardsError,
+  rewardsLoading,
+  timeZone
+}: {
+  competition: CurrentCompetition;
+  isQrSelected: boolean;
+  rewards: readonly RewardCatalogItem[];
+  rewardsError: boolean;
+  rewardsLoading: boolean;
+  timeZone: string;
+}) {
+  const contestWindow = `${formatContestWindowDate(
+    competition.startsAt,
+    timeZone
+  )} to ${formatContestWindowDate(competition.endsAt, timeZone)}`;
+
+  return (
+    <HUDBorderBox style={styles.contestContextCard} tone="cyan">
+      <View style={styles.contestContextHeader}>
+        <TerminalText tone="cyan" variant="label">
+          YOUR CONTEST
+        </TerminalText>
+        {isQrSelected ? (
+          <TerminalText tone="green" variant="micro">
+            QR MATCHED
+          </TerminalText>
+        ) : null}
+      </View>
+
+      <TerminalText style={styles.contestName} tone="text" variant="body">
+        {competition.name}
+      </TerminalText>
+
+      <View style={styles.contestDetails}>
+        <View style={styles.contestDetailRow}>
+          <TerminalText style={styles.contestDetailLabel} tone="dim" variant="micro">
+            LOCATION
+          </TerminalText>
+          <TerminalText
+            style={styles.contestDetailValue}
+            tone="muted"
+            uppercase={false}
+            variant="caption"
+          >
+            {competition.regionName}
+          </TerminalText>
+        </View>
+        <View style={styles.contestDetailRow}>
+          <TerminalText style={styles.contestDetailLabel} tone="dim" variant="micro">
+            DATES
+          </TerminalText>
+          <TerminalText
+            style={styles.contestDetailValue}
+            tone="muted"
+            uppercase={false}
+            variant="caption"
+          >
+            {contestWindow}
+          </TerminalText>
+        </View>
+      </View>
+
+      <View style={styles.contestOffers}>
+        <TerminalText tone="pink" variant="micro">
+          REWARDS
+        </TerminalText>
+        {rewardsLoading ? (
+          <TerminalText live="polite" tone="muted" uppercase={false} variant="caption">
+            Loading rewards...
+          </TerminalText>
+        ) : rewardsError ? (
+          <TerminalText tone="muted" uppercase={false} variant="caption">
+            Rewards couldn&apos;t load. You can still join.
+          </TerminalText>
+        ) : rewards.length === 0 ? (
+          <TerminalText tone="muted" uppercase={false} variant="caption">
+            Rewards coming soon.
+          </TerminalText>
+        ) : (
+          <View style={styles.contestOfferList}>
+            {rewards.map((reward) => (
+              <View key={reward.id} style={styles.contestOffer}>
+                <View style={styles.contestOfferHeader}>
+                  <TerminalText style={styles.contestOfferTitle} tone="text" variant="body">
+                    {reward.title}
+                  </TerminalText>
+                  <TerminalText tone="pink" variant="micro">
+                    {reward.rewardType === 'coupon' ? 'COUPON' : 'PRIZE'}
+                  </TerminalText>
+                </View>
+                <TerminalText tone="cyan" variant="micro">
+                  OFFERED BY {reward.sponsorName}
+                </TerminalText>
+                <TerminalText tone="muted" uppercase={false} variant="caption">
+                  {reward.description}
+                </TerminalText>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </HUDBorderBox>
   );
 }
 
@@ -560,12 +914,11 @@ function WeeklyMatchControl({
 }) {
   return (
     <View style={styles.controlGroup}>
-      <TerminalText glow tone="cyan" variant="label">
+      <TerminalText tone="cyan" variant="label">
         1 // WEEKLY CHALLENGE RESULTS
       </TerminalText>
       <TerminalText tone="dim" uppercase={false} variant="caption">
-        Hit your goal for 1x. Both partners hit for 2x. Complete the available bonus condition for
-        3x. Miss your goal and that week earns 0.
+        Hit your goal: 1x. Both hit: 2x. Bonus condition: 3x. Miss: 0.
       </TerminalText>
       <View style={styles.weeklyMatchList}>
         {multipliers.map((selectedMultiplier, index) => (
@@ -654,7 +1007,7 @@ function getWeeklyOptionAccessibilityLabel(multiplier: WeeklyMatchMultiplier) {
     return '3X bonus';
   }
 
-  return '1X, weekly goal hit';
+  return '1X, Weekly Goal hit';
 }
 
 function ChoiceControl({
@@ -674,7 +1027,7 @@ function ChoiceControl({
 }) {
   return (
     <View style={styles.controlGroup}>
-      <TerminalText glow tone="cyan" variant="label">
+      <TerminalText tone="cyan" variant="label">
         {label}
       </TerminalText>
       <View accessibilityRole="radiogroup" style={styles.segmentedControl}>
@@ -719,41 +1072,274 @@ function ChoiceControl({
   );
 }
 
+function getRegistrationErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    const code = getApiErrorCode(error.body);
+    const messages: Record<string, string> = {
+      GYM_INACTIVE:
+        'This Partner gym is not currently active. Ask the gym or try another participating location.',
+      GYM_LOCATION_INACCURATE: gymLocationAccuracyWarning,
+      GYM_NOT_ELIGIBLE_FOR_COMPETITION:
+        'This Partner gym is not participating in the current regional Contest.',
+      GYM_QR_INVALID:
+        'That gym QR is inactive or has been replaced. Scan the current GoGymGo poster and try again.',
+      OUTSIDE_GYM_GEOFENCE:
+        'You must be within 75 metres of the Partner gym whose QR poster you scanned. Return to that gym and try again.'
+    };
+    if (code && messages[code]) return messages[code];
+    if (
+      /location.+not accurate enough/i.test(error.message) ||
+      isGymLocationAccuracyValidationMessage(error.message)
+    ) {
+      return gymLocationAccuracyWarning;
+    }
+    if (error.status === 401) {
+      return 'Your account session expired. Sign in again, then confirm registration.';
+    }
+    if (error.status < 500 && error.message.trim().length <= 180) {
+      return error.message.trim();
+    }
+  }
+
+  return getUserFacingErrorMessage(
+    error,
+    'Registration could not be completed. Your selections are still here; try again.'
+  );
+}
+
+function getApiErrorCode(body: unknown) {
+  if (!body || typeof body !== 'object') return null;
+  const direct = body as { code?: unknown; error?: unknown };
+  if (typeof direct.code === 'string') return direct.code;
+  if (direct.error && typeof direct.error === 'object') {
+    const nested = direct.error as { code?: unknown };
+    return typeof nested.code === 'string' ? nested.code : null;
+  }
+  return null;
+}
+
+function GymLocationVerificationProgress({
+  phase,
+  reduceMotion
+}: {
+  phase: Exclude<ConfirmationPhase, 'idle'>;
+  reduceMotion: boolean;
+}) {
+  const [progress] = useState(() => new Animated.Value(0));
+  const locating = phase === 'locating';
+
+  useEffect(() => {
+    progress.stopAnimation();
+    if (reduceMotion) {
+      progress.setValue(0.72);
+      return;
+    }
+
+    progress.setValue(0);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progress, {
+          duration: 1_150,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: false
+        }),
+        Animated.timing(progress, {
+          duration: 300,
+          easing: Easing.linear,
+          toValue: 0,
+          useNativeDriver: false
+        })
+      ])
+    );
+    animation.start();
+
+    return () => {
+      animation.stop();
+      progress.stopAnimation();
+    };
+  }, [phase, progress, reduceMotion]);
+
+  const progressWidth = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['14%', '100%']
+  });
+
+  return (
+    <HUDBorderBox glow style={styles.locationProgressCard} tone="cyan">
+      <View style={styles.locationProgressHeader}>
+        <TerminalText live="polite" glow tone="cyan" variant="label">
+          {locating ? 'ACQUIRING LIVE GYM POSITION' : 'SECURING CONTEST REGISTRATION'}
+        </TerminalText>
+        <TerminalText tone="cyan" variant="micro">
+          {locating ? 'LIVE SIGNAL' : 'COMMITTING'}
+        </TerminalText>
+      </View>
+      <View
+        accessibilityRole="progressbar"
+        accessibilityValue={{
+          text: locating ? 'Acquiring live gym position' : 'Securing Contest registration'
+        }}
+        style={styles.locationProgressTrack}
+      >
+        <Animated.View style={[styles.locationProgressFill, { width: progressWidth }]}>
+          <View style={styles.locationProgressLeadingEdge} />
+        </Animated.View>
+      </View>
+      <View style={styles.locationProgressScale}>
+        <TerminalText tone="dim" variant="micro">
+          00
+        </TerminalText>
+        <TerminalText tone="dim" variant="micro">
+          VERIFY
+        </TerminalText>
+        <TerminalText tone="dim" variant="micro">
+          100
+        </TerminalText>
+      </View>
+      <TerminalText
+        style={styles.locationProgressCopy}
+        tone="muted"
+        uppercase={false}
+        variant="caption"
+      >
+        {locating
+          ? 'Hold still while we verify this gym.'
+          : 'Gym confirmed. Joining Contest.'}
+      </TerminalText>
+    </HUDBorderBox>
+  );
+}
+
 const styles = StyleSheet.create({
   scroll: {
     flex: 1
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.screenX,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background
+    backgroundColor: colors.transparent
   },
   title: {
     marginTop: spacing.sm,
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.titleXl,
     lineHeight: 31,
-    textAlign: 'center'
+    paddingLeft: 14,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan
   },
   body: {
     marginTop: spacing.sm,
-    fontFamily: fontFamilies.body,
-    textAlign: 'center'
+    marginBottom: spacing.sm,
+    paddingLeft: 16,
+    fontFamily: fontFamilies.ui,
+    fontSize: 16,
+    lineHeight: 24
+  },
+  editorialBody: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 23
+  },
+  editorialCaption: {
+    fontFamily: fontFamilies.ui,
+    fontSize: 14,
+    lineHeight: 21
   },
   registrationConsent: {
     gap: spacing.sm,
     padding: spacing.lg
   },
-  joinWindowNotice: {
+  presenceConfirmation: {
+    gap: spacing.xs,
+    marginVertical: spacing.xs,
+    padding: spacing.md
+  },
+  scanCta: {
+    marginTop: spacing.sm
+  },
+  contestContextCard: {
     gap: spacing.xs,
     marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    padding: spacing.md,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.cyan,
+    backgroundColor: colors.surfaceCyanFaint
+  },
+  contestContextError: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.md,
     borderLeftWidth: 2,
     borderLeftColor: colors.statusWarning,
     backgroundColor: colors.surfaceWarning
+  },
+  contextRetryButton: {
+    marginTop: spacing.xs
+  },
+  contestContextHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs
+  },
+  contestName: {
+    fontFamily: fontFamilies.display,
+    fontSize: 19,
+    lineHeight: 24
+  },
+  contestDetails: {
+    gap: spacing.xs,
+    paddingTop: spacing.xs
+  },
+  contestDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
+  },
+  contestDetailLabel: {
+    width: 64,
+    paddingTop: 2
+  },
+  contestDetailValue: {
+    minWidth: 0,
+    flex: 1,
+    fontFamily: fontFamilies.ui,
+    lineHeight: 19
+  },
+  contestOffers: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderCyanSubtle
+  },
+  contestOfferList: {
+    gap: spacing.sm
+  },
+  contestOffer: {
+    gap: 3,
+    paddingLeft: spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.borderPinkStrong
+  },
+  contestOfferHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.xs
+  },
+  contestOfferTitle: {
+    minWidth: 0,
+    flex: 1,
+    fontFamily: fontFamilies.ui,
+    fontSize: 15,
+    lineHeight: 20
   },
   dayPicker: {
     flexDirection: 'row',
@@ -793,13 +1379,62 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderCyanSubtle
   },
+  bonusDetailsCta: {
+    width: '100%',
+    marginTop: spacing.xs
+  },
   selectionHelper: {
     marginTop: spacing.md,
     paddingHorizontal: spacing.md,
+    fontFamily: fontFamilies.ui,
     textAlign: 'center'
   },
   topConfirmButton: {
     marginBottom: spacing.md
+  },
+  locationProgressCard: {
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.panelAlpha70
+  },
+  locationProgressHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs
+  },
+  locationProgressTrack: {
+    width: '100%',
+    height: 12,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderCyanStrong,
+    borderRadius: 2,
+    backgroundColor: colors.surfaceCyanProgress
+  },
+  locationProgressFill: {
+    height: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    backgroundColor: colors.cyan,
+    ...cyberGlow.cyan
+  },
+  locationProgressLeadingEdge: {
+    width: 3,
+    height: '100%',
+    backgroundColor: colors.text
+  },
+  locationProgressScale: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  locationProgressCopy: {
+    marginTop: spacing.xs,
+    lineHeight: 20
   },
   dayButton: {
     width: '23%',
@@ -879,7 +1514,7 @@ const styles = StyleSheet.create({
   },
   calculatorIntro: {
     marginBottom: spacing.xs,
-    fontFamily: fontFamilies.body
+    fontFamily: fontFamilies.ui
   },
   controlGroup: {
     gap: spacing.xs,

@@ -149,7 +149,7 @@ export default function AppTourScreen() {
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           Test the complete new-player experience or inspect any screen with
           sample data. Preview actions stay in this browser and do not create
-          real competition entries.
+          real contest entries.
         </TerminalText>
 
         <HUDBorderBox glow style={styles.status} tone="green">
@@ -344,7 +344,7 @@ export default function AppTourScreen() {
                       tone={visitedRoutes.has(route.route) ? 'green' : 'cyan'}
                       variant={visitedRoutes.has(route.route) ? 'micro' : 'button'}
                     >
-                      {visitedRoutes.has(route.route) ? 'DONE ✓' : '->'}
+                      {visitedRoutes.has(route.route) ? 'DONE ✓' : '→'}
                     </TerminalText>
                   </Pressable>
                 ))}

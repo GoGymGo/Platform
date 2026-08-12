@@ -8,26 +8,26 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/gym-goers" },
   description:
-    "Register for the eligible September GoGymGo beta or join the regional update list for future verified workout competitions.",
-  title: "Gym-goer registration and regional updates",
+    "Register for the eligible September GoGymGo beta or request Regional updates about future Verified workout Contests.",
+  title: "Gym-goer registration and Regional updates",
 };
 
 const points = [
   {
     title: "CHOOSE 1–7 DAYS",
-    copy: "Set a Weekly Goal that matches your routine. A higher completed goal earns more base Prize Draw Entries.",
+    copy: "Set a Weekly Goal that matches your real routine. Your Weekly Goal is locked after enrollment.",
   },
   {
-    title: "BUILD GOAL SCORE",
-    copy: "One approved partner-gym workout per regional calendar day adds 1 point to Goal Score.",
+    title: "CHECK LOCATION AT THE GYM",
+    copy: "Use Start Workout for a fresh location check at your selected Partner gym.",
   },
   {
-    title: "BANK WEEKLY ENTRIES",
-    copy: "Complete your Weekly Goal to bank that week’s Prize Draw Entries. Miss it and the week settles at zero entries.",
+    title: "TRAIN FOR 30+ MINUTES",
+    copy: "Use Finish Workout for another fresh location check after the authoritative 30-minute minimum.",
   },
   {
-    title: "COMPLETE ALL 4 WEEKS",
-    copy: "Meet your goal in every scoring week to unlock the 10× Perfect Month multiplier on eligible entries. Entries improve odds but never guarantee the reward.",
+    title: "FOLLOW THE RESULT",
+    copy: "The app keeps pending review, verified credit, standings, and published results clearly separated.",
   },
 ];
 
@@ -70,7 +70,7 @@ export default function GymGoersPage() {
           </p>
           <dl className="audience-summary">
             <div>
-              <dt>COMPETITION WINDOW</dt>
+              <dt>CONTEST WINDOW</dt>
               <dd>{septemberCampaign.displayWindow}</dd>
             </div>
             <div>
@@ -129,8 +129,8 @@ export default function GymGoersPage() {
           aria-labelledby="gym-details-title"
           className="audience-details"
         >
-          <p className="eyebrow">FROM VERIFIED DAY TO PRIZE DRAW ENTRIES</p>
-          <h2 id="gym-details-title">Know what each visit earns.</h2>
+          <p className="eyebrow">WHAT A VERIFIED WORKOUT INVOLVES</p>
+          <h2 id="gym-details-title">A clear path from goal to result.</h2>
           <div className="audience-points">
             {points.map((point) => (
               <article className="audience-point" key={point.title}>

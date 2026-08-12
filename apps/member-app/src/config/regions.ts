@@ -100,7 +100,7 @@ export function createCompetitionRegion({
     !normalizedName ||
     !isValidTimeZone(normalizedTimezone)
   ) {
-    throw new Error('The server returned invalid competition-region metadata.');
+    throw new Error('The server returned invalid contest-region metadata.');
   }
 
   return {

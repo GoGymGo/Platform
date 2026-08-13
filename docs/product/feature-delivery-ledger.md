@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `35dbf8095c423a4ea28261952230135a42649402` after PR #71 on 2026-08-13.
-- Active feature task: none while the coordinator records GGG-001 completion and
-  advances the queue to GGG-002.
+- Active feature task: `GoGymGo Feature GGG-002 — Versioned legal documents and
+  consent receipts` on `agent/ggg-002-versioned-legal-documents`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -104,8 +104,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Required tests / operations / cloud dependency: document identity, owner gate,
   stale/superseded bundle, durable receipts, enrollment fail-closed, browser
   rendering; database, Firebase owner identity, and deployed public URLs.
-- Delivery: priority `P0`; task `GoGymGo Feature GGG-002 — Versioned legal
-  documents and consent receipts`; branch/PR/merge `unassigned`; status `AUDITED`.
+- Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-002 — Versioned
+  legal documents and consent receipts`; branch
+  `agent/ggg-002-versioned-legal-documents`; PR/merge `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: legal approval is external authority; no placeholder
   legal contact may be treated as launch-ready.
 
@@ -934,6 +935,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-002` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-001 completion ledger merged through PR #72 as
+  `a9462b09bd3942391f8442b5168da078eda66332` with green main-push checks.
 - 2026-08-13 — Completed `GGG-001` through PR #71. Exact tested head
   `4de5f069d068c7437e02817fdf31bafd067c18bf` was squash-merged as
   `35dbf8095c423a4ea28261952230135a42649402`; all PR and main-push checks passed,

@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `f9df8ab3f8f9387adeaa964d60a1bd04327647b8` after PR #68 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-001 — Account authentication and
-  verified identity` on `agent/ggg-001-account-authentication`.
+  `35dbf8095c423a4ea28261952230135a42649402` after PR #71 on 2026-08-13.
+- Active feature task: none while the coordinator records GGG-001 completion and
+  advances the queue to GGG-002.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -63,19 +63,27 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   requires active database roles and password provider.
 - External providers / feature flag: Firebase; Apple and Google are separately
   disabled until provider configuration and platform tests exist.
-- Current implementation / missing behavior: email/password and token refresh are
-  connected; provider flags fail closed. Missing production Firebase values,
-  provider enablement evidence, revoked/disabled-account smoke tests, and a
-  bounded post-ledger feature audit.
+- Current implementation / missing behavior: email/password account actions await
+  authoritative Firebase results, including initial verification delivery.
+  Verification and restored-session gates reload identity and force-refresh the
+  token; API requests retry one unauthorized response with a forced refresh and
+  then fail closed. The API verifies revocation, derives identity and default
+  authorization from authoritative sources, and transactionally converges
+  concurrent first use on one stable user/profile. Social providers remain
+  fail-closed unless flag, platform, Firebase, and native-client prerequisites
+  are all present. No known repository behavior remains missing for this duty.
 - Required tests / operations / cloud dependency: form normalization, email
   verification, token refresh, stable profile, bearer enforcement, revoked and
   disabled identities, native provider smoke tests; Firebase project and runtime
   credentials are cloud dependencies.
 - Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-001 — Account
   authentication and verified identity`; branch
-  `agent/ggg-001-account-authentication`; PR/merge `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: social providers may look absent by design; production
-  verification needs credentials and separate deployment authority.
+  `agent/ggg-001-account-authentication` (deleted after merge); PR `#71`; merge
+  `35dbf8095c423a4ea28261952230135a42649402`; status `COMPLETE`.
+- Residual risks / blocker: hosted Firebase values, provider enablement, and
+  physical provider/device smoke tests remain release-environment UAT requiring
+  separate credentials and deployment authority. Controls remain unavailable
+  meanwhile. No cloud access or deployment occurred for this delivery.
 
 ### GGG-002 — Versioned legal documents and consent receipts
 
@@ -926,6 +934,11 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-001` through PR #71. Exact tested head
+  `4de5f069d068c7437e02817fdf31bafd067c18bf` was squash-merged as
+  `35dbf8095c423a4ea28261952230135a42649402`; all PR and main-push checks passed,
+  the remote feature branch was deleted, GGG-002 and GGG-004 were unblocked, and
+  there was no cloud impact.
 - 2026-08-13 — Assigned `GGG-001` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-006 ledger update merged through PR #69 as
   `40f604e14c15725375847ef6bda41c52dcdc9a4f` with green main-push checks.

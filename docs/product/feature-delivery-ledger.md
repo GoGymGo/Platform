@@ -17,6 +17,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   GitHub issue inventory. Open pull requests 57-66 are Dependabot updates.
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
+- Latest completed delivery: `origin/main` at
+  `f9df8ab3f8f9387adeaa964d60a1bd04327647b8` after PR #68 on 2026-08-13.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -31,17 +33,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Ordered queue
 
-1. `GGG-006` — finish and publish the already-started active QR workout
-   cancellation/recovery repair.
-2. `GGG-001` through `GGG-005` — re-verify identity, legal, region, enrollment,
+1. `GGG-001` through `GGG-005` — re-verify identity, legal, region, enrollment,
    and gym selection foundations.
-3. `GGG-007` through `GGG-011` — scoring, streak, friends, Weekly Challenge,
+2. `GGG-007` through `GGG-011` — scoring, streak, friends, Weekly Challenge,
    and social Challenge duties.
-4. `GGG-014` through `GGG-024` — partner, reward, result, profile, reminder,
+3. `GGG-014` through `GGG-024` — partner, reward, result, profile, reminder,
    privacy, admin, moderation, partner-portal, and pilot-cash duties.
-5. `GGG-025` through `GGG-030` — public conversion, feedback, data migration,
+4. `GGG-025` through `GGG-030` — public conversion, feedback, data migration,
    release, governance, and infrastructure readiness.
-6. Re-evaluate `GGG-012`, `GGG-013`, and `GGG-900` through `GGG-904` only when
+5. Re-evaluate `GGG-012`, `GGG-013`, and `GGG-900` through `GGG-904` only when
    their documented release or product gates change.
 
 ## Feature records
@@ -196,21 +196,27 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   and evidence are authoritative.
 - External providers / feature flag: device location and Firebase; QR enabled;
   device presence, heart rate, and mid-session presence disabled.
-- Current implementation / missing behavior: start/finish/review/recovery exist.
-  The released UI could not cancel an active QR workout, stranding the one-active
-  session slot. A seven-file repair with member, source-audit, storage, and
-  database regression coverage exists uncommitted in the dedicated branch and
-  must be validated and published without overwriting unrelated work.
+- Current implementation / missing behavior: start, finish, review, and recovery
+  now include explicit confirmed cancellation. Successful cancellation uses the
+  authoritative session ID, including a fresh-result fallback; calls the
+  authenticated, idempotent, owned-session cancel endpoint; clears only local
+  active-session recovery while preserving the Partner gym; invalidates progress;
+  and permits another start. Failure remains recoverable and App Tour remains
+  API-isolated. No known repository behavior remains missing for this duty.
 - Required tests / operations / cloud dependency: start/too-early/finish,
   evidence rejection, pending review, idempotent completion, failed-submit retry,
   explicit cancellation confirmation, local-session cleanup, active-slot reuse,
   browser/mobile backgrounding, physical two-device gym UAT; database and real
   gym/device staging.
 - Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-006 — Cancel and
-  recover active QR workout`; branch `agent/cancel-active-qr-workout`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: no task is allowed to fabricate elapsed time or
-  location. Cloud UAT requires separate deployment authority.
+  recover active QR workout`; branch `agent/cancel-active-qr-workout` (deleted
+  after merge); PR `#68`; merge `f9df8ab3f8f9387adeaa964d60a1bd04327647b8`;
+  status `COMPLETE`.
+- Residual risks / blocker: there is no dedicated rendered component interaction
+  harness; source-audit, repository/storage, journey, and database coverage
+  enforce the repaired boundaries. Physical staging UAT remains a program-level
+  release gate and requires separate deployment authority. No cloud access or
+  deployment occurred for this delivery.
 
 ### GGG-007 — Competition scoring, progress, rankings, and settlement inputs
 
@@ -917,6 +923,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-006` through PR #68. Exact tested head
+  `2878d80080bdd3d52d860f3f88b2b6de304eddc0` was squash-merged as
+  `f9df8ab3f8f9387adeaa964d60a1bd04327647b8`; all PR and main-push checks passed,
+  the remote feature branch was deleted, and there was no cloud impact.
 - 2026-08-13 — Created the first repository-wide inventory from main
   `4155f806085ee09d743fa211656ae96e67fbfcb4`; preserved the existing
   `agent/cancel-active-qr-workout` work as `GGG-006`; recorded release-disabled,

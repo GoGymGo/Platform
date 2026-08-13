@@ -32,7 +32,10 @@ export default function VerifyEmailScreen() {
   const { active: appTourActive } = useAppTour();
   const mobileGymVerificationAvailable =
     Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
-  const { next } = useLocalSearchParams<{ next?: string }>();
+  const { next, verificationEmailSent } = useLocalSearchParams<{
+    next?: string;
+    verificationEmailSent?: string;
+  }>();
   const {
     firebaseConfigured,
     refreshUser,
@@ -41,8 +44,15 @@ export default function VerifyEmailScreen() {
     user
   } = useAuth();
   const [busyAction, setBusyAction] = useState<'check' | 'resend' | 'signout' | null>(null);
-  const [message, setMessage] = useState<string>();
-  const [messageTone, setMessageTone] = useState<'green' | 'amber' | 'red'>('amber');
+  const initialVerificationDeliveryFailed = verificationEmailSent === 'false';
+  const [message, setMessage] = useState<string | undefined>(
+    initialVerificationDeliveryFailed
+      ? 'THE FIRST VERIFICATION EMAIL COULD NOT BE SENT. CHOOSE RESEND EMAIL TO TRY AGAIN.'
+      : undefined
+  );
+  const [messageTone, setMessageTone] = useState<'green' | 'amber' | 'red'>(
+    initialVerificationDeliveryFailed ? 'red' : 'amber'
+  );
   const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
   const polling = useRef(false);
   const continueAfterVerification = useCallback(() => {
@@ -157,7 +167,9 @@ export default function VerifyEmailScreen() {
         ? 'This preview simulates the email-verification step without sending a message.'
         : next === gymScanAuthNext || next === gymScanSetupNext
           ? 'Your Partner gym selection is saved. Verify your email and GoGymGo will continue your workout setup automatically.'
-          : 'Verify the email attached to your GoGymGo account before entering contest flows.'}
+          : initialVerificationDeliveryFailed
+            ? 'Your account was created, but the first verification message was not delivered. Retry below.'
+            : 'Verify the email attached to your GoGymGo account before entering contest flows.'}
       eyebrow={next === gymScanAuthNext || next === gymScanSetupNext
         ? 'PARTNER GYM SAVED'
         : 'ACCOUNT SECURITY'}
@@ -181,7 +193,7 @@ export default function VerifyEmailScreen() {
       ) : (
         <HUDBorderBox style={styles.panel} tone="cyan">
           <TerminalText tone="cyan" variant="label">
-            VERIFICATION SENT TO
+            VERIFY EMAIL FOR
           </TerminalText>
           <TerminalText style={styles.panelBody} tone="text" uppercase={false} variant="body">
             {user.email ?? 'YOUR ACCOUNT EMAIL'}

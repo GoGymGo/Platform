@@ -126,6 +126,11 @@ describeWithDatabase('critical private profile-media workflow', () => {
       database.connection,
     );
     operatorUserId = operator.id;
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', operatorUserId)
+      .executeTakeFirstOrThrow();
   });
 
   afterAll(async () => {

@@ -29,6 +29,8 @@ describe('authentication guard', () => {
     expect(extractBearerToken('Bearer firebase-token')).toBe('firebase-token');
     expect(extractBearerToken('Basic credentials')).toBeNull();
     expect(extractBearerToken('Bearer token with spaces')).toBeNull();
+    expect(extractBearerToken('Bearer')).toBeNull();
+    expect(extractBearerToken('Bearer token,other')).toBeNull();
   });
 
   it('rejects an unauthenticated protected request', async () => {
@@ -58,4 +60,33 @@ describe('authentication guard', () => {
     expect(request.principal).toEqual(principal);
     expect(verifyIdToken).toHaveBeenCalledWith('valid-token');
   });
+
+  it.each([
+    'auth/id-token-revoked',
+    'auth/user-disabled',
+    'auth/id-token-expired',
+    'auth/argument-error',
+  ])(
+    'returns one generic unauthorized response for Firebase rejection %s',
+    async (code) => {
+      const verifier = {
+        verifyIdToken: jest
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error('Sensitive Firebase detail.'), { code }),
+          ),
+      } as TokenVerifier;
+      const guard = new AuthGuard(new Reflector(), verifier);
+      const { context, request } = createContext('Bearer rejected-token');
+
+      await expect(guard.canActivate(context)).rejects.toMatchObject({
+        response: {
+          code: 'INVALID_AUTH_TOKEN',
+          message: 'The Firebase bearer token is invalid or expired.',
+        },
+        status: 401,
+      });
+      expect(request.principal).toBeUndefined();
+    },
+  );
 });

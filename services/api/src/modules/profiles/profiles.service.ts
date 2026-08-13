@@ -124,7 +124,7 @@ export class ProfilesService {
         email: principal.email ?? null,
         email_verified: principal.emailVerified,
         firebase_uid: principal.firebaseUid,
-        roles: principal.roles.length > 0 ? principal.roles : ['user'],
+        roles: ['user'],
         status: 'active',
         updated_at: now,
       })

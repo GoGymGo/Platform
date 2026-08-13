@@ -66,4 +66,70 @@ describe('API authentication boundary', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('retries one rejected bearer token with a forced Firebase refresh', async () => {
+    const originalFetch = globalThis.fetch;
+    const authorizationHeaders: (string | null)[] = [];
+    const tokenRefreshes: (boolean | undefined)[] = [];
+    globalThis.fetch = async (_input, init) => {
+      const headers = new Headers(init?.headers);
+      authorizationHeaders.push(headers.get('authorization'));
+      return authorizationHeaders.length === 1
+        ? new Response(JSON.stringify({ message: 'Expired token.' }), {
+            headers: { 'content-type': 'application/json' },
+            status: 401
+          })
+        : new Response(JSON.stringify({ id: 'stable-profile' }), {
+            headers: { 'content-type': 'application/json' },
+            status: 200
+          });
+    };
+
+    try {
+      const api = createApiClient({
+        baseUrl: 'https://api.gogymgo.com',
+        getAccessToken: async (forceRefresh) => {
+          tokenRefreshes.push(forceRefresh);
+          return forceRefresh ? 'fresh-token' : 'cached-token';
+        }
+      });
+
+      await assert.doesNotReject(api.request('/v1/me'));
+      assert.deepEqual(tokenRefreshes, [undefined, true]);
+      assert.deepEqual(authorizationHeaders, [
+        'Bearer cached-token',
+        'Bearer fresh-token'
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('fails closed without replaying when Firebase rejects the forced refresh', async () => {
+    const originalFetch = globalThis.fetch;
+    let requests = 0;
+    globalThis.fetch = async () => {
+      requests += 1;
+      return new Response(null, { status: 401 });
+    };
+
+    try {
+      const api = createApiClient({
+        baseUrl: 'https://api.gogymgo.com',
+        getAccessToken: async (forceRefresh) => {
+          if (forceRefresh) {
+            throw Object.assign(new Error('Firebase rejected the session.'), {
+              code: 'auth/user-token-expired'
+            });
+          }
+          return 'revoked-token';
+        }
+      });
+
+      await assert.rejects(api.request('/v1/me'), /Firebase rejected the session/);
+      assert.equal(requests, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

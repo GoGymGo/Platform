@@ -5,6 +5,7 @@ import {
   getAuthErrorMessage,
   hasAuthFormErrors,
   normalizeEmail,
+  shouldClearAuthSession,
   validateSignInForm,
   validateSignUpForm
 } from './auth';
@@ -42,5 +43,19 @@ describe('authentication form rules', () => {
       getAuthErrorMessage({ code: 'auth/invalid-credential' }),
       'EMAIL OR PASSWORD IS INCORRECT.'
     );
+    assert.equal(
+      getAuthErrorMessage({ code: 'auth/user-token-expired' }),
+      'YOUR SESSION EXPIRED. SIGN IN AGAIN.'
+    );
+    assert.equal(
+      getAuthErrorMessage({ code: 'auth/user-disabled' }),
+      'THIS ACCOUNT HAS BEEN DISABLED.'
+    );
+  });
+
+  it('clears only sessions Firebase says can no longer authenticate', () => {
+    assert.equal(shouldClearAuthSession({ code: 'auth/user-disabled' }), true);
+    assert.equal(shouldClearAuthSession({ code: 'auth/user-token-expired' }), true);
+    assert.equal(shouldClearAuthSession({ code: 'auth/network-request-failed' }), false);
   });
 });

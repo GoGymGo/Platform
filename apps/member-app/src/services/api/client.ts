@@ -57,32 +57,43 @@ export function createApiClient({
       options.signal?.addEventListener('abort', abortFromCaller, { once: true });
 
       try {
-        const token = options.authenticated === false ? null : await getAccessToken();
-        const response = await fetch(buildApiUrl(normalizedBaseUrl, path), {
-          body: options.body === undefined ? undefined : JSON.stringify(options.body),
-          headers: {
-            Accept: 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-            ...(options.idempotencyKey
-              ? { 'Idempotency-Key': options.idempotencyKey }
-              : {}),
-            ...options.headers
-          },
-          method: options.method ?? 'GET',
-          signal: controller.signal
-        });
-        const body = await parseResponseBody(response);
+        const sendRequest = async (forceRefresh: boolean) => {
+          const token = options.authenticated === false
+            ? null
+            : forceRefresh
+              ? await getAccessToken(true)
+              : await getAccessToken();
+          const response = await fetch(buildApiUrl(normalizedBaseUrl, path), {
+            body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            headers: {
+              Accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+              ...(options.idempotencyKey
+                ? { 'Idempotency-Key': options.idempotencyKey }
+                : {}),
+              ...options.headers
+            },
+            method: options.method ?? 'GET',
+            signal: controller.signal
+          });
 
-        if (!response.ok) {
+          return { body: await parseResponseBody(response), response };
+        };
+        let result = await sendRequest(false);
+        if (result.response.status === 401 && options.authenticated !== false) {
+          result = await sendRequest(true);
+        }
+
+        if (!result.response.ok) {
           throw new ApiError(
-            getApiErrorMessage(body, response.status),
-            response.status,
-            body
+            getApiErrorMessage(result.body, result.response.status),
+            result.response.status,
+            result.body
           );
         }
 
-        return body as TResponse;
+        return result.body as TResponse;
       } finally {
         clearTimeout(timeout);
         options.signal?.removeEventListener('abort', abortFromCaller);

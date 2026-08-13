@@ -56,7 +56,15 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       }),
     );
     legal = new LegalDocumentsService(database, idempotency, profiles);
-    await profiles.ensureUser(adminPrincipal, database.connection);
+    const admin = await profiles.ensureUser(
+      adminPrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', admin.id)
+      .executeTakeFirstOrThrow();
   });
 
   afterAll(async () => {

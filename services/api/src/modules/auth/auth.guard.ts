@@ -20,7 +20,7 @@ export function extractBearerToken(
     return null;
   }
 
-  const match = /^Bearer ([^\s]+)$/i.exec(authorizationHeader.trim());
+  const match = /^Bearer ([^\s,]+)$/i.exec(authorizationHeader.trim());
   return match?.[1] ?? null;
 }
 

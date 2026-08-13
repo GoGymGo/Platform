@@ -79,18 +79,13 @@ for (const filePath of sourceFiles) {
   }
 
   if (relativePath !== 'app/_layout.tsx') {
-    const fontMatch = sourceText.match(
-      /\b(?:Orbitron-Bold|ShareTechMono-Regular)\b/
-    );
+    const fontMatch = sourceText.match(/\b(?:Orbitron-Bold|ShareTechMono-Regular)\b/);
     if (fontMatch) {
       issues.push(`${relativePath}: raw brand font registration ${fontMatch[0]}`);
     }
   }
 
-  if (
-    relativePath !== 'src/navigation/goBack.ts' &&
-    /\brouter\.back\s*\(/.test(sourceText)
-  ) {
+  if (relativePath !== 'src/navigation/goBack.ts' && /\brouter\.back\s*\(/.test(sourceText)) {
     issues.push(`${relativePath}: raw router.back bypasses the safe fallback helper`);
   }
 
@@ -123,6 +118,7 @@ auditAppTourProductionBoundary();
 auditFlowReliability();
 auditAuthoritativeRegionBoundary();
 auditAuthoritativeSessionRulesBoundary();
+auditAuthoritativeLegalBoundary();
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const dependencies = {
@@ -232,20 +228,20 @@ function auditAppTourCoverage(appDirectory) {
     'utf8'
   );
   const configuredRoutes = new Set(
-    [...configuredRouteSource.matchAll(/\broute:\s*['"]([^'"]+)['"]/g)]
-      .map((match) => normalizeRoute(match[1]))
+    [...configuredRouteSource.matchAll(/\broute:\s*['"]([^'"]+)['"]/g)].map((match) =>
+      normalizeRoute(match[1])
+    )
   );
   const routeExemptions = new Set([
     '/app-tour',
     '/demo',
     '/consents',
     '/entry-confirmed',
+    '/legal-document',
     '/scan',
     '/test-preview'
   ]);
-  const dynamicRouteExamples = new Map([
-    ['/workouts/[workoutId]', '/workouts/app-tour-workout']
-  ]);
+  const dynamicRouteExamples = new Map([['/workouts/[workoutId]', '/workouts/app-tour-workout']]);
 
   for (const { filePath, route } of collectRouteEntries(appDirectory)) {
     if (routeExemptions.has(route) || isRedirectOnlyRoute(filePath)) {
@@ -261,18 +257,18 @@ function auditAppTourCoverage(appDirectory) {
 
 function auditDesignSystemCoverage(appDirectory) {
   const designSystemMarkers = [
-    "@/constants/theme",
-    "@/components/auth",
-    "@/components/connectedLegalDocumentScreen",
-    "@/components/creatorApplicationScreen",
-    "@/components/cyber",
-    "@/components/firstRun",
-    "@/components/legal",
-    "@/components/onboarding",
-    "@/components/screenLayout",
-    "@/demo/PublicDemoScreen",
-    "@/testing/AppTourScreen",
-    "./(onboarding)/welcome"
+    '@/constants/theme',
+    '@/components/auth',
+    '@/components/connectedLegalDocumentScreen',
+    '@/components/creatorApplicationScreen',
+    '@/components/cyber',
+    '@/components/firstRun',
+    '@/components/legal',
+    '@/components/onboarding',
+    '@/components/screenLayout',
+    '@/demo/PublicDemoScreen',
+    '@/testing/AppTourScreen',
+    './(onboarding)/welcome'
   ];
 
   for (const { filePath, route } of collectRouteEntries(appDirectory)) {
@@ -289,155 +285,152 @@ function auditDesignSystemCoverage(appDirectory) {
 
 function auditFlowReliability() {
   const requirements = new Map([
-    ['app/(auth)/sign-in.tsx', [
-      'getAuthenticatedHomeRoute',
-      'const refreshedUser = await refreshUser()',
-      'emailSignInReady',
-      'Enter both fields.'
-    ]],
-    ['app/(auth)/sign-up.tsx', [
-      'emailAccountReady',
-      'Complete all three fields.',
-      'verificationEmailSent'
-    ]],
-    ['app/(auth)/verify-email.tsx', [
-      'initialVerificationDeliveryFailed',
-      'refreshUser',
-      'RESEND EMAIL'
-    ]],
-    ['src/state/auth.tsx', [
-      'refreshFirebaseUser',
-      'sendInitialVerificationEmail'
-    ]],
-    ['app/(tabs)/_layout.tsx', [
-      "title: 'Calendar'",
-      "tabBarAccessibilityLabel: 'Workout calendar tab'"
-    ]],
-    ['app/(tabs)/home/index.tsx', [
-      'getAppResumeTarget',
-      'RecoverableError',
-      'resume-started',
-      'resume-completed',
-      'OBJECTIVE',
-      'ACHIEVED THIS WEEK',
-      'Start your workout at',
-      'formatCompetitionOpeningDateTime',
-      'CONTEST COMPLETE',
-      'VIEW YOUR RESULTS'
-    ]],
-    ['app/(tabs)/leaderboard/index.tsx', [
-      'useScreenMemory',
-      'memoryKey="leaderboard"',
-      'RecoverableError',
-      'Entries set your Prize Draw odds.',
-      'Hide ranking details'
-    ]],
-    ['app/(tabs)/calendar.tsx', [
-      'Return on this day to verify a workout.',
-      'RETURN TO TODAY TO START ->',
-      "START TODAY'S VERIFIED WORKOUT ->",
-      'function goToToday()'
-    ]],
-    ['app/(tabs)/workouts/index.tsx', [
-      'plannedDate={plannedDate}',
-      'CREATOR STUDIO UNAVAILABLE',
-      'creatorFeaturesEnabled'
-    ]],
-    ['app/(tabs)/workouts/[workoutId].tsx', [
-      'requestedPlannedDate',
-      'creatorFeaturePausedMessage',
-      'creatorFeaturesEnabled'
-    ]],
-    ['app/(tabs)/squad/index.tsx', [
-      'ActionFeedback',
-      'memoryKey="squad"',
-      'RecoverableError',
-      'Pairing options'
-    ]],
-    ['app/workout/active.tsx', [
-      'showSessionDetails',
-      'VIEW SESSION DETAILS',
-      'showSessionOptions',
-      'SESSION OPTIONS'
-    ]],
-    ['src/testing/AppTourScreen.tsx', [
-      'SEARCH SCREENS',
-      'appTourRouteGroups',
-      'hydrateAppTourReview',
-      'PREVIOUS',
-      'START TOUR ->',
-      'RESUME LAST SCREEN ->',
-      'RESET REVIEW PROGRESS',
-      'function resetReviewProgress()',
-      'showFlowDiagnostics',
-      'SHOW TEST DIAGNOSTICS'
-    ]],
-    ['src/testing/AppTourModeBanner.tsx', [
-      'findAppTourRouteIndex',
-      'Previous App Tour screen',
-      'Next App Tour screen',
-      'recordAppTourVisit'
-    ]],
-    ['app/(onboarding)/commitment.tsx', [
-      'useScreenMemory',
-      'memoryKey={draftKey}',
-      'useReducedMotionPreference',
-      "day === 1 ? 'day' : 'days'} per week"
-    ]],
-    ['app/(onboarding)/how-it-works.tsx', [
-      'See how to earn entries and claim Awards.',
-      'Winners claim in My Awards.'
-    ]],
-    ['app/(onboarding)/identity.tsx', [
-      'useScreenMemory',
-      'memoryKey={draftKey}'
-    ]],
-    ['app/rewards/awards.tsx', [
-      'RecoverableError',
-      'reward-claim-completed',
-      'goBackOrReplace',
-      'READY TO CLAIM'
-    ]],
-    ['src/components/cyber.ts', [
-      'allowFontScaling: true',
-      'minHeight: 54'
-    ]],
-    ['src/components/firstRun.tsx', [
-      'CyberButtonPrimary',
-      'CyberButtonOutline'
-    ]],
+    [
+      'app/(auth)/sign-in.tsx',
+      [
+        'getAuthenticatedHomeRoute',
+        'const refreshedUser = await refreshUser()',
+        'emailSignInReady',
+        'Enter both fields.'
+      ]
+    ],
+    [
+      'app/(auth)/sign-up.tsx',
+      ['emailAccountReady', 'Complete all three fields.', 'verificationEmailSent']
+    ],
+    [
+      'app/(auth)/verify-email.tsx',
+      ['initialVerificationDeliveryFailed', 'refreshUser', 'RESEND EMAIL']
+    ],
+    ['src/state/auth.tsx', ['refreshFirebaseUser', 'sendInitialVerificationEmail']],
+    [
+      'app/(tabs)/_layout.tsx',
+      ["title: 'Calendar'", "tabBarAccessibilityLabel: 'Workout calendar tab'"]
+    ],
+    [
+      'app/(tabs)/home/index.tsx',
+      [
+        'getAppResumeTarget',
+        'RecoverableError',
+        'resume-started',
+        'resume-completed',
+        'OBJECTIVE',
+        'ACHIEVED THIS WEEK',
+        'Start your workout at',
+        'formatCompetitionOpeningDateTime',
+        'CONTEST COMPLETE',
+        'VIEW YOUR RESULTS'
+      ]
+    ],
+    [
+      'app/(tabs)/leaderboard/index.tsx',
+      [
+        'useScreenMemory',
+        'memoryKey="leaderboard"',
+        'RecoverableError',
+        'Entries set your Prize Draw odds.',
+        'Hide ranking details'
+      ]
+    ],
+    [
+      'app/(tabs)/calendar.tsx',
+      [
+        'Return on this day to verify a workout.',
+        'RETURN TO TODAY TO START ->',
+        "START TODAY'S VERIFIED WORKOUT ->",
+        'function goToToday()'
+      ]
+    ],
+    [
+      'app/(tabs)/workouts/index.tsx',
+      ['plannedDate={plannedDate}', 'CREATOR STUDIO UNAVAILABLE', 'creatorFeaturesEnabled']
+    ],
+    [
+      'app/(tabs)/workouts/[workoutId].tsx',
+      ['requestedPlannedDate', 'creatorFeaturePausedMessage', 'creatorFeaturesEnabled']
+    ],
+    [
+      'app/(tabs)/squad/index.tsx',
+      ['ActionFeedback', 'memoryKey="squad"', 'RecoverableError', 'Pairing options']
+    ],
+    [
+      'app/workout/active.tsx',
+      ['showSessionDetails', 'VIEW SESSION DETAILS', 'showSessionOptions', 'SESSION OPTIONS']
+    ],
+    [
+      'src/testing/AppTourScreen.tsx',
+      [
+        'SEARCH SCREENS',
+        'appTourRouteGroups',
+        'hydrateAppTourReview',
+        'PREVIOUS',
+        'START TOUR ->',
+        'RESUME LAST SCREEN ->',
+        'RESET REVIEW PROGRESS',
+        'function resetReviewProgress()',
+        'showFlowDiagnostics',
+        'SHOW TEST DIAGNOSTICS'
+      ]
+    ],
+    [
+      'src/testing/AppTourModeBanner.tsx',
+      [
+        'findAppTourRouteIndex',
+        'Previous App Tour screen',
+        'Next App Tour screen',
+        'recordAppTourVisit'
+      ]
+    ],
+    [
+      'app/(onboarding)/commitment.tsx',
+      [
+        'useScreenMemory',
+        'memoryKey={draftKey}',
+        'useReducedMotionPreference',
+        "day === 1 ? 'day' : 'days'} per week"
+      ]
+    ],
+    [
+      'app/(onboarding)/how-it-works.tsx',
+      ['See how to earn entries and claim Awards.', 'Winners claim in My Awards.']
+    ],
+    ['app/(onboarding)/identity.tsx', ['useScreenMemory', 'memoryKey={draftKey}']],
+    [
+      'app/rewards/awards.tsx',
+      ['RecoverableError', 'reward-claim-completed', 'goBackOrReplace', 'READY TO CLAIM']
+    ],
+    ['src/components/cyber.ts', ['allowFontScaling: true', 'minHeight: 54']],
+    ['src/components/firstRun.tsx', ['CyberButtonPrimary', 'CyberButtonOutline']],
     ['src/components/auth.tsx', ['ScreenBackButton']],
     ['src/components/clarity.tsx', ['GUIDE', 'minWidth: 72']],
-    ['src/components/competitionHubNav.tsx', [
-      'aria-selected={selected}',
-      'accessibilityState={{ selected }}',
-      'if (!selected)'
-    ]],
-    ['src/components/onboarding.tsx', [
-      'minHeight: 44',
-      'useWindowDimensions',
-      'numberOfLines={1}'
-    ]],
-    ['src/components/socialChallenges.tsx', [
-      'ChallengeBuilderStep',
-      'STEP {builderStepIndex + 1} OF',
-      'CONTINUE TO GOAL ->',
-      'CONTINUE TO INVITE ->',
-      'showExternalInvite'
-    ]],
+    [
+      'src/components/competitionHubNav.tsx',
+      ['aria-selected={selected}', 'accessibilityState={{ selected }}', 'if (!selected)']
+    ],
+    [
+      'src/components/onboarding.tsx',
+      ['minHeight: 44', 'useWindowDimensions', 'numberOfLines={1}']
+    ],
+    [
+      'src/components/socialChallenges.tsx',
+      [
+        'ChallengeBuilderStep',
+        'STEP {builderStepIndex + 1} OF',
+        'CONTINUE TO GOAL ->',
+        'CONTINUE TO INVITE ->',
+        'showExternalInvite'
+      ]
+    ],
     ['src/components/screenScrollView.tsx', ['rememberedOffsets']],
-    ['src/services/flowMetrics.ts', [
-      'getFlowFunnelSummaries',
-      'createUserStorage',
-      'recordFlowMetric'
-    ]]
+    [
+      'src/services/flowMetrics.ts',
+      ['getFlowFunnelSummaries', 'createUserStorage', 'recordFlowMetric']
+    ]
   ]);
 
   for (const [relativePath, markers] of requirements) {
     const filePath = path.join(projectRoot, relativePath);
-    const sourceText = fs.existsSync(filePath)
-      ? fs.readFileSync(filePath, 'utf8')
-      : '';
+    const sourceText = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
 
     for (const marker of markers) {
       if (!sourceText.includes(marker)) {
@@ -447,12 +440,11 @@ function auditFlowReliability() {
   }
 
   const forbiddenRequirements = new Map([
-    ['app/(tabs)/leaderboard/index.tsx', [
-      'Goal Score determines rank. Prize Draw Entries determine winning odds.'
-    ]],
-    ['app/(onboarding)/how-it-works.tsx', [
-      'BRAND REWARDS // NO PAYMENT SETUP'
-    ]],
+    [
+      'app/(tabs)/leaderboard/index.tsx',
+      ['Goal Score determines rank. Prize Draw Entries determine winning odds.']
+    ],
+    ['app/(onboarding)/how-it-works.tsx', ['BRAND REWARDS // NO PAYMENT SETUP']],
     ['app/(tabs)/squad/index.tsx', ["'More options'"]],
     ['app/(tabs)/_layout.tsx', ["title: 'Log'"]],
     ['src/components/competitionHubNav.tsx', ['disabled={selected}']]
@@ -460,9 +452,7 @@ function auditFlowReliability() {
 
   for (const [relativePath, markers] of forbiddenRequirements) {
     const filePath = path.join(projectRoot, relativePath);
-    const sourceText = fs.existsSync(filePath)
-      ? fs.readFileSync(filePath, 'utf8')
-      : '';
+    const sourceText = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
 
     for (const marker of markers) {
       if (sourceText.includes(marker)) {
@@ -473,14 +463,8 @@ function auditFlowReliability() {
 }
 
 function auditAppTourProductionBoundary() {
-  const stateSource = fs.readFileSync(
-    path.join(projectRoot, 'src/state/appTour.tsx'),
-    'utf8'
-  );
-  const routeSource = fs.readFileSync(
-    path.join(projectRoot, 'app/app-tour.tsx'),
-    'utf8'
-  );
+  const stateSource = fs.readFileSync(path.join(projectRoot, 'src/state/appTour.tsx'), 'utf8');
+  const routeSource = fs.readFileSync(path.join(projectRoot, 'app/app-tour.tsx'), 'utf8');
   const browserPreviewRouteSource = fs.readFileSync(
     path.join(projectRoot, 'app/test-preview.tsx'),
     'utf8'
@@ -493,14 +477,8 @@ function auditAppTourProductionBoundary() {
     path.join(projectRoot, 'src/testing/AppTourModeBanner.tsx'),
     'utf8'
   );
-  const rootLayoutSource = fs.readFileSync(
-    path.join(projectRoot, 'app/_layout.tsx'),
-    'utf8'
-  );
-  const metroSource = fs.readFileSync(
-    path.join(projectRoot, 'metro.config.js'),
-    'utf8'
-  );
+  const rootLayoutSource = fs.readFileSync(path.join(projectRoot, 'app/_layout.tsx'), 'utf8');
+  const metroSource = fs.readFileSync(path.join(projectRoot, 'metro.config.js'), 'utf8');
   const requiredProductionAliases = [
     '@/state/appTour',
     '@/testing/appTourData',
@@ -521,13 +499,11 @@ function auditAppTourProductionBoundary() {
   ];
 
   if (!stateSource.includes('browserTestPreviewEnabled &&')) {
-    issues.push('src/state/appTour.tsx: test preview activation must use the shared availability guard');
+    issues.push(
+      'src/state/appTour.tsx: test preview activation must use the shared availability guard'
+    );
   }
-  if (
-    !stateSource.includes(
-      'if (!browserTestPreviewEnabled && !publicDemoRequested)'
-    )
-  ) {
+  if (!stateSource.includes('if (!browserTestPreviewEnabled && !publicDemoRequested)')) {
     issues.push('src/state/appTour.tsx: enterTour must reject unavailable preview activation');
   }
   for (const marker of [
@@ -543,8 +519,10 @@ function auditAppTourProductionBoundary() {
   if (!routeSource.includes('if (!__DEV__)')) {
     issues.push('app/app-tour.tsx: production builds must redirect away from the App Tour');
   }
-  if (!routeSource.includes("@/testing/AppTourScreen")) {
-    issues.push('app/app-tour.tsx: development App Tour UI must remain isolated from the route entry');
+  if (!routeSource.includes('@/testing/AppTourScreen')) {
+    issues.push(
+      'app/app-tour.tsx: development App Tour UI must remain isolated from the route entry'
+    );
   }
   if (
     !browserPreviewConfigSource.includes('__DEV__ || browserTestPreviewBuildEnabled') ||
@@ -555,7 +533,7 @@ function auditAppTourProductionBoundary() {
   }
   if (
     !browserPreviewRouteSource.includes('browserTestPreviewEnabled') ||
-    !browserPreviewRouteSource.includes("@/testing/AppTourScreen")
+    !browserPreviewRouteSource.includes('@/testing/AppTourScreen')
   ) {
     issues.push('app/test-preview.tsx: hosted preview route must use the guarded testing UI');
   }
@@ -563,26 +541,31 @@ function auditAppTourProductionBoundary() {
     !browserPreviewBannerSource.includes('browserTestPreviewBuildEnabled') ||
     !browserPreviewBannerSource.includes("'/test-preview?appTour=1'")
   ) {
-    issues.push('src/testing/AppTourModeBanner.tsx: hosted preview navigation must open the production-safe screen directory');
+    issues.push(
+      'src/testing/AppTourModeBanner.tsx: hosted preview navigation must open the production-safe screen directory'
+    );
   }
   if (!rootLayoutSource.includes("<AuthProvider key={active ? 'tour' : 'app'}>")) {
     issues.push('app/_layout.tsx: App Tour scenario changes must not remount the router');
   }
   if (!metroSource.includes('context.dev')) {
-    issues.push('metro.config.js: production module aliases must be selected from the Metro development flag');
+    issues.push(
+      'metro.config.js: production module aliases must be selected from the Metro development flag'
+    );
   }
-  if (
-    !metroSource.includes('publicDemoWebModules') ||
-    !metroSource.includes('keepPublicWebDemo')
-  ) {
-    issues.push('metro.config.js: public Demo data must remain available only to production web exports');
+  if (!metroSource.includes('publicDemoWebModules') || !metroSource.includes('keepPublicWebDemo')) {
+    issues.push(
+      'metro.config.js: public Demo data must remain available only to production web exports'
+    );
   }
   if (
     !metroSource.includes("platform === 'web'") ||
     !metroSource.includes('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW') ||
-    !metroSource.includes("src/testing/browserPreviewLegal.ts")
+    !metroSource.includes('src/testing/browserPreviewLegal.ts')
   ) {
-    issues.push('metro.config.js: hosted preview fixtures and sample legal copy must be retained only for explicit web exports');
+    issues.push(
+      'metro.config.js: hosted preview fixtures and sample legal copy must be retained only for explicit web exports'
+    );
   }
   for (const moduleName of requiredProductionAliases) {
     if (!metroSource.includes(moduleName)) {
@@ -612,26 +595,14 @@ function auditAuthoritativeRegionBoundary() {
     path.join(projectRoot, 'src/services/competitionRegionVerification.ts'),
     'utf8'
   );
-  const regionConfig = fs.readFileSync(
-    path.join(projectRoot, 'src/config/regions.ts'),
-    'utf8'
-  );
+  const regionConfig = fs.readFileSync(path.join(projectRoot, 'src/config/regions.ts'), 'utf8');
   const regionState = fs.readFileSync(
     path.join(projectRoot, 'src/state/competitionRegion.tsx'),
     'utf8'
   );
-  const appData = fs.readFileSync(
-    path.join(projectRoot, 'src/data/appData.ts'),
-    'utf8'
-  );
-  const socialDomain = fs.readFileSync(
-    path.join(projectRoot, 'src/domain/social.ts'),
-    'utf8'
-  );
-  const homeScreen = fs.readFileSync(
-    path.join(projectRoot, 'app/(tabs)/home/index.tsx'),
-    'utf8'
-  );
+  const appData = fs.readFileSync(path.join(projectRoot, 'src/data/appData.ts'), 'utf8');
+  const socialDomain = fs.readFileSync(path.join(projectRoot, 'src/domain/social.ts'), 'utf8');
+  const homeScreen = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/home/index.tsx'), 'utf8');
   const registrationAccess = fs.readFileSync(
     path.join(projectRoot, 'src/hooks/useSessionRegistrationAccess.ts'),
     'utf8'
@@ -647,9 +618,7 @@ function auditAuthoritativeRegionBoundary() {
     }
   }
   if (regionScreen.includes('regionPolicyId:')) {
-    issues.push(
-      'app/(onboarding)/region.tsx: the client must not select a server region policy'
-    );
+    issues.push('app/(onboarding)/region.tsx: the client must not select a server region policy');
   }
   if (/radiusKilometers|resolveCompetitionRegionFromCoordinates/.test(regionLocation)) {
     issues.push(
@@ -687,23 +656,53 @@ function auditAuthoritativeRegionBoundary() {
   }
 }
 
+function auditAuthoritativeLegalBoundary() {
+  const connectedDocument = fs.readFileSync(
+    path.join(projectRoot, 'src/components/connectedLegalDocumentScreen.tsx'),
+    'utf8'
+  );
+  const agreement = fs.readFileSync(
+    path.join(projectRoot, 'src/components/accountLegalAgreement.tsx'),
+    'utf8'
+  );
+  const authState = fs.readFileSync(path.join(projectRoot, 'src/state/auth.tsx'), 'utf8');
+
+  for (const marker of [
+    'documents.isError || !current',
+    'No saved or bundled copy is being shown as current.',
+    'documents.refetch()'
+  ]) {
+    if (!connectedDocument.includes(marker)) {
+      issues.push(
+        `src/components/connectedLegalDocumentScreen.tsx: missing fail-closed legal marker ${marker}`
+      );
+    }
+  }
+  for (const marker of [
+    'requiredLegalDocuments(legalDocuments.data)',
+    'legalReceiptMatchesCurrentBundle(',
+    '<CurrentLegalDocumentLinks',
+    'legalDocuments.isError || legalReceipt.isError'
+  ]) {
+    if (!agreement.includes(marker)) {
+      issues.push(
+        `src/components/accountLegalAgreement.tsx: missing exact legal-bundle marker ${marker}`
+      );
+    }
+  }
+  if (/recordAccountLegalAcceptance|account-legal-acceptance/.test(authState)) {
+    issues.push('src/state/auth.tsx: account creation must not fabricate a local legal acceptance');
+  }
+}
+
 function auditAuthoritativeSessionRulesBoundary() {
   const progressState = fs.readFileSync(
     path.join(projectRoot, 'src/state/workoutProgress.tsx'),
     'utf8'
   );
-  const activeWorkout = fs.readFileSync(
-    path.join(projectRoot, 'app/workout/active.tsx'),
-    'utf8'
-  );
-  const checkout = fs.readFileSync(
-    path.join(projectRoot, 'app/workout/check-out.tsx'),
-    'utf8'
-  );
-  const qrScanner = fs.readFileSync(
-    path.join(projectRoot, 'app/(modals)/qr-scanner.tsx'),
-    'utf8'
-  );
+  const activeWorkout = fs.readFileSync(path.join(projectRoot, 'app/workout/active.tsx'), 'utf8');
+  const checkout = fs.readFileSync(path.join(projectRoot, 'app/workout/check-out.tsx'), 'utf8');
+  const qrScanner = fs.readFileSync(path.join(projectRoot, 'app/(modals)/qr-scanner.tsx'), 'utf8');
   const gymScanRepository = fs.readFileSync(
     path.join(projectRoot, 'src/data/gymScanRepository.ts'),
     'utf8'
@@ -729,9 +728,7 @@ function auditAuthoritativeSessionRulesBoundary() {
     );
   }
   if (!checkout.includes('activeSession.minimumSessionSeconds')) {
-    issues.push(
-      'app/workout/check-out.tsx: check-out must use the started session duration'
-    );
+    issues.push('app/workout/check-out.tsx: check-out must use the started session duration');
   }
   if (
     !qrScanner.includes('result.remainingSeconds') ||

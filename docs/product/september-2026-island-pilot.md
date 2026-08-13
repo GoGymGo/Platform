@@ -77,11 +77,17 @@ has been bootstrapped:
 
 ```powershell
 $env:APPLY_PILOT_CONFIGURATION = 'yes'
+$env:CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256 = '<exact digest printed by the command>'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
 The configuration command is idempotent for the region policy and competition
-month. It uses the backend's audited operator services for database writes.
+month. Its first apply attempt prints the exact canonical public legal
+configuration SHA-256 and refuses publication. After the configured owner and
+counsel approve that exact content, rerun with the digest in
+`CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256`. A content change produces a different
+digest and requires new approval. The command uses the backend's audited
+operator services for database writes.
 
 After the real gym has been assigned and the legal, reward and UAT gates pass,
 publish the competition through the same audited competition service.
@@ -89,6 +95,7 @@ Publication immediately opens registration:
 
 ```powershell
 $env:APPLY_PILOT_CONFIGURATION = 'yes'
+$env:CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256 = '<same approved exact digest>'
 $env:PUBLISH_PILOT_COMPETITION = 'yes'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```

@@ -34,10 +34,6 @@ export function canDeleteRegionPolicy(input: {
   );
 }
 
-export function canDeleteLegalDocument(state: string): boolean {
-  return state === 'withdrawn';
-}
-
 export function requiresExclusiveCompetitionSlot(
   proposalGymId: string | null,
 ): boolean {

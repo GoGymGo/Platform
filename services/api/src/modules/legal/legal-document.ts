@@ -9,6 +9,11 @@ export const requiredAccountLegalDocumentKeys = [
 
 const jurisdictionPattern = /^(?:GLOBAL|[A-Z]{2}(?:-[A-Z0-9]{1,8})?)$/;
 const localePattern = /^[a-z]{2}(?:-[A-Z]{2})?$/;
+const initialLegalAcceptanceContext = new Date(0);
+
+export function legalAcceptanceContextAt(onboardingResetAt: Date | null): Date {
+  return onboardingResetAt ?? initialLegalAcceptanceContext;
+}
 
 export function normalizeJurisdictionCode(value: string): string {
   const normalized = value.trim().toUpperCase();
@@ -45,6 +50,22 @@ export function hashLegalDocumentContent(
   return createHash('sha256')
     .update(stableJson({ content, title: title.trim() }))
     .digest('hex');
+}
+
+export function requireLegalPublicationApproval(
+  configuration: JsonObject,
+  suppliedApprovalSha256: string | undefined,
+): string {
+  const approvalSha256 = createHash('sha256')
+    .update(stableJson(configuration))
+    .digest('hex');
+  if (suppliedApprovalSha256?.trim().toLowerCase() !== approvalSha256) {
+    throw new Error(
+      'CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256 must equal the exact public legal ' +
+        `configuration SHA-256 ${approvalSha256} after owner and counsel approval.`,
+    );
+  }
+  return approvalSha256;
 }
 
 export function hashLegalReceiptBundle(input: {

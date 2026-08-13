@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Headers,
   Param,
@@ -22,7 +21,6 @@ import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key'
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import { Public } from '../auth/public.decorator';
-import { AdminDeletedEntityResponseDto } from '../operator/dto/admin-configuration.dto';
 import { AdminLegalDocumentsService } from './admin-legal-documents.service';
 import {
   AdminLegalDocumentResponseDto,
@@ -163,26 +161,6 @@ export class OperatorLegalDocumentsController {
     @Body() input: WithdrawLegalDocumentDto,
   ): Promise<AdminLegalDocumentResponseDto> {
     return this.legalDocuments.withdraw(
-      principal,
-      legalDocumentId,
-      requireIdempotencyKey(idempotencyKey),
-      input,
-    );
-  }
-
-  @Delete(':legalDocumentId')
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOperation({
-    summary: 'Delete a withdrawn legal version from the admin dashboard',
-  })
-  @ApiOkResponse({ type: AdminDeletedEntityResponseDto })
-  delete(
-    @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Param('legalDocumentId', ParseUUIDPipe) legalDocumentId: string,
-    @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() input: WithdrawLegalDocumentDto,
-  ): Promise<AdminDeletedEntityResponseDto> {
-    return this.legalDocuments.delete(
       principal,
       legalDocumentId,
       requireIdempotencyKey(idempotencyKey),

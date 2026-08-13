@@ -33,6 +33,15 @@ const userPrincipal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 
+const otherAdminPrincipal: AuthenticatedPrincipal = {
+  email: 'other-admin@gogymgo.example',
+  emailVerified: true,
+  firebaseUid: 'critical-legal-other-admin',
+  roles: ['admin'],
+  signInProvider: 'password',
+  tokenIssuedAt: 1,
+};
+
 describeWithDatabase('critical account legal receipt workflow', () => {
   jest.setTimeout(120_000);
 
@@ -64,6 +73,15 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       .updateTable('users')
       .set({ roles: ['admin'] })
       .where('id', '=', admin.id)
+      .executeTakeFirstOrThrow();
+    const otherAdmin = await profiles.ensureUser(
+      otherAdminPrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', otherAdmin.id)
       .executeTakeFirstOrThrow();
   });
 
@@ -135,6 +153,29 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       }),
     );
     await expect(
+      Promise.all([
+        legal.recordReceiptBundle(
+          userPrincipal,
+          'legal-receipt-concurrent-a',
+          receiptRequest(initial),
+        ),
+        legal.recordReceiptBundle(
+          userPrincipal,
+          'legal-receipt-concurrent-b',
+          receiptRequest(initial),
+        ),
+      ]),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        complete: true,
+        receiptBundleId: initialReceipt.receiptBundleId,
+      }),
+      expect.objectContaining({
+        complete: true,
+        receiptBundleId: initialReceipt.receiptBundleId,
+      }),
+    ]);
+    await expect(
       legal.recordReceiptBundle(
         userPrincipal,
         'legal-receipt-global-v1',
@@ -167,6 +208,16 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       title: 'British Columbia Terms',
       version: '2026-07-13-bc',
     });
+    await expect(
+      adminLegal.withdraw(
+        otherAdminPrincipal,
+        regionalTerms.id,
+        'legal-non-owner-withdrawal',
+        { reason: 'A non-owner admin must not withdraw legal text' },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'LEGAL_OWNER_APPROVAL_REQUIRED' },
+    });
     const regional = await legal.getCurrent({
       jurisdictionCode: 'CA-BC',
       locale: 'en-CA',
@@ -190,6 +241,30 @@ describeWithDatabase('critical account legal receipt workflow', () => {
     );
     await expect(
       assertCurrent(regionalReceipt.receiptBundleId!),
+    ).resolves.toBeUndefined();
+
+    const user = await profiles.ensureUser(userPrincipal, database.connection);
+    const resetAt = new Date();
+    await database.connection
+      .updateTable('users')
+      .set({ pilot_onboarding_reset_at: resetAt })
+      .where('id', '=', user.id)
+      .executeTakeFirstOrThrow();
+    await expect(
+      assertCurrent(regionalReceipt.receiptBundleId!),
+    ).rejects.toMatchObject({
+      response: { code: 'LEGAL_RECEIPT_BUNDLE_STALE' },
+    });
+    const resetReceipt = await legal.recordReceiptBundle(
+      userPrincipal,
+      'legal-receipt-regional-after-reset',
+      receiptRequest(regional),
+    );
+    expect(resetReceipt.receiptBundleId).not.toBe(
+      regionalReceipt.receiptBundleId,
+    );
+    await expect(
+      assertCurrent(resetReceipt.receiptBundleId!),
     ).resolves.toBeUndefined();
 
     await expect(
@@ -221,8 +296,8 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        complete: true,
-        receiptBundleId: initialReceipt.receiptBundleId,
+        complete: false,
+        receiptBundleId: null,
       }),
     );
 
@@ -256,13 +331,12 @@ describeWithDatabase('critical account legal receipt workflow', () => {
     );
     expect(counts.rows[0]).toEqual({
       audits: 4,
-      bundles: 2,
+      bundles: 3,
       document_events: 4,
       documents: 3,
-      receipts: 4,
+      receipts: 6,
     });
 
-    const user = await profiles.ensureUser(userPrincipal, database.connection);
     const leaseToken = '50000000-0000-4000-8000-000000000005';
     const privacyRequest = await database.connection
       .insertInto('privacy_requests')

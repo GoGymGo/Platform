@@ -31,9 +31,11 @@ rules. Documentation and audit tooling may inspect multiple owners read-only.
   API shapes belong in `packages/contracts`.
 
 One narrow legacy exception remains: the member app embeds
-`services/api/config/legal/public-ca-bc-en.json` as its offline public legal
-fallback. The API owns that exact public document bundle; no executable API
-source is imported. The boundary audit allowlists only that file pair.
+`services/api/config/legal/public-ca-bc-en.json` for explicitly labeled browser
+preview presentation. Connected legal routes never treat it as current and
+fail closed when the API publication is unavailable. The API owns that exact
+document source; no executable API source is imported. The boundary audit
+allowlists only that file pair.
 
 ## Enforcement
 

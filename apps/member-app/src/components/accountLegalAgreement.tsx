@@ -3,8 +3,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { AuthStatusNotice } from '@/components/auth';
 import { HUDBorderBox, TerminalText } from '@/components/cyber';
-import { FirstRunPrimaryButton } from '@/components/firstRun';
-import { LegalConsentCheckbox, LegalDocumentLinks } from '@/components/legal';
+import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
+import { CurrentLegalDocumentLinks, LegalConsentCheckbox } from '@/components/legal';
 import { getUserFacingErrorMessage } from '@/components/reliability';
 import { fontFamilies, spacing } from '@/constants/theme';
 import {
@@ -12,6 +12,7 @@ import {
   useLegalReceiptStatus,
   useRecordLegalReceipt
 } from '@/data/accountReadinessHooks';
+import { legalReceiptMatchesCurrentBundle, requiredLegalDocuments } from '@/domain/accountLegal';
 
 export function AccountLegalAgreement({
   jurisdictionCode,
@@ -25,15 +26,25 @@ export function AccountLegalAgreement({
   const recordLegalReceipt = useRecordLegalReceipt();
   const [acceptedBundleSha256, setAcceptedBundleSha256] = useState<string>();
   const [submissionError, setSubmissionError] = useState<string>();
-  const legalReceiptCurrent = legalReceipt.data?.complete === true;
+  const currentRequiredDocuments = requiredLegalDocuments(legalDocuments.data);
+  const legalReceiptCurrent = legalReceiptMatchesCurrentBundle(
+    legalReceipt.data,
+    legalDocuments.data
+  );
   const legalBundleReady =
-    legalDocuments.data?.configured === true && legalDocuments.data.documents.length > 0;
+    legalDocuments.data?.configured === true && currentRequiredDocuments.length > 0;
   const legalBundleSha256 = legalDocuments.data?.bundleSha256;
   const accountLegalAccepted =
     legalReceiptCurrent ||
     (Boolean(legalBundleSha256) && acceptedBundleSha256 === legalBundleSha256);
-  const busy = legalDocuments.isLoading || legalReceipt.isLoading || recordLegalReceipt.isPending;
-  const canContinue = legalBundleReady && accountLegalAccepted && !busy;
+  const busy =
+    legalDocuments.isLoading ||
+    legalDocuments.isFetching ||
+    legalReceipt.isLoading ||
+    legalReceipt.isFetching ||
+    recordLegalReceipt.isPending;
+  const queryFailed = legalDocuments.isError || legalReceipt.isError;
+  const canContinue = legalBundleReady && accountLegalAccepted && !busy && !queryFailed;
 
   async function saveAndContinue() {
     setSubmissionError(undefined);
@@ -45,23 +56,28 @@ export function AccountLegalAgreement({
       return;
     }
     if (!accountLegalAccepted) {
-      setSubmissionError('Accept the Terms and acknowledge the Privacy Policy to continue.');
+      setSubmissionError('Accept or acknowledge every listed document to continue.');
       return;
     }
 
     try {
       if (!legalReceiptCurrent) {
         const receipt = await recordLegalReceipt.mutateAsync(legalDocuments.data);
-        if (!receipt.complete || !receipt.receiptBundleId) {
+        if (
+          !legalReceiptMatchesCurrentBundle(receipt, legalDocuments.data) ||
+          !receipt.receiptBundleId
+        ) {
           throw new Error('Your agreement receipt could not be confirmed.');
         }
       }
       onComplete();
     } catch (error) {
-      setSubmissionError(getUserFacingErrorMessage(
-        error,
-        'Your agreements could not be recorded. Review your connection and try again.'
-      ));
+      setSubmissionError(
+        getUserFacingErrorMessage(
+          error,
+          'Your agreements could not be recorded. Review your connection and try again.'
+        )
+      );
     }
   }
 
@@ -88,11 +104,17 @@ export function AccountLegalAgreement({
             </TerminalText>
           ) : null}
         </View>
-        <LegalDocumentLinks compact={legalReceiptCurrent} jurisdictionCode={jurisdictionCode} />
-        {!legalReceiptCurrent ? (
+        {legalBundleReady ? (
+          <CurrentLegalDocumentLinks
+            documents={currentRequiredDocuments}
+            jurisdictionCode={legalDocuments.data!.jurisdictionCode}
+            locale={legalDocuments.data!.locale}
+          />
+        ) : null}
+        {!legalReceiptCurrent && legalBundleReady ? (
           <LegalConsentCheckbox
             checked={accountLegalAccepted}
-            label="I accept the Terms and acknowledge the Privacy Policy."
+            label="I accept or acknowledge every current document listed above as indicated."
             onToggle={() =>
               setAcceptedBundleSha256(
                 accountLegalAccepted ? undefined : legalDocuments.data?.bundleSha256
@@ -105,7 +127,21 @@ export function AccountLegalAgreement({
             CHECKING CURRENT DOCUMENTS...
           </TerminalText>
         ) : null}
-        {!busy && !legalBundleReady ? (
+        {!busy && queryFailed ? (
+          <>
+            <AuthStatusNotice
+              message="CURRENT LEGAL DOCUMENTS COULD NOT BE VERIFIED. NO SAVED COPY WILL BE USED."
+              tone="red"
+            />
+            <FirstRunSecondaryButton
+              label="RETRY LEGAL CHECK"
+              onPress={() => {
+                void legalDocuments.refetch();
+                void legalReceipt.refetch();
+              }}
+            />
+          </>
+        ) : !busy && !legalBundleReady ? (
           <AuthStatusNotice
             message="LEGAL DOCUMENTS HAVE NOT BEEN CONFIGURED FOR THIS REGION YET."
             tone="amber"

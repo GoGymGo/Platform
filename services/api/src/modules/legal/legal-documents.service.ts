@@ -21,6 +21,7 @@ import type {
 import {
   buildJurisdictionHierarchy,
   hashLegalReceiptBundle,
+  legalAcceptanceContextAt,
   normalizeJurisdictionCode,
   normalizeLegalLocale,
   requiredAccountLegalDocumentKeys,
@@ -96,48 +97,56 @@ export class LegalDocumentsService {
           requiredDocuments,
         );
 
-        let existingQuery = transaction
+        const acceptanceContextAt = legalAcceptanceContextAt(
+          user.pilot_onboarding_reset_at,
+        );
+        const existing = await transaction
           .selectFrom('account_legal_receipt_bundles')
           .select('id')
           .where('user_id', '=', user.id)
-          .where('bundle_sha256', '=', bundle.bundleSha256);
-        if (user.pilot_onboarding_reset_at) {
-          existingQuery = existingQuery.where(
-            'accepted_at',
-            '>',
-            user.pilot_onboarding_reset_at,
-          );
-        }
-        const existing = await existingQuery.executeTakeFirst();
+          .where('bundle_sha256', '=', bundle.bundleSha256)
+          .where('acceptance_context_at', '=', acceptanceContextAt)
+          .executeTakeFirst();
         if (!existing) {
           const now = new Date();
           const receiptBundle = await transaction
             .insertInto('account_legal_receipt_bundles')
             .values({
               accepted_at: now,
+              acceptance_context_at: acceptanceContextAt,
               bundle_sha256: bundle.bundleSha256,
               jurisdiction_code: bundle.jurisdictionCode,
               locale: bundle.locale,
               request_id: idempotencyKey,
               user_id: user.id,
             })
-            .returning('id')
-            .executeTakeFirstOrThrow();
-          const submittedById = new Map(
-            input.documents.map((document) => [document.documentId, document]),
-          );
-          await transaction
-            .insertInto('account_legal_receipts')
-            .values(
-              requiredDocuments.map((document) => ({
-                accepted_at: now,
-                legal_document_id: document.id,
-                presented_content_sha256: document.contentSha256,
-                receipt_action: submittedById.get(document.id)!.action,
-                receipt_bundle_id: receiptBundle.id,
-              })),
+            .onConflict((conflict) =>
+              conflict
+                .columns(['user_id', 'bundle_sha256', 'acceptance_context_at'])
+                .doNothing(),
             )
-            .execute();
+            .returning('id')
+            .executeTakeFirst();
+          if (receiptBundle) {
+            const submittedById = new Map(
+              input.documents.map((document) => [
+                document.documentId,
+                document,
+              ]),
+            );
+            await transaction
+              .insertInto('account_legal_receipts')
+              .values(
+                requiredDocuments.map((document) => ({
+                  accepted_at: now,
+                  legal_document_id: document.id,
+                  presented_content_sha256: document.contentSha256,
+                  receipt_action: submittedById.get(document.id)!.action,
+                  receipt_bundle_id: receiptBundle.id,
+                })),
+              )
+              .execute();
+          }
         }
 
         const status = await this.buildStatus(
@@ -184,8 +193,8 @@ export class LegalDocumentsService {
       .where('id', '=', userId)
       .executeTakeFirstOrThrow();
     if (
-      account.pilot_onboarding_reset_at &&
-      receiptBundle.accepted_at <= account.pilot_onboarding_reset_at
+      receiptBundle.acceptance_context_at.getTime() !==
+      legalAcceptanceContextAt(account.pilot_onboarding_reset_at).getTime()
     ) {
       throw new ConflictException({
         code: 'LEGAL_RECEIPT_BUNDLE_STALE',
@@ -276,6 +285,7 @@ export class LegalDocumentsService {
       .where('document.locale', '=', locale)
       .where('document.effective_at', '<=', now)
       .where('document.owner_approved_at', 'is not', null)
+      .where('document.owner_approved_by_user_id', 'is not', null)
       .execute();
 
     const selected = new Map<string, (typeof candidates)[number]>();
@@ -393,19 +403,17 @@ export class LegalDocumentsService {
     onboardingResetAt: Date | null,
     bundle: CurrentLegalDocumentsResponseDto,
   ): Promise<LegalReceiptStatusResponseDto> {
-    let acceptedQuery = executor
+    const accepted = await executor
       .selectFrom('account_legal_receipt_bundles as bundle')
       .select(['bundle.accepted_at', 'bundle.id'])
       .where('bundle.user_id', '=', userId)
-      .where('bundle.bundle_sha256', '=', bundle.bundleSha256);
-    if (onboardingResetAt) {
-      acceptedQuery = acceptedQuery.where(
-        'bundle.accepted_at',
-        '>',
-        onboardingResetAt,
-      );
-    }
-    const accepted = await acceptedQuery.executeTakeFirst();
+      .where('bundle.bundle_sha256', '=', bundle.bundleSha256)
+      .where(
+        'bundle.acceptance_context_at',
+        '=',
+        legalAcceptanceContextAt(onboardingResetAt),
+      )
+      .executeTakeFirst();
     const requiredIds = new Set(
       this.requiredDocuments(bundle).map((document) => document.id),
     );

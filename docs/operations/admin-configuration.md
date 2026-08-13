@@ -49,9 +49,12 @@ scripts, CI logs, or Expo environment variables. The command resolves the
 already-created database user by email, is idempotent and records
 `user.admin_bootstrapped` in the append-only operator audit ledger.
 
-Publishing a legal document is additionally restricted to this configured
-owner identity and requires explicit approval of the exact immutable version.
-Unapproved legacy documents are not returned by the member legal API.
+Publishing and withdrawing a legal document are additionally restricted to
+this configured owner identity. Publication requires explicit approval of the
+exact immutable version. Unapproved legacy documents are not returned by the
+member legal API. Legal records cannot be deleted from the operator API or
+dashboard; withdrawal preserves immutable content, approvals, events, and
+receipt history while returning resolution to the prior current version.
 
 After the first bootstrap, role administration should be implemented as a separate, dual-approval security workflow before additional administrators are delegated. Do not broaden the configuration endpoints to grant roles.
 

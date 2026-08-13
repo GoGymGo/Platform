@@ -19,6 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `f9df8ab3f8f9387adeaa964d60a1bd04327647b8` after PR #68 on 2026-08-13.
+- Active feature task: `GoGymGo Feature GGG-001 — Account authentication and
+  verified identity` on `agent/ggg-001-account-authentication`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -69,8 +71,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   verification, token refresh, stable profile, bearer enforcement, revoked and
   disabled identities, native provider smoke tests; Firebase project and runtime
   credentials are cloud dependencies.
-- Delivery: priority `P0`; task `GoGymGo Feature GGG-001 — Account authentication
-  and verified identity`; branch/PR/merge `unassigned`; status `AUDITED`.
+- Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-001 — Account
+  authentication and verified identity`; branch
+  `agent/ggg-001-account-authentication`; PR/merge `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: social providers may look absent by design; production
   verification needs credentials and separate deployment authority.
 
@@ -923,6 +926,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-001` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-006 ledger update merged through PR #69 as
+  `40f604e14c15725375847ef6bda41c52dcdc9a4f` with green main-push checks.
 - 2026-08-13 — Completed `GGG-006` through PR #68. Exact tested head
   `2878d80080bdd3d52d860f3f88b2b6de304eddc0` was squash-merged as
   `f9df8ab3f8f9387adeaa964d60a1bd04327647b8`; all PR and main-push checks passed,

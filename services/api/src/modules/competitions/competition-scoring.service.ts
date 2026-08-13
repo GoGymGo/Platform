@@ -468,13 +468,20 @@ export class CompetitionScoringService {
     for (const outcome of outcomes) {
       const enrollment =
         outcome.userId === userA.userId ? userA : (userB as ScoringEnrollment);
-      const rawEntries =
-        outcome.verifiedDays *
-        competition.rules.verifiedSessionPrizeDrawEntries;
-      const adjustment = outcome.entries - rawEntries;
-      if (adjustment !== 0) {
+      const provisionalValue = await this.loadPeriodVerifiedSessionValue(
+        transaction,
+        competition.id,
+        outcome.userId,
+        period.startDateKey,
+        period.endDateKey,
+      );
+      const categoryScoreAdjustment =
+        outcome.entries - provisionalValue.categoryScore;
+      const prizeDrawEntriesAdjustment =
+        outcome.entries - provisionalValue.prizeDrawEntries;
+      if (categoryScoreAdjustment !== 0 || prizeDrawEntriesAdjustment !== 0) {
         await this.ledger.append(transaction, {
-          categoryScoreDelta: 0,
+          categoryScoreDelta: categoryScoreAdjustment,
           competitionId: competition.id,
           enrollmentId: enrollment.id,
           goalDays: enrollment.goalDays,
@@ -482,11 +489,13 @@ export class CompetitionScoringService {
             entriesAfterSettlement: outcome.entries,
             multiplier: outcome.multiplier,
             periodIndex: period.index,
+            provisionalCategoryScore: provisionalValue.categoryScore,
+            provisionalPrizeDrawEntries: provisionalValue.prizeDrawEntries,
             recovered: outcome.recovered,
             verifiedDays: outcome.verifiedDays,
           },
           policyVersion: competition.rulesVersion,
-          prizeDrawEntriesDelta: adjustment,
+          prizeDrawEntriesDelta: prizeDrawEntriesAdjustment,
           reason: 'weekly_match',
           sourceEventId: match.id,
           userId: enrollment.userId,
@@ -541,6 +550,41 @@ export class CompetitionScoringService {
     });
 
     return { ...score, userId: enrollment.userId, verifiedDays };
+  }
+
+  private async loadPeriodVerifiedSessionValue(
+    transaction: Transaction<Database>,
+    competitionId: string,
+    userId: string,
+    startDateKey: string,
+    endDateKey: string,
+  ): Promise<{ categoryScore: number; prizeDrawEntries: number }> {
+    const row = await transaction
+      .selectFrom('entry_ledger as entry')
+      .innerJoin(
+        'workout_sessions as session',
+        'session.id',
+        'entry.source_event_id',
+      )
+      .select((expression) => [
+        expression.fn
+          .sum<number>('entry.category_score_delta')
+          .as('category_score'),
+        expression.fn
+          .sum<number>('entry.prize_draw_entries_delta')
+          .as('prize_draw_entries'),
+      ])
+      .where('entry.competition_id', '=', competitionId)
+      .where('entry.user_id', '=', userId)
+      .where('entry.reason', '=', 'verified_session')
+      .where('session.eligible_date', '>=', startDateKey)
+      .where('session.eligible_date', '<=', endDateKey)
+      .executeTakeFirstOrThrow();
+
+    return {
+      categoryScore: Number(row.category_score ?? 0),
+      prizeDrawEntries: Number(row.prize_draw_entries ?? 0),
+    };
   }
 
   private async applyFinalAdjustments(
@@ -631,6 +675,14 @@ export class CompetitionScoringService {
       const rawBonusEntries =
         bonusDays * competition.rules.verifiedSessionPrizeDrawEntries;
       const bonusAdjustment = bonusEntries - rawBonusEntries;
+      const provisionalBonusValue = await this.loadPeriodVerifiedSessionValue(
+        transaction,
+        competition.id,
+        enrollment.userId,
+        `${competition.monthKey}-29`,
+        competitionMonthEndDateKey(competition.monthKey),
+      );
+      const bonusCategoryScoreAdjustment = -provisionalBonusValue.categoryScore;
       const perfectMonth = buildCompetitionPeriods(competition.monthKey).every(
         (period) =>
           firstFourWeekDays.filter(
@@ -665,12 +717,14 @@ export class CompetitionScoringService {
           reason: 'category_placement',
         });
       }
-      if (bonusAdjustment !== 0) {
+      if (bonusAdjustment !== 0 || bonusCategoryScoreAdjustment !== 0) {
         await this.ledger.append(transaction, {
           ...common,
+          categoryScoreDelta: bonusCategoryScoreAdjustment,
           metadata: {
             bonusDays,
             entriesAfterSettlement: bonusEntries,
+            provisionalCategoryScore: provisionalBonusValue.categoryScore,
           },
           prizeDrawEntriesDelta: bonusAdjustment,
           reason: 'bonus_day',

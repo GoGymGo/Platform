@@ -9,7 +9,7 @@ const commonCompetitionRules = z.object({
   requireGymQr: z.boolean(),
 });
 
-export const competitionRulesSchema = commonCompetitionRules
+const storedCompetitionRulesSchema = commonCompetitionRules
   .extend({
     categoryPodiumMultipliers: z
       .object({
@@ -26,6 +26,15 @@ export const competitionRulesSchema = commonCompetitionRules
     weeklyChallengeRecoveryMultiplier: z.literal(3),
   })
   .strict();
+
+export const competitionRulesSchema = storedCompetitionRulesSchema.transform(
+  (rules) => ({
+    ...rules,
+    signupPrizeDrawEntries: 1 as const,
+    verifiedSessionCategoryScore: 1 as const,
+    verifiedSessionPrizeDrawEntries: 1 as const,
+  }),
+);
 
 export type CompetitionRules = z.infer<typeof competitionRulesSchema>;
 

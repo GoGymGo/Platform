@@ -311,8 +311,8 @@ function auditFlowReliability() {
       'ACHIEVED THIS WEEK',
       'Start your workout at',
       'formatCompetitionOpeningDateTime',
-      'WINNERS FROM LAST CONTEST',
-      'isWinnersBannerVisible'
+      'CONTEST COMPLETE',
+      'VIEW YOUR RESULTS'
     ]],
     ['app/(tabs)/leaderboard/index.tsx', [
       'useScreenMemory',

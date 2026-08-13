@@ -87,9 +87,9 @@ const competitionRules = {
   requireDeviceAttestation: true,
   requirePresenceCheck: true,
   requireGymQr: true,
-  signupPrizeDrawEntries: 5,
-  verifiedSessionCategoryScore: 7,
-  verifiedSessionPrizeDrawEntries: 3,
+  signupPrizeDrawEntries: 1,
+  verifiedSessionCategoryScore: 1,
+  verifiedSessionPrizeDrawEntries: 1,
   weeklyChallengeBothHitMultiplier: 2,
   weeklyChallengeRecoveryMultiplier: 3,
 };
@@ -991,8 +991,8 @@ describeWithDatabase('critical session and ledger workflow', () => {
       [fixture.competitionId, enrollment.id],
     );
     expect(progress.rows[0]).toEqual({
-      category_score: 7,
-      prize_draw_entries: 8,
+      category_score: 1,
+      prize_draw_entries: 2,
       verified_days: 1,
     });
     await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);

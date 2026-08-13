@@ -20,7 +20,7 @@ const rules = {
   requireDeviceAttestation: true,
   requirePresenceCheck: true,
   requireGymQr: true,
-  signupPrizeDrawEntries: 5,
+  signupPrizeDrawEntries: 1,
   verifiedSessionCategoryScore: 1,
   verifiedSessionPrizeDrawEntries: 1,
   weeklyChallengeBothHitMultiplier: 2,
@@ -260,10 +260,11 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
     await settle();
 
     const progress = await migrated.pool.query<{
+      category_score: number;
       prize_draw_entries: number;
       user_id: string;
     }>(
-      `SELECT user_id, prize_draw_entries
+      `SELECT user_id, category_score, prize_draw_entries
        FROM competition_progress
        WHERE competition_id = $1
        ORDER BY user_id`,
@@ -273,13 +274,16 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
       new Map(
         progress.rows.map((row) => [
           row.user_id,
-          Number(row.prize_draw_entries),
+          {
+            categoryScore: Number(row.category_score),
+            prizeDrawEntries: Number(row.prize_draw_entries),
+          },
         ]),
       ),
     ).toEqual(
       new Map([
-        [userAId, 785],
-        [userBId, 485],
+        [userAId, { categoryScore: 24, prizeDrawEntries: 781 }],
+        [userBId, { categoryScore: 24, prizeDrawEntries: 481 }],
       ]),
     );
 

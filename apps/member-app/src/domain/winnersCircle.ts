@@ -5,21 +5,6 @@ export function shouldAutoPresentWinnersCircle(
   return presentationKey !== null && presentationKey !== lastSeenPresentationKey;
 }
 
-const winnersBannerDurationMs = 7 * 24 * 60 * 60 * 1000;
-
-export function isWinnersBannerVisible(
-  contestEndedAt: string,
-  referenceTime = Date.now()
-) {
-  const contestEndedAtTime = Date.parse(contestEndedAt);
-
-  return (
-    Number.isFinite(contestEndedAtTime) &&
-    referenceTime >= contestEndedAtTime &&
-    referenceTime < contestEndedAtTime + winnersBannerDurationMs
-  );
-}
-
 export function getWinnersCirclePresentationKey({
   competitionId,
   resultsStatus

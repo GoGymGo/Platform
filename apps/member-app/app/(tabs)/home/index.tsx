@@ -40,9 +40,7 @@ import {
 import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
 import {
-  formatCompetitionMonth,
   getWinnersCirclePresentationKey,
-  isWinnersBannerVisible,
   shouldAutoPresentWinnersCircle
 } from '@/domain/winnersCircle';
 import { useCompetitionStart } from '@/hooks/useCompetitionStart';
@@ -181,12 +179,6 @@ export default function HomeScreen() {
   );
   const resultsPresentationKey = latestCompetitionResults
     ? getWinnersCirclePresentationKey(latestCompetitionResults)
-    : null;
-  const showRecentWinnersBanner = latestCompetitionResults
-    ? isWinnersBannerVisible(latestCompetitionResults.endedAt)
-    : false;
-  const recentWinnersMonth = latestCompetitionResults
-    ? formatCompetitionMonth(latestCompetitionResults.monthKey)
     : null;
   const unseenCompetitionResults =
     lastSeenResultsKey !== undefined &&
@@ -448,32 +440,6 @@ export default function HomeScreen() {
           <ProfileAvatar imageUri={profileImageUri} initials={publicInitials} showStatus size={46} />
         </View>
 
-        {showRecentWinnersBanner && latestCompetitionResults && recentWinnersMonth ? (
-          <Pressable
-            accessibilityHint="Open the completed contest Winners Circle"
-            accessibilityLabel={`Winners from last contest, ${recentWinnersMonth}`}
-            accessibilityRole="button"
-            onPress={() => router.push('/winners-circle')}
-            style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
-          >
-            <HUDBorderBox glow style={styles.recentWinnersBanner} tone="pink">
-              <View style={styles.recentWinnersCopy}>
-                <TerminalText glow tone="pink" variant="label">
-                  WINNERS FROM LAST CONTEST
-                </TerminalText>
-                <TerminalText tone="text" uppercase={false} variant="body">
-                  {latestCompetitionResults.resultsStatus === 'settled'
-                    ? `${recentWinnersMonth} results are in. See the Goal champions and prize-draw winners.`
-                    : `${recentWinnersMonth} results are being finalized. Check the Winners Circle for updates.`}
-                </TerminalText>
-              </View>
-              <TerminalText glow tone="pink" variant="button">
-                -&gt;
-              </TerminalText>
-            </HUDBorderBox>
-          </Pressable>
-        ) : null}
-
         {registered === '1' ? (
           <HUDBorderBox style={styles.registrationSuccess} tone="green">
             <View style={styles.registrationSuccessCopy}>
@@ -527,8 +493,8 @@ export default function HomeScreen() {
               >
                 {completedContestWithoutReplacement
                   ? latestCompetitionResults?.resultsStatus === 'settled'
-                    ? 'RESULTS PUBLISHED'
-                    : 'FINALIZING RESULTS'
+                    ? 'CONTEST COMPLETE'
+                    : 'RESULTS IN PROGRESS'
                   : effectiveSetupRequired
                   ? setupEyebrow
                   : desktopSetupChecking
@@ -545,7 +511,9 @@ export default function HomeScreen() {
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
                 {completedContestWithoutReplacement
-                  ? 'YOUR CONTEST IS COMPLETE'
+                  ? latestCompetitionResults?.resultsStatus === 'settled'
+                    ? 'VIEW YOUR RESULTS'
+                    : 'RESULTS ARE BEING FINALIZED'
                   : effectiveSetupRequired
                   ? setupTitle
                   : desktopSetupChecking
@@ -565,8 +533,8 @@ export default function HomeScreen() {
               <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
                 {completedContestWithoutReplacement
                   ? latestCompetitionResults?.resultsStatus === 'settled'
-                    ? 'Your placement and any prize-draw award are ready in the Winners Circle.'
-                    : 'Your result is saved. GoGymGo is completing the audited draw before publishing the Winners Circle.'
+                    ? 'Your placement is ready in the Winners Circle.'
+                    : 'Check back soon.'
                   : effectiveSetupRequired
                   ? setupMessage
                   : desktopSetupChecking
@@ -591,34 +559,30 @@ export default function HomeScreen() {
                 </TerminalText>
               ) : null}
             </View>
-            <View style={styles.multiplierBlock}>
-              <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
-                {completedContestWithoutReplacement
-                  ? 'DONE'
-                  : effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
-                  ? '--'
-                  : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
-              </TerminalText>
-              <TerminalText tone="muted" variant="micro">
-                {completedContestWithoutReplacement
-                  ? latestCompetitionResults?.resultsStatus === 'settled'
-                    ? 'RESULTS READY'
-                    : 'UNDER REVIEW'
-                  : effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
-                  ? desktopSetupChecking
-                    ? 'SYNCING'
-                    : desktopSetupError
-                      ? 'CHECK LATER'
-                      : 'NEXT STEP'
-                  : competitionNotStarted
-                  ? 'DAY GOAL'
-                   : liveMultiplier === 3
-                    ? 'BONUS READY'
-                    : liveMultiplier === 2
-                      ? 'TEAM BONUS'
-                      : 'BASE ENTRIES'}
-              </TerminalText>
-            </View>
+            {!completedContestWithoutReplacement ? (
+              <View style={styles.multiplierBlock}>
+                <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
+                  {effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
+                    ? '--'
+                    : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
+                </TerminalText>
+                <TerminalText tone="muted" variant="micro">
+                  {effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
+                    ? desktopSetupChecking
+                      ? 'SYNCING'
+                      : desktopSetupError
+                        ? 'CHECK LATER'
+                        : 'NEXT STEP'
+                    : competitionNotStarted
+                    ? 'DAY GOAL'
+                     : liveMultiplier === 3
+                      ? 'BONUS READY'
+                      : liveMultiplier === 2
+                        ? 'TEAM BONUS'
+                        : 'BASE ENTRIES'}
+                </TerminalText>
+              </View>
+            ) : null}
           </View>
 
           {showGoalProgress ? (
@@ -672,8 +636,8 @@ export default function HomeScreen() {
             <CyberButtonPrimary
               label={
                 latestCompetitionResults?.resultsStatus === 'settled'
-                  ? 'VIEW WINNERS CIRCLE'
-                  : 'VIEW RESULTS STATUS'
+                  ? 'VIEW RESULTS'
+                  : 'CHECK RESULTS'
               }
               onPress={() => router.push('/winners-circle')}
               tone={
@@ -989,18 +953,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg,
     padding: spacing.md
-  },
-  recentWinnersBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    padding: spacing.md
-  },
-  recentWinnersCopy: {
-    minWidth: 0,
-    flex: 1,
-    gap: spacing.xs
   },
   registrationSuccessCopy: {
     flex: 1,

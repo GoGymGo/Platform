@@ -54,6 +54,33 @@ export class LedgerService {
       return false;
     }
 
+    if (
+      entry.categoryScoreDelta < 0 ||
+      entry.prizeDrawEntriesDelta < 0 ||
+      entry.verifiedDaysDelta < 0
+    ) {
+      const updated = await transaction
+        .updateTable('competition_progress')
+        .set({
+          category_score: sql<number>`competition_progress.category_score + ${entry.categoryScoreDelta}`,
+          enrollment_id: entry.enrollmentId,
+          goal_days: entry.goalDays,
+          prize_draw_entries: sql<number>`competition_progress.prize_draw_entries + ${entry.prizeDrawEntriesDelta}`,
+          updated_at: now,
+          verified_days: sql<number>`competition_progress.verified_days + ${entry.verifiedDaysDelta}`,
+        })
+        .where('competition_id', '=', entry.competitionId)
+        .where('user_id', '=', entry.userId)
+        .returning('user_id')
+        .executeTakeFirst();
+      if (!updated) {
+        throw new Error(
+          'A negative ledger adjustment requires existing competition progress.',
+        );
+      }
+      return true;
+    }
+
     await transaction
       .insertInto('competition_progress')
       .values({

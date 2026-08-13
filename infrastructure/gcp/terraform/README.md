@@ -1,5 +1,9 @@
 # GoGymGo Google Cloud foundation
 
+> Archived migration history: the current GoGymGo runtime supports AWS only.
+> Do not apply this Terraform root or use it to deploy the current API. It is
+> retained temporarily to document the retired foundation during migration.
+
 This root codifies one isolated environment of the GoGymGo backend. Use a separate Google Cloud project and Terraform state bucket for staging and production. It creates:
 
 - private PostgreSQL 17 Cloud SQL with point-in-time recovery and PostGIS enabled by the application migration;

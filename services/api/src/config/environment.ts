@@ -34,6 +34,12 @@ const optionalSecret = z.preprocess(
   z.string().min(32).optional(),
 );
 
+const awsRegion = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().trim().min(1).default('ca-central-1'),
+);
+
 export const environmentSchema = z
   .object({
     NODE_ENV: z
@@ -89,11 +95,9 @@ export const environmentSchema = z
       .url()
       .default('postgresql://gogymgo:gogymgo@localhost:5432/gogymgo'),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
-    PRIVATE_OBJECT_STORAGE_PROVIDER: z
-      .enum(['google-cloud', 'aws-s3'])
-      .default('google-cloud'),
+    PRIVATE_OBJECT_STORAGE_PROVIDER: z.literal('aws-s3').default('aws-s3'),
     PRIVATE_CONTENT_BUCKET: optionalTrimmedString,
-    AWS_REGION: optionalTrimmedString,
+    AWS_REGION: awsRegion,
     PROFILE_MEDIA_ENABLED: booleanString.default(false),
     PROFILE_MEDIA_MAX_BYTES: z.coerce
       .number()
@@ -169,6 +173,14 @@ export const environmentSchema = z
     }
 
     if (environment.NODE_ENV === 'production') {
+      if (environment.AWS_REGION !== 'ca-central-1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AWS_REGION must be ca-central-1 in production.',
+          path: ['AWS_REGION'],
+        });
+      }
+
       const databaseHost = new URL(environment.DATABASE_URL).hostname
         .trim()
         .toLowerCase();
@@ -303,17 +315,6 @@ export const environmentSchema = z
           path: ['PRIVACY_PSEUDONYMIZATION_KEY'],
         });
       }
-    }
-
-    if (
-      environment.PRIVATE_OBJECT_STORAGE_PROVIDER === 'aws-s3' &&
-      !environment.AWS_REGION
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'AWS_REGION is required when private storage uses aws-s3.',
-        path: ['AWS_REGION'],
-      });
     }
 
     if (

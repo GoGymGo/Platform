@@ -57,7 +57,6 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     layout,
     packageJson,
     environmentExample,
-    authorization,
     styles,
     formValidation,
     contestSetupWorkspace,
@@ -77,13 +76,6 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
-    readFile(
-      new URL(
-        "../../../services/api/src/modules/operator/admin-authorization.service.ts",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/form-validation.ts", import.meta.url), "utf8"),
     readFile(
@@ -343,10 +335,6 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(environmentExample, /SITE_URL=https:\/\/admin\.gogymgo\.com/);
   assert.doesNotMatch(environmentExample, /private_key|service_account/i);
 
-  assert.match(authorization, /signInProvider\s*!==\s*'password'/);
-  assert.match(authorization, /OPERATOR_PASSWORD_SIGN_IN_REQUIRED/);
-  assert.match(authorization, /PARTNER_GYM_ASSIGNMENT_REQUIRED/);
-  assert.match(authorization, /GYM_SCOPE_FORBIDDEN/);
   assert.match(
     styles,
     /\.sign-in-panel \.stacked-form input,[\s\S]*min-height: 48px/,

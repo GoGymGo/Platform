@@ -33,26 +33,28 @@ describe('AdminAuthorizationService', () => {
     } as unknown as Transaction<Database>;
   }
 
-  it('rejects social-provider sessions for the operator console', async () => {
-    const ensureUser = jest.fn();
-    const profiles = {
-      ensureUser,
-      requireVerifiedEmail: jest.fn(),
-    } as unknown as ProfilesService;
-    const service = new AdminAuthorizationService(profiles);
-
-    await expect(
-      service.requireAdmin(
-        { ...principal, signInProvider: 'google.com' },
+  it.each([null, 'google.com', 'apple.com', 'custom'])(
+    'rejects the %s provider before consulting the profile database',
+    async (signInProvider) => {
+      const ensureUser = jest.fn();
+      const profiles = {
+        ensureUser,
+        requireVerifiedEmail: jest.fn(),
+      } as unknown as ProfilesService;
+      const service = new AdminAuthorizationService(profiles);
+      const attempt = service.requireAdmin(
+        { ...principal, signInProvider },
         transaction,
-      ),
-    ).rejects.toMatchObject({
-      response: {
-        code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
-      },
-    });
-    expect(ensureUser).not.toHaveBeenCalled();
-  });
+      );
+
+      await expect(attempt).rejects.toMatchObject({
+        response: {
+          code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
+        },
+      });
+      expect(ensureUser).not.toHaveBeenCalled();
+    },
+  );
 
   it('uses the authoritative database role rather than token claims', async () => {
     const profiles = {

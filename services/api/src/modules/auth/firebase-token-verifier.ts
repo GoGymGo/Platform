@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Environment } from '../../config/environment';
 import type { AuthenticatedPrincipal, TokenVerifier } from './auth.types';
 import { getGoGymGoFirebaseApp } from './firebase-admin-app';
+import { authenticatedPrincipalFromDecodedToken } from './firebase-token-principal';
 
 export class FirebaseTokenVerifier implements TokenVerifier {
   constructor(private readonly config: ConfigService<Environment, true>) {}
@@ -12,18 +13,6 @@ export class FirebaseTokenVerifier implements TokenVerifier {
       getGoGymGoFirebaseApp(this.config),
     ]);
     const decodedToken = await getAuth(app).verifyIdToken(token, true);
-    const claimedRoles: unknown = decodedToken.roles;
-    const roles = Array.isArray(claimedRoles)
-      ? claimedRoles.filter((role): role is string => typeof role === 'string')
-      : ['user'];
-
-    return {
-      ...(decodedToken.email ? { email: decodedToken.email } : {}),
-      emailVerified: decodedToken.email_verified === true,
-      firebaseUid: decodedToken.uid,
-      roles: roles.length > 0 ? roles : ['user'],
-      signInProvider: decodedToken.firebase.sign_in_provider ?? null,
-      tokenIssuedAt: decodedToken.iat,
-    };
+    return authenticatedPrincipalFromDecodedToken(decodedToken);
   }
 }

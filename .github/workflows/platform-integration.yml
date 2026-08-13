@@ -4,15 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths:
-      - "packages/**"
-      - "services/api/openapi.json"
-      - "apps/member-app/src/services/api/**"
-      - "infrastructure/local/**"
-      - "tooling/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -37,6 +28,9 @@ jobs:
       - run: npm run contracts:check
       - run: npm run audit:contract --workspace @gogymgo/api
       - run: npm run audit:api-routes --workspace @gogymgo/member-app
+      - run: npm run test:smoke:qr --workspace @gogymgo/api
+        env:
+          RUN_DATABASE_INTEGRATION: "true"
       - run: docker compose -f infrastructure/local/compose.yml config --quiet
         env:
           REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

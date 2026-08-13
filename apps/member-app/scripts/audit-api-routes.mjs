@@ -159,7 +159,6 @@ function normalizeFrontendRoute(route) {
   const [pathname] = route.split(/[?#]/, 1);
   return pathname
     .replace(/\/+/g, '/')
-    .replace(/\{param\}/g, '{param}')
     .replace(/\/$/, '') || '/';
 }
 

@@ -11,6 +11,8 @@ import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { ResultsService } from '../src/modules/results/results.service';
+import { RewardCodeCipherService } from '../src/modules/rewards/reward-code-cipher.service';
+import { RewardsService } from '../src/modules/rewards/rewards.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
   createTestConfig,
@@ -126,6 +128,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let profiles: ProfilesService;
   let registrationFixtureSequence = 0;
   let results: ResultsService;
+  let rewards: RewardsService;
   let sessions: SessionsService;
 
   beforeAll(async () => {
@@ -135,6 +138,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
     results = new ResultsService(database, profiles);
+    rewards = new RewardsService(
+      {} as RewardCodeCipherService,
+      database,
+      idempotency,
+      profiles,
+    );
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
     const scoring = new CompetitionScoringService(database, ledger);
     const lifecycle = new CompetitionLifecycleService(
@@ -681,8 +690,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
          (competition_id, sponsor_name, title, description, reward_type,
           status, inventory_total, display_order, version,
           fulfillment_instructions)
-       VALUES ($1, 'GoGymGo', '$200 Cash', 'Participant result test reward',
-               'cash', 'published', 1, 1, 1, 'Contact GoGymGo to claim.')
+       VALUES ($1, 'GoGymGo', 'Recovery Kit', 'Participant result test reward',
+               'physical', 'published', 1, 1, 1,
+               'Collect at the partner gym.')
        RETURNING id`,
       [fixture.competitionId],
     );
@@ -696,11 +706,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
        RETURNING id`,
       [fixture.competitionId, new Date()],
     );
-    await migrated.pool.query(
+    const award = await migrated.pool.query<{ id: string }>(
       `INSERT INTO reward_awards
          (draw_id, reward_catalog_item_id, user_id, award_rank, status,
           awarded_at, updated_at)
-       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)`,
+       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)
+       RETURNING id`,
       [draw.rows[0].id, reward.rows[0].id, user.id, new Date()],
     );
     await migrated.pool.query(
@@ -730,12 +741,38 @@ describeWithDatabase('critical session and ledger workflow', () => {
       rewardWinners: [
         {
           awardRank: 1,
-          rewardTitle: '$200 Cash',
-          rewardType: 'cash',
+          rewardTitle: 'Recovery Kit',
+          rewardType: 'physical',
           sponsorName: 'GoGymGo',
         },
       ],
       settledAt: expect.any(String),
+    });
+
+    await expect(rewards.getMyAwards(userPrincipal)).resolves.toMatchObject([
+      {
+        id: award.rows[0].id,
+        rewardType: 'physical',
+        status: 'awarded',
+        title: 'Recovery Kit',
+      },
+    ]);
+    const claim = await rewards.claim(
+      userPrincipal,
+      award.rows[0].id,
+      'participant-results-reward-claim',
+    );
+    await expect(
+      rewards.claim(
+        userPrincipal,
+        award.rows[0].id,
+        'participant-results-reward-claim',
+      ),
+    ).resolves.toEqual(claim);
+    expect(claim).toMatchObject({
+      fulfillmentInstructions: 'Collect at the partner gym.',
+      id: award.rows[0].id,
+      status: 'claimed',
     });
   });
 

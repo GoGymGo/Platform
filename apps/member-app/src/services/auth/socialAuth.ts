@@ -19,15 +19,20 @@ import { Platform } from 'react-native';
 import {
   googleWebClientId,
   isAppleAuthEnabled,
+  isFirebaseConfigured,
   isGoogleAuthEnabled
 } from '@/config/firebase';
+import { resolveSocialProviderAvailability } from '@/domain/socialAuthAvailability';
 
 let googleConfigured = false;
 
-export const socialProviderAvailability = {
-  apple: Platform.OS === 'ios' && isAppleAuthEnabled,
-  google: Boolean(googleWebClientId) && isGoogleAuthEnabled
-} as const;
+export const socialProviderAvailability = resolveSocialProviderAvailability({
+  appleEnabled: isAppleAuthEnabled,
+  firebaseConfigured: isFirebaseConfigured,
+  googleEnabled: isGoogleAuthEnabled,
+  googleWebClientId,
+  platform: Platform.OS
+});
 
 export async function signInWithGoogleProvider(auth: Auth) {
   if (!googleWebClientId) {

@@ -50,6 +50,7 @@ export default function SignInScreen() {
     appleSignInAvailable,
     firebaseConfigured,
     googleSignInAvailable,
+    refreshUser,
     signInWithEmail,
     signOutUser,
     user
@@ -139,22 +140,28 @@ export default function SignInScreen() {
     if (!user) {
       return;
     }
-    if (!user.emailVerified) {
-      router.replace({
-        pathname: '/verify-email',
-        params: {
-          next: challengeInvite
-            ? `challenge:${challengeInvite}`
-            : gymScanContinuation
-              ? gymScanAuthNext
-              : 'home'
-        }
-      });
-      return;
-    }
 
     setSubmitting(true);
+    setFormError(undefined);
     try {
+      const refreshedUser = await refreshUser();
+      if (!refreshedUser) {
+        setFormError('YOUR SESSION EXPIRED. SIGN IN AGAIN.');
+        return;
+      }
+      if (!refreshedUser.emailVerified) {
+        router.replace({
+          pathname: '/verify-email',
+          params: {
+            next: challengeInvite
+              ? `challenge:${challengeInvite}`
+              : gymScanContinuation
+                ? gymScanAuthNext
+                : 'home'
+          }
+        });
+        return;
+      }
       if (challengeInvite) {
         await social.redeemContactInvitation(challengeInvite);
         router.replace('/squad/social');
@@ -165,6 +172,8 @@ export default function SignInScreen() {
         return;
       }
       router.replace(getAuthenticatedHomeRoute(mobileGymVerificationAvailable));
+    } catch (error) {
+      setFormError(getAuthErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
@@ -189,8 +198,10 @@ export default function SignInScreen() {
           <TerminalText style={styles.editorialBody} tone="text" uppercase={false} variant="body">
             {user.email ?? 'SIGNED-IN ACCOUNT'}
           </TerminalText>
+          {formError ? <AuthStatusNotice message={formError} tone="red" /> : null}
           <FirstRunPrimaryButton
-            label="CONTINUE ->"
+            disabled={submitting}
+            label={submitting ? 'CHECKING SESSION...' : 'CONTINUE ->'}
             onPress={continueActiveSession}
           />
           <FirstRunSecondaryButton

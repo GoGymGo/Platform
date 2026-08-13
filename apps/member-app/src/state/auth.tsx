@@ -11,20 +11,24 @@ import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
   onAuthStateChanged,
-  reload,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signOut,
-  type User
+  signOut
 } from 'firebase/auth';
 
 import {
   isFirebaseConfigured,
   missingFirebaseEnvironmentValues
 } from '@/config/firebase';
-import { normalizeEmail } from '@/domain/auth';
+import { normalizeEmail, shouldClearAuthSession } from '@/domain/auth';
 import { getFirebaseAuth } from '@/services/auth/firebaseClient';
+import {
+  mapFirebaseUser,
+  refreshFirebaseUser,
+  sendInitialVerificationEmail,
+  type AuthenticatedUser
+} from '@/services/auth/firebaseIdentity';
 import {
   signInWithAppleProvider,
   signInWithGoogleProvider,
@@ -39,23 +43,20 @@ import {
   appTourUser
 } from '@/testing/appTourData';
 
-export type AuthenticatedUser = {
-  displayName: string | null;
-  email: string | null;
-  emailVerified: boolean;
-  photoUrl: string | null;
-  providerIds: readonly string[];
-  uid: string;
-};
+export type { AuthenticatedUser } from '@/services/auth/firebaseIdentity';
 
 export type AuthSignInResult = {
   isNewUser: boolean;
   user: AuthenticatedUser;
 };
 
+export type AuthAccountCreationResult = AuthSignInResult & {
+  verificationEmailSent: boolean;
+};
+
 type AuthContextValue = {
   appleSignInAvailable: boolean;
-  createAccount: (email: string, password: string) => Promise<AuthSignInResult>;
+  createAccount: (email: string, password: string) => Promise<AuthAccountCreationResult>;
   firebaseConfigured: boolean;
   getIdToken: (forceRefresh?: boolean) => Promise<string>;
   googleSignInAvailable: boolean;
@@ -106,8 +107,9 @@ function AppTourAuthProvider({ children }: PropsWithChildren) {
     setUser(createdUser);
     return {
       isNewUser: true,
-      user: createdUser
-    } satisfies AuthSignInResult;
+      user: createdUser,
+      verificationEmailSent: true
+    } satisfies AuthAccountCreationResult;
   }, []);
   const refreshUser = useCallback(async () => {
     if (!user) {
@@ -164,10 +166,46 @@ function FirebaseAuthProvider({ children }: PropsWithChildren) {
     const auth = getFirebaseAuth();
     auth.useDeviceLanguage();
 
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser ? mapFirebaseUser(nextUser) : null);
-      setLoading(false);
+    let active = true;
+    let requestVersion = 0;
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      const currentRequest = ++requestVersion;
+      if (!nextUser) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      void refreshFirebaseUser(nextUser)
+        .then((refreshedUser) => {
+          if (
+            active &&
+            currentRequest === requestVersion &&
+            auth.currentUser?.uid === nextUser.uid
+          ) {
+            setUser(refreshedUser);
+          }
+        })
+        .catch(async (error: unknown) => {
+          if (shouldClearAuthSession(error)) {
+            await signOut(auth).catch(() => undefined);
+          }
+          if (active && currentRequest === requestVersion) {
+            setUser(null);
+          }
+        })
+        .finally(() => {
+          if (active && currentRequest === requestVersion) {
+            setLoading(false);
+          }
+        });
     });
+
+    return () => {
+      active = false;
+      requestVersion += 1;
+      unsubscribe();
+    };
   }, []);
 
   const createAccount = useCallback(async (email: string, password: string) => {
@@ -178,15 +216,16 @@ function FirebaseAuthProvider({ children }: PropsWithChildren) {
       password
     );
 
-    void sendEmailVerification(credential.user).catch(() => {
-      // The verification screen offers an explicit resend action.
-    });
+    const verificationEmailSent = await sendInitialVerificationEmail(credential.user);
     void recordAccountLegalAcceptance(credential.user.uid).catch(() => {
       // Account creation must not fail after Firebase has already created the user.
       // The production API will record the authoritative acceptance separately.
     });
 
-    const result = mapCredential(credential, true);
+    const result = {
+      ...mapCredential(credential, true),
+      verificationEmailSent
+    } satisfies AuthAccountCreationResult;
     setUser(result.user);
     return result;
   }, []);
@@ -246,10 +285,17 @@ function FirebaseAuthProvider({ children }: PropsWithChildren) {
       return null;
     }
 
-    await reload(currentUser);
-    const refreshedUser = mapFirebaseUser(currentUser);
-    setUser(refreshedUser);
-    return refreshedUser;
+    try {
+      const refreshedUser = await refreshFirebaseUser(currentUser);
+      setUser(refreshedUser);
+      return refreshedUser;
+    } catch (error) {
+      if (shouldClearAuthSession(error)) {
+        setUser(null);
+        await signOut(requireFirebaseAuth()).catch(() => undefined);
+      }
+      throw error;
+    }
   }, []);
 
   const getIdToken = useCallback(async (forceRefresh = false) => {
@@ -334,16 +380,5 @@ function mapCredential(
   return {
     isNewUser,
     user: mapFirebaseUser(credential.user)
-  };
-}
-
-function mapFirebaseUser(user: User): AuthenticatedUser {
-  return {
-    displayName: user.displayName,
-    email: user.email,
-    emailVerified: user.emailVerified,
-    photoUrl: user.photoURL,
-    providerIds: user.providerData.map((provider) => provider.providerId),
-    uid: user.uid
   };
 }

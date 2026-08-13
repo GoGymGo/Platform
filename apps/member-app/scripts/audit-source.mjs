@@ -291,12 +291,23 @@ function auditFlowReliability() {
   const requirements = new Map([
     ['app/(auth)/sign-in.tsx', [
       'getAuthenticatedHomeRoute',
+      'const refreshedUser = await refreshUser()',
       'emailSignInReady',
       'Enter both fields.'
     ]],
     ['app/(auth)/sign-up.tsx', [
       'emailAccountReady',
-      'Complete all three fields.'
+      'Complete all three fields.',
+      'verificationEmailSent'
+    ]],
+    ['app/(auth)/verify-email.tsx', [
+      'initialVerificationDeliveryFailed',
+      'refreshUser',
+      'RESEND EMAIL'
+    ]],
+    ['src/state/auth.tsx', [
+      'refreshFirebaseUser',
+      'sendInitialVerificationEmail'
     ]],
     ['app/(tabs)/_layout.tsx', [
       "title: 'Calendar'",

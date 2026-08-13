@@ -60,9 +60,21 @@ Customize Firebase Authentication templates for email verification and password 
 
 ## 6. Backend Contract
 
-The frontend exposes `getIdToken()` from the authentication provider. Future API calls send that token in the `Authorization: Bearer <token>` header. The backend must use Firebase Admin to verify the token and derive the account ID from the verified `uid` claim.
+The member API client obtains `getIdToken()` from the authentication provider
+and sends it as `Authorization: Bearer <token>`. If the API rejects a cached
+token with `401`, the client asks Firebase for one forced refresh and retries
+once. A revoked, disabled, malformed, or otherwise unrecoverable identity stays
+failed closed; the client does not fabricate a successful response or continue
+retrying.
 
-The backend must also become authoritative for:
+The API's global guard verifies every non-public route with Firebase Admin and
+enables revocation checking. It derives the account from the verified `uid`
+claim and never accepts client-supplied ownership. The `users.firebase_uid`
+unique constraint and transactional profile bootstrap converge concurrent
+first-use requests on one durable user and profile. Database account status and
+roles remain authoritative and are not promoted from token claims.
+
+The backend is authoritative for:
 
 - account status and moderation;
 - accepted Privacy Policy and Terms versions;
@@ -71,6 +83,13 @@ The backend must also become authoritative for:
 - contest and reward eligibility;
 - revoked or blocked sessions;
 - account deletion and data-retention workflows.
+
+Email verification refresh reloads the Firebase user and forces a fresh ID
+token before verified navigation continues. A restored session receives the
+same reconciliation before authenticated screens render. The initial
+verification-email attempt is awaited; if delivery fails after Firebase has
+created the account, the verification screen reports that partial outcome and
+offers the authoritative resend action.
 
 ### AWS staging credentials
 
@@ -114,3 +133,10 @@ Before authentication is called production-ready, verify:
 - offline and interrupted authentication;
 - Firebase authorized domains and OAuth redirect configuration;
 - backend rejection of expired, forged, revoked, or wrong-project ID tokens.
+
+Repository CI covers normalization, fail-closed provider availability,
+authoritative verification/token refresh, one-time bearer recovery, revocation
+checking, malformed-token rejection, and concurrent stable profile bootstrap
+without contacting a hosted Firebase project. The remaining provider/device and
+hosted-project checks above are release-environment smoke tests and require
+separate deployment authorization and credentials.

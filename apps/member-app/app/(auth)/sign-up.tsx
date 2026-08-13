@@ -98,10 +98,11 @@ export default function SignUpScreen() {
 
     setSubmitting(true);
     try {
-      await createAccount(email, password);
+      const result = await createAccount(email, password);
       router.replace({
         pathname: '/verify-email',
         params: {
+          verificationEmailSent: String(result.verificationEmailSent),
           next: challengeInvite
             ? `challenge:${challengeInvite}`
             : gymScanContinuation

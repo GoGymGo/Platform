@@ -72,8 +72,11 @@ export function getAuthErrorMessage(error: unknown) {
     'auth/popup-blocked': 'THE SIGN-IN WINDOW WAS BLOCKED. ALLOW POPUPS AND TRY AGAIN.',
     'auth/popup-closed-by-user': 'SIGN-IN WAS CANCELED.',
     'auth/too-many-requests': 'TOO MANY ATTEMPTS. WAIT A MOMENT AND TRY AGAIN.',
+    'auth/id-token-revoked': 'YOUR SESSION EXPIRED. SIGN IN AGAIN.',
+    'auth/invalid-user-token': 'YOUR SESSION EXPIRED. SIGN IN AGAIN.',
     'auth/user-disabled': 'THIS ACCOUNT HAS BEEN DISABLED.',
     'auth/user-not-found': 'EMAIL OR PASSWORD IS INCORRECT.',
+    'auth/user-token-expired': 'YOUR SESSION EXPIRED. SIGN IN AGAIN.',
     'auth/weak-password': 'CHOOSE A STRONGER PASSWORD.',
     ERR_REQUEST_CANCELED: 'SIGN-IN WAS CANCELED.',
     SIGN_IN_CANCELLED: 'SIGN-IN WAS CANCELED.'
@@ -88,6 +91,16 @@ export function getAuthErrorMessage(error: unknown) {
   }
 
   return 'AUTHENTICATION COULD NOT BE COMPLETED. TRY AGAIN.';
+}
+
+export function shouldClearAuthSession(error: unknown) {
+  return [
+    'auth/id-token-revoked',
+    'auth/invalid-user-token',
+    'auth/user-disabled',
+    'auth/user-not-found',
+    'auth/user-token-expired'
+  ].includes(getErrorCode(error) ?? '');
 }
 
 function compactErrors(errors: AuthFormErrors): AuthFormErrors {

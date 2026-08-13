@@ -6,12 +6,21 @@ import {
   type UserCredential
 } from 'firebase/auth';
 
-import { isAppleAuthEnabled, isGoogleAuthEnabled } from '@/config/firebase';
+import {
+  googleWebClientId,
+  isAppleAuthEnabled,
+  isFirebaseConfigured,
+  isGoogleAuthEnabled
+} from '@/config/firebase';
+import { resolveSocialProviderAvailability } from '@/domain/socialAuthAvailability';
 
-export const socialProviderAvailability = {
-  apple: isAppleAuthEnabled,
-  google: isGoogleAuthEnabled
-} as const;
+export const socialProviderAvailability = resolveSocialProviderAvailability({
+  appleEnabled: isAppleAuthEnabled,
+  firebaseConfigured: isFirebaseConfigured,
+  googleEnabled: isGoogleAuthEnabled,
+  googleWebClientId,
+  platform: 'web'
+});
 
 export function signInWithGoogleProvider(auth: Auth) {
   const provider = new GoogleAuthProvider();

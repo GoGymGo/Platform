@@ -166,6 +166,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
       database.connection,
     );
     operatorUserId = operator.id;
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', operatorUserId)
+      .executeTakeFirstOrThrow();
     await seedAccountLegalDocuments();
   });
 

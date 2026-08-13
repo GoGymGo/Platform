@@ -33,6 +33,7 @@ jobs:
           cache-dependency-path: package-lock.json
           node-version: 24
       - run: npm ci --ignore-scripts
+      - if: github.event_name == 'schedule'
+        run: npm run audit:dependencies
       - run: npm run check --workspace @gogymgo/admin
       - run: npm run audit:production-bundle --workspace @gogymgo/admin
-      - run: npm run audit:dependencies --workspace @gogymgo/admin

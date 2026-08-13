@@ -26,5 +26,6 @@ file under `docs/change-plans/` and explain why the coordination is indivisible.
 - [ ] I am authorized to submit this work under GoGymGo's applicable confidentiality and intellectual-property terms.
 - [ ] No environment file, credential, database dump, Terraform state, deployment archive or generated production bundle is included.
 - [ ] OpenAPI contracts were regenerated when required.
+- [ ] Dependency changes pass the central audit and do not extend a temporary exception without reassessment.
 - [ ] Database changes are forward-only and operationally documented.
 - [ ] Production deployment remains a manual, environment-gated action.

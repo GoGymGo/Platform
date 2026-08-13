@@ -30,8 +30,9 @@ jobs:
       - run: npm run contracts:check
       - run: npm run audit:contract --workspace @gogymgo/api
       - run: npm run audit:api-routes --workspace @gogymgo/member-app
-      - run: node --test tooling/architecture-policy.test.mjs tooling/change-scope-policy.test.mjs
+      - run: node --test tooling/architecture-policy.test.mjs tooling/change-scope-policy.test.mjs tooling/dependency-risk-policy.test.mjs
       - run: node tooling/architecture-policy.mjs
+      - run: npm run audit:dependencies
       - if: github.event_name == 'pull_request'
         run: node tooling/change-scope-policy.mjs "${{ github.event.pull_request.base.sha }}"
       - run: node --test tooling/deployment-source-policy.test.mjs

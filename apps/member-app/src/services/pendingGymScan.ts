@@ -177,6 +177,25 @@ export async function clearPendingGymScan(
   notifyPendingGymScan(null);
 }
 
+export async function clearPendingGymScanSession(
+  dependencies: PendingGymScanDependencies = {}
+) {
+  const storage = dependencies.storage ?? AsyncStorage;
+  const pending = await readPendingGymScan({ ...dependencies, storage });
+  if (!pending) {
+    notifyPendingGymScan(null);
+    return null;
+  }
+
+  const withoutActiveSession = { ...pending, activeSession: null };
+  await storage.setItem(
+    pendingGymScanStorageKey,
+    JSON.stringify(withoutActiveSession)
+  );
+  notifyPendingGymScan(withoutActiveSession);
+  return withoutActiveSession;
+}
+
 function notifyPendingGymScan(pending: PendingGymScan | null) {
   for (const listener of pendingGymScanListeners) {
     listener(pending);

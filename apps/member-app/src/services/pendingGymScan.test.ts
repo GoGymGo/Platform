@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  clearPendingGymScanSession,
   pendingGymScanMaxAgeMs,
   readPendingGymScan,
   rememberCompetitionGymAccess,
@@ -202,5 +203,44 @@ describe('pending gym scan storage', () => {
     assert.equal(stored?.activeSession, null);
     assert.equal(stored?.competitionId, 'competition-1');
     assert.equal(stored?.credential, credential);
+  });
+
+  it('clears a cancelled workout while preserving enrolled gym access', async () => {
+    const storage = createMemoryStorage();
+    const dependencies = { now: () => startedAt, storage };
+    await rememberCompetitionGymAccess(
+      {
+        competitionId: 'competition-1',
+        credential,
+        credentialValidUntil: '2026-10-01T07:00:00.000Z'
+      },
+      dependencies
+    );
+    await rememberGymScanResult(
+      credential,
+      {
+        credentialVersion: 1,
+        expiresAt: '2026-09-01T21:00:00.000Z',
+        gymLocationId: 'gym-1',
+        gymName: 'SkyGate',
+        minimumCompleteAt: '2026-09-01T17:30:00.000Z',
+        outcome: 'started',
+        rejectionReason: null,
+        remainingSeconds: 1800,
+        serverTimestamp: '2026-09-01T17:00:00.000Z',
+        sessionId: 'session-1',
+        startedAt: '2026-09-01T17:00:00.000Z'
+      },
+      dependencies
+    );
+
+    const stored = await clearPendingGymScanSession(dependencies);
+    assert.equal(stored?.activeSession, null);
+    assert.equal(stored?.competitionId, 'competition-1');
+    assert.equal(stored?.credential, credential);
+    assert.equal(
+      (await readPendingGymScan(dependencies))?.credentialValidUntil,
+      '2026-10-01T07:00:00.000Z'
+    );
   });
 });

@@ -7,6 +7,7 @@ import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { AdminAuthorizationService } from '../src/modules/operator/admin-authorization.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
+import { SessionsService } from '../src/modules/sessions/sessions.service';
 import {
   createTestConfig,
   type MigratedPostgisTestDatabase,
@@ -35,6 +36,7 @@ describeWithDatabase('connected static QR pilot', () => {
   let database: DatabaseService;
   let migrated: MigratedPostgisTestDatabase;
   let gyms: GymsService;
+  let sessions: SessionsService;
   let competitionId: string;
   let gymId: string;
   let regionId: string;
@@ -52,6 +54,12 @@ describeWithDatabase('connected static QR pilot', () => {
       new LedgerService(),
       profiles,
       new AdminAuthorizationService(profiles),
+    );
+    sessions = new SessionsService(
+      database,
+      idempotency,
+      new LedgerService(),
+      profiles,
     );
     userId = (await profiles.ensureUser(principal, database.connection)).id;
     gymId = await seedPilot();
@@ -90,6 +98,54 @@ describeWithDatabase('connected static QR pilot', () => {
     expect(first.outcome).toBe('started');
     expect(replay).toEqual(first);
     await expect(scanEventCount()).resolves.toBe(1);
+  });
+
+  it('cancels a started static QR workout and releases the active-session slot', async () => {
+    const started = await gyms.scan(
+      principal,
+      'member-cancel-start',
+      scanRequest('member-cancel-start-event'),
+    );
+
+    const cancelled = await sessions.cancel(
+      principal,
+      started.sessionId!,
+      'member-cancel-session',
+    );
+    expect(cancelled).toMatchObject({
+      completedAt: expect.any(String),
+      id: started.sessionId,
+      status: 'cancelled',
+    });
+    await expect(
+      sessions.cancel(principal, started.sessionId!, 'member-cancel-session'),
+    ).resolves.toEqual(cancelled);
+    await expect(
+      database.connection
+        .selectFrom('entry_ledger')
+        .select('id')
+        .where('user_id', '=', userId)
+        .execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      database.connection
+        .selectFrom('competition_progress')
+        .select(['category_score', 'prize_draw_entries', 'verified_days'])
+        .where('competition_id', '=', competitionId)
+        .where('user_id', '=', userId)
+        .executeTakeFirstOrThrow(),
+    ).resolves.toMatchObject({
+      category_score: 0,
+      prize_draw_entries: 1,
+      verified_days: 0,
+    });
+    await expect(
+      gyms.scan(
+        principal,
+        'member-cancel-restart',
+        scanRequest('member-cancel-restart-event'),
+      ),
+    ).resolves.toMatchObject({ outcome: 'started' });
   });
 
   it('starts from the enrolled gym with fresh location and no QR credential', async () => {

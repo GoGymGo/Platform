@@ -240,6 +240,77 @@ describe("critical member product journeys", () => {
       ],
     );
   });
+
+  it("closes a cancelled static QR workout through the authoritative session contract", async () => {
+    const requests: RecordedRequest[] = [];
+    const api: ApiClient = {
+      request: async <TResponse, TBody = never>(
+        path: string,
+        options?: ApiRequestOptions<TBody>,
+      ) => {
+        requests.push(recordRequest(path, options));
+        if (path === "/v1/gym-scans") {
+          return {
+            credentialVersion: 1,
+            expiresAt: "2026-08-12T17:00:00.000Z",
+            gymLocationId: "80000000-0000-4000-8000-000000000001",
+            gymName: "Partner Gym",
+            minimumCompleteAt: "2026-08-12T13:30:00.000Z",
+            outcome: "started",
+            rejectionReason: null,
+            remainingSeconds: 1800,
+            serverTimestamp: "2026-08-12T13:00:00.000Z",
+            sessionId,
+            startedAt: "2026-08-12T13:00:00.000Z",
+          } as TResponse;
+        }
+        if (path === `/v1/sessions/${sessionId}/cancel`) {
+          return {
+            completedAt: "2026-08-12T13:05:00.000Z",
+            competitionId,
+            eligibleDate: "2026-08-12",
+            id: sessionId,
+            policyVersion: "rules-v1",
+            startedAt: "2026-08-12T13:00:00.000Z",
+            status: "cancelled",
+          } as TResponse;
+        }
+        throw new Error(`Unexpected cancellation request: ${path}`);
+      },
+    };
+    const scans = createGymScanRepository(api);
+    const sessions = createWorkoutSessionRepository("api", api);
+
+    const started = await scans.scan({
+      accuracyMeters: 8,
+      credential: gymCredential,
+      eventId: "90000000-0000-4000-8000-000000000003",
+      latitude: 49.2827,
+      longitude: -123.1207,
+    });
+    const cancelled = await sessions.cancelSession(started.sessionId!);
+
+    assert.equal(cancelled.status, "cancelled");
+    assert.deepEqual(
+      requests.map(({ idempotencyKey, method, path }) => ({
+        idempotencyKey,
+        method,
+        path,
+      })),
+      [
+        {
+          idempotencyKey: "gym-scan-90000000-0000-4000-8000-000000000003",
+          method: "POST",
+          path: "/v1/gym-scans",
+        },
+        {
+          idempotencyKey: `session-cancel-${sessionId}`,
+          method: "POST",
+          path: `/v1/sessions/${sessionId}/cancel`,
+        },
+      ],
+    );
+  });
 });
 
 function createJourneyApi(requests: RecordedRequest[]): ApiClient {

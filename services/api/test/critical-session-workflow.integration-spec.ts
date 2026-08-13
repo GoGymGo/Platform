@@ -48,6 +48,15 @@ const pairingPrincipal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 
+const contestPinningPrincipal: AuthenticatedPrincipal = {
+  email: 'contest-pinning-user@integration.test',
+  emailVerified: true,
+  firebaseUid: 'contest-pinning-user',
+  roles: ['user'],
+  signInProvider: 'password',
+  tokenIssuedAt: 1,
+};
+
 const operatorPrincipal: AuthenticatedPrincipal = {
   email: 'session-operator@integration.test',
   emailVerified: true,
@@ -298,7 +307,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   });
 
   it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {
-    const fixture = await seedRegistrationCompetition();
+    const fixture = await seedRegistrationCompetition(contestPinningPrincipal);
     const source = await database.connection
       .selectFrom('competitions as competition')
       .innerJoin(
@@ -374,20 +383,23 @@ describeWithDatabase('critical session and ledger workflow', () => {
       .execute();
 
     await expect(
-      competitions.resolveGymQrCompetition(userPrincipal, otherCredential),
+      competitions.resolveGymQrCompetition(
+        contestPinningPrincipal,
+        otherCredential,
+      ),
     ).resolves.toMatchObject({
       id: otherCompetition.id,
       name: 'Later Contest At Same Gym',
     });
     await expect(
       competitions.resolveGymQrCompetition(
-        userPrincipal,
+        contestPinningPrincipal,
         fixture.gymPresence.credential,
       ),
     ).resolves.toMatchObject({ id: fixture.competitionId });
     await expect(
       competitions.enroll(
-        userPrincipal,
+        contestPinningPrincipal,
         otherCompetition.id,
         'wrong-contest-poster-enrollment',
         {
@@ -404,7 +416,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     });
 
     await competitions.enroll(
-      userPrincipal,
+      contestPinningPrincipal,
       otherCompetition.id,
       'existing-later-contest-enrollment',
       {
@@ -419,20 +431,20 @@ describeWithDatabase('critical session and ledger workflow', () => {
         rulesAccepted: true,
       },
     );
-    await expect(competitions.getCurrent(userPrincipal)).resolves.toMatchObject(
-      {
-        id: otherCompetition.id,
-      },
-    );
+    await expect(
+      competitions.getCurrent(contestPinningPrincipal),
+    ).resolves.toMatchObject({
+      id: otherCompetition.id,
+    });
     await expect(
       competitions.resolveGymQrCompetition(
-        userPrincipal,
+        contestPinningPrincipal,
         fixture.gymPresence.credential,
       ),
     ).resolves.toMatchObject({ id: fixture.competitionId });
 
     await competitions.enroll(
-      userPrincipal,
+      contestPinningPrincipal,
       fixture.competitionId,
       'scanned-earlier-contest-enrollment',
       {
@@ -445,7 +457,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       },
     );
     await expect(
-      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+      competitions.getCurrentEnrollment(
+        contestPinningPrincipal,
+        fixture.competitionId,
+      ),
     ).resolves.toMatchObject({ competitionId: fixture.competitionId });
 
     const activeEnrollment = await migrated.pool.query<{
@@ -471,7 +486,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await expect(
       competitions.withdrawEnrollment(
-        userPrincipal,
+        contestPinningPrincipal,
         fixture.competitionId,
         'withdraw-scanned-earlier-contest',
       ),
@@ -480,7 +495,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       status: 'withdrawn',
     });
     await expect(
-      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+      competitions.getCurrentEnrollment(
+        contestPinningPrincipal,
+        fixture.competitionId,
+      ),
     ).resolves.toBeNull();
     const cancelledSession = await migrated.pool.query<{ status: string }>(
       `SELECT status FROM workout_sessions WHERE id = $1`,
@@ -1263,12 +1281,14 @@ describeWithDatabase('critical session and ledger workflow', () => {
     return Number(result.rows[0].count);
   }
 
-  async function seedRegistrationCompetition(): Promise<CompetitionFixture> {
+  async function seedRegistrationCompetition(
+    principal: AuthenticatedPrincipal = userPrincipal,
+  ): Promise<CompetitionFixture> {
     const now = Date.now();
     const fixtureSequence = ++registrationFixtureSequence;
-    const user = await profiles.ensureUser(userPrincipal, database.connection);
+    const user = await profiles.ensureUser(principal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(
-      userPrincipal,
+      principal,
       'critical-session-legal-receipt',
     );
     const region = await migrated.pool.query<{ id: string }>(

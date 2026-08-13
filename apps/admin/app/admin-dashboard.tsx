@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveFeatureCapabilities } from "@gogymgo/contracts/feature-capabilities";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
@@ -202,7 +203,9 @@ const mobilePrimarySections = new Set<AdminSection>([
   "competitions",
   "operations",
 ]);
-const creatorFeaturesEnabled = false;
+const { creatorFeaturesEnabled } = resolveFeatureCapabilities({
+  creatorFeaturesEnabled: process.env.NEXT_PUBLIC_ENABLE_CREATOR_FEATURES,
+});
 
 const emptyPilotData: PilotData = {
   auditEvents: [],

@@ -1,4 +1,7 @@
-import { buildAutomaticWeeklyChallengePairs } from './weekly-challenge-pairing';
+import {
+  buildAutomaticWeeklyChallengePairingPlan,
+  buildAutomaticWeeklyChallengePairs,
+} from './weekly-challenge-pairing';
 
 describe('automatic Weekly Challenge pairing', () => {
   it('pairs two entrants inside every Weekly Goal selection from 1 through 7', () => {
@@ -48,5 +51,56 @@ describe('automatic Weekly Challenge pairing', () => {
       { goalDays: 7, userAId: 'seven-a', userBId: 'seven-b' },
       { goalDays: 7, userAId: 'seven-c', userBId: null },
     ]);
+  });
+
+  it('matches a newly available entrant to the compatible user already waiting', () => {
+    expect(
+      buildAutomaticWeeklyChallengePairingPlan(
+        [
+          { goalDays: 1, userId: 'player-one' },
+          { goalDays: 1, userId: 'player-two' },
+          { goalDays: 2, userId: 'different-goal' },
+        ],
+        [
+          { id: 'waiting-one', userId: 'player-one' },
+          { id: 'waiting-different', userId: 'different-goal' },
+        ],
+      ),
+    ).toEqual({
+      create: [],
+      deleteMatchIds: [],
+      matchWaitingUsers: [
+        {
+          matchId: 'waiting-one',
+          userAId: 'player-one',
+          userBId: 'player-two',
+        },
+      ],
+    });
+  });
+
+  it('repairs two compatible waiting rows into one match', () => {
+    expect(
+      buildAutomaticWeeklyChallengePairingPlan(
+        [
+          { goalDays: 7, userId: 'player-one' },
+          { goalDays: 7, userId: 'player-two' },
+        ],
+        [
+          { id: 'waiting-one', userId: 'player-one' },
+          { id: 'waiting-two', userId: 'player-two' },
+        ],
+      ),
+    ).toEqual({
+      create: [],
+      deleteMatchIds: ['waiting-two'],
+      matchWaitingUsers: [
+        {
+          matchId: 'waiting-one',
+          userAId: 'player-one',
+          userBId: 'player-two',
+        },
+      ],
+    });
   });
 });

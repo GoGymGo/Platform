@@ -32,7 +32,9 @@ import {
   availableRegistrationGoalDays,
   competitionRegistrationAvailability,
 } from './competition-registration';
+import { CompetitionLifecycleService } from './competition-lifecycle.service';
 import { parseCompetitionRules } from './competition-rules';
+import { CompetitionScoringService } from './competition-scoring.service';
 import type {
   CompetitionMatchResponseDto,
   CompetitionResponseDto,
@@ -89,6 +91,8 @@ export class CompetitionsService {
     private readonly ledger: LedgerService,
     private readonly legalDocuments: LegalDocumentsService,
     private readonly profiles: ProfilesService,
+    private readonly lifecycle: CompetitionLifecycleService,
+    private readonly scoring: CompetitionScoringService,
   ) {}
 
   getCurrent(
@@ -113,12 +117,13 @@ export class CompetitionsService {
     principal: AuthenticatedPrincipal,
     query: CurrentCompetitionQueryDto,
     credentialHash?: string,
+    synchronizeDueStart = true,
   ): Promise<CompetitionResponseDto | null> {
-    return this.database.connection
+    const now = new Date();
+    const competition = await this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        const now = new Date();
         let competitionQuery = transaction
           .selectFrom('region_verifications as verification')
           .innerJoin(
@@ -258,6 +263,22 @@ export class CompetitionsService {
           status: competition.status,
         };
       });
+
+    if (
+      synchronizeDueStart &&
+      competition?.status === 'registration' &&
+      new Date(competition.startsAt) <= now
+    ) {
+      await this.lifecycle.processDueStart(competition.id, now);
+      return this.findCurrentCompetition(
+        principal,
+        query,
+        credentialHash,
+        false,
+      );
+    }
+
+    return competition;
   }
 
   async getCurrentEnrollment(
@@ -640,6 +661,12 @@ export class CompetitionsService {
           userId: user.id,
           verifiedDaysDelta: 0,
         });
+        await this.scoring.ensureWeeklyChallengeMatches(
+          transaction,
+          competition.id,
+          competition.month_key,
+          now,
+        );
 
         return {
           competitionId: competition.id,

@@ -10,6 +10,7 @@ import {
   getCompetitionRegionDateKey,
   getCurrentWeekProgress,
   getWeeklyChallengeDisplayStatus,
+  hasCompetitionStarted,
   isCompetitionBonusDay,
   type CompetitionMatch,
   type CompetitionPeriodIndex
@@ -25,6 +26,27 @@ describe('monthly competition scoring', () => {
       ),
       'September 1, 2026 at 12:00 a.m. PDT'
     );
+    assert.equal(
+      formatCompetitionOpeningDateTime(
+        '2026-09-01T07:00:30.000Z',
+        'America/Vancouver'
+      ),
+      'September 1, 2026 at 12:00:30 a.m. PDT'
+    );
+  });
+
+  it('opens workouts at the exact admin-configured instant', () => {
+    const startsAt = '2026-08-13T00:06:30.000Z';
+
+    assert.equal(
+      hasCompetitionStarted(startsAt, Date.parse('2026-08-13T00:06:29.999Z')),
+      false
+    );
+    assert.equal(
+      hasCompetitionStarted(startsAt, Date.parse('2026-08-13T00:06:30.000Z')),
+      true
+    );
+    assert.equal(hasCompetitionStarted('not-a-date'), false);
   });
 
   it('creates four seven-day periods and separate leftover bonus days', () => {

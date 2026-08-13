@@ -45,6 +45,7 @@ import {
   isWinnersBannerVisible,
   shouldAutoPresentWinnersCircle
 } from '@/domain/winnersCircle';
+import { useCompetitionStart } from '@/hooks/useCompetitionStart';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
@@ -136,6 +137,9 @@ export default function HomeScreen() {
         competitionTimeZone
       )
     : null;
+  const competitionStartReached = useCompetitionStart(
+    currentCompetition?.startsAt
+  );
   const [competitionYear, competitionMonth] = competition.competitionMonthKey.split('-').map(Number);
   const competitionStartMonth = new Intl.DateTimeFormat('en-CA', { month: 'long' }).format(
     new Date(competitionYear, competitionMonth - 1, 1, 12)
@@ -216,7 +220,9 @@ export default function HomeScreen() {
     }
   ];
 
-  const workoutAccessMode = getWorkoutAccessMode(competitionNotStarted);
+  const workoutAccessMode = getWorkoutAccessMode(
+    currentCompetition ? !competitionStartReached : competitionNotStarted
+  );
   const workoutUnavailable = workoutAccessMode === 'upcoming';
   const workoutEntryTarget = getWorkoutEntryTarget({
     activeSession: activeSession !== null,
@@ -705,9 +711,7 @@ export default function HomeScreen() {
             </TerminalText>
           ) : !activeSession && competitionOpeningDateTime ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              {workoutUnavailable
-                ? `First workout recording opens ${competitionOpeningDateTime}.`
-                : `Workout recording is open now. It opened ${competitionOpeningDateTime}.`}
+              {`Start your workout at ${competitionOpeningDateTime}.`}
             </TerminalText>
           ) : null}
           {!activeSession && !setupRequired ? (

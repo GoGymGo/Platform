@@ -24,7 +24,7 @@ import {
   parseCompetitionRules,
   type CompetitionRules,
 } from './competition-rules';
-import { buildAutomaticWeeklyChallengePairs } from './weekly-challenge-pairing';
+import { buildAutomaticWeeklyChallengePairingPlan } from './weekly-challenge-pairing';
 
 interface ScoringCompetition {
   id: string;
@@ -193,7 +193,7 @@ export class CompetitionScoringService {
     }
     const existingMatches = await transaction
       .selectFrom('competition_matches')
-      .select(['period_index', 'user_a_id', 'user_b_id'])
+      .select(['id', 'period_index', 'status', 'user_a_id', 'user_b_id'])
       .where('competition_id', '=', competitionId)
       .where(
         'period_index',
@@ -201,25 +201,58 @@ export class CompetitionScoringService {
         periods.map((period) => period.index),
       )
       .execute();
-    let created = 0;
+    let changes = 0;
 
     for (const period of periods) {
       const assignedUserIds = new Set<string>();
-      for (const match of existingMatches) {
-        if (match.period_index !== period.index) {
+      const periodMatches = existingMatches.filter(
+        (match) => match.period_index === period.index,
+      );
+      const waitingMatches = periodMatches
+        .filter(
+          (match) => match.status === 'searching' && match.user_b_id === null,
+        )
+        .map((match) => ({ id: match.id, userId: match.user_a_id }));
+      for (const match of periodMatches) {
+        if (match.status === 'searching' && match.user_b_id === null) {
           continue;
         }
         assignedUserIds.add(match.user_a_id);
-        if (match.user_b_id) {
-          assignedUserIds.add(match.user_b_id);
-        }
+        if (match.user_b_id) assignedUserIds.add(match.user_b_id);
       }
 
-      const automaticPairs = buildAutomaticWeeklyChallengePairs(
+      const pairingPlan = buildAutomaticWeeklyChallengePairingPlan(
         enrollments,
+        waitingMatches,
         assignedUserIds,
       );
-      for (const pair of automaticPairs) {
+      const affectedUserIds = new Set<string>();
+
+      if (pairingPlan.deleteMatchIds.length > 0) {
+        await transaction
+          .deleteFrom('competition_matches')
+          .where('id', 'in', pairingPlan.deleteMatchIds)
+          .where('status', '=', 'searching')
+          .where('user_b_id', 'is', null)
+          .execute();
+        changes += pairingPlan.deleteMatchIds.length;
+      }
+
+      for (const update of pairingPlan.matchWaitingUsers) {
+        await transaction
+          .updateTable('competition_matches')
+          .set({ status: 'matched', user_b_id: update.userBId })
+          .where('id', '=', update.matchId)
+          .where('status', '=', 'searching')
+          .where('user_a_id', '=', update.userAId)
+          .where('user_b_id', 'is', null)
+          .executeTakeFirstOrThrow();
+        affectedUserIds.add(update.userAId);
+        affectedUserIds.add(update.userBId);
+        changes += 1;
+      }
+
+      for (const pair of pairingPlan.create) {
         await transaction
           .insertInto('competition_matches')
           .values({
@@ -235,19 +268,30 @@ export class CompetitionScoringService {
             user_b_id: pair.userBId,
           })
           .executeTakeFirstOrThrow();
-        created += 1;
+        affectedUserIds.add(pair.userAId);
+        if (pair.userBId) affectedUserIds.add(pair.userBId);
+        changes += 1;
       }
 
-      await transaction
-        .updateTable('weekly_challenge_requests')
-        .set({ responded_at: now, status: 'cancelled' })
-        .where('competition_id', '=', competitionId)
-        .where('period_index', '=', period.index)
-        .where('status', '=', 'pending')
-        .execute();
+      if (affectedUserIds.size > 0) {
+        const userIds = [...affectedUserIds];
+        await transaction
+          .updateTable('weekly_challenge_requests')
+          .set({ responded_at: now, status: 'cancelled' })
+          .where('competition_id', '=', competitionId)
+          .where('period_index', '=', period.index)
+          .where('status', '=', 'pending')
+          .where((expression) =>
+            expression.or([
+              expression('requester_user_id', 'in', userIds),
+              expression('recipient_user_id', 'in', userIds),
+            ]),
+          )
+          .execute();
+      }
     }
 
-    return created;
+    return changes;
   }
 
   private async settlePeriod(

@@ -74,7 +74,21 @@ export function useCurrentCompetition(
       'current-competition',
       gymQrCredential ? `gym-qr-${gymQrScanKey ?? 'pending'}` : (expectedMonthKey ?? 'published'),
       regionCode
-    ]
+    ],
+    refetchInterval: (query) => {
+      const competition = query.state.data;
+      if (competition?.status !== 'registration') return false;
+
+      const startsAt = Date.parse(competition.startsAt);
+      if (!Number.isFinite(startsAt)) return false;
+
+      const millisecondsUntilStart = startsAt - Date.now();
+      if (millisecondsUntilStart <= 0) return 250;
+
+      return Math.min(millisecondsUntilStart + 25, 2_147_483_647);
+    },
+    refetchOnMount: 'always',
+    staleTime: 0
   });
 }
 

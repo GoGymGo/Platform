@@ -309,7 +309,7 @@ function auditFlowReliability() {
       'resume-completed',
       'OBJECTIVE',
       'ACHIEVED THIS WEEK',
-      'First workout recording opens',
+      'Start your workout at',
       'formatCompetitionOpeningDateTime',
       'WINNERS FROM LAST CONTEST',
       'isWinnersBannerVisible'

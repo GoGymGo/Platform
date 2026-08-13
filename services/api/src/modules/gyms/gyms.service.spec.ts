@@ -26,6 +26,11 @@ interface GymsServiceInternals {
     },
     qrPayload: string,
     credentialVersion: number,
+    reward: {
+      inventoryTotal: number;
+      sponsorName: string;
+      title: string;
+    } | null,
   ): Promise<string>;
   gymAuditState(gym: GymLocationResponseDto): JsonObject;
   mapFulfillment(fulfillment: {
@@ -264,6 +269,11 @@ describe('gym service privacy-safe presentation helpers', () => {
       },
       'https://app.gogymgo.com/scan?credential=opaque-test-value',
       7,
+      {
+        inventoryTotal: 5,
+        sponsorName: 'Island Health & Fitness',
+        title: '$100 Training Package',
+      },
     );
 
     expect(poster).toContain('aria-label="GoGymGo logo"');
@@ -271,6 +281,17 @@ describe('gym service privacy-safe presentation helpers', () => {
     expect(poster).not.toContain('<svg x="72" y="52"');
     expect(poster).toContain('valid only for Cameron &amp; Friends');
     expect(poster).toContain('Cameron &amp; Friends');
+    expect(poster).toContain('SPONSORED BY ISLAND HEALTH &amp; FITNESS');
+    expect(poster).toContain('$100 TRAINING PACKAGE  |  5 WINNERS');
+    expect(poster).toContain(
+      '<text x="500" y="184" text-anchor="middle" fill="#FFE066"',
+    );
+    expect(poster).toContain(
+      '<text x="500" y="226" text-anchor="middle" fill="#9FF3F5"',
+    );
+    expect(poster).toContain(
+      '<text x="500" y="270" text-anchor="middle" fill="#FF2D9B"',
+    );
     expect(poster).toContain(
       'SCAN ONCE  &gt;  LOCATION IN  &gt;  TRAIN 30+ MIN  &gt;  LOCATION OUT',
     );

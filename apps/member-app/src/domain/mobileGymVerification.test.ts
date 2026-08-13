@@ -7,12 +7,12 @@ import {
   isMobileWebGymVerificationDevice
 } from './mobileGymVerification';
 
-test('desktop browsers do not expose gym verification', () => {
+test('desktop browsers expose the browser-pilot gym verification flow', () => {
   assert.equal(
     isMobileWebGymVerificationDevice({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0'
     }),
-    false
+    true
   );
 });
 
@@ -47,7 +47,7 @@ test('tablet browsers expose gym verification', () => {
   );
 });
 
-test('desktop authentication opens Home without the mobile resume flow', () => {
+test('an unavailable browser runtime opens Home without the verification resume flow', () => {
   assert.equal(getAuthenticatedHomeRoute(false), '/home');
   assert.deepEqual(
     getGymVerificationHomeState({
@@ -68,7 +68,7 @@ test('desktop authentication opens Home without the mobile resume flow', () => {
   );
 });
 
-test('desktop keeps contest status visible without exposing workout actions', () => {
+test('an unavailable browser runtime keeps contest status visible without workout actions', () => {
   assert.deepEqual(
     getGymVerificationHomeState({
       mobileGymVerificationAvailable: false,
@@ -88,7 +88,7 @@ test('desktop keeps contest status visible without exposing workout actions', ()
   );
 });
 
-test('phone and tablet authentication preserves setup, resume and workout actions', () => {
+test('an available verification runtime preserves setup, resume and workout actions', () => {
   assert.equal(getAuthenticatedHomeRoute(true), '/home?resume=1');
   assert.deepEqual(
     getGymVerificationHomeState({
@@ -109,7 +109,7 @@ test('phone and tablet authentication preserves setup, resume and workout action
   );
 });
 
-test('desktop reports background contest status without blocking the page', () => {
+test('an unavailable browser runtime reports contest status without blocking the page', () => {
   assert.deepEqual(
     getGymVerificationHomeState({
       mobileGymVerificationAvailable: false,

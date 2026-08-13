@@ -200,7 +200,8 @@ export function useCategoryLeaderboard(goal: GoalCategory) {
 export function useCompetitionMatches(
   competitionMonthKey: string,
   weeklyGoal: number,
-  regionCode: string
+  regionCode: string,
+  competitionId?: string | null
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
@@ -208,9 +209,16 @@ export function useCompetitionMatches(
     queryFn: () => source.getCompetitionMatches(
       competitionMonthKey,
       weeklyGoal,
-      regionCode
+      regionCode,
+      competitionId
     ),
-    queryKey: ['competition-matches', competitionMonthKey, weeklyGoal, regionCode]
+    queryKey: [
+      'competition-matches',
+      competitionMonthKey,
+      weeklyGoal,
+      regionCode,
+      competitionId ?? null
+    ]
   });
 }
 

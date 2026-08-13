@@ -16,11 +16,7 @@ export function isMobileWebGymVerificationDevice(
   runtime: MobileWebRuntime | null = readBrowserRuntime()
 ) {
   if (!runtime) return false;
-  const userAgent = runtime.userAgent ?? '';
-  return (
-    /Android|iPhone|iPad|iPod|IEMobile|Mobile|Opera Mini/i.test(userAgent) ||
-    (/Macintosh/i.test(userAgent) && (runtime.maxTouchPoints ?? 0) > 1)
-  );
+  return Boolean(runtime.userAgent?.trim());
 }
 
 export function getAuthenticatedHomeRoute(

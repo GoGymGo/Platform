@@ -77,6 +77,29 @@ describe('app data boundary', () => {
     assert.equal(streaks?.streaks.weekly, 4);
   });
 
+  it('pins Weekly Challenge matches to the authoritative enrolled contest', async () => {
+    let requestedPath = '';
+    const api: ApiClient = {
+      request: <TResponse>(path: string) => {
+        requestedPath = path;
+        return Promise.resolve([]) as Promise<TResponse>;
+      }
+    };
+
+    await createAppDataSource('api', api).getCompetitionMatches(
+      '2026-08',
+      1,
+      'vancouver-bc',
+      '40000000-0000-4000-8000-000000000001'
+    );
+
+    assert.equal(
+      requestedPath,
+      '/v1/competitions/2026-08/matches?goal=1&region=vancouver-bc' +
+        '&competitionId=40000000-0000-4000-8000-000000000001'
+    );
+  });
+
   it('loads participant results from the authenticated API boundary', async () => {
     let requestedPath = '';
     let requestedOptions: ApiRequestOptions<never> | undefined;

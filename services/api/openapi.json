@@ -1348,6 +1348,12 @@
             "required": true,
             "in": "query",
             "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "competitionId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
           }
         ],
         "responses": {

@@ -9,13 +9,13 @@ import {
 } from './gymScanLocationSampling';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 
-it('limits web gym verification location to phones and tablets', () => {
+it('allows the browser pilot to verify location on desktop, phone, and tablet', () => {
   assert.equal(
     isMobileWebGymVerificationDevice({
       maxTouchPoints: 0,
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140'
     }),
-    false
+    true
   );
   assert.equal(
     isMobileWebGymVerificationDevice({

@@ -179,6 +179,7 @@ export class CompetitionsController {
       monthKey,
       query.goal,
       query.region,
+      query.competitionId,
     );
   }
 

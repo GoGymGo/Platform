@@ -12,6 +12,24 @@ export function getWorkoutEntryTarget({
   return registrationReady ? 'workout' : 'setup';
 }
 
+export function getWorkoutEntryLabel({
+  activeSession,
+  setupActionLabel,
+  setupRequired,
+  workoutUnavailable
+}: {
+  activeSession: boolean;
+  setupActionLabel: string;
+  setupRequired: boolean;
+  workoutUnavailable: boolean;
+}) {
+  if (setupRequired) return setupActionLabel;
+  if (activeSession) return 'WORKOUT IN PROGRESS';
+  return workoutUnavailable
+    ? 'VERIFIED WORKOUTS NOT YET OPEN'
+    : 'START WORKOUT';
+}
+
 export function getWorkoutAccessMode(
   competitionNotStarted: boolean
 ): WorkoutAccessMode {

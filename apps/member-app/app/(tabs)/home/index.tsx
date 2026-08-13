@@ -38,7 +38,11 @@ import {
   isMobileWebGymVerificationDevice
 } from '@/domain/mobileGymVerification';
 import { formatCompetitionOpeningDateTime } from '@/domain/competition';
-import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
+import {
+  getWorkoutAccessMode,
+  getWorkoutEntryLabel,
+  getWorkoutEntryTarget
+} from '@/domain/workoutAccess';
 import {
   getWinnersCirclePresentationKey,
   shouldAutoPresentWinnersCircle
@@ -226,6 +230,12 @@ export default function HomeScreen() {
     : '/qr-scanner';
   const setupRequired =
     workoutEntryTarget === 'setup' && !completedContestWithoutReplacement;
+  const workoutEntryLabel = getWorkoutEntryLabel({
+    activeSession: activeSession !== null,
+    setupActionLabel,
+    setupRequired,
+    workoutUnavailable
+  });
   const gymVerificationHome = getGymVerificationHomeState({
     mobileGymVerificationAvailable,
     resume,
@@ -650,13 +660,7 @@ export default function HomeScreen() {
           <>
           <CyberButtonPrimary
             disabled={!setupRequired && workoutUnavailable && !activeSession}
-            label={setupRequired
-              ? setupActionLabel
-              : activeSession
-               ? 'Return to workout'
-               : workoutUnavailable
-                 ? 'VERIFIED WORKOUTS NOT YET OPEN'
-                 : 'Start workout'}
+            label={workoutEntryLabel}
             onPress={() => {
               if (workoutEntryTarget === 'setup' && setupRoute) {
                 router.push(setupRoute as Href);

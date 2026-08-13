@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   getWorkoutAccessMode,
+  getWorkoutEntryLabel,
   getWorkoutEntryTarget,
   hasSessionCompetitionAccess,
   resolveSessionCompetitionMonthKey
@@ -22,6 +23,15 @@ describe('workout access policy', () => {
       activeSession: true,
       registrationReady: false
     }), 'active-session');
+  });
+
+  it('labels an active session as a workout in progress', () => {
+    assert.equal(getWorkoutEntryLabel({
+      activeSession: true,
+      setupActionLabel: 'CHOOSE YOUR WEEKLY GOAL',
+      setupRequired: false,
+      workoutUnavailable: false
+    }), 'WORKOUT IN PROGRESS');
   });
 
   it('keeps production sessions on the current competition month', () => {

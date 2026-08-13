@@ -11,7 +11,7 @@ on:
           - staging
           - production
       source_commit:
-        description: Full 40-character Git commit SHA to build and deploy
+        description: Merged main commit SHA to build and deploy
         required: true
         type: string
   workflow_call:
@@ -21,22 +21,42 @@ on:
         required: true
         type: string
       source_commit:
-        description: Full 40-character Git commit SHA to build and deploy
+        description: Merged main commit SHA to build and deploy
         required: true
         type: string
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 concurrency:
   group: member-web-deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
+  authorize_source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: read
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: main
+      - name: Authorize the reviewed main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tooling/deployment-source-policy.mjs "${{ inputs.source_commit }}"
+
   deploy:
+    needs: authorize_source
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     environment:
       name: ${{ inputs.environment }}
     env:

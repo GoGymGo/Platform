@@ -28,6 +28,7 @@ jobs:
       - run: npm run contracts:check
       - run: npm run audit:contract --workspace @gogymgo/api
       - run: npm run audit:api-routes --workspace @gogymgo/member-app
+      - run: node --test tooling/deployment-source-policy.test.mjs
       - run: npm run test:smoke:qr --workspace @gogymgo/api
         env:
           RUN_DATABASE_INTEGRATION: "true"

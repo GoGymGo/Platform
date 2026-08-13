@@ -11,7 +11,7 @@ on:
           - staging
           - production
       source_commit:
-        description: Full 40-character Git commit SHA to build and deploy
+        description: Merged main commit SHA to build and deploy
         required: true
         type: string
       scope:
@@ -24,19 +24,39 @@ on:
           - member-web
           - pilot-configuration
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 concurrency:
   group: gogymgo-deploy-${{ inputs.scope }}-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
+  authorize_source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: read
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: main
+      - name: Authorize the reviewed main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tooling/deployment-source-policy.mjs "${{ inputs.source_commit }}"
+
   deploy:
-    if: inputs.scope == 'platform'
+    needs: authorize_source
+    if: needs.authorize_source.result == 'success' && inputs.scope == 'platform'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
     environment:
       name: ${{ inputs.environment }}
     env:
@@ -397,16 +417,26 @@ jobs:
             "${API_URL}/v1/health/ready"
 
   member-web:
-    if: inputs.scope == 'member-web'
+    needs: authorize_source
+    if: needs.authorize_source.result == 'success' && inputs.scope == 'member-web'
+    permissions:
+      checks: read
+      contents: read
+      id-token: write
+      pull-requests: read
     uses: ./.github/workflows/member-web-deployment.yml
     with:
       environment: ${{ inputs.environment }}
       source_commit: ${{ inputs.source_commit }}
 
   pilot-configuration:
-    if: inputs.scope == 'pilot-configuration'
+    needs: authorize_source
+    if: needs.authorize_source.result == 'success' && inputs.scope == 'pilot-configuration'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     environment:
       name: ${{ inputs.environment }}
     env:

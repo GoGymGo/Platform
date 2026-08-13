@@ -950,7 +950,8 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
   const { data: competitionMatches = [] } = useCompetitionMatches(
     dataCompetitionMonthKey,
     effectiveWeeklyGoal,
-    competitionRegionCode
+    competitionRegionCode,
+    authoritativeProgress?.competitionId
   );
 
   const derived = useMemo(() => {

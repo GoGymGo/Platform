@@ -304,6 +304,36 @@ describeWithDatabase('critical session and ledger workflow', () => {
         user_b_id: secondUser.id,
       })),
     );
+
+    await database.connection
+      .updateTable('competition_matches')
+      .set({ status: 'searching', user_b_id: null })
+      .where('competition_id', '=', fixture.competitionId)
+      .execute();
+    const region = await database.connection
+      .selectFrom('competitions as competition')
+      .innerJoin(
+        'region_policies as policy',
+        'policy.id',
+        'competition.region_policy_id',
+      )
+      .select('policy.code')
+      .where('competition.id', '=', fixture.competitionId)
+      .executeTakeFirstOrThrow();
+    const repairedMatches = await competitions.getMatches(
+      pairingPrincipal,
+      '2030-01',
+      3,
+      region.code,
+      fixture.competitionId,
+    );
+    expect(repairedMatches).toHaveLength(4);
+    expect(repairedMatches.map(({ availability }) => availability)).toEqual([
+      'matched',
+      'matched',
+      'matched',
+      'matched',
+    ]);
   });
 
   it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {

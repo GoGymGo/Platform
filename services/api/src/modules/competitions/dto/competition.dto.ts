@@ -239,6 +239,11 @@ export class EnrollmentCountResponseDto {
 }
 
 export class CompetitionMatchesQueryDto extends EnrollmentCountQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  competitionId?: string;
+
   @ApiProperty({ maximum: 7, minimum: 1, type: Number })
   @Type(() => Number)
   @IsInt()

@@ -436,6 +436,12 @@ export class CompetitionsService {
                 'This account is already enrolled with different enrollment details.',
             });
           }
+          await this.scoring.ensureWeeklyChallengeMatches(
+            transaction,
+            competition.id,
+            competition.month_key,
+            now,
+          );
           return {
             competitionId: competition.id,
             enrolledAt: existingEnrollment.enrolled_at.toISOString(),
@@ -809,14 +815,20 @@ export class CompetitionsService {
     monthKey: string,
     goalDays: number,
     region: string,
+    competitionId?: string,
   ): Promise<CompetitionMatchResponseDto[]> {
     assertMonthKey(monthKey);
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        const competition = await transaction
-          .selectFrom('competitions as competition')
+        let competitionQuery = transaction
+          .selectFrom('competition_enrollments as enrollment')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'enrollment.competition_id',
+          )
           .innerJoin(
             'region_policies as policy',
             'policy.id',
@@ -828,24 +840,37 @@ export class CompetitionsService {
             'policy.metro_name',
             'policy.timezone',
           ])
+          .where('enrollment.user_id', '=', user.id)
+          .where('enrollment.goal_days', '=', goalDays)
+          .where('enrollment.status', '=', 'active')
           .where('competition.month_key', '=', monthKey)
           .where('policy.code', '=', region)
-          .executeTakeFirst();
+          .orderBy('competition.starts_at')
+          .orderBy('competition.id');
+        if (competitionId) {
+          competitionQuery = competitionQuery.where(
+            'competition.id',
+            '=',
+            competitionId,
+          );
+        }
+        const competition = await competitionQuery.executeTakeFirst();
         if (!competition) {
           return [];
         }
 
-        const enrollment = await transaction
-          .selectFrom('competition_enrollments')
+        await transaction
+          .selectFrom('competitions')
           .select('id')
-          .where('competition_id', '=', competition.id)
-          .where('user_id', '=', user.id)
-          .where('goal_days', '=', goalDays)
-          .where('status', '=', 'active')
-          .executeTakeFirst();
-        if (!enrollment) {
-          return [];
-        }
+          .where('id', '=', competition.id)
+          .forUpdate()
+          .executeTakeFirstOrThrow();
+        await this.scoring.ensureWeeklyChallengeMatches(
+          transaction,
+          competition.id,
+          competition.month_key,
+          new Date(),
+        );
 
         const matches = await transaction
           .selectFrom('competition_matches')

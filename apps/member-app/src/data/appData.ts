@@ -38,7 +38,8 @@ export type AppDataSource = {
   getCompetitionMatches: (
     competitionMonthKey: string,
     weeklyGoal: number,
-    regionCode: string
+    regionCode: string,
+    competitionId?: string | null
   ) => Promise<readonly CompetitionMatch[]>;
   getCompetitionEnrollmentCount: (
     regionCode: string,
@@ -109,8 +110,18 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     getCategoryLeaderboard: (goal) => api.request<unknown>(
       `/v1/leaderboards/current?goal=${goal}`
     ).then((response) => normalizeCategoryLeaderboard(response, goal)),
-    getCompetitionMatches: (competitionMonthKey, weeklyGoal, regionCode) =>
-      api.request<readonly CompetitionMatch[]>(
+    getCompetitionMatches: (
+      competitionMonthKey,
+      weeklyGoal,
+      regionCode,
+      competitionId
+    ) => competitionId
+      ? api.request<readonly CompetitionMatch[]>(
+        `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
+        `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}` +
+        `&competitionId=${encodeURIComponent(competitionId)}`
+      )
+      : api.request<readonly CompetitionMatch[]>(
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
         `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}`
       ),

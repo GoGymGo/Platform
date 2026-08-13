@@ -618,7 +618,7 @@ export interface operations {
   getMatches: {
     method: "GET";
     path: "/v1/competitions/{monthKey}/matches";
-    parameters: { path: { monthKey: string }; query: { goal: number; region: string } };
+    parameters: { path: { monthKey: string }; query: { competitionId?: string; goal: number; region: string } };
     responses: {
       "200": Array<components['schemas']["CompetitionMatchResponseDto"]>;
     };

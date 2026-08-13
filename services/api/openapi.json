@@ -1344,16 +1344,16 @@
             "schema": { "example": "vancouver-bc", "type": "string" }
           },
           {
-            "name": "competitionId",
-            "required": false,
-            "in": "query",
-            "schema": { "format": "uuid", "type": "string" }
-          },
-          {
             "name": "goal",
             "required": true,
             "in": "query",
             "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "competitionId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
           }
         ],
         "responses": {
@@ -1391,12 +1391,6 @@
             "required": true,
             "in": "query",
             "schema": { "example": "vancouver-bc", "type": "string" }
-          },
-          {
-            "name": "competitionId",
-            "required": false,
-            "in": "query",
-            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "goal",
@@ -1446,12 +1440,6 @@
             "required": true,
             "in": "query",
             "schema": { "example": "vancouver-bc", "type": "string" }
-          },
-          {
-            "name": "competitionId",
-            "required": false,
-            "in": "query",
-            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "goal",
@@ -5580,7 +5568,6 @@
         "type": "object",
         "properties": {
           "region": { "type": "string", "example": "vancouver-bc" },
-          "competitionId": { "type": "string", "format": "uuid" },
           "goal": { "type": "number", "maximum": 7, "minimum": 1 },
           "period": { "type": "number", "maximum": 4, "minimum": 1 },
           "recipientUserId": { "type": "string", "format": "uuid" }

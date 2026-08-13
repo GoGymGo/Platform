@@ -223,6 +223,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       pairingPrincipal,
       database.connection,
     );
+    await Promise.all([
+      profiles.ensureProfile(firstUser.id, database.connection),
+      profiles.ensureProfile(secondUser.id, database.connection),
+    ]);
     const secondLegalReceiptBundleId = await acceptCurrentLegalBundle(
       pairingPrincipal,
       'weekly-pairing-legal-receipt',

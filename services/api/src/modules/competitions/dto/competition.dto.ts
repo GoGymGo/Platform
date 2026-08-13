@@ -238,18 +238,20 @@ export class EnrollmentCountResponseDto {
   count!: number;
 }
 
-export class CompetitionMatchesQueryDto extends EnrollmentCountQueryDto {
-  @ApiPropertyOptional({ format: 'uuid', type: String })
-  @IsOptional()
-  @IsUUID()
-  competitionId?: string;
-
+export class CompetitionGoalQueryDto extends EnrollmentCountQueryDto {
   @ApiProperty({ maximum: 7, minimum: 1, type: Number })
   @Type(() => Number)
   @IsInt()
   @Max(7)
   @Min(1)
   goal!: number;
+}
+
+export class CompetitionMatchesQueryDto extends CompetitionGoalQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  competitionId?: string;
 }
 
 export class CompetitionMatchResponseDto {
@@ -284,7 +286,7 @@ export class CompetitionMatchResponseDto {
   opponentStreaks!: StreakCountsDto;
 }
 
-export class WeeklyChallengePeriodQueryDto extends CompetitionMatchesQueryDto {
+export class WeeklyChallengePeriodQueryDto extends CompetitionGoalQueryDto {
   @ApiProperty({ maximum: 4, minimum: 1, type: Number })
   @Type(() => Number)
   @IsInt()

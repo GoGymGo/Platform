@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `35dbf8095c423a4ea28261952230135a42649402` after PR #71 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-002 — Versioned legal documents and
-  consent receipts` on `agent/ggg-002-versioned-legal-documents`.
+  `ed0ef8a940ab65f01c312be9cfbd75d94002a61d` after PR #74 on 2026-08-13.
+- Active feature task: none while the coordinator records GGG-002 completion and
+  advances the queue to GGG-003.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -93,22 +93,33 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Surfaces: Region + Agreements, legal modals, Profile, admin Content + Legal,
   public privacy/rules links.
 - API and worker support / persistence: current-document, receipt-status, receipt,
-  owner publication/withdrawal/deletion endpoints; `legal_documents`, events,
-  receipt bundles, and receipts; no routine worker duty.
+  and owner publication/withdrawal endpoints; `legal_documents`, events, receipt
+  bundles, immutable acceptance context, and receipts; no routine worker duty.
 - Authentication and authorization: current documents are public; receipts are
   member-authenticated; publication is admin- and configured-owner-restricted.
 - External providers / feature flag: Firebase identity; no product flag.
-- Current implementation / missing behavior: connected hash/version/locale flow
-  and stale-bundle failure states. Missing owner-approved final production text,
-  verified contacts, counsel approval, and staging receipt rehearsal.
+- Current implementation / missing behavior: member and public routes render the
+  authoritative current jurisdiction/locale publication or fail unavailable with
+  retry; preview copy is explicitly non-authoritative. Account agreement lists
+  every current receipt-required document with exact action/version and submits
+  only that displayed bundle. The API validates current IDs/actions/hashes and
+  immutable acceptance context transactionally, tolerates concurrent retries and
+  reset re-acceptance, and keeps status/enrollment fail-closed. Publication and
+  withdrawal require the configured owner; impossible destructive deletion was
+  removed. The pilot configurator requires an exact approved content SHA-256. No
+  known repository behavior remains missing for this technical duty.
 - Required tests / operations / cloud dependency: document identity, owner gate,
   stale/superseded bundle, durable receipts, enrollment fail-closed, browser
   rendering; database, Firebase owner identity, and deployed public URLs.
 - Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-002 — Versioned
   legal documents and consent receipts`; branch
-  `agent/ggg-002-versioned-legal-documents`; PR/merge `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: legal approval is external authority; no placeholder
-  legal contact may be treated as launch-ready.
+  `agent/ggg-002-versioned-legal-documents` (deleted after merge); PR `#74`;
+  merge `ed0ef8a940ab65f01c312be9cfbd75d94002a61d`; status `COMPLETE`.
+- Residual risks / blocker: final owner/counsel approval of substantive text,
+  verified public contacts/URLs, supplying the exact approval digest, and staging
+  publication/receipt/withdrawal/reset rehearsal remain external release gates.
+  Missing approval/configuration remains fail-closed. No cloud access or
+  deployment occurred for this delivery.
 
 ### GGG-003 — Region eligibility and regional waitlist
 
@@ -935,6 +946,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-002` through PR #74. Exact tested head
+  `40ddf4c462b42487e76300b6cbc80ca3f9bc8cd1` was squash-merged as
+  `ed0ef8a940ab65f01c312be9cfbd75d94002a61d`; all PR and six main-push checks
+  passed, the remote feature branch was deleted, and there was no cloud impact.
 - 2026-08-13 — Assigned `GGG-002` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-001 completion ledger merged through PR #72 as
   `a9462b09bd3942391f8442b5168da078eda66332` with green main-push checks.

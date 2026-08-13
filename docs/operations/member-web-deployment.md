@@ -95,17 +95,20 @@ For a permanent release:
 3. configure exact frontend CORS origins and production secrets;
 4. build Expo web with the permanent `EXPO_PUBLIC_API_URL`;
 5. run the frontend, backend, contract and production-bundle gates;
-6. dispatch `Member Web Deployment` with the protected environment and exact
-   40-character source commit;
+6. dispatch `Member Web Deployment` from `main` with the protected environment
+   and the exact 40-character merge commit SHA from the approved pull request
+   into `main`;
 7. verify sign-in, profile/region restoration, enrollment, reads and a
    non-destructive write with a staging Firebase account.
 
-The workflow builds the exact source commit and runs
-`audit:browser-pilot-release` before assuming the AWS deployment role. The audit
-requires the permanent HTTPS API origin, rejects browser-test and tunnel
-markers, verifies QR plus foreground-location pilot capabilities, and rejects
-native association files when signing identifiers are absent. The S3 publish
-step also removes and verifies the absence of stale association files.
+Before assuming the AWS deployment role, the workflow verifies that the commit
+is on `main`, is the merge commit of a merged pull request into `main`, and
+passed every check currently required by branch protection. It then builds the
+exact source commit and runs `audit:browser-pilot-release`. The audit requires
+the permanent HTTPS API origin, rejects browser-test and tunnel markers,
+verifies QR plus foreground-location pilot capabilities, and rejects native
+association files when signing identifiers are absent. The S3 publish step also
+removes and verifies the absence of stale association files.
 
 This browser deployment does not authorize or imply an iOS App Store, Google
 Play or native QR-link release.

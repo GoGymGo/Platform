@@ -39,13 +39,17 @@ to Git, Expo variables, Terraform state, container images, or logs.
 
 ## Release order
 
-1. Record the full 40-character Git commit SHA approved for the release.
+1. Record the full 40-character merge commit SHA from the approved pull request
+   into `main`.
 2. Run Backend CI, Terraform validation, and the PostGIS integration suite.
 3. Confirm a fresh backup and validate that the target migration ledger matches
    the clean release baseline.
-4. Manually dispatch the protected deployment workflow. It checks out that exact
-   commit, builds and scans the image, pushes it to the environment's immutable
-   ECR repository, and records its digest.
+4. Manually dispatch the protected deployment workflow from `main`. Before an
+   AWS credential-bearing job can start, the workflow verifies that the exact
+   commit is on `main`, is the merge commit of a merged pull request into `main`,
+   and passed every check currently required by branch protection. It then checks
+   out that commit, builds and scans the image, pushes it to the environment's
+   immutable ECR repository, and records its digest.
 5. Execute the migration task with the new digest and wait for success.
 6. Update the worker service with the same digest.
 7. Deploy the API with ECS circuit-breaker rollback and ALB health checks.
@@ -65,9 +69,10 @@ It does not publish the draft competition.
 The final gate requires the active `2026-09-pilot-v1` policy to appear through
 `GET /v1/regions`.
 
-The protected GitHub workflow enforces migration, worker, rolling API, and
-readiness order. Terraform ignores image-only drift so an infrastructure apply
-cannot bypass it.
+The protected GitHub workflow rejects feature-branch and unreviewed commits
+before requesting AWS credentials. It also enforces migration, worker, rolling
+API, and readiness order. Terraform ignores image-only drift so an
+infrastructure apply cannot bypass it.
 
 ## Reward incident rule
 

@@ -8,13 +8,6 @@ updates:
       time: "16:00"
       timezone: America/Vancouver
     open-pull-requests-limit: 10
-    groups:
-      npm-nonbreaking:
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
 
   - package-ecosystem: github-actions
     directory: /

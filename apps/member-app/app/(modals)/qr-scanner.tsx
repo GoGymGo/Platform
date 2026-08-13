@@ -1,4 +1,5 @@
 import type { GymScanResultDto } from '@gogymgo/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { randomUUID } from 'expo-crypto';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ import { AppTourQrSimulator } from '@/testing/AppTourQrSimulator';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
 import { gymLocationAccuracyWarning } from '@/constants/gymScan';
 import { createGymScanRepository } from '@/data/gymScanRepository';
+import { createWorkoutSessionRepository } from '@/data/sessionRepository';
 import {
   extractGymScanCredential,
   getGymScanRemainingSeconds,
@@ -36,6 +38,7 @@ import { getGymScanSetupRoute } from '@/navigation/gymScanFlow';
 import { ApiError } from '@/services/api/client';
 import { readGymScanLocation } from '@/services/gymScanLocation';
 import {
+  clearPendingGymScanSession,
   readPendingGymScan,
   rememberGymScanCredential,
   rememberGymScanResult,
@@ -74,6 +77,7 @@ export default function QrScannerModal() {
 
 function MobileQrScannerModal() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { active: appTourActive, scenario: appTourScenario } = useAppTour();
   const { competitionRegion } = useCompetitionRegion();
   const {
@@ -88,6 +92,10 @@ function MobileQrScannerModal() {
   const enrollmentPresenceMode = enrollment === '1';
   const { api, configured } = useApi();
   const repository = useMemo(() => (api ? createGymScanRepository(api) : null), [api]);
+  const sessionRepository = useMemo(
+    () => createWorkoutSessionRepository(configured && api ? 'api' : 'unavailable', api),
+    [api, configured]
+  );
   const [pendingIntent, setPendingIntent] = useState<PendingGymScan | null>(null);
   const [pendingIntentLoading, setPendingIntentLoading] = useState(true);
   const linkedCredentialValue = extractGymScanCredential(linkedCredential ?? '');
@@ -116,7 +124,15 @@ function MobileQrScannerModal() {
   const [state, setState] = useState<ScanUiState>('ready');
   const [result, setResult] = useState<GymScanResultDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [workoutCancelled, setWorkoutCancelled] = useState(false);
   const activeSession = pendingIntent?.activeSession ?? null;
+  const activeSessionId =
+    activeSession?.sessionId ??
+    (result?.outcome === 'started' || result?.outcome === 'too_early'
+      ? result.sessionId
+      : null);
   const timerTarget =
     result?.outcome === 'started' || result?.outcome === 'too_early'
       ? result.minimumCompleteAt
@@ -292,8 +308,9 @@ function MobileQrScannerModal() {
           return;
         }
         try {
-          if (credential) {
-            setPendingIntent(await rememberGymScanResult(credential, scanResult));
+          const recoveryCredential = credential ?? effectiveCredential;
+          if (recoveryCredential) {
+            setPendingIntent(await rememberGymScanResult(recoveryCredential, scanResult));
           } else {
             setPendingIntent((current) =>
               current
@@ -325,6 +342,7 @@ function MobileQrScannerModal() {
     [
       activeSession,
       appTourActive,
+      effectiveCredential,
       enrollmentPresenceMode,
       pendingIntent?.credential,
       next,
@@ -344,6 +362,40 @@ function MobileQrScannerModal() {
     setState('ready');
     setResult(null);
     setError(null);
+  }
+
+  async function cancelWorkout() {
+    if (!activeSessionId || cancelling) {
+      return;
+    }
+
+    setCancelling(true);
+    setError(null);
+    try {
+      if (!appTourActive) {
+        await sessionRepository.cancelSession(activeSessionId);
+        setPendingIntent(await clearPendingGymScanSession());
+        void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+      } else {
+        setPendingIntent((current) =>
+          current ? { ...current, activeSession: null } : current
+        );
+      }
+      setCancelConfirming(false);
+      setResult(null);
+      setScanLocked(false);
+      setState('ready');
+      setWorkoutCancelled(true);
+    } catch (cancelError) {
+      setError(
+        getUserFacingErrorMessage(
+          cancelError,
+          'The workout could not be cancelled. Check your connection and try again.'
+        )
+      );
+    } finally {
+      setCancelling(false);
+    }
   }
 
   if (pendingIntentLoading) {
@@ -464,7 +516,7 @@ function MobileQrScannerModal() {
                   />
                 ) : null}
                 <CyberButtonPrimary
-                  disabled={!completionReady}
+                  disabled={!completionReady || cancelling}
                   label={
                     completionReady
                       ? error
@@ -474,8 +526,59 @@ function MobileQrScannerModal() {
                   }
                   onPress={() => void submitCredential(null, true)}
                 />
+                {cancelConfirming ? (
+                  <HUDBorderBox style={styles.cancelConfirmation} tone="red">
+                    <TerminalText live="assertive" glow tone="red" variant="label">
+                      CANCEL THIS WORKOUT?
+                    </TerminalText>
+                    <TerminalText tone="muted" uppercase={false} variant="body">
+                      This session will close without verification, score or Prize Draw Entries.
+                    </TerminalText>
+                    <CyberButtonPrimary
+                      disabled={cancelling}
+                      label={cancelling ? 'CANCELLING...' : 'YES, CANCEL WORKOUT'}
+                      onPress={() => void cancelWorkout()}
+                      tone="red"
+                    />
+                    <CyberButtonOutline
+                      disabled={cancelling}
+                      label="NO, KEEP WORKING OUT"
+                      onPress={() => {
+                        setCancelConfirming(false);
+                        setError(null);
+                      }}
+                    />
+                  </HUDBorderBox>
+                ) : (
+                  <CyberButtonOutline
+                    disabled={cancelling}
+                    label="CANCEL WORKOUT"
+                    onPress={() => {
+                      setCancelConfirming(true);
+                      setError(null);
+                    }}
+                    tone="red"
+                  />
+                )}
               </>
             )}
+          </HUDBorderBox>
+        ) : workoutCancelled ? (
+          <HUDBorderBox glow style={styles.stateCard} tone="amber">
+            <TerminalText glow live="polite" tone="amber" variant="label">
+              WORKOUT CANCELLED
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              The session is closed. No verified credit, score or Prize Draw Entries were awarded.
+            </TerminalText>
+            <CyberButtonPrimary
+              label="START ANOTHER WORKOUT"
+              onPress={() => setWorkoutCancelled(false)}
+            />
+            <CyberButtonOutline
+              label="BACK TO HOME"
+              onPress={() => router.replace('/home')}
+            />
           </HUDBorderBox>
         ) : workoutVerified ? (
           <HUDBorderBox glow style={styles.stateCard} tone="green">
@@ -522,7 +625,7 @@ function MobileQrScannerModal() {
           </>
         )}
 
-        {workoutActive || workoutVerified ? null : busy ? (
+        {workoutActive || workoutVerified || workoutCancelled ? null : busy ? (
           <HUDBorderBox glow style={styles.stateCard} tone="cyan">
             <TerminalText live="polite" glow tone="cyan" variant="label">
               {state === 'locating' ? 'READING LIVE LOCATION...' : 'VERIFYING WITH SERVER...'}
@@ -782,6 +885,10 @@ const styles = StyleSheet.create({
   timerCard: {
     gap: spacing.lg,
     padding: spacing.lg
+  },
+  cancelConfirmation: {
+    gap: spacing.md,
+    padding: spacing.md
   },
   remaining: {
     alignSelf: 'center',

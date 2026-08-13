@@ -731,6 +731,21 @@ function auditAuthoritativeSessionRulesBoundary() {
     );
   }
   if (
+    !qrScanner.includes('sessionRepository.cancelSession(activeSessionId)') ||
+    !qrScanner.includes("result?.outcome === 'started' || result?.outcome === 'too_early'") ||
+    !qrScanner.includes('const recoveryCredential = credential ?? effectiveCredential') ||
+    !qrScanner.includes('rememberGymScanResult(recoveryCredential, scanResult)') ||
+    !qrScanner.includes('clearPendingGymScanSession') ||
+    !qrScanner.includes('CANCEL THIS WORKOUT?') ||
+    !qrScanner.includes('START ANOTHER WORKOUT') ||
+    !qrScanner.includes('if (!appTourActive)') ||
+    !qrScanner.includes('The workout could not be cancelled. Check your connection and try again.')
+  ) {
+    issues.push(
+      'app/(modals)/qr-scanner.tsx: an active pilot workout must support confirmed authoritative cancellation, retryable failure, local-session cleanup and App Tour isolation'
+    );
+  }
+  if (
     !qrScanner.includes("autofocus={Platform.OS === 'web' ? 'on' : 'off'}") ||
     !qrScanner.includes('facing="back"')
   ) {

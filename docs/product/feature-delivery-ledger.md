@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `ed0ef8a940ab65f01c312be9cfbd75d94002a61d` after PR #74 on 2026-08-13.
-- Active feature task: none while the coordinator records GGG-002 completion and
-  advances the queue to GGG-003.
+- Active feature task: `GoGymGo Feature GGG-003 — Region eligibility and regional
+  waitlist` on `agent/ggg-003-region-eligibility`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -143,8 +143,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Required tests / operations / cloud dependency: boundary points, minimized
   evidence, pending fail-closed, age/jurisdiction matching, waitlist validation,
   reviewer audit; PostgreSQL/PostGIS and physical-device location.
-- Delivery: priority `P0`; task `GoGymGo Feature GGG-003 — Region eligibility and
-  regional waitlist`; branch/PR/merge `unassigned`; status `AUDITED`.
+- Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-003 — Region
+  eligibility and regional waitlist`; branch `agent/ggg-003-region-eligibility`;
+  PR/merge `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: legal approval of enabled geography and on-device
   location behavior remain external gates.
 
@@ -946,6 +947,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-003` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-002 completion ledger merged through PR #75 as
+  `b54f1a52844960b018155a1806033d2cd22ba401` with green main-push checks.
 - 2026-08-13 — Completed `GGG-002` through PR #74. Exact tested head
   `40ddf4c462b42487e76300b6cbc80ca3f9bc8cd1` was squash-merged as
   `ed0ef8a940ab65f01c312be9cfbd75d94002a61d`; all PR and six main-push checks

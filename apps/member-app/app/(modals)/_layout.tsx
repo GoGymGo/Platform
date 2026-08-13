@@ -34,6 +34,7 @@ export default function ModalLayout() {
       <Stack.Screen name="commitment-rules" />
       <Stack.Screen name="consent-settings" />
       <Stack.Screen name="official-rules" />
+      <Stack.Screen name="legal-document" />
       <Stack.Screen name="privacy-policy" />
       <Stack.Screen name="qr-scanner" />
       <Stack.Screen name="terms-of-service" />
@@ -42,10 +43,18 @@ export default function ModalLayout() {
 
   return activeRoute === 'qr-scanner' ? (
     <AuthGate
-      signedOutHref={{ pathname: '/sign-in', params: { next: gymScanAuthNext } }}
-      unverifiedHref={{ pathname: '/verify-email', params: { next: gymScanAuthNext } }}
+      signedOutHref={{
+        pathname: '/sign-in',
+        params: { next: gymScanAuthNext }
+      }}
+      unverifiedHref={{
+        pathname: '/verify-email',
+        params: { next: gymScanAuthNext }
+      }}
     >
       {stack}
     </AuthGate>
-  ) : stack;
+  ) : (
+    stack
+  );
 }

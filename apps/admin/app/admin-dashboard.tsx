@@ -135,9 +135,7 @@ function loadPendingDrawFinalization(): PendingDrawFinalization | null {
   }
 }
 
-function savePendingDrawFinalization(
-  value: PendingDrawFinalization | null,
-) {
+function savePendingDrawFinalization(value: PendingDrawFinalization | null) {
   if (typeof window === "undefined") return;
   try {
     if (value) {
@@ -176,8 +174,7 @@ const navigation: {
     short: "CS",
   },
   {
-    description:
-      "Manage Creator workouts and published legal content.",
+    description: "Manage Creator workouts and published legal content.",
     id: "content",
     label: "Content + Legal",
     short: "CL",
@@ -767,14 +764,13 @@ export function AdminDashboard({
   const draftCompetitions = snapshot.competitions.filter(
     (competition) => competition.status === "draft",
   );
-  const publishReady = draftCompetitions.filter(
-    (competition) =>
-      isContestReadyToPublish(
-        competition,
-        snapshot.rewards,
-        snapshot.regions,
-        pilotData.gyms,
-      ),
+  const publishReady = draftCompetitions.filter((competition) =>
+    isContestReadyToPublish(
+      competition,
+      snapshot.rewards,
+      snapshot.regions,
+      pilotData.gyms,
+    ),
   );
   const activeCompetitions = snapshot.competitions.filter((competition) =>
     ["registration", "active"].includes(competition.status),
@@ -994,16 +990,14 @@ export function AdminDashboard({
           "Choose an approved Partner gym before publishing the contest.",
         );
       }
-      const alreadyAssigned = submission.competition?.assignedGymIds.includes(
-        gymId,
-      );
+      const alreadyAssigned =
+        submission.competition?.assignedGymIds.includes(gymId);
       if (!alreadyAssigned) {
         await request(
           `operator/competitions/${competitionId}/gym-locations/${gymId}`,
           {
             body: {
-              reason:
-                "Assign the approved Partner gym during contest launch.",
+              reason: "Assign the approved Partner gym during contest launch.",
             },
             method: "POST",
           },
@@ -1367,20 +1361,6 @@ export function AdminDashboard({
               documents={snapshot.legalDocuments}
               onCreateDocument={() => setLegalEditor(true)}
               onCreateWorkout={() => setWorkoutEditor("new")}
-              onDeleteDocument={(document) =>
-                setConfirmAction({
-                  actionLabel: "Delete legal version",
-                  description: `${document.title} version ${document.version} will be removed from the dashboard. Existing acceptance records will not be affected.`,
-                  execute: (reason) =>
-                    mutate(
-                      "Legal version deleted from the dashboard.",
-                      `operator/configuration/legal-documents/${document.id}`,
-                      "DELETE",
-                      { reason },
-                    ),
-                  tone: "danger",
-                })
-              }
               onDeleteWorkout={(workout) =>
                 setConfirmAction({
                   actionLabel: "Delete workout",
@@ -2347,8 +2327,7 @@ function Overview({
           (candidate) =>
             competition.assignedGymIds.includes(candidate.id) &&
             (candidate.activeQrCredentials ?? []).some(
-              (credential) =>
-                credential.competitionId === competition.id,
+              (credential) => credential.competitionId === competition.id,
             ),
         )
       : undefined;
@@ -2596,7 +2575,8 @@ function Overview({
                           {formatContestDateTime(
                             competition.registrationOpensAt,
                             contestTimeZone,
-                          )} {" → "}
+                          )}{" "}
+                          {" → "}
                           {formatContestDateTime(
                             competition.registrationClosesAt,
                             contestTimeZone,
@@ -2609,7 +2589,8 @@ function Overview({
                           {formatContestDateTime(
                             competition.startsAt,
                             contestTimeZone,
-                          )} {" → "}
+                          )}{" "}
+                          {" → "}
                           {formatContestDateTime(
                             competition.endsAt,
                             contestTimeZone,
@@ -2722,7 +2703,10 @@ function Overview({
                                       !gym.active
                                     }
                                     onClick={() =>
-                                      void loadContestHomePoster(competition, gym)
+                                      void loadContestHomePoster(
+                                        competition,
+                                        gym,
+                                      )
                                     }
                                     type="button"
                                   >
@@ -2739,7 +2723,10 @@ function Overview({
                                     !gym.active
                                   }
                                   onClick={() =>
-                                    void issueContestHomePoster(competition, gym)
+                                    void issueContestHomePoster(
+                                      competition,
+                                      gym,
+                                    )
                                   }
                                   type="button"
                                 >
@@ -3395,7 +3382,9 @@ function RegionsPanel({
                 <dl>
                   <div>
                     <dt>CONTESTS</dt>
-                    <dd>{region.competitionEnabled ? "Allowed" : "Disabled"}</dd>
+                    <dd>
+                      {region.competitionEnabled ? "Allowed" : "Disabled"}
+                    </dd>
                   </div>
                   <div>
                     <dt>MINIMUM AGE</dt>
@@ -3437,7 +3426,6 @@ function ContentPanel({
   documents,
   onCreateDocument,
   onCreateWorkout,
-  onDeleteDocument,
   onDeleteWorkout,
   onEditWorkout,
   onWithdrawDocument,
@@ -3448,7 +3436,6 @@ function ContentPanel({
   documents: LegalDocument[];
   onCreateDocument: () => void;
   onCreateWorkout: () => void;
-  onDeleteDocument: (document: LegalDocument) => void;
   onDeleteWorkout: (workout: CreatorWorkout) => void;
   onEditWorkout: (workout: CreatorWorkout) => void;
   onWithdrawDocument: (document: LegalDocument) => void;
@@ -3722,13 +3709,9 @@ function ContentPanel({
                             Withdraw
                           </button>
                         ) : (
-                          <button
-                            className="text-button danger-text"
-                            onClick={() => onDeleteDocument(document)}
-                            type="button"
-                          >
-                            Delete
-                          </button>
+                          <span className="table-action-note">
+                            History retained
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -4458,9 +4441,7 @@ function CompetitionForm({
         <FormActions
           onClose={onClose}
           submitting={submitting}
-          submitLabel={
-            competition ? "SAVE PROPOSAL" : "SUBMIT PROPOSAL"
-          }
+          submitLabel={competition ? "SAVE PROPOSAL" : "SUBMIT PROPOSAL"}
         />
         {formError ? (
           <p className="form-error" role="alert">
@@ -4898,8 +4879,7 @@ function RegionForm({
           metroName,
           minimumAge: Number(form.get("minimumAge")),
           policyVersion,
-          reason:
-            "Add a region for contest eligibility.",
+          reason: "Add a region for contest eligibility.",
           subdivisionCode,
           timezone: String(form.get("timezone")),
           validFrom,
@@ -5105,11 +5085,7 @@ function RegionForm({
             </div>
           </details>
           <label className="check-row field wide">
-            <input
-              defaultChecked
-              name="competitionEnabled"
-              type="checkbox"
-            />
+            <input defaultChecked name="competitionEnabled" type="checkbox" />
             <span>Allow contests to use this region immediately</span>
           </label>
         </FormGrid>

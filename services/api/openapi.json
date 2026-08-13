@@ -1747,50 +1747,6 @@
         "tags": ["operator-configuration"]
       }
     },
-    "/v1/operator/configuration/legal-documents/{legalDocumentId}": {
-      "delete": {
-        "operationId": "delete",
-        "parameters": [
-          {
-            "name": "legalDocumentId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WithdrawLegalDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminDeletedEntityResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Delete a withdrawn legal version from the admin dashboard",
-        "tags": ["operator-configuration"]
-      }
-    },
     "/v1/me/verification-consents/device-presence": {
       "get": {
         "operationId": "getStatus",

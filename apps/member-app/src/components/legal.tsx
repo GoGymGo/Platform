@@ -1,17 +1,13 @@
 import { type Href, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import {
-  ScreenScrollView,
-  HUDBorderBox,
-  ScreenContainer,
-  TerminalText
-} from '@/components/cyber';
+import { ScreenScrollView, HUDBorderBox, ScreenContainer, TerminalText } from '@/components/cyber';
 import { FirstRunSecondaryButton } from '@/components/firstRun';
 import { OnboardingHeader } from '@/components/onboarding';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { biometricConsentCopy, type LegalDocument } from '@/constants/legal';
 import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
+import type { AccountLegalDocument } from '@/domain/accountReadiness';
 import { goBackOrReplace } from '@/navigation/goBack';
 
 type LegalTone = 'cyan' | 'pink';
@@ -42,6 +38,12 @@ type LegalDocumentLinksProps = {
 type DataCollectionNoticeProps = {
   message: string;
   style?: StyleProp<ViewStyle>;
+};
+
+type CurrentLegalDocumentLinksProps = {
+  documents: readonly AccountLegalDocument[];
+  jurisdictionCode: string;
+  locale: string;
 };
 
 type LegalDocumentScreenProps = {
@@ -176,6 +178,47 @@ export function LegalDocumentLinks({
         onPress={() => openDocument('/terms-of-service')}
         style={styles.linkButton}
       />
+    </View>
+  );
+}
+
+export function CurrentLegalDocumentLinks({
+  documents,
+  jurisdictionCode,
+  locale
+}: CurrentLegalDocumentLinksProps) {
+  const router = useRouter();
+
+  return (
+    <View style={styles.currentDocumentList}>
+      {documents.map((document) => {
+        const action = document.receiptRequirement === 'accept' ? 'ACCEPT' : 'ACKNOWLEDGE';
+        return (
+          <Pressable
+            accessibilityLabel={`${action.toLowerCase()} ${document.title}, version ${document.version}`}
+            accessibilityRole="link"
+            key={document.id}
+            onPress={() =>
+              router.push({
+                pathname: '/legal-document',
+                params: {
+                  documentKey: document.documentKey,
+                  jurisdictionCode,
+                  locale
+                }
+              } as Href)
+            }
+            style={({ pressed }) => [styles.currentDocumentLink, pressed ? styles.pressed : null]}
+          >
+            <TerminalText tone="cyan" variant="micro">
+              {`${action} // ${document.title}`}
+            </TerminalText>
+            <TerminalText tone="dim" variant="micro">
+              {`VERSION // ${document.version}`}
+            </TerminalText>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -387,6 +430,20 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm
+  },
+  currentDocumentList: {
+    gap: spacing.xs
+  },
+  currentDocumentLink: {
+    minHeight: 52,
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderCyanSubtle,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceCyanGhost
   },
   cameraBanner: {
     gap: spacing.sm,

@@ -152,10 +152,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(contestSetupWorkspace, /PUBLISH CONTEST/);
   assert.match(contestSetupWorkspace, /setup-section-error/);
   assert.match(contestSetupWorkspace, /minimumEntrants: 1/);
-  assert.match(
-    contestSetupWorkspace,
-    /AT LEAST 30 MINUTES/,
-  );
+  assert.match(contestSetupWorkspace, /AT LEAST 30 MINUTES/);
   assert.match(contestSetupWorkspace, /Workouts must start before/);
   assert.match(contestSetupWorkspace, /IN-PROGRESS WORKOUTS FINISH/);
   assert.match(contestSetupWorkspace, /region&apos;s timezone/);
@@ -170,7 +167,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(contestSetupWorkspace, /ASSIGNED GYM/);
   assert.match(contestSetupWorkspace, /Only active partner gyms approved/);
   assert.match(contestSetupWorkspace, /added by GoGymGo/);
-  assert.match(contestSetupWorkspace, /contest QR poster is created automatically/);
+  assert.match(
+    contestSetupWorkspace,
+    /contest QR poster is created automatically/,
+  );
   assert.match(
     styles,
     /\.setup-anchor-rail \{[\s\S]*grid-template-columns: repeat\(4, minmax\(150px, 1fr\)\)/,
@@ -194,7 +194,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /Delete contest/);
   assert.match(dashboard, /Delete reward/);
   assert.match(dashboard, /Delete region/);
-  assert.match(dashboard, /Delete legal version/);
+  assert.doesNotMatch(dashboard, /Delete legal version/);
+  assert.match(dashboard, /History retained/);
   assert.match(dashboard, /Delete workout/);
   assert.doesNotMatch(dashboard, /remain preserved/);
   assert.match(dashboard, /operator\/gym-locations/);
@@ -263,7 +264,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /CREATE ANOTHER CONTEST/);
   assert.match(dashboard, /CONTEST-SPECIFIC QR POSTERS/);
   assert.match(dashboard, /These controls are locked to \{competition\.name\}/);
-  assert.match(dashboard, /VIEW \$\{competition\.name\.toUpperCase\(\)\} POSTER/);
+  assert.match(
+    dashboard,
+    /VIEW \$\{competition\.name\.toUpperCase\(\)\} POSTER/,
+  );
   assert.match(
     dashboard,
     /onIssueQr\(competition\.id, gym\.id,[\s\S]*assertGymQrCredentialScope/,
@@ -275,9 +279,15 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(styles, /\.contest-home-poster-controls/);
   assert.match(styles, /\.contest-home-poster-row/);
   assert.match(dashboard, /ReasonPresetChips/);
-  assert.match(styles, /\.mobile-admin-navigation \{[\s\S]*display: none !important/);
+  assert.match(
+    styles,
+    /\.mobile-admin-navigation \{[\s\S]*display: none !important/,
+  );
   assert.match(styles, /\.panel \{[\s\S]*?min-width: 0;/);
-  assert.match(styles, /\.table-wrap \{[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: auto;/);
+  assert.match(
+    styles,
+    /\.table-wrap \{[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: auto;/,
+  );
   assert.doesNotMatch(pilot, /\.filter\(isOperationalCompetition\)/);
   assert.match(contestLaunchFlow, /competition\.assignedGymIds \?\? \[\]/);
   assert.match(contestLaunchFlow, /competition\.status !== "draft"/);
@@ -294,7 +304,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     dashboard,
     /canDeleteContestFromDashboard\(competition\.status\)/,
   );
-  assert.match(dashboard, /Active workouts, rankings, and prize eligibility will close/);
+  assert.match(
+    dashboard,
+    /Active workouts, rankings, and prize eligibility will close/,
+  );
   assert.doesNotMatch(contestLaunchFlow, /completedSteps|blockedReason/);
   assert.match(
     contestSetupWorkspace,
@@ -356,7 +369,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /title="Add a region"/);
   assert.match(dashboard, /<Field label="REGION NAME"/);
   assert.match(dashboard, /<Field label="REGION BOUNDARY FILE"/);
-  assert.match(dashboard, /GoGymGo uses it to decide whether a phone is inside/);
+  assert.match(
+    dashboard,
+    /GoGymGo uses it to decide whether a phone is inside/,
+  );
   assert.doesNotMatch(
     dashboard,
     /<Field label="(?:REGION CODE|DISPLAY NAME|POLICY VERSION|BOUNDARY VERSION|GEOJSON)/,

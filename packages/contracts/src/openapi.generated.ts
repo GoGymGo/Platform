@@ -424,16 +424,7 @@ export interface operations {
       "200": components['schemas']["OperatorActionResponseDto"];
     };
   };
-  delete_delete_v1_operator_configuration_legal_documents_legalDocumentId: {
-    method: "DELETE";
-    path: "/v1/operator/configuration/legal-documents/{legalDocumentId}";
-    parameters: { header: { "Idempotency-Key": string }; path: { legalDocumentId: string } };
-    requestBody: components['schemas']["WithdrawLegalDocumentDto"];
-    responses: {
-      "200": components['schemas']["AdminDeletedEntityResponseDto"];
-    };
-  };
-  delete_delete_v1_operator_configuration_rewards_rewardId: {
+  delete: {
     method: "DELETE";
     path: "/v1/operator/configuration/rewards/{rewardId}";
     parameters: { header: { "Idempotency-Key": string }; path: { rewardId: string } };
@@ -1343,9 +1334,6 @@ export interface paths {
   "/v1/operator/configuration/legal-documents": {
     post: operations["publish"];
   };
-  "/v1/operator/configuration/legal-documents/{legalDocumentId}": {
-    delete: operations["delete_delete_v1_operator_configuration_legal_documents_legalDocumentId"];
-  };
   "/v1/operator/configuration/legal-documents/{legalDocumentId}/withdrawal": {
     post: operations["withdraw"];
   };
@@ -1360,7 +1348,7 @@ export interface paths {
   };
   "/v1/operator/configuration/rewards/{rewardId}": {
     put: operations["update"];
-    delete: operations["delete_delete_v1_operator_configuration_rewards_rewardId"];
+    delete: operations["delete"];
   };
   "/v1/operator/configuration/rewards/{rewardId}/coupon-codes": {
     post: operations["addCouponCodes"];

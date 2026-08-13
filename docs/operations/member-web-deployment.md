@@ -149,10 +149,14 @@ false so Metro replaces every sample-data module with its production stub.
 
 The exported preview replaces the public release legal documents with short,
 clearly labeled browser-preview notices. `audit:web-test-preview` rejects
-internal-only wording and engineering fixture names. Release builds use the
-owner-approved Privacy Policy, Terms of Service and Official Contest Rules from
-`services/api/config/legal/public-ca-bc-en.json`; the protected configuration
-operation publishes that same source and the member app bundles it as fallback.
+internal-only wording and engineering fixture names. Release builds include the
+public legal source only for explicitly labeled preview presentation. Connected
+Privacy Policy, Terms of Service and Official Contest Rules routes fetch the
+current owner-approved publication from the API and fail unavailable instead of
+presenting bundled copy as current. The protected configuration operation
+publishes `services/api/config/legal/public-ca-bc-en.json` only after its exact
+digest is separately confirmed by the configured owner following counsel
+approval.
 
 For an optional time-limited Firebase Hosting link:
 

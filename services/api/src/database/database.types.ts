@@ -362,6 +362,7 @@ export interface AccountLegalReceiptBundlesTable {
   jurisdiction_code: string;
   locale: string;
   bundle_sha256: string;
+  acceptance_context_at: Timestamp;
   request_id: string;
   accepted_at: Timestamp;
 }

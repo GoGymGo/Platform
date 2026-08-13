@@ -18,8 +18,14 @@ Run the idempotent configuration command only against the intended environment:
 ```powershell
 $env:DATABASE_URL='<secret-managed target connection>'
 $env:APPLY_PILOT_CONFIGURATION='yes'
+$env:CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256='<owner- and counsel-approved exact digest>'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
+
+The command refuses to publish the public legal bundle unless the approval
+digest matches the exact committed content. Run it once without the value to
+obtain the expected digest, complete owner and counsel review, then rerun with
+that exact value. Never copy the digest forward after legal content changes.
 
 ## Staging order
 

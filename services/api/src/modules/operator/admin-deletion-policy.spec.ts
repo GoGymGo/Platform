@@ -3,7 +3,6 @@ import {
   canDeleteCompetition,
   canDeleteCreatorWorkout,
   canDeleteGym,
-  canDeleteLegalDocument,
   canDeleteRegionPolicy,
   canDeleteReward,
   requiresExclusiveCompetitionSlot,
@@ -36,7 +35,7 @@ describe('admin deletion policy', () => {
     expect(canDeleteGym(true)).toBe(false);
   });
 
-  it('allows retired regions and withdrawn legal versions', () => {
+  it('allows retired regions', () => {
     const now = new Date('2026-08-08T12:00:00.000Z');
     expect(
       canDeleteRegionPolicy({
@@ -59,8 +58,6 @@ describe('admin deletion policy', () => {
         validTo: null,
       }),
     ).toBe(false);
-    expect(canDeleteLegalDocument('withdrawn')).toBe(true);
-    expect(canDeleteLegalDocument('effective')).toBe(false);
   });
 
   it('does not reserve a region and month for platform contests', () => {

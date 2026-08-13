@@ -182,6 +182,10 @@ const pilotConfiguration = await readFile(
   join(root, 'src/operations/configure-september-2026-island-pilot.ts'),
   'utf8',
 );
+const legalDocumentPolicy = await readFile(
+  join(root, 'src/modules/legal/legal-document.ts'),
+  'utf8',
+);
 const workloadsTerraform = await readFile(
   join(platformRoot, 'infrastructure/gcp/terraform/workloads.tf'),
   'utf8',
@@ -341,6 +345,17 @@ if (
   violations.push(
     'public legal publication idempotency keys must track each document version',
   );
+}
+for (const marker of [
+  'CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256',
+  'after owner and counsel approval',
+  'owner- and counsel-approved public legal configuration',
+]) {
+  if (!(pilotConfiguration + legalDocumentPolicy).includes(marker)) {
+    violations.push(
+      `public legal publication is missing approval-boundary marker ${marker}`,
+    );
+  }
 }
 for (const marker of [
   'command = ["node"]',

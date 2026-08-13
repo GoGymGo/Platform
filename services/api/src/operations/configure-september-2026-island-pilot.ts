@@ -12,7 +12,10 @@ import { DatabaseService } from '../database/database.service';
 import type { AuthenticatedPrincipal } from '../modules/auth/auth.types';
 import { getGoGymGoFirebaseApp } from '../modules/auth/firebase-admin-app';
 import { AdminLegalDocumentsService } from '../modules/legal/admin-legal-documents.service';
-import { hashLegalDocumentContent } from '../modules/legal/legal-document';
+import {
+  hashLegalDocumentContent,
+  requireLegalPublicationApproval,
+} from '../modules/legal/legal-document';
 import { AdminCompetitionConfigurationService } from '../modules/operator/admin-competition-configuration.service';
 import { AdminRegionConfigurationService } from '../modules/operator/admin-region-configuration.service';
 import { CompetitionStatusAction } from '../modules/operator/dto/admin-configuration.dto';
@@ -701,6 +704,10 @@ async function publishPublicLegalDocuments(
   principal: AuthenticatedPrincipal,
 ): Promise<string[]> {
   const configuration = await loadPublicLegalConfiguration();
+  const approvalSha256 = requireLegalPublicationApproval(
+    configuration,
+    process.env.CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256,
+  );
   const published: string[] = [];
 
   for (const document of configuration.documents) {
@@ -736,8 +743,7 @@ async function publishPublicLegalDocuments(
         jurisdictionCode: document.jurisdictionCode,
         locale: document.locale,
         ownerApprovalConfirmed: true,
-        reason:
-          'Publish the exact public legal copy requested and approved by the GoGymGo owner on August 11, 2026.',
+        reason: `Publish the exact owner- and counsel-approved public legal configuration ${approvalSha256}.`,
         receiptRequirement: document.receiptRequirement,
         title: document.title,
         version: document.version,

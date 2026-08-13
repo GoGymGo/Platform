@@ -2,7 +2,9 @@ import {
   buildJurisdictionHierarchy,
   hashLegalDocumentContent,
   hashLegalReceiptBundle,
+  legalAcceptanceContextAt,
   normalizeLegalLocale,
+  requireLegalPublicationApproval,
 } from './legal-document';
 
 describe('legal document identity', () => {
@@ -62,5 +64,36 @@ describe('legal document identity', () => {
         locale: 'en-ca',
       }),
     );
+  });
+
+  it('separates a reset acceptance context from the initial account context', () => {
+    expect(legalAcceptanceContextAt(null).toISOString()).toBe(
+      '1970-01-01T00:00:00.000Z',
+    );
+    const resetAt = new Date('2026-08-13T12:00:00.000Z');
+    expect(legalAcceptanceContextAt(resetAt)).toBe(resetAt);
+  });
+
+  it('requires approval for the canonical exact publication configuration', () => {
+    const configuration = {
+      documents: [{ documentKey: 'terms_of_service', version: 'v1' }],
+    };
+    let expectedSha256 = '';
+    try {
+      requireLegalPublicationApproval(configuration, undefined);
+    } catch (error) {
+      expectedSha256 =
+        (error as Error).message.match(/[0-9a-f]{64}/)?.[0] ?? '';
+    }
+    expect(expectedSha256).toHaveLength(64);
+    expect(requireLegalPublicationApproval(configuration, expectedSha256)).toBe(
+      expectedSha256,
+    );
+    expect(() =>
+      requireLegalPublicationApproval(
+        { documents: [{ documentKey: 'terms_of_service', version: 'v2' }] },
+        expectedSha256,
+      ),
+    ).toThrow(/owner and counsel approval/i);
   });
 });

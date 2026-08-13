@@ -1,4 +1,10 @@
-export const creatorFeaturesEnabled = false;
+import { resolveFeatureCapabilities } from '@gogymgo/contracts/feature-capabilities';
+
+const featureCapabilities = resolveFeatureCapabilities({
+  creatorFeaturesEnabled: process.env.EXPO_PUBLIC_ENABLE_CREATOR_FEATURES,
+});
+
+export const { creatorFeaturesEnabled } = featureCapabilities;
 
 export const creatorFeatureStatusLabel = 'NOT AVAILABLE';
 

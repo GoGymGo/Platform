@@ -49,6 +49,16 @@ npm.cmd run contracts:generate
 npm.cmd run contracts:check
 ```
 
+## Release capabilities
+
+Public feature capabilities are resolved by the shared
+`@gogymgo/contracts/feature-capabilities` module. Creator surfaces default to
+disabled in every app. Set `EXPO_PUBLIC_ENABLE_CREATOR_FEATURES=true` for a
+member build and `NEXT_PUBLIC_ENABLE_CREATOR_FEATURES=true` for an admin build
+only when that release should expose the connected creator workflows. Values
+other than `true` or `false` fail the build instead of silently selecting an
+unexpected state.
+
 ## Connected local preview
 
 Create ignored local environment files from `apps/member-app/.env.example` and `services/api/.env.example`, then run:

@@ -5,6 +5,7 @@ GoGymGo's authoritative backend is a strict TypeScript/NestJS modular monolith. 
 ## Trust boundaries
 
 - Firebase Admin verifies the bearer token and supplies the account identity. Client-supplied user IDs are never authoritative.
+- Administrative operations require Firebase's verified `password` sign-in provider in addition to an active, email-verified database administrator role.
 - Accounts must remain active and have a current Firebase-verified email for enrollment, workout evidence/awards, privileged operations, draw eligibility, and reward claims.
 - PostgreSQL/PostGIS is the source of truth and durable job queue. Workers claim jobs with bounded database leases; Redis is not required for the initial production system.
 - Retryable award, claim, and operator mutations require an idempotency key.
@@ -54,6 +55,13 @@ The liveness route is `GET http://localhost:3000/v1/health`. In non-production e
 `npm run check` runs formatting verification, strict TypeScript compilation, ESLint, unit tests, HTTP end-to-end tests, OpenAPI generation, the mobile-to-API contract audit, the source-policy/secret audit, and a production build. Run `npm run audit:deps` separately when dependency metadata is available.
 
 Database integration tests use Testcontainers and require a running Docker engine. A missing Docker engine is an environment limitation, never a passing database test.
+Run the focused static-QR lifecycle gate from the repository root with:
+
+```powershell
+$env:RUN_DATABASE_INTEGRATION = 'true'
+npm.cmd run test:smoke:qr --workspace @gogymgo/api
+```
+
 With `RUN_DATABASE_INTEGRATION=true`, the suite also exercises the critical
 PostgreSQL-backed trust paths. Evidence-to-ledger coverage proves enrollment
 and session idempotency, serialized entrant caps, inactive re-enrollment

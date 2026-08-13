@@ -26,12 +26,16 @@ describe('environment validation', () => {
     expect(environment.DATABASE_URL).toContain('localhost:5432');
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
-    expect(environment.PRIVATE_OBJECT_STORAGE_PROVIDER).toBe('google-cloud');
+    expect(environment.PRIVATE_OBJECT_STORAGE_PROVIDER).toBe('aws-s3');
+    expect(environment.AWS_REGION).toBe('ca-central-1');
     expect(environment.PROFILE_MEDIA_MAX_BYTES).toBe(2 * 1_024 * 1_024);
     expect(environment.PRIVACY_EXPORT_RETENTION_DAYS).toBe(7);
     expect(environment.OTEL_ENABLED).toBe(false);
     expect(environment.WORKER_HEARTBEAT_INTERVAL_MS).toBe(30_000);
     expect(environment.REWARD_CODE_ENCRYPTION_KEY).toBeUndefined();
+    expect(
+      validateEnvironment({ AWS_REGION: '', NODE_ENV: 'test' }).AWS_REGION,
+    ).toBe('ca-central-1');
   });
 
   it('requires an OTLP endpoint and service name when telemetry is enabled', () => {
@@ -129,6 +133,11 @@ describe('environment validation', () => {
       },
       /OTEL_EXPORTER_OTLP_ENDPOINT must use HTTPS/i,
     ],
+    [
+      'non-Canadian AWS region',
+      { AWS_REGION: 'us-east-2' },
+      /AWS_REGION must be ca-central-1/i,
+    ],
   ])('rejects %s in production', (_label, override, message) => {
     expect(() =>
       validateEnvironment({
@@ -196,20 +205,23 @@ describe('environment validation', () => {
     ).toBe(true);
   });
 
-  it('requires an AWS region for S3-backed private storage', () => {
+  it('accepts only the AWS S3 private-storage provider', () => {
     expect(() =>
       validateEnvironment({
         NODE_ENV: 'test',
-        PRIVATE_OBJECT_STORAGE_PROVIDER: 'aws-s3',
+        PRIVATE_OBJECT_STORAGE_PROVIDER: 'google-cloud',
       }),
-    ).toThrow(/AWS_REGION is required/i);
+    ).toThrow(/PRIVATE_OBJECT_STORAGE_PROVIDER/i);
+
+    const localEnvironment = validateEnvironment({
+      AWS_REGION: 'us-west-2',
+      NODE_ENV: 'test',
+      PRIVATE_OBJECT_STORAGE_PROVIDER: 'aws-s3',
+    });
+    expect(localEnvironment.AWS_REGION).toBe('us-west-2');
 
     expect(
-      validateEnvironment({
-        AWS_REGION: 'ca-central-1',
-        NODE_ENV: 'test',
-        PRIVATE_OBJECT_STORAGE_PROVIDER: 'aws-s3',
-      }).PRIVATE_OBJECT_STORAGE_PROVIDER,
+      validateEnvironment({ NODE_ENV: 'test' }).PRIVATE_OBJECT_STORAGE_PROVIDER,
     ).toBe('aws-s3');
   });
 

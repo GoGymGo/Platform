@@ -54,6 +54,11 @@ The liveness route is `GET http://localhost:3000/v1/health`. In non-production e
 
 `npm run check` runs formatting verification, strict TypeScript compilation, ESLint, unit tests, HTTP end-to-end tests, OpenAPI generation, the mobile-to-API contract audit, the source-policy/secret audit, and a production build. Run `npm run audit:deps` separately when dependency metadata is available.
 
+Production images install only the AWS runtime and prune development plus
+optional dependencies. Firebase Admin's optional Firestore and Google Cloud
+Storage clients are intentionally excluded. `npm run audit:deps` audits that
+same production dependency boundary and fails on moderate-or-higher findings.
+
 Database integration tests use Testcontainers and require a running Docker engine. A missing Docker engine is an environment limitation, never a passing database test.
 Run the focused static-QR lifecycle gate from the repository root with:
 

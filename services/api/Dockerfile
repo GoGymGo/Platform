@@ -12,7 +12,7 @@ RUN npm ci --ignore-scripts --workspace @gogymgo/api
 
 COPY services/api services/api
 RUN npm run build --workspace @gogymgo/api \
-  && npm prune --omit=dev --ignore-scripts
+  && npm prune --omit=dev --omit=optional --ignore-scripts
 
 FROM node:24-alpine AS runtime
 

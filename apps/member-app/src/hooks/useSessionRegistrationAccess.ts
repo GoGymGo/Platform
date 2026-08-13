@@ -9,6 +9,7 @@ import {
   getAccountSetupRoute,
   getAccountSetupStep
 } from '@/domain/accountSetup';
+import { hasCompetitionStarted } from '@/domain/competition';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -37,6 +38,10 @@ export function useSessionRegistrationAccess({
     resolvedCompetition?.id ?? null,
     Boolean(gymQrCredential)
   );
+  const competitionStartSynchronizing = Boolean(
+    resolvedCompetition?.status === 'registration' &&
+    hasCompetitionStarted(resolvedCompetition.startsAt)
+  );
   const enrollmentReady = Boolean(currentEnrollment.data);
   const retry = async () => {
     await Promise.all([
@@ -56,6 +61,7 @@ export function useSessionRegistrationAccess({
       !progressReady ||
       !regionReady ||
       currentCompetition.isLoading ||
+      competitionStartSynchronizing ||
       currentEnrollment.isLoading ||
       (regionVerified && legalReceipt.isLoading),
     error:

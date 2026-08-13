@@ -37,11 +37,13 @@ import {
   getGymVerificationHomeState,
   isMobileWebGymVerificationDevice
 } from '@/domain/mobileGymVerification';
+import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { getWorkoutAccessMode, getWorkoutEntryTarget } from '@/domain/workoutAccess';
 import {
   getWinnersCirclePresentationKey,
   shouldAutoPresentWinnersCircle
 } from '@/domain/winnersCircle';
+import { useCompetitionStart } from '@/hooks/useCompetitionStart';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
@@ -91,6 +93,7 @@ export default function HomeScreen() {
     activeSession,
     competition,
     competitionRegion,
+    competitionTimeZone,
     currentWeekIndex,
     currentWeekVerified,
     prizeDrawEligible,
@@ -126,6 +129,15 @@ export default function HomeScreen() {
   const isBonusDayPhase = competition.phase === 'bonus-days';
   const competitionNotStarted = competition.phase === 'before-month';
   const competitionStartLabel = formatCampaignDate(`${competition.competitionMonthKey}-01`);
+  const competitionOpeningDateTime = currentCompetition
+    ? formatCompetitionOpeningDateTime(
+        currentCompetition.startsAt,
+        competitionTimeZone
+      )
+    : null;
+  const competitionStartReached = useCompetitionStart(
+    currentCompetition?.startsAt
+  );
   const [competitionYear, competitionMonth] = competition.competitionMonthKey.split('-').map(Number);
   const competitionStartMonth = new Intl.DateTimeFormat('en-CA', { month: 'long' }).format(
     new Date(competitionYear, competitionMonth - 1, 1, 12)
@@ -200,7 +212,9 @@ export default function HomeScreen() {
     }
   ];
 
-  const workoutAccessMode = getWorkoutAccessMode(competitionNotStarted);
+  const workoutAccessMode = getWorkoutAccessMode(
+    currentCompetition ? !competitionStartReached : competitionNotStarted
+  );
   const workoutUnavailable = workoutAccessMode === 'upcoming';
   const workoutEntryTarget = getWorkoutEntryTarget({
     activeSession: activeSession !== null,
@@ -479,8 +493,8 @@ export default function HomeScreen() {
               >
                 {completedContestWithoutReplacement
                   ? latestCompetitionResults?.resultsStatus === 'settled'
-                    ? 'RESULTS PUBLISHED'
-                    : 'FINALIZING RESULTS'
+                    ? 'CONTEST COMPLETE'
+                    : 'RESULTS IN PROGRESS'
                   : effectiveSetupRequired
                   ? setupEyebrow
                   : desktopSetupChecking
@@ -497,7 +511,9 @@ export default function HomeScreen() {
               </TerminalText>
               <TerminalText style={styles.commitmentTitle} tone="text" uppercase variant="title">
                 {completedContestWithoutReplacement
-                  ? 'YOUR CONTEST IS COMPLETE'
+                  ? latestCompetitionResults?.resultsStatus === 'settled'
+                    ? 'VIEW YOUR RESULTS'
+                    : 'RESULTS ARE BEING FINALIZED'
                   : effectiveSetupRequired
                   ? setupTitle
                   : desktopSetupChecking
@@ -517,8 +533,8 @@ export default function HomeScreen() {
               <TerminalText style={styles.commitmentCopy} tone="muted" uppercase={false} variant="body">
                 {completedContestWithoutReplacement
                   ? latestCompetitionResults?.resultsStatus === 'settled'
-                    ? 'Your placement and any prize-draw award are ready in the Winners Circle.'
-                    : 'Your result is saved. GoGymGo is completing the audited draw before publishing the Winners Circle.'
+                    ? 'Your placement is ready in the Winners Circle.'
+                    : 'Check back soon.'
                   : effectiveSetupRequired
                   ? setupMessage
                   : desktopSetupChecking
@@ -543,34 +559,30 @@ export default function HomeScreen() {
                 </TerminalText>
               ) : null}
             </View>
-            <View style={styles.multiplierBlock}>
-              <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
-                {completedContestWithoutReplacement
-                  ? 'DONE'
-                  : effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
-                  ? '--'
-                  : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
-              </TerminalText>
-              <TerminalText tone="muted" variant="micro">
-                {completedContestWithoutReplacement
-                  ? latestCompetitionResults?.resultsStatus === 'settled'
-                    ? 'RESULTS READY'
-                    : 'UNDER REVIEW'
-                  : effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
-                  ? desktopSetupChecking
-                    ? 'SYNCING'
-                    : desktopSetupError
-                      ? 'CHECK LATER'
-                      : 'NEXT STEP'
-                  : competitionNotStarted
-                  ? 'DAY GOAL'
-                   : liveMultiplier === 3
-                    ? 'BONUS READY'
-                    : liveMultiplier === 2
-                      ? 'TEAM BONUS'
-                      : 'BASE ENTRIES'}
-              </TerminalText>
-            </View>
+            {!completedContestWithoutReplacement ? (
+              <View style={styles.multiplierBlock}>
+                <TerminalText glow style={styles.multiplier} tone="cyan" variant="value">
+                  {effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
+                    ? '--'
+                    : competitionNotStarted ? `${weeklyGoal}` : liveMultiplier === 0 ? '1X' : `${liveMultiplier}X`}
+                </TerminalText>
+                <TerminalText tone="muted" variant="micro">
+                  {effectiveSetupRequired || desktopSetupChecking || desktopSetupError || desktopSetupPending
+                    ? desktopSetupChecking
+                      ? 'SYNCING'
+                      : desktopSetupError
+                        ? 'CHECK LATER'
+                        : 'NEXT STEP'
+                    : competitionNotStarted
+                    ? 'DAY GOAL'
+                     : liveMultiplier === 3
+                      ? 'BONUS READY'
+                      : liveMultiplier === 2
+                        ? 'TEAM BONUS'
+                        : 'BASE ENTRIES'}
+                </TerminalText>
+              </View>
+            ) : null}
           </View>
 
           {showGoalProgress ? (
@@ -624,8 +636,8 @@ export default function HomeScreen() {
             <CyberButtonPrimary
               label={
                 latestCompetitionResults?.resultsStatus === 'settled'
-                  ? 'VIEW WINNERS CIRCLE'
-                  : 'VIEW RESULTS STATUS'
+                  ? 'VIEW RESULTS'
+                  : 'CHECK RESULTS'
               }
               onPress={() => router.push('/winners-circle')}
               tone={
@@ -661,9 +673,9 @@ export default function HomeScreen() {
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
               Complete this step before starting a Verified workout.
             </TerminalText>
-          ) : workoutUnavailable ? (
+          ) : !activeSession && competitionOpeningDateTime ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
-              Verified contest workouts open when scoring begins on {competitionStartLabel}.
+              {`Start your workout at ${competitionOpeningDateTime}.`}
             </TerminalText>
           ) : null}
           {!activeSession && !setupRequired ? (

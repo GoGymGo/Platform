@@ -34,7 +34,11 @@ import {
   calculateWeeklyMatchEntries,
   type WeeklyMatchMultiplier
 } from '@/domain/campaignEconomics';
-import { getCompetitionMonthKey, getCompetitionRegionDateKey } from '@/domain/competition';
+import {
+  getCompetitionMonthKey,
+  getCompetitionRegionDateKey,
+  hasCompetitionStarted
+} from '@/domain/competition';
 import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
 import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
@@ -358,10 +362,11 @@ function MobileCommitmentScreen() {
         'bonus-days',
         'calculator-open'
       ].forEach((key) => clearScreenMemory(`${draftKey}:${key}`));
+      const selectedContest = registration.competition;
       const selectedContestAcceptsWorkouts =
-        registration.competition?.status === 'active' &&
-        Date.now() >= Date.parse(registration.competition.startsAt) &&
-        Date.now() < Date.parse(registration.competition.endsAt);
+        selectedContest != null &&
+        hasCompetitionStarted(selectedContest.startsAt) &&
+        Date.now() < Date.parse(selectedContest.endsAt);
       if (isGymScanSource && selectedContestAcceptsWorkouts) {
         router.replace('/qr-scanner');
       } else {

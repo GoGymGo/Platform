@@ -25,4 +25,19 @@ describe('versioned competition rules', () => {
       parseCompetitionRules({ ...validRules, clientCanVerify: true }),
     ).toThrow();
   });
+
+  it('normalizes legacy scoring weights to one point and one entry', () => {
+    expect(
+      parseCompetitionRules({
+        ...validRules,
+        signupPrizeDrawEntries: 5,
+        verifiedSessionCategoryScore: 10,
+        verifiedSessionPrizeDrawEntries: 2,
+      }),
+    ).toMatchObject({
+      signupPrizeDrawEntries: 1,
+      verifiedSessionCategoryScore: 1,
+      verifiedSessionPrizeDrawEntries: 1,
+    });
+  });
 });

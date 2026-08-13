@@ -1,11 +1,14 @@
 import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
+import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
+import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
 import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
+import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { ResultsService } from '../src/modules/results/results.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
@@ -31,6 +34,24 @@ const unverifiedPrincipal: AuthenticatedPrincipal = {
   email: 'unverified-session-user@integration.test',
   emailVerified: false,
   firebaseUid: 'unverified-critical-session-user',
+  roles: ['user'],
+  signInProvider: 'password',
+  tokenIssuedAt: 1,
+};
+
+const pairingPrincipal: AuthenticatedPrincipal = {
+  email: 'weekly-pairing-user@integration.test',
+  emailVerified: true,
+  firebaseUid: 'weekly-pairing-user',
+  roles: ['user'],
+  signInProvider: 'password',
+  tokenIssuedAt: 1,
+};
+
+const contestPinningPrincipal: AuthenticatedPrincipal = {
+  email: 'contest-pinning-user@integration.test',
+  emailVerified: true,
+  firebaseUid: 'contest-pinning-user',
   roles: ['user'],
   signInProvider: 'password',
   tokenIssuedAt: 1,
@@ -75,9 +96,9 @@ const competitionRules = {
   requireDeviceAttestation: true,
   requirePresenceCheck: true,
   requireGymQr: true,
-  signupPrizeDrawEntries: 5,
-  verifiedSessionCategoryScore: 7,
-  verifiedSessionPrizeDrawEntries: 3,
+  signupPrizeDrawEntries: 1,
+  verifiedSessionCategoryScore: 1,
+  verifiedSessionPrizeDrawEntries: 1,
   weeklyChallengeBothHitMultiplier: 2,
   weeklyChallengeRecoveryMultiplier: 3,
 };
@@ -115,12 +136,20 @@ describeWithDatabase('critical session and ledger workflow', () => {
     profiles = new ProfilesService(database);
     results = new ResultsService(database, profiles);
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
+    const scoring = new CompetitionScoringService(database, ledger);
+    const lifecycle = new CompetitionLifecycleService(
+      database,
+      { enqueue: jest.fn() } as unknown as NotificationsService,
+      scoring,
+    );
     competitions = new CompetitionsService(
       database,
       idempotency,
       ledger,
       legalDocuments,
       profiles,
+      lifecycle,
+      scoring,
     );
     sessions = new SessionsService(database, idempotency, ledger, profiles);
     const operator = await profiles.ensureUser(
@@ -136,8 +165,149 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await migrated?.stop();
   });
 
-  it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {
+  it('activates a due contest during the member read without waiting for the worker poll', async () => {
     const fixture = await seedRegistrationCompetition();
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'due-start-member-read-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    const dueStartReference = Date.now();
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET minimum_entrants = 1,
+           registration_closes_at = $1,
+           starts_at = $2
+       WHERE id = $3`,
+      [
+        new Date(dueStartReference - 1_000),
+        new Date(dueStartReference - 500),
+        fixture.competitionId,
+      ],
+    );
+
+    await expect(
+      competitions.resolveGymQrCompetition(
+        userPrincipal,
+        fixture.gymPresence.credential,
+      ),
+    ).resolves.toMatchObject({
+      id: fixture.competitionId,
+      status: 'active',
+    });
+
+    const matches = await migrated.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM competition_matches
+       WHERE competition_id = $1`,
+      [fixture.competitionId],
+    );
+    expect(Number(matches.rows[0].count)).toBe(4);
+  });
+
+  it('instantly pairs the second registrant with a waiting user in the same Weekly Goal', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const firstUser = await profiles.ensureUser(
+      userPrincipal,
+      database.connection,
+    );
+    const secondUser = await profiles.ensureUser(
+      pairingPrincipal,
+      database.connection,
+    );
+    const secondLegalReceiptBundleId = await acceptCurrentLegalBundle(
+      pairingPrincipal,
+      'weekly-pairing-legal-receipt',
+    );
+    const competition = await database.connection
+      .selectFrom('competitions')
+      .select('region_policy_id')
+      .where('id', '=', fixture.competitionId)
+      .executeTakeFirstOrThrow();
+    const secondVerification = await database.connection
+      .insertInto('region_verifications')
+      .values({
+        evidence_metadata: {},
+        expires_at: new Date(Date.now() + 24 * 60 * 60_000),
+        method: 'manual_review',
+        policy_version: 'policy-v1',
+        region_policy_id: competition.region_policy_id,
+        status: 'approved',
+        user_id: secondUser.id,
+        verified_at: new Date(),
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const enrollmentRequest = {
+      ageEligibilityAttested: true as const,
+      goalDays: 3,
+      gymPresence: fixture.gymPresence,
+      rulesAccepted: true as const,
+    };
+
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'weekly-pairing-first-enrollment',
+      {
+        ...enrollmentRequest,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+      },
+    );
+    const waitingMatches = await database.connection
+      .selectFrom('competition_matches')
+      .select(['period_index', 'status', 'user_a_id', 'user_b_id'])
+      .where('competition_id', '=', fixture.competitionId)
+      .orderBy('period_index')
+      .execute();
+    expect(waitingMatches).toEqual(
+      [1, 2, 3, 4].map((periodIndex) => ({
+        period_index: periodIndex,
+        status: 'searching',
+        user_a_id: firstUser.id,
+        user_b_id: null,
+      })),
+    );
+
+    await competitions.enroll(
+      pairingPrincipal,
+      fixture.competitionId,
+      'weekly-pairing-second-enrollment',
+      {
+        ...enrollmentRequest,
+        legalReceiptBundleId: secondLegalReceiptBundleId,
+        regionVerificationId: secondVerification.id,
+      },
+    );
+
+    const pairedMatches = await database.connection
+      .selectFrom('competition_matches')
+      .select(['period_index', 'status', 'user_a_id', 'user_b_id'])
+      .where('competition_id', '=', fixture.competitionId)
+      .orderBy('period_index')
+      .execute();
+    expect(pairedMatches).toHaveLength(4);
+    expect(pairedMatches).toEqual(
+      [1, 2, 3, 4].map((periodIndex) => ({
+        period_index: periodIndex,
+        status: 'matched',
+        user_a_id: firstUser.id,
+        user_b_id: secondUser.id,
+      })),
+    );
+  });
+
+  it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {
+    const fixture = await seedRegistrationCompetition(contestPinningPrincipal);
     const source = await database.connection
       .selectFrom('competitions as competition')
       .innerJoin(
@@ -213,20 +383,23 @@ describeWithDatabase('critical session and ledger workflow', () => {
       .execute();
 
     await expect(
-      competitions.resolveGymQrCompetition(userPrincipal, otherCredential),
+      competitions.resolveGymQrCompetition(
+        contestPinningPrincipal,
+        otherCredential,
+      ),
     ).resolves.toMatchObject({
       id: otherCompetition.id,
       name: 'Later Contest At Same Gym',
     });
     await expect(
       competitions.resolveGymQrCompetition(
-        userPrincipal,
+        contestPinningPrincipal,
         fixture.gymPresence.credential,
       ),
     ).resolves.toMatchObject({ id: fixture.competitionId });
     await expect(
       competitions.enroll(
-        userPrincipal,
+        contestPinningPrincipal,
         otherCompetition.id,
         'wrong-contest-poster-enrollment',
         {
@@ -243,7 +416,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     });
 
     await competitions.enroll(
-      userPrincipal,
+      contestPinningPrincipal,
       otherCompetition.id,
       'existing-later-contest-enrollment',
       {
@@ -258,20 +431,20 @@ describeWithDatabase('critical session and ledger workflow', () => {
         rulesAccepted: true,
       },
     );
-    await expect(competitions.getCurrent(userPrincipal)).resolves.toMatchObject(
-      {
-        id: otherCompetition.id,
-      },
-    );
+    await expect(
+      competitions.getCurrent(contestPinningPrincipal),
+    ).resolves.toMatchObject({
+      id: otherCompetition.id,
+    });
     await expect(
       competitions.resolveGymQrCompetition(
-        userPrincipal,
+        contestPinningPrincipal,
         fixture.gymPresence.credential,
       ),
     ).resolves.toMatchObject({ id: fixture.competitionId });
 
     await competitions.enroll(
-      userPrincipal,
+      contestPinningPrincipal,
       fixture.competitionId,
       'scanned-earlier-contest-enrollment',
       {
@@ -284,7 +457,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       },
     );
     await expect(
-      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+      competitions.getCurrentEnrollment(
+        contestPinningPrincipal,
+        fixture.competitionId,
+      ),
     ).resolves.toMatchObject({ competitionId: fixture.competitionId });
 
     const activeEnrollment = await migrated.pool.query<{
@@ -310,7 +486,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await expect(
       competitions.withdrawEnrollment(
-        userPrincipal,
+        contestPinningPrincipal,
         fixture.competitionId,
         'withdraw-scanned-earlier-contest',
       ),
@@ -319,7 +495,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       status: 'withdrawn',
     });
     await expect(
-      competitions.getCurrentEnrollment(userPrincipal, fixture.competitionId),
+      competitions.getCurrentEnrollment(
+        contestPinningPrincipal,
+        fixture.competitionId,
+      ),
     ).resolves.toBeNull();
     const cancelledSession = await migrated.pool.query<{ status: string }>(
       `SELECT status FROM workout_sessions WHERE id = $1`,
@@ -830,8 +1009,8 @@ describeWithDatabase('critical session and ledger workflow', () => {
       [fixture.competitionId, enrollment.id],
     );
     expect(progress.rows[0]).toEqual({
-      category_score: 7,
-      prize_draw_entries: 8,
+      category_score: 1,
+      prize_draw_entries: 2,
       verified_days: 1,
     });
     await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
@@ -1102,12 +1281,14 @@ describeWithDatabase('critical session and ledger workflow', () => {
     return Number(result.rows[0].count);
   }
 
-  async function seedRegistrationCompetition(): Promise<CompetitionFixture> {
+  async function seedRegistrationCompetition(
+    principal: AuthenticatedPrincipal = userPrincipal,
+  ): Promise<CompetitionFixture> {
     const now = Date.now();
     const fixtureSequence = ++registrationFixtureSequence;
-    const user = await profiles.ensureUser(userPrincipal, database.connection);
+    const user = await profiles.ensureUser(principal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(
-      userPrincipal,
+      principal,
       'critical-session-legal-receipt',
     );
     const region = await migrated.pool.query<{ id: string }>(

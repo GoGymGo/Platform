@@ -21,14 +21,15 @@ test('App Tour routes are unique and resolve to stable screen positions', () => 
   assert.equal(findAppTourRouteIndex(['', 'not-a-screen'].join('/')), -1);
 });
 
-test('the public demo exposes the first ten reviewed product destinations', () => {
-  assert.equal(publicDemoRoutes.length, 10);
+test('the public demo exposes the reviewed product destinations', () => {
+  assert.equal(publicDemoRoutes.length, 11);
   assert.deepEqual(
     publicDemoRoutes.map(({ route }) => route),
     [
       '/home',
       '/calendar',
       '/leaderboard',
+      '/leaderboard/standings',
       '/winners-circle',
       '/leaderboard/rewards',
       '/rewards/awards',

@@ -355,15 +355,30 @@ export function getCompetitionRegionDateKey(date: Date, timeZone: string) {
 }
 
 export function formatCompetitionOpeningDateTime(value: string, timeZone: string) {
+  const date = new Date(value);
+  const includesSubMinutePrecision =
+    date.getUTCSeconds() !== 0 || date.getUTCMilliseconds() !== 0;
+
   return new Intl.DateTimeFormat('en-CA', {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     month: 'long',
+    ...(includesSubMinutePrecision ? { second: '2-digit' } : {}),
     timeZone,
     timeZoneName: 'short',
     year: 'numeric'
-  }).format(new Date(value));
+  }).format(date);
+}
+
+export function hasCompetitionStarted(
+  startsAt: string | null | undefined,
+  now = Date.now()
+) {
+  if (!startsAt) return false;
+
+  const startTime = Date.parse(startsAt);
+  return Number.isFinite(startTime) && now >= startTime;
 }
 
 export function isCompetitionBonusDay(dateKey: string) {

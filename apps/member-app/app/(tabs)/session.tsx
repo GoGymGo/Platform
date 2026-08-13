@@ -11,8 +11,10 @@ import {
 import { RecoverableScreenError } from '@/components/reliability';
 import { BrandScreenHeader } from '@/components/screenLayout';
 import { colors, spacing } from '@/constants/theme';
-import { getWorkoutAccessMode } from '@/domain/workoutAccess';
+import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import { getWorkoutAccessMode } from '@/domain/workoutAccess';
+import { useCompetitionStart } from '@/hooks/useCompetitionStart';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -29,12 +31,10 @@ export default function SessionTabRoute() {
 
 function MobileSessionTabRoute() {
   const router = useRouter();
-  const { competition } = useWorkoutProgress();
-  const verifiedWorkoutUnavailable = getWorkoutAccessMode(
-    competition.phase === 'before-month'
-  ) === 'upcoming';
+  const { competition, competitionTimeZone } = useWorkoutProgress();
   const {
     checking: setupChecking,
+    currentCompetition,
     error: setupError,
     ready: setupReady,
     retry: retrySetup,
@@ -43,6 +43,20 @@ function MobileSessionTabRoute() {
     setupMessage,
     setupRoute
   } = useSessionRegistrationAccess();
+  const competitionStartReached = useCompetitionStart(
+    currentCompetition?.startsAt
+  );
+  const verifiedWorkoutUnavailable = getWorkoutAccessMode(
+    currentCompetition
+      ? !competitionStartReached
+      : competition.phase === 'before-month'
+  ) === 'upcoming';
+  const competitionOpeningDateTime = currentCompetition
+    ? formatCompetitionOpeningDateTime(
+        currentCompetition.startsAt,
+        competitionTimeZone
+      )
+    : null;
 
   if (setupChecking) {
     return <ScreenLoadingState body="Checking your Contest." />;
@@ -88,7 +102,9 @@ function MobileSessionTabRoute() {
             CONTEST NOT STARTED
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Verified workouts unlock when the September Contest begins.
+            {competitionOpeningDateTime
+              ? `Start your workout at ${competitionOpeningDateTime}.`
+              : 'Verified workouts unlock when the Contest begins.'}
           </TerminalText>
         </HUDBorderBox>
       ) : (

@@ -76,6 +76,12 @@ interface DeletedGymJson extends JsonObject {
   status: 'deleted';
 }
 
+interface PosterReward {
+  inventoryTotal: number;
+  sponsorName: string;
+  title: string;
+}
+
 @Injectable()
 export class GymsService {
   constructor(
@@ -799,6 +805,10 @@ export class GymsService {
           reason,
           requestId,
         });
+        const posterReward = await this.getPosterReward(
+          transaction,
+          competition.id,
+        );
         return {
           competitionId: competition.id,
           competitionName: competition.name,
@@ -811,6 +821,7 @@ export class GymsService {
             competition,
             qrPayload,
             credentialVersion,
+            posterReward,
           ),
           qrPayload,
         };
@@ -873,6 +884,10 @@ export class GymsService {
         if (!credential?.qr_payload) {
           return null;
         }
+        const posterReward = await this.getPosterReward(
+          transaction,
+          credential.competition_id,
+        );
         return {
           competitionId: credential.competition_id,
           competitionName: credential.competition_name,
@@ -893,6 +908,7 @@ export class GymsService {
             },
             credential.qr_payload,
             credential.credential_version,
+            posterReward,
           ),
           qrPayload: credential.qr_payload,
         };
@@ -1751,6 +1767,7 @@ export class GymsService {
     },
     qrPayload: string,
     credentialVersion: number,
+    reward: PosterReward | null,
   ): Promise<string> {
     const qr = await QRCode.toString(qrPayload, {
       color: { dark: '#05090b', light: '#ffffff' },
@@ -1781,6 +1798,18 @@ export class GymsService {
         ? `${competition.name.slice(0, 31)}...`
         : competition.name,
     );
+    const truncatePosterLine = (value: string, maximumLength: number) =>
+      value.length > maximumLength
+        ? `${value.slice(0, maximumLength - 3).trimEnd()}...`
+        : value;
+    const sponsorLine = reward
+      ? `SPONSORED BY ${reward.sponsorName.toUpperCase()}`
+      : 'SPONSOR TO BE ANNOUNCED';
+    const rewardLine = reward
+      ? `${reward.title.toUpperCase()}  |  ${reward.inventoryTotal} ${reward.inventoryTotal === 1 ? 'WINNER' : 'WINNERS'}`
+      : 'REWARD TO BE ANNOUNCED';
+    const safeSponsorLine = escapeXml(truncatePosterLine(sponsorLine, 58));
+    const safeRewardLine = escapeXml(truncatePosterLine(rewardLine, 62));
     const safeRegionName = escapeXml(competition.region_name.toUpperCase());
     const dateFormatter = new Intl.DateTimeFormat('en-CA', {
       day: 'numeric',
@@ -1797,7 +1826,7 @@ export class GymsService {
     const contestEnds = dateFormatter.format(competition.ends_at).toUpperCase();
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-label="${safeContestName} QR poster for ${safeGymName}">
   <title>${safeContestName} at ${safeGymName}</title>
-  <desc>This poster is valid only for ${safeContestName}. Scan once to join and select this gym. Workout start and finish use fresh location checks.</desc>
+  <desc>This poster is valid only for ${safeContestName}. ${safeSponsorLine}. ${safeRewardLine}. Scan once to join and select this gym. Workout start and finish use fresh location checks.</desc>
   <rect width="1000" height="1400" fill="#05090b"/>
   <rect x="24" y="24" width="952" height="1352" rx="32" fill="none" stroke="#173A46" stroke-width="3"/>
 
@@ -1806,9 +1835,10 @@ export class GymsService {
     <text x="500" y="124" text-anchor="middle" font-family="Orbitron, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="2"><tspan fill="#34E5E8">GO</tspan><tspan fill="#FF2D9B">GYM</tspan><tspan fill="#34E5E8">GO</tspan></text>
   </g>
 
-  <text x="500" y="190" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="3">${safeRegionName}</text>
-  <text x="500" y="246" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="31" font-weight="700">SCAN THE QR CODE TO JOIN</text>
-  <text x="500" y="307" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="44" font-weight="700">${safeContestDisplayName}</text>
+  <text x="500" y="184" text-anchor="middle" fill="#FFE066" font-family="Orbitron, Arial, sans-serif" font-size="44" font-weight="700">${safeContestDisplayName}</text>
+  <text x="500" y="226" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="22" letter-spacing="2">${safeSponsorLine}</text>
+  <text x="500" y="270" text-anchor="middle" fill="#FF2D9B" font-family="Orbitron, Arial, sans-serif" font-size="27" font-weight="700">${safeRewardLine}</text>
+  <text x="500" y="317" text-anchor="middle" fill="#E9F7F8" font-family="Orbitron, Arial, sans-serif" font-size="29" font-weight="700">SCAN THE QR CODE TO JOIN</text>
 
   <rect x="160" y="345" width="680" height="680" rx="34" fill="#fff"/>
   <svg x="190" y="375" width="620" height="620" viewBox="${qrViewBox}" shape-rendering="crispEdges" aria-label="Scan to open ${safeContestName}">
@@ -1820,11 +1850,34 @@ export class GymsService {
   <line x1="100" y1="1165" x2="900" y2="1165" stroke="#173A46" stroke-width="2"/>
 
   <text x="500" y="1208" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">REGISTRATION ${registrationDate}  |  CONTEST ${contestStarts} - ${contestEnds}</text>
-  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">CONTEST-SPECIFIC POSTER  |  FREE TO ENTER  |  NO PURCHASE REQUIRED</text>
+  <text x="500" y="1248" text-anchor="middle" fill="#4DFF88" font-family="Share Tech Mono, monospace" font-size="19">${safeRegionName}  |  FREE TO ENTER  |  NO PURCHASE REQUIRED</text>
   <text x="500" y="1288" text-anchor="middle" fill="#E9F7F8" font-family="Share Tech Mono, monospace" font-size="19">Choose a 1-7 day weekly goal. Complete it to earn Prize Draw Entries.</text>
   <text x="500" y="1324" text-anchor="middle" fill="#96AAB0" font-family="Share Tech Mono, monospace" font-size="16">Location access is required. Entries improve odds but do not guarantee the reward.</text>
   <text x="500" y="1358" text-anchor="middle" fill="#9FF3F5" font-family="Share Tech Mono, monospace" font-size="16">Official Rules and eligibility apply - GOGYMGO.COM</text>
   <text x="950" y="1358" text-anchor="end" fill="#607781" font-family="monospace" font-size="11">POSTER V${credentialVersion}</text>
 </svg>`;
+  }
+
+  private async getPosterReward(
+    transaction: Transaction<Database>,
+    competitionId: string,
+  ): Promise<PosterReward | null> {
+    const reward = await transaction
+      .selectFrom('reward_catalog_items')
+      .select(['inventory_total', 'sponsor_name', 'title'])
+      .where('competition_id', '=', competitionId)
+      .where('status', '=', 'published')
+      .where('deleted_at', 'is', null)
+      .orderBy('display_order')
+      .orderBy('created_at')
+      .executeTakeFirst();
+
+    return reward
+      ? {
+          inventoryTotal: reward.inventory_total,
+          sponsorName: reward.sponsor_name,
+          title: reward.title,
+        }
+      : null;
   }
 }

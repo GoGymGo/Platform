@@ -33,8 +33,8 @@ const defaultCompetitionRules = {
   requireGymQr: true,
   requirePresenceCheck: false,
   signupPrizeDrawEntries: 1,
-  verifiedSessionCategoryScore: 10,
-  verifiedSessionPrizeDrawEntries: 2,
+  verifiedSessionCategoryScore: 1,
+  verifiedSessionPrizeDrawEntries: 1,
   weeklyChallengeBothHitMultiplier: 2,
   weeklyChallengeRecoveryMultiplier: 3,
 };

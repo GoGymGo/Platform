@@ -25,6 +25,25 @@ describe('authoritative competition scoring', () => {
     });
   });
 
+  it('awards one settled point for a one-day goal at 1x', () => {
+    expect(
+      calculateWeeklyScore({
+        availableDays: 7,
+        bothHitMultiplier: 2,
+        entriesPerVerifiedDay: 1,
+        goalDays: 1,
+        opponentVerifiedDays: null,
+        recoveryMultiplier: 3,
+        verifiedDays: 1,
+      }),
+    ).toEqual({
+      entries: 1,
+      goalMet: true,
+      multiplier: 1,
+      recovered: false,
+    });
+  });
+
   it('awards both-hit and recovery outcomes without inventing a partner', () => {
     const base = {
       availableDays: 7,

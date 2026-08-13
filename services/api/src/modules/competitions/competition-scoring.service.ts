@@ -24,6 +24,7 @@ import {
   parseCompetitionRules,
   type CompetitionRules,
 } from './competition-rules';
+import { buildAutomaticWeeklyChallengePairingPlan } from './weekly-challenge-pairing';
 
 interface ScoringCompetition {
   id: string;
@@ -89,8 +90,28 @@ export class CompetitionScoringService {
 
     for (const row of competitions) {
       const competition = toScoringCompetition(row);
+      const periods = buildCompetitionPeriods(competition.monthKey);
+      await this.database.connection
+        .transaction()
+        .execute(async (transaction) => {
+          const activeCompetition = await transaction
+            .selectFrom('competitions')
+            .select('status')
+            .where('id', '=', competition.id)
+            .forUpdate()
+            .executeTakeFirst();
+          if (activeCompetition?.status === 'active') {
+            await this.ensureWeeklyChallengeMatches(
+              transaction,
+              competition.id,
+              competition.monthKey,
+              now,
+              periods,
+            );
+          }
+        });
       const regionalDateKey = dateKeyInTimezone(now, competition.timezone);
-      for (const period of buildCompetitionPeriods(competition.monthKey)) {
+      for (const period of periods) {
         if (settled >= settlementLimit) {
           return settled;
         }
@@ -155,6 +176,124 @@ export class CompetitionScoringService {
     await this.applyFinalAdjustments(transaction, competition);
   }
 
+  async ensureWeeklyChallengeMatches(
+    transaction: Transaction<Database>,
+    competitionId: string,
+    monthKey: string,
+    now: Date,
+    periods: readonly CompetitionPeriod[] = buildCompetitionPeriods(monthKey),
+  ): Promise<number> {
+    if (periods.length === 0) {
+      return 0;
+    }
+
+    const enrollments = await this.loadEnrollments(transaction, competitionId);
+    if (enrollments.length === 0) {
+      return 0;
+    }
+    const existingMatches = await transaction
+      .selectFrom('competition_matches')
+      .select(['id', 'period_index', 'status', 'user_a_id', 'user_b_id'])
+      .where('competition_id', '=', competitionId)
+      .where(
+        'period_index',
+        'in',
+        periods.map((period) => period.index),
+      )
+      .execute();
+    let changes = 0;
+
+    for (const period of periods) {
+      const assignedUserIds = new Set<string>();
+      const periodMatches = existingMatches.filter(
+        (match) => match.period_index === period.index,
+      );
+      const waitingMatches = periodMatches
+        .filter(
+          (match) => match.status === 'searching' && match.user_b_id === null,
+        )
+        .map((match) => ({ id: match.id, userId: match.user_a_id }));
+      for (const match of periodMatches) {
+        if (match.status === 'searching' && match.user_b_id === null) {
+          continue;
+        }
+        assignedUserIds.add(match.user_a_id);
+        if (match.user_b_id) assignedUserIds.add(match.user_b_id);
+      }
+
+      const pairingPlan = buildAutomaticWeeklyChallengePairingPlan(
+        enrollments,
+        waitingMatches,
+        assignedUserIds,
+      );
+      const affectedUserIds = new Set<string>();
+
+      if (pairingPlan.deleteMatchIds.length > 0) {
+        await transaction
+          .deleteFrom('competition_matches')
+          .where('id', 'in', pairingPlan.deleteMatchIds)
+          .where('status', '=', 'searching')
+          .where('user_b_id', 'is', null)
+          .execute();
+        changes += pairingPlan.deleteMatchIds.length;
+      }
+
+      for (const update of pairingPlan.matchWaitingUsers) {
+        await transaction
+          .updateTable('competition_matches')
+          .set({ status: 'matched', user_b_id: update.userBId })
+          .where('id', '=', update.matchId)
+          .where('status', '=', 'searching')
+          .where('user_a_id', '=', update.userAId)
+          .where('user_b_id', 'is', null)
+          .executeTakeFirstOrThrow();
+        affectedUserIds.add(update.userAId);
+        affectedUserIds.add(update.userBId);
+        changes += 1;
+      }
+
+      for (const pair of pairingPlan.create) {
+        await transaction
+          .insertInto('competition_matches')
+          .values({
+            competition_id: competitionId,
+            created_at: now,
+            outcome: null,
+            period_end_date: period.endDateKey,
+            period_index: period.index,
+            period_start_date: period.startDateKey,
+            settled_at: null,
+            status: pair.userBId ? 'matched' : 'searching',
+            user_a_id: pair.userAId,
+            user_b_id: pair.userBId,
+          })
+          .executeTakeFirstOrThrow();
+        affectedUserIds.add(pair.userAId);
+        if (pair.userBId) affectedUserIds.add(pair.userBId);
+        changes += 1;
+      }
+
+      if (affectedUserIds.size > 0) {
+        const userIds = [...affectedUserIds];
+        await transaction
+          .updateTable('weekly_challenge_requests')
+          .set({ responded_at: now, status: 'cancelled' })
+          .where('competition_id', '=', competitionId)
+          .where('period_index', '=', period.index)
+          .where('status', '=', 'pending')
+          .where((expression) =>
+            expression.or([
+              expression('requester_user_id', 'in', userIds),
+              expression('recipient_user_id', 'in', userIds),
+            ]),
+          )
+          .execute();
+      }
+    }
+
+    return changes;
+  }
+
   private async settlePeriod(
     transaction: Transaction<Database>,
     competition: ScoringCompetition,
@@ -168,6 +307,14 @@ export class CompetitionScoringService {
     ) {
       return false;
     }
+
+    await this.ensureWeeklyChallengeMatches(
+      transaction,
+      competition.id,
+      competition.monthKey,
+      now,
+      [period],
+    );
 
     const enrollments = await this.loadEnrollments(transaction, competition.id);
     if (enrollments.length === 0) {
@@ -321,13 +468,20 @@ export class CompetitionScoringService {
     for (const outcome of outcomes) {
       const enrollment =
         outcome.userId === userA.userId ? userA : (userB as ScoringEnrollment);
-      const rawEntries =
-        outcome.verifiedDays *
-        competition.rules.verifiedSessionPrizeDrawEntries;
-      const adjustment = outcome.entries - rawEntries;
-      if (adjustment !== 0) {
+      const provisionalValue = await this.loadPeriodVerifiedSessionValue(
+        transaction,
+        competition.id,
+        outcome.userId,
+        period.startDateKey,
+        period.endDateKey,
+      );
+      const categoryScoreAdjustment =
+        outcome.entries - provisionalValue.categoryScore;
+      const prizeDrawEntriesAdjustment =
+        outcome.entries - provisionalValue.prizeDrawEntries;
+      if (categoryScoreAdjustment !== 0 || prizeDrawEntriesAdjustment !== 0) {
         await this.ledger.append(transaction, {
-          categoryScoreDelta: 0,
+          categoryScoreDelta: categoryScoreAdjustment,
           competitionId: competition.id,
           enrollmentId: enrollment.id,
           goalDays: enrollment.goalDays,
@@ -335,11 +489,13 @@ export class CompetitionScoringService {
             entriesAfterSettlement: outcome.entries,
             multiplier: outcome.multiplier,
             periodIndex: period.index,
+            provisionalCategoryScore: provisionalValue.categoryScore,
+            provisionalPrizeDrawEntries: provisionalValue.prizeDrawEntries,
             recovered: outcome.recovered,
             verifiedDays: outcome.verifiedDays,
           },
           policyVersion: competition.rulesVersion,
-          prizeDrawEntriesDelta: adjustment,
+          prizeDrawEntriesDelta: prizeDrawEntriesAdjustment,
           reason: 'weekly_match',
           sourceEventId: match.id,
           userId: enrollment.userId,
@@ -394,6 +550,41 @@ export class CompetitionScoringService {
     });
 
     return { ...score, userId: enrollment.userId, verifiedDays };
+  }
+
+  private async loadPeriodVerifiedSessionValue(
+    transaction: Transaction<Database>,
+    competitionId: string,
+    userId: string,
+    startDateKey: string,
+    endDateKey: string,
+  ): Promise<{ categoryScore: number; prizeDrawEntries: number }> {
+    const row = await transaction
+      .selectFrom('entry_ledger as entry')
+      .innerJoin(
+        'workout_sessions as session',
+        'session.id',
+        'entry.source_event_id',
+      )
+      .select((expression) => [
+        expression.fn
+          .sum<number>('entry.category_score_delta')
+          .as('category_score'),
+        expression.fn
+          .sum<number>('entry.prize_draw_entries_delta')
+          .as('prize_draw_entries'),
+      ])
+      .where('entry.competition_id', '=', competitionId)
+      .where('entry.user_id', '=', userId)
+      .where('entry.reason', '=', 'verified_session')
+      .where('session.eligible_date', '>=', startDateKey)
+      .where('session.eligible_date', '<=', endDateKey)
+      .executeTakeFirstOrThrow();
+
+    return {
+      categoryScore: Number(row.category_score ?? 0),
+      prizeDrawEntries: Number(row.prize_draw_entries ?? 0),
+    };
   }
 
   private async applyFinalAdjustments(
@@ -484,6 +675,14 @@ export class CompetitionScoringService {
       const rawBonusEntries =
         bonusDays * competition.rules.verifiedSessionPrizeDrawEntries;
       const bonusAdjustment = bonusEntries - rawBonusEntries;
+      const provisionalBonusValue = await this.loadPeriodVerifiedSessionValue(
+        transaction,
+        competition.id,
+        enrollment.userId,
+        `${competition.monthKey}-29`,
+        competitionMonthEndDateKey(competition.monthKey),
+      );
+      const bonusCategoryScoreAdjustment = -provisionalBonusValue.categoryScore;
       const perfectMonth = buildCompetitionPeriods(competition.monthKey).every(
         (period) =>
           firstFourWeekDays.filter(
@@ -518,12 +717,14 @@ export class CompetitionScoringService {
           reason: 'category_placement',
         });
       }
-      if (bonusAdjustment !== 0) {
+      if (bonusAdjustment !== 0 || bonusCategoryScoreAdjustment !== 0) {
         await this.ledger.append(transaction, {
           ...common,
+          categoryScoreDelta: bonusCategoryScoreAdjustment,
           metadata: {
             bonusDays,
             entriesAfterSettlement: bonusEntries,
+            provisionalCategoryScore: provisionalBonusValue.categoryScore,
           },
           prizeDrawEntriesDelta: bonusAdjustment,
           reason: 'bonus_day',

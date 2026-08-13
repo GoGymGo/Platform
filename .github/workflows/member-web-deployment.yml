@@ -120,7 +120,7 @@ jobs:
         with:
           ref: ${{ inputs.source_commit }}
 
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           cache: npm
           cache-dependency-path: package-lock.json
@@ -141,7 +141,7 @@ jobs:
           npm run audit:demo-isolation
           npm run audit:browser-pilot-release -- dist
 
-      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.MEMBER_WEB_DEPLOY_ROLE_ARN }}

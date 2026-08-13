@@ -29,6 +29,7 @@ Cloud and local infrastructure live under `infrastructure/`. Product, architectu
 ```powershell
 npm.cmd ci
 npm.cmd run check
+npm.cmd run audit:dependencies
 npm.cmd run build
 npm.cmd test
 ```
@@ -87,4 +88,4 @@ deployment is manual through the protected `Platform Deployment` GitHub Actions
 workflow. The retired GCP foundation remains temporarily for migration history;
 new environments use [the AWS foundation](infrastructure/aws/terraform/README.md).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [product requirements](docs/product/product-requirements.md), [QR verification architecture](docs/architecture/session-evidence-review.md), [September pilot runbook](docs/operations/september-qr-pilot.md), [member-app QR-link deployment](docs/operations/member-app-native-links.md), [production domains and admin access](docs/operations/domains-and-admin-access.md), and [API deployment](docs/operations/api-deployment.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [dependency risk governance](docs/architecture/dependency-risk-governance.md), [product requirements](docs/product/product-requirements.md), [QR verification architecture](docs/architecture/session-evidence-review.md), [September pilot runbook](docs/operations/september-qr-pilot.md), [member-app QR-link deployment](docs/operations/member-app-native-links.md), [production domains and admin access](docs/operations/domains-and-admin-access.md), and [API deployment](docs/operations/api-deployment.md).

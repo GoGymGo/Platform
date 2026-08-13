@@ -21,6 +21,13 @@ feature should change no more than two runtime owners. A pull request spanning
 three or more runtime owners or more than 75 files requires a concrete plan
 under `docs/change-plans/`; unrelated work must still be split.
 
+Run `npm run audit:dependencies` for lockfile or dependency changes. Temporary
+security approvals are centralized in
+`config/dependency-risk-exceptions.json`, expire within 45 days, and must not be
+renewed without reassessing the exposure and upgrade path. Routine Dependabot
+PRs are limited to patch/minor changes; major migrations require focused plans
+and compatibility tests.
+
 Never commit environment files, credentials, database dumps, Terraform state, deployment archives, generated production bundles or local caches.
 
 ## Contracts

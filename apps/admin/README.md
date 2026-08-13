@@ -60,11 +60,13 @@ safeguards.
 
 The production-bundle audit blocks deployment if the vulnerable `image-size`
 ICNS, HEIF, or JXL parser becomes reachable in the built admin artifact. The
-dependency audit separately reports the two upstream build-tool advisories and
-accepts only the dated exceptions in
-`config/dependency-audit-exceptions.json`. Those exceptions expire on September
-8, 2026, so the weekly Admin CI run will require an upgrade or a fresh security
-review instead of allowing them indefinitely.
+dependency audit evaluates the shared workspace lockfile and accepts only the
+exact, dated approvals in `../../config/dependency-risk-exceptions.json`. The
+central Platform Integration job enforces that policy once for the repository;
+the existing weekly Admin schedule reruns it when there is no repository
+activity, and the workspace command remains available as a local shortcut.
+Expired, unused, mismatched, or newly reported advisories fail instead of being
+allowed indefinitely.
 
 ## Backend contract
 

@@ -8,6 +8,16 @@ updates:
       time: "16:00"
       timezone: America/Vancouver
     open-pull-requests-limit: 10
+    allow:
+      - dependency-type: all
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+    ignore:
+      - dependency-name: vinext
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
@@ -17,6 +27,11 @@ updates:
       time: "16:30"
       timezone: America/Vancouver
     open-pull-requests-limit: 5
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
     groups:
       actions:
         patterns:

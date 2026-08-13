@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "maximumReviewWindowDays": 45,
+  "exceptions": [
+    {
+      "advisoryId": 1138808,
+      "package": "image-size",
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "severity": "high",
+      "scope": "build-only",
+      "remediation": "no-patch-available",
+      "patchedVersion": null,
+      "expiresOn": "2026-09-08",
+      "reason": "Metro and Vinext use image-size while processing trusted source assets, and the advisory currently has no patched release.",
+      "controls": [
+        "Do not process user-supplied ICNS assets in build or preview jobs.",
+        "Keep the member and admin production-bundle audits required in CI."
+      ]
+    },
+    {
+      "advisoryId": 1138809,
+      "package": "image-size",
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "severity": "high",
+      "scope": "build-only",
+      "remediation": "no-patch-available",
+      "patchedVersion": null,
+      "expiresOn": "2026-09-08",
+      "reason": "Metro and Vinext use image-size while processing trusted source assets, and the advisory currently has no patched release.",
+      "controls": [
+        "Do not process user-supplied JXL or HEIF assets in build or preview jobs.",
+        "Keep the member and admin production-bundle audits required in CI."
+      ]
+    },
+    {
+      "advisoryId": 1102341,
+      "package": "esbuild",
+      "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+      "severity": "moderate",
+      "scope": "build-only",
+      "remediation": "upstream-migration-required",
+      "patchedVersion": "0.25.0",
+      "expiresOn": "2026-09-08",
+      "reason": "Drizzle Kit's legacy esbuild loader pins an affected build-only copy; replacing that loader requires a separately validated tooling migration.",
+      "controls": [
+        "Never expose local Drizzle or esbuild development servers to untrusted networks.",
+        "Keep deployable artifacts isolated from development-only migration tooling."
+      ]
+    },
+    {
+      "advisoryId": 1119441,
+      "package": "uuid",
+      "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+      "severity": "moderate",
+      "scope": "api-transitive",
+      "remediation": "upstream-migration-required",
+      "patchedVersion": "11.1.1",
+      "expiresOn": "2026-09-08",
+      "reason": "A legacy Firebase Admin transitive client retains uuid below 11.1.1; removing it requires an integration-tested SDK-chain migration.",
+      "controls": [
+        "Do not call the transitive uuid v3, v5, or v6 APIs or provide output buffers.",
+        "Require API integration tests before changing the Firebase Admin dependency chain."
+      ]
+    }
+  ]
+}

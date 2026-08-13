@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test": "node scripts/run-tests.mjs",
+    "test:journeys": "node --import=tsx --test src/journeys/criticalProductJourney.test.ts",
     "audit:api-routes": "node scripts/audit-api-routes.mjs",
     "audit:app-links": "node scripts/audit-app-links.mjs",
     "audit:browser-pilot-release": "node scripts/audit-browser-pilot-release.mjs",

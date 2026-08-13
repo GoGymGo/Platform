@@ -31,6 +31,9 @@
       "uuid": "11.1.1"
     }
   },
+  "devDependencies": {
+    "cross-env": "10.1.0"
+  },
   "scripts": {
     "build": "npm run contracts:generate && npm run build --workspace @gogymgo/brand && npm run build --workspace @gogymgo/contracts && npm run build --workspace @gogymgo/api && npm run build --workspace @gogymgo/admin && npm run build --workspace @gogymgo/landing && npm run build --workspace @gogymgo/member-app",
     "check": "npm run check:architecture && npm run contracts:check && npm run check --workspace @gogymgo/brand && npm run check --workspace @gogymgo/member-app && npm run check --workspace @gogymgo/api && npm run check --workspace @gogymgo/admin && npm run check --workspace @gogymgo/landing",
@@ -42,6 +45,8 @@
     "start:landing": "npm run dev --workspace @gogymgo/landing",
     "start:api": "npm run start:dev --workspace @gogymgo/api",
     "start:worker": "npm run start:worker --workspace @gogymgo/api",
-    "test": "npm run test --workspace @gogymgo/member-app && npm run test --workspace @gogymgo/api && npm run test --workspace @gogymgo/admin && npm run test --workspace @gogymgo/landing"
+    "test": "npm run test --workspace @gogymgo/member-app && npm run test --workspace @gogymgo/api && npm run test --workspace @gogymgo/admin && npm run test --workspace @gogymgo/landing",
+    "test:journeys": "npm run test:journeys --workspace @gogymgo/member-app && npm run test:journeys --workspace @gogymgo/admin",
+    "test:journeys:integration": "cross-env RUN_DATABASE_INTEGRATION=true npm run test:journeys --workspace @gogymgo/api"
   }
 }

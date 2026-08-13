@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           cache: npm
@@ -28,6 +30,10 @@ jobs:
       - run: npm run contracts:check
       - run: npm run audit:contract --workspace @gogymgo/api
       - run: npm run audit:api-routes --workspace @gogymgo/member-app
+      - run: node --test tooling/architecture-policy.test.mjs tooling/change-scope-policy.test.mjs
+      - run: node tooling/architecture-policy.mjs
+      - if: github.event_name == 'pull_request'
+        run: node tooling/change-scope-policy.mjs "${{ github.event.pull_request.base.sha }}"
       - run: node --test tooling/deployment-source-policy.test.mjs
       - run: npm run test:smoke:qr --workspace @gogymgo/api
         env:

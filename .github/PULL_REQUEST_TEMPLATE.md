@@ -16,6 +16,11 @@ Describe the user or operator outcome delivered by this change.
 
 List the exact root or workspace commands run and their results.
 
+## Boundaries
+
+List each runtime owner changed. If CI requires a broad-change plan, link the
+file under `docs/change-plans/` and explain why the coordination is indivisible.
+
 ## Release and risk
 
 - [ ] I am authorized to submit this work under GoGymGo's applicable confidentiality and intellectual-property terms.

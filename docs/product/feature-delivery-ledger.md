@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `b4e98a63933143b2a7eed70bab02c0aeb879c1d7` after PR #80 on 2026-08-13.
-- Active feature task: none while the coordinator records GGG-004 completion and
-  prepares the next dependency-ordered feature assignment.
+- Active feature task: `GoGymGo Feature GGG-005 — Partner gym QR enrollment` on
+  `agent/ggg-005-partner-gym-qr-enrollment`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -224,7 +224,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   contest and gym mismatch, scoped partner authorization, poster render, camera
   permissions, exact enrollment gym persistence; real gym and devices.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-005 — Partner gym QR
-  enrollment`; branch/PR/merge `unassigned`; status `AUDITED`.
+  enrollment`; branch `agent/ggg-005-partner-gym-qr-enrollment`; PR/merge
+  `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: production QR must never use sample gym data or
   placeholder native identifiers.
 
@@ -973,6 +974,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-005` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-004 completion ledger merged through PR #81 as
+  `f011ba0cc0cd1ac875eb58aa8178e6a25eaf82c9` with green main-push checks.
 - 2026-08-13 — Completed `GGG-004` through PR #80. Exact tested head
   `bbaa881f2b1dfd458aa13a6e41da2f0725dd1081` was squash-merged as
   `b4e98a63933143b2a7eed70bab02c0aeb879c1d7`; all PR and six main-push checks

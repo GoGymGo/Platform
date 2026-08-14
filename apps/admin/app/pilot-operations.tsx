@@ -991,7 +991,11 @@ function WaitlistReviewControl({
       <button disabled={submitting} type="submit">
         UPDATE
       </button>
-      {error ? <span className="form-error" role="alert">{error}</span> : null}
+      {error ? (
+        <span className="form-error" role="alert">
+          {error}
+        </span>
+      ) : null}
     </form>
   );
 }
@@ -1292,6 +1296,9 @@ export function PosterPreview({ credential }: { credential: GymQrCredential }) {
           {credential.competitionName.toUpperCase()} · PRINTABLE QR POSTER ·
           VERSION {credential.credentialVersion}
         </strong>
+        <span>
+          ACTIVE UNTIL {new Date(credential.expiresAt).toLocaleString()}
+        </span>
         <div className="poster-preview-actions">
           <button
             aria-controls={contentId}

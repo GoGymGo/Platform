@@ -22,6 +22,7 @@ import type {
   CashFulfillmentRequestDto,
   CreateGymLocationDto,
   GymLocationResponseDto,
+  GymQrCredentialHistoryDto,
   GymQrCredentialResponseDto,
   GymScanRequestDto,
   GymScanResultDto,
@@ -78,6 +79,28 @@ interface GymPresenceContext {
 interface DeletedGymJson extends JsonObject {
   id: string;
   status: 'deleted';
+}
+
+interface GymQrCredentialJson extends JsonObject {
+  competitionId: string;
+  competitionName: string;
+  credentialVersion: number;
+  expiresAt: string;
+  gymLocationId: string;
+  id: string;
+  issuedAt: string;
+  printablePosterSvg: string;
+  qrPayload: string;
+}
+
+interface GymQrCredentialActionJson extends JsonObject {
+  id: string;
+  status: 'revoked';
+}
+
+interface CompetitionGymAssignmentJson extends JsonObject {
+  id: string;
+  status: 'assigned';
 }
 
 interface WaitlistEntryJson extends JsonObject {
@@ -701,9 +724,15 @@ export class GymsService {
     requestId: string,
     reason: string,
   ): Promise<GymQrCredentialResponseDto> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    return this.idempotency.execute<GymQrCredentialJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: { competitionId, gymId, reason: reason.trim() },
+        responseCode: 201,
+        scope: `gym-qr-credentials:${competitionId}:${gymId}:issue`,
+      },
+      async (transaction) => {
         const operator = await this.adminAuthorization.requireGymAccess(
           principal,
           transaction,
@@ -712,7 +741,7 @@ export class GymsService {
         );
         const gym = await transaction
           .selectFrom('gym_locations')
-          .select(['active', 'id', 'name'])
+          .select(['active', 'id', 'name', 'region_policy_id'])
           .where('id', '=', gymId)
           .where('deleted_at', 'is', null)
           .forUpdate()
@@ -745,6 +774,7 @@ export class GymsService {
             'competition.ends_at',
             'competition.id',
             'competition.name',
+            'competition.region_policy_id',
             'competition.registration_opens_at',
             'competition.starts_at',
             'competition.status',
@@ -754,6 +784,8 @@ export class GymsService {
           .where('assignment.competition_id', '=', competitionId)
           .where('assignment.gym_location_id', '=', gym.id)
           .where('competition.deleted_at', 'is', null)
+          .where('region.competition_enabled', '=', true)
+          .where('region.deleted_at', 'is', null)
           .executeTakeFirst();
         if (!competition) {
           throw new ConflictException({
@@ -770,6 +802,19 @@ export class GymsService {
           });
         }
         const now = new Date();
+        if (competition.region_policy_id !== gym.region_policy_id) {
+          throw new ConflictException({
+            code: 'COMPETITION_GYM_REGION_MISMATCH',
+            message:
+              'The Partner gym no longer belongs to the selected Contest region.',
+          });
+        }
+        if (competition.ends_at <= now) {
+          throw new ConflictException({
+            code: 'GYM_QR_WINDOW_CLOSED',
+            message: 'A QR poster cannot be issued after its Contest ends.',
+          });
+        }
         await transaction
           .updateTable('gym_qr_credentials')
           .set({
@@ -797,6 +842,7 @@ export class GymsService {
           .values({
             competition_id: competition.id,
             credential_version: credentialVersion,
+            expires_at: competition.ends_at,
             gym_location_id: gym.id,
             issued_at: now,
             issued_by_user_id: operator.user.id,
@@ -828,6 +874,7 @@ export class GymsService {
           competitionId: competition.id,
           competitionName: competition.name,
           credentialVersion,
+          expiresAt: competition.ends_at.toISOString(),
           gymLocationId: gym.id,
           id: credential.id,
           issuedAt: credential.issued_at.toISOString(),
@@ -840,7 +887,8 @@ export class GymsService {
           ),
           qrPayload,
         };
-      });
+      },
+    );
   }
 
   getActiveCredential(
@@ -869,6 +917,11 @@ export class GymsService {
             'competition.id',
             'credential.competition_id',
           )
+          .innerJoin('competition_gym_locations as assignment', (join) =>
+            join
+              .onRef('assignment.competition_id', '=', 'competition.id')
+              .onRef('assignment.gym_location_id', '=', 'gym.id'),
+          )
           .innerJoin(
             'region_policies as region',
             'region.id',
@@ -881,6 +934,7 @@ export class GymsService {
             'competition.registration_opens_at',
             'competition.starts_at',
             'credential.credential_version',
+            'credential.expires_at',
             'credential.id',
             'credential.issued_at',
             'credential.qr_payload',
@@ -895,6 +949,11 @@ export class GymsService {
           .where('gym.deleted_at', 'is', null)
           .where('gym.active', '=', true)
           .where('credential.status', '=', 'active')
+          .where('credential.expires_at', '>', new Date())
+          .where('competition.ends_at', '>', new Date())
+          .whereRef('competition.region_policy_id', '=', 'gym.region_policy_id')
+          .where('region.competition_enabled', '=', true)
+          .where('region.deleted_at', 'is', null)
           .executeTakeFirst();
         if (!credential?.qr_payload) {
           return null;
@@ -907,6 +966,7 @@ export class GymsService {
           competitionId: credential.competition_id,
           competitionName: credential.competition_name,
           credentialVersion: credential.credential_version,
+          expiresAt: credential.expires_at.toISOString(),
           gymLocationId: credential.gym_location_id,
           id: credential.id,
           issuedAt: credential.issued_at.toISOString(),
@@ -930,6 +990,61 @@ export class GymsService {
       });
   }
 
+  listCredentialHistory(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    gymId: string,
+  ): Promise<GymQrCredentialHistoryDto[]> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.adminAuthorization.requireGymAccess(
+          principal,
+          transaction,
+          gymId,
+          'staff',
+        );
+        const now = new Date();
+        const credentials = await transaction
+          .selectFrom('gym_qr_credentials as credential')
+          .innerJoin(
+            'competitions as competition',
+            'competition.id',
+            'credential.competition_id',
+          )
+          .select([
+            'competition.id as competition_id',
+            'competition.name as competition_name',
+            'credential.credential_version',
+            'credential.expires_at',
+            'credential.gym_location_id',
+            'credential.id',
+            'credential.issued_at',
+            'credential.revoked_at',
+            'credential.status',
+          ])
+          .where('competition.id', '=', competitionId)
+          .where('credential.gym_location_id', '=', gymId)
+          .orderBy('credential.credential_version', 'desc')
+          .execute();
+
+        return credentials.map((credential) => ({
+          competitionId: credential.competition_id,
+          competitionName: credential.competition_name,
+          credentialVersion: credential.credential_version,
+          expiresAt: credential.expires_at.toISOString(),
+          gymLocationId: credential.gym_location_id,
+          id: credential.id,
+          issuedAt: credential.issued_at.toISOString(),
+          revokedAt: credential.revoked_at?.toISOString() ?? null,
+          status:
+            credential.status === 'active' && credential.expires_at <= now
+              ? ('expired' as const)
+              : credential.status,
+        }));
+      });
+  }
+
   revokeCredential(
     principal: AuthenticatedPrincipal,
     competitionId: string,
@@ -937,9 +1052,14 @@ export class GymsService {
     requestId: string,
     reason: string,
   ): Promise<{ id: string; status: 'revoked' }> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    return this.idempotency.execute<GymQrCredentialActionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: { competitionId, gymId, reason: reason.trim() },
+        scope: `gym-qr-credentials:${competitionId}:${gymId}:revoke`,
+      },
+      async (transaction) => {
         const operator = await this.adminAuthorization.requireGymAccess(
           principal,
           transaction,
@@ -981,7 +1101,8 @@ export class GymsService {
           requestId,
         });
         return { id: credential.id, status: 'revoked' };
-      });
+      },
+    );
   }
 
   assignCompetitionGym(
@@ -991,9 +1112,14 @@ export class GymsService {
     requestId: string,
     reason: string,
   ): Promise<{ id: string; status: 'assigned' }> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    return this.idempotency.execute<CompetitionGymAssignmentJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: { competitionId, gymId, reason: reason.trim() },
+        scope: `competition-gym-locations:${competitionId}:${gymId}:assign`,
+      },
+      async (transaction) => {
         const admin = await this.adminAuthorization.requireAdmin(
           principal,
           transaction,
@@ -1053,7 +1179,8 @@ export class GymsService {
           requestId,
         });
         return { id: competitionId, status: 'assigned' };
-      });
+      },
+    );
   }
 
   async submitPublicWaitlist(
@@ -1591,6 +1718,16 @@ export class GymsService {
       .selectFrom('gym_qr_credentials as credential')
       .innerJoin('gym_locations as gym', 'gym.id', 'credential.gym_location_id')
       .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'credential.competition_id',
+      )
+      .innerJoin('competition_gym_locations as assignment', (join) =>
+        join
+          .onRef('assignment.competition_id', '=', 'competition.id')
+          .onRef('assignment.gym_location_id', '=', 'gym.id'),
+      )
+      .innerJoin(
         'region_policies as region',
         'region.id',
         'gym.region_policy_id',
@@ -1612,6 +1749,13 @@ export class GymsService {
       ])
       .where('credential.token_hash', '=', hashOpaqueValue(request.credential))
       .where('credential.status', '=', 'active')
+      .where('credential.expires_at', '>', new Date())
+      .where('competition.deleted_at', 'is', null)
+      .where('competition.ends_at', '>', new Date())
+      .where('gym.deleted_at', 'is', null)
+      .whereRef('competition.region_policy_id', '=', 'gym.region_policy_id')
+      .where('region.competition_enabled', '=', true)
+      .where('region.deleted_at', 'is', null)
       .executeTakeFirst();
 
     if (!resolved?.competition_id) return null;
@@ -1631,6 +1775,11 @@ export class GymsService {
     const resolved = await transaction
       .selectFrom('competition_enrollments as enrollment')
       .innerJoin('gym_locations as gym', 'gym.id', 'enrollment.gym_location_id')
+      .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'enrollment.competition_id',
+      )
       .innerJoin(
         'region_policies as region',
         'region.id',
@@ -1659,6 +1808,12 @@ export class GymsService {
       .where('enrollment.competition_id', '=', request.competitionId)
       .where('enrollment.user_id', '=', userId)
       .where('enrollment.status', '=', 'active')
+      .where('competition.deleted_at', 'is', null)
+      .where('gym.active', '=', true)
+      .where('gym.deleted_at', 'is', null)
+      .whereRef('competition.region_policy_id', '=', 'gym.region_policy_id')
+      .where('region.competition_enabled', '=', true)
+      .where('region.deleted_at', 'is', null)
       .executeTakeFirst();
 
     if (!resolved || resolved.credential_version === null) return null;
@@ -1776,14 +1931,20 @@ export class GymsService {
           FROM gym_qr_credentials AS credential
           WHERE credential.gym_location_id = gym.id
             AND credential.status = 'active'
+            AND credential.expires_at > CURRENT_TIMESTAMP
         )`.as('active_credential_version'),
         sql<
-          Array<{ competitionId: string; credentialVersion: number }>
+          Array<{
+            competitionId: string;
+            credentialVersion: number;
+            expiresAt: string;
+          }>
         >`COALESCE((
           SELECT json_agg(
             json_build_object(
               'competitionId', credential.competition_id,
-              'credentialVersion', credential.credential_version
+              'credentialVersion', credential.credential_version,
+              'expiresAt', credential.expires_at
             )
             ORDER BY credential.credential_version DESC
           )
@@ -1791,6 +1952,7 @@ export class GymsService {
           WHERE credential.gym_location_id = gym.id
             AND credential.status = 'active'
             AND credential.competition_id IS NOT NULL
+            AND credential.expires_at > CURRENT_TIMESTAMP
         ), '[]'::json)`.as('active_qr_credentials'),
         'gym.active',
         'gym.address',
@@ -1833,6 +1995,7 @@ export class GymsService {
     active_qr_credentials: Array<{
       competitionId: string;
       credentialVersion: number;
+      expiresAt: string;
     }>;
     address: string;
     created_at: Date;

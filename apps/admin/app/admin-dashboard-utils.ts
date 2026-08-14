@@ -228,6 +228,7 @@ export async function adminRequest<T>(
   options: {
     body?: unknown;
     expectedStatuses?: number[];
+    idempotencyKey?: string;
     method?: HttpMethod;
   } = {},
 ): Promise<T> {
@@ -240,6 +241,13 @@ export async function adminRequest<T>(
     );
   }
 
+  const mutationFingerprint = options.method
+    ? `${options.method}:${path}:${JSON.stringify(options.body ?? null)}`
+    : null;
+  const idempotencyKey = mutationFingerprint
+    ? (options.idempotencyKey ?? pendingAdminMutationKey(mutationFingerprint))
+    : null;
+
   let response: Response;
   try {
     response = await fetch(`/api/gogymgo/${path}`, {
@@ -248,7 +256,7 @@ export async function adminRequest<T>(
       headers: {
         authorization: `Bearer ${token}`,
         ...(options.body ? { "content-type": "application/json" } : {}),
-        ...(options.method ? { "idempotency-key": crypto.randomUUID() } : {}),
+        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       method: options.method ?? "GET",
     });
@@ -278,11 +286,70 @@ export async function adminRequest<T>(
     const error = new AdminRequestError(
       adminRequestErrorMessage(response.status, apiError),
     );
+    if (
+      mutationFingerprint &&
+      response.status < 500 &&
+      apiError?.code !== "IDEMPOTENCY_REQUEST_IN_PROGRESS"
+    ) {
+      clearPendingAdminMutationKey(mutationFingerprint);
+    }
     Object.assign(error, {
       code: apiError?.code,
       status: response.status,
     });
     throw error;
   }
+  if (mutationFingerprint) {
+    clearPendingAdminMutationKey(mutationFingerprint);
+  }
   return payload as T;
+}
+
+const pendingAdminMutationsStorageKey =
+  "gogymgo.admin.pending-idempotency-keys.v1";
+
+function pendingAdminMutationKey(fingerprint: string) {
+  try {
+    const pending = readPendingAdminMutationKeys();
+    const existing = pending[fingerprint];
+    if (existing) return existing;
+    const created = `admin-${crypto.randomUUID()}`;
+    sessionStorage.setItem(
+      pendingAdminMutationsStorageKey,
+      JSON.stringify({ ...pending, [fingerprint]: created }),
+    );
+    return created;
+  } catch {
+    return `admin-${crypto.randomUUID()}`;
+  }
+}
+
+function clearPendingAdminMutationKey(fingerprint: string) {
+  try {
+    const pending = readPendingAdminMutationKeys();
+    delete pending[fingerprint];
+    if (Object.keys(pending).length === 0) {
+      sessionStorage.removeItem(pendingAdminMutationsStorageKey);
+    } else {
+      sessionStorage.setItem(
+        pendingAdminMutationsStorageKey,
+        JSON.stringify(pending),
+      );
+    }
+  } catch {
+    // Storage availability never changes the authoritative API result.
+  }
+}
+
+function readPendingAdminMutationKeys(): Record<string, string> {
+  const raw = sessionStorage.getItem(pendingAdminMutationsStorageKey);
+  if (!raw) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === "string" && entry[1].startsWith("admin-"),
+    ),
+  );
 }

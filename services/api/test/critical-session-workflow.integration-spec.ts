@@ -59,6 +59,15 @@ const contestPinningPrincipal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 
+const concurrentEnrollmentPrincipal: AuthenticatedPrincipal = {
+  email: 'concurrent-enrollment-user@integration.test',
+  emailVerified: true,
+  firebaseUid: 'concurrent-enrollment-user',
+  roles: ['user'],
+  signInProvider: 'password',
+  tokenIssuedAt: 1,
+};
+
 const operatorPrincipal: AuthenticatedPrincipal = {
   email: 'session-operator@integration.test',
   emailVerified: true,
@@ -357,6 +366,57 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ]);
   });
 
+  it('serializes concurrent poster enrollments onto one immutable gym selection', async () => {
+    const fixture = await seedRegistrationCompetition(
+      concurrentEnrollmentPrincipal,
+    );
+    const request = {
+      ageEligibilityAttested: true as const,
+      goalDays: 3,
+      gymPresence: fixture.gymPresence,
+      legalReceiptBundleId: fixture.legalReceiptBundleId,
+      regionVerificationId: fixture.regionVerificationId,
+      rulesAccepted: true as const,
+    };
+    const [first, second] = await Promise.all([
+      competitions.enroll(
+        concurrentEnrollmentPrincipal,
+        fixture.competitionId,
+        'concurrent-gym-enrollment-a',
+        request,
+      ),
+      competitions.enroll(
+        concurrentEnrollmentPrincipal,
+        fixture.competitionId,
+        'concurrent-gym-enrollment-b',
+        request,
+      ),
+    ]);
+
+    expect(second).toEqual(first);
+    expect(first).toMatchObject({
+      gymCredentialVersion: expect.any(Number),
+      gymLocationId: expect.any(String),
+      gymName: 'Critical Session Gym',
+    });
+    const member = await profiles.ensureUser(
+      concurrentEnrollmentPrincipal,
+      database.connection,
+    );
+    const persisted = await database.connection
+      .selectFrom('competition_enrollments')
+      .select(['gym_credential_version', 'gym_location_id'])
+      .where('competition_id', '=', fixture.competitionId)
+      .where('user_id', '=', member.id)
+      .execute();
+    expect(persisted).toEqual([
+      {
+        gym_credential_version: first.gymCredentialVersion,
+        gym_location_id: first.gymLocationId,
+      },
+    ]);
+  });
+
   it('pins enrollment to the scanned contest when a later contest shares one gym', async () => {
     const fixture = await seedRegistrationCompetition(contestPinningPrincipal);
     const source = await database.connection
@@ -425,6 +485,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       .values({
         competition_id: otherCompetition.id,
         credential_version: Number(latestCredential.version ?? 0) + 1,
+        expires_at: laterContestEndsAt,
         gym_location_id: source.gym_location_id,
         issued_by_user_id: operatorUserId,
         qr_payload: `https://app.gogymgo.com/scan?credential=${otherCredential}`,
@@ -512,7 +573,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
         contestPinningPrincipal,
         fixture.competitionId,
       ),
-    ).resolves.toMatchObject({ competitionId: fixture.competitionId });
+    ).resolves.toMatchObject({
+      competitionId: fixture.competitionId,
+      gymCredentialVersion: expect.any(Number),
+      gymLocationId: source.gym_location_id,
+      gymName: 'Critical Session Gym',
+    });
 
     const activeEnrollment = await migrated.pool.query<{
       id: string;
@@ -625,6 +691,14 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toThrow('Weekly Goal are immutable');
     await expect(
       migrated.pool.query(
+        `UPDATE competition_enrollments
+         SET gym_credential_version = gym_credential_version + 1
+         WHERE id = $1`,
+        [activeEnrollment.rows[0].id],
+      ),
+    ).rejects.toThrow('evidence, and Weekly Goal are immutable');
+    await expect(
+      migrated.pool.query(
         `UPDATE competition_enrollments SET status = 'active' WHERE id = $1`,
         [activeEnrollment.rows[0].id],
       ),
@@ -646,6 +720,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
         rulesAccepted: true,
       },
     );
+    expect(enrollment).toMatchObject({
+      gymCredentialVersion: expect.any(Number),
+      gymLocationId: expect.any(String),
+      gymName: 'Critical Session Gym',
+    });
     const member = await profiles.ensureUser(
       userPrincipal,
       database.connection,
@@ -1680,8 +1759,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await migrated.pool.query(
       `INSERT INTO gym_qr_credentials
-         (competition_id, gym_location_id, credential_version, token_hash, status, issued_by_user_id)
-       VALUES ($1, $2, 1, $3, 'active', $4)`,
+         (competition_id, gym_location_id, credential_version, token_hash, status,
+          issued_by_user_id, expires_at)
+       VALUES ($1, $2, 1, $3, 'active', $4, current_timestamp + interval '30 days')`,
       [
         competition.rows[0].id,
         gym.rows[0].id,
@@ -1807,8 +1887,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await migrated.pool.query(
       `INSERT INTO gym_qr_credentials
-         (competition_id, gym_location_id, credential_version, token_hash, status, issued_by_user_id)
-       VALUES ($1, $2, 1, $3, 'active', $4)`,
+         (competition_id, gym_location_id, credential_version, token_hash, status,
+          issued_by_user_id, expires_at)
+       VALUES ($1, $2, 1, $3, 'active', $4, current_timestamp + interval '30 days')`,
       [
         competition.rows[0].id,
         gym.rows[0].id,

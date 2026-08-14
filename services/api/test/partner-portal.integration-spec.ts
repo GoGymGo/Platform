@@ -2,6 +2,8 @@ import { sql } from 'kysely';
 import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
+import { GymsService } from '../src/modules/gyms/gyms.service';
+import { LedgerService } from '../src/modules/ledger/ledger.service';
 import type { NotificationsService } from '../src/modules/notifications/notifications.service';
 import type { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { AdminAuthorizationService } from '../src/modules/operator/admin-authorization.service';
@@ -53,6 +55,7 @@ describeWithDatabase('gym partner operator portal', () => {
 
   let competitionConfiguration: AdminCompetitionConfigurationService;
   let database: DatabaseService;
+  let gyms: GymsService;
   let gymId: string;
   let migrated: MigratedPostgisTestDatabase;
   let portal: OperatorPortalService;
@@ -64,6 +67,13 @@ describeWithDatabase('gym partner operator portal', () => {
     const profiles = new ProfilesService(database);
     const authorization = new AdminAuthorizationService(profiles);
     const idempotency = new IdempotencyService(database);
+    gyms = new GymsService(
+      database,
+      idempotency,
+      new LedgerService(),
+      profiles,
+      authorization,
+    );
     competitionConfiguration = new AdminCompetitionConfigurationService(
       authorization,
       idempotency,
@@ -236,6 +246,119 @@ describeWithDatabase('gym partner operator portal', () => {
     ).rejects.toMatchObject({
       response: { code: 'PARTNER_COMPETITION_ADMIN_REQUIRED' },
     });
+  });
+
+  it('issues, recovers, lists, and immediately revokes one scoped contest poster idempotently', async () => {
+    const competition = await database.connection
+      .selectFrom('competitions')
+      .select(['ends_at', 'id'])
+      .where('name', '=', 'Partner Proposal')
+      .executeTakeFirstOrThrow();
+    const first = await gyms.issueCredential(
+      partnerPrincipal,
+      competition.id,
+      gymId,
+      'partner-poster-issue',
+      'Issue the approved poster for the partner contest.',
+    );
+    const replay = await gyms.issueCredential(
+      partnerPrincipal,
+      competition.id,
+      gymId,
+      'partner-poster-issue',
+      'Issue the approved poster for the partner contest.',
+    );
+
+    expect(replay).toEqual(first);
+    expect(first).toMatchObject({
+      competitionId: competition.id,
+      competitionName: 'Partner Proposal',
+      expiresAt: competition.ends_at.toISOString(),
+      gymLocationId: gymId,
+      printablePosterSvg: expect.stringContaining('Partner Integration Gym'),
+      qrPayload: expect.stringMatching(
+        /^https:\/\/app\.gogymgo\.com\/scan\?credential=[A-Za-z0-9_-]{43}$/,
+      ),
+    });
+    expect(first.printablePosterSvg).toContain('Partner Proposal');
+    expect(first.printablePosterSvg).not.toMatch(/demo|sample|placeholder/i);
+    await expect(
+      gyms.getActiveCredential(partnerPrincipal, competition.id, gymId),
+    ).resolves.toEqual(first);
+
+    const history = await gyms.listCredentialHistory(
+      staffPrincipal,
+      competition.id,
+      gymId,
+    );
+    expect(history).toEqual([
+      expect.objectContaining({
+        competitionId: competition.id,
+        credentialVersion: first.credentialVersion,
+        gymLocationId: gymId,
+        id: first.id,
+        status: 'active',
+      }),
+    ]);
+    expect(JSON.stringify(history)).not.toContain('credential=');
+    await expect(
+      gyms.issueCredential(
+        staffPrincipal,
+        competition.id,
+        gymId,
+        'staff-poster-issue',
+        'Staff must not issue a contest poster.',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'GYM_SCOPE_FORBIDDEN' } });
+    await expect(
+      gyms.listCredentialHistory(
+        partnerPrincipal,
+        competition.id,
+        '00000000-0000-4000-8000-000000000099',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'GYM_SCOPE_FORBIDDEN' } });
+
+    const revoked = await gyms.revokeCredential(
+      partnerPrincipal,
+      competition.id,
+      gymId,
+      'partner-poster-revoke',
+      'Retire the poster immediately after the test.',
+    );
+    await expect(
+      gyms.revokeCredential(
+        partnerPrincipal,
+        competition.id,
+        gymId,
+        'partner-poster-revoke',
+        'Retire the poster immediately after the test.',
+      ),
+    ).resolves.toEqual(revoked);
+    await expect(
+      gyms.getActiveCredential(partnerPrincipal, competition.id, gymId),
+    ).resolves.toBeNull();
+    await expect(
+      gyms.listCredentialHistory(partnerPrincipal, competition.id, gymId),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: first.id, status: 'revoked' }),
+    ]);
+
+    const evidence = await database.connection
+      .selectFrom('operator_audit_events')
+      .select(['action', 'request_id'])
+      .where('entity_id', '=', first.id)
+      .orderBy('action')
+      .execute();
+    expect(evidence).toEqual([
+      {
+        action: 'gym_qr_credential.issued',
+        request_id: 'partner-poster-issue',
+      },
+      {
+        action: 'gym_qr_credential.revoked',
+        request_id: 'partner-poster-revoke',
+      },
+    ]);
   });
 
   function competitionInput(

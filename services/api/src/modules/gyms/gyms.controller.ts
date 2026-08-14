@@ -26,6 +26,7 @@ import { Public } from '../auth/public.decorator';
 import {
   CashFulfillmentRecordDto,
   GymLocationResponseDto,
+  GymQrCredentialHistoryDto,
   GymQrCredentialResponseDto,
   GymScanResultDto,
   InterestSubmissionResponseDto,
@@ -224,6 +225,17 @@ export class GymOperatorController {
     @Param('gymId', ParseUUIDPipe) gymId: string,
   ): Promise<GymQrCredentialResponseDto | null> {
     return this.gyms.getActiveCredential(principal, competitionId, gymId);
+  }
+
+  @Get('competitions/:competitionId/gym-locations/:gymId/qr-credentials')
+  @ApiOperation({ summary: 'List scoped gym QR credential history' })
+  @ApiOkResponse({ isArray: true, type: GymQrCredentialHistoryDto })
+  listCredentialHistory(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
+    @Param('gymId', ParseUUIDPipe) gymId: string,
+  ): Promise<GymQrCredentialHistoryDto[]> {
+    return this.gyms.listCredentialHistory(principal, competitionId, gymId);
   }
 
   @Post(

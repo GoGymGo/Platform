@@ -324,6 +324,9 @@ AccountReadinessRepository {
         competitionId: appTourCompetitionId,
         enrolledAt: nowIso(),
         goalDays: 4,
+        gymCredentialVersion: 1,
+        gymLocationId: 'app-tour-gym',
+        gymName: 'SKYGATE',
         id: appTourEnrollmentId,
         status: 'active'
       };
@@ -344,6 +347,9 @@ AccountReadinessRepository {
         competitionId,
         enrolledAt: nowIso(),
         goalDays: input.goalDays,
+        gymCredentialVersion: 1,
+        gymLocationId: 'app-tour-gym',
+        gymName: 'SKYGATE',
         id: appTourEnrollmentId,
         status: 'active'
       };
@@ -383,6 +389,9 @@ AccountReadinessRepository {
           competitionId,
           enrolledAt: nowIso(),
           goalDays: 3,
+          gymCredentialVersion: 1,
+          gymLocationId: 'app-tour-gym',
+          gymName: 'SKYGATE',
           id: appTourEnrollmentId
         }),
         status: 'withdrawn' as const

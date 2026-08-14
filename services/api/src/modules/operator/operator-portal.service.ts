@@ -78,14 +78,20 @@ export class OperatorPortalService {
                 FROM gym_qr_credentials AS credential
                 WHERE credential.gym_location_id = gym.id
                   AND credential.status = 'active'
+                  AND credential.expires_at > CURRENT_TIMESTAMP
               )`.as('active_credential_version'),
               sql<
-                Array<{ competitionId: string; credentialVersion: number }>
+                Array<{
+                  competitionId: string;
+                  credentialVersion: number;
+                  expiresAt: string;
+                }>
               >`COALESCE((
                 SELECT json_agg(
                   json_build_object(
                     'competitionId', credential.competition_id,
-                    'credentialVersion', credential.credential_version
+                    'credentialVersion', credential.credential_version,
+                    'expiresAt', credential.expires_at
                   )
                   ORDER BY credential.credential_version DESC
                 )
@@ -93,6 +99,7 @@ export class OperatorPortalService {
                 WHERE credential.gym_location_id = gym.id
                   AND credential.status = 'active'
                   AND credential.competition_id IS NOT NULL
+                  AND credential.expires_at > CURRENT_TIMESTAMP
               ), '[]'::json)`.as('active_qr_credentials'),
               sql<number>`ST_Y(gym.coordinates::geometry)`.as('latitude'),
               sql<number>`ST_X(gym.coordinates::geometry)`.as('longitude'),

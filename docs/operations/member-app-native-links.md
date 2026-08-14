@@ -28,6 +28,9 @@ release and do not block this explicitly browser-only pilot.
 - Gym posters use `https://app.gogymgo.com/scan?credential=...`.
 - The browser flow preserves the scan through sign-in, sign-up, email
   verification, password recovery, region setup, and Weekly Goal selection.
+- After authoritative enrollment, the app removes the poster credential from
+  local storage and uses the immutable enrolled Contest/gym/version evidence
+  for later start and finish location checks.
 - Authenticated players return to the Start Workout or Finish Workout screen.
 - iOS registers `app.gogymgo.com` as an associated domain.
 - Android registers `/scan` as a verified App Link.
@@ -39,11 +42,11 @@ release and do not block this explicitly browser-only pilot.
 
 Never guess or publish placeholders for these values:
 
-| Environment variable | Required value |
-| --- | --- |
-| `GOGYMGO_IOS_TEAM_ID` | The 10-character Apple Developer Team ID that signs GoGymGo. |
-| `GOGYMGO_IOS_BUNDLE_ID` | The final iOS bundle identifier registered for GoGymGo. |
-| `GOGYMGO_ANDROID_PACKAGE` | The final Android application ID registered for GoGymGo. |
+| Environment variable          | Required value                                                                                                                                                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GOGYMGO_IOS_TEAM_ID`         | The 10-character Apple Developer Team ID that signs GoGymGo.                                                                                                                                                    |
+| `GOGYMGO_IOS_BUNDLE_ID`       | The final iOS bundle identifier registered for GoGymGo.                                                                                                                                                         |
+| `GOGYMGO_ANDROID_PACKAGE`     | The final Android application ID registered for GoGymGo.                                                                                                                                                        |
 | `GOGYMGO_ANDROID_CERT_SHA256` | The SHA-256 fingerprint of every certificate that signs a distributed Android build. Use comma-separated fingerprints when needed. A Google Play install requires the Play App Signing certificate fingerprint. |
 
 The iOS bundle ID and Android package must match the apps registered in Firebase,
@@ -109,6 +112,9 @@ Test all of these before announcing the QR flow:
 8. The browser build shows the completion banner while open and immediately when
    reopened. Do not claim that a fully closed browser tab will notify the player;
    that requires a separately deployed web-push service.
+9. Denied camera and location permissions show recoverable instructions; cancel
+   returns safely; a malformed, expired, revoked, cross-Contest, or unassigned
+   poster fails without creating or changing enrollment.
 
 Location is checked when the player submits Start Workout and Finish Workout. The
 app does not continuously track the player or automatically boot them out when
@@ -116,7 +122,7 @@ they move outside the radius.
 
 ## Current native-release blocker
 
-As of August 11, 2026, the code and build pipeline are prepared, but the final
+As of August 13, 2026, the code and build pipeline are prepared, but the final
 Apple Team ID, iOS bundle ID, Android package, and Android signing-certificate
 fingerprint have not been recorded in this repository. Native QR opening must not
 be described as live until those real values are configured, the association

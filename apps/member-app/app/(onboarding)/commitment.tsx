@@ -313,7 +313,7 @@ function MobileCommitmentScreen() {
       let confirmedGymScan: PendingGymScan | null = null;
       if (!appTourActive && !registration.alreadyEnrolled) {
         const pendingScan = await readPendingGymScan();
-        if (!pendingScan) {
+        if (!pendingScan?.credential) {
           setGymPresenceStatus('missing');
           setConfirmationError(
             'Scan the active QR poster at a Partner gym before confirming registration.'
@@ -343,7 +343,6 @@ function MobileCommitmentScreen() {
         try {
           await rememberCompetitionGymAccess({
             competitionId: registration.competition.id,
-            credential: confirmedGymScan.credential,
             credentialValidUntil: getWorkoutCompletionDeadline(
               registration.competition.endsAt
             ).toISOString()

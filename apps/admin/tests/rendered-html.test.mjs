@@ -111,6 +111,18 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /recorded automatically in the audit history/);
   assert.match(dashboard, /action\.auditReason \?\?/);
   assert.match(dashboardUtils, /idempotency-key/);
+  assert.match(
+    dashboardUtils,
+    /pendingAdminMutationKey\(mutationFingerprint\)/,
+  );
+  assert.match(dashboardUtils, /gogymgo\.admin\.pending-idempotency-keys\.v1/);
+  assert.match(dashboardUtils, /sessionStorage\.setItem/);
+  assert.match(dashboardUtils, /response\.status < 500/);
+  assert.match(dashboardUtils, /IDEMPOTENCY_REQUEST_IN_PROGRESS/);
+  assert.match(
+    dashboardUtils,
+    /clearPendingAdminMutationKey\(mutationFingerprint\)/,
+  );
   assert.match(dashboardUtils, /"DELETE" \| "POST" \| "PUT"/);
   assert.match(
     dashboardUtils,
@@ -201,7 +213,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /operator\/gym-locations/);
   assert.match(dashboard, /operator\/gym-sessions/);
   assert.match(dashboard, /operator\/region-waitlist/);
-  assert.match(dashboard, /operator\/region-verifications\/\$\{verificationId\}\/decision/);
+  assert.match(
+    dashboard,
+    /operator\/region-verifications\/\$\{verificationId\}\/decision/,
+  );
   assert.match(dashboard, /Region verification decision recorded/);
   assert.doesNotMatch(dashboard, /defaultChecked name="competitionEnabled"/);
   assert.match(dashboard, /operator\/interest-submissions/);
@@ -217,6 +232,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /available in the assignment form below/);
   assert.match(pilot, /formErrorMessage/);
   assert.match(pilot, /DOWNLOAD JPEG FOR PRINTING/);
+  assert.match(pilot, /credential\.expiresAt/);
   assert.match(pilot, /aria-expanded=\{!collapsed\}/);
   assert.match(pilot, /\{collapsed \? "Expand" : "Collapse"\}/);
   assert.match(pilot, /poster-collapse-button/);

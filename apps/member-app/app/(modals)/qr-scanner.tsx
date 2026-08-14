@@ -31,6 +31,7 @@ import {
   isGymScanCompletionReady
 } from '@/domain/gymScan';
 import { formatCompetitionOpeningDateTime } from '@/domain/competition';
+import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -40,6 +41,7 @@ import { readGymScanLocation } from '@/services/gymScanLocation';
 import {
   clearPendingGymScanSession,
   readPendingGymScan,
+  rememberCompetitionGymScanResult,
   rememberGymScanCredential,
   rememberGymScanResult,
   type PendingGymScan
@@ -311,6 +313,16 @@ function MobileQrScannerModal() {
           const recoveryCredential = credential ?? effectiveCredential;
           if (recoveryCredential) {
             setPendingIntent(await rememberGymScanResult(recoveryCredential, scanResult));
+          } else if (scannedCompetition) {
+            setPendingIntent(
+              await rememberCompetitionGymScanResult({
+                competitionId: scannedCompetition.id,
+                credentialValidUntil: getWorkoutCompletionDeadline(
+                  scannedCompetition.endsAt
+                ).toISOString(),
+                result: scanResult
+              })
+            );
           } else {
             setPendingIntent((current) =>
               current

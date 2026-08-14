@@ -18,19 +18,22 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `4b7a8d6002b2ca26788f969beef18d6661631338` after PR #92 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-010 — Direct Weekly Challenges` on
-  `agent/ggg-010-direct-weekly-challenges`; creation follows this assignment
+  `11ca6a407c65e6e8fff7dc35685f3b3b74609db5` after PR #94 on 2026-08-14.
+- Active feature task: `GoGymGo Feature GGG-011 — Social activity Challenges`
+  on `agent/ggg-011-social-activity-challenges`; creation follows this assignment
   ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
+- Local resource limit: validation commands run serially with reduced worker
+  concurrency where supported, and no more than one Docker-backed task or stack
+  may run at a time.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
   Cloudflare, staging, or production inspection, mutation, or deployment is
   authorized here. The eventual AWS task is read-only and must be created only
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 31 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 32 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -398,17 +401,28 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Authentication and authorization: same competition, region, week, Weekly Goal,
   accepted friendship, ownership, and conflicting-request rules are server-side.
 - External providers / feature flag: database/worker; no flag.
-- Current implementation / missing behavior: direct pairing and recent timing/
-  workout-access fixes are merged. Independent duty audit is assigned; complete
-  four-week two-account staging rehearsal remains an external release exercise.
-- Required tests / operations / cloud dependency: eligibility, explicit response,
-  conflict cancellation, solo/searching state, 1x/2x/3x settlement, permitted
-  partner stats, withdrawal; database/worker.
+- Current implementation / missing behavior: automatic stranger pairing and
+  synthetic searching assignments are removed. Exact accepted/unblocked friend,
+  active enrollment/Contest/region/week/server-time/Weekly Goal eligibility,
+  explicit accept/decline/cancel, stable idempotency, accepted-request
+  provenance, cross-role and permanent one-assignment constraints, privacy-safe
+  partner aggregates, lifecycle closure, and authoritative 0x/1x/2x/3x settled
+  scoring are connected. Projected values remain explicitly provisional; only
+  settled ledger entries are banked. No repository duty remains missing.
+- Required tests / operations / cloud dependency: exact eligibility, explicit
+  response/cancel/retry, conflicting/concurrent acceptance, solo/searching/
+  matched/settled states, privacy-safe partner detail, lifecycle closure,
+  provenance/assignment database constraints, 0x/1x/2x/3x settlement,
+  reconciliation, contracts, journeys, and artifacts passed locally and in CI.
+  Migration rollout and the four-week/two-account staging rehearsal require
+  separate deployment authority.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-010 — Direct Weekly
-  Challenges`; branch `agent/ggg-010-direct-weekly-challenges`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: pre-settlement projections must never be labeled as
-  banked entries.
+  Challenges`; branch `agent/ggg-010-direct-weekly-challenges` deleted; PR #94;
+  exact tested head `548b0cdf6e63af839a1fa1ff5f03717965f3595f`; merge
+  `11ca6a407c65e6e8fff7dc35685f3b3b74609db5`; status `COMPLETE`.
+- Residual risks / blocker: applying the migration and completing the documented
+  four-week/two-account staging rehearsal remain external release work requiring
+  deployment authorization. No cloud access or deployment occurred.
 
 ### GGG-011 — Friend and regional activity Challenges
 
@@ -423,13 +437,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   membership, capacity, block, and one-check-in-per-day rules; idempotent writes.
 - External providers / feature flag: optional contact-delivery provider; no flag.
 - Current implementation / missing behavior: structured UI/API/data model and
-  integration workflow exist. Missing authoritative delivery evidence and a
-  bounded browser accessibility/failure-state audit.
+  integration workflow exist. Independent duty audit is assigned; provider-free
+  invitation behavior from GGG-009 and browser accessibility/failure states must
+  be verified without inventing delivery evidence.
 - Required tests / operations / cloud dependency: validation bounds, discovery,
   capacity, invitation states, block/privacy, verified-gym derivation, manual
   non-gym check-in, no Contest credit, exports; database.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-011 — Social activity
-  Challenges`; branch/PR/merge `unassigned`; status `AUDITED`.
+  Challenges`; branch `agent/ggg-011-social-activity-challenges`; PR/merge
+  `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: large combined client component raises regression
   risk; refactoring is not required unless the feature task needs it.
 
@@ -1018,6 +1034,16 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed `GGG-010` through PR #94. Exact tested head
+  `548b0cdf6e63af839a1fa1ff5f03717965f3595f` was squash-merged as
+  `11ca6a407c65e6e8fff7dc35685f3b3b74609db5`; all seven PR and six main-push
+  checks passed, the remote feature branch was deleted, and there was no cloud
+  impact. Explicit friend-only Weekly Challenges, authoritative eligibility and
+  lifecycle closure, provenance/concurrency/database constraints, privacy-safe
+  projections, honest member states, canonical settlement/reconciliation, and
+  direct regressions are complete. Assigned `GGG-011` to its fresh feature task
+  and isolated branch for creation after this ledger merge. Local validation is
+  now permanently serialized with at most one Docker task at a time.
 - 2026-08-14 — Completed `GGG-009` through PR #92. Exact tested head
   `c8d67539f745ed6b42b5400a066a4b25465fe523` was squash-merged as
   `4b7a8d6002b2ca26788f969beef18d6661631338`; all seven PR and six main-push

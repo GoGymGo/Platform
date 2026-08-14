@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `1c6e73075993742666a15aaf8fe13514a742048b` after PR #86 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-008 — Streaks and Alias badges` on
-  `agent/ggg-008-streaks-alias-badges`.
+  `265a203e6c613d27d6811226d4eb784dd71b6595` after PR #89 on 2026-08-14.
+- Active feature task: none while the coordinator records GGG-008 completion and
+  prepares the next dependency-ordered feature assignment.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -327,17 +327,25 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Authentication and authorization: own streak endpoint is authenticated;
   shared rows expose only permitted public streak fields.
 - External providers / feature flag: PostgreSQL; no flag.
-- Current implementation / missing behavior: documented end-to-end implementation
-  with timezone, gap, duplicate-period, and display tests. Still requires a
-  bounded cross-surface audit proving every Alias row follows the two-badge rule.
+- Current implementation / missing behavior: versioned `streaks-v1` daily,
+  weekly, monthly, and yearly projections use exact authoritative active
+  enrollment/Contest/gym/rules/region evidence; dates deduplicate and exclude
+  future rows; timezone fallback is consistent; bounded SQL batching, privacy-
+  safe public suppression, honest client states, and canonical maximum-two Alias
+  rendering across every production/App Tour identity row are connected.
 - Required tests / operations / cloud dependency: verified-only source, period
   boundaries, grace periods, timezone fallback, zero state, compact
-  decomposition, all Alias surfaces; database.
+  decomposition, future dates, privacy/ownership, 100-subject batching, every
+  Alias surface, preview isolation, and production artifacts passed locally and
+  in CI. Staging data/latency reconciliation requires deployment authority.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-008 — Streaks and Alias
-  badges`; branch `agent/ggg-008-streaks-alias-badges`; PR/merge `pending`;
-  status `IN_PROGRESS`.
-- Residual risks / blocker: historical UI may omit badges on a less-visible Alias
-  row until the surface audit is complete.
+  badges`; branch `agent/ggg-008-streaks-alias-badges` deleted; PR #89; exact
+  tested head `8e2b6871d20bc0a1d88c18e5273bc8bc064a1f65`; merge
+  `265a203e6c613d27d6811226d4eb784dd71b6595`; status `COMPLETE`.
+- Residual risks / blocker: staging data/latency reconciliation and query-latency
+  monitoring remain operational rollout steps requiring deployment authority.
+  GGG-009, GGG-010, GGG-011, and GGG-016 consume the projection but retain their
+  separately owned duties. No cloud access or deployment occurred.
 
 ### GGG-009 — Friends, Alias discovery, requests, and private invitations
 
@@ -996,6 +1004,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed `GGG-008` through PR #89. Exact tested head
+  `8e2b6871d20bc0a1d88c18e5273bc8bc064a1f65` was squash-merged as
+  `265a203e6c613d27d6811226d4eb784dd71b6595`; all seven PR and six main-push
+  checks passed, the remote feature branch was deleted, and there was no cloud
+  impact. Authoritative versioned streaks, bounded database projection, privacy-
+  safe public fields, fail-closed client states, two-badge Alias rendering,
+  contracts, and direct database/browser/cross-surface regressions are complete;
+  staging data/latency reconciliation remains external.
 - 2026-08-13 — Assigned `GGG-008` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-007 completion ledger merged through PR #87 as
   `ada4982f9c0e2d001604cd34c73064351c5a5c8d` with green main-push checks.

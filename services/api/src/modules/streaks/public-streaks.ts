@@ -3,6 +3,7 @@ import { normalizeDateKey } from '../../database/date-key';
 import type { Database } from '../../database/database.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { calculateStreaks, type StreakCounts } from './streak-calculation';
+import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
 
 type DatabaseExecutor = Kysely<Database> | Transaction<Database>;
 
@@ -38,13 +39,7 @@ export async function loadPublicStreaks(
         'verification.verified_at',
       ])
       .where('verification.user_id', 'in', uniqueUserIds)
-      .where('verification.status', '=', 'approved')
-      .where((expression) =>
-        expression.or([
-          expression('verification.expires_at', 'is', null),
-          expression('verification.expires_at', '>', now),
-        ]),
-      )
+      .where(currentRegionVerificationPredicate('verification', 'region', now))
       .orderBy('verification.verified_at', 'desc')
       .orderBy('verification.created_at', 'desc')
       .execute(),

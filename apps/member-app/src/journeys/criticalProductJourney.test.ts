@@ -82,9 +82,11 @@ describe("critical member product journeys", () => {
     const documents = await account.getCurrentLegalDocuments("CA-BC", "en");
     const receipt = await account.recordLegalReceipt(documents);
     const region = await account.createRegionVerification({
+      accuracyMeters: 8,
       latitude: 49.2827,
       longitude: -123.1207,
       method: "device_location",
+      observedAt: new Date().toISOString(),
     });
     const competition = await account.resolveCompetitionByGymQr(gymCredential);
     assert.equal(competition?.id, competitionId);

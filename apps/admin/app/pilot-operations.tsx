@@ -5,9 +5,18 @@ import type {
   CashFulfillmentRequestDto,
   CreateGymLocationDto,
   OperatorReasonDto,
+  UpdateRegionWaitlistStatusDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
-import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { parseCoordinate } from "./coordinate-input";
 import { AdminUserFacingError, errorMessage } from "./admin-dashboard-utils";
 import { formValidationError } from "./form-validation";
@@ -61,6 +70,10 @@ type PilotOperationsProps = PilotData & {
     input: OperatorReasonDto,
   ) => Promise<void>;
   onUpdateGym: (gymId: string, input: UpdateGymLocationDto) => Promise<void>;
+  onUpdateWaitlist: (
+    entryId: string,
+    input: UpdateRegionWaitlistStatusDto,
+  ) => Promise<void>;
   regions: RegionPolicy[];
   selectedCompetition: Competition;
   submitting: boolean;
@@ -254,10 +267,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     }
   }
 
-  async function issueQrForGym(
-    gym: GymLocation,
-    input: OperatorReasonDto,
-  ) {
+  async function issueQrForGym(gym: GymLocation, input: OperatorReasonDto) {
     setPosterRecoveryMessage("");
     const issuedCredential = await props.onIssueQr(
       props.selectedCompetition.id,
@@ -537,7 +547,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
             </button>
             {activeAssignedGyms.length > 0 ? (
               <p className="pilot-form-message form-success">
-                {activeAssignedGyms.map((gym) => gym.name).join(", ")} {" "}
+                {activeAssignedGyms.map((gym) => gym.name).join(", ")}{" "}
                 {activeAssignedGyms.length === 1 ? "is" : "are"} already
                 assigned to this contest.
               </p>
@@ -566,9 +576,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           <div>
             <p className="eyebrow">STATIC QR PILOT</p>
             <h2>QR posters for {props.selectedCompetition.name}</h2>
-            <p>
-              Issue or recover the printable QR poster for an assigned gym.
-            </p>
+            <p>Issue or recover the printable QR poster for an assigned gym.</p>
           </div>
         </div>
         <details
@@ -755,12 +763,28 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         <PilotTable
           empty="No unsupported-region requests."
           eyebrow="REGIONAL DEMAND"
-          headings={["Email", "Requested region", "Status", "Submitted"]}
+          headings={[
+            "Email",
+            "Requested region",
+            "Consent",
+            "Status",
+            "Submitted",
+            "Review",
+          ]}
           rows={props.waitlist.map((entry) => [
             entry.email,
             entry.requestedRegion,
+            entry.consentedAt && entry.consentNoticeVersion
+              ? "recorded"
+              : "legacy / not recorded",
             entry.status,
             formatDateTime(entry.createdAt),
+            <WaitlistReviewControl
+              entry={entry}
+              key={entry.id}
+              onUpdate={props.onUpdateWaitlist}
+              submitting={props.submitting}
+            />,
           ])}
           title="Region waitlist"
         />
@@ -895,6 +919,80 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         />
       )}
     </div>
+  );
+}
+
+function WaitlistReviewControl({
+  entry,
+  onUpdate,
+  submitting,
+}: {
+  entry: RegionWaitlistEntry;
+  onUpdate: PilotOperationsProps["onUpdateWaitlist"];
+  submitting: boolean;
+}) {
+  const transitions: Record<string, UpdateRegionWaitlistStatusDto["status"][]> =
+    {
+      contacted: ["launched", "closed"],
+      launched: ["closed"],
+      waiting: ["contacted", "closed"],
+    };
+  const choices = transitions[entry.status] ?? [];
+  const [status, setStatus] = useState<UpdateRegionWaitlistStatusDto["status"]>(
+    choices[0] ?? "closed",
+  );
+  const [reason, setReason] = useState(
+    "Record the regional update review outcome.",
+  );
+  const [error, setError] = useState("");
+
+  if (choices.length === 0) {
+    return <span className="table-action-note">No further transition</span>;
+  }
+
+  return (
+    <form
+      className="table-inline-form"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        const validationError = formValidationError(event.currentTarget);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+        setError("");
+        void onUpdate(entry.id, { reason, status });
+      }}
+    >
+      <select
+        aria-label={`Next status for ${entry.requestedRegion}`}
+        onChange={(event) =>
+          setStatus(
+            event.target.value as UpdateRegionWaitlistStatusDto["status"],
+          )
+        }
+        value={status}
+      >
+        {choices.map((choice) => (
+          <option key={choice} value={choice}>
+            {choice}
+          </option>
+        ))}
+      </select>
+      <input
+        aria-label={`Reason for ${entry.requestedRegion} status`}
+        maxLength={500}
+        minLength={8}
+        onChange={(event) => setReason(event.target.value)}
+        required
+        value={reason}
+      />
+      <button disabled={submitting} type="submit">
+        UPDATE
+      </button>
+      {error ? <span className="form-error" role="alert">{error}</span> : null}
+    </form>
   );
 }
 
@@ -1154,11 +1252,7 @@ function GymCard({
   );
 }
 
-export function PosterPreview({
-  credential,
-}: {
-  credential: GymQrCredential;
-}) {
+export function PosterPreview({ credential }: { credential: GymQrCredential }) {
   const [source, setSource] = useState<string | null>(null);
   const [conversionError, setConversionError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
@@ -1262,7 +1356,7 @@ function PilotTable({
   eyebrow: string;
   headings: string[];
   onDismiss?: () => void;
-  rows: string[][];
+  rows: ReactNode[][];
   title: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);

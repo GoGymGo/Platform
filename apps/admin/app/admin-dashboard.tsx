@@ -1,6 +1,10 @@
 "use client";
 
 import { resolveFeatureCapabilities } from "@gogymgo/contracts/feature-capabilities";
+import type {
+  DecideRegionVerificationDto,
+  UpdateRegionWaitlistStatusDto,
+} from "@gogymgo/contracts";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
@@ -1280,6 +1284,17 @@ export function AdminDashboard({
                   body,
                 );
               }}
+              onUpdateWaitlist={async (
+                entryId,
+                body: UpdateRegionWaitlistStatusDto,
+              ) => {
+                await mutate(
+                  "Regional waitlist status updated.",
+                  `operator/region-waitlist/${entryId}/status`,
+                  "POST",
+                  body,
+                );
+              }}
               regions={snapshot.regions}
               selectedCompetition={setupCompetition}
               submitting={submitting}
@@ -1419,6 +1434,14 @@ export function AdminDashboard({
             <OperationsPanel
               events={snapshot.auditEvents}
               health={health}
+              onDecideRegion={async (verificationId, body) => {
+                await mutate(
+                  "Region verification decision recorded.",
+                  `operator/region-verifications/${verificationId}/decision`,
+                  "POST",
+                  body,
+                );
+              }}
               onNavigate={navigateToSection}
               queue={queue}
             />
@@ -3737,11 +3760,16 @@ function ContentPanel({
 function OperationsPanel({
   events,
   health,
+  onDecideRegion,
   onNavigate,
   queue,
 }: {
   events: AuditEvent[];
   health: SystemHealth | null;
+  onDecideRegion: (
+    verificationId: string,
+    body: DecideRegionVerificationDto,
+  ) => Promise<void>;
   onNavigate: (section: AdminSection) => void;
   queue: WorkQueueItem[];
 }) {
@@ -3939,6 +3967,12 @@ function OperationsPanel({
                       </p>
                     )}
                   </details>
+                  {selectedItem.kind === "region_verification" ? (
+                    <RegionVerificationDecisionControl
+                      item={selectedItem}
+                      onDecide={onDecideRegion}
+                    />
+                  ) : null}
                   {selectedDestination ? (
                     <button
                       className="primary-button full"
@@ -3974,11 +4008,85 @@ function OperationsPanel({
   );
 }
 
+function RegionVerificationDecisionControl({
+  item,
+  onDecide,
+}: {
+  item: WorkQueueItem;
+  onDecide: (
+    verificationId: string,
+    body: DecideRegionVerificationDto,
+  ) => Promise<void>;
+}) {
+  const [decision, setDecision] =
+    useState<DecideRegionVerificationDto["decision"]>("rejected");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <form
+      className="queue-decision-form"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        const validationError = formValidationError(event.currentTarget);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+        setSubmitting(true);
+        setError("");
+        void onDecide(item.id, { decision, reason })
+          .catch((cause) => setError(errorMessage(cause)))
+          .finally(() => setSubmitting(false));
+      }}
+    >
+      <label>
+        <span>DECISION</span>
+        <select
+          onChange={(event) =>
+            setDecision(
+              event.target.value as DecideRegionVerificationDto["decision"],
+            )
+          }
+          value={decision}
+        >
+          <option value="rejected">Reject</option>
+          <option value="approved">Approve within policy window</option>
+        </select>
+      </label>
+      <label>
+        <span>AUDIT REASON</span>
+        <textarea
+          maxLength={500}
+          minLength={8}
+          onChange={(event) => setReason(event.target.value)}
+          required
+          rows={3}
+          value={reason}
+        />
+      </label>
+      <button
+        className="primary-button full"
+        disabled={submitting}
+        type="submit"
+      >
+        {submitting ? "RECORDING..." : "RECORD DECISION"}
+      </button>
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function queueDestination(kind: string): AdminSection | null {
   if (kind === "workout_session" || kind === "partner_application") {
     return "pilot";
   }
-  if (kind === "region_verification") return "regions";
   return null;
 }
 
@@ -5085,8 +5193,10 @@ function RegionForm({
             </div>
           </details>
           <label className="check-row field wide">
-            <input defaultChecked name="competitionEnabled" type="checkbox" />
-            <span>Allow contests to use this region immediately</span>
+            <input name="competitionEnabled" type="checkbox" />
+            <span>
+              Enable only after boundary reconciliation and documented approval
+            </span>
           </label>
         </FormGrid>
         <FormActions

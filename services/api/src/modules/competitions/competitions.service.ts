@@ -18,6 +18,7 @@ import {
 import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
 import { ProfilesService } from '../profiles/profiles.service';
+import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
 import {
   calculateStreaks,
   type StreakCounts,
@@ -159,12 +160,8 @@ export class CompetitionsService {
             'region.metro_name as region_name',
           ])
           .where('verification.user_id', '=', user.id)
-          .where('verification.status', '=', 'approved')
-          .where((expression) =>
-            expression.or([
-              expression('verification.expires_at', 'is', null),
-              expression('verification.expires_at', '>', now),
-            ]),
+          .where(
+            currentRegionVerificationPredicate('verification', 'region', now),
           )
           .where('competition.status', 'in', ['registration', 'active'])
           .where('competition.deleted_at', 'is', null)
@@ -556,12 +553,8 @@ export class CompetitionsService {
               '=',
               competition.region_policy_id,
             )
-            .where('verification.status', '=', 'approved')
-            .where((expression) =>
-              expression.or([
-                expression('verification.expires_at', 'is', null),
-                expression('verification.expires_at', '>', now),
-              ]),
+            .where(
+              currentRegionVerificationPredicate('verification', 'policy', now),
             )
             .executeTakeFirst(),
           transaction

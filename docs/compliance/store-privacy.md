@@ -42,6 +42,21 @@ the approved region or gym-presence result, not the coordinate pair. Historical
 region evidence is scrubbed by migration
 `1784181600000_authoritative_region_verification.ts`.
 
+Region verification additionally sends the device observation time and reported
+horizontal accuracy so the API can reject stale or inaccurate readings. Those
+values are minimized to the current technical thresholds; coordinates remain
+absent from retained evidence and operator views.
+
+## Regional availability requests
+
+The landing and signed-in unsupported-region forms require an explicit regional
+email-updates checkbox and record the notice version and consent time. Public
+responses contain no email, record identifier, or internal workflow state.
+Signed-in requests are included in account export and deletion; requests made
+without an account use the email-based privacy process. Legacy rows without the
+current notice cannot advance to outreach states. Retention duration remains a
+legal approval gate documented in `docs/operations/region-eligibility.md`.
+
 Apple defines collection as retaining off-device data longer than needed to
 service the real-time request. On that basis, the manifest declares the retained
 coarse region, not precise location. Confirm this interpretation against the

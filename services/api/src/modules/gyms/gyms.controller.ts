@@ -33,6 +33,7 @@ import {
   OperatorAuditHistoryDto,
   OperatorGymSessionDto,
   RegionWaitlistEntryDto,
+  RegionWaitlistReceiptDto,
 } from './dto/gym.dto';
 import {
   AssignCompetitionGymDto,
@@ -40,8 +41,10 @@ import {
   CreateGymLocationDto,
   GymScanRequestDto,
   InterestSubmissionDto,
+  MemberRegionWaitlistRequestDto,
   OperatorReasonDto,
   RegionWaitlistRequestDto,
+  UpdateRegionWaitlistStatusDto,
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import { GymsService } from './gyms.service';
@@ -81,11 +84,11 @@ export class PilotSubmissionsController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Join the unsupported-region launch waitlist' })
-  @ApiCreatedResponse({ type: RegionWaitlistEntryDto })
+  @ApiCreatedResponse({ type: RegionWaitlistReceiptDto })
   submitWaitlist(
     @Body() input: RegionWaitlistRequestDto,
-  ): Promise<RegionWaitlistEntryDto> {
-    return this.gyms.submitWaitlist(input);
+  ): Promise<RegionWaitlistReceiptDto> {
+    return this.gyms.submitPublicWaitlist(input);
   }
 
   @Post('interest-submissions')
@@ -97,6 +100,26 @@ export class PilotSubmissionsController {
     @Body() input: InterestSubmissionDto,
   ): Promise<InterestSubmissionResponseDto> {
     return this.gyms.submitInterest(input);
+  }
+}
+
+@ApiTags('member region waitlist')
+@ApiBearerAuth('firebase')
+@Controller('me/region-waitlist')
+export class MemberRegionWaitlistController {
+  constructor(private readonly gyms: GymsService) {}
+
+  @Post()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Request regional launch updates for the signed-in member',
+  })
+  @ApiCreatedResponse({ type: RegionWaitlistReceiptDto })
+  submitWaitlist(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Body() input: MemberRegionWaitlistRequestDto,
+  ): Promise<RegionWaitlistReceiptDto> {
+    return this.gyms.submitMemberWaitlist(principal, input);
   }
 }
 
@@ -263,6 +286,24 @@ export class GymOperatorController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<RegionWaitlistEntryDto[]> {
     return this.gyms.listWaitlist(principal);
+  }
+
+  @Post('region-waitlist/:entryId/status')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Record a regional waitlist review outcome' })
+  @ApiOkResponse({ type: RegionWaitlistEntryDto })
+  updateWaitlistStatus(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: UpdateRegionWaitlistStatusDto,
+  ): Promise<RegionWaitlistEntryDto> {
+    return this.gyms.updateWaitlistStatus(
+      principal,
+      entryId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
   }
 
   @Get('interest-submissions')

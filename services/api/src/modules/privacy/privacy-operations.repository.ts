@@ -285,6 +285,10 @@ export class PrivacyOperationsRepository {
           .where('user_id', '=', request.user_id)
           .execute();
         await transaction
+          .deleteFrom('region_waitlist_entries')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
           .deleteFrom('idempotency_keys')
           .where('actor_key', '=', `firebase:${user.firebase_uid}`)
           .execute();

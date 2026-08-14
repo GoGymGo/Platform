@@ -54,7 +54,7 @@ export interface components {
     CreateGymLocationDto: { address?: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     CreatePrivacyRequestDto: { reason?: string; requestType: "delete" | "export" };
     CreateRegionPolicyDto: { boundary: Record<string, unknown>; boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: "CAD" | "MXN" | "USD"; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; reason: string; subdivisionCode: string; timezone: string; validFrom: string; validTo?: string };
-    CreateRegionVerificationDto: { latitude: number; longitude: number; method: "device_location" };
+    CreateRegionVerificationDto: { accuracyMeters: number; latitude: number; longitude: number; method: "device_location"; observedAt: string };
     CreateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
     CreateSessionDto: { clientStartedAt?: string; competitionId: string };
     CreateSocialChallengeDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; challengeType: "friend" | "regional"; description?: string | null; endDate: string; invitedFriendUserIds: Array<string>; locationName?: string; name: string; participantLimit?: number; regionCode?: string; scheduledDays: Array<number>; scheduledTime?: string; startDate: string; targetCount: number; targetPeriod: "weekly" | "monthly" };
@@ -100,6 +100,7 @@ export interface components {
     LegalReceiptStatusResponseDto: { acceptedAt: string | null; bundleSha256: string; complete: boolean; configured: boolean; documents: Array<components['schemas']["LegalDocumentResponseDto"]>; jurisdictionCode: string; locale: string; receiptBundleId: string | null };
     LockDrawDto: { competitionId: string; reason: string; seedCommitment: string };
     MeResponseDto: { callsign: string; email: string | null; emailVerified: boolean; id: string; privacySettings: components['schemas']["PrivacySettingsDto"]; publicIdentityMode: "private" | "alias" | "real_name"; publicName: string | null; roles: Array<string>; screenName: string; status: "active" | "suspended" | "deleted"; version: number };
+    MemberRegionWaitlistRequestDto: { consent: true; consentNoticeVersion: "regional-updates-2026-08-13-v1"; countryCode?: string; requestedRegion: string; subdivisionCode?: string };
     OperatorActionResponseDto: { id: string; status: string };
     OperatorAuditHistoryDto: { action: string; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
     OperatorGymSessionDto: { completedAt: string | null; gymLocationId: string; gymName: string; id: string; incomplete: boolean; startedAt: string; status: string };
@@ -129,8 +130,9 @@ export interface components {
     RedeemChallengeContactInvitationDto: { token: string };
     RegionPolicyResponseDto: { boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: string; id: string; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; subdivisionCode: string; timezone: string; validFrom: string; validTo: string | null };
     RegionVerificationResponseDto: { createdAt: string; expiresAt: string; id: string; jurisdictionCode: string; method: "device_location"; policyVersion: string; regionCode: string; regionName: string; regionPolicyId: string; reviewedAt: string; status: "approved"; timezone: string };
-    RegionWaitlistEntryDto: { createdAt: string; email: string; id: string; requestedRegion: string; source: string; status: string };
-    RegionWaitlistRequestDto: { countryCode?: string; email: string; requestedRegion: string; subdivisionCode?: string };
+    RegionWaitlistEntryDto: { consentedAt?: string | null; consentNoticeVersion?: string | null; createdAt: string; email: string; id: string; requestedRegion: string; source: string; status: string };
+    RegionWaitlistReceiptDto: { status: "received" };
+    RegionWaitlistRequestDto: { consent: true; consentNoticeVersion: "regional-updates-2026-08-13-v1"; countryCode?: string; email: string; requestedRegion: string; subdivisionCode?: string };
     RegisterPushDeviceDto: { platform: "android" | "ios"; pushToken: string };
     RejectSessionDto: { evidenceSnapshotSha256: string; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
     RemoveAvatarResponseDto: { status: "removed" };
@@ -165,6 +167,7 @@ export interface components {
     UpdateGymLocationDto: { active: boolean; address?: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     UpdateMeDto: { privacySettings?: components['schemas']["UpdatePrivacySettingsDto"]; publicIdentityMode?: "private" | "alias" | "real_name"; publicName?: string | null; screenName?: string };
     UpdatePrivacySettingsDto: { showRegion?: boolean; showStats?: boolean };
+    UpdateRegionWaitlistStatusDto: { reason: string; status: "contacted" | "launched" | "closed" };
     UpdateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; expectedVersion: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
     UserSearchResultDto: { relationship: "none" | "friend" | "incoming_request" | "outgoing_request"; screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     VerificationConsentStatusResponseDto: { accepted: boolean; acceptedAt: string | null; consentKey: "device_presence_qr_camera"; consentVersion: string; updatedAt: string | null; withdrawnAt: string | null };
@@ -1094,13 +1097,22 @@ export interface operations {
       "201": components['schemas']["PartnerApplicationResponseDto"];
     };
   };
-  submitWaitlist: {
+  submitWaitlist_post_v1_me_region_waitlist: {
+    method: "POST";
+    path: "/v1/me/region-waitlist";
+    parameters: Record<string, never>;
+    requestBody: components['schemas']["MemberRegionWaitlistRequestDto"];
+    responses: {
+      "201": components['schemas']["RegionWaitlistReceiptDto"];
+    };
+  };
+  submitWaitlist_post_v1_region_waitlist: {
     method: "POST";
     path: "/v1/region-waitlist";
     parameters: Record<string, never>;
     requestBody: components['schemas']["RegionWaitlistRequestDto"];
     responses: {
-      "201": components['schemas']["RegionWaitlistEntryDto"];
+      "201": components['schemas']["RegionWaitlistReceiptDto"];
     };
   };
   update: {
@@ -1137,6 +1149,15 @@ export interface operations {
     requestBody: components['schemas']["UpdateMeDto"];
     responses: {
       "200": components['schemas']["MeResponseDto"];
+    };
+  };
+  updateWaitlistStatus: {
+    method: "POST";
+    path: "/v1/operator/region-waitlist/{entryId}/status";
+    parameters: { header: { "Idempotency-Key": string }; path: { entryId: string } };
+    requestBody: components['schemas']["UpdateRegionWaitlistStatusDto"];
+    responses: {
+      "200": components['schemas']["RegionWaitlistEntryDto"];
     };
   };
   updateWorkout: {
@@ -1283,6 +1304,9 @@ export interface paths {
   "/v1/me/region-verifications/current": {
     get: operations["getCurrentVerification"];
   };
+  "/v1/me/region-waitlist": {
+    post: operations["submitWaitlist_post_v1_me_region_waitlist"];
+  };
   "/v1/me/verification-consents/device-presence": {
     get: operations["getStatus_get_v1_me_verification_consents_device_presence"];
     put: operations["setStatus"];
@@ -1400,6 +1424,9 @@ export interface paths {
   "/v1/operator/region-waitlist": {
     get: operations["listWaitlist"];
   };
+  "/v1/operator/region-waitlist/{entryId}/status": {
+    post: operations["updateWaitlistStatus"];
+  };
   "/v1/operator/reward-awards/{awardId}/status-action": {
     post: operations["changeStatus_post_v1_operator_reward_awards_awardId_status_action"];
   };
@@ -1428,7 +1455,7 @@ export interface paths {
     post: operations["submitSponsor"];
   };
   "/v1/region-waitlist": {
-    post: operations["submitWaitlist"];
+    post: operations["submitWaitlist_post_v1_region_waitlist"];
   };
   "/v1/regions": {
     get: operations["listRegions"];
@@ -1603,6 +1630,7 @@ export type LegalReceiptItemDto = components['schemas']["LegalReceiptItemDto"];
 export type LegalReceiptStatusResponseDto = components['schemas']["LegalReceiptStatusResponseDto"];
 export type LockDrawDto = components['schemas']["LockDrawDto"];
 export type MeResponseDto = components['schemas']["MeResponseDto"];
+export type MemberRegionWaitlistRequestDto = components['schemas']["MemberRegionWaitlistRequestDto"];
 export type OperatorActionResponseDto = components['schemas']["OperatorActionResponseDto"];
 export type OperatorAuditHistoryDto = components['schemas']["OperatorAuditHistoryDto"];
 export type OperatorGymSessionDto = components['schemas']["OperatorGymSessionDto"];
@@ -1633,6 +1661,7 @@ export type RedeemChallengeContactInvitationDto = components['schemas']["RedeemC
 export type RegionPolicyResponseDto = components['schemas']["RegionPolicyResponseDto"];
 export type RegionVerificationResponseDto = components['schemas']["RegionVerificationResponseDto"];
 export type RegionWaitlistEntryDto = components['schemas']["RegionWaitlistEntryDto"];
+export type RegionWaitlistReceiptDto = components['schemas']["RegionWaitlistReceiptDto"];
 export type RegionWaitlistRequestDto = components['schemas']["RegionWaitlistRequestDto"];
 export type RegisterPushDeviceDto = components['schemas']["RegisterPushDeviceDto"];
 export type RejectSessionDto = components['schemas']["RejectSessionDto"];
@@ -1668,6 +1697,7 @@ export type UpdateCreatorWorkoutDto = components['schemas']["UpdateCreatorWorkou
 export type UpdateGymLocationDto = components['schemas']["UpdateGymLocationDto"];
 export type UpdateMeDto = components['schemas']["UpdateMeDto"];
 export type UpdatePrivacySettingsDto = components['schemas']["UpdatePrivacySettingsDto"];
+export type UpdateRegionWaitlistStatusDto = components['schemas']["UpdateRegionWaitlistStatusDto"];
 export type UpdateRewardCatalogItemDto = components['schemas']["UpdateRewardCatalogItemDto"];
 export type UserSearchResultDto = components['schemas']["UserSearchResultDto"];
 export type VerificationConsentStatusResponseDto = components['schemas']["VerificationConsentStatusResponseDto"];

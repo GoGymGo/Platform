@@ -201,10 +201,15 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /operator\/gym-locations/);
   assert.match(dashboard, /operator\/gym-sessions/);
   assert.match(dashboard, /operator\/region-waitlist/);
+  assert.match(dashboard, /operator\/region-verifications\/\$\{verificationId\}\/decision/);
+  assert.match(dashboard, /Region verification decision recorded/);
+  assert.doesNotMatch(dashboard, /defaultChecked name="competitionEnabled"/);
   assert.match(dashboard, /operator\/interest-submissions/);
   assert.match(dashboard, /operator\/partner-applications/);
   assert.match(dashboard, /operator\/cash-fulfillments/);
   assert.match(pilot, /STATIC QR PILOT/);
+  assert.match(pilot, /onUpdateWaitlist/);
+  assert.match(pilot, /legacy \/ not recorded/);
   assert.match(pilot, /Compass coordinates/);
   assert.match(pilot, /USE MY PHONE LOCATION/);
   assert.match(pilot, /navigator\.geolocation\.getCurrentPosition/);
@@ -392,8 +397,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
 
   const dashboardForms = dashboard.match(/<form\b[\s\S]*?>/g) ?? [];
   const pilotForms = pilot.match(/<form\b[\s\S]*?>/g) ?? [];
-  assert.equal(dashboardForms.length, 7);
-  assert.equal(pilotForms.length, 4);
+  assert.equal(dashboardForms.length, 8);
+  assert.equal(pilotForms.length, 5);
   dashboardForms.forEach((form) => assert.match(form, /noValidate/));
   pilotForms.forEach((form) => assert.match(form, /noValidate/));
   assert.equal(

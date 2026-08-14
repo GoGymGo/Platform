@@ -1,10 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
+  IsDateString,
   IsLatitude,
   IsLongitude,
+  IsNumber,
   IsOptional,
+  Max,
   Matches,
+  Min,
 } from 'class-validator';
 import type {
   RegionVerificationMethod,
@@ -65,6 +69,12 @@ export class CreateRegionVerificationDto {
   @IsEnum(RegionVerificationMethodDto)
   method!: 'device_location';
 
+  @ApiProperty({ maximum: 50, minimum: 0, type: Number })
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @Max(50)
+  accuracyMeters!: number;
+
   @ApiProperty({ maximum: 90, minimum: -90, type: Number })
   @IsLatitude()
   latitude!: number;
@@ -72,6 +82,10 @@ export class CreateRegionVerificationDto {
   @ApiProperty({ maximum: 180, minimum: -180, type: Number })
   @IsLongitude()
   longitude!: number;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  @IsDateString()
+  observedAt!: string;
 }
 
 export class CurrentRegionVerificationQueryDto {

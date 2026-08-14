@@ -1442,6 +1442,35 @@ main {
   text-transform: none !important;
 }
 
+.queue-decision-form,
+.table-inline-form {
+  display: grid;
+  gap: 8px;
+}
+
+.queue-decision-form {
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.queue-decision-form label {
+  display: grid;
+  gap: 5px;
+}
+
+.queue-decision-form label > span {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.table-inline-form {
+  min-width: 220px;
+}
+
 .queue-review-note {
   margin: 0;
   border-left: 2px solid var(--yellow);

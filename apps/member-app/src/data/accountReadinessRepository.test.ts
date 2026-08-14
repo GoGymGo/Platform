@@ -84,9 +84,11 @@ describe('account readiness repository', () => {
     };
     const account = createAccountReadinessRepository('api', api);
     await account.createRegionVerification({
+      accuracyMeters: 8,
       latitude: 49.2827,
       longitude: -123.1207,
-      method: 'device_location'
+      method: 'device_location',
+      observedAt: '2026-08-13T12:00:00.000Z'
     });
     await account.enrollInCompetition(
       '40000000-0000-4000-8000-000000000001',
@@ -153,9 +155,11 @@ describe('account readiness repository', () => {
       }
     ]);
     assert.deepEqual(requests[0].body, {
+      accuracyMeters: 8,
       latitude: 49.2827,
       longitude: -123.1207,
-      method: 'device_location'
+      method: 'device_location',
+      observedAt: '2026-08-13T12:00:00.000Z'
     });
     assert.deepEqual(requests[1].body, {
       ageEligibilityAttested: true,

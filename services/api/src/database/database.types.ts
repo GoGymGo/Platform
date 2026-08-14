@@ -644,10 +644,13 @@ export interface RegionWaitlistEntriesTable {
   user_id: string | null;
   email: string;
   requested_region: string;
+  requested_region_key: string;
   country_code: string | null;
   subdivision_code: string | null;
   source: string;
   status: RegionWaitlistStatus;
+  consent_notice_version: string | null;
+  consented_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

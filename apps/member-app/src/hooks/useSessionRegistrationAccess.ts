@@ -10,6 +10,7 @@ import {
   getAccountSetupStep
 } from '@/domain/accountSetup';
 import { hasCompetitionStarted } from '@/domain/competition';
+import { isCompetitionRegionVerificationCurrent } from '@/config/regions';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -21,9 +22,13 @@ export function useSessionRegistrationAccess({
   gymQrScanKey?: number | null;
 } = {}) {
   const { competition, progressReady } = useWorkoutProgress();
-  const { regionReady, regionVerification } = useCompetitionRegion();
-  const regionVerified =
-    regionVerification?.status === 'verified' && Boolean(regionVerification.verificationId);
+  const {
+    refreshCompetitionRegion,
+    regionError,
+    regionReady,
+    regionVerification
+  } = useCompetitionRegion();
+  const regionVerified = isCompetitionRegionVerificationCurrent(regionVerification);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const regionCode = regionVerification?.regionCode ?? '';
   const legalReceipt = useLegalReceiptStatus(jurisdictionCode);
@@ -45,6 +50,7 @@ export function useSessionRegistrationAccess({
   const enrollmentReady = Boolean(currentEnrollment.data);
   const retry = async () => {
     await Promise.all([
+      refreshCompetitionRegion(),
       currentCompetition.refetch(),
       currentEnrollment.refetch(),
       ...(regionVerified ? [legalReceipt.refetch()] : [])
@@ -65,6 +71,7 @@ export function useSessionRegistrationAccess({
       currentEnrollment.isLoading ||
       (regionVerified && legalReceipt.isLoading),
     error:
+      regionError ||
       currentCompetition.isError ||
       currentEnrollment.isError ||
       (regionVerified && legalReceipt.isError),

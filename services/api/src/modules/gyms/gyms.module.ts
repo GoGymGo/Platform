@@ -4,6 +4,7 @@ import { ProfilesModule } from '../profiles/profiles.module';
 import {
   GymOperatorController,
   GymScansController,
+  MemberRegionWaitlistController,
   PilotSubmissionsController,
 } from './gyms.controller';
 import { GymsService } from './gyms.service';
@@ -12,6 +13,7 @@ import { GymsService } from './gyms.service';
   controllers: [
     GymOperatorController,
     GymScansController,
+    MemberRegionWaitlistController,
     PilotSubmissionsController,
   ],
   exports: [GymsService],

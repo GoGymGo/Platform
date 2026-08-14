@@ -48,9 +48,11 @@ test('new-player App Tour starts onboarding without completed setup', async () =
 test('new-player App Tour records each onboarding milestone in memory', async () => {
   const account = createAppTourAccountReadinessRepository('new-player');
   const verification = await account.createRegionVerification({
+    accuracyMeters: 8,
     latitude: 49.1659,
     longitude: -123.9401,
-    method: 'device_location'
+    method: 'device_location',
+    observedAt: new Date().toISOString()
   });
   const legalBundle = await account.getCurrentLegalDocuments('CA-BC', 'en');
   const legalReceipt = await account.recordLegalReceipt(legalBundle);

@@ -3,6 +3,7 @@
 ## Fixed configuration
 
 - Region: Vancouver Island + Gulf Islands
+- Reviewed region artifact canonical LF repository-byte SHA-256: `5d341887130e81061ec23689ead15aee0c3433d481b90092a143f70a25409aa7`
 - Time zone: `America/Vancouver`
 - Competition: September 1, 2026 00:00 through October 1, 2026 00:00
 - Verification: approved static gym QR, live location, 75 m radius
@@ -30,7 +31,9 @@ that exact value. Never copy the digest forward after legal content changes.
 ## Staging order
 
 1. Apply all migrations and deploy the same image digest to the API and worker.
-2. Configure the production-shaped regional boundary.
+2. Reconcile the exact committed regional boundary digest and representative
+   points using `docs/operations/region-eligibility.md`, then configure it only
+   after the separate geography approval gate.
 3. Have the configured GoGymGo owner verify email and sign in once, then run
    the audited administrator bootstrap.
 4. Create the real condo gym with its verified name, street address and measured

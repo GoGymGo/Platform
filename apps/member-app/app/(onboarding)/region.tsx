@@ -17,6 +17,8 @@ import {
 } from '@/components/firstRun';
 import { OnboardingHeader } from '@/components/onboarding';
 import { getUserFacingErrorMessage } from '@/components/reliability';
+import { LegalConsentCheckbox } from '@/components/legal';
+import { isCompetitionRegionVerificationCurrent } from '@/config/regions';
 import { colors, fontFamilies, fontSizes, spacing } from '@/constants/theme';
 import { useCreateRegionVerification } from '@/data/accountReadinessHooks';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
@@ -34,6 +36,9 @@ type VerificationState =
   | 'checking'
   | 'verified'
   | 'permission-denied'
+  | 'location-inaccurate'
+  | 'location-stale'
+  | 'location-timeout'
   | 'location-unavailable'
   | 'service-error'
   | 'unsupported-region';
@@ -55,18 +60,23 @@ function MobileRegionScreen() {
   const { api } = useApi();
   const { user } = useAuth();
   const { source } = useLocalSearchParams<{ source?: string }>();
-  const { competitionRegion, regionVerification, verifyCompetitionRegion } = useCompetitionRegion();
+  const {
+    competitionRegion,
+    regionError,
+    regionVerification,
+    verifyCompetitionRegion
+  } = useCompetitionRegion();
   const createRegionVerification = useCreateRegionVerification();
   const [verificationState, setVerificationState] = useState<VerificationState>('idle');
   const [requestedRegion, setRequestedRegion] = useState('');
   const [waitlistBusy, setWaitlistBusy] = useState(false);
   const [waitlistJoined, setWaitlistJoined] = useState(false);
+  const [waitlistConsent, setWaitlistConsent] = useState(false);
   const [waitlistError, setWaitlistError] = useState<string | null>(null);
   const isProfileSource = source === 'profile';
   const isHomeSource = source === 'home';
   const isGymScanSource = source === 'gym-scan';
-  const approvedRegionReady =
-    regionVerification?.status === 'verified' && Boolean(regionVerification.verificationId);
+  const approvedRegionReady = isCompetitionRegionVerificationCurrent(regionVerification);
   const jurisdictionCode = regionVerification?.jurisdictionCode || 'GLOBAL';
   const permissionDeniedMessage =
     'ALLOW LOCATION IN DEVICE SETTINGS, THEN TRY AGAIN.';
@@ -77,9 +87,11 @@ function MobileRegionScreen() {
     if (appTourActive) {
       try {
         const serverVerification = await createRegionVerification.mutateAsync({
+          accuracyMeters: 5,
           latitude: 43.6532,
           longitude: -79.3832,
-          method: 'device_location'
+          method: 'device_location',
+          observedAt: new Date().toISOString()
         });
         await verifyCompetitionRegion(serverVerification);
         setVerificationState('verified');
@@ -121,15 +133,23 @@ function MobileRegionScreen() {
   }
 
   async function joinRegionWaitlist() {
-    if (!api || !user?.email || requestedRegion.trim().length < 2) {
+    if (!api || !user?.email) {
+      setWaitlistError('Sign in with a verified email and try again.');
+      return;
+    }
+    if (requestedRegion.trim().length < 2) {
       setWaitlistError('Enter your city or region.');
+      return;
+    }
+    if (!waitlistConsent) {
+      setWaitlistError('Confirm that GoGymGo may email you regional updates.');
       return;
     }
     setWaitlistBusy(true);
     setWaitlistError(null);
     try {
       await submitRegionWaitlist(api, {
-        email: user.email,
+        consent: true,
         requestedRegion: requestedRegion.trim()
       });
       setWaitlistJoined(true);
@@ -181,7 +201,7 @@ function MobileRegionScreen() {
               ONE-TIME LOCATION CHECK
             </TerminalText>
             <TerminalText style={styles.bodyCopy} tone="muted" uppercase={false} variant="body">
-              We check once, save only your region, and do not track you.
+              We send one foreground location reading to check the active boundary. We retain the region decision, not the coordinates, and do not track you.
             </TerminalText>
           </HUDBorderBox>
         ) : null}
@@ -226,6 +246,24 @@ function MobileRegionScreen() {
             tone="amber"
           />
         ) : null}
+        {verificationState === 'location-inaccurate' ? (
+          <AuthStatusNotice
+            message="LOCATION ISN'T ACCURATE ENOUGH. MOVE NEAR A WINDOW OR OUTSIDE, THEN TRY AGAIN."
+            tone="amber"
+          />
+        ) : null}
+        {verificationState === 'location-stale' ? (
+          <AuthStatusNotice
+            message="A FRESH LOCATION COULDN'T BE CONFIRMED. TRY AGAIN."
+            tone="amber"
+          />
+        ) : null}
+        {verificationState === 'location-timeout' ? (
+          <AuthStatusNotice
+            message="LOCATION CHECK TIMED OUT. CHECK YOUR SIGNAL AND TRY AGAIN."
+            tone="amber"
+          />
+        ) : null}
         {verificationState === 'unsupported-region' ? (
           <HUDBorderBox style={styles.waitlistCard} tone="amber">
             <TerminalText tone="amber" variant="label">
@@ -240,23 +278,35 @@ function MobileRegionScreen() {
             />
             {waitlistJoined ? (
               <TerminalText live="polite" tone="green" variant="label">
-                REGIONAL UPDATES CONFIRMED
+                REGIONAL UPDATE REQUEST RECEIVED
               </TerminalText>
             ) : (
               <>
                 <AuthTextField
                   autoCapitalize="words"
                   label="YOUR CITY OR REGION"
+                  maxLength={160}
                   onChangeText={(value) => {
                     setRequestedRegion(value);
+                    setWaitlistJoined(false);
                     setWaitlistError(null);
                   }}
                   placeholder="Example: Nanaimo, BC"
                   value={requestedRegion}
                 />
+                <LegalConsentCheckbox
+                  checked={waitlistConsent}
+                  helper="This request does not create a contest registration. You can unsubscribe from any update."
+                  label="GoGymGo may store my email and region and email me about regional availability."
+                  onToggle={() => {
+                    setWaitlistConsent((current) => !current);
+                    setWaitlistError(null);
+                  }}
+                  tone="cyan"
+                />
                 {waitlistError ? <AuthStatusNotice message={waitlistError} tone="red" /> : null}
                 <FirstRunPrimaryButton
-                  disabled={waitlistBusy}
+                  disabled={waitlistBusy || !waitlistConsent}
                   label={waitlistBusy ? 'SAVING REQUEST...' : 'GET REGIONAL UPDATES ->'}
                   onPress={() => void joinRegionWaitlist()}
                   tone="amber"
@@ -268,6 +318,12 @@ function MobileRegionScreen() {
         {verificationState === 'service-error' ? (
           <AuthStatusNotice
             message="COULDN&apos;T VERIFY YOUR REGION. CHECK YOUR CONNECTION AND TRY AGAIN."
+            tone="red"
+          />
+        ) : null}
+        {regionError && verificationState === 'idle' ? (
+          <AuthStatusNotice
+            message="YOUR SAVED REGION COULDN'T BE CONFIRMED. VERIFY AGAIN TO CONTINUE."
             tone="red"
           />
         ) : null}

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  Equals,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -16,8 +17,12 @@ import {
   Max,
   MaxLength,
   Min,
+  Matches,
   ValidateIf,
 } from 'class-validator';
+
+export const regionalUpdatesConsentNoticeVersion =
+  'regional-updates-2026-08-13-v1';
 
 export class GymScanRequestDto {
   @ApiProperty({ format: 'uuid', type: String })
@@ -245,17 +250,93 @@ export class RegionWaitlistRequestDto {
   @Length(2, 160)
   requestedRegion!: string;
 
-  @ApiPropertyOptional({ maxLength: 2, minLength: 2, type: String })
+  @ApiPropertyOptional({
+    maxLength: 2,
+    minLength: 2,
+    pattern: '^[A-Za-z]{2}$',
+    type: String,
+  })
   @IsOptional()
   @IsString()
   @Length(2, 2)
+  @Matches(/^[A-Za-z]{2}$/)
   countryCode?: string;
 
-  @ApiPropertyOptional({ maxLength: 8, minLength: 2, type: String })
+  @ApiPropertyOptional({
+    maxLength: 8,
+    minLength: 2,
+    pattern: '^[A-Za-z0-9-]{2,8}$',
+    type: String,
+  })
   @IsOptional()
   @IsString()
   @Length(2, 8)
+  @Matches(/^[A-Za-z0-9-]{2,8}$/)
   subdivisionCode?: string;
+
+  @ApiProperty({ enum: [true], type: Boolean })
+  @Equals(true)
+  consent!: true;
+
+  @ApiProperty({
+    enum: [regionalUpdatesConsentNoticeVersion],
+    type: String,
+  })
+  @Equals(regionalUpdatesConsentNoticeVersion)
+  consentNoticeVersion!: typeof regionalUpdatesConsentNoticeVersion;
+}
+
+export class MemberRegionWaitlistRequestDto {
+  @ApiProperty({ maxLength: 160, minLength: 2, type: String })
+  @IsString()
+  @Length(2, 160)
+  requestedRegion!: string;
+
+  @ApiPropertyOptional({
+    maxLength: 2,
+    minLength: 2,
+    pattern: '^[A-Za-z]{2}$',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  @Matches(/^[A-Za-z]{2}$/)
+  countryCode?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 8,
+    minLength: 2,
+    pattern: '^[A-Za-z0-9-]{2,8}$',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @Length(2, 8)
+  @Matches(/^[A-Za-z0-9-]{2,8}$/)
+  subdivisionCode?: string;
+
+  @ApiProperty({ enum: [true], type: Boolean })
+  @Equals(true)
+  consent!: true;
+
+  @ApiProperty({
+    enum: [regionalUpdatesConsentNoticeVersion],
+    type: String,
+  })
+  @Equals(regionalUpdatesConsentNoticeVersion)
+  consentNoticeVersion!: typeof regionalUpdatesConsentNoticeVersion;
+}
+
+export class RegionWaitlistReceiptDto {
+  @ApiProperty({ enum: ['received'], type: String })
+  status!: 'received';
+}
+
+export class UpdateRegionWaitlistStatusDto extends OperatorReasonDto {
+  @ApiProperty({ enum: ['contacted', 'launched', 'closed'], type: String })
+  @IsIn(['contacted', 'launched', 'closed'])
+  status!: 'contacted' | 'launched' | 'closed';
 }
 
 export class RegionWaitlistEntryDto {
@@ -276,6 +357,12 @@ export class RegionWaitlistEntryDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
+
+  @ApiPropertyOptional({ format: 'date-time', nullable: true, type: String })
+  consentedAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  consentNoticeVersion!: string | null;
 }
 
 export class InterestSubmissionDto {

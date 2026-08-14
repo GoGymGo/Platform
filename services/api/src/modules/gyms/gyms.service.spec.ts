@@ -62,6 +62,8 @@ interface GymsServiceInternals {
     updated_at: Date;
   }): GymLocationResponseDto;
   mapWaitlist(entry: {
+    consent_notice_version: string | null;
+    consented_at: Date | null;
     created_at: Date;
     email: string;
     id: string;
@@ -217,6 +219,8 @@ describe('gym service privacy-safe presentation helpers', () => {
     });
     expect(
       service.mapWaitlist({
+        consent_notice_version: 'regional-updates-2026-08-13-v1',
+        consented_at: createdAt,
         created_at: createdAt,
         email: 'player@example.com',
         id: 'waitlist-1',
@@ -225,6 +229,8 @@ describe('gym service privacy-safe presentation helpers', () => {
         status: 'waiting',
       }),
     ).toEqual({
+      consentNoticeVersion: 'regional-updates-2026-08-13-v1',
+      consentedAt: createdAt.toISOString(),
       createdAt: createdAt.toISOString(),
       email: 'player@example.com',
       id: 'waitlist-1',

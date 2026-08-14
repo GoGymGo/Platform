@@ -644,7 +644,11 @@ function auditAuthoritativeRegionBoundary() {
   if (!appData.includes('/v1/creator-workouts?region=')) {
     issues.push('src/data/appData.ts: creator workouts must be scoped to the verified region');
   }
-  if (!homeScreen.includes('useCompetitionEnrollmentCount(\n    competitionRegionCode,')) {
+  if (
+    !homeScreen.includes(
+      'useCompetitionEnrollmentCount(\n    currentCompetition?.id ?? null,\n    competitionRegionCode,'
+    )
+  ) {
     issues.push(
       'app/(tabs)/home/index.tsx: regional competition queries must use the verified region code'
     );

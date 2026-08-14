@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DrawsModule } from '../draws/draws.module';
+import { LegalModule } from '../legal/legal.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { SessionsModule } from '../sessions/sessions.module';
@@ -23,6 +24,7 @@ import { OperatorService } from './operator.service';
   imports: [
     AdminAuthorizationModule,
     DrawsModule,
+    LegalModule,
     NotificationsModule,
     ProfilesModule,
     SessionsModule,

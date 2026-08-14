@@ -681,6 +681,7 @@ function createCurrentCompetition(
       weeklyChallengeRecoveryMultiplier: 3
     },
     rulesVersion: 'app-tour',
+    serverTime: nowIso(),
     startsAt: start,
     status: 'active'
   };

@@ -13,6 +13,8 @@ import type {
   JsonValue,
 } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import { closeCompetitionParticipation } from '../competitions/competition-participation';
+import { LegalDocumentsService } from '../legal/legal-documents.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   canCancelCompetition,
@@ -66,6 +68,7 @@ export class AdminCompetitionConfigurationService {
   constructor(
     private readonly authorization: AdminAuthorizationService,
     private readonly idempotency: IdempotencyService,
+    private readonly legalDocuments: LegalDocumentsService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -388,44 +391,15 @@ export class AdminCompetitionConfigurationService {
         }
 
         if (nextStatus === 'cancelled' && competition.status !== 'draft') {
-          const enrollments = await transaction
-            .selectFrom('competition_enrollments')
-            .select(['id', 'user_id'])
-            .where('competition_id', '=', competitionId)
-            .where('status', '=', 'active')
-            .execute();
-          await transaction
-            .updateTable('competition_enrollments')
-            .set({ status: 'withdrawn' })
-            .where('competition_id', '=', competitionId)
-            .where('status', '=', 'active')
-            .execute();
-          await transaction
-            .updateTable('workout_sessions')
-            .set({
-              completed_at: changedAt,
-              status: 'cancelled',
-              updated_at: changedAt,
-            })
-            .where('competition_id', '=', competitionId)
-            .where('status', '=', 'active')
-            .execute();
-          await transaction
-            .updateTable('weekly_challenge_requests')
-            .set({ responded_at: changedAt, status: 'cancelled' })
-            .where('competition_id', '=', competitionId)
-            .where('status', 'in', ['accepted', 'pending'])
-            .execute();
-          await transaction
-            .updateTable('competition_matches')
-            .set({ settled_at: changedAt, status: 'cancelled' })
-            .where('competition_id', '=', competitionId)
-            .where('status', 'in', ['matched', 'searching'])
-            .execute();
+          const enrollments = await closeCompetitionParticipation(
+            transaction,
+            competitionId,
+            changedAt,
+          );
           for (const enrollment of enrollments) {
             await this.notifications.enqueue(
               transaction,
-              enrollment.user_id,
+              enrollment.userId,
               'competition_cancelled',
               { competitionId },
             );
@@ -784,38 +758,42 @@ export class AdminCompetitionConfigurationService {
         message: 'An ended competition cannot be published.',
       });
     }
+    if (competition.registration_opens_at > now) {
+      throw new ConflictException({
+        code: 'COMPETITION_REGISTRATION_NOT_OPEN',
+        message:
+          'Registration must already be open when the competition is published.',
+      });
+    }
+    if (
+      competition.registration_closes_at <= now ||
+      competition.starts_at <= now
+    ) {
+      throw new ConflictException({
+        code: 'COMPETITION_PUBLISH_WINDOW_CLOSED',
+        message:
+          'Registration close and competition start must still be in the future at publication.',
+      });
+    }
     const rules = parseAdminCompetitionRules(competition.rules);
-    const [region, bracket, reward, activeGym] = await Promise.all([
-      transaction
-        .selectFrom('region_policies')
-        .select(['competition_enabled', 'valid_from', 'valid_to'])
-        .where('id', '=', competition.region_policy_id)
-        .executeTakeFirst(),
-      transaction
-        .selectFrom('competition_goal_brackets')
-        .select('goal_days')
-        .where('competition_id', '=', competition.id)
-        .executeTakeFirst(),
-      transaction
-        .selectFrom('reward_catalog_items')
-        .select('id')
-        .where('competition_id', '=', competition.id)
-        .where('status', '=', 'published')
-        .executeTakeFirst(),
-      rules.requireGymQr
-        ? transaction
-            .selectFrom('competition_gym_locations as competition_gym')
-            .innerJoin(
-              'gym_locations as gym',
-              'gym.id',
-              'competition_gym.gym_location_id',
-            )
-            .select('gym.id')
-            .where('competition_gym.competition_id', '=', competition.id)
-            .where('gym.active', '=', true)
-            .executeTakeFirst()
-        : Promise.resolve({ id: 'not-required' }),
-    ]);
+    if (!rules.requireGymQr) {
+      throw new ConflictException({
+        code: 'COMPETITION_VERIFICATION_METHOD_UNSUPPORTED',
+        message:
+          'Contest publication currently requires Partner gym QR verification.',
+      });
+    }
+    const region = await transaction
+      .selectFrom('region_policies')
+      .select([
+        'competition_enabled',
+        'country_code',
+        'subdivision_code',
+        'valid_from',
+        'valid_to',
+      ])
+      .where('id', '=', competition.region_policy_id)
+      .executeTakeFirst();
     if (!region) {
       throw new NotFoundException({
         code: 'REGION_POLICY_NOT_FOUND',
@@ -838,6 +816,54 @@ export class AdminCompetitionConfigurationService {
           'The region policy must cover the entire competition lifecycle.',
       });
     }
+
+    const jurisdictionCode = `${region.country_code}-${region.subdivision_code}`;
+    const [bracket, reward, activePoster, legalBundle] = await Promise.all([
+      transaction
+        .selectFrom('competition_goal_brackets')
+        .select('goal_days')
+        .where('competition_id', '=', competition.id)
+        .executeTakeFirst(),
+      transaction
+        .selectFrom('reward_catalog_items')
+        .select('id')
+        .where('competition_id', '=', competition.id)
+        .where('status', '=', 'published')
+        .executeTakeFirst(),
+      rules.requireGymQr
+        ? transaction
+            .selectFrom('competition_gym_locations as competition_gym')
+            .innerJoin(
+              'gym_locations as gym',
+              'gym.id',
+              'competition_gym.gym_location_id',
+            )
+            .innerJoin('gym_qr_credentials as credential', (join) =>
+              join
+                .onRef(
+                  'credential.competition_id',
+                  '=',
+                  'competition_gym.competition_id',
+                )
+                .onRef(
+                  'credential.gym_location_id',
+                  '=',
+                  'competition_gym.gym_location_id',
+                ),
+            )
+            .select('credential.id')
+            .where('competition_gym.competition_id', '=', competition.id)
+            .where('gym.active', '=', true)
+            .where('gym.deleted_at', 'is', null)
+            .where('credential.status', '=', 'active')
+            .executeTakeFirst()
+        : Promise.resolve({ id: 'not-required' }),
+      this.legalDocuments.resolveCurrentBundle(
+        transaction,
+        jurisdictionCode,
+        'en',
+      ),
+    ]);
     if (!bracket) {
       throw new ConflictException({
         code: 'COMPETITION_GOAL_BRACKET_REQUIRED',
@@ -851,11 +877,29 @@ export class AdminCompetitionConfigurationService {
           'Publish at least one reward before publishing the competition.',
       });
     }
-    if (rules.requireGymQr && !activeGym) {
+    if (!legalBundle.configured) {
       throw new ConflictException({
-        code: 'COMPETITION_GYM_REQUIRED',
+        code: 'COMPETITION_LEGAL_DOCUMENTS_REQUIRED',
         message:
-          'Assign at least one active gym location before publishing a QR-required competition.',
+          'Publish current owner-approved Privacy and Terms documents before publishing the competition.',
+      });
+    }
+    if (
+      !legalBundle.documents.some(
+        (document) => document.documentKey === 'official_contest_rules',
+      )
+    ) {
+      throw new ConflictException({
+        code: 'COMPETITION_OFFICIAL_RULES_REQUIRED',
+        message:
+          'Publish current owner-approved Official Contest Rules before publishing the competition.',
+      });
+    }
+    if (rules.requireGymQr && !activePoster) {
+      throw new ConflictException({
+        code: 'COMPETITION_GYM_QR_REQUIRED',
+        message:
+          'Assign an active gym and issue its active contest-specific QR poster before publishing.',
       });
     }
     return 'registration';

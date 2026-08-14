@@ -813,12 +813,23 @@ describeWithDatabase('connected static QR pilot', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    const gym = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO gym_locations
+         (region_policy_id, name, address, coordinates, radius_meters)
+       VALUES
+         ($1, 'Integration Condo Gym', '1 Test Way',
+          ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 75)
+       RETURNING id`,
+      [region.id, gymLongitude, gymLatitude],
+    );
     const enrollment = await database.connection
       .insertInto('competition_enrollments')
       .values({
         competition_id: competition.id,
         enrolled_at: new Date(),
         goal_days: 3,
+        gym_credential_version: 1,
+        gym_location_id: gym.rows[0].id,
         region_verification_id: verification.id,
         rules_acceptance_id: acceptance.id,
         status: 'active',
@@ -839,23 +850,6 @@ describeWithDatabase('connected static QR pilot', () => {
         verified_days: 0,
       })
       .execute();
-    const gym = await migrated.pool.query<{ id: string }>(
-      `INSERT INTO gym_locations
-         (region_policy_id, name, address, coordinates, radius_meters)
-       VALUES
-         ($1, 'Integration Condo Gym', '1 Test Way',
-          ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 75)
-       RETURNING id`,
-      [region.id, gymLongitude, gymLatitude],
-    );
-    await database.connection
-      .updateTable('competition_enrollments')
-      .set({
-        gym_credential_version: 1,
-        gym_location_id: gym.rows[0].id,
-      })
-      .where('id', '=', enrollment.id)
-      .executeTakeFirstOrThrow();
     await database.connection
       .insertInto('gym_qr_credentials')
       .values({

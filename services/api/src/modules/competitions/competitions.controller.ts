@@ -159,7 +159,11 @@ export class CompetitionsController {
     @Query() query: EnrollmentCountQueryDto,
   ): Promise<EnrollmentCountResponseDto> {
     return {
-      count: await this.competitions.getEnrollmentCount(monthKey, query.region),
+      count: await this.competitions.getEnrollmentCount(
+        query.competitionId,
+        monthKey,
+        query.region,
+      ),
     };
   }
 

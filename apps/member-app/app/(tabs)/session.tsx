@@ -14,7 +14,6 @@ import { colors, spacing } from '@/constants/theme';
 import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { getWorkoutAccessMode } from '@/domain/workoutAccess';
-import { useCompetitionStart } from '@/hooks/useCompetitionStart';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -43,12 +42,9 @@ function MobileSessionTabRoute() {
     setupMessage,
     setupRoute
   } = useSessionRegistrationAccess();
-  const competitionStartReached = useCompetitionStart(
-    currentCompetition?.startsAt
-  );
   const verifiedWorkoutUnavailable = getWorkoutAccessMode(
     currentCompetition
-      ? !competitionStartReached
+      ? currentCompetition.status !== 'active'
       : competition.phase === 'before-month'
   ) === 'upcoming';
   const competitionOpeningDateTime = currentCompetition

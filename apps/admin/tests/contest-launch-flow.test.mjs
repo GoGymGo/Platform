@@ -4,15 +4,32 @@ import {
   canCancelContest,
   canDeleteContestFromDashboard,
   chooseSetupCompetition,
+  hasPublishableLegalDocuments,
   isContestReadyToPublish,
 } from "../app/contest-launch-flow.js";
 
+const now = new Date("2026-08-15T00:00:00.000Z");
+
 const region = {
   competitionEnabled: true,
+  countryCode: "CA",
   id: "region-1",
+  subdivisionCode: "BC",
   validFrom: "2026-01-01T00:00:00.000Z",
   validTo: "2027-01-01T00:00:00.000Z",
 };
+const legalDocuments = [
+  "privacy_policy",
+  "terms_of_service",
+  "official_contest_rules",
+].map((documentKey) => ({
+  documentKey,
+  effectiveAt: "2026-08-01T00:00:00.000Z",
+  jurisdictionCode: "CA-BC",
+  locale: "en",
+  ownerApprovedAt: "2026-07-31T00:00:00.000Z",
+  status: "effective",
+}));
 const gym = {
   active: true,
   activeCredentialVersion: 4,
@@ -31,6 +48,8 @@ function competition(id, status = "draft") {
     name: `Contest ${id}`,
     regionPolicyId: "region-1",
     registrationOpensAt: "2026-08-01T07:00:00.000Z",
+    registrationClosesAt: "2026-09-01T06:00:00.000Z",
+    startsAt: "2026-09-01T07:00:00.000Z",
     status,
   };
 }
@@ -49,15 +68,36 @@ test("requires a separate poster for same-region, same-gym contests", () => {
   };
 
   assert.equal(
-    isContestReadyToPublish(first, rewards, [region], [firstPosterOnly]),
+    isContestReadyToPublish(
+      first,
+      rewards,
+      [region],
+      [firstPosterOnly],
+      legalDocuments,
+      now,
+    ),
     true,
   );
   assert.equal(
-    isContestReadyToPublish(second, rewards, [region], [firstPosterOnly]),
+    isContestReadyToPublish(
+      second,
+      rewards,
+      [region],
+      [firstPosterOnly],
+      legalDocuments,
+      now,
+    ),
     false,
   );
   assert.equal(
-    isContestReadyToPublish(second, rewards, [region], [gym]),
+    isContestReadyToPublish(
+      second,
+      rewards,
+      [region],
+      [gym],
+      legalDocuments,
+      now,
+    ),
     true,
   );
 });
@@ -71,6 +111,8 @@ test("never treats a non-draft contest as publish-ready", () => {
         [publishedReward(candidate.id)],
         [region],
         [gym],
+        legalDocuments,
+        now,
       ),
       false,
     );
@@ -79,7 +121,17 @@ test("never treats a non-draft contest as publish-ready", () => {
 
 test("requires every setup prerequisite", () => {
   const draft = competition("draft");
-  assert.equal(isContestReadyToPublish(draft, [], [region], [gym]), false);
+  assert.equal(
+    isContestReadyToPublish(
+      draft,
+      [],
+      [region],
+      [gym],
+      legalDocuments,
+      now,
+    ),
+    false,
+  );
 
   const noQrGym = {
     ...gym,
@@ -92,6 +144,8 @@ test("requires every setup prerequisite", () => {
       [publishedReward(draft.id)],
       [region],
       [noQrGym],
+      legalDocuments,
+      now,
     ),
     false,
   );
@@ -102,6 +156,40 @@ test("requires every setup prerequisite", () => {
       [publishedReward(draft.id)],
       [{ ...region, competitionEnabled: false }],
       [gym],
+      legalDocuments,
+      now,
+    ),
+    false,
+  );
+});
+
+test("requires current legal content and a live registration window", () => {
+  const draft = competition("draft");
+  assert.equal(
+    hasPublishableLegalDocuments(region, legalDocuments, now),
+    true,
+  );
+  assert.equal(
+    isContestReadyToPublish(
+      draft,
+      [publishedReward(draft.id)],
+      [region],
+      [gym],
+      legalDocuments.filter(
+        (document) => document.documentKey !== "official_contest_rules",
+      ),
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    isContestReadyToPublish(
+      { ...draft, registrationOpensAt: "2026-08-16T00:00:00.000Z" },
+      [publishedReward(draft.id)],
+      [region],
+      [gym],
+      legalDocuments,
+      now,
     ),
     false,
   );

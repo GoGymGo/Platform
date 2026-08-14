@@ -1309,6 +1309,12 @@
             "required": true,
             "in": "query",
             "schema": { "example": "vancouver-bc", "type": "string" }
+          },
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
           }
         ],
         "responses": {
@@ -5422,6 +5428,11 @@
           "minimumEntrants": { "type": "number", "minimum": 1 },
           "entrantCap": { "type": "number", "minimum": 1, "nullable": true },
           "registrationOpensAt": { "type": "string", "format": "date-time" },
+          "serverTime": {
+            "type": "string",
+            "description": "Server time used to resolve this competition state",
+            "format": "date-time"
+          },
           "registrationClosesAt": { "type": "string", "format": "date-time" },
           "startsAt": { "type": "string", "format": "date-time" },
           "endsAt": { "type": "string", "format": "date-time" }
@@ -5439,6 +5450,7 @@
           "minimumEntrants",
           "entrantCap",
           "registrationOpensAt",
+          "serverTime",
           "registrationClosesAt",
           "startsAt",
           "endsAt"

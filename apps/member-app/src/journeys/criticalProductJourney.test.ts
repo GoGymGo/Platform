@@ -382,6 +382,7 @@ function journeyResponse(path: string, method: string): unknown {
       registrationClosesAt: "2026-08-31T07:00:00.000Z",
       registrationOpensAt: "2026-07-01T07:00:00.000Z",
       rulesVersion: "rules-v1",
+      serverTime: "2026-08-12T12:46:00.000Z",
       startsAt: "2026-08-01T07:00:00.000Z",
       status: "active",
     };

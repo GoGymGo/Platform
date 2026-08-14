@@ -2,6 +2,10 @@
 
 import type { User } from "firebase/auth";
 import type { AuditEvent, Competition, WorkQueueItem } from "./admin-types";
+import {
+  FirebaseTokenUnavailableError,
+  sendWithFirebaseTokenRecovery,
+} from "./admin-auth-request.mjs";
 
 export type HttpMethod = "DELETE" | "POST" | "PUT";
 
@@ -124,10 +128,10 @@ export function authErrorMessage(error: unknown) {
       : "";
   if (code.includes("invalid-credential"))
     return "The email or password is incorrect.";
-  if (code.includes("popup-closed"))
-    return "The sign-in window was closed before authentication finished.";
-  if (code.includes("popup-blocked"))
-    return "Your browser blocked the sign-in window. Allow pop-ups and try again.";
+  if (code.includes("too-many-requests"))
+    return "Too many sign-in attempts were made. Wait a moment and try again.";
+  if (code.includes("network-request-failed"))
+    return "Sign-in could not reach Firebase. Check your connection and try again.";
   return "Sign-in could not be completed. Check your connection and try again.";
 }
 
@@ -232,15 +236,6 @@ export async function adminRequest<T>(
     method?: HttpMethod;
   } = {},
 ): Promise<T> {
-  let token: string;
-  try {
-    token = await activeUser.getIdToken();
-  } catch {
-    throw new AdminRequestError(
-      "Your admin session could not be confirmed. Sign in again.",
-    );
-  }
-
   const mutationFingerprint = options.method
     ? `${options.method}:${path}:${JSON.stringify(options.body ?? null)}`
     : null;
@@ -250,17 +245,31 @@ export async function adminRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(`/api/gogymgo/${path}`, {
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      cache: "no-store",
-      headers: {
-        authorization: `Bearer ${token}`,
-        ...(options.body ? { "content-type": "application/json" } : {}),
-        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
-      },
-      method: options.method ?? "GET",
-    });
-  } catch {
+    response = await sendWithFirebaseTokenRecovery(
+      activeUser,
+      (token: string) =>
+        fetch(`/api/gogymgo/${path}`, {
+          body: options.body ? JSON.stringify(options.body) : undefined,
+          cache: "no-store",
+          headers: {
+            authorization: `Bearer ${token}`,
+            ...(options.body ? { "content-type": "application/json" } : {}),
+            ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
+          },
+          method: options.method ?? "GET",
+        }),
+    );
+  } catch (error) {
+    if (error instanceof FirebaseTokenUnavailableError) {
+      const sessionError = new AdminRequestError(
+        "Your admin session expired. Sign out and sign in again.",
+      );
+      Object.assign(sessionError, {
+        code: "ADMIN_SESSION_EXPIRED",
+        status: 401,
+      });
+      throw sessionError;
+    }
     throw new AdminRequestError(
       "The GoGymGo admin service could not be reached. Check your connection and try again.",
     );
@@ -303,6 +312,14 @@ export async function adminRequest<T>(
     clearPendingAdminMutationKey(mutationFingerprint);
   }
   return payload as T;
+}
+
+export function clearAdminRequestSession(): void {
+  try {
+    sessionStorage.removeItem(pendingAdminMutationsStorageKey);
+  } catch {
+    // Firebase sign-out is still authoritative when browser storage is blocked.
+  }
 }
 
 const pendingAdminMutationsStorageKey =

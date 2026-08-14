@@ -84,6 +84,28 @@ The backend is authoritative for:
 - revoked or blocked sessions;
 - account deletion and data-retention workflows.
 
+### Invitation-only operator origin
+
+The dedicated admin app exposes only Firebase email/password sign-in. It has no
+registration, passwordless, Google, Apple, or generic OAuth action. After
+Firebase restores or creates a session, the app waits for
+`GET /v1/operator/access` before rendering a workspace; there is no legacy or
+client-selected workspace fallback. One API `401` forces one fresh ID token and
+one retry. A second `401`, a failed refresh, access denial, or assignment
+revocation remains failed closed and exposes an honest sign-out/retry state.
+
+Every `/v1/operator/*` service authorization reloads the active PostgreSQL user
+and checks the verified database email. Admin/partner authorization also
+requires the verified Firebase `sign_in_provider=password`; specialist operator
+routes use the same provider check. Firebase custom role claims are discarded
+when the principal is built, so they cannot seed or promote PostgreSQL roles.
+An `admin` role combined with a partner role or active gym assignment is rejected
+as a configuration conflict. Specialist global operators are rejected from
+their global routes under the same conflicting partner state. Partner
+authorization intersects database role
+flags with each exact active assignment and an active, nondeleted gym; a staff
+assignment never inherits write access from another gym's admin assignment.
+
 Email verification refresh reloads the Firebase user and forces a fresh ID
 token before verified navigation continues. A restored session receives the
 same reconciliation before authenticated screens render. The initial

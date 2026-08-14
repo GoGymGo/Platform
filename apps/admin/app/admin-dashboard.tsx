@@ -47,6 +47,7 @@ import {
   adminRequestStatus,
   adminRequest,
   authErrorMessage,
+  clearAdminRequestSession,
   compactObject,
   errorMessage,
   formatDate,
@@ -98,7 +99,8 @@ import {
   type ContestSetupSubmission,
 } from "./contest-setup-workspace";
 
-type AuthStage = "checking" | "denied" | "ready" | "signed-out";
+type AuthStage =
+  "checking" | "denied" | "error" | "expired" | "ready" | "signed-out";
 type ConfirmAction = {
   actionLabel: string;
   auditReason?: string;
@@ -446,7 +448,10 @@ export function AdminDashboard({
   );
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [authAttempt, setAuthAttempt] = useState(0);
+  const authEpoch = useRef(0);
   const [rewardEditor, setRewardEditor] = useState<Reward | "new" | null>(null);
   const [regionEditor, setRegionEditor] = useState(false);
   const [setupCompetitionId, setSetupCompetitionId] = useStoredPreference(
@@ -491,109 +496,100 @@ export function AdminDashboard({
     [request],
   );
 
-  const refresh = useCallback(async (activeUser: User) => {
-    setBusy(true);
-    setLoadError("");
-    try {
-      let access: OperatorPortalAccess;
+  const refresh = useCallback(
+    async (activeUser: User, expectedEpoch?: number) => {
+      const refreshEpoch = expectedEpoch ?? authEpoch.current;
+      setBusy(true);
+      setLoadError("");
       try {
-        access = await adminRequest<OperatorPortalAccess>(
+        const access = await adminRequest<OperatorPortalAccess>(
           activeUser,
           "operator/access",
-          {
-            expectedStatuses: [404],
-          },
         );
-      } catch (error) {
-        if (adminRequestStatus(error) !== 404) throw error;
-
-        // Older API releases predate role-aware partner workspaces. Continue
-        // through the platform-admin contract; its protected endpoints still
-        // enforce the administrator role on the server.
-        access = {
-          assignments: [],
-          email: activeUser.email ?? "",
-          id: activeUser.uid,
-          portal: "gogymgo",
-          roles: [],
-        };
-      }
-      setPortalAccess(access);
-      if (access.portal === "partner") {
-        const partnerResult = await adminRequest<PartnerDashboardSnapshot>(
-          activeUser,
-          "operator/partner-dashboard",
-        );
-        setPartnerSnapshot(partnerResult);
-        setSnapshot(null);
-        setHealth(null);
-        setQueue([]);
-        setPilotData(emptyPilotData);
+        if (authEpoch.current !== refreshEpoch) return;
+        setPortalAccess(access);
+        if (access.portal === "partner") {
+          const partnerResult = await adminRequest<PartnerDashboardSnapshot>(
+            activeUser,
+            "operator/partner-dashboard",
+          );
+          if (authEpoch.current !== refreshEpoch) return;
+          setPartnerSnapshot(partnerResult);
+          setSnapshot(null);
+          setHealth(null);
+          setQueue([]);
+          setPilotData(emptyPilotData);
+          setLastRefreshedAt(new Date());
+          setAuthStage("ready");
+          return;
+        }
+        const [
+          dashboardResult,
+          healthResult,
+          queueResult,
+          gyms,
+          sessions,
+          waitlist,
+          interestSubmissions,
+          partnerApplications,
+          auditEvents,
+        ] = await Promise.all([
+          adminRequest<DashboardSnapshot>(
+            activeUser,
+            "operator/configuration/dashboard",
+          ),
+          adminRequest<SystemHealth>(activeUser, "operator/system-health"),
+          adminRequest<WorkQueueItem[]>(activeUser, "operator/work-queue"),
+          adminRequest<PilotData["gyms"]>(activeUser, "operator/gym-locations"),
+          adminRequest<PilotData["sessions"]>(
+            activeUser,
+            "operator/gym-sessions",
+          ),
+          adminRequest<PilotData["waitlist"]>(
+            activeUser,
+            "operator/region-waitlist",
+          ),
+          adminRequest<PilotData["interestSubmissions"]>(
+            activeUser,
+            "operator/interest-submissions",
+          ),
+          adminRequest<PilotData["partnerApplications"]>(
+            activeUser,
+            "operator/partner-applications",
+          ),
+          adminRequest<PilotData["auditEvents"]>(
+            activeUser,
+            "operator/audit-history",
+          ),
+        ]);
+        if (authEpoch.current !== refreshEpoch) return;
+        setSnapshot(dashboardResult);
+        setPartnerSnapshot(null);
+        setHealth(healthResult);
+        setQueue(queueResult);
+        setPilotData({
+          auditEvents,
+          gyms,
+          interestSubmissions,
+          partnerApplications,
+          sessions,
+          waitlist,
+        });
         setLastRefreshedAt(new Date());
         setAuthStage("ready");
-        return;
+      } catch (error) {
+        if (authEpoch.current !== refreshEpoch) return;
+        const status = adminRequestStatus(error);
+        if (status === 401) setAuthStage("expired");
+        else if (status === 403) setAuthStage("denied");
+        else setAuthStage("error");
+        setLoadError(errorMessage(error));
+      } finally {
+        if (authEpoch.current === refreshEpoch) setBusy(false);
       }
-      const [
-        dashboardResult,
-        healthResult,
-        queueResult,
-        gyms,
-        sessions,
-        waitlist,
-        interestSubmissions,
-        partnerApplications,
-        auditEvents,
-      ] = await Promise.all([
-        adminRequest<DashboardSnapshot>(
-          activeUser,
-          "operator/configuration/dashboard",
-        ),
-        adminRequest<SystemHealth>(activeUser, "operator/system-health"),
-        adminRequest<WorkQueueItem[]>(activeUser, "operator/work-queue"),
-        adminRequest<PilotData["gyms"]>(activeUser, "operator/gym-locations"),
-        adminRequest<PilotData["sessions"]>(
-          activeUser,
-          "operator/gym-sessions",
-        ),
-        adminRequest<PilotData["waitlist"]>(
-          activeUser,
-          "operator/region-waitlist",
-        ),
-        adminRequest<PilotData["interestSubmissions"]>(
-          activeUser,
-          "operator/interest-submissions",
-        ),
-        adminRequest<PilotData["partnerApplications"]>(
-          activeUser,
-          "operator/partner-applications",
-        ),
-        adminRequest<PilotData["auditEvents"]>(
-          activeUser,
-          "operator/audit-history",
-        ),
-      ]);
-      setSnapshot(dashboardResult);
-      setPartnerSnapshot(null);
-      setHealth(healthResult);
-      setQueue(queueResult);
-      setPilotData({
-        auditEvents,
-        gyms,
-        interestSubmissions,
-        partnerApplications,
-        sessions,
-        waitlist,
-      });
-      setLastRefreshedAt(new Date());
-      setAuthStage("ready");
-    } catch (error) {
-      const status = adminRequestStatus(error);
-      if (status === 401 || status === 403) setAuthStage("denied");
-      setLoadError(errorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!firebaseConfigured) return;
@@ -601,18 +597,35 @@ export function AdminDashboard({
       const app =
         getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
       const auth = getAuth(app);
-      return onAuthStateChanged(auth, (nextUser) => {
+      let authStateResolved = false;
+      const authStateTimeout = window.setTimeout(() => {
+        if (authStateResolved) return;
+        setAuthStage("error");
+        setLoadError(
+          "Your Firebase session could not be restored. Check your connection and retry the session check.",
+        );
+      }, 8_000);
+      const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+        authStateResolved = true;
+        window.clearTimeout(authStateTimeout);
+        const nextEpoch = authEpoch.current + 1;
+        authEpoch.current = nextEpoch;
         setUser(nextUser);
         setPortalAccess(null);
         setSnapshot(null);
         setPartnerSnapshot(null);
         if (nextUser) {
           setAuthStage("checking");
-          void refresh(nextUser);
+          void refresh(nextUser, nextEpoch);
         } else {
+          setLoadError("");
           setAuthStage("signed-out");
         }
       });
+      return () => {
+        window.clearTimeout(authStateTimeout);
+        unsubscribe();
+      };
     } catch (error) {
       queueMicrotask(() => {
         setAuthStage("signed-out");
@@ -620,7 +633,7 @@ export function AdminDashboard({
       });
       return;
     }
-  }, [firebaseConfig, firebaseConfigured, refresh]);
+  }, [authAttempt, firebaseConfig, firebaseConfigured, refresh]);
 
   useEffect(() => {
     if (!toast) return;
@@ -663,6 +676,7 @@ export function AdminDashboard({
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const rememberMe = form.get("rememberMe") === "on";
+    setSigningIn(true);
     try {
       if (!firebaseConfigured) {
         throw new AdminUserFacingError(
@@ -679,30 +693,73 @@ export function AdminDashboard({
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       setLoadError(authErrorMessage(error));
+    } finally {
+      setSigningIn(false);
     }
   }
 
   async function handleSignOut() {
-    await signOut(getAuth());
-    setPortalAccess(null);
-    setSnapshot(null);
-    setPartnerSnapshot(null);
-    setHealth(null);
-    setQueue([]);
-    setPilotData(emptyPilotData);
-    setLastRefreshedAt(null);
-    setAuthStage("signed-out");
+    setBusy(true);
+    setLoadError("");
+    try {
+      await signOut(getAuth());
+      authEpoch.current += 1;
+      clearAdminRequestSession();
+      savePendingDrawFinalization(null);
+      setPendingDrawFinalization(null);
+      setUser(null);
+      setPortalAccess(null);
+      setSnapshot(null);
+      setPartnerSnapshot(null);
+      setHealth(null);
+      setQueue([]);
+      setPilotData(emptyPilotData);
+      setLastRefreshedAt(null);
+      setAuthStage("signed-out");
+    } catch {
+      setLoadError(
+        "Sign-out could not be completed. Check your connection and try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (authStage === "signed-out" || authStage === "denied") {
+  if (
+    authStage === "signed-out" ||
+    authStage === "denied" ||
+    authStage === "expired"
+  ) {
     return (
       <SignInScreen
+        busy={busy}
         denied={authStage === "denied"}
         error={loadError}
+        expired={authStage === "expired"}
         firebaseConfigured={firebaseConfigured}
         onEmailSignIn={handleEmailSignIn}
         onSignOut={user ? handleSignOut : undefined}
+        signingIn={signingIn}
         signedInEmail={user?.email ?? undefined}
+      />
+    );
+  }
+
+  if (authStage === "error") {
+    return (
+      <AccessResolutionError
+        busy={busy}
+        error={loadError}
+        onRetry={() => {
+          if (user) {
+            void refresh(user);
+          } else {
+            setLoadError("");
+            setAuthStage("checking");
+            setAuthAttempt((attempt) => attempt + 1);
+          }
+        }}
+        onSignOut={handleSignOut}
       />
     );
   }
@@ -1565,22 +1622,69 @@ export function AdminDashboard({
   );
 }
 
+function AccessResolutionError({
+  busy,
+  error,
+  onRetry,
+  onSignOut,
+}: {
+  busy: boolean;
+  error: string;
+  onRetry: () => void;
+  onSignOut: () => Promise<void>;
+}) {
+  return (
+    <main className="access-resolution-screen">
+      <section className="sign-in-panel">
+        <p className="eyebrow">INVITATION-ONLY OPERATOR ACCESS</p>
+        <h1>We could not confirm your workspace</h1>
+        <p className="form-error" role="alert">
+          {error ||
+            "The operator access service is temporarily unavailable. Try again."}
+        </p>
+        <button
+          aria-busy={busy}
+          className="primary-button full"
+          disabled={busy}
+          onClick={onRetry}
+          type="button"
+        >
+          {busy ? "CHECKING ACCESS…" : "RETRY ACCESS CHECK"}
+        </button>
+        <button
+          className="secondary-button full"
+          disabled={busy}
+          onClick={() => void onSignOut()}
+          type="button"
+        >
+          SIGN OUT
+        </button>
+      </section>
+    </main>
+  );
+}
+
 function SignInScreen({
+  busy,
   denied,
   error,
+  expired,
   firebaseConfigured,
   onEmailSignIn,
   onSignOut,
+  signingIn,
   signedInEmail,
 }: {
+  busy: boolean;
   denied: boolean;
   error: string;
+  expired: boolean;
   firebaseConfigured: boolean;
   onEmailSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignOut?: () => Promise<void>;
+  signingIn: boolean;
   signedInEmail?: string;
 }) {
-  const [portal, setPortal] = useState<"gogymgo" | "partner">("gogymgo");
   return (
     <main className="sign-in-screen">
       <section className="sign-in-intro">
@@ -1616,13 +1720,21 @@ function SignInScreen({
       </section>
       <section className="sign-in-panel">
         <p className="eyebrow">INVITATION-ONLY OPERATOR ACCESS</p>
-        <h2>{denied ? "Operator access required" : "Sign in to continue"}</h2>
-        {denied ? (
+        <h2>
+          {expired
+            ? "Your session expired"
+            : denied
+              ? "Operator access required"
+              : "Sign in to continue"}
+        </h2>
+        {denied || expired ? (
           <div className="alert error compact" role="alert">
             <span>!</span>
             <p>
-              {signedInEmail || "This account"} does not have access to this
-              workspace or an active gym assignment.
+              {error ||
+                (expired
+                  ? "Your Firebase session could not be renewed. Sign out before trying again."
+                  : `${signedInEmail || "This account"} does not have operator access or an active gym assignment.`)}
             </p>
           </div>
         ) : null}
@@ -1631,49 +1743,29 @@ function SignInScreen({
             Sign-in is temporarily unavailable. Contact GoGymGo support and try
             again later.
           </p>
-        ) : denied && onSignOut ? (
+        ) : (denied || expired) && onSignOut ? (
           <button
+            aria-busy={busy}
             className="primary-button full"
+            disabled={busy}
             onClick={() => void onSignOut()}
             type="button"
           >
-            SIGN OUT AND TRY ANOTHER ACCOUNT
+            {busy ? "SIGNING OUT…" : "SIGN OUT AND TRY ANOTHER ACCOUNT"}
           </button>
         ) : (
           <>
-            <div
-              aria-label="Choose operator workspace"
-              className="portal-selector"
-            >
-              <button
-                aria-pressed={portal === "gogymgo"}
-                className={portal === "gogymgo" ? "active" : ""}
-                onClick={() => setPortal("gogymgo")}
-                type="button"
-              >
-                <strong>GoGymGo Team</strong>
-                <span>Full platform operations</span>
-              </button>
-              <button
-                aria-pressed={portal === "partner"}
-                className={portal === "partner" ? "active" : ""}
-                onClick={() => setPortal("partner")}
-                type="button"
-              >
-                <strong>Gym Partner</strong>
-                <span>Your assigned locations</span>
-              </button>
-            </div>
             <form
+              aria-busy={signingIn}
               className="stacked-form"
               noValidate
               onSubmit={(event) => void onEmailSignIn(event)}
             >
-              <input name="portal" type="hidden" value={portal} />
               <label>
-                {portal === "gogymgo" ? "GOGYMGO TEAM EMAIL" : "PARTNER EMAIL"}
+                OPERATOR EMAIL
                 <input
                   autoComplete="username"
+                  disabled={signingIn}
                   name="email"
                   placeholder="you@example.com"
                   required
@@ -1684,6 +1776,7 @@ function SignInScreen({
                 PASSWORD
                 <input
                   autoComplete="current-password"
+                  disabled={signingIn}
                   minLength={8}
                   name="password"
                   placeholder="Your account password"
@@ -1692,13 +1785,15 @@ function SignInScreen({
                 />
               </label>
               <label className="remember-session">
-                <input name="rememberMe" type="checkbox" />
+                <input disabled={signingIn} name="rememberMe" type="checkbox" />
                 <span>Keep me signed in on this device</span>
               </label>
-              <button className="primary-button full" type="submit">
-                {portal === "gogymgo"
-                  ? "ENTER GOGYMGO CONTROL"
-                  : "ENTER PARTNER WORKSPACE"}
+              <button
+                className="primary-button full"
+                disabled={signingIn}
+                type="submit"
+              >
+                {signingIn ? "SIGNING IN…" : "SIGN IN SECURELY"}
               </button>
               {error && firebaseConfigured ? (
                 <p className="form-error" role="alert">

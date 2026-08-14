@@ -27,8 +27,10 @@ hosting provider reports the custom domain as verified and staging UAT passes.
 5. Wait for all three providers to show verified TLS certificates, then test
    HTTPS and redirects from a private browser session.
 6. In Firebase Authentication settings, add `admin.gogymgo.com` to the
-   production project's authorized domains so the existing email, Google and
-   Apple sign-in methods can complete from the admin origin.
+   production project's authorized domains. The member app may use separately
+   approved Google or Apple providers, but the admin origin exposes only the
+   existing Firebase Email/Password provider and the API rejects every other
+   `sign_in_provider`.
 
 ## Cloudflare Access gate for admin
 
@@ -37,9 +39,9 @@ After `admin.gogymgo.com` resolves through Cloudflare:
 1. In Cloudflare Zero Trust, create a self-hosted Access application for the
    exact hostname `admin.gogymgo.com`.
 2. Use an email identity provider or one-time PIN and create an **Allow** policy
-   limited to approved GoGymGo administrator email addresses. Keep the first
-   owner entry in the protected access register; do not commit it to this
-   repository.
+   limited to approved GoGymGo and gym-partner operator email addresses. Keep
+   the first owner entry and every partner sponsor/approval in the protected
+   access register; do not commit it to this repository.
 3. Add a final deny-by-default policy and use a short administrator session
    lifetime. Do not use a public bypass rule.
 4. Confirm an unapproved email is stopped by Cloudflare before the application
@@ -85,8 +87,14 @@ in AWS Secrets Manager or the hosting provider's encrypted environment storage.
 - `app.gogymgo.com/` opens the member-app welcome screen; its Get Started and
   Sign In actions use production Firebase and the production API.
 - `admin.gogymgo.com` rejects an unapproved email at Cloudflare, rejects a
-  non-admin Firebase user at the API, and permits the bootstrapped owner.
+  non-operator Firebase user at the API, permits the unscoped bootstrapped
+  owner, routes an assigned partner administrator to only its exact gyms, keeps
+  partner staff read-only, and rejects a revoked assignment immediately.
 - CORS allows only the reviewed production origins.
 
 Record screenshots and timestamps in the production UAT evidence before the
 release tag is created.
+
+Firebase authorized-domain/provider state and Cloudflare Access policy state are
+external release gates. Repository tests cannot prove them configured, and no
+repository-only delivery should claim that they are.

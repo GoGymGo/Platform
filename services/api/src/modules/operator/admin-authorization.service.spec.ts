@@ -14,17 +14,20 @@ const principal: AuthenticatedPrincipal = {
 };
 
 describe('AdminAuthorizationService', () => {
-  const transaction = {} as Transaction<Database>;
-
   function transactionWithAssignments(
     assignments: { access_level: 'admin' | 'staff'; gym_location_id: string }[],
   ): Transaction<Database> {
     const query = {
       execute: jest.fn().mockResolvedValue(assignments),
+      executeTakeFirst: jest.fn().mockResolvedValue(assignments[0]),
+      innerJoin: jest.fn(),
+      limit: jest.fn(),
       orderBy: jest.fn(),
       select: jest.fn(),
       where: jest.fn(),
     };
+    query.innerJoin.mockReturnValue(query);
+    query.limit.mockReturnValue(query);
     query.select.mockReturnValue(query);
     query.where.mockReturnValue(query);
     query.orderBy.mockReturnValue(query);
@@ -44,7 +47,7 @@ describe('AdminAuthorizationService', () => {
       const service = new AdminAuthorizationService(profiles);
       const attempt = service.requireAdmin(
         { ...principal, signInProvider },
-        transaction,
+        transactionWithAssignments([]),
       );
 
       await expect(attempt).rejects.toMatchObject({
@@ -66,9 +69,9 @@ describe('AdminAuthorizationService', () => {
     } as unknown as ProfilesService;
     const service = new AdminAuthorizationService(profiles);
 
-    await expect(service.requireAdmin(principal, transaction)).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(
+      service.requireAdmin(principal, transactionWithAssignments([])),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('allows an active database user with the exact admin role', async () => {
@@ -79,9 +82,89 @@ describe('AdminAuthorizationService', () => {
     } as unknown as ProfilesService;
     const service = new AdminAuthorizationService(profiles);
 
-    await expect(service.requireAdmin(principal, transaction)).resolves.toBe(
-      admin,
-    );
+    await expect(
+      service.requireAdmin(principal, transactionWithAssignments([])),
+    ).resolves.toBe(admin);
+  });
+
+  it('fails closed when a platform administrator also has a partner role', async () => {
+    const profiles = {
+      ensureUser: jest.fn().mockResolvedValue({
+        id: 'admin-1',
+        roles: ['admin', 'gym_partner_staff', 'user'],
+      }),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.resolvePortalAccess(principal, transactionWithAssignments([])),
+    ).rejects.toMatchObject({
+      response: { code: 'OPERATOR_ROLE_CONFLICT' },
+    });
+  });
+
+  it('fails closed when a platform administrator retains an active gym assignment', async () => {
+    const profiles = {
+      ensureUser: jest.fn().mockResolvedValue({
+        id: 'admin-1',
+        roles: ['admin', 'user'],
+      }),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.requireAdmin(
+        principal,
+        transactionWithAssignments([
+          { access_level: 'staff', gym_location_id: 'gym-1' },
+        ]),
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'OPERATOR_ROLE_CONFLICT' },
+    });
+  });
+
+  it('fails closed when a specialist global operator also has a partner role', async () => {
+    const profiles = {
+      ensureUser: jest.fn(),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.assertGlobalOperatorIsUnscoped(
+        {
+          id: 'operator-1',
+          roles: ['operator', 'gym_partner_staff'],
+        } as Awaited<ReturnType<ProfilesService['ensureUser']>>,
+        transactionWithAssignments([]),
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'OPERATOR_ROLE_CONFLICT' },
+    });
+  });
+
+  it('fails closed when a specialist global operator retains an active gym assignment', async () => {
+    const profiles = {
+      ensureUser: jest.fn(),
+      requireVerifiedEmail: jest.fn(),
+    } as unknown as ProfilesService;
+    const service = new AdminAuthorizationService(profiles);
+
+    await expect(
+      service.assertGlobalOperatorIsUnscoped(
+        { id: 'operator-1', roles: ['operator'] } as Awaited<
+          ReturnType<ProfilesService['ensureUser']>
+        >,
+        transactionWithAssignments([
+          { access_level: 'staff', gym_location_id: 'gym-1' },
+        ]),
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'OPERATOR_ROLE_CONFLICT' },
+    });
   });
 
   it('resolves a gym partner only from matching database roles and assignments', async () => {

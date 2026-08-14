@@ -2707,6 +2707,28 @@ textarea[aria-invalid="true"] {
   grid-template-columns: minmax(0, 1.15fr) minmax(430px, 0.65fr);
 }
 
+.access-resolution-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.access-resolution-screen .sign-in-panel {
+  position: static;
+  width: min(100%, 540px);
+  height: auto;
+  min-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.access-resolution-screen h1 {
+  margin: 12px 0 20px;
+  color: var(--cyan-soft);
+  font-size: 30px;
+}
+
 .sign-in-intro {
   display: flex;
   flex-direction: column;

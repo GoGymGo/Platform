@@ -1,7 +1,7 @@
 import { authenticatedPrincipalFromDecodedToken } from './firebase-token-principal';
 
 describe('authenticatedPrincipalFromDecodedToken', () => {
-  it('preserves the verified Firebase sign-in provider for authorization', () => {
+  it('preserves the verified provider but discards role claims', () => {
     expect(
       authenticatedPrincipalFromDecodedToken({
         email: 'operator@gogymgo.com',
@@ -15,7 +15,7 @@ describe('authenticatedPrincipalFromDecodedToken', () => {
       email: 'operator@gogymgo.com',
       emailVerified: true,
       firebaseUid: 'firebase-operator',
-      roles: ['admin'],
+      roles: ['user'],
       signInProvider: 'password',
       tokenIssuedAt: 123,
     });

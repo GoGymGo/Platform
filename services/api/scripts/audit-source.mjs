@@ -178,6 +178,26 @@ const authModule = await readFile(
   join(root, 'src/modules/auth/auth.module.ts'),
   'utf8',
 );
+const firebaseTokenPrincipal = await readFile(
+  join(root, 'src/modules/auth/firebase-token-principal.ts'),
+  'utf8',
+);
+const adminAuthorization = await readFile(
+  join(root, 'src/modules/operator/admin-authorization.service.ts'),
+  'utf8',
+);
+const operatorService = await readFile(
+  join(root, 'src/modules/operator/operator.service.ts'),
+  'utf8',
+);
+const adminBootstrap = await readFile(
+  join(root, 'scripts/bootstrap-admin.ts'),
+  'utf8',
+);
+const partnerAccess = await readFile(
+  join(root, 'scripts/configure-gym-partner-access.ts'),
+  'utf8',
+);
 const pilotConfiguration = await readFile(
   join(root, 'src/operations/configure-september-2026-island-pilot.ts'),
   'utf8',
@@ -342,6 +362,38 @@ if (
   violations.push(
     'the production authentication module must expose only Firebase verification',
   );
+}
+if (
+  !firebaseTokenPrincipal.includes("roles: ['user']") ||
+  firebaseTokenPrincipal.includes('claimedRoles')
+) {
+  violations.push(
+    'Firebase token role claims must never enter the authenticated principal',
+  );
+}
+for (const marker of [
+  'assertOperatorPasswordPrincipal(principal)',
+  'adminAuthorization.assertGlobalOperatorIsUnscoped',
+  "code: 'OPERATOR_ROLE_CONFLICT'",
+  ".where('gym.active', '=', true)",
+  ".where('gym.deleted_at', 'is', null)",
+]) {
+  if (!(adminAuthorization + operatorService).includes(marker)) {
+    violations.push(
+      `operator authorization is missing fail-closed marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'loadTrustedFirebaseOperatorAccount',
+  'CONFIRM_BOOTSTRAP_ADMIN',
+  'CONFIRM_PARTNER_ACCESS',
+  'PARTNER_ACCESS_REASON',
+  'operator_audit_events',
+]) {
+  if (!(adminBootstrap + partnerAccess).includes(marker)) {
+    violations.push(`trusted operator tooling is missing marker ${marker}`);
+  }
 }
 if (
   !pilotConfiguration.includes(

@@ -11,6 +11,10 @@ import type { Environment } from '../config/environment';
 import { DatabaseService } from '../database/database.service';
 import type { AuthenticatedPrincipal } from '../modules/auth/auth.types';
 import { getGoGymGoFirebaseApp } from '../modules/auth/firebase-admin-app';
+import {
+  assertTrustedFirebaseOperatorIdentity,
+  type TrustedFirebaseOperatorIdentity,
+} from '../modules/auth/trusted-operator-identity';
 import { AdminLegalDocumentsService } from '../modules/legal/admin-legal-documents.service';
 import {
   hashLegalDocumentContent,
@@ -391,9 +395,23 @@ async function findAdministrator(
       'PILOT_ADMIN_EMAIL must match the protected GoGymGo owner identity.',
     );
   }
+  let firebaseUser: TrustedFirebaseOperatorIdentity;
+  try {
+    const { getAuth } = await import('firebase-admin/auth');
+    const firebaseApp = await getGoGymGoFirebaseApp(config);
+    firebaseUser = await getAuth(firebaseApp).getUserByEmail(requestedEmail);
+    assertTrustedFirebaseOperatorIdentity(firebaseUser, {
+      email: requestedEmail,
+      firebaseUid: requestedUid ?? firebaseUser.uid,
+    });
+  } catch {
+    throw new Error(
+      'The exact enabled, verified Firebase password owner could not be confirmed.',
+    );
+  }
   let query = database.connection
     .selectFrom('users')
-    .select(['email', 'email_verified', 'firebase_uid', 'roles'])
+    .select(['email', 'email_verified', 'firebase_uid', 'id', 'roles'])
     .where('status', '=', 'active')
     .where(sql<boolean>`'admin' = ANY(roles)`);
   if (requestedUid) {
@@ -407,9 +425,26 @@ async function findAdministrator(
     if (
       !administrator.email ||
       !administrator.email_verified ||
-      administrator.email.trim().toLowerCase() !== ownerEmail
+      administrator.email.trim().toLowerCase() !== ownerEmail ||
+      administrator.firebase_uid !== firebaseUser.uid ||
+      administrator.roles.some((role) =>
+        ['gym_partner_admin', 'gym_partner_staff'].includes(role),
+      )
     ) {
-      throw new Error('The pilot administrator must have a verified email.');
+      throw new Error(
+        'The pilot administrator must be the unscoped verified owner identity.',
+      );
+    }
+    const assignment = await database.connection
+      .selectFrom('gym_partner_assignments')
+      .select('gym_location_id')
+      .where('user_id', '=', administrator.id)
+      .where('active', '=', true)
+      .executeTakeFirst();
+    if (assignment) {
+      throw new Error(
+        'The pilot administrator must not retain an active gym assignment.',
+      );
     }
     return {
       email: administrator.email,
@@ -427,20 +462,6 @@ async function findAdministrator(
         : 'PILOT_ADMIN_EMAIL does not identify one active administrator.',
     );
   }
-  const { getAuth } = await import('firebase-admin/auth');
-  const firebaseApp = await getGoGymGoFirebaseApp(config);
-  const firebaseUser =
-    await getAuth(firebaseApp).getUserByEmail(requestedEmail);
-  if (
-    firebaseUser.disabled ||
-    !firebaseUser.emailVerified ||
-    firebaseUser.email?.trim().toLowerCase() !== requestedEmail
-  ) {
-    throw new Error(
-      'The GoGymGo bootstrap owner must be enabled with a verified email.',
-    );
-  }
-
   return database.connection.transaction().execute(async (transaction) => {
     const uidUser = await transaction
       .selectFrom('users')
@@ -492,6 +513,27 @@ async function findAdministrator(
         .executeTakeFirstOrThrow());
     if (user.status !== 'active') {
       throw new Error('The GoGymGo bootstrap owner is not active.');
+    }
+    if (
+      user.roles.some((role) =>
+        ['gym_partner_admin', 'gym_partner_staff'].includes(role),
+      )
+    ) {
+      throw new Error(
+        'The GoGymGo bootstrap owner must not retain a gym-partner role.',
+      );
+    }
+    const assignment = await transaction
+      .selectFrom('gym_partner_assignments')
+      .select('gym_location_id')
+      .where('user_id', '=', user.id)
+      .where('active', '=', true)
+      .forUpdate()
+      .executeTakeFirst();
+    if (assignment) {
+      throw new Error(
+        'The GoGymGo bootstrap owner must not retain an active gym assignment.',
+      );
     }
 
     const nextRoles = [...new Set([...user.roles, 'admin', 'user'])].sort();

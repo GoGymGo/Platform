@@ -297,8 +297,21 @@ export class PrivacyOperationsRepository {
           .where('user_id', '=', request.user_id)
           .execute();
         await transaction
+          .deleteFrom('challenge_contact_invitations')
+          .where('claimed_by_user_id', '=', request.user_id)
+          .execute();
+        await transaction
           .deleteFrom('social_challenges')
           .where('owner_user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .deleteFrom('user_blocks')
+          .where((expression) =>
+            expression.or([
+              expression('blocker_user_id', '=', request.user_id),
+              expression('blocked_user_id', '=', request.user_id),
+            ]),
+          )
           .execute();
         await transaction
           .deleteFrom('social_challenge_members')

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -9,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -21,8 +23,11 @@ import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key'
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
+  BlockedMemberResponseDto,
+  BlockMemberDto,
   ChallengeCheckInResponseDto,
   ChallengeContactInvitationResponseDto,
+  ChallengeContactInvitationPreviewDto,
   ChallengeInvitationDecisionDto,
   ChallengeInvitationResponseDto,
   CreateSocialChallengeDto,
@@ -33,10 +38,12 @@ import {
   FriendResponseDto,
   InviteChallengeFriendDto,
   InviteChallengeContactDto,
+  InspectChallengeContactInvitationDto,
   RedeemChallengeContactInvitationDto,
   SearchUsersQueryDto,
   SendFriendRequestDto,
   SocialChallengeResponseDto,
+  SocialRelationshipActionResponseDto,
   UserSearchResultDto,
 } from './dto/social.dto';
 import { SocialService } from './social.service';
@@ -48,6 +55,7 @@ export class SocialController {
   constructor(private readonly social: SocialService) {}
 
   @Get('users')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'Search active users by unique alias' })
   @ApiOkResponse({ isArray: true, type: UserSearchResultDto })
   searchUsers(
@@ -75,6 +83,82 @@ export class SocialController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<FriendRequestResponseDto[]> {
     return this.social.listFriendRequests(principal);
+  }
+
+  @Delete('friend-requests/:requestId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Cancel my pending outgoing friend request' })
+  @ApiOkResponse({ type: SocialRelationshipActionResponseDto })
+  cancelFriendRequest(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.social.cancelFriendRequest(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      requestId,
+    );
+  }
+
+  @Delete('friends/:friendUserId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Remove an accepted friendship' })
+  @ApiOkResponse({ type: SocialRelationshipActionResponseDto })
+  removeFriend(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Param('friendUserId', new ParseUUIDPipe()) friendUserId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.social.removeFriend(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      friendUserId,
+    );
+  }
+
+  @Get('blocks')
+  @ApiOperation({ summary: 'List members I have blocked' })
+  @ApiOkResponse({ isArray: true, type: BlockedMemberResponseDto })
+  listBlocks(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<BlockedMemberResponseDto[]> {
+    return this.social.listBlocks(principal);
+  }
+
+  @Post('blocks')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Block a member and remove incompatible social state',
+  })
+  @ApiCreatedResponse({ type: SocialRelationshipActionResponseDto })
+  blockMember(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: BlockMemberDto,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.social.blockMember(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      input.memberUserId,
+    );
+  }
+
+  @Delete('blocks/:blockedUserId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Unblock a member without restoring prior state' })
+  @ApiOkResponse({ type: SocialRelationshipActionResponseDto })
+  unblockMember(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Param('blockedUserId', new ParseUUIDPipe()) blockedUserId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.social.unblockMember(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      blockedUserId,
+    );
   }
 
   @Post('friend-requests')
@@ -199,6 +283,7 @@ export class SocialController {
   }
 
   @Post('challenges/:challengeId/contact-invitations')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({
     summary: 'Create an email or phone invitation link for an owned challenge',
@@ -219,6 +304,7 @@ export class SocialController {
   }
 
   @Post('challenge-contact-invitations/redeem')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({
     summary: 'Redeem an email or phone challenge invitation after sign-in',
@@ -233,7 +319,21 @@ export class SocialController {
       principal,
       requireIdempotencyKey(idempotencyKey),
       input.token,
+      input.destination,
     );
+  }
+
+  @Post('challenge-contact-invitations/inspect')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Inspect an invitation after sign-in without consuming it',
+  })
+  @ApiOkResponse({ type: ChallengeContactInvitationPreviewDto })
+  inspectContactInvitation(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Body() input: InspectChallengeContactInvitationDto,
+  ): Promise<ChallengeContactInvitationPreviewDto> {
+    return this.social.inspectContactInvitation(principal, input.token);
   }
 
   @Patch('challenges/:challengeId/invitations/me')

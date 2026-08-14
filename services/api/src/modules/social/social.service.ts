@@ -18,6 +18,7 @@ import type {
   SocialChallengeMemberStatus,
   SocialChallengeTargetPeriod,
   SocialChallengeType,
+  SocialRelationshipEventAction,
   UsersTable,
 } from '../../database/database.types';
 import { normalizeDateKey } from '../../database/date-key';
@@ -27,8 +28,10 @@ import { ProfilesService } from '../profiles/profiles.service';
 import { loadPublicStreaks } from '../streaks/public-streaks';
 import type { StreakCounts } from '../streaks/streak-calculation';
 import type {
+  BlockedMemberResponseDto,
   ChallengeCheckInResponseDto,
   ChallengeContactInvitationResponseDto,
+  ChallengeContactInvitationPreviewDto,
   ChallengeInvitationDecisionDto,
   ChallengeInvitationResponseDto,
   CreateSocialChallengeDto,
@@ -42,14 +45,21 @@ import type {
   SearchUsersQueryDto,
   SocialChallengeResponseDto,
   SocialRelationship,
+  SocialRelationshipActionResponseDto,
   UserSearchResultDto,
 } from './dto/social.dto';
+import {
+  lockSocialPair,
+  loadBlockedUserIds,
+  requireSocialPairAvailable,
+} from './social-block-policy';
 import { socialChallengeDateWindow } from './social-challenge-window';
 import {
   contactDestinationHint,
   normalizeContactDestination,
   socialInvitationHash,
 } from './social-contact';
+import { requireInvitationDestinationHash } from './social-invitation-contact';
 
 type DatabaseExecutor = Kysely<Database> | Transaction<Database>;
 
@@ -77,6 +87,12 @@ interface FriendRequestJson extends JsonObject {
 interface FriendRequestDecisionJson extends JsonObject {
   requestId: string;
   status: 'accepted' | 'declined';
+}
+
+interface SocialRelationshipActionJson extends JsonObject {
+  action: 'blocked' | 'cancelled' | 'removed' | 'unblocked';
+  requestId: string | null;
+  userId: string;
 }
 
 interface ChallengeMemberJson extends JsonObject {
@@ -133,6 +149,8 @@ interface ChallengeContactInvitationJson extends JsonObject {
   challengeId: string;
   channel: 'email' | 'phone';
   destinationHint: string;
+  deliveryMode: 'link';
+  deliveryStatus: 'not_sent';
   expiresAt: string;
   id: string;
   joinUrl: string;
@@ -161,7 +179,7 @@ export class SocialService {
       .transaction()
       .execute(async (transaction) => {
         const { user } = await this.ensureIdentity(principal, transaction);
-        const query = input.screenName.trim();
+        const query = input.screenName.trim().toUpperCase();
         const escapedQuery = query.replace(/[\\%_]/g, '\\$&');
         const candidates = await transaction
           .selectFrom('profiles')
@@ -169,8 +187,17 @@ export class SocialService {
           .select(['profiles.screen_name', 'profiles.user_id'])
           .where('users.status', '=', 'active')
           .where('profiles.user_id', '!=', user.id)
+          .where('profiles.public_identity_mode', '=', 'alias')
           .where(
-            sql<boolean>`${sql.ref('profiles.screen_name')}::text ILIKE ${`%${escapedQuery}%`} ESCAPE '\\'`,
+            sql<boolean>`NOT EXISTS (
+              SELECT 1
+              FROM user_blocks AS block
+              WHERE (block.blocker_user_id = ${user.id} AND block.blocked_user_id = profiles.user_id)
+                 OR (block.blocker_user_id = profiles.user_id AND block.blocked_user_id = ${user.id})
+            )`,
+          )
+          .where(
+            sql<boolean>`${sql.ref('profiles.screen_name')}::text ILIKE ${`${escapedQuery}%`} ESCAPE '\\'`,
           )
           .orderBy('profiles.screen_name', 'asc')
           .limit(20)
@@ -272,12 +299,16 @@ export class SocialService {
           )
           .orderBy('created_at', 'desc')
           .execute();
+        const blockedUserIds = await loadBlockedUserIds(transaction, user.id);
         const friendIds = friendships.map((friendship) =>
           friendship.user_a_id === user.id
             ? friendship.user_b_id
             : friendship.user_a_id,
         );
-        const identities = await this.loadSocialUsers(transaction, friendIds);
+        const identities = await this.loadSocialUsers(
+          transaction,
+          friendIds.filter((friendId) => !blockedUserIds.has(friendId)),
+        );
 
         return friendships.flatMap((friendship) => {
           const friendId =
@@ -316,12 +347,16 @@ export class SocialService {
           )
           .orderBy('created_at', 'desc')
           .execute();
+        const blockedUserIds = await loadBlockedUserIds(transaction, user.id);
         const otherIds = requests.map((request) =>
           request.requester_user_id === user.id
             ? request.recipient_user_id
             : request.requester_user_id,
         );
-        const identities = await this.loadSocialUsers(transaction, otherIds);
+        const identities = await this.loadSocialUsers(
+          transaction,
+          otherIds.filter((otherId) => !blockedUserIds.has(otherId)),
+        );
 
         return requests.flatMap((request) => {
           const outgoing = request.requester_user_id === user.id;
@@ -343,6 +378,240 @@ export class SocialService {
             : [];
         });
       });
+  }
+
+  async listBlocks(
+    principal: AuthenticatedPrincipal,
+  ): Promise<BlockedMemberResponseDto[]> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        const blocks = await transaction
+          .selectFrom('user_blocks as block')
+          .innerJoin('profiles', 'profiles.user_id', 'block.blocked_user_id')
+          .select([
+            'block.blocked_user_id',
+            'block.created_at',
+            'profiles.screen_name',
+          ])
+          .where('block.blocker_user_id', '=', user.id)
+          .orderBy('block.created_at', 'desc')
+          .execute();
+        const streaksByUser = await loadPublicStreaks(
+          transaction,
+          blocks.map((block) => block.blocked_user_id),
+        );
+        return blocks.map((block) => ({
+          blockedAt: block.created_at.toISOString(),
+          screenName: block.screen_name,
+          streaks: this.toStreaksJson(streaksByUser.get(block.blocked_user_id)),
+          userId: block.blocked_user_id,
+        }));
+      });
+  }
+
+  cancelFriendRequest(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    requestId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.idempotency.execute<SocialRelationshipActionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { requestId },
+        responseCode: 200,
+        scope: 'social:friend-requests:cancel',
+      },
+      async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        const request = await transaction
+          .selectFrom('friend_requests')
+          .selectAll()
+          .where('id', '=', requestId)
+          .where('requester_user_id', '=', user.id)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!request) {
+          throw new NotFoundException({
+            code: 'FRIEND_REQUEST_NOT_FOUND',
+            message: 'That outgoing friend request was not found.',
+          });
+        }
+        if (request.status !== 'pending') {
+          throw new ConflictException({
+            code: 'FRIEND_REQUEST_ALREADY_DECIDED',
+            message: 'That friend request is no longer pending.',
+          });
+        }
+        const now = new Date();
+        await transaction
+          .updateTable('friend_requests')
+          .set({ responded_at: now, status: 'cancelled', updated_at: now })
+          .where('id', '=', request.id)
+          .executeTakeFirstOrThrow();
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'friend_request_cancelled',
+          actorUserId: user.id,
+          requestId: idempotencyKey,
+          subjectUserId: request.recipient_user_id,
+        });
+        return {
+          action: 'cancelled',
+          requestId: request.id,
+          userId: request.recipient_user_id,
+        };
+      },
+    );
+  }
+
+  removeFriend(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    friendUserId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.idempotency.execute<SocialRelationshipActionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { friendUserId },
+        responseCode: 200,
+        scope: 'social:friends:remove',
+      },
+      async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        if (friendUserId === user.id) {
+          throw new BadRequestException({
+            code: 'SELF_SOCIAL_ACTION',
+            message: 'You cannot perform that action on yourself.',
+          });
+        }
+        const [userA, userB] = this.canonicalPair(user.id, friendUserId);
+        const removed = await transaction
+          .deleteFrom('friendships')
+          .where('user_a_id', '=', userA)
+          .where('user_b_id', '=', userB)
+          .executeTakeFirst();
+        if (Number(removed.numDeletedRows) === 0) {
+          throw new NotFoundException({
+            code: 'FRIENDSHIP_NOT_FOUND',
+            message: 'That friendship was not found.',
+          });
+        }
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'friendship_removed',
+          actorUserId: user.id,
+          requestId: idempotencyKey,
+          subjectUserId: friendUserId,
+        });
+        return { action: 'removed', requestId: null, userId: friendUserId };
+      },
+    );
+  }
+
+  blockMember(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    memberUserId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.idempotency.execute<SocialRelationshipActionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { memberUserId },
+        responseCode: 201,
+        scope: 'social:blocks:create',
+      },
+      async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        if (memberUserId === user.id) {
+          throw new BadRequestException({
+            code: 'SELF_BLOCK_NOT_ALLOWED',
+            message: 'You cannot block yourself.',
+          });
+        }
+        const member = await transaction
+          .selectFrom('users')
+          .select('id')
+          .where('id', '=', memberUserId)
+          .where('status', '=', 'active')
+          .executeTakeFirst();
+        if (!member) {
+          throw new NotFoundException({
+            code: 'SOCIAL_MEMBER_NOT_AVAILABLE',
+            message: 'That member is not available.',
+          });
+        }
+
+        await lockSocialPair(transaction, user.id, memberUserId);
+
+        const now = new Date();
+        const inserted = await transaction
+          .insertInto('user_blocks')
+          .values({
+            blocked_user_id: memberUserId,
+            blocker_user_id: user.id,
+            created_at: now,
+          })
+          .onConflict((conflict) =>
+            conflict
+              .columns(['blocker_user_id', 'blocked_user_id'])
+              .doNothing(),
+          )
+          .returning('id')
+          .executeTakeFirst();
+
+        if (inserted) {
+          await this.removeBlockedPairState(
+            transaction,
+            user.id,
+            memberUserId,
+            now,
+          );
+          await this.recordSocialRelationshipEvent(transaction, {
+            action: 'member_blocked',
+            actorUserId: user.id,
+            requestId: idempotencyKey,
+            subjectUserId: memberUserId,
+          });
+        }
+        return { action: 'blocked', requestId: null, userId: memberUserId };
+      },
+    );
+  }
+
+  unblockMember(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    blockedUserId: string,
+  ): Promise<SocialRelationshipActionResponseDto> {
+    return this.idempotency.execute<SocialRelationshipActionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { blockedUserId },
+        responseCode: 200,
+        scope: 'social:blocks:delete',
+      },
+      async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        const removed = await transaction
+          .deleteFrom('user_blocks')
+          .where('blocker_user_id', '=', user.id)
+          .where('blocked_user_id', '=', blockedUserId)
+          .executeTakeFirst();
+        if (Number(removed.numDeletedRows) > 0) {
+          await this.recordSocialRelationshipEvent(transaction, {
+            action: 'member_unblocked',
+            actorUserId: user.id,
+            requestId: idempotencyKey,
+            subjectUserId: blockedUserId,
+          });
+        }
+        return { action: 'unblocked', requestId: null, userId: blockedUserId };
+      },
+    );
   }
 
   async sendFriendRequest(
@@ -381,6 +650,12 @@ export class SocialService {
               message: 'That user is not available.',
             });
           }
+          await lockSocialPair(transaction, user.id, recipientUserId);
+          await requireSocialPairAvailable(
+            transaction,
+            user.id,
+            recipientUserId,
+          );
           const recipientStreaks = this.toStreaksJson(
             (await loadPublicStreaks(transaction, [recipientUserId])).get(
               recipientUserId,
@@ -451,6 +726,12 @@ export class SocialService {
             })
             .returningAll()
             .executeTakeFirstOrThrow();
+          await this.recordSocialRelationshipEvent(transaction, {
+            action: 'friend_request_sent',
+            actorUserId: user.id,
+            requestId: idempotencyKey,
+            subjectUserId: recipientUserId,
+          });
           return {
             createdAt: request.created_at.toISOString(),
             direction: 'outgoing',
@@ -491,19 +772,35 @@ export class SocialService {
       },
       async (transaction) => {
         const { user } = await this.ensureIdentity(principal, transaction);
+        const requestIdentity = await transaction
+          .selectFrom('friend_requests')
+          .select(['recipient_user_id', 'requester_user_id'])
+          .where('id', '=', requestId)
+          .where('recipient_user_id', '=', user.id)
+          .executeTakeFirst();
+        if (!requestIdentity) {
+          throw new NotFoundException({
+            code: 'FRIEND_REQUEST_NOT_FOUND',
+            message: 'That incoming friend request was not found.',
+          });
+        }
+        await lockSocialPair(
+          transaction,
+          requestIdentity.requester_user_id,
+          requestIdentity.recipient_user_id,
+        );
         const request = await transaction
           .selectFrom('friend_requests')
           .selectAll()
           .where('id', '=', requestId)
           .where('recipient_user_id', '=', user.id)
           .forUpdate()
-          .executeTakeFirst();
-        if (!request) {
-          throw new NotFoundException({
-            code: 'FRIEND_REQUEST_NOT_FOUND',
-            message: 'That incoming friend request was not found.',
-          });
-        }
+          .executeTakeFirstOrThrow();
+        await requireSocialPairAvailable(
+          transaction,
+          request.requester_user_id,
+          request.recipient_user_id,
+        );
         if (request.status !== 'pending') {
           throw new ConflictException({
             code: 'FRIEND_REQUEST_ALREADY_DECIDED',
@@ -534,6 +831,15 @@ export class SocialService {
             )
             .execute();
         }
+        await this.recordSocialRelationshipEvent(transaction, {
+          action:
+            input.decision === 'accepted'
+              ? 'friend_request_accepted'
+              : 'friend_request_declined',
+          actorUserId: user.id,
+          requestId: idempotencyKey,
+          subjectUserId: request.requester_user_id,
+        });
 
         return { requestId: request.id, status: input.decision };
       },
@@ -571,6 +877,14 @@ export class SocialService {
           .where('region_policy_id', '=', region.id)
           .where('status', '=', 'active')
           .where('end_date', '>=', today)
+          .where(
+            sql<boolean>`NOT EXISTS (
+              SELECT 1
+              FROM user_blocks AS block
+              WHERE (block.blocker_user_id = ${user.id} AND block.blocked_user_id = social_challenges.owner_user_id)
+                 OR (block.blocker_user_id = social_challenges.owner_user_id AND block.blocked_user_id = ${user.id})
+            )`,
+          )
           .orderBy('start_date')
           .orderBy('created_at', 'desc')
           .limit(100)
@@ -601,12 +915,6 @@ export class SocialService {
       });
     }
     this.assertChallengeWindow(input.startDate, input.endDate);
-    if (input.challengeType === 'friend' && invitedFriendUserIds.length === 0) {
-      throw new BadRequestException({
-        code: 'CHALLENGE_FRIEND_REQUIRED',
-        message: 'Choose at least one accepted friend to challenge.',
-      });
-    }
     if (
       input.challengeType === 'regional' &&
       (!input.regionCode ||
@@ -752,6 +1060,12 @@ export class SocialService {
             message: 'Only the challenge creator can invite friends.',
           });
         }
+        await lockSocialPair(transaction, user.id, input.friendUserId);
+        await requireSocialPairAvailable(
+          transaction,
+          user.id,
+          input.friendUserId,
+        );
 
         const [userA, userB] = this.canonicalPair(user.id, input.friendUserId);
         const friendship = await transaction
@@ -875,6 +1189,7 @@ export class SocialService {
         request: { challengeId, channel: input.channel, destination },
         responseCode: 201,
         scope: 'social:challenge-contact-invitations:create',
+        storeResponseBody: false,
       },
       async (transaction) => {
         const { user } = await this.ensureIdentity(principal, transaction);
@@ -903,6 +1218,17 @@ export class SocialService {
           });
         }
 
+        const creationKeyHash = socialInvitationHash(
+          `${user.id}:${idempotencyKey}`,
+        );
+        // A response containing the opaque token is never persisted. If a caller
+        // retries after losing a completed response, rotate the previous link so
+        // exactly one link for this idempotency key remains valid.
+        await transaction
+          .deleteFrom('challenge_contact_invitations')
+          .where('creation_key_hash', '=', creationKeyHash)
+          .execute();
+
         const token = randomBytes(24).toString('base64url');
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1_000);
@@ -911,6 +1237,7 @@ export class SocialService {
           .values({
             challenge_id: challengeId,
             channel: input.channel,
+            creation_key_hash: creationKeyHash,
             claimed_at: null,
             claimed_by_user_id: null,
             created_at: now,
@@ -919,10 +1246,12 @@ export class SocialService {
               input.channel,
               destination,
             ),
+            delivery_mode: 'link',
             expires_at: expiresAt,
             invite_token_hash: socialInvitationHash(token),
             inviter_user_id: user.id,
             status: 'pending',
+            token_version: 1,
           })
           .returning(['destination_hint', 'id'])
           .executeTakeFirstOrThrow();
@@ -930,6 +1259,8 @@ export class SocialService {
           challengeId,
           channel: input.channel,
           destinationHint: invitation.destination_hint,
+          deliveryMode: 'link',
+          deliveryStatus: 'not_sent',
           expiresAt: expiresAt.toISOString(),
           id: invitation.id,
           joinUrl: `https://gogymgo.com/join?challengeInvite=${encodeURIComponent(token)}`,
@@ -938,12 +1269,64 @@ export class SocialService {
     );
   }
 
+  async inspectContactInvitation(
+    principal: AuthenticatedPrincipal,
+    token: string,
+  ): Promise<ChallengeContactInvitationPreviewDto> {
+    const tokenHash = socialInvitationHash(token.trim());
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        const invitation = await transaction
+          .selectFrom('challenge_contact_invitations as invitation')
+          .innerJoin(
+            'social_challenges as challenge',
+            'challenge.id',
+            'invitation.challenge_id',
+          )
+          .select([
+            'challenge.owner_user_id',
+            'challenge.status as challenge_status',
+            'invitation.channel',
+            'invitation.destination_hint',
+            'invitation.expires_at',
+            'invitation.status',
+          ])
+          .where('invitation.invite_token_hash', '=', tokenHash)
+          .executeTakeFirst();
+        if (
+          !invitation ||
+          invitation.challenge_status !== 'active' ||
+          invitation.status !== 'pending' ||
+          invitation.expires_at <= new Date()
+        ) {
+          throw new NotFoundException({
+            code: 'CHALLENGE_CONTACT_INVITATION_NOT_FOUND',
+            message: 'That challenge invitation is not available.',
+          });
+        }
+        await requireSocialPairAvailable(
+          transaction,
+          invitation.owner_user_id,
+          user.id,
+        );
+        return {
+          channel: invitation.channel,
+          destinationHint: invitation.destination_hint,
+          expiresAt: invitation.expires_at.toISOString(),
+        };
+      });
+  }
+
   redeemContactInvitation(
     principal: AuthenticatedPrincipal,
     idempotencyKey: string,
     token: string,
+    suppliedDestination?: string,
   ): Promise<ChallengeInvitationResponseDto> {
-    const tokenHash = socialInvitationHash(token.trim());
+    const normalizedToken = token.trim();
+    const tokenHash = socialInvitationHash(normalizedToken);
     return this.idempotency.execute<ChallengeInvitationJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -966,6 +1349,8 @@ export class SocialService {
             'challenge.owner_user_id',
             'challenge.status as challenge_status',
             'invitation.expires_at',
+            'invitation.channel',
+            'invitation.destination_hash',
             'invitation.id',
             'invitation.status',
           ])
@@ -978,6 +1363,13 @@ export class SocialService {
             message: 'That challenge invitation is not available.',
           });
         }
+        const now = new Date();
+        if (invitation.expires_at <= now) {
+          throw new ConflictException({
+            code: 'CHALLENGE_CONTACT_INVITATION_EXPIRED',
+            message: 'That challenge invitation has expired.',
+          });
+        }
         if (invitation.status !== 'pending') {
           throw new ConflictException({
             code: 'CHALLENGE_CONTACT_INVITATION_RESOLVED',
@@ -985,16 +1377,16 @@ export class SocialService {
               'That challenge invitation has already been used or revoked.',
           });
         }
-        const now = new Date();
-        if (invitation.expires_at <= now) {
-          await transaction
-            .updateTable('challenge_contact_invitations')
-            .set({ status: 'expired' })
-            .where('id', '=', invitation.id)
-            .execute();
-          throw new ConflictException({
-            code: 'CHALLENGE_CONTACT_INVITATION_EXPIRED',
-            message: 'That challenge invitation has expired.',
+        const destinationHash = requireInvitationDestinationHash(
+          principal,
+          invitation.channel,
+          normalizedToken,
+          suppliedDestination,
+        );
+        if (destinationHash !== invitation.destination_hash) {
+          throw new NotFoundException({
+            code: 'CHALLENGE_CONTACT_INVITATION_NOT_FOUND',
+            message: 'That challenge invitation is not available.',
           });
         }
         if (invitation.owner_user_id === user.id) {
@@ -1003,6 +1395,12 @@ export class SocialService {
             message: 'You already own this challenge.',
           });
         }
+        await lockSocialPair(transaction, invitation.owner_user_id, user.id);
+        await requireSocialPairAvailable(
+          transaction,
+          invitation.owner_user_id,
+          user.id,
+        );
         await transaction
           .insertInto('social_challenge_members')
           .values({
@@ -1084,6 +1482,12 @@ export class SocialService {
             message: 'That regional challenge is not available.',
           });
         }
+        await lockSocialPair(transaction, user.id, challenge.owner_user_id);
+        await requireSocialPairAvailable(
+          transaction,
+          user.id,
+          challenge.owner_user_id,
+        );
         if (
           normalizeDateKey(challenge.end_date) <
           dateKeyInTimezone(new Date(), challenge.timezone ?? 'UTC')
@@ -1294,6 +1698,34 @@ export class SocialService {
       },
       async (transaction) => {
         const { user } = await this.ensureIdentity(principal, transaction);
+        const membershipIdentity = await transaction
+          .selectFrom('social_challenge_members')
+          .select(['role', 'status'])
+          .where('challenge_id', '=', challengeId)
+          .where('user_id', '=', user.id)
+          .executeTakeFirst();
+        if (!membershipIdentity || membershipIdentity.role !== 'member') {
+          throw new NotFoundException({
+            code: 'CHALLENGE_INVITATION_NOT_FOUND',
+            message: 'That challenge invitation was not found.',
+          });
+        }
+        const challengeOwner = await transaction
+          .selectFrom('social_challenges')
+          .select('owner_user_id')
+          .where('id', '=', challengeId)
+          .executeTakeFirst();
+        if (!challengeOwner) {
+          throw new NotFoundException({
+            code: 'CHALLENGE_INVITATION_NOT_FOUND',
+            message: 'That challenge invitation was not found.',
+          });
+        }
+        await lockSocialPair(
+          transaction,
+          user.id,
+          challengeOwner.owner_user_id,
+        );
         const membership = await transaction
           .selectFrom('social_challenge_members')
           .select(['role', 'status'])
@@ -1307,6 +1739,11 @@ export class SocialService {
             message: 'That challenge invitation was not found.',
           });
         }
+        await requireSocialPairAvailable(
+          transaction,
+          user.id,
+          challengeOwner.owner_user_id,
+        );
         if (membership.status !== 'pending') {
           throw new ConflictException({
             code: 'CHALLENGE_INVITATION_ALREADY_DECIDED',
@@ -1343,6 +1780,125 @@ export class SocialService {
     const user = await this.profiles.ensureUser(principal, executor);
     const profile = await this.profiles.ensureProfile(user.id, executor);
     return { profile, user };
+  }
+
+  private async removeBlockedPairState(
+    transaction: Transaction<Database>,
+    blockerUserId: string,
+    blockedUserId: string,
+    now: Date,
+  ): Promise<void> {
+    await transaction
+      .updateTable('friend_requests')
+      .set({ responded_at: now, status: 'cancelled', updated_at: now })
+      .where('status', '=', 'pending')
+      .where((expression) =>
+        expression.or([
+          expression.and([
+            expression('requester_user_id', '=', blockerUserId),
+            expression('recipient_user_id', '=', blockedUserId),
+          ]),
+          expression.and([
+            expression('requester_user_id', '=', blockedUserId),
+            expression('recipient_user_id', '=', blockerUserId),
+          ]),
+        ]),
+      )
+      .execute();
+
+    const [userA, userB] = this.canonicalPair(blockerUserId, blockedUserId);
+    await transaction
+      .deleteFrom('friendships')
+      .where('user_a_id', '=', userA)
+      .where('user_b_id', '=', userB)
+      .execute();
+
+    const ownedChallenges = await transaction
+      .selectFrom('social_challenges')
+      .select(['id', 'owner_user_id'])
+      .where('owner_user_id', 'in', [blockerUserId, blockedUserId])
+      .execute();
+    const blockerOwnedChallengeIds = ownedChallenges
+      .filter((challenge) => challenge.owner_user_id === blockerUserId)
+      .map((challenge) => challenge.id);
+    const blockedOwnedChallengeIds = ownedChallenges
+      .filter((challenge) => challenge.owner_user_id === blockedUserId)
+      .map((challenge) => challenge.id);
+    if (blockerOwnedChallengeIds.length > 0) {
+      await transaction
+        .deleteFrom('social_challenge_members')
+        .where('challenge_id', 'in', blockerOwnedChallengeIds)
+        .where('user_id', '=', blockedUserId)
+        .execute();
+    }
+    if (blockedOwnedChallengeIds.length > 0) {
+      await transaction
+        .deleteFrom('social_challenge_members')
+        .where('challenge_id', 'in', blockedOwnedChallengeIds)
+        .where('user_id', '=', blockerUserId)
+        .execute();
+    }
+
+    await transaction
+      .updateTable('weekly_challenge_requests')
+      .set({ responded_at: now, status: 'cancelled' })
+      .where('status', '=', 'pending')
+      .where((expression) =>
+        expression.or([
+          expression.and([
+            expression('requester_user_id', '=', blockerUserId),
+            expression('recipient_user_id', '=', blockedUserId),
+          ]),
+          expression.and([
+            expression('requester_user_id', '=', blockedUserId),
+            expression('recipient_user_id', '=', blockerUserId),
+          ]),
+        ]),
+      )
+      .execute();
+
+    await transaction
+      .updateTable('competition_matches')
+      .set({
+        outcome: { reason: 'member_blocked' },
+        status: 'cancelled',
+      })
+      .where('status', 'in', ['matched', 'searching'])
+      .where((expression) =>
+        expression.or([
+          expression.and([
+            expression('user_a_id', '=', blockerUserId),
+            expression('user_b_id', '=', blockedUserId),
+          ]),
+          expression.and([
+            expression('user_a_id', '=', blockedUserId),
+            expression('user_b_id', '=', blockerUserId),
+          ]),
+        ]),
+      )
+      .execute();
+  }
+
+  private recordSocialRelationshipEvent(
+    transaction: Transaction<Database>,
+    event: {
+      action: SocialRelationshipEventAction;
+      actorUserId: string;
+      requestId: string;
+      subjectUserId: string;
+    },
+  ): Promise<unknown> {
+    return transaction
+      .insertInto('social_relationship_events')
+      .values({
+        action: event.action,
+        actor_user_id: event.actorUserId,
+        created_at: new Date(),
+        metadata: {},
+        request_id: event.requestId,
+        subject_user_id: event.subjectUserId,
+      })
+      .executeTakeFirstOrThrow();
   }
 
   private async loadSocialUsers(
@@ -1459,12 +2015,16 @@ export class SocialService {
       .orderBy('challenge.start_date')
       .orderBy('challenge.created_at', 'desc')
       .execute();
-    const activityWindow = socialChallengeDateWindow(challenges);
+    const blockedUserIds = await loadBlockedUserIds(executor, userId);
+    const visibleChallenges = challenges.filter(
+      (challenge) => !blockedUserIds.has(challenge.owner_user_id),
+    );
+    const activityWindow = socialChallengeDateWindow(visibleChallenges);
     if (!activityWindow) {
       return [];
     }
-    const activeChallengeIds = challenges.map(({ id }) => id);
-    const members = await executor
+    const activeChallengeIds = visibleChallenges.map(({ id }) => id);
+    let memberQuery = executor
       .selectFrom('social_challenge_members')
       .innerJoin(
         'profiles',
@@ -1480,8 +2040,15 @@ export class SocialService {
       ])
       .where('social_challenge_members.challenge_id', 'in', activeChallengeIds)
       .where('social_challenge_members.status', '!=', 'declined')
-      .orderBy('social_challenge_members.created_at', 'asc')
-      .execute();
+      .orderBy('social_challenge_members.created_at', 'asc');
+    if (blockedUserIds.size > 0) {
+      memberQuery = memberQuery.where(
+        'social_challenge_members.user_id',
+        'not in',
+        [...blockedUserIds],
+      );
+    }
+    const members = await memberQuery.execute();
     const checkIns = await executor
       .selectFrom('social_challenge_checkins')
       .select(['challenge_id', 'eligible_date', 'user_id'])
@@ -1519,7 +2086,7 @@ export class SocialService {
       verifiedDatesByUser.set(workout.user_id, dates);
     }
 
-    return challenges.flatMap((challenge) => {
+    return visibleChallenges.flatMap((challenge) => {
       const startDate = normalizeDateKey(challenge.start_date);
       const endDate = normalizeDateKey(challenge.end_date);
       const targetTotal = this.challengeTargetTotal(
@@ -1648,6 +2215,10 @@ export class SocialService {
         message: 'You are already the challenge creator.',
       });
     }
+    const sortedFriendUserIds = [...friendUserIds].sort();
+    for (const friendUserId of sortedFriendUserIds) {
+      await lockSocialPair(executor, userId, friendUserId);
+    }
     const friendships = await executor
       .selectFrom('friendships')
       .select(['user_a_id', 'user_b_id'])
@@ -1669,6 +2240,15 @@ export class SocialService {
       (friendUserId) => !acceptedFriendIds.has(friendUserId),
     );
     if (unavailable) {
+      throw new ForbiddenException({
+        code: 'ACCEPTED_FRIEND_REQUIRED',
+        message: 'Only accepted friends can be challenged.',
+      });
+    }
+    const blockedUserIds = await loadBlockedUserIds(executor, userId);
+    if (
+      friendUserIds.some((friendUserId) => blockedUserIds.has(friendUserId))
+    ) {
       throw new ForbiddenException({
         code: 'ACCEPTED_FRIEND_REQUIRED',
         message: 'Only accepted friends can be challenged.',

@@ -469,6 +469,34 @@ export class PrivacyExportBuilder {
           )
           .orderBy('created_at')
           .execute();
+        const userBlocks = await transaction
+          .selectFrom('user_blocks')
+          .select(['blocker_user_id', 'created_at'])
+          .where((expression) =>
+            expression.or([
+              expression('blocker_user_id', '=', job.userId),
+              expression('blocked_user_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
+        const socialRelationshipEvents = await transaction
+          .selectFrom('social_relationship_events')
+          .select([
+            'action',
+            'actor_user_id',
+            'created_at',
+            'metadata',
+            'subject_user_id',
+          ])
+          .where((expression) =>
+            expression.or([
+              expression('actor_user_id', '=', job.userId),
+              expression('subject_user_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
         const friendships = await transaction
           .selectFrom('friendships')
           .select('created_at')
@@ -615,20 +643,30 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 8,
+          schemaVersion: 9,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',
             'Encrypted coupon inventory and unassigned coupon codes',
             "Other users' identifiers and internal operator case material",
             'Raw device-attestation and reusable QR credentials',
+            'Raw contact-invitation destinations, hashes, and invite tokens',
           ],
           socialData: {
             challengeCheckIns: challengeCheckIns.map((checkIn) => ({
               ...checkIn,
               eligible_date: normalizeDateKey(checkIn.eligible_date),
             })),
-            challengeContactInvitations,
+            challengeContactInvitations: challengeContactInvitations.map(
+              (invitation) => ({
+                ...invitation,
+                status:
+                  invitation.status === 'pending' &&
+                  invitation.expires_at <= new Date()
+                    ? 'expired'
+                    : invitation.status,
+              }),
+            ),
             challengeMemberships: challengeMemberships.map(
               ({ owner_user_id: ownerUserId, ...membership }) => ({
                 ...membership,
@@ -645,6 +683,28 @@ export class PrivacyExportBuilder {
               }),
             ),
             friendships,
+            relationshipEvents: socialRelationshipEvents.map(
+              ({
+                actor_user_id: actorUserId,
+                subject_user_id: subjectUserId,
+                ...event
+              }) => ({
+                ...event,
+                accountRole:
+                  actorUserId === job.userId
+                    ? 'actor'
+                    : subjectUserId === job.userId
+                      ? 'subject'
+                      : 'unrelated',
+              }),
+            ),
+            blocks: userBlocks.map(
+              ({ blocker_user_id: blockerUserId, ...block }) => ({
+                ...block,
+                direction:
+                  blockerUserId === job.userId ? 'outgoing' : 'incoming',
+              }),
+            ),
             weeklyChallengeRequests: weeklyChallengeRequests.map(
               ({ requester_user_id: requesterUserId, ...weeklyRequest }) => ({
                 ...weeklyRequest,

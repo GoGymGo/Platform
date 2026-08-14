@@ -69,7 +69,8 @@ export type LegalReceiptRequirement = 'accept' | 'acknowledge' | 'none';
 export type LegalDocumentState = 'published' | 'withdrawn';
 export type LegalReceiptAction = 'accept' | 'acknowledge';
 export type VerificationConsentAction = 'granted' | 'withdrawn';
-export type FriendRequestStatus = 'accepted' | 'declined' | 'pending';
+export type FriendRequestStatus =
+  'accepted' | 'cancelled' | 'declined' | 'pending';
 export type SocialChallengeStatus = 'active' | 'archived';
 export type SocialChallengeType = 'friend' | 'regional';
 export type SocialChallengeActivity =
@@ -138,14 +139,43 @@ export interface FriendshipsTable {
   created_at: Timestamp;
 }
 
+export interface UserBlocksTable {
+  id: Generated<string>;
+  blocker_user_id: string;
+  blocked_user_id: string;
+  created_at: Timestamp;
+}
+
+export type SocialRelationshipEventAction =
+  | 'friend_request_sent'
+  | 'friend_request_accepted'
+  | 'friend_request_declined'
+  | 'friend_request_cancelled'
+  | 'friendship_removed'
+  | 'member_blocked'
+  | 'member_unblocked';
+
+export interface SocialRelationshipEventsTable {
+  id: Generated<string>;
+  actor_user_id: string;
+  subject_user_id: string | null;
+  action: SocialRelationshipEventAction;
+  request_id: string;
+  metadata: ColumnType<JsonValue, JsonValue | undefined, never>;
+  created_at: Timestamp;
+}
+
 export interface ChallengeContactInvitationsTable {
   id: Generated<string>;
   challenge_id: string;
   inviter_user_id: string;
   channel: ChallengeContactInvitationChannel;
+  creation_key_hash: string;
   destination_hash: string;
   destination_hint: string;
+  delivery_mode: 'link';
   invite_token_hash: string;
+  token_version: number;
   status: ChallengeContactInvitationStatus;
   expires_at: Timestamp;
   claimed_by_user_id: string | null;
@@ -848,6 +878,8 @@ export interface Database {
   entry_ledger: EntryLedgerTable;
   friend_requests: FriendRequestsTable;
   friendships: FriendshipsTable;
+  user_blocks: UserBlocksTable;
+  social_relationship_events: SocialRelationshipEventsTable;
   gym_partner_assignments: GymPartnerAssignmentsTable;
   gym_locations: GymLocationsTable;
   gym_qr_credentials: GymQrCredentialsTable;

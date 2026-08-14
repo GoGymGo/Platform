@@ -1,18 +1,24 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ScreenScrollView,
   HUDBorderBox,
-  TerminalText
+  TerminalText,
 } from '@/components/cyber';
 import {
   FirstRunPrimaryButton,
   FirstRunScreen,
-  FirstRunSecondaryButton
+  FirstRunSecondaryButton,
 } from '@/components/firstRun';
 import { CompactTextButton, OnboardingHeader } from '@/components/onboarding';
+import { AuthTextField } from '@/components/auth';
+import {
+  getUserFacingErrorMessage,
+  InlineLoadingState,
+} from '@/components/reliability';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -30,25 +36,42 @@ const applicationOptions: readonly JoinOption[] = [
   {
     category: 'SPONSOR',
     label: 'APPLY AS A SPONSOR',
-    route: '/sponsor/apply'
+    route: '/sponsor/apply',
   },
   {
     category: 'PARTNER GYM',
     label: 'REGISTER A GYM',
-    route: '/gym/register'
-  }
+    route: '/gym/register',
+  },
 ];
 
 export default function JoinScreen() {
   const router = useRouter();
-  const { challengeInvite } = useLocalSearchParams<{ challengeInvite?: string }>();
+  const { challengeInvite } = useLocalSearchParams<{
+    challengeInvite?: string;
+  }>();
   const { social } = useAppData();
   const { user } = useAuth();
   const mobileGymVerificationAvailable =
     Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [phoneConfirmation, setPhoneConfirmation] = useState('');
   const [redeemingInvite, setRedeemingInvite] = useState(false);
   const [showPartnerOptions, setShowPartnerOptions] = useState(false);
+  const invitationPreviewQuery = useQuery({
+    enabled: Boolean(user && challengeInvite),
+    queryFn: () => social.inspectContactInvitation(challengeInvite!),
+    queryKey: ['contact-invitation-preview', user?.uid, challengeInvite],
+    retry: false,
+  });
+  const invitePreview = invitationPreviewQuery.data ?? null;
+  const previewError = invitationPreviewQuery.error
+    ? getUserFacingErrorMessage(
+        invitationPreviewQuery.error,
+        'This invitation could not be checked. Check your connection and try again.',
+      )
+    : null;
+  const visibleInviteError = inviteError ?? previewError;
 
   return (
     <FirstRunScreen>
@@ -68,7 +91,12 @@ export default function JoinScreen() {
           <TerminalText style={styles.title} tone="text" variant="title">
             HOW DO YOU WANT TO JOIN?
           </TerminalText>
-          <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
+          <TerminalText
+            style={styles.body}
+            tone="muted"
+            uppercase={false}
+            variant="body"
+          >
             Players join below. Sponsors and gyms use the Partner options.
           </TerminalText>
         </View>
@@ -79,27 +107,87 @@ export default function JoinScreen() {
               FRIEND CHALLENGE INVITATION
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Sign in or create an account to accept this challenge.
+              Sign in or create an account, review the masked destination, then
+              choose whether to accept. Opening this link never joins
+              automatically.
             </TerminalText>
-            {user ? (
+            {invitationPreviewQuery.isLoading ? (
+              <InlineLoadingState label="Checking invitation..." />
+            ) : null}
+            {user && invitePreview ? (
+              <TerminalText tone="cyan" uppercase={false} variant="body">
+                Invitation for {invitePreview.destinationHint}. Expires{' '}
+                {new Date(invitePreview.expiresAt).toLocaleString()}.
+              </TerminalText>
+            ) : null}
+            {user && invitePreview?.channel === 'phone' ? (
+              <AuthTextField
+                autoCapitalize="none"
+                keyboardType="phone-pad"
+                label="CONFIRM INVITED PHONE"
+                onChangeText={(value) => {
+                  setPhoneConfirmation(value);
+                  setInviteError(null);
+                }}
+                placeholder="+1 250 555 0199"
+                value={phoneConfirmation}
+              />
+            ) : null}
+            {user && invitePreview ? (
               <FirstRunPrimaryButton
-                disabled={redeemingInvite}
+                disabled={
+                  redeemingInvite ||
+                  (invitePreview.channel === 'phone' &&
+                    phoneConfirmation.trim().length < 8)
+                }
                 label={redeemingInvite ? 'ACCEPTING...' : 'ACCEPT CHALLENGE ->'}
                 onPress={() => {
                   setRedeemingInvite(true);
                   setInviteError(null);
-                  void social.redeemContactInvitation(challengeInvite)
+                  void social
+                    .redeemContactInvitation(
+                      challengeInvite,
+                      invitePreview.channel === 'phone'
+                        ? phoneConfirmation
+                        : undefined,
+                    )
                     .then(() => router.replace('/squad/social'))
-                    .catch(() => setInviteError('This invitation is invalid, expired or already used.'))
+                    .catch((error) =>
+                      setInviteError(
+                        getUserFacingErrorMessage(
+                          error,
+                          'This invitation is invalid, expired, already used, or does not match this account.',
+                        ),
+                      ),
+                    )
                     .finally(() => setRedeemingInvite(false));
                 }}
                 tone="pink"
               />
             ) : null}
-            {inviteError ? (
-              <TerminalText live="assertive" tone="red" uppercase={false} variant="caption">
-                {inviteError}
+            {visibleInviteError ? (
+              <TerminalText
+                live="assertive"
+                tone="red"
+                uppercase={false}
+                variant="caption"
+              >
+                {visibleInviteError}
               </TerminalText>
+            ) : null}
+            {user && previewError && !invitePreview ? (
+              <FirstRunSecondaryButton
+                disabled={invitationPreviewQuery.isFetching}
+                label={
+                  invitationPreviewQuery.isFetching
+                    ? 'CHECKING...'
+                    : 'RETRY INVITATION CHECK'
+                }
+                onPress={() => {
+                  setInviteError(null);
+                  void invitationPreviewQuery.refetch();
+                }}
+              />
             ) : null}
           </HUDBorderBox>
         ) : null}
@@ -110,16 +198,26 @@ export default function JoinScreen() {
           </TerminalText>
           <FirstRunPrimaryButton
             disabled={!challengeInvite && !mobileGymVerificationAvailable}
-            label={challengeInvite ? 'CREATE PLAYER ACCOUNT ->' : 'SCAN GYM QR + CREATE ACCOUNT ->'}
-            onPress={() => router.push(
+            label={
               challengeInvite
-                ? { pathname: '/sign-up', params: { challengeInvite } }
-                : { pathname: '/qr-scanner', params: { enrollment: '1', next: 'sign-up' } }
-            )}
+                ? 'CREATE PLAYER ACCOUNT ->'
+                : 'SCAN GYM QR + CREATE ACCOUNT ->'
+            }
+            onPress={() =>
+              router.push(
+                challengeInvite
+                  ? { pathname: '/sign-up', params: { challengeInvite } }
+                  : {
+                      pathname: '/qr-scanner',
+                      params: { enrollment: '1', next: 'sign-up' },
+                    },
+              )
+            }
           />
           {!challengeInvite && mobileGymVerificationAvailable ? (
             <TerminalText tone="muted" uppercase={false} variant="caption">
-              Scan the gym poster. We&apos;ll match your Contest, then verify your region.
+              Scan the gym poster. We&apos;ll match your Contest, then verify
+              your region.
             </TerminalText>
           ) : !challengeInvite ? (
             <TerminalText tone="amber" uppercase={false} variant="caption">
@@ -128,15 +226,23 @@ export default function JoinScreen() {
           ) : null}
           <FirstRunSecondaryButton
             label="SIGN IN TO EXISTING ACCOUNT"
-            onPress={() => router.push(challengeInvite
-              ? { pathname: '/sign-in', params: { challengeInvite } }
-              : '/sign-in')}
+            onPress={() =>
+              router.push(
+                challengeInvite
+                  ? { pathname: '/sign-in', params: { challengeInvite } }
+                  : '/sign-in',
+              )
+            }
           />
         </View>
 
         <View style={styles.section}>
           <FirstRunSecondaryButton
-            label={showPartnerOptions ? 'HIDE PARTNER OPTIONS' : 'PARTNER WITH GOGYMGO'}
+            label={
+              showPartnerOptions
+                ? 'HIDE PARTNER OPTIONS'
+                : 'PARTNER WITH GOGYMGO'
+            }
             onPress={() => setShowPartnerOptions((visible) => !visible)}
           />
           {showPartnerOptions ? (
@@ -171,7 +277,7 @@ export default function JoinScreen() {
 
 function JoinApplicationOption({
   onPress,
-  option
+  option,
 }: {
   onPress: () => void;
   option: JoinOption;
@@ -180,7 +286,10 @@ function JoinApplicationOption({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.optionPressable, pressed ? styles.optionPressed : null]}
+      style={({ pressed }) => [
+        styles.optionPressable,
+        pressed ? styles.optionPressed : null,
+      ]}
     >
       <HUDBorderBox style={styles.optionRow} tone="cyan">
         <View style={styles.optionCopy}>
@@ -206,43 +315,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.transparent
+    backgroundColor: colors.transparent,
   },
   header: {
     gap: spacing.sm,
     paddingLeft: 14,
     paddingVertical: spacing.xs,
     borderLeftWidth: 2,
-    borderLeftColor: colors.cyan
+    borderLeftColor: colors.cyan,
   },
   title: {
     fontFamily: fontFamilies.display,
-    lineHeight: 30
+    lineHeight: 30,
   },
   body: {
     fontFamily: fontFamilies.ui,
     fontSize: 16,
-    lineHeight: 24
+    lineHeight: 24,
   },
   section: {
     gap: spacing.md,
     paddingVertical: spacing.lg,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.borderCyanSubtle
+    borderColor: colors.borderCyanSubtle,
   },
   inviteCard: {
     gap: spacing.md,
-    padding: spacing.lg
+    padding: spacing.lg,
   },
   partnerOptions: {
-    gap: spacing.sm
+    gap: spacing.sm,
   },
   optionPressable: {
-    width: '100%'
+    width: '100%',
   },
   optionPressed: {
-    opacity: 0.72
+    opacity: 0.72,
   },
   optionRow: {
     minHeight: 64,
@@ -250,16 +359,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-    paddingVertical: spacing.md
+    paddingVertical: spacing.md,
   },
   optionCopy: {
     flex: 1,
-    gap: 2
+    gap: 2,
   },
   legalLinks: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.md,
-    marginTop: spacing.md
-  }
+    marginTop: spacing.md,
+  },
 });

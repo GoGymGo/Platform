@@ -15,7 +15,6 @@ import {
 import { FirstRunPrimaryButton, FirstRunSecondaryButton } from '@/components/firstRun';
 import { SocialAuthButtons } from '@/components/socialAuthButtons';
 import { LegalDocumentLinks } from '@/components/legal';
-import { useAppData } from '@/data/appDataHooks';
 import {
   getAuthErrorMessage,
   hasAuthFormErrors,
@@ -33,6 +32,11 @@ import {
   gymScanAuthNext,
   isGymScanContinuation
 } from '@/navigation/gymScanFlow';
+import {
+  contactInvitationAuthRoute,
+  contactInvitationNext,
+  contactInvitationReviewRoute
+} from '@/navigation/contactInvitationFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
 
 export default function SignInScreen() {
@@ -45,7 +49,6 @@ export default function SignInScreen() {
   }>();
   const gymScanContinuation =
     mobileGymVerificationAvailable && isGymScanContinuation(next);
-  const { social } = useAppData();
   const {
     appleSignInAvailable,
     firebaseConfigured,
@@ -66,7 +69,7 @@ export default function SignInScreen() {
         pathname: '/verify-email',
         params: {
           next: challengeInvite
-            ? `challenge:${challengeInvite}`
+            ? contactInvitationNext(challengeInvite)
             : gymScanContinuation
               ? gymScanAuthNext
               : 'home'
@@ -75,7 +78,8 @@ export default function SignInScreen() {
       return;
     }
     if (challengeInvite) {
-      await social.redeemContactInvitation(challengeInvite);
+      router.replace(contactInvitationReviewRoute(challengeInvite));
+      return;
     }
     if (result.isNewUser && mobileGymVerificationAvailable) {
       router.replace(
@@ -83,11 +87,6 @@ export default function SignInScreen() {
           ? getGymScanPostAuthRoute(true)
           : { pathname: '/qr-scanner', params: { enrollment: '1', next: 'region' } }
       );
-      return;
-    }
-
-    if (challengeInvite) {
-      router.replace('/squad/social');
       return;
     }
 
@@ -154,7 +153,7 @@ export default function SignInScreen() {
           pathname: '/verify-email',
           params: {
             next: challengeInvite
-              ? `challenge:${challengeInvite}`
+              ? contactInvitationNext(challengeInvite)
               : gymScanContinuation
                 ? gymScanAuthNext
                 : 'home'
@@ -163,8 +162,7 @@ export default function SignInScreen() {
         return;
       }
       if (challengeInvite) {
-        await social.redeemContactInvitation(challengeInvite);
-        router.replace('/squad/social');
+        router.replace(contactInvitationReviewRoute(challengeInvite));
         return;
       }
       if (gymScanContinuation) {
@@ -185,7 +183,9 @@ export default function SignInScreen() {
         ? 'Sign in to continue with this gym.'
         : 'Sign in to continue your Contest.'}
       eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'SECURE ACCESS'}
-      onBack={() => router.replace('/join')}
+      onBack={() => router.replace(
+        challengeInvite ? contactInvitationReviewRoute(challengeInvite) : '/join'
+      )}
       title={gymScanContinuation ? 'SIGN IN TO CONTINUE' : 'WELCOME BACK'}
     >
       {!firebaseConfigured ? <AuthConfigurationNotice /> : null}
@@ -286,7 +286,9 @@ export default function SignInScreen() {
               disabled={busy}
               label="RESET PASSWORD"
               onPress={() => router.push(
-                gymScanContinuation
+                challengeInvite
+                  ? contactInvitationAuthRoute('/forgot-password', challengeInvite)
+                  : gymScanContinuation
                   ? { pathname: '/forgot-password', params: { next: gymScanAuthNext } }
                   : '/forgot-password'
               )}
@@ -297,7 +299,9 @@ export default function SignInScreen() {
             disabled={busy}
             label="CREATE A NEW ACCOUNT"
             onPress={() => router.replace(
-              gymScanContinuation
+              challengeInvite
+                ? contactInvitationAuthRoute('/sign-up', challengeInvite)
+                : gymScanContinuation
                 ? { pathname: '/sign-up', params: { next: gymScanAuthNext } }
                 : '/sign-up'
             )}

@@ -5,6 +5,7 @@ import { GymsService } from '../gyms/gyms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
 import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
+import { SocialInvitationCleanupService } from '../social/social-invitation-cleanup.service';
 
 export interface WorkerRunResult {
   competitionsActivated: number;
@@ -17,6 +18,8 @@ export interface WorkerRunResult {
   privacyExportsDeleted: number;
   privacyOperationsCompleted: number;
   privacyOperationsFailed: number;
+  socialInvitationsExpired: number;
+  socialInvitationsPurged: number;
 }
 
 @Injectable()
@@ -28,6 +31,7 @@ export class OperationsWorkerService {
     private readonly notifications: NotificationsService,
     private readonly profileMedia: ProfileMediaCleanupService,
     private readonly privacy: PrivacyOperationsService,
+    private readonly socialInvitations: SocialInvitationCleanupService,
   ) {}
 
   async runOnce(): Promise<WorkerRunResult> {
@@ -69,6 +73,10 @@ export class OperationsWorkerService {
       () => this.notifications.processPending(),
       0,
     );
+    const socialInvitations = await attempt(
+      () => this.socialInvitations.process(),
+      { expired: 0, purged: 0 },
+    );
 
     if (failures.length > 0) {
       throw new AggregateError(
@@ -88,6 +96,8 @@ export class OperationsWorkerService {
       privacyExportsDeleted: privacy.expiredExportsDeleted,
       privacyOperationsCompleted: privacy.completed,
       privacyOperationsFailed: privacy.failed,
+      socialInvitationsExpired: socialInvitations.expired,
+      socialInvitationsPurged: socialInvitations.purged,
     };
   }
 }

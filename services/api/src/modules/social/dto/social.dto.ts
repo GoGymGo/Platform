@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
@@ -52,13 +53,16 @@ export type SocialRelationship = (typeof socialRelationships)[number];
 
 export class SearchUsersQueryDto {
   @ApiProperty({
-    description: 'Case-insensitive partial alias match',
+    description: 'Case-insensitive Alias prefix match',
     example: 'GHOST',
     maxLength: 24,
     minLength: 2,
     pattern: '^[A-Za-z0-9_]+$',
     type: String,
   })
+  @Transform(({ value }: TransformFnParams): unknown =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
   @IsString()
   @Length(2, 24)
   @Matches(/^[A-Za-z0-9_]+$/)
@@ -69,6 +73,12 @@ export class SendFriendRequestDto {
   @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
   recipientUserId!: string;
+}
+
+export class BlockMemberDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  @IsUUID()
+  memberUserId!: string;
 }
 
 export class FriendRequestDecisionDto {
@@ -215,6 +225,12 @@ export class ChallengeContactInvitationResponseDto {
 
   @ApiProperty({ type: String })
   joinUrl!: string;
+
+  @ApiProperty({ enum: ['link'], type: String })
+  deliveryMode!: 'link';
+
+  @ApiProperty({ enum: ['not_sent'], type: String })
+  deliveryStatus!: 'not_sent';
 }
 
 export class RedeemChallengeContactInvitationDto {
@@ -222,6 +238,30 @@ export class RedeemChallengeContactInvitationDto {
   @IsString()
   @Length(20, 200)
   token!: string;
+
+  @ApiProperty({ maxLength: 160, required: false, type: String })
+  @IsOptional()
+  @IsString()
+  @Length(5, 160)
+  destination?: string;
+}
+
+export class InspectChallengeContactInvitationDto {
+  @ApiProperty({ minLength: 20, type: String })
+  @IsString()
+  @Length(20, 200)
+  token!: string;
+}
+
+export class ChallengeContactInvitationPreviewDto {
+  @ApiProperty({ enum: ['email', 'phone'], type: String })
+  channel!: 'email' | 'phone';
+
+  @ApiProperty({ type: String })
+  destinationHint!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
 }
 
 export class ChallengeInvitationDecisionDto {
@@ -251,6 +291,11 @@ export class FriendResponseDto extends SocialUserSummaryDto {
   friendsSince!: string;
 }
 
+export class BlockedMemberResponseDto extends SocialUserSummaryDto {
+  @ApiProperty({ format: 'date-time', type: String })
+  blockedAt!: string;
+}
+
 export class FriendRequestResponseDto {
   @ApiProperty({ enum: ['incoming', 'outgoing'], type: String })
   direction!: 'incoming' | 'outgoing';
@@ -271,6 +316,20 @@ export class FriendRequestDecisionResponseDto {
 
   @ApiProperty({ enum: friendRequestDecisions, type: String })
   status!: Extract<FriendRequestStatus, 'accepted' | 'declined'>;
+}
+
+export class SocialRelationshipActionResponseDto {
+  @ApiProperty({
+    enum: ['blocked', 'cancelled', 'removed', 'unblocked'],
+    type: String,
+  })
+  action!: 'blocked' | 'cancelled' | 'removed' | 'unblocked';
+
+  @ApiProperty({ format: 'uuid', nullable: true, type: String })
+  requestId!: string | null;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  userId!: string;
 }
 
 export class SocialChallengeProgressDto {

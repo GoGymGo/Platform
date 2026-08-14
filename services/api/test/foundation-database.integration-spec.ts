@@ -44,6 +44,7 @@ describeWithDatabase('database migrations', () => {
         'entry_ledger',
         'friend_requests',
         'friendships',
+        'challenge_contact_invitations',
         'gym_locations',
         'gym_partner_assignments',
         'gym_qr_credentials',
@@ -71,6 +72,8 @@ describeWithDatabase('database migrations', () => {
         'social_challenge_checkins',
         'social_challenge_members',
         'social_challenges',
+        'social_relationship_events',
+        'user_blocks',
         'users',
         'worker_heartbeats',
         'workout_sessions',
@@ -218,8 +221,13 @@ describeWithDatabase('database migrations', () => {
          'friendships_canonical_pair',
          'social_challenge_owner_accepted',
          'social_challenge_checkins_unique_day',
-         'social_challenges_dates_valid',
-         'social_challenges_name_valid'
+          'social_challenges_dates_valid',
+          'social_challenges_name_valid',
+          'profiles_screen_name_not_reserved',
+          'challenge_contact_invitation_integrity',
+          'challenge_contact_invitation_creation_key_unique',
+          'user_blocks_distinct_users',
+          'user_blocks_unique_pair'
        )`,
     );
 
@@ -241,6 +249,11 @@ describeWithDatabase('database migrations', () => {
         'social_challenge_owner_accepted',
         'social_challenges_dates_valid',
         'social_challenges_name_valid',
+        'profiles_screen_name_not_reserved',
+        'challenge_contact_invitation_integrity',
+        'challenge_contact_invitation_creation_key_unique',
+        'user_blocks_distinct_users',
+        'user_blocks_unique_pair',
       ]),
     );
   });

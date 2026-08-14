@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
@@ -81,6 +81,9 @@ export class UpdateMeDto {
     type: String,
   })
   @IsOptional()
+  @Transform(({ value }: TransformFnParams): unknown =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
   @IsString()
   @Length(3, 24)
   @Matches(/^[A-Za-z0-9_]+$/)

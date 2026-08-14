@@ -8,21 +8,25 @@ import {
   normalizeScreenName,
   validateChallengeInput,
   validateChallengeName,
-  validateScreenName
+  validateScreenName,
 } from '@/domain/social';
 
 describe('social input rules', () => {
   it('keeps searchable aliases portable and predictable', () => {
+    assert.equal(normalizeScreenName('  ghost_runner  '), 'GHOST_RUNNER');
     assert.equal(normalizeScreenName('  GHOST_RUNNER  '), 'GHOST_RUNNER');
     assert.equal(validateScreenName('GHOST_RUNNER'), null);
-    assert.match(validateScreenName('ghost runner') ?? '', /underscores/i);
+    assert.match(validateScreenName('ghost runner') ?? '', /ASCII/i);
     assert.match(validateScreenName('ab') ?? '', /3-24/i);
+    assert.match(validateScreenName('SUPPORT_TEAM') ?? '', /reserved/i);
+    assert.match(validateScreenName('GG_ABCDEF123456') ?? '', /reserved/i);
+    assert.match(validateScreenName('NÓVA') ?? '', /ASCII/i);
   });
 
   it('normalizes named challenges without changing their words', () => {
     assert.equal(
       normalizeChallengeName('  July   Strength\nSprint  '),
-      'July Strength Sprint'
+      'July Strength Sprint',
     );
     assert.equal(validateChallengeName('July Strength Sprint'), null);
     assert.match(validateChallengeName('   ') ?? '', /enter/i);
@@ -39,7 +43,7 @@ describe('social input rules', () => {
       scheduledDays: [],
       startDate: '2026-07-01',
       targetCount: 4,
-      targetPeriod: 'weekly'
+      targetPeriod: 'weekly',
     });
 
     assert.equal(validateChallengeInput(input), null);
@@ -59,10 +63,13 @@ describe('social input rules', () => {
       scheduledDays: [],
       startDate: '2026-07-01',
       targetCount: 4,
-      targetPeriod: 'weekly' as const
+      targetPeriod: 'weekly' as const,
     };
 
-    assert.match(validateChallengeInput(input) ?? '', /email address or phone/i);
+    assert.match(
+      validateChallengeInput(input) ?? '',
+      /email address or phone/i,
+    );
     assert.equal(validateChallengeInput(input, 1), null);
   });
 
@@ -80,11 +87,14 @@ describe('social input rules', () => {
       scheduledTime: '18:30',
       startDate: '2026-07-01',
       targetCount: 8,
-      targetPeriod: 'monthly' as const
+      targetPeriod: 'monthly' as const,
     };
 
     assert.match(validateChallengeInput(base) ?? '', /scheduled day/i);
-    assert.equal(validateChallengeInput({ ...base, scheduledDays: [2, 4] }), null);
+    assert.equal(
+      validateChallengeInput({ ...base, scheduledDays: [2, 4] }),
+      null,
+    );
   });
 
   it('builds calendar-month windows without UTC date drift', () => {

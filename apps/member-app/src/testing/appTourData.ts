@@ -538,8 +538,18 @@ export function createAppTourSocialRepository(): SocialRepository {
     userId: 'app-tour-friend'
   };
   let challenges = [createSocialChallenge()];
+  let blocks: (typeof friend & { blockedAt: string })[] = [];
 
   return {
+    blockMember: async (memberUserId) => {
+      blocks = [{ ...friend, blockedAt: nowIso(), userId: memberUserId }];
+      return { action: 'blocked', requestId: null, userId: memberUserId };
+    },
+    cancelFriendRequest: async (requestId) => ({
+      action: 'cancelled',
+      requestId,
+      userId: friend.userId
+    }),
     checkInToChallenge: async (challengeId) => ({
       challengeId,
       checkInId: 'app-tour-check-in',
@@ -556,10 +566,17 @@ export function createAppTourSocialRepository(): SocialRepository {
     inviteContactToChallenge: async (challengeId, contact) => ({
       challengeId,
       channel: contact.channel,
+      deliveryMode: 'link',
+      deliveryStatus: 'not_sent',
       destinationHint: contact.channel === 'email' ? 't***@example.com' : '***-***-0100',
       expiresAt: nowIso(),
       id: 'app-tour-contact-invite',
       joinUrl: 'https://example.invalid/app-tour-invite'
+    }),
+    inspectContactInvitation: async () => ({
+      channel: 'email',
+      destinationHint: 't***@example.com',
+      expiresAt: nowIso()
     }),
     inviteFriendToChallenge: async (challengeId, friendUserId) => ({
       challengeId,
@@ -572,6 +589,7 @@ export function createAppTourSocialRepository(): SocialRepository {
       userId: appTourUserId
     }),
     listChallenges: async () => challenges,
+    listBlocks: async () => blocks,
     listFriendRequests: async () => [
       {
         createdAt: nowIso(),
@@ -585,6 +603,11 @@ export function createAppTourSocialRepository(): SocialRepository {
       challengeId: challenges[0].id,
       status: 'accepted',
       userId: appTourUserId
+    }),
+    removeFriend: async (friendUserId) => ({
+      action: 'removed',
+      requestId: null,
+      userId: friendUserId
     }),
     respondToChallengeInvitation: async (challengeId, decision) => ({
       challengeId,
@@ -612,6 +635,10 @@ export function createAppTourSocialRepository(): SocialRepository {
     updateScreenName: async (screenName) => {
       profile = { ...profile, screenName };
       return profile;
+    },
+    unblockMember: async (blockedUserId) => {
+      blocks = blocks.filter((block) => block.userId !== blockedUserId);
+      return { action: 'unblocked', requestId: null, userId: blockedUserId };
     }
   };
 }

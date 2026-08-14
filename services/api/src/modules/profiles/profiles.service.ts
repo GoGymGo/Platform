@@ -21,6 +21,11 @@ import type {
   PrivacySettingsDto,
   UpdateMeDto,
 } from './dto/profile.dto';
+import {
+  isGeneratedPrivateAlias,
+  normalizeAlias,
+  requireValidPublicAlias,
+} from './alias-policy';
 
 type DatabaseExecutor = Kysely<Database> | Transaction<Database>;
 
@@ -48,13 +53,20 @@ export class ProfilesService {
         .execute(async (transaction) => {
           const user = await this.ensureUser(principal, transaction);
           const current = await this.ensureProfile(user.id, transaction);
-          const screenName = update.screenName?.trim() ?? current.screen_name;
+          const screenName =
+            update.screenName === undefined
+              ? current.screen_name
+              : requireValidPublicAlias(update.screenName);
           const publicIdentityMode =
             update.publicIdentityMode ?? current.public_identity_mode;
-          const publicName =
+          let publicName =
             update.publicName === undefined
               ? current.public_name
               : update.publicName?.trim() || null;
+
+          if (publicIdentityMode === 'alias') {
+            publicName = screenName;
+          }
 
           if (publicIdentityMode !== 'private' && !publicName) {
             throw new BadRequestException({
@@ -69,7 +81,9 @@ export class ProfilesService {
             ...update.privacySettings,
           } satisfies PrivacySettingsDto;
 
-          if (screenName !== current.screen_name) {
+          if (
+            normalizeAlias(screenName) !== normalizeAlias(current.screen_name)
+          ) {
             const existing = await transaction
               .selectFrom('profiles')
               .select('user_id')
@@ -195,6 +209,10 @@ export class ProfilesService {
       .slice(0, 12)
       .toUpperCase();
     return `GG-${suffix}`;
+  }
+
+  isPrivateGeneratedAlias(screenName: string): boolean {
+    return isGeneratedPrivateAlias(screenName);
   }
 
   private normalizePrivacySettings(value: JsonValue): PrivacySettingsDto {

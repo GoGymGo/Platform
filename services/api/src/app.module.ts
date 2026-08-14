@@ -65,6 +65,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
                 'req.headers.cookie',
                 'req.body.password',
                 'req.body.token',
+                'req.body.destination',
                 'req.body.idToken',
                 'req.body.codes',
                 'req.body.pushToken',

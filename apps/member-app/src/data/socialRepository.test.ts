@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createSocialRepository } from '@/data/socialRepository';
-import type { CreateSocialChallengeInput, SocialChallenge } from '@/domain/social';
+import type {
+  CreateSocialChallengeInput,
+  SocialChallenge,
+} from '@/domain/social';
 
 const friendChallengeInput: CreateSocialChallengeInput = {
   activity: 'gym',
@@ -14,21 +17,24 @@ const friendChallengeInput: CreateSocialChallengeInput = {
   scheduledDays: [],
   startDate: '2026-07-01',
   targetCount: 4,
-  targetPeriod: 'weekly'
+  targetPeriod: 'weekly',
 };
 
 describe('social repository', () => {
   it('does not fabricate social state when the API is unavailable', async () => {
     const social = createSocialRepository('unavailable', null);
 
-    assert.deepEqual(await social.searchUsers('NOVA'), []);
-    assert.deepEqual(await social.listFriendRequests(), []);
-    assert.deepEqual(await social.listFriends(), []);
-    assert.deepEqual(await social.listChallenges(), []);
-    await assert.rejects(
-      () => social.createChallenge(friendChallengeInput),
-      /not configured/i
-    );
+    await Promise.all([
+      assert.rejects(() => social.searchUsers('NOVA'), /not configured/i),
+      assert.rejects(() => social.listBlocks(), /not configured/i),
+      assert.rejects(() => social.listFriendRequests(), /not configured/i),
+      assert.rejects(() => social.listFriends(), /not configured/i),
+      assert.rejects(() => social.listChallenges(), /not configured/i),
+      assert.rejects(
+        () => social.createChallenge(friendChallengeInput),
+        /not configured/i,
+      ),
+    ]);
   });
 
   it('maps production methods to the authenticated API contract', async () => {
@@ -36,7 +42,7 @@ describe('social repository', () => {
     const api = {
       request: <TResponse>(
         path: string,
-        options?: { body?: unknown; method?: string }
+        options?: { body?: unknown; method?: string },
       ) => {
         requests.push({ body: options?.body, method: options?.method, path });
         return Promise.resolve({
@@ -49,7 +55,11 @@ describe('social repository', () => {
           id: 'challenge-1',
           locationName: null,
           members: [],
-          myProgress: { completedCount: 0, completionPercent: 0, targetTotal: 20 },
+          myProgress: {
+            completedCount: 0,
+            completionPercent: 0,
+            targetTotal: 20,
+          },
           myRole: 'owner',
           myStatus: 'accepted',
           name: 'July Strength Sprint',
@@ -59,7 +69,7 @@ describe('social repository', () => {
             monthly: 1,
             projectionVersion: 'streaks-v1',
             weekly: 2,
-            yearly: 0
+            yearly: 0,
           },
           ownerUserId: 'user-1',
           participantCount: 1,
@@ -71,24 +81,29 @@ describe('social repository', () => {
           startDate: '2026-07-01',
           targetCount: 4,
           targetPeriod: 'weekly',
-          timezone: null
+          timezone: null,
         } as SocialChallenge) as Promise<TResponse>;
-      }
+      },
     };
 
-    await createSocialRepository('api', api).createChallenge(friendChallengeInput);
+    await createSocialRepository('api', api).createChallenge(
+      friendChallengeInput,
+    );
 
     assert.deepEqual(requests[0], {
       body: friendChallengeInput,
       method: 'POST',
-      path: '/v1/social/challenges'
+      path: '/v1/social/challenges',
     });
   });
 
   it('saves one alias contract for profile and social surfaces', async () => {
     const requests: { body?: unknown; method?: string; path: string }[] = [];
     const api = {
-      request: <TResponse>(path: string, options?: { body?: unknown; method?: string }) => {
+      request: <TResponse>(
+        path: string,
+        options?: { body?: unknown; method?: string },
+      ) => {
         requests.push({ body: options?.body, method: options?.method, path });
         if (path === '/v1/streaks/me') {
           return Promise.resolve({
@@ -98,19 +113,21 @@ describe('social repository', () => {
               monthly: 0,
               projectionVersion: 'streaks-v1',
               weekly: 1,
-              yearly: 0
+              yearly: 0,
             },
-            timezone: 'America/Vancouver'
+            timezone: 'America/Vancouver',
           }) as Promise<TResponse>;
         }
         return Promise.resolve({
           id: 'user-1',
-          screenName: 'GHOST_RUNNER'
+          screenName: 'GHOST_RUNNER',
         }) as Promise<TResponse>;
-      }
+      },
     };
 
-    const profile = await createSocialRepository('api', api).updateScreenName('GHOST_RUNNER');
+    const profile = await createSocialRepository('api', api).updateScreenName(
+      'GHOST_RUNNER',
+    );
 
     assert.equal(profile.screenName, 'GHOST_RUNNER');
     assert.equal(profile.streaks.daily, 2);
@@ -119,12 +136,12 @@ describe('social repository', () => {
         body: {
           publicIdentityMode: 'alias',
           publicName: 'GHOST_RUNNER',
-          screenName: 'GHOST_RUNNER'
+          screenName: 'GHOST_RUNNER',
         },
         method: 'PATCH',
-        path: '/v1/me'
+        path: '/v1/me',
       },
-      { body: undefined, method: undefined, path: '/v1/streaks/me' }
+      { body: undefined, method: undefined, path: '/v1/streaks/me' },
     ]);
   });
 
@@ -134,7 +151,7 @@ describe('social repository', () => {
       request: <TResponse>(path: string, options?: { method?: string }) => {
         requests.push({ method: options?.method, path });
         return Promise.resolve([] as unknown as TResponse);
-      }
+      },
     };
     const social = createSocialRepository('api', api);
 
@@ -145,52 +162,90 @@ describe('social repository', () => {
     assert.deepEqual(requests, [
       {
         method: undefined,
-        path: '/v1/social/challenges/discover?regionCode=toronto-on'
+        path: '/v1/social/challenges/discover?regionCode=toronto-on',
       },
       {
         method: 'POST',
-        path: '/v1/social/challenges/challenge-1/join'
+        path: '/v1/social/challenges/challenge-1/join',
       },
       {
         method: 'POST',
-        path: '/v1/social/challenges/challenge-1/check-ins'
-      }
+        path: '/v1/social/challenges/challenge-1/check-ins',
+      },
     ]);
   });
 
   it('creates a privacy-safe email or phone invitation through the API', async () => {
     const requests: { body?: unknown; method?: string; path: string }[] = [];
     const api = {
-      request: <TResponse>(path: string, options?: { body?: unknown; method?: string }) => {
+      request: <TResponse>(
+        path: string,
+        options?: { body?: unknown; method?: string },
+      ) => {
         requests.push({ body: options?.body, method: options?.method, path });
         return Promise.resolve({
           challengeId: 'challenge-1',
           channel: 'email',
+          deliveryMode: 'link',
+          deliveryStatus: 'not_sent',
           destinationHint: 'f***@example.com',
           expiresAt: '2026-08-15T00:00:00.000Z',
           id: 'invite-1',
-          joinUrl: 'https://gogymgo.com/join?challengeInvite=token'
+          joinUrl: 'https://gogymgo.com/join?challengeInvite=token',
         }) as Promise<TResponse>;
-      }
+      },
     };
 
-    await createSocialRepository('api', api).inviteContactToChallenge('challenge-1', {
-      channel: 'email',
-      destination: 'friend@example.com'
-    });
-    await createSocialRepository('api', api).redeemContactInvitation('invite-token');
+    await createSocialRepository('api', api).inviteContactToChallenge(
+      'challenge-1',
+      {
+        channel: 'email',
+        destination: 'friend@example.com',
+      },
+    );
+    await createSocialRepository('api', api).redeemContactInvitation(
+      'invite-token',
+    );
 
     assert.deepEqual(requests, [
       {
         body: { channel: 'email', destination: 'friend@example.com' },
         method: 'POST',
-        path: '/v1/social/challenges/challenge-1/contact-invitations'
+        path: '/v1/social/challenges/challenge-1/contact-invitations',
       },
       {
         body: { token: 'invite-token' },
         method: 'POST',
-        path: '/v1/social/challenge-contact-invitations/redeem'
-      }
+        path: '/v1/social/challenge-contact-invitations/redeem',
+      },
     ]);
+  });
+
+  it('reuses the same idempotency key after a failed relationship mutation', async () => {
+    const keys: string[] = [];
+    let attempt = 0;
+    const api = {
+      request: <TResponse>(
+        _path: string,
+        options?: { idempotencyKey?: string },
+      ): Promise<TResponse> => {
+        keys.push(options?.idempotencyKey ?? '');
+        attempt += 1;
+        if (attempt === 1) return Promise.reject(new Error('offline'));
+        return Promise.resolve({
+          action: 'blocked',
+          requestId: null,
+          userId: 'friend-1',
+        } as TResponse);
+      },
+    };
+    const social = createSocialRepository('api', api);
+
+    await assert.rejects(() => social.blockMember('friend-1'), /offline/);
+    await social.blockMember('friend-1');
+
+    assert.equal(keys.length, 2);
+    assert.ok(keys[0]);
+    assert.equal(keys[1], keys[0]);
   });
 });

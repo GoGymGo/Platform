@@ -2,9 +2,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   View,
   type StyleProp,
@@ -32,6 +32,9 @@ import {
 import { useAppData } from '@/data/appDataHooks';
 import {
   useChallengeCheckIn,
+  useBlockedMembers,
+  useBlockMember,
+  useCancelFriendRequest,
   useCreateSocialChallenge,
   useFriendRequests,
   useFriends,
@@ -42,9 +45,11 @@ import {
   useRespondToChallengeInvitation,
   useRespondToFriendRequest,
   useRegionalChallengeDiscovery,
+  useRemoveFriend,
   useSendFriendRequest,
   useSocialChallenges,
-  useSocialUserSearch
+  useSocialUserSearch,
+  useUnblockMember
 } from '@/data/socialHooks';
 import {
   type ChallengeInviteContact,
@@ -72,6 +77,12 @@ type Feedback = {
   tone: 'amber' | 'cyan' | 'green' | 'red';
 };
 
+type PendingInvitationShare = {
+  challengeName: string;
+  joinUrl: string;
+  screenName: string;
+};
+
 type SocialSection = 'friends' | 'requests' | 'challenges';
 
 export default function SocialChallengesScreen() {
@@ -82,11 +93,16 @@ export default function SocialChallengesScreen() {
   const regionCode = regionVerification?.regionCode ?? '';
   const profileQuery = useMySocialProfile();
   const friendsQuery = useFriends();
+  const blocksQuery = useBlockedMembers();
   const requestsQuery = useFriendRequests();
   const challengesQuery = useSocialChallenges();
   const regionalChallengesQuery = useRegionalChallengeDiscovery(regionCode);
   const sendFriendRequest = useSendFriendRequest();
   const respondToFriendRequest = useRespondToFriendRequest();
+  const cancelFriendRequest = useCancelFriendRequest();
+  const removeFriend = useRemoveFriend();
+  const blockMember = useBlockMember();
+  const unblockMember = useUnblockMember();
   const createChallenge = useCreateSocialChallenge();
   const inviteFriend = useInviteFriendToChallenge();
   const inviteContact = useInviteContactToChallenge();
@@ -98,6 +114,7 @@ export default function SocialChallengesScreen() {
     ''
   );
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [pendingShare, setPendingShare] = useState<PendingInvitationShare | null>(null);
   const [activeSection, setActiveSection] = useScreenMemory<SocialSection>(
     'social-challenges:section',
     'friends'
@@ -105,6 +122,7 @@ export default function SocialChallengesScreen() {
   const debouncedSearch = useDebouncedValue(searchValue, 300);
   const searchQuery = useSocialUserSearch(debouncedSearch);
   const friends = friendsQuery.data ?? [];
+  const blockedMembers = blocksQuery.data ?? [];
   const requests = requestsQuery.data ?? [];
   const challenges = challengesQuery.data ?? [];
   const regionalChallenges = regionalChallengesQuery.data ?? [];
@@ -113,6 +131,7 @@ export default function SocialChallengesScreen() {
   const loading = [
     profileQuery,
     friendsQuery,
+    blocksQuery,
     requestsQuery,
     challengesQuery,
     regionalChallengesQuery
@@ -121,11 +140,12 @@ export default function SocialChallengesScreen() {
   const initialLoading = loading && [
     profileQuery.data,
     friendsQuery.data,
+    blocksQuery.data,
     requestsQuery.data,
     challengesQuery.data,
     regionalChallengesQuery.data
   ].some((data) => data === undefined);
-  const dataError = profileQuery.error ?? friendsQuery.error ??
+  const dataError = profileQuery.error ?? friendsQuery.error ?? blocksQuery.error ??
     requestsQuery.error ?? challengesQuery.error ??
     regionalChallengesQuery.error ?? searchQuery.error;
 
@@ -156,32 +176,99 @@ export default function SocialChallengesScreen() {
     }
   };
 
+  const cancelRequest = async (requestId: string, screenNameValue: string) => {
+    try {
+      await cancelFriendRequest.mutateAsync(requestId);
+      setFeedback({
+        message: `Friend request to @${screenNameValue} cancelled.`,
+        tone: 'cyan'
+      });
+    } catch (mutationError) {
+      setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
+    }
+  };
+
+  const remove = async (friendUserId: string, screenNameValue: string) => {
+    try {
+      await removeFriend.mutateAsync(friendUserId);
+      setFeedback({ message: `@${screenNameValue} removed from friends.`, tone: 'cyan' });
+    } catch (mutationError) {
+      setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
+    }
+  };
+
+  const block = async (memberUserId: string, screenNameValue: string) => {
+    try {
+      await blockMember.mutateAsync(memberUserId);
+      setFeedback({
+        message: `@${screenNameValue} is blocked. Prior requests and shared social access were removed.`,
+        tone: 'amber'
+      });
+    } catch (mutationError) {
+      setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
+    }
+  };
+
+  const unblock = async (blockedUserId: string, screenNameValue: string) => {
+    try {
+      await unblockMember.mutateAsync(blockedUserId);
+      setFeedback({
+        message: `@${screenNameValue} is unblocked. Prior relationships were not restored.`,
+        tone: 'cyan'
+      });
+    } catch (mutationError) {
+      setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
+    }
+  };
+
+  const openInvitationShare = async (invitation: PendingInvitationShare) => {
+    try {
+      const result = await Share.share({
+        message: `I challenged you to ${invitation.challengeName} on GoGymGo.\n\nOpen this private invitation link: ${invitation.joinUrl}`,
+        title: `GoGymGo challenge: ${invitation.challengeName}`
+      });
+      if (result.action === Share.dismissedAction) {
+        throw new Error('The share sheet was dismissed.');
+      }
+      setPendingShare(null);
+      return true;
+    } catch {
+      setPendingShare(invitation);
+      setFeedback({
+        message: `The invitation link for ${invitation.screenName} is ready, but sharing did not finish. Retry when ready.`,
+        tone: 'amber'
+      });
+      return false;
+    }
+  };
+
   const submitChallenge = async (
     input: CreateSocialChallengeInput,
     contacts: readonly ChallengeInviteContact[]
   ) => {
     try {
       const challenge = await createChallenge.mutateAsync(input);
+      let shareFailed = false;
       for (const contact of contacts) {
         const invitation = await inviteContact.mutateAsync({
           challengeId: challenge.id,
           contact
         });
-        const invitationMessage = [
-          `I challenged you to ${challenge.name} on GoGymGo.`,
-          `Join here: ${invitation.joinUrl}`
-        ].join('\n\n');
-        const composerUrl = contact.channel === 'email'
-          ? `mailto:${encodeURIComponent(contact.destination)}?subject=${encodeURIComponent(`GoGymGo challenge: ${challenge.name}`)}&body=${encodeURIComponent(invitationMessage)}`
-          : `sms:${encodeURIComponent(contact.destination)}?body=${encodeURIComponent(invitationMessage)}`;
-        await Linking.openURL(composerUrl);
+        const shared = await openInvitationShare({
+          challengeName: challenge.name,
+          joinUrl: invitation.joinUrl,
+          screenName: invitation.destinationHint
+        });
+        shareFailed ||= !shared;
       }
-      setFeedback({
-        message: challenge.challengeType === 'friend'
-          ? `${challenge.name} created. ${contacts.length > 0 ? 'Your phone opened the invitation composer.' : 'Your in-app friend invitation is on its way.'}`
-          : `${challenge.name} is now open in ${challenge.regionName ?? competitionRegion.label}.`,
-        tone: 'green'
-      });
+      if (!shareFailed) {
+        setFeedback({
+          message: challenge.challengeType === 'friend'
+            ? `${challenge.name} created. ${contacts.length > 0 ? 'The private link is ready in your share sheet; GoGymGo did not send it.' : 'Your in-app friend invitation is pending.'}`
+            : `${challenge.name} is now open in ${challenge.regionName ?? competitionRegion.label}.`,
+          tone: 'green'
+        });
+      }
       return true;
     } catch (mutationError) {
       setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
@@ -250,214 +337,357 @@ export default function SocialChallengesScreen() {
           memoryKey="social-challenges"
           showsVerticalScrollIndicator={false}
         >
-        <OnboardingHeader
-          label="FRIENDS + CHALLENGES"
-          onBack={() => goBackOrReplace(router, '/squad')}
-          step="SOCIAL"
-        />
-        <BrandScreenHeader
-          description="Challenge a friend to a monthly goal, or join a scheduled activity challenge in your region."
-          eyebrow="FRIENDS + LOCAL ACTIVITIES"
-          title="CHALLENGE YOUR CREW"
-        />
-
-        {mode === 'unavailable' ? (
-          <StatusCard
-            message="Friends and Challenges are temporarily unavailable. Check your connection and try again."
-            tone="amber"
+          <OnboardingHeader
+            label="FRIENDS + CHALLENGES"
+            onBack={() => goBackOrReplace(router, '/squad')}
+            step="SOCIAL"
           />
-        ) : null}
-        {feedback ? (
-          <ActionFeedback message={feedback.message} tone={feedback.tone} />
-        ) : null}
-        {dataError ? (
-          <RecoverableError
-            body={getErrorMessage(dataError)}
-            onRetry={() => {
-              void recordFlowMetric(
-                user?.uid,
-                'flow-retry',
-                'weekly-challenge'
-              );
-              void Promise.all([
-                profileQuery.refetch(),
-                friendsQuery.refetch(),
-                requestsQuery.refetch(),
-                challengesQuery.refetch(),
-                regionalChallengesQuery.refetch(),
-                ...(searchQuery.isError ? [searchQuery.refetch()] : [])
-              ]);
-            }}
-            retrying={[
-              profileQuery,
-              friendsQuery,
-              requestsQuery,
-              challengesQuery,
-              regionalChallengesQuery,
-              searchQuery
-            ].some(({ isFetching }) => isFetching)}
-            title="COULD NOT LOAD SOCIAL DATA"
+          <BrandScreenHeader
+            description="Challenge a friend to a monthly goal, or join a scheduled activity challenge in your region."
+            eyebrow="FRIENDS + LOCAL ACTIVITIES"
+            title="CHALLENGE YOUR CREW"
           />
-        ) : null}
 
-        {initialLoading ? (
-          <InlineLoadingState label="Loading friends and challenges..." />
-        ) : null}
-
-        {!initialLoading ? <SocialSectionTabs
-          activeSection={activeSection}
-          challengeCount={challenges.length}
-          friendCount={friends.length}
-          requestCount={incomingRequests.length}
-          onSelect={setActiveSection}
-        /> : null}
-
-        {!initialLoading && activeSection === 'friends' ? (
-          <>
-        <Section
-          eyebrow={friends.length === 0 ? 'GET CONNECTED' : 'DISCOVERY'}
-          title={friends.length === 0 ? 'FIND YOUR FIRST FRIEND' : 'FIND FRIENDS'}
-        >
-          {friends.length === 0 ? (
-            <TerminalText style={styles.sectionCopy} tone="muted" uppercase={false} variant="body">
-              Search by GoGymGo Alias. They choose whether to accept, and your email or phone number is never shown.
-            </TerminalText>
-          ) : null}
-          <AuthTextField
-            autoCapitalize="characters"
-            autoCorrect={false}
-            editable={mode !== 'unavailable'}
-            label="SEARCH BY ALIAS"
-            maxLength={24}
-            onChangeText={setSearchValue}
-            placeholder="ENTER AT LEAST 2 CHARACTERS"
-            value={searchValue}
-          />
-          {debouncedSearch.length > 0 && debouncedSearch.length < 2 ? (
-            <TerminalText tone="amber" uppercase={false} variant="micro">
-              Enter at least 2 characters to search.
-            </TerminalText>
-          ) : null}
-          {searchQuery.isFetching ? (
-            <TerminalText tone="dim" variant="micro">SEARCHING...</TerminalText>
-          ) : null}
-          {searchQuery.data?.map((result) => (
-            <UserResultRow
-              busy={sendFriendRequest.isPending}
-              key={result.userId}
-              onAdd={() => addFriend(result)}
-              result={result}
-            />
-          ))}
-          {searchQuery.data && searchQuery.data.length === 0 ? (
-            <EmptyState>No Aliases matched that search.</EmptyState>
-          ) : null}
-        </Section>
-
-        <Section eyebrow="YOUR IDENTITY" title="YOUR ALIAS">
-          <TerminalText style={styles.sectionCopy} tone="muted" uppercase={false} variant="body">
-            Friends find you by this case-insensitive Alias. You can change it without exposing your account details.
-          </TerminalText>
-          {profileQuery.data ? (
-            <UserAlias
-              alias={profileQuery.data.screenName}
-              prefix="@"
-              streaks={profileQuery.data.streaks}
+          {mode === 'unavailable' ? (
+            <StatusCard
+              message="Friends and Challenges are temporarily unavailable. Check your connection and try again."
+              tone="amber"
             />
           ) : null}
-          <CyberButtonPrimary
-            disabled={mode === 'unavailable' || profileQuery.isLoading}
-            label="EDIT ALIAS"
-            onPress={() => router.push('/identity?source=social')}
-          />
-        </Section>
-          </>
-        ) : null}
-
-        {!initialLoading && activeSection === 'requests' ? (
-          <Section eyebrow="CONSENT QUEUE" title="FRIEND REQUESTS">
-          {incomingRequests.length > 0 ? (
-            <TerminalText tone="cyan" variant="micro">INCOMING</TerminalText>
+          {feedback ? (
+            <ActionFeedback message={feedback.message} tone={feedback.tone} />
           ) : null}
-          {incomingRequests.map((request) => (
-            <View key={request.id} style={styles.requestRow}>
-              <UserIdentity screenName={request.user.screenName} streaks={request.user.streaks} />
-              <View style={styles.actionRow}>
-                <CompactButton
-                  disabled={respondToFriendRequest.isPending}
-                  label="ACCEPT"
-                  onPress={() => decideFriendRequest(request.id, request.user.screenName, 'accepted')}
-                  tone="green"
+          {pendingShare ? (
+            <CyberButtonPrimary
+              label={`RETRY SHARE // ${pendingShare.screenName}`}
+              onPress={() => void openInvitationShare(pendingShare)}
+            />
+          ) : null}
+          {dataError ? (
+            <RecoverableError
+              body={getErrorMessage(dataError)}
+              onRetry={() => {
+                void recordFlowMetric(
+                  user?.uid,
+                  'flow-retry',
+                  'weekly-challenge',
+                );
+                void Promise.all([
+                  profileQuery.refetch(),
+                  friendsQuery.refetch(),
+                  blocksQuery.refetch(),
+                  requestsQuery.refetch(),
+                  challengesQuery.refetch(),
+                  regionalChallengesQuery.refetch(),
+                  ...(searchQuery.isError ? [searchQuery.refetch()] : []),
+                ]);
+              }}
+              retrying={[
+                profileQuery,
+                friendsQuery,
+                blocksQuery,
+                requestsQuery,
+                challengesQuery,
+                regionalChallengesQuery,
+                searchQuery,
+              ].some(({ isFetching }) => isFetching)}
+              title="COULD NOT LOAD SOCIAL DATA"
+            />
+          ) : null}
+
+          {initialLoading ? (
+            <InlineLoadingState label="Loading friends and challenges..." />
+          ) : null}
+
+          {mode !== 'unavailable' && !initialLoading ? (
+            <SocialSectionTabs
+              activeSection={activeSection}
+              challengeCount={challenges.length}
+              friendCount={friends.length}
+              requestCount={incomingRequests.length}
+              onSelect={setActiveSection}
+            />
+          ) : null}
+
+          {mode !== 'unavailable' &&
+          !initialLoading &&
+          activeSection === 'friends' ? (
+            <>
+              <Section
+                eyebrow={friends.length === 0 ? 'GET CONNECTED' : 'DISCOVERY'}
+                title={
+                  friends.length === 0
+                    ? 'FIND YOUR FIRST FRIEND'
+                    : 'FIND FRIENDS'
+                }
+              >
+                {friends.length === 0 ? (
+                  <TerminalText
+                    style={styles.sectionCopy}
+                    tone="muted"
+                    uppercase={false}
+                    variant="body"
+                  >
+                    Search by GoGymGo Alias. They choose whether to accept, and
+                    your email or phone number is never shown.
+                  </TerminalText>
+                ) : null}
+                <AuthTextField
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  editable
+                  label="SEARCH BY ALIAS"
+                  maxLength={24}
+                  onChangeText={setSearchValue}
+                  placeholder="ENTER AT LEAST 2 CHARACTERS"
+                  value={searchValue}
                 />
-                <CompactButton
-                  disabled={respondToFriendRequest.isPending}
-                  label="DECLINE"
-                  onPress={() => decideFriendRequest(request.id, request.user.screenName, 'declined')}
+                {debouncedSearch.length > 0 && debouncedSearch.length < 2 ? (
+                  <TerminalText tone="amber" uppercase={false} variant="micro">
+                    Enter at least 2 characters to search.
+                  </TerminalText>
+                ) : null}
+                {searchQuery.isFetching ? (
+                  <TerminalText tone="dim" variant="micro">
+                    SEARCHING...
+                  </TerminalText>
+                ) : null}
+                {searchQuery.data?.map((result) => (
+                  <UserResultRow
+                    busy={sendFriendRequest.isPending || blockMember.isPending}
+                    key={result.userId}
+                    onAdd={() => addFriend(result)}
+                    onBlock={() => block(result.userId, result.screenName)}
+                    result={result}
+                  />
+                ))}
+                {searchQuery.data && searchQuery.data.length === 0 ? (
+                  <EmptyState>No Aliases matched that search.</EmptyState>
+                ) : null}
+              </Section>
+
+              <Section eyebrow="YOUR IDENTITY" title="YOUR ALIAS">
+                <TerminalText
+                  style={styles.sectionCopy}
                   tone="muted"
+                  uppercase={false}
+                  variant="body"
+                >
+                  Friends find you by this case-insensitive Alias. You can
+                  change it without exposing your account details.
+                </TerminalText>
+                {profileQuery.data ? (
+                  <UserAlias
+                    alias={profileQuery.data.screenName}
+                    prefix="@"
+                    streaks={profileQuery.data.streaks}
+                  />
+                ) : null}
+                <CyberButtonPrimary
+                  disabled={profileQuery.isLoading}
+                  label="EDIT ALIAS"
+                  onPress={() => router.push('/identity?source=social')}
                 />
-              </View>
-            </View>
-          ))}
-          {outgoingRequests.length > 0 ? (
-            <TerminalText style={styles.subsectionLabel} tone="dim" variant="micro">
-              SENT
-            </TerminalText>
+              </Section>
+            </>
           ) : null}
-          {outgoingRequests.map((request) => (
-            <View key={request.id} style={styles.requestRow}>
-              <UserIdentity screenName={request.user.screenName} streaks={request.user.streaks} />
-              <TerminalText tone="amber" variant="micro">PENDING</TerminalText>
-            </View>
-          ))}
-          {requests.length === 0 ? (
-            <EmptyState>No pending friend requests.</EmptyState>
-          ) : null}
-          </Section>
-        ) : null}
 
-        {!initialLoading && activeSection === 'friends' ? (
-          <Section eyebrow="CONNECTED" title={`FRIENDS // ${friends.length}`}>
-          <View style={styles.friendGrid}>
-            {friends.map((friend) => (
-              <View key={friend.userId} style={styles.friendChip}>
-                <UserIdentity screenName={friend.screenName} streaks={friend.streaks} />
-                <TerminalText tone="green" variant="micro">FRIEND</TerminalText>
-              </View>
-            ))}
-          </View>
-          {friends.length === 0 ? (
-            <EmptyState>Search by Alias above and send a request. Challenge invitations unlock after they accept.</EmptyState>
+          {mode !== 'unavailable' &&
+          !initialLoading &&
+          activeSection === 'requests' ? (
+            <Section eyebrow="CONSENT QUEUE" title="FRIEND REQUESTS">
+              {incomingRequests.length > 0 ? (
+                <TerminalText tone="cyan" variant="micro">
+                  INCOMING
+                </TerminalText>
+              ) : null}
+              {incomingRequests.map((request) => (
+                <View key={request.id} style={styles.requestRow}>
+                  <UserIdentity
+                    screenName={request.user.screenName}
+                    streaks={request.user.streaks}
+                  />
+                  <View style={styles.actionRow}>
+                    <CompactButton
+                      disabled={respondToFriendRequest.isPending}
+                      label="ACCEPT"
+                      onPress={() =>
+                        decideFriendRequest(
+                          request.id,
+                          request.user.screenName,
+                          'accepted',
+                        )
+                      }
+                      tone="green"
+                    />
+                    <CompactButton
+                      disabled={blockMember.isPending}
+                      label="BLOCK"
+                      onPress={() =>
+                        block(request.user.userId, request.user.screenName)
+                      }
+                      tone="muted"
+                    />
+                    <CompactButton
+                      disabled={respondToFriendRequest.isPending}
+                      label="DECLINE"
+                      onPress={() =>
+                        decideFriendRequest(
+                          request.id,
+                          request.user.screenName,
+                          'declined',
+                        )
+                      }
+                      tone="muted"
+                    />
+                  </View>
+                </View>
+              ))}
+              {outgoingRequests.length > 0 ? (
+                <TerminalText
+                  style={styles.subsectionLabel}
+                  tone="dim"
+                  variant="micro"
+                >
+                  SENT
+                </TerminalText>
+              ) : null}
+              {outgoingRequests.map((request) => (
+                <View key={request.id} style={styles.requestRow}>
+                  <UserIdentity
+                    screenName={request.user.screenName}
+                    streaks={request.user.streaks}
+                  />
+                  <View style={styles.actionRow}>
+                    <CompactButton
+                      disabled={cancelFriendRequest.isPending}
+                      label="CANCEL"
+                      onPress={() =>
+                        cancelRequest(request.id, request.user.screenName)
+                      }
+                      tone="amber"
+                    />
+                    <CompactButton
+                      disabled={blockMember.isPending}
+                      label="BLOCK"
+                      onPress={() =>
+                        block(request.user.userId, request.user.screenName)
+                      }
+                      tone="muted"
+                    />
+                  </View>
+                </View>
+              ))}
+              {requests.length === 0 ? (
+                <EmptyState>No pending friend requests.</EmptyState>
+              ) : null}
+            </Section>
           ) : null}
-          </Section>
-        ) : null}
 
-        {!initialLoading && activeSection === 'challenges' ? (
-          <ChallengeHub
-            busy={
-              createChallenge.isPending ||
-              inviteContact.isPending ||
-              inviteFriend.isPending ||
-              respondToChallenge.isPending ||
-              joinRegionalChallenge.isPending ||
-              challengeCheckIn.isPending
-            }
-            challenges={challenges}
-            disabled={mode === 'unavailable'}
-            discoveredChallenges={regionalChallenges}
-            friends={friends}
-            onCheckIn={checkIn}
-            onCreate={submitChallenge}
-            onDecision={decideChallenge}
-            onInvite={(challenge, friendUserId, friendScreenName) =>
-              invite(challenge.id, friendUserId, friendScreenName)
-            }
-            onJoin={joinChallenge}
-            regionCode={regionCode}
-          />
-        ) : null}
-        {loading && !initialLoading ? (
-          <InlineLoadingState label="Refreshing friends and challenges..." />
-        ) : null}
+          {mode !== 'unavailable' &&
+          !initialLoading &&
+          activeSection === 'friends' ? (
+            <Section eyebrow="CONNECTED" title={`FRIENDS // ${friends.length}`}>
+              <View style={styles.friendGrid}>
+                {friends.map((friend) => (
+                  <View key={friend.userId} style={styles.friendChip}>
+                    <UserIdentity
+                      screenName={friend.screenName}
+                      streaks={friend.streaks}
+                    />
+                    <View style={styles.actionRow}>
+                      <CompactButton
+                        disabled={removeFriend.isPending}
+                        label="REMOVE"
+                        onPress={() => remove(friend.userId, friend.screenName)}
+                        tone="amber"
+                      />
+                      <CompactButton
+                        disabled={blockMember.isPending}
+                        label="BLOCK"
+                        onPress={() => block(friend.userId, friend.screenName)}
+                        tone="muted"
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+              {friends.length === 0 ? (
+                <EmptyState>
+                  Search by Alias above and send a request. Challenge
+                  invitations unlock after they accept.
+                </EmptyState>
+              ) : null}
+            </Section>
+          ) : null}
+
+          {mode !== 'unavailable' &&
+          !initialLoading &&
+          activeSection === 'friends' ? (
+            <Section
+              eyebrow="PRIVACY"
+              title={`BLOCKED // ${blockedMembers.length}`}
+              tone="pink"
+            >
+              <TerminalText
+                style={styles.sectionCopy}
+                tone="muted"
+                uppercase={false}
+                variant="body"
+              >
+                Blocked members cannot find you, request you, invite you, or
+                appear in shared social projections. Unblocking never restores
+                old relationships.
+              </TerminalText>
+              {blockedMembers.map((member) => (
+                <View key={member.userId} style={styles.requestRow}>
+                  <UserIdentity
+                    screenName={member.screenName}
+                    streaks={member.streaks}
+                  />
+                  <CompactButton
+                    disabled={unblockMember.isPending}
+                    label="UNBLOCK"
+                    onPress={() => unblock(member.userId, member.screenName)}
+                    tone="cyan"
+                  />
+                </View>
+              ))}
+              {blockedMembers.length === 0 ? (
+                <EmptyState>You have not blocked anyone.</EmptyState>
+              ) : null}
+            </Section>
+          ) : null}
+
+          {mode !== 'unavailable' &&
+          !initialLoading &&
+          activeSection === 'challenges' ? (
+            <ChallengeHub
+              busy={
+                createChallenge.isPending ||
+                inviteContact.isPending ||
+                inviteFriend.isPending ||
+                respondToChallenge.isPending ||
+                joinRegionalChallenge.isPending ||
+                challengeCheckIn.isPending
+              }
+              challenges={challenges}
+              disabled={false}
+              discoveredChallenges={regionalChallenges}
+              friends={friends}
+              onCheckIn={checkIn}
+              onCreate={submitChallenge}
+              onDecision={decideChallenge}
+              onInvite={(challenge, friendUserId, friendScreenName) =>
+                invite(challenge.id, friendUserId, friendScreenName)
+              }
+              onJoin={joinChallenge}
+              regionCode={regionCode}
+            />
+          ) : null}
+          {loading && !initialLoading ? (
+            <InlineLoadingState label="Refreshing friends and challenges..." />
+          ) : null}
         </ScreenScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
@@ -469,7 +699,7 @@ function SocialSectionTabs({
   challengeCount,
   friendCount,
   onSelect,
-  requestCount
+  requestCount,
 }: {
   activeSection: SocialSection;
   challengeCount: number;
@@ -526,8 +756,15 @@ function Section({
 }) {
   return (
     <HUDBorderBox style={styles.section} tone={tone}>
-      <TerminalText tone={tone} variant="micro">{eyebrow}</TerminalText>
-      <TerminalText glow style={styles.sectionTitle} tone={tone} variant="label">
+      <TerminalText tone={tone} variant="micro">
+        {eyebrow}
+      </TerminalText>
+      <TerminalText
+        glow
+        style={styles.sectionTitle}
+        tone={tone}
+        variant="label"
+      >
         {title}
       </TerminalText>
       {children}
@@ -538,38 +775,55 @@ function Section({
 function UserResultRow({
   busy,
   onAdd,
-  result
+  onBlock,
+  result,
 }: {
   busy: boolean;
   onAdd: () => void;
+  onBlock: () => void;
   result: SocialUserSearchResult;
 }) {
   const button = {
     friend: { label: 'FRIEND', tone: 'green' as const },
     incoming_request: { label: 'REVIEW REQUEST', tone: 'amber' as const },
     none: { label: 'ADD FRIEND', tone: 'cyan' as const },
-    outgoing_request: { label: 'REQUEST SENT', tone: 'amber' as const }
+    outgoing_request: { label: 'REQUEST SENT', tone: 'amber' as const },
   }[result.relationship];
 
   return (
     <View style={styles.resultRow}>
       <UserIdentity screenName={result.screenName} streaks={result.streaks} />
-      <CompactButton
-        disabled={busy || result.relationship !== 'none'}
-        label={button.label}
-        onPress={onAdd}
-        tone={button.tone}
-      />
+      <View style={styles.actionRow}>
+        <CompactButton
+          disabled={busy || result.relationship !== 'none'}
+          label={button.label}
+          onPress={onAdd}
+          tone={button.tone}
+        />
+        <CompactButton
+          disabled={busy}
+          label="BLOCK"
+          onPress={onBlock}
+          tone="muted"
+        />
+      </View>
     </View>
   );
 }
 
-function UserIdentity({ screenName, streaks }: Pick<SocialUser, 'screenName' | 'streaks'>) {
+function UserIdentity({
+  screenName,
+  streaks,
+}: Pick<SocialUser, 'screenName' | 'streaks'>) {
   return (
     <View style={styles.identity}>
       <View style={styles.avatar}>
         <TerminalText tone="cyan" variant="button">
-          {screenName.split('_').map((part) => part[0]).join('').slice(0, 2)}
+          {screenName
+            .split('_')
+            .map((part) => part[0])
+            .join('')
+            .slice(0, 2)}
         </TerminalText>
       </View>
       <UserAlias
@@ -588,7 +842,7 @@ function CompactButton({
   label,
   onPress,
   style,
-  tone
+  tone,
 }: {
   disabled?: boolean;
   label: string;

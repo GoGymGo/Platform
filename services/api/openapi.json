@@ -3049,6 +3049,690 @@
         "tags": ["privacy requests"]
       }
     },
+    "/v1/social/users": {
+      "get": {
+        "operationId": "searchUsers",
+        "parameters": [
+          {
+            "name": "screenName",
+            "required": true,
+            "in": "query",
+            "description": "Case-insensitive Alias prefix match",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 24,
+              "pattern": "^[A-Za-z0-9_]+$",
+              "example": "GHOST",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSearchResultDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Search active users by unique alias",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friends": {
+      "get": {
+        "operationId": "listFriends",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/FriendResponseDto" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List accepted friends",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friend-requests": {
+      "get": {
+        "operationId": "listFriendRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FriendRequestResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List pending incoming and outgoing friend requests",
+        "tags": ["social"]
+      },
+      "post": {
+        "operationId": "sendFriendRequest",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendFriendRequestDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Send a consent-based friend request",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friend-requests/{requestId}": {
+      "delete": {
+        "operationId": "cancelFriendRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialRelationshipActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Cancel my pending outgoing friend request",
+        "tags": ["social"]
+      },
+      "patch": {
+        "operationId": "respondToFriendRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendRequestDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendRequestDecisionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Accept or decline an incoming friend request",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/friends/{friendUserId}": {
+      "delete": {
+        "operationId": "removeFriend",
+        "parameters": [
+          {
+            "name": "friendUserId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialRelationshipActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Remove an accepted friendship",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/blocks": {
+      "get": {
+        "operationId": "listBlocks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BlockedMemberResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List members I have blocked",
+        "tags": ["social"]
+      },
+      "post": {
+        "operationId": "blockMember",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BlockMemberDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialRelationshipActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Block a member and remove incompatible social state",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/blocks/{blockedUserId}": {
+      "delete": {
+        "operationId": "unblockMember",
+        "parameters": [
+          {
+            "name": "blockedUserId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialRelationshipActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Unblock a member without restoring prior state",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges": {
+      "get": {
+        "operationId": "listChallenges",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SocialChallengeResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List owned, joined, and pending social challenges",
+        "tags": ["social"]
+      },
+      "post": {
+        "operationId": "createChallenge",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSocialChallengeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialChallengeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create a structured friend or regional challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/discover": {
+      "get": {
+        "operationId": "discoverChallenges",
+        "parameters": [
+          {
+            "name": "regionCode",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "example": "toronto-on",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SocialChallengeResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Discover open regional activity challenges",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/join": {
+      "post": {
+        "operationId": "joinRegionalChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Join an open regional activity challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/check-ins": {
+      "post": {
+        "operationId": "checkInToChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeCheckInResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Record one activity check-in for today",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/invitations": {
+      "post": {
+        "operationId": "inviteFriendToChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteChallengeFriendDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Invite an accepted friend to an owned challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/contact-invitations": {
+      "post": {
+        "operationId": "inviteContactToChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteChallengeContactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeContactInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Create an email or phone invitation link for an owned challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenge-contact-invitations/redeem": {
+      "post": {
+        "operationId": "redeemContactInvitation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemChallengeContactInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Redeem an email or phone challenge invitation after sign-in",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenge-contact-invitations/inspect": {
+      "post": {
+        "operationId": "inspectContactInvitation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectChallengeContactInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeContactInvitationPreviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Inspect an invitation after sign-in without consuming it",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/invitations/me": {
+      "patch": {
+        "operationId": "respondToChallengeInvitation",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeInvitationDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Accept or decline my challenge invitation",
+        "tags": ["social"]
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "getHealth",
@@ -3530,501 +4214,6 @@
         "security": [{ "firebase": [] }],
         "summary": "List my planned creator workouts",
         "tags": ["creator workouts"]
-      }
-    },
-    "/v1/social/users": {
-      "get": {
-        "operationId": "searchUsers",
-        "parameters": [
-          {
-            "name": "screenName",
-            "required": true,
-            "in": "query",
-            "description": "Case-insensitive partial alias match",
-            "schema": {
-              "minLength": 2,
-              "maxLength": 24,
-              "pattern": "^[A-Za-z0-9_]+$",
-              "example": "GHOST",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserSearchResultDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Search active users by unique alias",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/friends": {
-      "get": {
-        "operationId": "listFriends",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/FriendResponseDto" }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "List accepted friends",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/friend-requests": {
-      "get": {
-        "operationId": "listFriendRequests",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/FriendRequestResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "List pending incoming and outgoing friend requests",
-        "tags": ["social"]
-      },
-      "post": {
-        "operationId": "sendFriendRequest",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/SendFriendRequestDto" }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FriendRequestResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Send a consent-based friend request",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/friend-requests/{requestId}": {
-      "patch": {
-        "operationId": "respondToFriendRequest",
-        "parameters": [
-          {
-            "name": "requestId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FriendRequestDecisionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FriendRequestDecisionResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Accept or decline an incoming friend request",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges": {
-      "get": {
-        "operationId": "listChallenges",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SocialChallengeResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "List owned, joined, and pending social challenges",
-        "tags": ["social"]
-      },
-      "post": {
-        "operationId": "createChallenge",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSocialChallengeDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SocialChallengeResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Create a structured friend or regional challenge",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges/discover": {
-      "get": {
-        "operationId": "discoverChallenges",
-        "parameters": [
-          {
-            "name": "regionCode",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "maxLength": 64,
-              "example": "toronto-on",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SocialChallengeResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Discover open regional activity challenges",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges/{challengeId}/join": {
-      "post": {
-        "operationId": "joinRegionalChallenge",
-        "parameters": [
-          {
-            "name": "challengeId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Join an open regional activity challenge",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges/{challengeId}/check-ins": {
-      "post": {
-        "operationId": "checkInToChallenge",
-        "parameters": [
-          {
-            "name": "challengeId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChallengeCheckInResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Record one activity check-in for today",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges/{challengeId}/invitations": {
-      "post": {
-        "operationId": "inviteFriendToChallenge",
-        "parameters": [
-          {
-            "name": "challengeId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InviteChallengeFriendDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Invite an accepted friend to an owned challenge",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges/{challengeId}/contact-invitations": {
-      "post": {
-        "operationId": "inviteContactToChallenge",
-        "parameters": [
-          {
-            "name": "challengeId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InviteChallengeContactDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChallengeContactInvitationResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Create an email or phone invitation link for an owned challenge",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenge-contact-invitations/redeem": {
-      "post": {
-        "operationId": "redeemContactInvitation",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RedeemChallengeContactInvitationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Redeem an email or phone challenge invitation after sign-in",
-        "tags": ["social"]
-      }
-    },
-    "/v1/social/challenges/{challengeId}/invitations/me": {
-      "patch": {
-        "operationId": "respondToChallengeInvitation",
-        "parameters": [
-          {
-            "name": "challengeId",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChallengeInvitationDecisionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "firebase": [] }],
-        "summary": "Accept or decline my challenge invitation",
-        "tags": ["social"]
       }
     },
     "/v1/streaks/me": {
@@ -6852,6 +7041,390 @@
         },
         "required": ["url", "expiresAt"]
       },
+      "UserSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "relationship": {
+            "type": "string",
+            "enum": ["none", "friend", "incoming_request", "outgoing_request"]
+          }
+        },
+        "required": ["screenName", "userId", "streaks", "relationship"]
+      },
+      "FriendResponseDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "friendsSince": { "type": "string", "format": "date-time" }
+        },
+        "required": ["screenName", "userId", "streaks", "friendsSince"]
+      },
+      "SocialUserSummaryDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+        },
+        "required": ["screenName", "userId", "streaks"]
+      },
+      "FriendRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "id": { "type": "string", "format": "uuid" },
+          "user": { "$ref": "#/components/schemas/SocialUserSummaryDto" }
+        },
+        "required": ["direction", "createdAt", "id", "user"]
+      },
+      "SocialRelationshipActionResponseDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["blocked", "cancelled", "removed", "unblocked"]
+          },
+          "requestId": { "type": "string", "format": "uuid", "nullable": true },
+          "userId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["action", "requestId", "userId"]
+      },
+      "BlockedMemberResponseDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "blockedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["screenName", "userId", "streaks", "blockedAt"]
+      },
+      "BlockMemberDto": {
+        "type": "object",
+        "properties": {
+          "memberUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["memberUserId"]
+      },
+      "SendFriendRequestDto": {
+        "type": "object",
+        "properties": {
+          "recipientUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["recipientUserId"]
+      },
+      "FriendRequestDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["decision"]
+      },
+      "FriendRequestDecisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["requestId", "status"]
+      },
+      "SocialChallengeProgressDto": {
+        "type": "object",
+        "properties": {
+          "completedCount": { "type": "number", "minimum": 0 },
+          "completionPercent": {
+            "type": "number",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "targetTotal": { "type": "number", "minimum": 1 }
+        },
+        "required": ["completedCount", "completionPercent", "targetTotal"]
+      },
+      "SocialChallengeMemberDto": {
+        "type": "object",
+        "properties": {
+          "screenName": { "type": "string" },
+          "userId": { "type": "string", "format": "uuid" },
+          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "role": { "type": "string", "enum": ["owner", "member"] },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "declined"]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/SocialChallengeProgressDto"
+          }
+        },
+        "required": [
+          "screenName",
+          "userId",
+          "streaks",
+          "role",
+          "status",
+          "progress"
+        ]
+      },
+      "SocialChallengeResponseDto": {
+        "type": "object",
+        "properties": {
+          "createdAt": { "type": "string", "format": "date-time" },
+          "id": { "type": "string", "format": "uuid" },
+          "members": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SocialChallengeMemberDto" }
+          },
+          "myRole": { "type": "string", "enum": ["owner", "member"] },
+          "myStatus": {
+            "type": "string",
+            "enum": ["pending", "accepted", "not_joined"]
+          },
+          "name": { "type": "string" },
+          "ownerScreenName": { "type": "string" },
+          "ownerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "ownerUserId": { "type": "string", "format": "uuid" },
+          "challengeType": { "type": "string", "enum": ["friend", "regional"] },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "gym",
+              "running",
+              "walking",
+              "cycling",
+              "hiking",
+              "fitness_class",
+              "other"
+            ]
+          },
+          "activityLabel": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "targetCount": { "type": "number", "minimum": 1 },
+          "targetPeriod": { "type": "string", "enum": ["weekly", "monthly"] },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "regionCode": { "type": "string", "nullable": true },
+          "regionName": { "type": "string", "nullable": true },
+          "timezone": { "type": "string", "nullable": true },
+          "locationName": { "type": "string", "nullable": true },
+          "scheduledDays": { "type": "array", "items": { "type": "number" } },
+          "scheduledTime": { "type": "string", "nullable": true },
+          "participantLimit": { "type": "number", "nullable": true },
+          "participantCount": { "type": "number", "minimum": 1 },
+          "myProgress": {
+            "$ref": "#/components/schemas/SocialChallengeProgressDto"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "members",
+          "myRole",
+          "myStatus",
+          "name",
+          "ownerScreenName",
+          "ownerStreaks",
+          "ownerUserId",
+          "challengeType",
+          "activity",
+          "activityLabel",
+          "description",
+          "targetCount",
+          "targetPeriod",
+          "startDate",
+          "endDate",
+          "regionCode",
+          "regionName",
+          "timezone",
+          "locationName",
+          "scheduledDays",
+          "scheduledTime",
+          "participantLimit",
+          "participantCount",
+          "myProgress"
+        ]
+      },
+      "CreateSocialChallengeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "July Strength Sprint",
+            "maxLength": 80
+          },
+          "challengeType": { "type": "string", "enum": ["friend", "regional"] },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "gym",
+              "running",
+              "walking",
+              "cycling",
+              "hiking",
+              "fitness_class",
+              "other"
+            ]
+          },
+          "activityLabel": {
+            "type": "string",
+            "example": "Gym visits",
+            "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 240,
+            "nullable": true
+          },
+          "targetCount": {
+            "type": "number",
+            "example": 4,
+            "maximum": 31,
+            "minimum": 1
+          },
+          "targetPeriod": { "type": "string", "enum": ["weekly", "monthly"] },
+          "startDate": {
+            "type": "string",
+            "example": "2026-08-01",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2026-08-31",
+            "format": "date"
+          },
+          "regionCode": {
+            "type": "string",
+            "example": "toronto-on",
+            "maxLength": 64
+          },
+          "locationName": { "type": "string", "maxLength": 120 },
+          "scheduledDays": {
+            "example": [1, 3, 6],
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "scheduledTime": { "type": "string", "example": "09:00" },
+          "participantLimit": {
+            "type": "number",
+            "maximum": 500,
+            "minimum": 2
+          },
+          "invitedFriendUserIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        },
+        "required": [
+          "name",
+          "challengeType",
+          "activity",
+          "activityLabel",
+          "targetCount",
+          "targetPeriod",
+          "startDate",
+          "endDate",
+          "scheduledDays",
+          "invitedFriendUserIds"
+        ]
+      },
+      "ChallengeInvitationResponseDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "declined"]
+          },
+          "userId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["challengeId", "status", "userId"]
+      },
+      "ChallengeCheckInResponseDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": { "type": "string", "format": "uuid" },
+          "checkInId": { "type": "string", "format": "uuid" },
+          "eligibleDate": { "type": "string", "format": "date" },
+          "source": { "type": "string", "enum": ["manual", "verified_workout"] }
+        },
+        "required": ["challengeId", "checkInId", "eligibleDate", "source"]
+      },
+      "InviteChallengeFriendDto": {
+        "type": "object",
+        "properties": {
+          "friendUserId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["friendUserId"]
+      },
+      "InviteChallengeContactDto": {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destination": {
+            "type": "string",
+            "example": "friend@example.com",
+            "maxLength": 160
+          }
+        },
+        "required": ["channel", "destination"]
+      },
+      "ChallengeContactInvitationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "challengeId": { "type": "string", "format": "uuid" },
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destinationHint": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "joinUrl": { "type": "string" },
+          "deliveryMode": { "type": "string", "enum": ["link"] },
+          "deliveryStatus": { "type": "string", "enum": ["not_sent"] }
+        },
+        "required": [
+          "id",
+          "challengeId",
+          "channel",
+          "destinationHint",
+          "expiresAt",
+          "joinUrl",
+          "deliveryMode",
+          "deliveryStatus"
+        ]
+      },
+      "RedeemChallengeContactInvitationDto": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "minLength": 20 },
+          "destination": { "type": "string", "maxLength": 160 }
+        },
+        "required": ["token"]
+      },
+      "InspectChallengeContactInvitationDto": {
+        "type": "object",
+        "properties": { "token": { "type": "string", "minLength": 20 } },
+        "required": ["token"]
+      },
+      "ChallengeContactInvitationPreviewDto": {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destinationHint": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["channel", "destinationHint", "expiresAt"]
+      },
+      "ChallengeInvitationDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accepted", "declined"] }
+        },
+        "required": ["decision"]
+      },
       "HealthResponseDto": {
         "type": "object",
         "properties": {
@@ -7360,340 +7933,6 @@
           "durationMinutes",
           "workoutStyle"
         ]
-      },
-      "UserSearchResultDto": {
-        "type": "object",
-        "properties": {
-          "screenName": { "type": "string" },
-          "userId": { "type": "string", "format": "uuid" },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "relationship": {
-            "type": "string",
-            "enum": ["none", "friend", "incoming_request", "outgoing_request"]
-          }
-        },
-        "required": ["screenName", "userId", "streaks", "relationship"]
-      },
-      "FriendResponseDto": {
-        "type": "object",
-        "properties": {
-          "screenName": { "type": "string" },
-          "userId": { "type": "string", "format": "uuid" },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "friendsSince": { "type": "string", "format": "date-time" }
-        },
-        "required": ["screenName", "userId", "streaks", "friendsSince"]
-      },
-      "SocialUserSummaryDto": {
-        "type": "object",
-        "properties": {
-          "screenName": { "type": "string" },
-          "userId": { "type": "string", "format": "uuid" },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" }
-        },
-        "required": ["screenName", "userId", "streaks"]
-      },
-      "FriendRequestResponseDto": {
-        "type": "object",
-        "properties": {
-          "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "id": { "type": "string", "format": "uuid" },
-          "user": { "$ref": "#/components/schemas/SocialUserSummaryDto" }
-        },
-        "required": ["direction", "createdAt", "id", "user"]
-      },
-      "SendFriendRequestDto": {
-        "type": "object",
-        "properties": {
-          "recipientUserId": { "type": "string", "format": "uuid" }
-        },
-        "required": ["recipientUserId"]
-      },
-      "FriendRequestDecisionDto": {
-        "type": "object",
-        "properties": {
-          "decision": { "type": "string", "enum": ["accepted", "declined"] }
-        },
-        "required": ["decision"]
-      },
-      "FriendRequestDecisionResponseDto": {
-        "type": "object",
-        "properties": {
-          "requestId": { "type": "string", "format": "uuid" },
-          "status": { "type": "string", "enum": ["accepted", "declined"] }
-        },
-        "required": ["requestId", "status"]
-      },
-      "SocialChallengeProgressDto": {
-        "type": "object",
-        "properties": {
-          "completedCount": { "type": "number", "minimum": 0 },
-          "completionPercent": {
-            "type": "number",
-            "maximum": 100,
-            "minimum": 0
-          },
-          "targetTotal": { "type": "number", "minimum": 1 }
-        },
-        "required": ["completedCount", "completionPercent", "targetTotal"]
-      },
-      "SocialChallengeMemberDto": {
-        "type": "object",
-        "properties": {
-          "screenName": { "type": "string" },
-          "userId": { "type": "string", "format": "uuid" },
-          "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "role": { "type": "string", "enum": ["owner", "member"] },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "accepted", "declined"]
-          },
-          "progress": {
-            "$ref": "#/components/schemas/SocialChallengeProgressDto"
-          }
-        },
-        "required": [
-          "screenName",
-          "userId",
-          "streaks",
-          "role",
-          "status",
-          "progress"
-        ]
-      },
-      "SocialChallengeResponseDto": {
-        "type": "object",
-        "properties": {
-          "createdAt": { "type": "string", "format": "date-time" },
-          "id": { "type": "string", "format": "uuid" },
-          "members": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/SocialChallengeMemberDto" }
-          },
-          "myRole": { "type": "string", "enum": ["owner", "member"] },
-          "myStatus": {
-            "type": "string",
-            "enum": ["pending", "accepted", "not_joined"]
-          },
-          "name": { "type": "string" },
-          "ownerScreenName": { "type": "string" },
-          "ownerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "ownerUserId": { "type": "string", "format": "uuid" },
-          "challengeType": { "type": "string", "enum": ["friend", "regional"] },
-          "activity": {
-            "type": "string",
-            "enum": [
-              "gym",
-              "running",
-              "walking",
-              "cycling",
-              "hiking",
-              "fitness_class",
-              "other"
-            ]
-          },
-          "activityLabel": { "type": "string" },
-          "description": { "type": "string", "nullable": true },
-          "targetCount": { "type": "number", "minimum": 1 },
-          "targetPeriod": { "type": "string", "enum": ["weekly", "monthly"] },
-          "startDate": { "type": "string", "format": "date" },
-          "endDate": { "type": "string", "format": "date" },
-          "regionCode": { "type": "string", "nullable": true },
-          "regionName": { "type": "string", "nullable": true },
-          "timezone": { "type": "string", "nullable": true },
-          "locationName": { "type": "string", "nullable": true },
-          "scheduledDays": { "type": "array", "items": { "type": "number" } },
-          "scheduledTime": { "type": "string", "nullable": true },
-          "participantLimit": { "type": "number", "nullable": true },
-          "participantCount": { "type": "number", "minimum": 1 },
-          "myProgress": {
-            "$ref": "#/components/schemas/SocialChallengeProgressDto"
-          }
-        },
-        "required": [
-          "createdAt",
-          "id",
-          "members",
-          "myRole",
-          "myStatus",
-          "name",
-          "ownerScreenName",
-          "ownerStreaks",
-          "ownerUserId",
-          "challengeType",
-          "activity",
-          "activityLabel",
-          "description",
-          "targetCount",
-          "targetPeriod",
-          "startDate",
-          "endDate",
-          "regionCode",
-          "regionName",
-          "timezone",
-          "locationName",
-          "scheduledDays",
-          "scheduledTime",
-          "participantLimit",
-          "participantCount",
-          "myProgress"
-        ]
-      },
-      "CreateSocialChallengeDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "July Strength Sprint",
-            "maxLength": 80
-          },
-          "challengeType": { "type": "string", "enum": ["friend", "regional"] },
-          "activity": {
-            "type": "string",
-            "enum": [
-              "gym",
-              "running",
-              "walking",
-              "cycling",
-              "hiking",
-              "fitness_class",
-              "other"
-            ]
-          },
-          "activityLabel": {
-            "type": "string",
-            "example": "Gym visits",
-            "maxLength": 60
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 240,
-            "nullable": true
-          },
-          "targetCount": {
-            "type": "number",
-            "example": 4,
-            "maximum": 31,
-            "minimum": 1
-          },
-          "targetPeriod": { "type": "string", "enum": ["weekly", "monthly"] },
-          "startDate": {
-            "type": "string",
-            "example": "2026-08-01",
-            "format": "date"
-          },
-          "endDate": {
-            "type": "string",
-            "example": "2026-08-31",
-            "format": "date"
-          },
-          "regionCode": {
-            "type": "string",
-            "example": "toronto-on",
-            "maxLength": 64
-          },
-          "locationName": { "type": "string", "maxLength": 120 },
-          "scheduledDays": {
-            "example": [1, 3, 6],
-            "type": "array",
-            "items": { "type": "number" }
-          },
-          "scheduledTime": { "type": "string", "example": "09:00" },
-          "participantLimit": {
-            "type": "number",
-            "maximum": 500,
-            "minimum": 2
-          },
-          "invitedFriendUserIds": {
-            "type": "array",
-            "items": { "type": "string", "format": "uuid" }
-          }
-        },
-        "required": [
-          "name",
-          "challengeType",
-          "activity",
-          "activityLabel",
-          "targetCount",
-          "targetPeriod",
-          "startDate",
-          "endDate",
-          "scheduledDays",
-          "invitedFriendUserIds"
-        ]
-      },
-      "ChallengeInvitationResponseDto": {
-        "type": "object",
-        "properties": {
-          "challengeId": { "type": "string", "format": "uuid" },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "accepted", "declined"]
-          },
-          "userId": { "type": "string", "format": "uuid" }
-        },
-        "required": ["challengeId", "status", "userId"]
-      },
-      "ChallengeCheckInResponseDto": {
-        "type": "object",
-        "properties": {
-          "challengeId": { "type": "string", "format": "uuid" },
-          "checkInId": { "type": "string", "format": "uuid" },
-          "eligibleDate": { "type": "string", "format": "date" },
-          "source": { "type": "string", "enum": ["manual", "verified_workout"] }
-        },
-        "required": ["challengeId", "checkInId", "eligibleDate", "source"]
-      },
-      "InviteChallengeFriendDto": {
-        "type": "object",
-        "properties": {
-          "friendUserId": { "type": "string", "format": "uuid" }
-        },
-        "required": ["friendUserId"]
-      },
-      "InviteChallengeContactDto": {
-        "type": "object",
-        "properties": {
-          "channel": { "type": "string", "enum": ["email", "phone"] },
-          "destination": {
-            "type": "string",
-            "example": "friend@example.com",
-            "maxLength": 160
-          }
-        },
-        "required": ["channel", "destination"]
-      },
-      "ChallengeContactInvitationResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "challengeId": { "type": "string", "format": "uuid" },
-          "channel": { "type": "string", "enum": ["email", "phone"] },
-          "destinationHint": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" },
-          "joinUrl": { "type": "string" }
-        },
-        "required": [
-          "id",
-          "challengeId",
-          "channel",
-          "destinationHint",
-          "expiresAt",
-          "joinUrl"
-        ]
-      },
-      "RedeemChallengeContactInvitationDto": {
-        "type": "object",
-        "properties": { "token": { "type": "string", "minLength": 20 } },
-        "required": ["token"]
-      },
-      "ChallengeInvitationDecisionDto": {
-        "type": "object",
-        "properties": {
-          "decision": { "type": "string", "enum": ["accepted", "declined"] }
-        },
-        "required": ["decision"]
       },
       "StreakSummaryResponseDto": {
         "type": "object",

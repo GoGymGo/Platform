@@ -18,10 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `640d4abc756f775b9f405b48b5c5cf96084dc36c` after PR #101 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-016 — Draw settlement and Winners
-  Circle` on `agent/ggg-016-draw-settlement-winners`; creation follows this
-  ledger merge.
+  `fef37d9a552ecb68b90b57d13f7b0082234172ae` after PR #103 on 2026-08-14.
+- Active feature task: `GoGymGo Feature GGG-024 — September pilot cash reward`
+  on `agent/ggg-024-pilot-cash-fulfillment`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -34,7 +33,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 39 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 40 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -585,20 +584,26 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   permission-limited.
 - External providers / feature flag: secure browser randomness and database; no
   flag.
-- Current implementation / missing behavior: commitment/reveal resume and result
-  paths are implemented. A fresh task must re-prove exact snapshot/finalization,
-  interruption recovery, deterministic settlement, privacy-safe result
-  publication, and authoritative GGG-015 award linkage. Full-month staging
-  settlement rehearsal and independently retained seed/audit recovery remain
-  external operational gates.
+- Current implementation / missing behavior: an exact admin-only, idempotent
+  lock persists immutable scoring, entrant, reward-slot, and public-identity
+  snapshots only after completion grace and reconciliation. Admin reviews the
+  snapshot hashes/counts before revealing a canonical matching seed; settlement
+  is deterministic, bounds-safe, transactional, retry/concurrency-safe, and
+  creates only snapshot-bound GGG-015 awards. Participant/public results use
+  immutable privacy-limited snapshots, and member/admin recovery states are
+  authoritative and runtime-validated. No known repository behavior remains
+  missing for this duty.
 - Required tests / operations / cloud dependency: exact snapshot, one user/rank,
   deterministic reveal, interrupted resume, duplicate settle, pending visibility,
   Alias/badge privacy, reward linkage; database and operator browser storage.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-016 — Draw settlement and
-  Winners Circle`; branch `agent/ggg-016-draw-settlement-winners`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: clearing the signed-in browser between lock/reveal is
-  an operational hazard documented in the admin runbook.
+  Winners Circle`; branch `agent/ggg-016-draw-settlement-winners` (deleted after
+  merge); PR `#103`; merge `fef37d9a552ecb68b90b57d13f7b0082234172ae`;
+  status `COMPLETE`.
+- Residual risks / blocker: coordinated migration/runtime rollout, separately
+  authorized full-month staging settlement, and independent retained-seed/audit
+  recovery rehearsal remain operational release gates. No cloud access or
+  deployment occurred.
 
 ### GGG-017 — Profile Alias, moderated avatar, and account controls
 
@@ -804,14 +809,18 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - External providers / feature flag: no payment provider; pilot configuration is
   explicit and idempotent.
 - Current implementation / missing behavior: sole-reward publication guard and
-  manual record exist. Documentation also describes the broader marketplace as
-  having no cash prizes; final pilot/legal copy must reconcile this explicit
-  exception and the UI empty state `Rewards coming soon` must remain honest.
+  manual fulfillment record exist. A fresh task must prove that the exact pilot
+  exception consumes only authoritative GGG-016 settled results, permits no
+  payment/wallet/bank data or automated payout, keeps fulfillment admin-only and
+  audited/idempotent, and presents consistent conditional copy without implying
+  an unapproved live cash offer. Final legal/financial approval and real reward
+  configuration remain external and must fail closed.
 - Required tests / operations / cloud dependency: exactly-one reward, no wallet/
   payout schema, fair settlement, duplicate fulfillment, public copy consistency,
   manual receipt/audit; real approved reward and staging database.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-024 — September pilot cash
-  reward`; branch/PR/merge `unassigned`; status `AUDITED`.
+  reward`; branch `agent/ggg-024-pilot-cash-fulfillment`; PR/merge `pending`;
+  status `IN_PROGRESS`.
 - Residual risks / blocker: legal/financial authority for the cash reward and
   winner fulfillment is outside repository authority.
 
@@ -1101,6 +1110,19 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed `GGG-016` through PR #103. Exact tested head
+  `16d6968cfc4009a9199d462ce327be18cfdfc6b6` was squash-merged as
+  `fef37d9a552ecb68b90b57d13f7b0082234172ae`; all seven PR checks and all six
+  exact-main workflows passed, the remote branch was deleted, and there was no
+  cloud impact. Serial validation included the full repository gate, 268 API
+  unit tests, 28 API E2E tests, 243 member tests, 37 admin tests, 15 landing
+  tests, 11 focused draw/scoring database tests, 38 database journey tests, and
+  65 full API database tests. Authorized Docker gates ran one at a time and
+  cleaned fully between runs. Dependency ordering assigns launch-critical P0
+  `GGG-024` next because its strictly manual pilot cash exception consumes the
+  now-audited result/award boundary; legal approval and real-money fulfillment
+  remain outside repository authority and must stay fail closed. Future Docker
+  use again pauses for user direction.
 - 2026-08-14 — Completed `GGG-015` through PR #101. Exact tested head
   `589561d8da975e10e546b63265eb02186e1d0037` was squash-merged as
   `640d4abc756f775b9f405b48b5c5cf96084dc36c`; all seven PR statuses and all six

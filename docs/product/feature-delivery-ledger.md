@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `6eb0dc667c0c1489f2cba18125367eae3074352c` after PR #99 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-015 — Brand Rewards and claims` on
-  `agent/ggg-015-brand-rewards-claims`; creation follows this ledger merge.
+  `640d4abc756f775b9f405b48b5c5cf96084dc36c` after PR #101 on 2026-08-14.
+- Active feature task: `GoGymGo Feature GGG-016 — Draw settlement and Winners
+  Circle` on `agent/ggg-016-draw-settlement-winners`; creation follows this
+  ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 33 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 39 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -547,21 +548,27 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   idempotency, reason, and optimistic version.
 - External providers / feature flag: AES-256-GCM key from secret manager and
   sponsor URLs/codes; no UI flag.
-- Current implementation / missing behavior: inventory triggers, unique slots,
-  cipher, claim reconstruction, and admin workflow exist. A fresh task must
-  verify the complete catalog-to-award-to-claim duty, fail-closed provider and
-  key behavior, and direct confidentiality/concurrency coverage. Production
-  encryption key, real approved inventory/terms, and staging secrecy/claim UAT
-  remain external release gates.
+- Current implementation / missing behavior: the public/member catalog now
+  enforces exact published competition, region-policy, deletion, and availability
+  eligibility and returns truthful bounded inventory. Coupon inventory is NFKC-
+  normalized, unique, transactionally uploaded only while draft, and encrypted
+  under a strict canonical 32-byte AES-256-GCM key. Allocation, owner-only claim,
+  retry, redemption, and admin lifecycle writes are versioned, reasoned,
+  idempotent, audited, concurrency-safe, and constrained at the database. Member
+  and admin projections are runtime-validated and redact private fulfillment
+  evidence. No known repository behavior remains missing for this duty.
 - Required tests / operations / cloud dependency: insufficient/duplicate codes,
   over-allocation, draw slot bounds, concurrent/idempotent claims, ownership,
   plaintext log/export exclusion, fulfillment transitions; secret manager,
   database, sponsor assets.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-015 — Brand Rewards and
-  claims`; branch `agent/ggg-015-brand-rewards-claims`; PR/merge `pending`;
-  status `IN_PROGRESS`.
-- Residual risks / blocker: never publish placeholder inventory or expose coupon
-  plaintext; business/legal approval is external.
+  claims`; branch `agent/ggg-015-brand-rewards-claims` (deleted after merge);
+  PR `#101`; merge `640d4abc756f775b9f405b48b5c5cf96084dc36c`;
+  status `COMPLETE`.
+- Residual risks / blocker: the production key, approved real sponsor inventory,
+  assets and HTTPS terms, and separately authorized staging claim/fulfillment UAT
+  remain external release gates and fail closed. Never publish placeholder
+  inventory or expose coupon plaintext. No cloud access or deployment occurred.
 
 ### GGG-016 — Audited draw settlement and Winners Circle
 
@@ -579,13 +586,17 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - External providers / feature flag: secure browser randomness and database; no
   flag.
 - Current implementation / missing behavior: commitment/reveal resume and result
-  paths are implemented. Missing full-month staging settlement rehearsal and an
-  independently retained seed/audit recovery exercise.
+  paths are implemented. A fresh task must re-prove exact snapshot/finalization,
+  interruption recovery, deterministic settlement, privacy-safe result
+  publication, and authoritative GGG-015 award linkage. Full-month staging
+  settlement rehearsal and independently retained seed/audit recovery remain
+  external operational gates.
 - Required tests / operations / cloud dependency: exact snapshot, one user/rank,
   deterministic reveal, interrupted resume, duplicate settle, pending visibility,
   Alias/badge privacy, reward linkage; database and operator browser storage.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-016 — Draw settlement and
-  Winners Circle`; branch/PR/merge `unassigned`; status `AUDITED`.
+  Winners Circle`; branch `agent/ggg-016-draw-settlement-winners`; PR/merge
+  `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: clearing the signed-in browser between lock/reveal is
   an operational hazard documented in the admin runbook.
 
@@ -1090,6 +1101,18 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed `GGG-015` through PR #101. Exact tested head
+  `589561d8da975e10e546b63265eb02186e1d0037` was squash-merged as
+  `640d4abc756f775b9f405b48b5c5cf96084dc36c`; all seven PR statuses and all six
+  exact-main workflows passed, the remote branch was deleted, and there was no
+  cloud impact. Serial validation included the full repository gate, 260 API
+  unit tests, 28 API E2E tests, 241 member tests, 35 admin tests, 15 landing
+  tests, 38 database journey tests, and 65 full API database integration tests.
+  The user explicitly authorized those two Docker gates; they ran one at a time
+  with Docker empty before, between, and after. Dependency ordering assigns P0
+  `GGG-016` next because audited draw settlement and result publication consume
+  the now-authoritative reward inventory and award boundary and precede GGG-024
+  pilot fulfillment. Future Docker use again pauses for user direction.
 - 2026-08-14 — Completed `GGG-020` through PR #99. Exact tested head
   `f679eb4fc2766a5698e2d166bd9c80966706ad7b` was squash-merged as
   `6eb0dc667c0c1489f2cba18125367eae3074352c`; all seven PR checks and all

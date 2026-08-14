@@ -227,6 +227,15 @@ export class EnrollmentResponseDto {
   @ApiProperty({ type: Number })
   goalDays!: number;
 
+  @ApiProperty({ format: 'uuid', nullable: true, type: String })
+  gymLocationId!: string | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  gymName!: string | null;
+
+  @ApiProperty({ nullable: true, type: Number })
+  gymCredentialVersion!: number | null;
+
   @ApiProperty({ enum: ['active', 'withdrawn', 'disqualified'] })
   status!: EnrollmentStatus;
 

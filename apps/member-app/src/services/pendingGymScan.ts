@@ -19,7 +19,7 @@ export type PendingGymScan = {
   competitionId: string | null;
   credentialValidUntil: string | null;
   createdAt: number;
-  credential: string;
+  credential: string | null;
 };
 
 type PendingGymScanStorage = {
@@ -48,7 +48,7 @@ export async function readPendingGymScan(
   const storage = dependencies.storage ?? AsyncStorage;
   const now = dependencies.now?.() ?? Date.now();
   const stored = await storage.getItem(pendingGymScanStorageKey);
-  const pending = parsePendingGymScan(stored);
+  let pending = parsePendingGymScan(stored);
 
   const hasEnrolledCredential = Boolean(pending?.credentialValidUntil);
   const credentialValidUntil = pending?.credentialValidUntil
@@ -75,6 +75,17 @@ export async function readPendingGymScan(
       await storage.removeItem(pendingGymScanStorageKey);
     }
     return null;
+  }
+
+  if (pending.credentialValidUntil && pending.credential !== null) {
+    // Migrate legacy enrolled state that retained the intentionally public QR
+    // payload. Later workouts use the immutable enrollment, not this token.
+    const withoutCredential = { ...pending, credential: null };
+    await storage.setItem(
+      pendingGymScanStorageKey,
+      JSON.stringify(withoutCredential)
+    );
+    pending = withoutCredential;
   }
 
   if (pending.activeSession && Date.parse(pending.activeSession.expiresAt) <= now) {
@@ -113,11 +124,9 @@ export async function rememberGymScanCredential(
 export async function rememberCompetitionGymAccess(
   {
     competitionId,
-    credential,
     credentialValidUntil
   }: {
     competitionId: string;
-    credential: string;
     credentialValidUntil: string;
   },
   dependencies: PendingGymScanDependencies = {}
@@ -127,14 +136,49 @@ export async function rememberCompetitionGymAccess(
   }
 
   const storage = dependencies.storage ?? AsyncStorage;
-  const pending = await rememberGymScanCredential(credential, {
-    ...dependencies,
-    storage
-  });
+  const pending = await readPendingGymScan({ ...dependencies, storage });
+  if (!pending?.credential) {
+    throw new Error('A scanned gym credential is required before enrollment.');
+  }
   const nextPending: PendingGymScan = {
     ...pending,
     competitionId,
+    credential: null,
     credentialValidUntil
+  };
+  await storage.setItem(pendingGymScanStorageKey, JSON.stringify(nextPending));
+  notifyPendingGymScan(nextPending);
+  return nextPending;
+}
+
+export async function rememberCompetitionGymScanResult(
+  {
+    competitionId,
+    credentialValidUntil,
+    result
+  }: {
+    competitionId: string;
+    credentialValidUntil: string;
+    result: GymScanResultDto;
+  },
+  dependencies: PendingGymScanDependencies = {}
+) {
+  if (!competitionId || !Number.isFinite(Date.parse(credentialValidUntil))) {
+    throw new Error('A competition and valid gym access window are required.');
+  }
+  const storage = dependencies.storage ?? AsyncStorage;
+  const existing = await readPendingGymScan({ ...dependencies, storage });
+  const now = dependencies.now?.() ?? Date.now();
+  const activeSession = parseActiveSession(result);
+  const nextPending: PendingGymScan = {
+    activeSession:
+      result.outcome === 'started' || result.outcome === 'too_early'
+        ? activeSession ?? existing?.activeSession ?? null
+        : null,
+    competitionId,
+    credential: null,
+    credentialValidUntil,
+    createdAt: existing?.createdAt ?? now
   };
   await storage.setItem(pendingGymScanStorageKey, JSON.stringify(nextPending));
   notifyPendingGymScan(nextPending);
@@ -209,9 +253,18 @@ function parsePendingGymScan(value: string | null): PendingGymScan | null {
 
   try {
     const parsed = JSON.parse(value) as Partial<PendingGymScan>;
+    const credentialValidUntil =
+      typeof parsed.credentialValidUntil === 'string' &&
+      Number.isFinite(Date.parse(parsed.credentialValidUntil))
+        ? parsed.credentialValidUntil
+        : null;
+    const credential =
+      typeof parsed.credential === 'string' &&
+      isGymScanCredential(parsed.credential)
+        ? parsed.credential
+        : null;
     if (
-      typeof parsed.credential !== 'string' ||
-      !isGymScanCredential(parsed.credential) ||
+      (!credential && !credentialValidUntil) ||
       typeof parsed.createdAt !== 'number' ||
       !Number.isFinite(parsed.createdAt)
     ) {
@@ -224,13 +277,9 @@ function parsePendingGymScan(value: string | null): PendingGymScan | null {
         typeof parsed.competitionId === 'string' && parsed.competitionId
           ? parsed.competitionId
           : null,
-      credentialValidUntil:
-        typeof parsed.credentialValidUntil === 'string' &&
-        Number.isFinite(Date.parse(parsed.credentialValidUntil))
-          ? parsed.credentialValidUntil
-          : null,
+      credentialValidUntil,
       createdAt: parsed.createdAt,
-      credential: parsed.credential
+      credential
     };
   } catch {
     return null;

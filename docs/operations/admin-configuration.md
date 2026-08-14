@@ -14,6 +14,27 @@ All routes use the `/v1/operator/configuration` prefix:
 - `PUT /creator-workouts/:id` replaces an unpublished workout when `expectedVersion` matches.
 - `POST /creator-workouts/:id/status-action` publishes or unpublishes a workout when `expectedVersion` matches.
 
+Contest-specific Partner-gym poster routes use the `/v1/operator` prefix:
+
+- `POST /competitions/:competitionId/gym-locations/:gymId` assigns one active
+  gym in the exact Contest region; this remains platform-admin only.
+- `POST /competitions/:competitionId/gym-locations/:gymId/qr-credentials`
+  issues or reissues one expiring poster. A partner needs active `admin` access
+  to that exact gym; staff access is read-only.
+- `GET /competitions/:competitionId/gym-locations/:gymId/qr-credentials/active`
+  recovers only the current nonexpired poster for an active, assigned gym and
+  enabled region.
+- `GET /competitions/:competitionId/gym-locations/:gymId/qr-credentials` lists
+  scoped lifecycle history without the public enrollment payload.
+- `POST /competitions/:competitionId/gym-locations/:gymId/qr-credentials/revoke`
+  immediately retires the active poster and preserves its audit history.
+
+Issue, assignment, and revocation commands require a reason and an
+`Idempotency-Key`. A browser retry after a network error, server error, or
+in-progress response must reuse the same key. Verify the preview's exact
+Contest, gym, version, and expiry before printing; revoke all test-era posters
+before distributing a real artifact.
+
 Competition publication requires registration to be open already, with its close and Contest start still in the future. The enabled region policy must cover the full lifecycle; current owner-approved Privacy, Terms, and Official Contest Rules must resolve for its exact jurisdiction; at least one goal bracket and published catalog reward must exist; and the currently supported verification policy must require an assigned active Partner gym with an active contest-specific QR credential. A future registration window remains a draft until an operator intentionally publishes it after the window opens. Creator workout publication requires absolute HTTPS media URLs and currently enabled target regions.
 
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, one locked transaction instead cancels the competition, withdraws active enrollments, cancels active workouts and open Weekly Challenge participation, queues neutral cancellation notifications, and records one append-only audit event. A notification enqueue or audit failure rolls back the whole transition so a worker retry can safely complete it without duplicate effects. Manual cancellation uses the same participation cleanup.
@@ -111,3 +132,6 @@ scoped and remain drafts until a GoGymGo administrator publishes them.
 5. Keep the OpenAPI artifact and mobile contract audit from the same commit.
 6. Test an idempotent draft creation and version-conflict response in staging.
 7. Review the append-only audit event before promoting production configuration.
+8. Confirm poster history contains no QR payload, a scoped staff account cannot
+   issue or revoke, and a revoked/expired poster immediately fails a member
+   enrollment attempt without changing enrollment state.

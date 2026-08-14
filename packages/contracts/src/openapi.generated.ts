@@ -3,7 +3,7 @@
 
 export interface components {
   schemas: {
-    ActiveGymQrCredentialDto: { competitionId: string; credentialVersion: number };
+    ActiveGymQrCredentialDto: { competitionId: string; credentialVersion: number; expiresAt: string };
     AddRewardCouponCodesDto: { codes: Array<string>; reason: string };
     AddedCouponCodesResponseDto: { added: number; rewardId: string };
     AdminDashboardAuditEventDto: { action: string; actorEmail: string | null; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
@@ -75,7 +75,7 @@ export interface components {
     EligibleWeeklyChallengePartnerDto: { alias: string; goalDays: number; requestStatus: "available" | "pending"; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     EnrollmentCountResponseDto: { count: number };
     EnrollmentGymPresenceDto: { accuracyMeters: number; credential: string; latitude: number; longitude: number };
-    EnrollmentResponseDto: { competitionId: string; enrolledAt: string; goalDays: number; id: string; status: "active" | "withdrawn" | "disqualified" };
+    EnrollmentResponseDto: { competitionId: string; enrolledAt: string; goalDays: number; gymCredentialVersion: number | null; gymLocationId: string | null; gymName: string | null; id: string; status: "active" | "withdrawn" | "disqualified" };
     FriendRequestDecisionDto: { decision: "accepted" | "declined" };
     FriendRequestDecisionResponseDto: { requestId: string; status: "accepted" | "declined" };
     FriendRequestResponseDto: { createdAt: string; direction: "incoming" | "outgoing"; id: string; user: components['schemas']["SocialUserSummaryDto"] };
@@ -83,7 +83,8 @@ export interface components {
     GoalBracketDto: { goalDays: number; label: string };
     GymApplicationDto: { gymAddress: string; gymName: string; managerName: string; region: string; workEmail: string };
     GymLocationResponseDto: { active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
-    GymQrCredentialResponseDto: { competitionId: string; competitionName: string; credentialVersion: number; gymLocationId: string; id: string; issuedAt: string; printablePosterSvg: string; qrPayload: string };
+    GymQrCredentialHistoryDto: { competitionId: string; competitionName: string; credentialVersion: number; expiresAt: string; gymLocationId: string; id: string; issuedAt: string; revokedAt: string | null; status: "active" | "expired" | "revoked" };
+    GymQrCredentialResponseDto: { competitionId: string; competitionName: string; credentialVersion: number; expiresAt: string; gymLocationId: string; id: string; issuedAt: string; printablePosterSvg: string; qrPayload: string };
     GymQrReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniquePayloadCount: number };
     GymScanRequestDto: { accuracyMeters: number; competitionId?: string; credential?: string; eventId: string; latitude: number; longitude: number };
     GymScanResultDto: { credentialVersion?: number | null; expiresAt?: string | null; gymLocationId?: string | null; gymName?: string | null; minimumCompleteAt?: string | null; outcome: "started" | "too_early" | "verified" | "rejected"; rejectionReason?: string | null; remainingSeconds: number; serverTimestamp: string; sessionId?: string | null; startedAt?: string | null };
@@ -788,6 +789,14 @@ export interface operations {
       "200": Array<components['schemas']["SocialChallengeResponseDto"]>;
     };
   };
+  listCredentialHistory: {
+    method: "GET";
+    path: "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials";
+    parameters: { path: { competitionId: string; gymId: string } };
+    responses: {
+      "200": Array<components['schemas']["GymQrCredentialHistoryDto"]>;
+    };
+  };
   listEligibleWeeklyChallengePartners: {
     method: "GET";
     path: "/v1/competitions/{monthKey}/weekly-challenges/eligible-partners";
@@ -1324,6 +1333,7 @@ export interface paths {
     post: operations["assignCompetitionGym"];
   };
   "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials": {
+    get: operations["listCredentialHistory"];
     post: operations["issueCredential"];
   };
   "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/active": {
@@ -1613,6 +1623,7 @@ export type FriendResponseDto = components['schemas']["FriendResponseDto"];
 export type GoalBracketDto = components['schemas']["GoalBracketDto"];
 export type GymApplicationDto = components['schemas']["GymApplicationDto"];
 export type GymLocationResponseDto = components['schemas']["GymLocationResponseDto"];
+export type GymQrCredentialHistoryDto = components['schemas']["GymQrCredentialHistoryDto"];
 export type GymQrCredentialResponseDto = components['schemas']["GymQrCredentialResponseDto"];
 export type GymQrReviewDto = components['schemas']["GymQrReviewDto"];
 export type GymScanRequestDto = components['schemas']["GymScanRequestDto"];

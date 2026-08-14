@@ -497,6 +497,7 @@ export interface GymQrCredentialsTable {
   status: GymQrCredentialStatus;
   issued_by_user_id: string;
   issued_at: Timestamp;
+  expires_at: Timestamp;
   revoked_by_user_id: string | null;
   revoked_at: NullableTimestamp;
   revocation_reason: string | null;

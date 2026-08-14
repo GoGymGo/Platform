@@ -2494,6 +2494,41 @@
         "security": [{ "firebase": [] }],
         "summary": "Issue a printable static QR poster",
         "tags": ["operator gyms and pilot"]
+      },
+      "get": {
+        "operationId": "listCredentialHistory",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "gymId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GymQrCredentialHistoryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "List scoped gym QR credential history",
+        "tags": ["operator gyms and pilot"]
       }
     },
     "/v1/operator/competitions/{competitionId}/gym-locations/{gymId}/qr-credentials/active": {
@@ -5192,9 +5227,10 @@
         "type": "object",
         "properties": {
           "competitionId": { "type": "string", "format": "uuid" },
-          "credentialVersion": { "type": "number" }
+          "credentialVersion": { "type": "number" },
+          "expiresAt": { "type": "string", "format": "date-time" }
         },
-        "required": ["competitionId", "credentialVersion"]
+        "required": ["competitionId", "credentialVersion", "expiresAt"]
       },
       "PartnerGymDto": {
         "type": "object",
@@ -5462,13 +5498,29 @@
           "id": { "type": "string", "format": "uuid" },
           "competitionId": { "type": "string", "format": "uuid" },
           "goalDays": { "type": "number" },
+          "gymLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "gymName": { "type": "string", "nullable": true },
+          "gymCredentialVersion": { "type": "number", "nullable": true },
           "status": {
             "type": "string",
             "enum": ["active", "withdrawn", "disqualified"]
           },
           "enrolledAt": { "type": "string", "format": "date-time" }
         },
-        "required": ["id", "competitionId", "goalDays", "status", "enrolledAt"]
+        "required": [
+          "id",
+          "competitionId",
+          "goalDays",
+          "gymLocationId",
+          "gymName",
+          "gymCredentialVersion",
+          "status",
+          "enrolledAt"
+        ]
       },
       "ResolveGymQrCompetitionDto": {
         "type": "object",
@@ -6414,7 +6466,8 @@
           "credentialVersion": { "type": "number" },
           "qrPayload": { "type": "string" },
           "printablePosterSvg": { "type": "string" },
-          "issuedAt": { "type": "string", "format": "date-time" }
+          "issuedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
         },
         "required": [
           "id",
@@ -6424,7 +6477,40 @@
           "credentialVersion",
           "qrPayload",
           "printablePosterSvg",
-          "issuedAt"
+          "issuedAt",
+          "expiresAt"
+        ]
+      },
+      "GymQrCredentialHistoryDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "gymLocationId": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
+          "competitionName": { "type": "string" },
+          "credentialVersion": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "expired", "revoked"]
+          },
+          "issuedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "gymLocationId",
+          "competitionId",
+          "competitionName",
+          "credentialVersion",
+          "status",
+          "issuedAt",
+          "expiresAt",
+          "revokedAt"
         ]
       },
       "AssignCompetitionGymDto": {

@@ -97,6 +97,9 @@ export type CompetitionEnrollment = {
   competitionId: string;
   enrolledAt: string;
   goalDays: number;
+  gymCredentialVersion: number | null;
+  gymLocationId: string | null;
+  gymName: string | null;
   id: string;
   status: 'active' | 'disqualified' | 'withdrawn';
 };

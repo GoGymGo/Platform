@@ -52,6 +52,9 @@ interface EnrollmentJson extends JsonObject {
   competitionId: string;
   enrolledAt: string;
   goalDays: number;
+  gymCredentialVersion: number | null;
+  gymLocationId: string | null;
+  gymName: string | null;
   id: string;
   status: 'active';
 }
@@ -60,6 +63,9 @@ interface EnrollmentWithdrawalJson extends JsonObject {
   competitionId: string;
   enrolledAt: string;
   goalDays: number;
+  gymCredentialVersion: number | null;
+  gymLocationId: string | null;
+  gymName: string | null;
   id: string;
   status: 'withdrawn';
 }
@@ -217,13 +223,22 @@ export class CompetitionsService {
                     'resolved_credential.gym_location_id',
                   ),
             )
-            .innerJoin(
-              'gym_locations as resolved_gym',
-              'resolved_gym.id',
-              'resolved_credential.gym_location_id',
+            .innerJoin('gym_locations as resolved_gym', (join) =>
+              join
+                .onRef(
+                  'resolved_gym.id',
+                  '=',
+                  'resolved_credential.gym_location_id',
+                )
+                .onRef(
+                  'resolved_gym.region_policy_id',
+                  '=',
+                  'competition.region_policy_id',
+                ),
             )
             .where('resolved_credential.token_hash', '=', credentialHash)
             .where('resolved_credential.status', '=', 'active')
+            .where('resolved_credential.expires_at', '>', now)
             .where('resolved_gym.active', '=', true)
             .where('resolved_gym.deleted_at', 'is', null);
         }
@@ -294,12 +309,20 @@ export class CompetitionsService {
             'competition.id',
             'enrollment.competition_id',
           )
+          .leftJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'enrollment.gym_location_id',
+          )
           .select([
             'competition.id as competition_id',
             'enrollment.enrolled_at',
             'enrollment.goal_days',
+            'enrollment.gym_credential_version',
+            'enrollment.gym_location_id',
             'enrollment.id',
-            'enrollment.status',
+            'enrollment.status as enrollment_status',
+            'gym.name as gym_name',
           ])
           .where('enrollment.user_id', '=', user.id)
           .where('enrollment.status', '=', 'active')
@@ -321,8 +344,11 @@ export class CompetitionsService {
               competitionId: enrollment.competition_id,
               enrolledAt: enrollment.enrolled_at.toISOString(),
               goalDays: enrollment.goal_days,
+              gymCredentialVersion: enrollment.gym_credential_version,
+              gymLocationId: enrollment.gym_location_id,
+              gymName: enrollment.gym_name,
               id: enrollment.id,
-              status: enrollment.status,
+              status: enrollment.enrollment_status,
             }
           : null;
       });
@@ -346,11 +372,7 @@ export class CompetitionsService {
           regionVerificationId: request.regionVerificationId,
           rulesAccepted: request.rulesAccepted,
           gymPresence: {
-            accuracyMeters: request.gymPresence.accuracyMeters,
             credentialHash: hashOpaqueValue(request.gymPresence.credential),
-            locationHash: hashOpaqueValue(
-              `${request.gymPresence.latitude}:${request.gymPresence.longitude}`,
-            ),
           },
         },
         responseCode: 201,
@@ -406,14 +428,62 @@ export class CompetitionsService {
             'acceptance.id',
             'enrollment.rules_acceptance_id',
           )
-          .selectAll('enrollment')
-          .select(
-            'acceptance.account_legal_receipt_bundle_id as legal_receipt_bundle_id',
+          .leftJoin(
+            'gym_locations as enrolled_gym',
+            'enrolled_gym.id',
+            'enrollment.gym_location_id',
           )
+          .selectAll('enrollment')
+          .select([
+            'acceptance.account_legal_receipt_bundle_id as legal_receipt_bundle_id',
+            'enrolled_gym.name as gym_name',
+          ])
           .where('enrollment.competition_id', '=', competition.id)
           .where('enrollment.user_id', '=', user.id)
           .executeTakeFirst();
         if (existingEnrollment) {
+          const requestedCredential = await transaction
+            .selectFrom('gym_qr_credentials as credential')
+            .innerJoin(
+              'gym_locations as gym',
+              'gym.id',
+              'credential.gym_location_id',
+            )
+            .innerJoin('competition_gym_locations as assignment', (join) =>
+              join
+                .onRef(
+                  'assignment.competition_id',
+                  '=',
+                  'credential.competition_id',
+                )
+                .onRef(
+                  'assignment.gym_location_id',
+                  '=',
+                  'credential.gym_location_id',
+                ),
+            )
+            .select([
+              'credential.credential_version',
+              'credential.gym_location_id',
+            ])
+            .where(
+              'credential.token_hash',
+              '=',
+              hashOpaqueValue(request.gymPresence.credential),
+            )
+            .where('credential.competition_id', '=', competition.id)
+            .where('credential.status', '=', 'active')
+            .where('credential.expires_at', '>', now)
+            .where('gym.active', '=', true)
+            .where('gym.deleted_at', 'is', null)
+            .where('gym.region_policy_id', '=', competition.region_policy_id)
+            .executeTakeFirst();
+          if (!requestedCredential) {
+            throw new UnprocessableEntityException({
+              code: 'GYM_QR_INVALID',
+              message: `Scan the active ${competition.name} QR poster at a Partner gym to confirm your gym location for enrollment.`,
+            });
+          }
           if (existingEnrollment.status !== 'active') {
             throw new ConflictException({
               code: 'COMPETITION_ENROLLMENT_INACTIVE',
@@ -426,7 +496,11 @@ export class CompetitionsService {
             existingEnrollment.region_verification_id !==
               request.regionVerificationId ||
             existingEnrollment.legal_receipt_bundle_id !==
-              (request.legalReceiptBundleId ?? null)
+              (request.legalReceiptBundleId ?? null) ||
+            existingEnrollment.gym_location_id !==
+              requestedCredential.gym_location_id ||
+            existingEnrollment.gym_credential_version !==
+              requestedCredential.credential_version
           ) {
             throw new ConflictException({
               code: 'COMPETITION_ENROLLMENT_ALREADY_EXISTS',
@@ -444,6 +518,9 @@ export class CompetitionsService {
             competitionId: competition.id,
             enrolledAt: existingEnrollment.enrolled_at.toISOString(),
             goalDays: existingEnrollment.goal_days,
+            gymCredentialVersion: existingEnrollment.gym_credential_version,
+            gymLocationId: existingEnrollment.gym_location_id,
+            gymName: existingEnrollment.gym_name,
             id: existingEnrollment.id,
             status: 'active',
           };
@@ -456,6 +533,19 @@ export class CompetitionsService {
             'gym.id',
             'credential.gym_location_id',
           )
+          .innerJoin('competition_gym_locations as assignment', (join) =>
+            join
+              .onRef(
+                'assignment.competition_id',
+                '=',
+                'credential.competition_id',
+              )
+              .onRef(
+                'assignment.gym_location_id',
+                '=',
+                'credential.gym_location_id',
+              ),
+          )
           .select([
             'credential.competition_id',
             'credential.credential_version',
@@ -463,6 +553,7 @@ export class CompetitionsService {
             'gym.active as gym_active',
             'gym.id as gym_id',
             'gym.name as gym_name',
+            'gym.region_policy_id as gym_region_policy_id',
             sql<number>`LEAST(${sql.ref('gym.radius_meters')}, 75)`.as(
               'presence_radius_meters',
             ),
@@ -476,12 +567,12 @@ export class CompetitionsService {
             '=',
             hashOpaqueValue(request.gymPresence.credential),
           )
+          .where('credential.competition_id', '=', competition.id)
+          .where('credential.status', '=', 'active')
+          .where('credential.expires_at', '>', now)
+          .where('gym.deleted_at', 'is', null)
           .executeTakeFirst();
-        if (
-          !gymPresence ||
-          gymPresence.credential_status !== 'active' ||
-          gymPresence.competition_id !== competition.id
-        ) {
+        if (!gymPresence || gymPresence.credential_status !== 'active') {
           throw new UnprocessableEntityException({
             code: 'GYM_QR_INVALID',
             message: `Scan the active ${competition.name} QR poster at a Partner gym to confirm your gym location for enrollment.`,
@@ -491,6 +582,13 @@ export class CompetitionsService {
           throw new ConflictException({
             code: 'GYM_INACTIVE',
             message: 'This Partner gym is not currently active.',
+          });
+        }
+        if (gymPresence.gym_region_policy_id !== competition.region_policy_id) {
+          throw new UnprocessableEntityException({
+            code: 'GYM_NOT_ELIGIBLE_FOR_COMPETITION',
+            message:
+              'This Partner gym is not eligible for the current regional Contest.',
           });
         }
         const withinGeofence = isWithinGymGeofence(
@@ -672,6 +770,9 @@ export class CompetitionsService {
           competitionId: competition.id,
           enrolledAt: enrollment.enrolled_at.toISOString(),
           goalDays: enrollment.goal_days,
+          gymCredentialVersion: enrollment.gym_credential_version,
+          gymLocationId: enrollment.gym_location_id,
+          gymName: gymPresence.gym_name,
           id: enrollment.id,
           status: 'active',
         };
@@ -697,17 +798,25 @@ export class CompetitionsService {
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
         const enrollment = await transaction
-          .selectFrom('competition_enrollments')
+          .selectFrom('competition_enrollments as enrollment')
+          .leftJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'enrollment.gym_location_id',
+          )
           .select([
-            'competition_id',
-            'enrolled_at',
-            'goal_days',
-            'id',
-            'status',
+            'enrollment.competition_id',
+            'enrollment.enrolled_at',
+            'enrollment.goal_days',
+            'enrollment.gym_credential_version',
+            'enrollment.gym_location_id',
+            'enrollment.id',
+            'enrollment.status',
+            'gym.name as gym_name',
           ])
-          .where('competition_id', '=', competitionId)
-          .where('user_id', '=', user.id)
-          .forUpdate()
+          .where('enrollment.competition_id', '=', competitionId)
+          .where('enrollment.user_id', '=', user.id)
+          .forUpdate('enrollment')
           .executeTakeFirst();
         if (!enrollment) {
           throw new NotFoundException({
@@ -791,6 +900,9 @@ export class CompetitionsService {
           competitionId: enrollment.competition_id,
           enrolledAt: enrollment.enrolled_at.toISOString(),
           goalDays: enrollment.goal_days,
+          gymCredentialVersion: enrollment.gym_credential_version,
+          gymLocationId: enrollment.gym_location_id,
+          gymName: enrollment.gym_name,
           id: enrollment.id,
           status: 'withdrawn',
         };

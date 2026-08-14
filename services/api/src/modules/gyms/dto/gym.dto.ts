@@ -202,6 +202,9 @@ export class ActiveGymQrCredentialDto {
 
   @ApiProperty({ type: Number })
   credentialVersion!: number;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
 }
 
 export class GymQrCredentialResponseDto {
@@ -228,6 +231,38 @@ export class GymQrCredentialResponseDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   issuedAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
+}
+
+export class GymQrCredentialHistoryDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  gymLocationId!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ type: String })
+  competitionName!: string;
+
+  @ApiProperty({ type: Number })
+  credentialVersion!: number;
+
+  @ApiProperty({ enum: ['active', 'expired', 'revoked'], type: String })
+  status!: 'active' | 'expired' | 'revoked';
+
+  @ApiProperty({ format: 'date-time', type: String })
+  issuedAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  expiresAt!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  revokedAt!: string | null;
 }
 
 export class OperatorReasonDto {

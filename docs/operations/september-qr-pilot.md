@@ -38,7 +38,10 @@ that exact value. Never copy the digest forward after legal content changes.
    the audited administrator bootstrap.
 4. Create the real condo gym with its verified name, street address and measured
    coordinates; keep the radius at 75 m.
-5. Assign the gym to the September competition, issue the poster and print it.
+5. Assign the gym to the September competition, issue the poster and verify the
+   preview shows the exact real gym, September Contest, credential version, and
+   Contest-end expiry before printing it. Never print App Tour, sample, or demo
+   output.
 6. Run the protected pilot configuration to publish the owner-approved Privacy,
    Terms and Official Contest Rules version. Unapproved versions are never served.
 7. Reset testing-era onboarding with the explicit reset command.
@@ -49,6 +52,28 @@ that exact value. Never copy the digest forward after legal content changes.
 10. Rehearse draw settlement and the audited $100 cash handoff record.
 11. Only after the legal, gym, reward and UAT gates pass, rerun the command with
     `PUBLISH_PILOT_COMPETITION=yes` to open registration.
+
+## Poster control and recovery
+
+- A poster is a public enrollment link scoped in the database to one exact
+  Contest, assigned Partner gym, credential version, and expiry. It is not an
+  operator secret, but it must not be retained by the member app after the
+  authoritative enrollment has pinned that gym.
+- Issue, recover, inspect, and revoke posters only through the authenticated
+  operator/partner portal. Mutation retries reuse the browser's pending
+  idempotency key, and every successful issue or revocation writes audit
+  evidence. The credential-history response intentionally omits the QR payload.
+- Revocation is immediate. Replace every displayed physical copy when a poster
+  is revoked or reissued; do not delete credential, enrollment, scan, session,
+  idempotency, or audit history.
+- Before opening registration, scan the printed artifact from a signed-out and
+  signed-in browser, deny and then grant camera/location permission, cancel and
+  retry, verify a stale or revoked poster fails without enrollment, and confirm
+  the current-enrollment read shows the exact real gym.
+- Final iOS/Android identifiers, association-file publication, physical-device
+  camera/App Link testing, real coordinates, and physical placement remain
+  external release gates. Do not describe native handoff as live until the
+  checklist in `member-app-native-links.md` passes.
 
 ## Production gate
 

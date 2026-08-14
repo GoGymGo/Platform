@@ -120,9 +120,9 @@ function createApiRepository(api: ApiClient): WorkoutSessionRepository {
         idempotencyKey: `session-create-${commandId}`,
         method: 'POST'
       }),
-    getCompetitionProgress: () => api.request<CompetitionProgress | null>(
+    getCompetitionProgress: () => api.request<unknown>(
       '/v1/me/progress'
-    )
+    ).then(normalizeCompetitionProgress)
   };
 }
 
@@ -166,4 +166,90 @@ function createUuid() {
     hex.slice(8, 10).join(''),
     hex.slice(10).join('')
   ].join('-');
+}
+
+function normalizeCompetitionProgress(
+  value: unknown
+): CompetitionProgress | null {
+  if (value === null) return null;
+  if (
+    !isRecord(value) ||
+    !isNonnegativeInteger(value.bankedPrizeDrawEntries) ||
+    !isNonnegativeInteger(value.categoryScore) ||
+    typeof value.competitionId !== 'string' ||
+    !isCompetitionStatus(value.competitionStatus) ||
+    typeof value.enrolledDateKey !== 'string' ||
+    !isIntegerInRange(value.goalDays, 1, 7) ||
+    typeof value.monthKey !== 'string' ||
+    !isNonnegativeInteger(value.prizeDrawEntries) ||
+    !isNonnegativeInteger(value.projectedPrizeDrawEntries) ||
+    value.prizeDrawEntries !== value.bankedPrizeDrawEntries ||
+    value.projectedPrizeDrawEntries < value.bankedPrizeDrawEntries ||
+    typeof value.referenceDateKey !== 'string' ||
+    typeof value.rulesVersion !== 'string' ||
+    !isScoringStatus(value.scoringStatus) ||
+    (value.scoringStatus === 'final' &&
+      value.projectedPrizeDrawEntries !== value.bankedPrizeDrawEntries) ||
+    typeof value.serverTime !== 'string' ||
+    !isIntegerInRange(value.settledPeriodCount, 0, 4) ||
+    typeof value.updatedAt !== 'string' ||
+    !Array.isArray(value.verifiedDateKeys) ||
+    !value.verifiedDateKeys.every((dateKey) => typeof dateKey === 'string') ||
+    !isNonnegativeInteger(value.verifiedDays) ||
+    value.verifiedDays !== value.verifiedDateKeys.length ||
+    value.verifiedDays !== new Set(value.verifiedDateKeys).size ||
+    !Array.isArray(value.sessions) ||
+    !value.sessions.every(isCompetitionSessionSummary)
+  ) {
+    throw new Error('The competition progress response is invalid.');
+  }
+
+  return value as CompetitionProgress;
+}
+
+function isCompetitionSessionSummary(value: unknown) {
+  return (
+    isRecord(value) &&
+    (value.completedAt === null || typeof value.completedAt === 'string') &&
+    typeof value.eligibleDate === 'string' &&
+    typeof value.id === 'string' &&
+    typeof value.startedAt === 'string' &&
+    isWorkoutSessionStatus(value.status)
+  );
+}
+
+function isWorkoutSessionStatus(
+  value: unknown
+): value is AuthoritativeWorkoutSession['status'] {
+  return (
+    value === 'active' ||
+    value === 'cancelled' ||
+    value === 'pending_review' ||
+    value === 'rejected' ||
+    value === 'verified'
+  );
+}
+
+function isCompetitionStatus(
+  value: unknown
+): value is CompetitionProgress['competitionStatus'] {
+  return (
+    value === 'active' || value === 'registration' || value === 'settled' || value === 'settling'
+  );
+}
+
+function isScoringStatus(value: unknown): value is CompetitionProgress['scoringStatus'] {
+  return value === 'final' || value === 'provisional';
+}
+
+function isNonnegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isIntegerInRange(value: unknown, minimum: number, maximum: number) {
+  return isNonnegativeInteger(value) && value >= minimum && value <= maximum;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

@@ -7107,20 +7107,34 @@
           "categoryEntries": { "type": "number" },
           "rank": { "type": "number" },
           "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "verifiedDays": { "type": "number" }
+          "verifiedDays": { "type": "number" },
+          "isCurrentUser": { "type": "boolean" }
         },
         "required": [
           "alias",
           "categoryEntries",
           "rank",
           "streaks",
-          "verifiedDays"
+          "verifiedDays",
+          "isCurrentUser"
         ]
       },
       "CategoryLeaderboardDto": {
         "type": "object",
         "properties": {
+          "competitionId": { "type": "string", "format": "uuid" },
           "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "rulesVersion": { "type": "string" },
+          "serverTime": { "type": "string", "format": "date-time" },
+          "scoringStatus": {
+            "type": "string",
+            "enum": ["final", "provisional"]
+          },
+          "settledPeriodCount": {
+            "type": "number",
+            "maximum": 4,
+            "minimum": 0
+          },
           "rows": {
             "type": "array",
             "items": {
@@ -7128,7 +7142,15 @@
             }
           }
         },
-        "required": ["goal", "rows"]
+        "required": [
+          "competitionId",
+          "goal",
+          "rulesVersion",
+          "serverTime",
+          "scoringStatus",
+          "settledPeriodCount",
+          "rows"
+        ]
       },
       "RewardWinnerResponseDto": {
         "type": "object",
@@ -7707,9 +7729,33 @@
           "verifiedDays": { "type": "number" },
           "categoryScore": { "type": "number" },
           "prizeDrawEntries": { "type": "number" },
+          "bankedPrizeDrawEntries": {
+            "type": "number",
+            "description": "Entries settled into the append-only ledger result so far"
+          },
+          "projectedPrizeDrawEntries": {
+            "type": "number",
+            "description": "Current server projection including verified days in an unsettled scoring period"
+          },
           "monthKey": { "type": "string" },
           "enrolledDateKey": { "type": "string" },
           "updatedAt": { "type": "string", "format": "date-time" },
+          "serverTime": { "type": "string", "format": "date-time" },
+          "referenceDateKey": { "type": "string" },
+          "rulesVersion": { "type": "string" },
+          "competitionStatus": {
+            "type": "string",
+            "enum": ["active", "registration", "settled", "settling"]
+          },
+          "scoringStatus": {
+            "type": "string",
+            "enum": ["final", "provisional"]
+          },
+          "settledPeriodCount": {
+            "type": "number",
+            "maximum": 4,
+            "minimum": 0
+          },
           "verifiedDateKeys": {
             "type": "array",
             "items": { "type": "string" }
@@ -7727,9 +7773,17 @@
           "verifiedDays",
           "categoryScore",
           "prizeDrawEntries",
+          "bankedPrizeDrawEntries",
+          "projectedPrizeDrawEntries",
           "monthKey",
           "enrolledDateKey",
           "updatedAt",
+          "serverTime",
+          "referenceDateKey",
+          "rulesVersion",
+          "competitionStatus",
+          "scoringStatus",
+          "settledPeriodCount",
           "verifiedDateKeys",
           "sessions"
         ]

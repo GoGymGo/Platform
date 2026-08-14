@@ -2,12 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { sql, type Transaction } from 'kysely';
 import type { Database } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
-import { normalizeDateKey } from '../../database/date-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
-import {
-  longestConsecutiveDateStreak,
-  rankCategoryStandings,
-} from '../competitions/competition-scoring';
 import type { CategoryLeaderboardDto } from '../leaderboards/dto/leaderboard.dto';
 import { ProfilesService } from '../profiles/profiles.service';
 import { loadPublicStreaks } from '../streaks/public-streaks';
@@ -56,6 +51,7 @@ export class ResultsService {
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        const now = new Date();
         await this.profiles.ensureProfile(user.id, transaction);
         const competition = await transaction
           .selectFrom('competition_enrollments as enrollment')
@@ -79,6 +75,7 @@ export class ResultsService {
             'competition.id',
             'competition.month_key',
             'competition.name',
+            'competition.rules_version',
             'competition.status',
             'draw.id as draw_id',
             'draw.settled_at',
@@ -90,7 +87,7 @@ export class ResultsService {
           .where('enrollment.user_id', '=', user.id)
           .where('enrollment.status', '=', 'active')
           .where('competition.status', 'in', ['active', 'settling', 'settled'])
-          .where('competition.ends_at', '<=', new Date())
+          .where('competition.ends_at', '<=', now)
           .orderBy('competition.ends_at', 'desc')
           .orderBy('competition.id')
           .executeTakeFirst();
@@ -102,7 +99,13 @@ export class ResultsService {
           competition.draw_id !== null;
         const [categoryLeaderboards, rewardWinners] = settled
           ? await Promise.all([
-              this.loadCategoryLeaderboards(transaction, competition.id),
+              this.loadCategoryLeaderboards(
+                transaction,
+                competition.id,
+                competition.rules_version,
+                user.id,
+                now,
+              ),
               this.loadRewardWinners(transaction, competition.draw_id!),
             ])
           : [[], []];
@@ -127,8 +130,11 @@ export class ResultsService {
   private async loadCategoryLeaderboards(
     transaction: Transaction<Database>,
     competitionId: string,
+    rulesVersion: string,
+    currentUserId: string,
+    now: Date,
   ): Promise<CategoryLeaderboardDto[]> {
-    const [brackets, progress, verifiedSessions] = await Promise.all([
+    const [brackets, settlementInputs] = await Promise.all([
       transaction
         .selectFrom('competition_goal_brackets')
         .select('goal_days')
@@ -136,77 +142,53 @@ export class ResultsService {
         .orderBy('goal_days')
         .execute(),
       transaction
-        .selectFrom('competition_progress as progress')
-        .innerJoin(
-          'competition_enrollments as enrollment',
-          'enrollment.id',
-          'progress.enrollment_id',
-        )
-        .innerJoin('profiles as profile', 'profile.user_id', 'progress.user_id')
+        .selectFrom('competition_settlement_inputs as input')
+        .innerJoin('profiles as profile', 'profile.user_id', 'input.user_id')
         .select([
           'profile.callsign',
           'profile.public_identity_mode',
           'profile.public_name',
-          'progress.category_score',
-          'progress.goal_days',
-          'progress.user_id',
-          'progress.verified_days',
+          'input.category_rank',
+          'input.category_score',
+          'input.goal_days',
+          'input.user_id',
+          'input.verified_days',
         ])
-        .where('progress.competition_id', '=', competitionId)
-        .where('enrollment.status', '=', 'active')
-        .execute(),
-      transaction
-        .selectFrom('workout_sessions')
-        .select(['eligible_date', 'user_id'])
-        .where('competition_id', '=', competitionId)
-        .where('status', '=', 'verified')
+        .where('input.competition_id', '=', competitionId)
+        .orderBy('input.goal_days')
+        .orderBy('input.category_rank')
         .execute(),
     ]);
-    const verifiedDatesByUser = new Map<string, string[]>();
-    for (const session of verifiedSessions) {
-      const dates = verifiedDatesByUser.get(session.user_id) ?? [];
-      dates.push(normalizeDateKey(session.eligible_date));
-      verifiedDatesByUser.set(session.user_id, dates);
-    }
     const streaksByUser = await loadPublicStreaks(
       transaction,
-      progress.map((row) => row.user_id),
+      settlementInputs.map((row) => row.user_id),
     );
-    const progressByUser = new Map(progress.map((row) => [row.user_id, row]));
 
     return brackets.map(({ goal_days: goal }) => ({
+      competitionId,
       goal,
-      rows: rankCategoryStandings(
-        competitionId,
-        progress
-          .filter((row) => row.goal_days === goal)
-          .map((row) => ({
-            categoryScore: row.category_score,
-            goalDays: row.goal_days,
-            longestStreak: longestConsecutiveDateStreak(
-              verifiedDatesByUser.get(row.user_id) ?? [],
-            ),
-            userId: row.user_id,
-            verifiedDays: row.verified_days,
-          })),
-      ).map((standing) => {
-        const row = progressByUser.get(standing.userId)!;
-        return {
+      rows: settlementInputs
+        .filter((row) => row.goal_days === goal)
+        .map((row) => ({
           alias:
             row.public_identity_mode === 'private'
               ? row.callsign
               : (row.public_name ?? row.callsign),
-          categoryEntries: standing.categoryScore,
-          rank: standing.rank,
-          streaks: streaksByUser.get(standing.userId) ?? {
+          categoryEntries: row.category_score,
+          isCurrentUser: row.user_id === currentUserId,
+          rank: row.category_rank,
+          streaks: streaksByUser.get(row.user_id) ?? {
             daily: 0,
             monthly: 0,
             weekly: 0,
             yearly: 0,
           },
-          verifiedDays: standing.verifiedDays,
-        };
-      }),
+          verifiedDays: row.verified_days,
+        })),
+      rulesVersion,
+      scoringStatus: 'final' as const,
+      serverTime: now.toISOString(),
+      settledPeriodCount: 4,
     }));
   }
 

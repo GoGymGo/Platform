@@ -27,6 +27,7 @@ export interface LockedDrawResult {
   drawId: string;
   entrantCount: number;
   entrantSnapshotHash: string;
+  scoringSnapshotHash: string;
   totalEntries: string;
 }
 
@@ -93,6 +94,7 @@ export class DrawsService {
             drawId: existing.id,
             entrantCount: existing.entrant_count,
             entrantSnapshotHash: existing.entrant_snapshot_hash,
+            scoringSnapshotHash: existing.scoring_snapshot_hash,
             totalEntries: existing.total_entries,
           };
         }
@@ -121,7 +123,7 @@ export class DrawsService {
           });
         }
 
-        await this.scoring.finalizeForDraw(
+        const finalizedScoring = await this.scoring.finalizeForDraw(
           transaction,
           competition.id,
           new Date(),
@@ -145,28 +147,7 @@ export class DrawsService {
           });
         }
 
-        const progress = await transaction
-          .selectFrom('competition_progress as progress')
-          .innerJoin(
-            'competition_enrollments as enrollment',
-            'enrollment.id',
-            'progress.enrollment_id',
-          )
-          .innerJoin('users as user', 'user.id', 'progress.user_id')
-          .select([
-            'progress.enrollment_id',
-            'progress.prize_draw_entries',
-            'progress.user_id',
-          ])
-          .where('progress.competition_id', '=', competition.id)
-          .where('enrollment.competition_id', '=', competition.id)
-          .where('enrollment.status', '=', 'active')
-          .where('progress.prize_draw_entries', '>', 0)
-          .where('user.email', 'is not', null)
-          .where('user.email_verified', '=', true)
-          .where('user.status', '=', 'active')
-          .orderBy('progress.user_id')
-          .execute();
+        const progress = finalizedScoring.settlementInputs;
         if (progress.length === 0) {
           throw new ConflictException({
             code: 'DRAW_HAS_NO_ENTRANTS',
@@ -175,15 +156,31 @@ export class DrawsService {
         }
 
         const snapshot: JsonArray = progress.map((entry, index) => ({
-          entryCount: entry.prize_draw_entries,
+          entryCount: entry.prizeDrawEntries,
           position: index + 1,
-          userId: entry.user_id,
+          userId: entry.userId,
         }));
         const entrantSnapshotHash = createHash('sha256')
           .update(stableJson(snapshot))
           .digest('hex');
+        const scoringSnapshot: JsonArray = progress.map((entry, index) => ({
+          categoryRank: entry.categoryRank,
+          categoryScore: entry.categoryScore,
+          enrollmentId: entry.enrollmentId,
+          goalDays: entry.goalDays,
+          longestStreak: entry.longestStreak,
+          position: index + 1,
+          prizeDrawEntries: entry.prizeDrawEntries,
+          rulesVersion: entry.rulesVersion,
+          tieBreakDigest: entry.tieBreakDigest,
+          userId: entry.userId,
+          verifiedDays: entry.verifiedDays,
+        }));
+        const scoringSnapshotHash = createHash('sha256')
+          .update(stableJson(scoringSnapshot))
+          .digest('hex');
         const totalEntries = progress.reduce(
-          (total, entry) => total + BigInt(entry.prize_draw_entries),
+          (total, entry) => total + BigInt(entry.prizeDrawEntries),
           0n,
         );
         const draw = await transaction
@@ -192,6 +189,7 @@ export class DrawsService {
             competition_id: competition.id,
             entrant_count: progress.length,
             entrant_snapshot_hash: entrantSnapshotHash,
+            scoring_snapshot_hash: scoringSnapshotHash,
             locked_at: new Date(),
             rules_version: competition.rules_version,
             seed_commitment: input.seedCommitment.toLowerCase(),
@@ -200,6 +198,26 @@ export class DrawsService {
           })
           .returningAll()
           .executeTakeFirstOrThrow();
+        await transaction
+          .insertInto('competition_settlement_inputs')
+          .values(
+            progress.map((entry, index) => ({
+              category_rank: entry.categoryRank,
+              category_score: entry.categoryScore,
+              competition_id: competition.id,
+              draw_id: draw.id,
+              enrollment_id: entry.enrollmentId,
+              goal_days: entry.goalDays,
+              longest_streak: entry.longestStreak,
+              prize_draw_entries: entry.prizeDrawEntries,
+              rules_version: entry.rulesVersion,
+              snapshot_position: index + 1,
+              tie_break_digest: entry.tieBreakDigest,
+              user_id: entry.userId,
+              verified_days: entry.verifiedDays,
+            })),
+          )
+          .execute();
         for (
           let offset = 0;
           offset < progress.length;
@@ -212,10 +230,10 @@ export class DrawsService {
               batch.map((entry, batchIndex) => ({
                 created_at: new Date(),
                 draw_id: draw.id,
-                enrollment_id: entry.enrollment_id,
-                entry_count: entry.prize_draw_entries,
+                enrollment_id: entry.enrollmentId,
+                entry_count: entry.prizeDrawEntries,
                 snapshot_position: offset + batchIndex + 1,
-                user_id: entry.user_id,
+                user_id: entry.userId,
               })),
             )
             .execute();
@@ -233,6 +251,8 @@ export class DrawsService {
           nextState: {
             entrantCount: progress.length,
             entrantSnapshotHash,
+            progressRowsReconciled: finalizedScoring.reconciledProgressRows,
+            scoringSnapshotHash,
             status: 'locked',
           },
           previousState: null,
@@ -244,6 +264,7 @@ export class DrawsService {
           drawId: draw.id,
           entrantCount: progress.length,
           entrantSnapshotHash,
+          scoringSnapshotHash,
           totalEntries: totalEntries.toString(),
         };
       });

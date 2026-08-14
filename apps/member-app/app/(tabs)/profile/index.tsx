@@ -131,7 +131,7 @@ export default function ProfileScreen() {
     { value: String(verifiedSessionCount), label: 'VERIFIED', accent: 'green' },
     {
       value: String(totalEntries),
-      label: 'PRIZE DRAW ENTRIES',
+      label: 'BANKED DRAW ENTRIES',
       accent: 'pink'
     }
   ];

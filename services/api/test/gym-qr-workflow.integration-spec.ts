@@ -2,6 +2,7 @@ import { IdempotencyService } from '../src/common/idempotency/idempotency.servic
 import { sql } from 'kysely';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
+import { dateKeyInTimezone } from '../src/modules/competitions/competition-calendar';
 import { GymsService } from '../src/modules/gyms/gyms.service';
 import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
@@ -429,11 +430,7 @@ describeWithDatabase('connected static QR pilot', () => {
       'verify-start',
       scanRequest('verify-start-event'),
     );
-    await database.connection
-      .updateTable('workout_sessions')
-      .set({ started_at: new Date(Date.now() - 31 * 60_000) })
-      .where('id', '=', started.sessionId!)
-      .execute();
+    await backdateSession(started.sessionId!);
 
     await expect(
       gyms.scan(principal, 'verify-exit', scanRequest('verify-exit-event')),
@@ -458,11 +455,7 @@ describeWithDatabase('connected static QR pilot', () => {
       'location-finish-start',
       scanRequest('location-finish-start-event'),
     );
-    await database.connection
-      .updateTable('workout_sessions')
-      .set({ started_at: new Date(Date.now() - 31 * 60_000) })
-      .where('id', '=', started.sessionId!)
-      .execute();
+    await backdateSession(started.sessionId!);
 
     const outside = await projectedPoint(85.5);
     await expect(
@@ -522,11 +515,7 @@ describeWithDatabase('connected static QR pilot', () => {
       .executeTakeFirstOrThrow();
 
     try {
-      await database.connection
-        .updateTable('workout_sessions')
-        .set({ started_at: new Date(Date.now() - 31 * 60_000) })
-        .where('id', '=', started.sessionId!)
-        .execute();
+      await backdateSession(started.sessionId!);
       await expect(
         gyms.scan(principal, 'credential-version-exit', {
           ...scanRequest('credential-version-exit-event'),
@@ -589,11 +578,7 @@ describeWithDatabase('connected static QR pilot', () => {
     );
     const now = Date.now();
     try {
-      await database.connection
-        .updateTable('workout_sessions')
-        .set({ started_at: new Date(now - 31 * 60_000) })
-        .where('id', '=', started.sessionId!)
-        .execute();
+      await backdateSession(started.sessionId!, now);
       await database.connection
         .updateTable('competitions')
         .set({ ends_at: new Date(now - 5 * 60_000) })
@@ -649,11 +634,7 @@ describeWithDatabase('connected static QR pilot', () => {
     );
     const now = Date.now();
     try {
-      await database.connection
-        .updateTable('workout_sessions')
-        .set({ started_at: new Date(now - 31 * 60_000) })
-        .where('id', '=', started.sessionId!)
-        .execute();
+      await backdateSession(started.sessionId!, now);
       await database.connection
         .updateTable('competitions')
         .set({ ends_at: new Date(now - 16 * 60_000) })
@@ -690,6 +671,10 @@ describeWithDatabase('connected static QR pilot', () => {
 
   it('keeps two active contest posters at one gym and scans into the poster contest', async () => {
     const now = Date.now();
+    const monthKey = dateKeyInTimezone(
+      new Date(now),
+      'America/Vancouver',
+    ).slice(0, 7);
     const original = await database.connection
       .selectFrom('competitions')
       .select(['rules', 'rules_version'])
@@ -700,7 +685,7 @@ describeWithDatabase('connected static QR pilot', () => {
       .values({
         ends_at: new Date(now + 48 * 60 * 60_000),
         minimum_entrants: 1,
-        month_key: '2026-10',
+        month_key: monthKey,
         name: 'Second Same Gym Competition',
         region_policy_id: regionId,
         registration_closes_at: new Date(now - 2 * 60 * 60_000),
@@ -829,6 +814,21 @@ describeWithDatabase('connected static QR pilot', () => {
     return Number(result.count);
   }
 
+  async function backdateSession(
+    sessionId: string,
+    referenceTime = Date.now(),
+  ): Promise<void> {
+    const startedAt = new Date(referenceTime - 31 * 60_000);
+    await database.connection
+      .updateTable('workout_sessions')
+      .set({
+        eligible_date: dateKeyInTimezone(startedAt, 'America/Vancouver'),
+        started_at: startedAt,
+      })
+      .where('id', '=', sessionId)
+      .execute();
+  }
+
   async function projectedPoint(distanceMeters: number): Promise<{
     latitude: number;
     longitude: number;
@@ -879,6 +879,10 @@ describeWithDatabase('connected static QR pilot', () => {
       .executeTakeFirstOrThrow();
     regionId = region.id;
     const now = Date.now();
+    const monthKey = dateKeyInTimezone(
+      new Date(now),
+      'America/Vancouver',
+    ).slice(0, 7);
     const rules = {
       categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
       minHeartRateSamples: 0,
@@ -898,7 +902,7 @@ describeWithDatabase('connected static QR pilot', () => {
       .values({
         ends_at: new Date(now + 24 * 60 * 60_000),
         minimum_entrants: 1,
-        month_key: '2026-09',
+        month_key: monthKey,
         name: 'QR Integration Competition',
         region_policy_id: region.id,
         registration_closes_at: new Date(now - 2 * 60 * 60_000),
@@ -974,7 +978,7 @@ describeWithDatabase('connected static QR pilot', () => {
       .insertInto('competition_enrollments')
       .values({
         competition_id: competition.id,
-        enrolled_at: new Date(),
+        enrolled_at: new Date(now - 2 * 60 * 60_000),
         goal_days: 3,
         gym_credential_version: 1,
         gym_location_id: gym.rows[0].id,

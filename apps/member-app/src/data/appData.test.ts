@@ -164,28 +164,33 @@ describe('app data boundary', () => {
     assert.equal(leaderboard, null);
   });
 
-  it('filters malformed leaderboard rows at the API boundary', async () => {
+  it('rejects malformed leaderboard rows at the API boundary', async () => {
     const api: ApiClient = {
-      request: <TResponse>() => Promise.resolve({
-        goal: 4,
-        rows: [
-          {
-            alias: 'GG-TEST',
-            categoryEntries: 12,
-            rank: 1,
-            streaks: { daily: 1, monthly: 0, weekly: 1, yearly: 0 },
-            verifiedDays: 3
-          },
-          { alias: null, rank: 2 }
-        ]
-      }) as Promise<TResponse>
+      request: <TResponse>() =>
+        Promise.resolve({
+          competitionId: '40000000-0000-4000-8000-000000000001',
+          goal: 4,
+          rulesVersion: 'rules-v1',
+          rows: [
+            {
+              alias: 'GG-TEST',
+              categoryEntries: 12,
+              isCurrentUser: true,
+              rank: 1,
+              streaks: { daily: 1, monthly: 0, weekly: 1, yearly: 0 },
+              verifiedDays: 3
+            },
+            { alias: null, rank: 2 }
+          ],
+          scoringStatus: 'provisional',
+          serverTime: '2026-07-16T12:00:00.000Z',
+          settledPeriodCount: 2
+        }) as Promise<TResponse>
     };
 
     const leaderboard = await createAppDataSource('api', api)
       .getCategoryLeaderboard(4);
 
-    assert.equal(leaderboard?.goal, 4);
-    assert.deepEqual(leaderboard?.rows.map(({ alias }) => alias), ['GG-TEST']);
+    assert.equal(leaderboard, null);
   });
-
 });

@@ -1,8 +1,12 @@
 import { DatabaseService } from '../src/database/database.service';
 import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
+import { DrawsService } from '../src/modules/draws/draws.service';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
+import { LeaderboardsService } from '../src/modules/leaderboards/leaderboards.service';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
+import { ProfilesService } from '../src/modules/profiles/profiles.service';
+import { RewardsService } from '../src/modules/rewards/rewards.service';
 import {
   createTestConfig,
   type MigratedPostgisTestDatabase,
@@ -89,6 +93,12 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
        RETURNING id`,
     );
     const [userAId, userBId] = users.rows.map(({ id }) => id);
+    await migrated.pool.query(
+      `INSERT INTO profiles (user_id, callsign, screen_name)
+       VALUES ($1, 'SCORING_ALPHA', 'SCORING_ALPHA'),
+              ($2, 'SCORING_BRAVO', 'SCORING_BRAVO')`,
+      [userAId, userBId],
+    );
     const verifications = await migrated.pool.query<{
       id: string;
       user_id: string;
@@ -214,6 +224,49 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
         userBDates,
       ],
     );
+    await migrated.pool.query(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at, completed_at)
+       VALUES
+         ($1, $2, $3, '2026-07-05', 'cancelled', 'rules-v1',
+          '2026-07-05 12:00:00+00', '2026-07-05 12:10:00+00'),
+         ($1, $2, $3, '2026-07-06', 'rejected', 'rules-v1',
+          '2026-07-06 12:00:00+00', '2026-07-06 12:10:00+00'),
+         ($1, $2, $3, '2026-07-07', 'pending_review', 'rules-v1',
+          '2026-07-07 12:00:00+00', '2026-07-07 12:10:00+00')`,
+      [competitionId, enrollmentByUser.get(userAId), userAId],
+    );
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO workout_sessions
+           (competition_id, enrollment_id, user_id, eligible_date, status,
+            policy_version, started_at, completed_at)
+         VALUES ($1, $2, $3, '2026-07-01', 'verified', 'rules-v1',
+                 '2026-07-01 18:00:00+00', '2026-07-01 18:30:00+00')`,
+        [competitionId, enrollmentByUser.get(userAId), userAId],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO workout_sessions
+           (competition_id, enrollment_id, user_id, eligible_date, status,
+            policy_version, started_at, completed_at)
+         VALUES ($1, $2, $3, '2026-07-12', 'verified', 'rules-v1',
+                 '2026-07-12 18:00:00+00', '2026-07-12 18:30:00+00')`,
+        [competitionId, enrollmentByUser.get(userBId), userAId],
+      ),
+    ).rejects.toThrow(/exact active enrollment|foreign key/i);
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO workout_sessions
+           (competition_id, enrollment_id, user_id, eligible_date, status,
+            policy_version, started_at, completed_at)
+         VALUES ($1, $2, $3, '2026-08-01', 'verified', 'rules-v1',
+                 '2026-08-01 18:00:00+00', '2026-08-01 18:30:00+00')`,
+        [competitionId, enrollmentByUser.get(userAId), userAId],
+      ),
+    ).rejects.toThrow(/regional calendar day/i);
     const ledger = new LedgerService();
     await database.connection.transaction().execute(async (transaction) => {
       for (const [userId, enrollmentId] of enrollmentByUser) {
@@ -246,6 +299,72 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
       }
     });
 
+    const liveReadTime = new Date('2026-07-20T12:00:00.000Z');
+    const leaderboards = new LeaderboardsService(
+      database,
+      new ProfilesService(database),
+    );
+    const userAPrincipal = {
+      email: 'scoring-a@integration.test',
+      emailVerified: true,
+      firebaseUid: 'scoring-user-a',
+      roles: [],
+      signInProvider: 'password',
+      tokenIssuedAt: 1,
+    };
+    const liveLeaderboard = await leaderboards.getCurrentLeaderboard(
+      userAPrincipal,
+      3,
+      liveReadTime,
+    );
+    expect(liveLeaderboard).toMatchObject({
+      competitionId,
+      goal: 3,
+      rulesVersion: 'rules-v1',
+      scoringStatus: 'provisional',
+      settledPeriodCount: 0,
+    });
+    expect(liveLeaderboard?.rows).toEqual([
+      {
+        alias: 'SCORING_ALPHA',
+        categoryEntries: 15,
+        isCurrentUser: true,
+        rank: 1,
+        streaks: expect.any(Object),
+        verifiedDays: 15,
+      },
+      {
+        alias: 'SCORING_BRAVO',
+        categoryEntries: 12,
+        isCurrentUser: false,
+        rank: 2,
+        streaks: expect.any(Object),
+        verifiedDays: 12,
+      },
+    ]);
+    expect(Object.keys(liveLeaderboard?.rows[0] ?? {}).sort()).toEqual([
+      'alias',
+      'categoryEntries',
+      'isCurrentUser',
+      'rank',
+      'streaks',
+      'verifiedDays',
+    ]);
+    await expect(
+      leaderboards.getMyProgress(userAPrincipal, liveReadTime),
+    ).resolves.toMatchObject({
+      bankedPrizeDrawEntries: 1,
+      categoryScore: 15,
+      competitionId,
+      competitionStatus: 'active',
+      prizeDrawEntries: 1,
+      projectedPrizeDrawEntries: 16,
+      referenceDateKey: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      rulesVersion: 'rules-v1',
+      scoringStatus: 'provisional',
+      settledPeriodCount: 0,
+      verifiedDays: 15,
+    });
     const settle = () =>
       database.connection
         .transaction()
@@ -256,8 +375,55 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
             new Date('2026-08-01T12:00:00.000Z'),
           ),
         );
-    await settle();
-    await settle();
+    const firstSettlement = await settle();
+    expect(firstSettlement.reconciledProgressRows).toBe(0);
+    expect(firstSettlement.settlementInputs).toHaveLength(2);
+    expect(
+      new Map(
+        firstSettlement.settlementInputs.map((input) => [
+          input.userId,
+          {
+            categoryRank: input.categoryRank,
+            goalDays: input.goalDays,
+            rulesVersion: input.rulesVersion,
+            verifiedDays: input.verifiedDays,
+          },
+        ]),
+      ),
+    ).toEqual(
+      new Map([
+        [
+          userAId,
+          {
+            categoryRank: 1,
+            goalDays: 3,
+            rulesVersion: 'rules-v1',
+            verifiedDays: 15,
+          },
+        ],
+        [
+          userBId,
+          {
+            categoryRank: 2,
+            goalDays: 3,
+            rulesVersion: 'rules-v1',
+            verifiedDays: 12,
+          },
+        ],
+      ]),
+    );
+
+    await migrated.pool.query(
+      `UPDATE competition_progress
+       SET category_score = 0, prize_draw_entries = 1, verified_days = 0
+       WHERE competition_id = $1 AND user_id = $2`,
+      [competitionId, userAId],
+    );
+    const replayedSettlement = await settle();
+    expect(replayedSettlement.reconciledProgressRows).toBe(1);
+    expect(replayedSettlement.settlementInputs).toEqual(
+      firstSettlement.settlementInputs,
+    );
 
     const progress = await migrated.pool.query<{
       category_score: number;
@@ -331,5 +497,71 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
       periods: '4',
       settled: '4',
     });
+
+    await migrated.pool.query(
+      `UPDATE workout_sessions
+       SET status = 'rejected'
+       WHERE competition_id = $1 AND status = 'pending_review'`,
+      [competitionId],
+    );
+    const draws = new DrawsService(
+      database,
+      {} as NotificationsService,
+      {} as RewardsService,
+      scoring,
+    );
+    const lockInput = {
+      competitionId,
+      operatorUserId: userAId,
+      reason: 'Integration settlement-input verification',
+      requestId: 'scoring-integration-lock',
+      seedCommitment: 'a'.repeat(64),
+    };
+    const lockedDraw = await draws.lock(lockInput);
+    expect(lockedDraw).toMatchObject({
+      entrantCount: 2,
+      entrantSnapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      scoringSnapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      totalEntries: '1262',
+    });
+    await expect(draws.lock(lockInput)).resolves.toEqual(lockedDraw);
+
+    const storedSnapshot = await migrated.pool.query<{
+      draw_id: string;
+      rows: string;
+      snapshot_positions: number[];
+    }>(
+      `SELECT draw_id, count(*)::text AS rows,
+              array_agg(snapshot_position ORDER BY snapshot_position) AS snapshot_positions
+       FROM competition_settlement_inputs
+       WHERE competition_id = $1
+       GROUP BY draw_id`,
+      [competitionId],
+    );
+    expect(storedSnapshot.rows).toEqual([
+      {
+        draw_id: lockedDraw.drawId,
+        rows: '2',
+        snapshot_positions: [1, 2],
+      },
+    ]);
+    const storedDrawEntries = await migrated.pool.query<{
+      entry_count: string;
+      snapshot_position: number;
+      user_id: string;
+    }>(
+      `SELECT user_id, entry_count::text, snapshot_position
+       FROM draw_entries
+       WHERE draw_id = $1
+       ORDER BY snapshot_position`,
+      [lockedDraw.drawId],
+    );
+    expect(storedDrawEntries.rows).toEqual(
+      firstSettlement.settlementInputs.map((input, index) => ({
+        entry_count: String(input.prizeDrawEntries),
+        snapshot_position: index + 1,
+        user_id: input.userId,
+      })),
+    );
   });
 });

@@ -130,6 +130,8 @@ export class SessionsService {
             'competition.rules_version',
             'competition.starts_at',
             'competition.status as competition_status',
+            'enrollment.gym_credential_version',
+            'enrollment.gym_location_id',
             'enrollment.id as enrollment_id',
             'region.timezone',
           ])
@@ -191,6 +193,8 @@ export class SessionsService {
             eligible_date: dateKeyInTimezone(now, enrollment.timezone),
             enrollment_id: enrollment.enrollment_id,
             expires_at: expiresAt,
+            gym_credential_version: enrollment.gym_credential_version,
+            gym_location_id: enrollment.gym_location_id,
             policy_version: enrollment.rules_version,
             started_at: now,
             status: 'active',

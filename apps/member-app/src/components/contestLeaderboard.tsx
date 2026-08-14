@@ -12,7 +12,6 @@ import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
-import { useProfile } from '@/state/profile';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
 const goalCategories = [
@@ -23,7 +22,6 @@ export function ContestLeaderboard() {
   const { width: viewportWidth } = useWindowDimensions();
   const compactRankings = viewportWidth < 360;
   const { user } = useAuth();
-  const { publicName } = useProfile();
   const { currentCompetition } = useSessionRegistrationAccess();
   const { competition, weeklyGoal } = useWorkoutProgress();
   const podiumMultipliers = resolveCategoryPodiumMultipliers(
@@ -51,7 +49,7 @@ export function ContestLeaderboard() {
           LEADERBOARD
         </TerminalText>
         <TerminalText tone="muted" uppercase={false} variant="caption">
-          Current leaders in each Weekly Goal group for this regional contest.
+          Server-authoritative {leaderboardQuery.data?.scoringStatus ?? 'provisional'} leaders in each Weekly Goal group.
         </TerminalText>
       </View>
 
@@ -121,11 +119,13 @@ export function ContestLeaderboard() {
               {displayedGoal}-DAY GOAL
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="caption">
-              Top three earn 3x, 2x and 1.5x entry boosts.
+              {leaderboardQuery.data?.scoringStatus === 'final'
+                ? 'Final top three earned 3x, 2x and 1.5x entry boosts.'
+                : 'Current top three project 3x, 2x and 1.5x boosts; placement is not banked.'}
             </TerminalText>
           </View>
           <TerminalText tone="dim" variant="micro">
-            GOAL SCORE
+            {leaderboardQuery.data?.scoringStatus === 'final' ? 'FINAL SCORE' : 'PROVISIONAL SCORE'}
           </TerminalText>
         </View>
 
@@ -144,10 +144,8 @@ export function ContestLeaderboard() {
           {leaderboardRows.map((row) => (
             <LeaderboardResultRow
               compact={compactRankings}
-              isCurrentUser={
-                row.alias.toLowerCase() === publicName.toLowerCase()
-              }
-              key={row.rank}
+              isCurrentUser={row.isCurrentUser}
+              key={`${row.rank}:${row.alias}`}
               multiplier={
                 row.rank <= 3
                   ? podiumMultipliers[row.rank as 1 | 2 | 3]

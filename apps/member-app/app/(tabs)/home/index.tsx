@@ -100,7 +100,9 @@ export default function HomeScreen() {
     currentWeekIndex,
     currentWeekVerified,
     prizeDrawEligible,
+    projectedEntries,
     progressReady,
+    scoringStatus,
     totalEntries,
     verifiedSessionCount,
     weeklyGoal
@@ -196,7 +198,7 @@ export default function HomeScreen() {
   const stats: readonly HomeStat[] = [
     {
       value: String(totalEntries),
-      label: 'PRIZE DRAW ENTRIES',
+      label: 'BANKED DRAW ENTRIES',
       tone: 'pink'
     },
     {
@@ -869,7 +871,9 @@ export default function HomeScreen() {
               {prizeDrawEligible
                 ? competitionNotStarted
                   ? 'Your free Prize Draw entry is secured. Workouts count when scoring opens.'
-                  : `Your free entry is secured. Bonus Days add ${weeklyGoal} ${weeklyGoal === 1 ? 'entry' : 'entries'}; a Perfect Month earns 10x.`
+                  : scoringStatus === 'final'
+                    ? `${totalEntries} final Prize Draw ${totalEntries === 1 ? 'Entry is' : 'Entries are'} locked to the audited Contest settlement.`
+                    : `${totalEntries} ${totalEntries === 1 ? 'entry is' : 'entries are'} banked. ${projectedEntries} ${projectedEntries === 1 ? 'entry is' : 'entries are'} projected if current scoring settles; Bonus Days and Perfect Month remain provisional until finalization.`
                 : 'Your free entry will carry into the next eligible regional draw.'}
             </TerminalText>
 

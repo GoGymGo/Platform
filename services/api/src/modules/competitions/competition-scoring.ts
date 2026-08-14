@@ -65,6 +65,7 @@ export function calculateWeeklyScore({
 
 export function rankCategoryStandings(
   competitionId: string,
+  rulesVersion: string,
   standings: readonly CategoryStandingInput[],
 ): CategoryStanding[] {
   return [...standings]
@@ -73,8 +74,12 @@ export function rankCategoryStandings(
         right.categoryScore - left.categoryScore ||
         right.longestStreak - left.longestStreak ||
         right.verifiedDays - left.verifiedDays ||
-        stableTieBreak(competitionId, left.userId).localeCompare(
-          stableTieBreak(competitionId, right.userId),
+        competitionTieBreakDigest(
+          competitionId,
+          rulesVersion,
+          left.userId,
+        ).localeCompare(
+          competitionTieBreakDigest(competitionId, rulesVersion, right.userId),
         ),
     )
     .map((standing, index) => ({ ...standing, rank: index + 1 }));
@@ -105,8 +110,12 @@ export function longestConsecutiveDateStreak(
   return longest;
 }
 
-function stableTieBreak(competitionId: string, userId: string): string {
+export function competitionTieBreakDigest(
+  competitionId: string,
+  rulesVersion: string,
+  userId: string,
+): string {
   return createHash('sha256')
-    .update(`${competitionId}:${userId}`)
+    .update(`${competitionId}:${rulesVersion}:${userId}`)
     .digest('hex');
 }

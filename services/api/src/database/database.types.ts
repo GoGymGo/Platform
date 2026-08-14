@@ -565,10 +565,28 @@ export interface CompetitionDrawsTable {
   seed_commitment: string;
   seed_reveal: string | null;
   entrant_snapshot_hash: string;
+  scoring_snapshot_hash: string;
   entrant_count: number;
   total_entries: BigInteger;
   locked_at: Timestamp;
   settled_at: NullableTimestamp;
+}
+
+export interface CompetitionSettlementInputsTable {
+  draw_id: string;
+  competition_id: string;
+  enrollment_id: string;
+  user_id: string;
+  goal_days: number;
+  verified_days: number;
+  longest_streak: number;
+  category_score: number;
+  category_rank: number;
+  prize_draw_entries: number;
+  tie_break_digest: string;
+  rules_version: string;
+  snapshot_position: number;
+  created_at: Timestamp;
 }
 
 export interface DrawEntriesTable {
@@ -822,6 +840,7 @@ export interface Database {
   competition_matches: CompetitionMatchesTable;
   weekly_challenge_requests: WeeklyChallengeRequestsTable;
   competition_progress: CompetitionProgressTable;
+  competition_settlement_inputs: CompetitionSettlementInputsTable;
   competition_rule_acceptances: CompetitionRuleAcceptancesTable;
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;

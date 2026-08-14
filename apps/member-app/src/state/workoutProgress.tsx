@@ -96,6 +96,7 @@ type WorkoutProgressContextValue = {
   addManualWorkoutLog: (input: ManualWorkoutInput) => void;
   bestStreak: number;
   calendarDays: readonly CalendarDay[];
+  categoryScore: number;
   cancelActiveWorkout: () => Promise<boolean>;
   completeActiveWorkout: () => Promise<CompleteWorkoutResult>;
   competition: MonthlyCompetitionResult;
@@ -112,6 +113,7 @@ type WorkoutProgressContextValue = {
   markMidSessionVerified: () => Promise<boolean>;
   midSessionAlertsReady: boolean;
   prizeDrawEligible: boolean;
+  projectedEntries: number;
   progressReady: boolean;
   recordHeartRateSample: (heartRateBpm: number, elapsedSeconds: number) => void;
   recordGymQrScan: (qrPayload: string) => Promise<boolean>;
@@ -120,6 +122,8 @@ type WorkoutProgressContextValue = {
   setWeeklyGoal: (goal: number, competitionMonthKey: string) => void;
   sessionActionError: string | null;
   sessionActionPending: boolean;
+  scoringStatus: 'final' | 'provisional';
+  settledPeriodCount: number;
   signupEntries: number;
   startWorkoutSession: (
     method?: WorkoutVerificationMethod,
@@ -939,10 +943,9 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     void setCompetitionRemindersEnabled(true);
   }, [competitionRegion.timeZone, setCompetitionRemindersEnabled, userStorage]);
 
-  const dataReferenceDateKey = getCompetitionRegionDateKey(
-    new Date(),
-    competitionRegion.timeZone
-  );
+  const dataReferenceDateKey =
+    authoritativeProgress?.referenceDateKey ??
+    getCompetitionRegionDateKey(new Date(), competitionRegion.timeZone);
   const dataCompetitionMonthKey =
     authoritativeProgress?.monthKey ??
     registrationCompetitionMonthKey ??
@@ -970,10 +973,9 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
           .map((log) => log.dateKey)
       )
     );
-    const referenceDateKey = getCompetitionRegionDateKey(
-      new Date(),
-      competitionRegion.timeZone
-    );
+    const referenceDateKey =
+      authoritativeProgress?.referenceDateKey ??
+      getCompetitionRegionDateKey(new Date(), competitionRegion.timeZone);
     const currentCompetitionMonthKey = getCompetitionMonthKey(referenceDateKey);
     const competitionMonthKey =
       authoritativeProgress?.monthKey ??
@@ -999,7 +1001,12 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       userVerifiedDateKeys: competitionVerifiedDateKeys,
       weeklyGoal: effectiveWeeklyGoal
     });
-    const totalEntries = authoritativeProgress?.prizeDrawEntries ?? 0;
+    const totalEntries =
+      authoritativeProgress?.bankedPrizeDrawEntries ??
+      authoritativeProgress?.prizeDrawEntries ??
+      0;
+    const projectedEntries =
+      authoritativeProgress?.projectedPrizeDrawEntries ?? totalEntries;
     const competitionEntries = totalEntries;
     const verifiedSessionCount = authoritativeProgress?.verifiedDays ?? 0;
     const prizeDrawEligible = hasActivePrizeDrawEntry(totalEntries);
@@ -1020,6 +1027,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         parseDateKey(referenceDateKey),
         effectiveLogs
       ),
+      categoryScore: authoritativeProgress?.categoryScore ?? 0,
       competition,
       competitionEntryStartDateKey,
       competitionEntries,
@@ -1033,6 +1041,9 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       lateRegistration: false,
       activePrizeDrawEntries: totalEntries,
       prizeDrawEligible,
+      projectedEntries,
+      scoringStatus: authoritativeProgress?.scoringStatus ?? 'provisional',
+      settledPeriodCount: authoritativeProgress?.settledPeriodCount ?? 0,
       totalEntries,
       verifiedSessionCount
     };
@@ -1045,6 +1056,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       addManualWorkoutLog,
       bestStreak: derived.bestStreak,
       calendarDays: derived.calendarDays,
+      categoryScore: derived.categoryScore,
       cancelActiveWorkout,
       completeActiveWorkout,
       competition: derived.competition,
@@ -1061,6 +1073,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       markMidSessionVerified,
       midSessionAlertsReady,
       prizeDrawEligible: derived.prizeDrawEligible,
+      projectedEntries: derived.projectedEntries,
       progressReady,
       recordGymQrScan,
       recordHeartRateSample,
@@ -1069,6 +1082,8 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       setWeeklyGoal,
       sessionActionError,
       sessionActionPending,
+      scoringStatus: derived.scoringStatus,
+      settledPeriodCount: derived.settledPeriodCount,
       signupEntries: 0,
       startWorkoutSession,
       totalEntries: derived.totalEntries,

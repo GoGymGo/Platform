@@ -30,8 +30,16 @@ export default function ContestOverviewScreen() {
   const { user } = useAuth();
   const { competitionRegion } = useCompetitionRegion();
   const { publicName } = useProfile();
-  const { competition, currentWeekVerified, totalEntries, weeklyGoal } =
-    useWorkoutProgress();
+  const {
+    categoryScore,
+    competition,
+    currentWeekVerified,
+    projectedEntries,
+    scoringStatus,
+    settledPeriodCount,
+    totalEntries,
+    weeklyGoal
+  } = useWorkoutProgress();
   const [showRankingRules, setShowRankingRules] = useScreenMemory(
     'leaderboard:ranking-rules',
     false
@@ -42,12 +50,11 @@ export default function ContestOverviewScreen() {
   const hasSettledWeek = competition.periodResults.some(
     (period) => period.status === 'settled'
   );
-  const categoryScore = competition.periodEntriesBeforePerfectMonth;
   const myLeaderboardRows = Array.isArray(myLeaderboardQuery.data?.rows)
     ? myLeaderboardQuery.data.rows
     : [];
   const myStanding = myLeaderboardRows.find(
-    ({ alias }) => alias.toLowerCase() === publicName.toLowerCase()
+    ({ isCurrentUser }) => isCurrentUser
   );
   const currentRankLabel = getCompetitionRankLabel({
     competitionNotStarted,
@@ -114,7 +121,7 @@ export default function ContestOverviewScreen() {
               value={`${Math.min(currentWeekVerified, weeklyGoal)} OF ${weeklyGoal}`}
             />
             <OverviewMetric
-              label="PRIZE DRAW ENTRIES"
+              label="BANKED DRAW ENTRIES"
               tone="pink"
               value={String(totalEntries)}
             />
@@ -132,7 +139,9 @@ export default function ContestOverviewScreen() {
           >
             {competitionNotStarted
               ? 'Rankings begin after the first scoring week.'
-              : `Goal Score ${categoryScore} sets your rank. Entries set your Prize Draw odds.`}
+              : scoringStatus === 'final'
+                ? `Final Goal Score ${categoryScore} and ${totalEntries} banked entries are locked to the audited settlement input.`
+                : `Provisional Goal Score ${categoryScore}. ${totalEntries} entries are banked; ${projectedEntries} are projected after ${settledPeriodCount} settled ${settledPeriodCount === 1 ? 'week' : 'weeks'}.`}
           </TerminalText>
           <CompactTextButton
             label={
@@ -145,8 +154,13 @@ export default function ContestOverviewScreen() {
             <View style={styles.rankingRules}>
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Goal Score includes each settled week&apos;s 1x, 2x or 3x Weekly
-                Challenge result. Equal scores are resolved by verified contest
-                days, then the published audited tie-break.
+                Challenge result. Equal scores are resolved by longest verified
+                Contest streak, verified Contest days, then the versioned
+                audited tie-break. Unsettled values remain projections.
+              </TerminalText>
+              <TerminalText tone="muted" uppercase={false} variant="caption">
+                Entries set your Prize Draw odds. Banked entries are final;
+                projected entries remain provisional until settlement.
               </TerminalText>
             </View>
           ) : null}

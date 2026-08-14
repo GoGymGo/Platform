@@ -242,29 +242,64 @@ function normalizeCategoryLeaderboard(
   response: unknown,
   requestedGoal: GoalCategory
 ): CategoryLeaderboard | null {
-  if (!isRecord(response) || !Array.isArray(response.rows)) {
+  if (
+    !isRecord(response) ||
+    response.goal !== requestedGoal ||
+    typeof response.competitionId !== 'string' ||
+    typeof response.rulesVersion !== 'string' ||
+    typeof response.serverTime !== 'string' ||
+    !isScoringStatus(response.scoringStatus) ||
+    !isIntegerInRange(response.settledPeriodCount, 0, 4) ||
+    !Array.isArray(response.rows) ||
+    !response.rows.every(isCategoryLeaderboardRow)
+  ) {
     return null;
   }
 
   return {
+    competitionId: response.competitionId,
     goal: requestedGoal,
-    rows: response.rows.filter(isCategoryLeaderboardRow)
+    rows: response.rows,
+    rulesVersion: response.rulesVersion,
+    scoringStatus: response.scoringStatus,
+    serverTime: response.serverTime,
+    settledPeriodCount: response.settledPeriodCount
   };
 }
 
 function isCategoryLeaderboardRow(
   value: unknown
 ): value is CategoryLeaderboard['rows'][number] {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     typeof value.alias === 'string' &&
     isFiniteNumber(value.categoryEntries) &&
+    typeof value.isCurrentUser === 'boolean' &&
     isFiniteNumber(value.rank) &&
     isRecord(value.streaks) &&
     isFiniteNumber(value.streaks.daily) &&
     isFiniteNumber(value.streaks.monthly) &&
     isFiniteNumber(value.streaks.weekly) &&
     isFiniteNumber(value.streaks.yearly) &&
-    isFiniteNumber(value.verifiedDays);
+    isFiniteNumber(value.verifiedDays)
+  );
+}
+
+function isScoringStatus(value: unknown): value is 'final' | 'provisional' {
+  return value === 'final' || value === 'provisional';
+}
+
+function isIntegerInRange(
+  value: unknown,
+  minimum: number,
+  maximum: number
+): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

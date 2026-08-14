@@ -430,13 +430,21 @@ function journeyResponse(path: string, method: string): unknown {
   }
   if (path === "/v1/me/progress") {
     return {
+      bankedPrizeDrawEntries: 1,
       categoryScore: 1,
       competitionId,
+      competitionStatus: "active",
       enrolledDateKey: "2026-08-12",
       goalDays: 4,
       monthKey: "2026-08",
-      prizeDrawEntries: 2,
+      prizeDrawEntries: 1,
+      projectedPrizeDrawEntries: 2,
+      referenceDateKey: "2026-08-12",
+      rulesVersion: "rules-v1",
+      scoringStatus: "provisional",
+      serverTime: "2026-08-12T13:30:00.000Z",
       sessions: [],
+      settledPeriodCount: 1,
       updatedAt: "2026-08-12T13:30:00.000Z",
       verifiedDateKeys: ["2026-08-12"],
       verifiedDays: 1,

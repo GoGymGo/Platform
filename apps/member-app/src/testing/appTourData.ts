@@ -187,8 +187,7 @@ export function createAppTourDataSource(): AppDataSource {
         claimedAt: nowIso(),
         claimUrl: null,
         couponCode: 'RECOVER20',
-        fulfillmentInstructions:
-          'Use this sample code during the browser preview.',
+        fulfillmentInstructions: null,
         status: 'claimed' as const
       };
       awards.splice(0, awards.length, claimed);
@@ -269,6 +268,8 @@ export function createAppTourDataSource(): AppDataSource {
     }),
     getRewardCatalog: async (region, monthKey = currentMonthKey()) => [
       {
+        availableFrom: null,
+        availableUntil: null,
         competitionId: appTourCompetitionId,
         competitionName: 'Monthly GoGymGo Contest',
         description:
@@ -280,6 +281,7 @@ export function createAppTourDataSource(): AppDataSource {
         monthKey,
         regionCode: 'vancouver-island-gulf-islands-bc',
         regionName: region,
+        regionTimezone: 'America/Vancouver',
         rewardType: 'coupon',
         sponsorName: 'Northline Wellness',
         termsUrl: null,

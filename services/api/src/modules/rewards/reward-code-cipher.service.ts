@@ -7,6 +7,7 @@ import {
   randomBytes,
 } from 'node:crypto';
 import type { Environment } from '../../config/environment';
+import { decodeRewardCodeEncryptionKey } from '../../config/reward-code-encryption-key';
 
 @Injectable()
 export class RewardCodeCipherService {
@@ -54,8 +55,8 @@ export class RewardCodeCipherService {
     const encoded = this.config.get('REWARD_CODE_ENCRYPTION_KEY', {
       infer: true,
     });
-    const key = encoded ? Buffer.from(encoded, 'base64') : Buffer.alloc(0);
-    if (key.length !== 32) {
+    const key = decodeRewardCodeEncryptionKey(encoded);
+    if (!key) {
       throw new ServiceUnavailableException({
         code: 'REWARD_CODE_ENCRYPTION_UNAVAILABLE',
         message:

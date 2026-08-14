@@ -443,10 +443,8 @@ export function useClaimReward() {
   const { source } = useAppData();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ awardId, idempotencyKey }: {
-      awardId: string;
-      idempotencyKey: string;
-    }) => source.claimReward(awardId, idempotencyKey),
+    mutationFn: ({ awardId }: { awardId: string }) =>
+      source.claimReward(awardId),
     onSuccess: (claimed) => {
       queryClient.setQueriesData<readonly RewardAward[]>(
         { queryKey: ['my-reward-awards'] },

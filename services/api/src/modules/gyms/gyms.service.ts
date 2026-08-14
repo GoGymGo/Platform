@@ -1621,6 +1621,7 @@ export class GymsService {
             fulfilled_at: now,
             status: 'fulfilled',
             updated_at: now,
+            version: sql<number>`version + 1`,
           })
           .where('id', '=', award.id)
           .executeTakeFirstOrThrow();

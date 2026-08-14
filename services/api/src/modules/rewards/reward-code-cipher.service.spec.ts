@@ -30,4 +30,15 @@ describe('RewardCodeCipherService', () => {
       /coupon code operations require/i,
     );
   });
+
+  it('rejects non-canonical base64 instead of accepting decoder junk', () => {
+    const config = {
+      get: () => `!!!!${randomBytes(32).toString('base64')}`,
+    } as unknown as ConfigService<Environment, true>;
+    const cipher = new RewardCodeCipherService(config);
+
+    expect(() => cipher.encrypt('SAVE-25')).toThrow(
+      /coupon code operations require/i,
+    );
+  });
 });

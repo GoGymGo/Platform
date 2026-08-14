@@ -86,6 +86,8 @@ export class RewardsService {
         'competition.id as competition_id',
         'competition.month_key',
         'competition.name as competition_name',
+        'item.available_from',
+        'item.available_until',
         'item.description',
         'item.id',
         'item.image_url',
@@ -96,6 +98,7 @@ export class RewardsService {
         'item.title',
         'region.code as region_code',
         'region.metro_name as region_name',
+        'region.timezone as region_timezone',
         sql<string>`GREATEST(
           item.inventory_total - (
             SELECT COUNT(*)
@@ -106,7 +109,18 @@ export class RewardsService {
           0
         )`.as('inventory_remaining'),
       ])
+      .where('competition.deleted_at', 'is', null)
+      .where('item.deleted_at', 'is', null)
+      .where('region.deleted_at', 'is', null)
       .where('region.code', '=', regionCode)
+      .where('region.competition_enabled', '=', true)
+      .where('region.valid_from', '<=', now)
+      .where((expression) =>
+        expression.or([
+          expression('region.valid_to', 'is', null),
+          expression('region.valid_to', '>', now),
+        ]),
+      )
       .where('competition.status', 'in', ['registration', 'active'])
       .where('item.status', '=', 'published')
       .where((expression) =>
@@ -133,19 +147,22 @@ export class RewardsService {
       .execute();
 
     return items.map((item) => ({
+      availableFrom: item.available_from?.toISOString() ?? null,
+      availableUntil: item.available_until?.toISOString() ?? null,
       competitionId: item.competition_id,
       competitionName: item.competition_name,
       description: item.description,
       id: item.id,
-      imageUrl: item.image_url,
+      imageUrl: item.image_url!,
       inventoryRemaining: Number(item.inventory_remaining),
       inventoryTotal: item.inventory_total,
       monthKey: item.month_key,
       regionCode: item.region_code,
       regionName: item.region_name,
+      regionTimezone: item.region_timezone,
       rewardType: item.reward_type,
       sponsorName: item.sponsor_name,
-      termsUrl: item.terms_url,
+      termsUrl: item.terms_url!,
       title: item.title,
     }));
   }
@@ -260,7 +277,12 @@ export class RewardsService {
         if (award.status === 'awarded') {
           await transaction
             .updateTable('reward_awards')
-            .set({ claimed_at: claimedAt, status, updated_at: now })
+            .set({
+              claimed_at: claimedAt,
+              status,
+              updated_at: now,
+              version: sql<number>`version + 1`,
+            })
             .where('id', '=', award.id)
             .executeTakeFirstOrThrow();
         }
@@ -302,6 +324,7 @@ export class RewardsService {
         )`.as('awarded_count'),
       ])
       .where('item.competition_id', '=', competitionId)
+      .where('item.deleted_at', 'is', null)
       .where('item.status', '=', 'published')
       .where((expression) =>
         expression.or([

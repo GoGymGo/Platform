@@ -36,6 +36,7 @@ export class AdminDashboardService {
           rewardCounts,
           rewards,
           couponCounts,
+          rewardAwards,
           creatorWorkouts,
           legalDocuments,
           legalDocumentEvents,
@@ -168,6 +169,35 @@ export class AdminDashboardService {
               ),
             ])
             .groupBy('reward_catalog_item_id')
+            .execute(),
+          transaction
+            .selectFrom('reward_awards as award')
+            .innerJoin(
+              'reward_catalog_items as reward',
+              'reward.id',
+              'award.reward_catalog_item_id',
+            )
+            .innerJoin(
+              'profiles as profile',
+              'profile.user_id',
+              'award.user_id',
+            )
+            .select([
+              'award.id',
+              'award.award_rank',
+              'award.awarded_at',
+              'award.claimed_at',
+              'award.fulfilled_at',
+              'award.redeemed_at',
+              'award.reward_catalog_item_id',
+              'award.status',
+              'award.version',
+              'profile.callsign as winner_callsign',
+              'reward.reward_type',
+              'reward.sponsor_name',
+              'reward.title',
+            ])
+            .orderBy('award.awarded_at', 'desc')
             .execute(),
           transaction
             .selectFrom('creator_workouts')
@@ -348,6 +378,21 @@ export class AdminDashboardService {
               version: reward.version,
             };
           }),
+          rewardAwards: rewardAwards.map((award) => ({
+            awardRank: award.award_rank,
+            awardedAt: award.awarded_at.toISOString(),
+            claimedAt: award.claimed_at?.toISOString() ?? null,
+            fulfilledAt: award.fulfilled_at?.toISOString() ?? null,
+            id: award.id,
+            redeemedAt: award.redeemed_at?.toISOString() ?? null,
+            rewardId: award.reward_catalog_item_id,
+            rewardType: award.reward_type,
+            sponsorName: award.sponsor_name,
+            status: award.status,
+            title: award.title,
+            version: award.version,
+            winnerCallsign: award.winner_callsign,
+          })),
         };
       });
   }

@@ -17,6 +17,7 @@ import { colors, fontFamilies, radii, spacing } from '@/constants/theme';
 import { useRewardCatalog } from '@/data/appDataHooks';
 import {
   rewardAvailabilityLabel,
+  rewardAvailabilityWindowLabel,
   type RewardCatalogItem
 } from '@/domain/rewards';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
@@ -130,6 +131,7 @@ export default function RewardMarketplaceScreen() {
 function RewardCard({ reward }: { reward: RewardCatalogItem }) {
   const inStock = reward.inventoryRemaining > 0;
   const tone = reward.rewardType === 'coupon' ? 'cyan' : 'pink';
+  const availabilityWindow = rewardAvailabilityWindowLabel(reward);
   return (
     <HUDBorderBox style={styles.rewardCard} tone={inStock ? tone : 'muted'}>
       {reward.imageUrl ? (
@@ -174,6 +176,11 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
             {rewardAvailabilityLabel(reward)}
           </TerminalText>
         </View>
+        {availabilityWindow ? (
+          <TerminalText tone="muted" variant="micro">
+            {availabilityWindow}
+          </TerminalText>
+        ) : null}
         <TerminalText style={styles.rewardTitle} tone="text" variant="body">
           {reward.title}
         </TerminalText>

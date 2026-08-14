@@ -4,6 +4,8 @@ import type { CategoryLeaderboard } from '@/domain/leaderboard';
 export type RewardType = 'cash' | 'coupon' | 'physical';
 
 export type RewardCatalogItem = {
+  availableFrom: string | null;
+  availableUntil: string | null;
   competitionId: string;
   competitionName: string;
   description: string;
@@ -14,6 +16,7 @@ export type RewardCatalogItem = {
   monthKey: string;
   regionCode: string;
   regionName: string;
+  regionTimezone: string;
   rewardType: RewardType;
   sponsorName: string;
   termsUrl: string | null;
@@ -66,4 +69,24 @@ export function rewardAvailabilityLabel(reward: RewardCatalogItem): string {
   if (reward.inventoryRemaining === 0) return 'FULLY AWARDED';
   if (reward.inventoryRemaining === 1) return '1 AVAILABLE';
   return `${reward.inventoryRemaining.toLocaleString()} AVAILABLE`;
+}
+
+export function rewardAvailabilityWindowLabel(
+  reward: RewardCatalogItem
+): string {
+  if (!reward.availableFrom && !reward.availableUntil) {
+    return 'AVAILABLE DURING THIS CONTEST';
+  }
+
+  const format = new Intl.DateTimeFormat('en-CA', {
+    dateStyle: 'medium',
+    timeZone: reward.regionTimezone
+  });
+  if (reward.availableFrom && reward.availableUntil) {
+    return `AVAILABLE ${format.format(new Date(reward.availableFrom))} – ${format.format(new Date(reward.availableUntil))}`;
+  }
+  if (reward.availableFrom) {
+    return `AVAILABLE FROM ${format.format(new Date(reward.availableFrom))}`;
+  }
+  return `AVAILABLE UNTIL ${format.format(new Date(reward.availableUntil!))}`;
 }

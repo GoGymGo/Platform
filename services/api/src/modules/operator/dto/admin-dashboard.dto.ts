@@ -187,6 +187,50 @@ export class AdminDashboardRewardDto {
   version!: number;
 }
 
+export class AdminDashboardRewardAwardDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid', type: String })
+  rewardId!: string;
+
+  @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
+  rewardType!: 'cash' | 'coupon' | 'physical';
+
+  @ApiProperty({ type: String })
+  sponsorName!: string;
+
+  @ApiProperty({ type: String })
+  title!: string;
+
+  @ApiProperty({ type: String })
+  winnerCallsign!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  awardRank!: number;
+
+  @ApiProperty({
+    enum: ['awarded', 'cancelled', 'claimed', 'fulfilled', 'redeemed'],
+    type: String,
+  })
+  status!: 'awarded' | 'cancelled' | 'claimed' | 'fulfilled' | 'redeemed';
+
+  @ApiProperty({ format: 'date-time', type: String })
+  awardedAt!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  claimedAt!: string | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  fulfilledAt!: string | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  redeemedAt!: string | null;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
+}
+
 export class AdminDashboardCreatorWorkoutDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -301,6 +345,9 @@ export class AdminDashboardSnapshotDto {
 
   @ApiProperty({ isArray: true, type: AdminDashboardRewardDto })
   rewards!: AdminDashboardRewardDto[];
+
+  @ApiProperty({ isArray: true, type: AdminDashboardRewardAwardDto })
+  rewardAwards!: AdminDashboardRewardAwardDto[];
 
   @ApiProperty({ isArray: true, type: AdminDashboardCreatorWorkoutDto })
   creatorWorkouts!: AdminDashboardCreatorWorkoutDto[];

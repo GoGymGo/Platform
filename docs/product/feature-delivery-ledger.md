@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `ed0ef8a940ab65f01c312be9cfbd75d94002a61d` after PR #74 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-003 — Region eligibility and regional
-  waitlist` on `agent/ggg-003-region-eligibility`.
+  `7268a6bffb2fc06499f6585ffa8a43ca89764d0a` after PR #77 on 2026-08-13.
+- Active feature task: none while the coordinator records GGG-003 completion and
+  advances the queue to GGG-004.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -137,17 +137,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   admin-only and audited.
 - External providers / feature flag: browser/native geolocation and PostGIS; no
   flag, but competition enablement is policy data.
-- Current implementation / missing behavior: Vancouver Island + Gulf Islands
-  geometry and pending/approved/rejected states exist. Missing real-device
-  permission/accuracy UAT and deployed-policy reconciliation.
+- Current implementation / missing behavior: member verification requires a
+  fresh foreground location sample within 30 seconds and 50 metres, exposes
+  honest permission/unavailable/timeout/inaccurate/retry states, and treats local
+  storage only as non-authoritative display recovery. A shared server predicate
+  requires an approved, unexpired verification tied to the exact current,
+  enabled, non-deleted policy version across discovery, enrollment, leaderboards,
+  and streaks. Coordinates are not retained. Member and public waitlist intake
+  records versioned consent, returns a generic minimized receipt, canonicalizes
+  race-safe replay without regressing status, and participates in privacy export
+  and deletion. Admin region/waitlist decisions are reachable, authorized,
+  idempotent, bounded, and audited. Region configuration defaults disabled and
+  canonical geometry provenance is machine-enforced. No known repository
+  behavior remains missing for this technical duty.
 - Required tests / operations / cloud dependency: boundary points, minimized
   evidence, pending fail-closed, age/jurisdiction matching, waitlist validation,
   reviewer audit; PostgreSQL/PostGIS and physical-device location.
 - Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-003 — Region
-  eligibility and regional waitlist`; branch `agent/ggg-003-region-eligibility`;
-  PR/merge `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: legal approval of enabled geography and on-device
-  location behavior remain external gates.
+  eligibility and regional waitlist`; branch `agent/ggg-003-region-eligibility`
+  (deleted after merge); PR `#77`; merge
+  `7268a6bffb2fc06499f6585ffa8a43ca89764d0a`; status `COMPLETE`.
+- Residual risks / blocker: legal/product approval of the exact enabled geography
+  and regional-update retention policy, production PostGIS migration/digest
+  reconciliation, and physical iOS/Android permission, accuracy, timeout,
+  boundary, retry, and expiry UAT remain external release gates requiring
+  separate deployment authority. No cloud access or deployment occurred.
 
 ### GGG-004 — Competition discovery, enrollment, Weekly Goal, and withdrawal
 
@@ -947,6 +961,11 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-003` through PR #77. Initial CI found a
+  platform-dependent raw-byte geometry hash; the corrected canonical-LF exact
+  head `48760972e76e2d75d360fce2fe52106fbd0fd6ed` was squash-merged as
+  `7268a6bffb2fc06499f6585ffa8a43ca89764d0a`. All PR and six main-push checks
+  passed, the remote feature branch was deleted, and there was no cloud impact.
 - 2026-08-13 — Assigned `GGG-003` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-002 completion ledger merged through PR #75 as
   `b54f1a52844960b018155a1806033d2cd22ba401` with green main-push checks.

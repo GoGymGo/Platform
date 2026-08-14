@@ -26,6 +26,7 @@ import {
   BlockedMemberResponseDto,
   BlockMemberDto,
   ChallengeCheckInResponseDto,
+  ChallengeCancellationResponseDto,
   ChallengeContactInvitationResponseDto,
   ChallengeContactInvitationPreviewDto,
   ChallengeInvitationDecisionDto,
@@ -242,6 +243,38 @@ export class SocialController {
     @Param('challengeId', new ParseUUIDPipe()) challengeId: string,
   ): Promise<ChallengeInvitationResponseDto> {
     return this.social.joinRegionalChallenge(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      challengeId,
+    );
+  }
+
+  @Delete('challenges/:challengeId')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Cancel an owned active social challenge' })
+  @ApiOkResponse({ type: ChallengeCancellationResponseDto })
+  cancelChallenge(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Param('challengeId', new ParseUUIDPipe()) challengeId: string,
+  ): Promise<ChallengeCancellationResponseDto> {
+    return this.social.cancelChallenge(
+      principal,
+      requireIdempotencyKey(idempotencyKey),
+      challengeId,
+    );
+  }
+
+  @Delete('challenges/:challengeId/members/me')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Withdraw my accepted challenge membership' })
+  @ApiOkResponse({ type: ChallengeInvitationResponseDto })
+  withdrawFromChallenge(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Param('challengeId', new ParseUUIDPipe()) challengeId: string,
+  ): Promise<ChallengeInvitationResponseDto> {
+    return this.social.withdrawFromChallenge(
       principal,
       requireIdempotencyKey(idempotencyKey),
       challengeId,

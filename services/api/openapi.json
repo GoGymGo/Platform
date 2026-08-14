@@ -3542,6 +3542,74 @@
         "tags": ["social"]
       }
     },
+    "/v1/social/challenges/{challengeId}": {
+      "delete": {
+        "operationId": "cancelChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeCancellationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Cancel an owned active social challenge",
+        "tags": ["social"]
+      }
+    },
+    "/v1/social/challenges/{challengeId}/members/me": {
+      "delete": {
+        "operationId": "withdrawFromChallenge",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeInvitationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Withdraw my accepted challenge membership",
+        "tags": ["social"]
+      }
+    },
     "/v1/social/challenges/{challengeId}/check-ins": {
       "post": {
         "operationId": "checkInToChallenge",
@@ -7202,24 +7270,36 @@
         "type": "object",
         "properties": {
           "screenName": { "type": "string" },
-          "userId": { "type": "string", "format": "uuid" },
           "streaks": { "$ref": "#/components/schemas/StreakCountsDto" },
           "role": { "type": "string", "enum": ["owner", "member"] },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "accepted", "declined"]
-          },
+          "status": { "type": "string", "enum": ["pending", "accepted"] },
           "progress": {
             "$ref": "#/components/schemas/SocialChallengeProgressDto"
           }
         },
+        "required": ["screenName", "streaks", "role", "status", "progress"]
+      },
+      "ChallengeContactInvitationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "challengeId": { "type": "string", "format": "uuid" },
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destinationHint": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "joinUrl": { "type": "string" },
+          "deliveryMode": { "type": "string", "enum": ["link"] },
+          "deliveryStatus": { "type": "string", "enum": ["not_sent"] }
+        },
         "required": [
-          "screenName",
-          "userId",
-          "streaks",
-          "role",
-          "status",
-          "progress"
+          "id",
+          "challengeId",
+          "channel",
+          "destinationHint",
+          "expiresAt",
+          "joinUrl",
+          "deliveryMode",
+          "deliveryStatus"
         ]
       },
       "SocialChallengeResponseDto": {
@@ -7231,7 +7311,11 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/SocialChallengeMemberDto" }
           },
-          "myRole": { "type": "string", "enum": ["owner", "member"] },
+          "myRole": {
+            "type": "string",
+            "enum": ["owner", "member"],
+            "nullable": true
+          },
           "myStatus": {
             "type": "string",
             "enum": ["pending", "accepted", "not_joined"]
@@ -7239,7 +7323,6 @@
           "name": { "type": "string" },
           "ownerScreenName": { "type": "string" },
           "ownerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
-          "ownerUserId": { "type": "string", "format": "uuid" },
           "challengeType": { "type": "string", "enum": ["friend", "regional"] },
           "activity": {
             "type": "string",
@@ -7261,7 +7344,7 @@
           "endDate": { "type": "string", "format": "date" },
           "regionCode": { "type": "string", "nullable": true },
           "regionName": { "type": "string", "nullable": true },
-          "timezone": { "type": "string", "nullable": true },
+          "timezone": { "type": "string" },
           "locationName": { "type": "string", "nullable": true },
           "scheduledDays": { "type": "array", "items": { "type": "number" } },
           "scheduledTime": { "type": "string", "nullable": true },
@@ -7269,6 +7352,23 @@
           "participantCount": { "type": "number", "minimum": 1 },
           "myProgress": {
             "$ref": "#/components/schemas/SocialChallengeProgressDto"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["upcoming", "active", "full", "ended", "cancelled"]
+          },
+          "canCancel": { "type": "boolean" },
+          "canCheckIn": { "type": "boolean" },
+          "canInvite": { "type": "boolean" },
+          "canJoin": { "type": "boolean" },
+          "canRespond": { "type": "boolean" },
+          "canWithdraw": { "type": "boolean" },
+          "serverTime": { "type": "string", "format": "date-time" },
+          "contactInvitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChallengeContactInvitationResponseDto"
+            }
           }
         },
         "required": [
@@ -7280,7 +7380,6 @@
           "name",
           "ownerScreenName",
           "ownerStreaks",
-          "ownerUserId",
           "challengeType",
           "activity",
           "activityLabel",
@@ -7297,8 +7396,29 @@
           "scheduledTime",
           "participantLimit",
           "participantCount",
-          "myProgress"
+          "myProgress",
+          "state",
+          "canCancel",
+          "canCheckIn",
+          "canInvite",
+          "canJoin",
+          "canRespond",
+          "canWithdraw",
+          "serverTime",
+          "contactInvitations"
         ]
+      },
+      "ChallengeContactInputDto": {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string", "enum": ["email", "phone"] },
+          "destination": {
+            "type": "string",
+            "example": "friend@example.com",
+            "maxLength": 160
+          }
+        },
+        "required": ["channel", "destination"]
       },
       "CreateSocialChallengeDto": {
         "type": "object",
@@ -7348,6 +7468,12 @@
             "example": "2026-08-31",
             "format": "date"
           },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone for a private friend challenge",
+            "example": "America/Vancouver",
+            "maxLength": 64
+          },
           "regionCode": {
             "type": "string",
             "example": "toronto-on",
@@ -7368,6 +7494,10 @@
           "invitedFriendUserIds": {
             "type": "array",
             "items": { "type": "string", "format": "uuid" }
+          },
+          "invitedContacts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ChallengeContactInputDto" }
           }
         },
         "required": [
@@ -7389,11 +7519,18 @@
           "challengeId": { "type": "string", "format": "uuid" },
           "status": {
             "type": "string",
-            "enum": ["pending", "accepted", "declined"]
-          },
-          "userId": { "type": "string", "format": "uuid" }
+            "enum": ["pending", "accepted", "declined", "withdrawn"]
+          }
         },
-        "required": ["challengeId", "status", "userId"]
+        "required": ["challengeId", "status"]
+      },
+      "ChallengeCancellationResponseDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": { "type": "string", "format": "uuid" },
+          "state": { "type": "string", "enum": ["cancelled"] }
+        },
+        "required": ["challengeId", "state"]
       },
       "ChallengeCheckInResponseDto": {
         "type": "object",
@@ -7424,29 +7561,6 @@
         },
         "required": ["channel", "destination"]
       },
-      "ChallengeContactInvitationResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "challengeId": { "type": "string", "format": "uuid" },
-          "channel": { "type": "string", "enum": ["email", "phone"] },
-          "destinationHint": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" },
-          "joinUrl": { "type": "string" },
-          "deliveryMode": { "type": "string", "enum": ["link"] },
-          "deliveryStatus": { "type": "string", "enum": ["not_sent"] }
-        },
-        "required": [
-          "id",
-          "challengeId",
-          "channel",
-          "destinationHint",
-          "expiresAt",
-          "joinUrl",
-          "deliveryMode",
-          "deliveryStatus"
-        ]
-      },
       "RedeemChallengeContactInvitationDto": {
         "type": "object",
         "properties": {
@@ -7465,9 +7579,17 @@
         "properties": {
           "channel": { "type": "string", "enum": ["email", "phone"] },
           "destinationHint": { "type": "string" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "challengeName": { "type": "string" },
+          "ownerScreenName": { "type": "string" }
         },
-        "required": ["channel", "destinationHint", "expiresAt"]
+        "required": [
+          "channel",
+          "destinationHint",
+          "expiresAt",
+          "challengeName",
+          "ownerScreenName"
+        ]
       },
       "ChallengeInvitationDecisionDto": {
         "type": "object",

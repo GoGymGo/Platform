@@ -362,7 +362,14 @@ const requiredSchemaProperties = {
   SocialChallengeResponseDto: [
     'activity',
     'activityLabel',
+    'canCancel',
+    'canCheckIn',
+    'canInvite',
+    'canJoin',
+    'canRespond',
+    'canWithdraw',
     'challengeType',
+    'contactInvitations',
     'createdAt',
     'description',
     'endDate',
@@ -375,14 +382,15 @@ const requiredSchemaProperties = {
     'name',
     'ownerScreenName',
     'ownerStreaks',
-    'ownerUserId',
     'participantCount',
     'participantLimit',
     'regionCode',
     'regionName',
     'scheduledDays',
     'scheduledTime',
+    'serverTime',
     'startDate',
+    'state',
     'targetCount',
     'targetPeriod',
     'timezone',
@@ -443,6 +451,20 @@ for (const [schemaName, propertyNames] of Object.entries(
     } else if (!required.has(propertyName)) {
       contractErrors.push(
         `${schemaName}.${propertyName} is not guaranteed in the response`,
+      );
+    }
+  }
+}
+
+for (const [schemaName, propertyNames] of Object.entries({
+  SocialChallengeMemberDto: ['userId'],
+  SocialChallengeResponseDto: ['ownerUserId'],
+})) {
+  const schema = contract.components?.schemas?.[schemaName];
+  for (const propertyName of propertyNames) {
+    if (schema?.properties?.[propertyName]) {
+      contractErrors.push(
+        `${schemaName}.${propertyName} exposes an internal social identifier`,
       );
     }
   }

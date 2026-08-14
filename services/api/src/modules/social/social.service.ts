@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { sql } from 'kysely';
@@ -25,6 +26,7 @@ import { normalizeDateKey } from '../../database/date-key';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { ProfilesService } from '../profiles/profiles.service';
+import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
 import { loadPublicStreaks } from '../streaks/public-streaks';
 import type { StreakCounts } from '../streaks/streak-calculation';
 import type {
@@ -100,8 +102,7 @@ interface ChallengeMemberJson extends JsonObject {
   role: 'member' | 'owner';
   screenName: string;
   streaks: StreakCountsJson;
-  status: SocialChallengeMemberStatus;
-  userId: string;
+  status: 'accepted' | 'pending';
 }
 
 interface ChallengeProgressJson extends JsonObject {
@@ -113,6 +114,12 @@ interface ChallengeProgressJson extends JsonObject {
 interface SocialChallengeJson extends JsonObject {
   activity: SocialChallengeActivity;
   activityLabel: string;
+  canCancel: boolean;
+  canCheckIn: boolean;
+  canInvite: boolean;
+  canJoin: boolean;
+  canRespond: boolean;
+  canWithdraw: boolean;
   challengeType: SocialChallengeType;
   createdAt: string;
   description: string | null;
@@ -126,23 +133,29 @@ interface SocialChallengeJson extends JsonObject {
   name: string;
   ownerScreenName: string;
   ownerStreaks: StreakCountsJson;
-  ownerUserId: string;
   participantCount: number;
   participantLimit: number | null;
   regionCode: string | null;
   regionName: string | null;
   scheduledDays: number[];
   scheduledTime: string | null;
+  serverTime: string;
   startDate: string;
+  state: 'active' | 'cancelled' | 'ended' | 'full' | 'upcoming';
   targetCount: number;
   targetPeriod: SocialChallengeTargetPeriod;
-  timezone: string | null;
+  timezone: string;
+  contactInvitations: ChallengeContactInvitationJson[];
 }
 
 interface ChallengeInvitationJson extends JsonObject {
   challengeId: string;
   status: SocialChallengeMemberStatus;
-  userId: string;
+}
+
+interface ChallengeCancellationJson extends JsonObject {
+  challengeId: string;
+  state: 'cancelled';
 }
 
 interface ChallengeContactInvitationJson extends JsonObject {
@@ -873,8 +886,9 @@ export class SocialService {
       .transaction()
       .execute(async (transaction) => {
         const { user } = await this.ensureIdentity(principal, transaction);
-        const region = await this.resolveRegionPolicy(
+        const region = await this.resolveApprovedRegionPolicy(
           transaction,
+          user.id,
           input.regionCode,
         );
         const today = dateKeyInTimezone(new Date(), region.timezone);
@@ -916,6 +930,20 @@ export class SocialService {
     const locationName =
       input.locationName?.trim().replace(/\s+/g, ' ') || null;
     const invitedFriendUserIds = [...new Set(input.invitedFriendUserIds)];
+    const invitedContacts = [
+      ...new Map(
+        (input.invitedContacts ?? []).map((contact) => {
+          const destination = normalizeContactDestination(
+            contact.channel,
+            contact.destination,
+          );
+          return [
+            `${contact.channel}:${destination}`,
+            { channel: contact.channel, destination },
+          ] as const;
+        }),
+      ).values(),
+    ];
     if (!name) {
       throw new BadRequestException({
         code: 'CHALLENGE_NAME_REQUIRED',
@@ -923,18 +951,51 @@ export class SocialService {
       });
     }
     this.assertChallengeWindow(input.startDate, input.endDate);
-    if (
-      input.challengeType === 'regional' &&
-      (!input.regionCode ||
+    if (input.challengeType === 'friend') {
+      if (invitedFriendUserIds.length + invitedContacts.length === 0) {
+        throw new BadRequestException({
+          code: 'FRIEND_CHALLENGE_INVITATION_REQUIRED',
+          message:
+            'Choose an accepted friend or create an email or phone invitation link.',
+        });
+      }
+      if (
+        input.regionCode ||
+        locationName ||
+        input.scheduledTime ||
+        input.scheduledDays.length > 0 ||
+        input.participantLimit !== undefined
+      ) {
+        throw new BadRequestException({
+          code: 'FRIEND_CHALLENGE_FIELDS_INVALID',
+          message:
+            'Private friend challenges cannot publish regional schedule, location, or capacity fields.',
+        });
+      }
+    } else {
+      if (
+        !input.regionCode ||
         !locationName ||
         !input.scheduledTime ||
-        input.scheduledDays.length === 0)
-    ) {
-      throw new BadRequestException({
-        code: 'REGIONAL_CHALLENGE_SCHEDULE_REQUIRED',
-        message:
-          'Regional challenges require a region, location, local time, and at least one scheduled day.',
-      });
+        input.scheduledDays.length === 0
+      ) {
+        throw new BadRequestException({
+          code: 'REGIONAL_CHALLENGE_SCHEDULE_REQUIRED',
+          message:
+            'Regional challenges require a region, location, local time, and at least one scheduled day.',
+        });
+      }
+      if (
+        invitedFriendUserIds.length > 0 ||
+        invitedContacts.length > 0 ||
+        input.timezone
+      ) {
+        throw new BadRequestException({
+          code: 'REGIONAL_CHALLENGE_INVITATIONS_INVALID',
+          message:
+            'Regional challenges use local discovery and cannot include private invitations or a caller-selected timezone.',
+        });
+      }
     }
 
     return this.idempotency.execute<SocialChallengeJson>(
@@ -945,22 +1006,35 @@ export class SocialService {
           ...input,
           activityLabel,
           description,
+          invitedContacts,
           invitedFriendUserIds,
           locationName,
           name,
         },
         responseCode: 201,
         scope: 'social:challenges:create',
+        storeResponseBody: invitedContacts.length === 0,
       },
       async (transaction) => {
         const { user } = await this.ensureIdentity(principal, transaction);
+        const creationKeyHash = socialInvitationHash(
+          `${user.id}:${idempotencyKey}`,
+        );
         const region =
           input.challengeType === 'regional'
-            ? await this.resolveRegionPolicy(
+            ? await this.resolveApprovedRegionPolicy(
                 transaction,
+                user.id,
                 input.regionCode ?? '',
               )
             : null;
+        const timezone =
+          region?.timezone ?? this.requireChallengeTimezone(input.timezone);
+        this.assertChallengeStartsFromCurrentDate(
+          input.startDate,
+          timezone,
+          new Date(),
+        );
         if (invitedFriendUserIds.length > 0) {
           await this.assertAcceptedFriends(
             transaction,
@@ -969,68 +1043,133 @@ export class SocialService {
           );
         }
         const now = new Date();
-        const challenge = await transaction
-          .insertInto('social_challenges')
-          .values({
-            activity: input.activity,
-            activity_label: activityLabel,
-            challenge_type: input.challengeType,
-            created_at: now,
-            description,
-            end_date: input.endDate,
-            location_name: locationName,
-            name,
-            owner_user_id: user.id,
-            participant_limit: input.participantLimit ?? null,
-            region_policy_id: region?.id ?? null,
-            scheduled_days: [...input.scheduledDays].sort(
-              (left, right) => left - right,
-            ),
-            scheduled_time_local: input.scheduledTime ?? null,
-            start_date: input.startDate,
-            status: 'active',
-            target_count: input.targetCount,
-            target_period: input.targetPeriod,
-            updated_at: now,
-          })
-          .returning('id')
-          .executeTakeFirstOrThrow();
-        await transaction
-          .insertInto('social_challenge_members')
-          .values({
-            challenge_id: challenge.id,
-            created_at: now,
-            invited_by_user_id: user.id,
-            responded_at: now,
-            role: 'owner',
-            status: 'accepted',
-            updated_at: now,
-            user_id: user.id,
-          })
-          .executeTakeFirstOrThrow();
-        if (invitedFriendUserIds.length > 0) {
+        const existingChallenge = await transaction
+          .selectFrom('social_challenges')
+          .select('id')
+          .where('creation_key_hash', '=', creationKeyHash)
+          .executeTakeFirst();
+        const challenge =
+          existingChallenge ??
+          (await transaction
+            .insertInto('social_challenges')
+            .values({
+              activity: input.activity,
+              activity_label: activityLabel,
+              challenge_type: input.challengeType,
+              creation_key_hash: creationKeyHash,
+              created_at: now,
+              description,
+              end_date: input.endDate,
+              location_name: locationName,
+              name,
+              owner_user_id: user.id,
+              participant_limit: input.participantLimit ?? null,
+              region_policy_id: region?.id ?? null,
+              scheduled_days: [...input.scheduledDays].sort(
+                (left, right) => left - right,
+              ),
+              scheduled_time_local: input.scheduledTime ?? null,
+              start_date: input.startDate,
+              status: 'active',
+              target_count: input.targetCount,
+              target_period: input.targetPeriod,
+              timezone,
+              updated_at: now,
+            })
+            .returning('id')
+            .executeTakeFirstOrThrow());
+        if (!existingChallenge) {
           await transaction
             .insertInto('social_challenge_members')
-            .values(
-              invitedFriendUserIds.map((friendUserId) => ({
-                challenge_id: challenge.id,
-                created_at: now,
-                invited_by_user_id: user.id,
-                responded_at: null,
-                role: 'member' as const,
-                status: 'pending' as const,
-                updated_at: now,
-                user_id: friendUserId,
-              })),
-            )
-            .execute();
+            .values({
+              challenge_id: challenge.id,
+              contact_invitation_id: null,
+              created_at: now,
+              invitation_source: 'owner',
+              invited_by_user_id: user.id,
+              responded_at: now,
+              role: 'owner',
+              status: 'accepted',
+              updated_at: now,
+              user_id: user.id,
+            })
+            .executeTakeFirstOrThrow();
+          if (invitedFriendUserIds.length > 0) {
+            await transaction
+              .insertInto('social_challenge_members')
+              .values(
+                invitedFriendUserIds.map((friendUserId) => ({
+                  challenge_id: challenge.id,
+                  contact_invitation_id: null,
+                  created_at: now,
+                  invitation_source: 'friend' as const,
+                  invited_by_user_id: user.id,
+                  responded_at: null,
+                  role: 'member' as const,
+                  status: 'pending' as const,
+                  updated_at: now,
+                  user_id: friendUserId,
+                })),
+              )
+              .execute();
+          }
+          await this.recordSocialRelationshipEvent(transaction, {
+            action: 'challenge_created',
+            actorUserId: user.id,
+            metadata: {
+              activity: input.activity,
+              challengeId: challenge.id,
+              challengeType: input.challengeType,
+            },
+            requestId: idempotencyKey,
+            subjectUserId: null,
+          });
+          for (const friendUserId of invitedFriendUserIds) {
+            await this.recordSocialRelationshipEvent(transaction, {
+              action: 'challenge_friend_invited',
+              actorUserId: user.id,
+              metadata: { challengeId: challenge.id },
+              requestId: idempotencyKey,
+              subjectUserId: friendUserId,
+            });
+          }
+        }
+        const contactInvitations: ChallengeContactInvitationJson[] = [];
+        for (const [index, contact] of invitedContacts.entries()) {
+          const invitation = await this.createContactInvitation(
+            transaction,
+            challenge.id,
+            user.id,
+            contact,
+            socialInvitationHash(`${user.id}:${idempotencyKey}:${index}`),
+            now,
+          );
+          contactInvitations.push(invitation);
+          await this.recordSocialRelationshipEvent(transaction, {
+            action: 'challenge_contact_link_created',
+            actorUserId: user.id,
+            metadata: { challengeId: challenge.id, channel: contact.channel },
+            requestId: socialInvitationHash(
+              `${idempotencyKey}:contact:${index}`,
+            ),
+            subjectUserId: null,
+          });
         }
         const created = await this.loadChallenges(
           transaction,
           user.id,
           challenge.id,
         );
-        return created[0];
+        const response = created[0];
+        if (!response) {
+          throw new ConflictException({
+            code: 'CHALLENGE_CREATION_INCOMPLETE',
+            message: 'The challenge could not be created. Please retry.',
+          });
+        }
+        return contactInvitations.length > 0
+          ? { ...response, contactInvitations }
+          : response;
       },
     );
   }
@@ -1053,10 +1192,22 @@ export class SocialService {
         const { user } = await this.ensureIdentity(principal, transaction);
         const challenge = await transaction
           .selectFrom('social_challenges')
-          .select(['owner_user_id', 'status'])
+          .select([
+            'challenge_type',
+            'end_date',
+            'owner_user_id',
+            'status',
+            'timezone',
+          ])
           .where('id', '=', challengeId)
           .executeTakeFirst();
-        if (!challenge || challenge.status !== 'active') {
+        if (
+          !challenge ||
+          challenge.status !== 'active' ||
+          challenge.challenge_type !== 'friend' ||
+          normalizeDateKey(challenge.end_date) <
+            dateKeyInTimezone(new Date(), challenge.timezone)
+        ) {
           throw new NotFoundException({
             code: 'CHALLENGE_NOT_FOUND',
             message: 'That challenge is not available.',
@@ -1120,7 +1271,6 @@ export class SocialService {
           return {
             challengeId,
             status: 'pending',
-            userId: input.friendUserId,
           };
         }
 
@@ -1129,6 +1279,8 @@ export class SocialService {
           await transaction
             .updateTable('social_challenge_members')
             .set({
+              contact_invitation_id: null,
+              invitation_source: 'friend',
               invited_by_user_id: user.id,
               responded_at: null,
               role: 'member',
@@ -1143,7 +1295,9 @@ export class SocialService {
             .insertInto('social_challenge_members')
             .values({
               challenge_id: challengeId,
+              contact_invitation_id: null,
               created_at: now,
+              invitation_source: 'friend',
               invited_by_user_id: user.id,
               responded_at: null,
               role: 'member',
@@ -1171,10 +1325,16 @@ export class SocialService {
             }
           }
         }
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'challenge_friend_invited',
+          actorUserId: user.id,
+          metadata: { challengeId },
+          requestId: idempotencyKey,
+          subjectUserId: input.friendUserId,
+        });
         return {
           challengeId,
           status: 'pending',
-          userId: input.friendUserId,
         };
       },
     );
@@ -1203,10 +1363,21 @@ export class SocialService {
         const { user } = await this.ensureIdentity(principal, transaction);
         const challenge = await transaction
           .selectFrom('social_challenges')
-          .select(['challenge_type', 'owner_user_id', 'status'])
+          .select([
+            'challenge_type',
+            'end_date',
+            'owner_user_id',
+            'status',
+            'timezone',
+          ])
           .where('id', '=', challengeId)
           .executeTakeFirst();
-        if (!challenge || challenge.status !== 'active') {
+        if (
+          !challenge ||
+          challenge.status !== 'active' ||
+          normalizeDateKey(challenge.end_date) <
+            dateKeyInTimezone(new Date(), challenge.timezone)
+        ) {
           throw new NotFoundException({
             code: 'CHALLENGE_NOT_FOUND',
             message: 'That challenge is not available.',
@@ -1229,50 +1400,23 @@ export class SocialService {
         const creationKeyHash = socialInvitationHash(
           `${user.id}:${idempotencyKey}`,
         );
-        // A response containing the opaque token is never persisted. If a caller
-        // retries after losing a completed response, rotate the previous link so
-        // exactly one link for this idempotency key remains valid.
-        await transaction
-          .deleteFrom('challenge_contact_invitations')
-          .where('creation_key_hash', '=', creationKeyHash)
-          .execute();
-
-        const token = randomBytes(24).toString('base64url');
         const now = new Date();
-        const expiresAt = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1_000);
-        const invitation = await transaction
-          .insertInto('challenge_contact_invitations')
-          .values({
-            challenge_id: challengeId,
-            channel: input.channel,
-            creation_key_hash: creationKeyHash,
-            claimed_at: null,
-            claimed_by_user_id: null,
-            created_at: now,
-            destination_hash: socialInvitationHash(`${token}:${destination}`),
-            destination_hint: contactDestinationHint(
-              input.channel,
-              destination,
-            ),
-            delivery_mode: 'link',
-            expires_at: expiresAt,
-            invite_token_hash: socialInvitationHash(token),
-            inviter_user_id: user.id,
-            status: 'pending',
-            token_version: 1,
-          })
-          .returning(['destination_hint', 'id'])
-          .executeTakeFirstOrThrow();
-        return {
+        const invitation = await this.createContactInvitation(
+          transaction,
           challengeId,
-          channel: input.channel,
-          destinationHint: invitation.destination_hint,
-          deliveryMode: 'link',
-          deliveryStatus: 'not_sent',
-          expiresAt: expiresAt.toISOString(),
-          id: invitation.id,
-          joinUrl: `https://gogymgo.com/join?challengeInvite=${encodeURIComponent(token)}`,
-        };
+          user.id,
+          { channel: input.channel, destination },
+          creationKeyHash,
+          now,
+        );
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'challenge_contact_link_created',
+          actorUserId: user.id,
+          metadata: { challengeId, channel: input.channel },
+          requestId: idempotencyKey,
+          subjectUserId: null,
+        });
+        return invitation;
       },
     );
   }
@@ -1293,19 +1437,30 @@ export class SocialService {
             'challenge.id',
             'invitation.challenge_id',
           )
+          .innerJoin(
+            'profiles as owner_profile',
+            'owner_profile.user_id',
+            'challenge.owner_user_id',
+          )
           .select([
+            'challenge.end_date',
+            'challenge.name as challenge_name',
             'challenge.owner_user_id',
             'challenge.status as challenge_status',
+            'challenge.timezone',
             'invitation.channel',
             'invitation.destination_hint',
             'invitation.expires_at',
             'invitation.status',
+            'owner_profile.screen_name as owner_screen_name',
           ])
           .where('invitation.invite_token_hash', '=', tokenHash)
           .executeTakeFirst();
         if (
           !invitation ||
           invitation.challenge_status !== 'active' ||
+          normalizeDateKey(invitation.end_date) <
+            dateKeyInTimezone(new Date(), invitation.timezone) ||
           invitation.status !== 'pending' ||
           invitation.expires_at <= new Date()
         ) {
@@ -1321,8 +1476,10 @@ export class SocialService {
         );
         return {
           channel: invitation.channel,
+          challengeName: invitation.challenge_name,
           destinationHint: invitation.destination_hint,
           expiresAt: invitation.expires_at.toISOString(),
+          ownerScreenName: invitation.owner_screen_name,
         };
       });
   }
@@ -1354,8 +1511,10 @@ export class SocialService {
           )
           .select([
             'challenge.id as challenge_id',
+            'challenge.end_date',
             'challenge.owner_user_id',
             'challenge.status as challenge_status',
+            'challenge.timezone',
             'invitation.expires_at',
             'invitation.channel',
             'invitation.destination_hash',
@@ -1365,7 +1524,12 @@ export class SocialService {
           .where('invitation.invite_token_hash', '=', tokenHash)
           .forUpdate()
           .executeTakeFirst();
-        if (!invitation || invitation.challenge_status !== 'active') {
+        if (
+          !invitation ||
+          invitation.challenge_status !== 'active' ||
+          normalizeDateKey(invitation.end_date) <
+            dateKeyInTimezone(new Date(), invitation.timezone)
+        ) {
           throw new NotFoundException({
             code: 'CHALLENGE_CONTACT_INVITATION_NOT_FOUND',
             message: 'That challenge invitation is not available.',
@@ -1409,11 +1573,34 @@ export class SocialService {
           invitation.owner_user_id,
           user.id,
         );
+        const existingMembership = await transaction
+          .selectFrom('social_challenge_members')
+          .select('status')
+          .where('challenge_id', '=', invitation.challenge_id)
+          .where('user_id', '=', user.id)
+          .executeTakeFirst();
+        if (existingMembership?.status === 'accepted') {
+          throw new ConflictException({
+            code: 'CHALLENGE_MEMBER_ALREADY_ACCEPTED',
+            message: 'You already joined this challenge.',
+          });
+        }
+        await transaction
+          .updateTable('challenge_contact_invitations')
+          .set({
+            claimed_at: now,
+            claimed_by_user_id: user.id,
+            status: 'claimed',
+          })
+          .where('id', '=', invitation.id)
+          .executeTakeFirstOrThrow();
         await transaction
           .insertInto('social_challenge_members')
           .values({
             challenge_id: invitation.challenge_id,
+            contact_invitation_id: invitation.id,
             created_at: now,
+            invitation_source: 'contact',
             invited_by_user_id: invitation.owner_user_id,
             responded_at: now,
             role: 'member',
@@ -1423,25 +1610,26 @@ export class SocialService {
           })
           .onConflict((conflict) =>
             conflict.columns(['challenge_id', 'user_id']).doUpdateSet({
+              contact_invitation_id: invitation.id,
+              invitation_source: 'contact',
+              invited_by_user_id: invitation.owner_user_id,
               responded_at: now,
+              role: 'member',
               status: 'accepted',
               updated_at: now,
             }),
           )
           .execute();
-        await transaction
-          .updateTable('challenge_contact_invitations')
-          .set({
-            claimed_at: now,
-            claimed_by_user_id: user.id,
-            status: 'claimed',
-          })
-          .where('id', '=', invitation.id)
-          .execute();
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'challenge_contact_link_redeemed',
+          actorUserId: user.id,
+          metadata: { challengeId: invitation.challenge_id },
+          requestId: idempotencyKey,
+          subjectUserId: invitation.owner_user_id,
+        });
         return {
           challengeId: invitation.challenge_id,
           status: 'accepted',
-          userId: user.id,
         };
       },
     );
@@ -1474,8 +1662,9 @@ export class SocialService {
             'challenge.end_date',
             'challenge.owner_user_id',
             'challenge.participant_limit',
+            'challenge.region_policy_id',
             'challenge.status',
-            'region.timezone',
+            'challenge.timezone',
           ])
           .where('challenge.id', '=', challengeId)
           .forUpdate('challenge')
@@ -1496,9 +1685,20 @@ export class SocialService {
           user.id,
           challenge.owner_user_id,
         );
+        if (!challenge.region_policy_id) {
+          throw new NotFoundException({
+            code: 'REGIONAL_CHALLENGE_NOT_FOUND',
+            message: 'That regional challenge is not available.',
+          });
+        }
+        await this.requireCurrentRegionVerification(
+          transaction,
+          user.id,
+          challenge.region_policy_id,
+        );
         if (
           normalizeDateKey(challenge.end_date) <
-          dateKeyInTimezone(new Date(), challenge.timezone ?? 'UTC')
+          dateKeyInTimezone(new Date(), challenge.timezone)
         ) {
           throw new ConflictException({
             code: 'REGIONAL_CHALLENGE_ENDED',
@@ -1512,7 +1712,7 @@ export class SocialService {
           .where('user_id', '=', user.id)
           .executeTakeFirst();
         if (existing?.status === 'accepted') {
-          return { challengeId, status: 'accepted', userId: user.id };
+          return { challengeId, status: 'accepted' };
         }
         if (challenge.participant_limit) {
           const memberCount = await transaction
@@ -1534,6 +1734,8 @@ export class SocialService {
           await transaction
             .updateTable('social_challenge_members')
             .set({
+              contact_invitation_id: null,
+              invitation_source: 'regional',
               invited_by_user_id: challenge.owner_user_id,
               responded_at: now,
               role: 'member',
@@ -1548,7 +1750,9 @@ export class SocialService {
             .insertInto('social_challenge_members')
             .values({
               challenge_id: challengeId,
+              contact_invitation_id: null,
               created_at: now,
+              invitation_source: 'regional',
               invited_by_user_id: challenge.owner_user_id,
               responded_at: now,
               role: 'member',
@@ -1558,7 +1762,14 @@ export class SocialService {
             })
             .executeTakeFirstOrThrow();
         }
-        return { challengeId, status: 'accepted', userId: user.id };
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'challenge_regional_joined',
+          actorUserId: user.id,
+          metadata: { challengeId },
+          requestId: idempotencyKey,
+          subjectUserId: challenge.owner_user_id,
+        });
+        return { challengeId, status: 'accepted' };
       },
     );
   }
@@ -1591,7 +1802,7 @@ export class SocialService {
             'challenge.scheduled_days',
             'challenge.start_date',
             'challenge.status',
-            'region.timezone',
+            'challenge.timezone',
           ])
           .where('challenge.id', '=', challengeId)
           .executeTakeFirst();
@@ -1612,10 +1823,7 @@ export class SocialService {
           });
         }
         const now = new Date();
-        const eligibleDate = dateKeyInTimezone(
-          now,
-          challenge.timezone ?? 'UTC',
-        );
+        const eligibleDate = dateKeyInTimezone(now, challenge.timezone);
         if (
           eligibleDate < normalizeDateKey(challenge.start_date) ||
           eligibleDate > normalizeDateKey(challenge.end_date)
@@ -1681,6 +1889,15 @@ export class SocialService {
             .where('user_id', '=', user.id)
             .where('eligible_date', '=', eligibleDate)
             .executeTakeFirstOrThrow());
+        if (inserted) {
+          await this.recordSocialRelationshipEvent(transaction, {
+            action: 'challenge_checkin_recorded',
+            actorUserId: user.id,
+            metadata: { challengeId, eligibleDate, source },
+            requestId: idempotencyKey,
+            subjectUserId: null,
+          });
+        }
         return {
           challengeId,
           checkInId: checkIn.id,
@@ -1720,10 +1937,15 @@ export class SocialService {
         }
         const challengeOwner = await transaction
           .selectFrom('social_challenges')
-          .select('owner_user_id')
+          .select(['end_date', 'owner_user_id', 'status', 'timezone'])
           .where('id', '=', challengeId)
           .executeTakeFirst();
-        if (!challengeOwner) {
+        if (
+          !challengeOwner ||
+          challengeOwner.status !== 'active' ||
+          normalizeDateKey(challengeOwner.end_date) <
+            dateKeyInTimezone(new Date(), challengeOwner.timezone)
+        ) {
           throw new NotFoundException({
             code: 'CHALLENGE_INVITATION_NOT_FOUND',
             message: 'That challenge invitation was not found.',
@@ -1769,11 +1991,157 @@ export class SocialService {
           .where('challenge_id', '=', challengeId)
           .where('user_id', '=', user.id)
           .executeTakeFirstOrThrow();
+        await this.recordSocialRelationshipEvent(transaction, {
+          action:
+            input.decision === 'accepted'
+              ? 'challenge_invitation_accepted'
+              : 'challenge_invitation_declined',
+          actorUserId: user.id,
+          metadata: { challengeId },
+          requestId: idempotencyKey,
+          subjectUserId: challengeOwner.owner_user_id,
+        });
         return {
           challengeId,
           status: input.decision,
-          userId: user.id,
         };
+      },
+    );
+  }
+
+  cancelChallenge(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    challengeId: string,
+  ): Promise<ChallengeCancellationJson> {
+    return this.idempotency.execute<ChallengeCancellationJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { challengeId },
+        scope: 'social:challenges:cancel',
+      },
+      async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        const challenge = await transaction
+          .selectFrom('social_challenges')
+          .select(['end_date', 'owner_user_id', 'status', 'timezone'])
+          .where('id', '=', challengeId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!challenge || challenge.owner_user_id !== user.id) {
+          throw new NotFoundException({
+            code: 'CHALLENGE_NOT_FOUND',
+            message: 'That challenge is not available.',
+          });
+        }
+        if (challenge.status === 'cancelled') {
+          return { challengeId, state: 'cancelled' };
+        }
+        if (
+          challenge.status !== 'active' ||
+          normalizeDateKey(challenge.end_date) <
+            dateKeyInTimezone(new Date(), challenge.timezone)
+        ) {
+          throw new ConflictException({
+            code: 'CHALLENGE_ALREADY_ENDED',
+            message: 'An ended challenge cannot be cancelled.',
+          });
+        }
+        const now = new Date();
+        await transaction
+          .updateTable('social_challenges')
+          .set({ status: 'cancelled', updated_at: now })
+          .where('id', '=', challengeId)
+          .executeTakeFirstOrThrow();
+        await transaction
+          .updateTable('challenge_contact_invitations')
+          .set({ status: 'revoked' })
+          .where('challenge_id', '=', challengeId)
+          .where('status', '=', 'pending')
+          .execute();
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'challenge_cancelled',
+          actorUserId: user.id,
+          metadata: { challengeId },
+          requestId: idempotencyKey,
+          subjectUserId: null,
+        });
+        return { challengeId, state: 'cancelled' };
+      },
+    );
+  }
+
+  withdrawFromChallenge(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    challengeId: string,
+  ): Promise<ChallengeInvitationResponseDto> {
+    return this.idempotency.execute<ChallengeInvitationJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { challengeId },
+        scope: 'social:challenges:withdraw',
+      },
+      async (transaction) => {
+        const { user } = await this.ensureIdentity(principal, transaction);
+        const membership = await transaction
+          .selectFrom('social_challenge_members as membership')
+          .innerJoin(
+            'social_challenges as challenge',
+            'challenge.id',
+            'membership.challenge_id',
+          )
+          .select([
+            'challenge.owner_user_id',
+            'challenge.status as challenge_status',
+            'membership.role',
+            'membership.status',
+          ])
+          .where('membership.challenge_id', '=', challengeId)
+          .where('membership.user_id', '=', user.id)
+          .forUpdate('membership')
+          .executeTakeFirst();
+        if (!membership) {
+          throw new NotFoundException({
+            code: 'CHALLENGE_MEMBERSHIP_NOT_FOUND',
+            message: 'That challenge membership is not available.',
+          });
+        }
+        if (membership.role === 'owner') {
+          throw new ConflictException({
+            code: 'CHALLENGE_OWNER_CANNOT_WITHDRAW',
+            message: 'Challenge creators can cancel, but cannot withdraw.',
+          });
+        }
+        if (membership.status === 'withdrawn') {
+          return { challengeId, status: 'withdrawn' };
+        }
+        if (
+          membership.status !== 'accepted' ||
+          membership.challenge_status !== 'active'
+        ) {
+          throw new ConflictException({
+            code: 'CHALLENGE_WITHDRAWAL_UNAVAILABLE',
+            message: 'That challenge membership cannot be withdrawn.',
+          });
+        }
+        const now = new Date();
+        await transaction
+          .updateTable('social_challenge_members')
+          .set({ responded_at: now, status: 'withdrawn', updated_at: now })
+          .where('challenge_id', '=', challengeId)
+          .where('user_id', '=', user.id)
+          .executeTakeFirstOrThrow();
+        await this.recordSocialRelationshipEvent(transaction, {
+          action: 'challenge_member_withdrawn',
+          actorUserId: user.id,
+          metadata: { challengeId },
+          requestId: idempotencyKey,
+          subjectUserId: membership.owner_user_id,
+        });
+        return { challengeId, status: 'withdrawn' };
       },
     );
   }
@@ -1834,16 +2202,22 @@ export class SocialService {
       .map((challenge) => challenge.id);
     if (blockerOwnedChallengeIds.length > 0) {
       await transaction
-        .deleteFrom('social_challenge_members')
+        .updateTable('social_challenge_members')
+        .set({ responded_at: now, status: 'withdrawn', updated_at: now })
         .where('challenge_id', 'in', blockerOwnedChallengeIds)
         .where('user_id', '=', blockedUserId)
+        .where('role', '=', 'member')
+        .where('status', 'in', ['accepted', 'pending'])
         .execute();
     }
     if (blockedOwnedChallengeIds.length > 0) {
       await transaction
-        .deleteFrom('social_challenge_members')
+        .updateTable('social_challenge_members')
+        .set({ responded_at: now, status: 'withdrawn', updated_at: now })
         .where('challenge_id', 'in', blockedOwnedChallengeIds)
         .where('user_id', '=', blockerUserId)
+        .where('role', '=', 'member')
+        .where('status', 'in', ['accepted', 'pending'])
         .execute();
     }
 
@@ -1913,8 +2287,9 @@ export class SocialService {
     event: {
       action: SocialRelationshipEventAction;
       actorUserId: string;
+      metadata?: JsonObject;
       requestId: string;
-      subjectUserId: string;
+      subjectUserId: string | null;
     },
   ): Promise<unknown> {
     return transaction
@@ -1923,11 +2298,16 @@ export class SocialService {
         action: event.action,
         actor_user_id: event.actorUserId,
         created_at: new Date(),
-        metadata: {},
+        metadata: event.metadata ?? {},
         request_id: event.requestId,
         subject_user_id: event.subjectUserId,
       })
-      .executeTakeFirstOrThrow();
+      .onConflict((conflict) =>
+        conflict
+          .columns(['actor_user_id', 'action', 'request_id', 'subject_user_id'])
+          .doNothing(),
+      )
+      .executeTakeFirst();
   }
 
   private async loadSocialUsers(
@@ -2033,14 +2413,14 @@ export class SocialService {
         'challenge.scheduled_days',
         'challenge.scheduled_time_local',
         'challenge.start_date',
+        'challenge.status',
         'challenge.target_count',
         'challenge.target_period',
         'region.code as region_code',
         'region.metro_name as region_name',
-        'region.timezone as region_timezone',
+        'challenge.timezone',
       ])
       .where('challenge.id', 'in', challengeIds)
-      .where('challenge.status', '=', 'active')
       .orderBy('challenge.start_date')
       .orderBy('challenge.created_at', 'desc')
       .execute();
@@ -2068,7 +2448,7 @@ export class SocialService {
         'profiles.screen_name',
       ])
       .where('social_challenge_members.challenge_id', 'in', activeChallengeIds)
-      .where('social_challenge_members.status', '!=', 'declined')
+      .where('social_challenge_members.status', 'in', ['accepted', 'pending'])
       .orderBy('social_challenge_members.created_at', 'asc');
     if (blockedUserIds.size > 0) {
       memberQuery = memberQuery.where(
@@ -2115,6 +2495,7 @@ export class SocialService {
       verifiedDatesByUser.set(workout.user_id, dates);
     }
 
+    const serverNow = new Date();
     return visibleChallenges.flatMap((challenge) => {
       const startDate = normalizeDateKey(challenge.start_date);
       const endDate = normalizeDateKey(challenge.end_date);
@@ -2124,7 +2505,7 @@ export class SocialService {
         challenge.target_count,
         challenge.target_period,
       );
-      const challengeMembers = members
+      const internalChallengeMembers = members
         .filter((member) => member.challenge_id === challenge.id)
         .map((member) => {
           const dates = new Set(
@@ -2134,7 +2515,14 @@ export class SocialService {
           );
           if (challenge.activity === 'gym') {
             for (const date of verifiedDatesByUser.get(member.user_id) ?? []) {
-              if (date >= startDate && date <= endDate) {
+              if (
+                date >= startDate &&
+                date <= endDate &&
+                (challenge.scheduled_days.length === 0 ||
+                  challenge.scheduled_days.includes(
+                    this.weekdayForDateKey(date),
+                  ))
+              ) {
                 dates.add(date);
               }
             }
@@ -2151,26 +2539,80 @@ export class SocialService {
             },
             role: member.role,
             screenName: member.screen_name,
-            status: member.status,
+            status: member.status as 'accepted' | 'pending',
             streaks: this.toStreaksJson(streaksByUser.get(member.user_id)),
             userId: member.user_id,
           };
         });
-      const mine = challengeMembers.find((member) => member.userId === userId);
-      const owner = challengeMembers.find((member) => member.role === 'owner');
+      const mine = internalChallengeMembers.find(
+        (member) => member.userId === userId,
+      );
+      const owner = internalChallengeMembers.find(
+        (member) => member.role === 'owner',
+      );
       if (!owner) {
         return [];
       }
+      const challengeMembers: ChallengeMemberJson[] =
+        internalChallengeMembers.map((member) => ({
+          progress: member.progress,
+          role: member.role,
+          screenName: member.screenName,
+          status: member.status,
+          streaks: member.streaks,
+        }));
       const emptyProgress = {
         completedCount: 0,
         completionPercent: 0,
         targetTotal,
       };
+      const participantCount = challengeMembers.filter(
+        ({ status }) => status === 'accepted',
+      ).length;
+      const today = dateKeyInTimezone(serverNow, challenge.timezone);
+      const lifecycleState =
+        challenge.status === 'cancelled'
+          ? 'cancelled'
+          : challenge.status === 'archived' || endDate < today
+            ? 'ended'
+            : startDate > today
+              ? 'upcoming'
+              : 'active';
+      const isFull =
+        challenge.participant_limit !== null &&
+        participantCount >= challenge.participant_limit;
+      const state =
+        (lifecycleState === 'active' || lifecycleState === 'upcoming') && isFull
+          ? 'full'
+          : lifecycleState;
+      const scheduledToday =
+        challenge.scheduled_days.length === 0 ||
+        challenge.scheduled_days.includes(this.weekdayForDateKey(today));
+      const isOpen =
+        lifecycleState === 'active' || lifecycleState === 'upcoming';
       return [
         {
           activity: challenge.activity,
           activityLabel: challenge.activity_label,
+          canCancel: mine?.role === 'owner' && isOpen,
+          canCheckIn:
+            mine?.status === 'accepted' &&
+            lifecycleState === 'active' &&
+            scheduledToday,
+          canInvite:
+            mine?.role === 'owner' &&
+            challenge.challenge_type === 'friend' &&
+            isOpen,
+          canJoin:
+            challenge.challenge_type === 'regional' &&
+            !mine &&
+            isOpen &&
+            !isFull,
+          canRespond: mine?.status === 'pending' && isOpen,
+          canWithdraw:
+            mine?.role === 'member' && mine.status === 'accepted' && isOpen,
           challengeType: challenge.challenge_type,
+          contactInvitations: [],
           createdAt: challenge.created_at.toISOString(),
           description: challenge.description,
           endDate,
@@ -2188,26 +2630,26 @@ export class SocialService {
           name: challenge.name,
           ownerScreenName: owner.screenName,
           ownerStreaks: owner.streaks,
-          ownerUserId: challenge.owner_user_id,
-          participantCount: challengeMembers.filter(
-            ({ status }) => status === 'accepted',
-          ).length,
+          participantCount,
           participantLimit: challenge.participant_limit,
           regionCode: challenge.region_code ?? null,
           regionName: challenge.region_name ?? null,
           scheduledDays: challenge.scheduled_days,
           scheduledTime: challenge.scheduled_time_local?.slice(0, 5) ?? null,
+          serverTime: serverNow.toISOString(),
           startDate,
+          state,
           targetCount: challenge.target_count,
           targetPeriod: challenge.target_period,
-          timezone: challenge.region_timezone ?? null,
+          timezone: challenge.timezone,
         },
       ];
     });
   }
 
-  private async resolveRegionPolicy(
+  private async resolveApprovedRegionPolicy(
     executor: DatabaseExecutor,
+    userId: string,
     regionCode: string,
   ) {
     const now = new Date();
@@ -2215,6 +2657,8 @@ export class SocialService {
       .selectFrom('region_policies')
       .select(['code', 'id', 'metro_name', 'timezone'])
       .where('code', '=', regionCode.trim().toLowerCase())
+      .where('competition_enabled', '=', true)
+      .where('deleted_at', 'is', null)
       .where('valid_from', '<=', now)
       .where((expression) =>
         expression.or([
@@ -2230,7 +2674,121 @@ export class SocialService {
         message: 'Choose a supported GoGymGo region.',
       });
     }
+    await this.requireCurrentRegionVerification(executor, userId, region.id);
     return region;
+  }
+
+  private async requireCurrentRegionVerification(
+    executor: DatabaseExecutor,
+    userId: string,
+    regionPolicyId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const verification = await executor
+      .selectFrom('region_verifications as verification')
+      .innerJoin(
+        'region_policies as policy',
+        'policy.id',
+        'verification.region_policy_id',
+      )
+      .select('verification.id')
+      .where('verification.user_id', '=', userId)
+      .where('verification.region_policy_id', '=', regionPolicyId)
+      .where(currentRegionVerificationPredicate('verification', 'policy', now))
+      .executeTakeFirst();
+    if (!verification) {
+      throw new UnprocessableEntityException({
+        code: 'APPROVED_REGION_VERIFICATION_REQUIRED',
+        message:
+          'A current approved verification for this exact region is required.',
+      });
+    }
+  }
+
+  private requireChallengeTimezone(value: string | undefined): string {
+    const timezone = value?.trim();
+    if (!timezone) {
+      throw new BadRequestException({
+        code: 'CHALLENGE_TIMEZONE_REQUIRED',
+        message: 'Choose the local timezone for this friend challenge.',
+      });
+    }
+    try {
+      new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format();
+    } catch {
+      throw new BadRequestException({
+        code: 'CHALLENGE_TIMEZONE_INVALID',
+        message: 'Choose a valid IANA timezone.',
+      });
+    }
+    return timezone;
+  }
+
+  private assertChallengeStartsFromCurrentDate(
+    startDate: string,
+    timezone: string,
+    now: Date,
+  ): void {
+    if (startDate < dateKeyInTimezone(now, timezone)) {
+      throw new BadRequestException({
+        code: 'CHALLENGE_START_DATE_PAST',
+        message: 'A challenge cannot start before the current local date.',
+      });
+    }
+  }
+
+  private async createContactInvitation(
+    transaction: Transaction<Database>,
+    challengeId: string,
+    inviterUserId: string,
+    contact: { channel: 'email' | 'phone'; destination: string },
+    creationKeyHash: string,
+    now: Date,
+  ): Promise<ChallengeContactInvitationJson> {
+    // Opaque tokens are never stored in an idempotency response. A completed
+    // retry rotates the old row so exactly one link for the creation key works.
+    await transaction
+      .deleteFrom('challenge_contact_invitations')
+      .where('creation_key_hash', '=', creationKeyHash)
+      .execute();
+
+    const token = randomBytes(24).toString('base64url');
+    const expiresAt = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1_000);
+    const invitation = await transaction
+      .insertInto('challenge_contact_invitations')
+      .values({
+        challenge_id: challengeId,
+        channel: contact.channel,
+        creation_key_hash: creationKeyHash,
+        claimed_at: null,
+        claimed_by_user_id: null,
+        created_at: now,
+        destination_hash: socialInvitationHash(
+          `${token}:${contact.destination}`,
+        ),
+        destination_hint: contactDestinationHint(
+          contact.channel,
+          contact.destination,
+        ),
+        delivery_mode: 'link',
+        expires_at: expiresAt,
+        invite_token_hash: socialInvitationHash(token),
+        inviter_user_id: inviterUserId,
+        status: 'pending',
+        token_version: 1,
+      })
+      .returning(['destination_hint', 'id'])
+      .executeTakeFirstOrThrow();
+    return {
+      challengeId,
+      channel: contact.channel,
+      destinationHint: invitation.destination_hint,
+      deliveryMode: 'link',
+      deliveryStatus: 'not_sent',
+      expiresAt: expiresAt.toISOString(),
+      id: invitation.id,
+      joinUrl: `https://gogymgo.com/join?challengeInvite=${encodeURIComponent(token)}`,
+    };
   }
 
   private async assertAcceptedFriends(
@@ -2293,8 +2851,12 @@ export class SocialService {
     const end = new Date(`${endDateKey}T00:00:00.000Z`);
     const days = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
     if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(startDateKey) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDateKey) ||
       Number.isNaN(start.getTime()) ||
       Number.isNaN(end.getTime()) ||
+      start.toISOString().slice(0, 10) !== startDateKey ||
+      end.toISOString().slice(0, 10) !== endDateKey ||
       days < 1 ||
       days > 31
     ) {

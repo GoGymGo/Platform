@@ -529,6 +529,7 @@ export class PrivacyExportBuilder {
             'challenge.description',
             'challenge.target_count',
             'challenge.target_period',
+            'challenge.timezone',
             'challenge.start_date',
             'challenge.end_date',
             'challenge.location_name',
@@ -643,7 +644,7 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 9,
+          schemaVersion: 10,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',
@@ -653,10 +654,13 @@ export class PrivacyExportBuilder {
             'Raw contact-invitation destinations, hashes, and invite tokens',
           ],
           socialData: {
-            challengeCheckIns: challengeCheckIns.map((checkIn) => ({
-              ...checkIn,
-              eligible_date: normalizeDateKey(checkIn.eligible_date),
-            })),
+            challengeCheckIns: challengeCheckIns.map(
+              ({ workout_session_id: workoutSessionId, ...checkIn }) => ({
+                ...checkIn,
+                eligible_date: normalizeDateKey(checkIn.eligible_date),
+                verifiedWorkoutLinked: workoutSessionId !== null,
+              }),
+            ),
             challengeContactInvitations: challengeContactInvitations.map(
               (invitation) => ({
                 ...invitation,

@@ -18,6 +18,7 @@ const friendChallengeInput: CreateSocialChallengeInput = {
   startDate: '2026-07-01',
   targetCount: 4,
   targetPeriod: 'weekly',
+  timezone: 'America/Vancouver',
 };
 
 describe('social repository', () => {
@@ -34,6 +35,14 @@ describe('social repository', () => {
         () => social.createChallenge(friendChallengeInput),
         /not configured/i,
       ),
+      assert.rejects(
+        () => social.cancelChallenge('challenge-1'),
+        /not configured/i,
+      ),
+      assert.rejects(
+        () => social.withdrawFromChallenge('challenge-1'),
+        /not configured/i,
+      ),
     ]);
   });
 
@@ -48,7 +57,14 @@ describe('social repository', () => {
         return Promise.resolve({
           activity: 'gym',
           activityLabel: 'Gym visits',
+          canCancel: true,
+          canCheckIn: true,
+          canInvite: true,
+          canJoin: false,
+          canRespond: false,
+          canWithdraw: false,
           challengeType: 'friend',
+          contactInvitations: [],
           createdAt: '2026-07-15T00:00:00.000Z',
           description: null,
           endDate: '2026-07-31',
@@ -71,30 +87,44 @@ describe('social repository', () => {
             weekly: 2,
             yearly: 0,
           },
-          ownerUserId: 'user-1',
           participantCount: 1,
           participantLimit: null,
           regionCode: null,
           regionName: null,
           scheduledDays: [],
           scheduledTime: null,
+          serverTime: '2026-07-15T00:00:00.000Z',
           startDate: '2026-07-01',
+          state: 'active',
           targetCount: 4,
           targetPeriod: 'weekly',
-          timezone: null,
+          timezone: 'America/Vancouver',
         } as SocialChallenge) as Promise<TResponse>;
       },
     };
 
-    await createSocialRepository('api', api).createChallenge(
-      friendChallengeInput,
-    );
+    const social = createSocialRepository('api', api);
+    await social.createChallenge(friendChallengeInput);
+    await social.cancelChallenge('challenge-1');
+    await social.withdrawFromChallenge('challenge-1');
 
     assert.deepEqual(requests[0], {
       body: friendChallengeInput,
       method: 'POST',
       path: '/v1/social/challenges',
     });
+    assert.deepEqual(requests.slice(1), [
+      {
+        body: undefined,
+        method: 'DELETE',
+        path: '/v1/social/challenges/challenge-1',
+      },
+      {
+        body: undefined,
+        method: 'DELETE',
+        path: '/v1/social/challenges/challenge-1/members/me',
+      },
+    ]);
   });
 
   it('saves one alias contract for profile and social surfaces', async () => {

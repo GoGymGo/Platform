@@ -34,11 +34,13 @@ export interface components {
     CategoryLeaderboardDto: { competitionId: string; goal: number; rows: Array<components['schemas']["CategoryLeaderboardRowDto"]>; rulesVersion: string; scoringStatus: "final" | "provisional"; serverTime: string; settledPeriodCount: number };
     CategoryLeaderboardRowDto: { alias: string; categoryEntries: number; isCurrentUser: boolean; rank: number; streaks: components['schemas']["StreakCountsDto"]; verifiedDays: number };
     CategoryPodiumMultipliersResponseDto: { "1": number; "2": number; "3": number };
+    ChallengeCancellationResponseDto: { challengeId: string; state: "cancelled" };
     ChallengeCheckInResponseDto: { challengeId: string; checkInId: string; eligibleDate: string; source: "manual" | "verified_workout" };
-    ChallengeContactInvitationPreviewDto: { channel: "email" | "phone"; destinationHint: string; expiresAt: string };
+    ChallengeContactInputDto: { channel: "email" | "phone"; destination: string };
+    ChallengeContactInvitationPreviewDto: { challengeName: string; channel: "email" | "phone"; destinationHint: string; expiresAt: string; ownerScreenName: string };
     ChallengeContactInvitationResponseDto: { challengeId: string; channel: "email" | "phone"; deliveryMode: "link"; deliveryStatus: "not_sent"; destinationHint: string; expiresAt: string; id: string; joinUrl: string };
     ChallengeInvitationDecisionDto: { decision: "accepted" | "declined" };
-    ChallengeInvitationResponseDto: { challengeId: string; status: "pending" | "accepted" | "declined"; userId: string };
+    ChallengeInvitationResponseDto: { challengeId: string; status: "pending" | "accepted" | "declined" | "withdrawn" };
     ClaimRewardResponseDto: { awardedAt: string; awardRank: number; claimedAt: string | null; claimUrl: string | null; couponCode: string | null; fulfillmentInstructions: string | null; id: string; imageUrl: string | null; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; status: "awarded" | "cancelled" | "claimed" | "fulfilled" | "redeemed"; title: string };
     CompetitionMatchResponseDto: { availability: "matched" | "searching" | "solo"; entries: number; multiplier: 0 | 1 | 2 | 3; opponentAlias?: string | null; opponentBestStreak: number; opponentCurrentStreak: number; opponentMonthlyVerifiedDays: number; opponentStreaks: components['schemas']["StreakCountsDto"]; opponentVerifiedCount: number; periodIndex: number; region: string; scoringStatus: "projected" | "settled" };
     CompetitionProgressResponseDto: { bankedPrizeDrawEntries: number; categoryScore: number; competitionId: string; competitionStatus: "active" | "registration" | "settled" | "settling"; enrolledDateKey: string; goalDays: number; monthKey: string; prizeDrawEntries: number; projectedPrizeDrawEntries: number; referenceDateKey: string; rulesVersion: string; scoringStatus: "final" | "provisional"; serverTime: string; sessions: Array<components['schemas']["CompetitionSessionSummaryDto"]>; settledPeriodCount: number; updatedAt: string; verifiedDateKeys: Array<string>; verifiedDays: number };
@@ -60,7 +62,7 @@ export interface components {
     CreateRegionVerificationDto: { accuracyMeters: number; latitude: number; longitude: number; method: "device_location"; observedAt: string };
     CreateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
     CreateSessionDto: { clientStartedAt?: string; competitionId: string };
-    CreateSocialChallengeDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; challengeType: "friend" | "regional"; description?: string | null; endDate: string; invitedFriendUserIds: Array<string>; locationName?: string; name: string; participantLimit?: number; regionCode?: string; scheduledDays: Array<number>; scheduledTime?: string; startDate: string; targetCount: number; targetPeriod: "weekly" | "monthly" };
+    CreateSocialChallengeDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; challengeType: "friend" | "regional"; description?: string | null; endDate: string; invitedContacts?: Array<components['schemas']["ChallengeContactInputDto"]>; invitedFriendUserIds: Array<string>; locationName?: string; name: string; participantLimit?: number; regionCode?: string; scheduledDays: Array<number>; scheduledTime?: string; startDate: string; targetCount: number; targetPeriod: "weekly" | "monthly"; timezone?: string };
     CreateWeeklyChallengeRequestDto: { competitionId: string; goal: number; period: number; recipientUserId: string; region: string };
     CreatorApplicationDto: { channelUrl: string; region: string; sampleWorkoutUrl: string; workoutStyle: string };
     CreatorVideoSubmissionResponseDto: { createdAt: string; id: string; rightsAcceptedAt: string; rightsVersion: string; status: "approved" | "in_review" | "rejected" | "submitted" | "withdrawn"; title: string; videoUrl: string };
@@ -159,9 +161,9 @@ export interface components {
     SetVerificationConsentDto: { accepted: boolean; consentVersion: string };
     SettleDrawDto: { reason: string; seedReveal: string };
     SettledCompetitionResponseDto: { competitionName: string; monthKey: string; rewardCount: number };
-    SocialChallengeMemberDto: { progress: components['schemas']["SocialChallengeProgressDto"]; role: "owner" | "member"; screenName: string; status: "pending" | "accepted" | "declined"; streaks: components['schemas']["StreakCountsDto"]; userId: string };
+    SocialChallengeMemberDto: { progress: components['schemas']["SocialChallengeProgressDto"]; role: "owner" | "member"; screenName: string; status: "pending" | "accepted"; streaks: components['schemas']["StreakCountsDto"] };
     SocialChallengeProgressDto: { completedCount: number; completionPercent: number; targetTotal: number };
-    SocialChallengeResponseDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; challengeType: "friend" | "regional"; createdAt: string; description: string | null; endDate: string; id: string; locationName: string | null; members: Array<components['schemas']["SocialChallengeMemberDto"]>; myProgress: components['schemas']["SocialChallengeProgressDto"]; myRole: "owner" | "member"; myStatus: "pending" | "accepted" | "not_joined"; name: string; ownerScreenName: string; ownerStreaks: components['schemas']["StreakCountsDto"]; ownerUserId: string; participantCount: number; participantLimit: number | null; regionCode: string | null; regionName: string | null; scheduledDays: Array<number>; scheduledTime: string | null; startDate: string; targetCount: number; targetPeriod: "weekly" | "monthly"; timezone: string | null };
+    SocialChallengeResponseDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; canCancel: boolean; canCheckIn: boolean; canInvite: boolean; canJoin: boolean; canRespond: boolean; canWithdraw: boolean; challengeType: "friend" | "regional"; contactInvitations: Array<components['schemas']["ChallengeContactInvitationResponseDto"]>; createdAt: string; description: string | null; endDate: string; id: string; locationName: string | null; members: Array<components['schemas']["SocialChallengeMemberDto"]>; myProgress: components['schemas']["SocialChallengeProgressDto"]; myRole: "owner" | "member" | null; myStatus: "pending" | "accepted" | "not_joined"; name: string; ownerScreenName: string; ownerStreaks: components['schemas']["StreakCountsDto"]; participantCount: number; participantLimit: number | null; regionCode: string | null; regionName: string | null; scheduledDays: Array<number>; scheduledTime: string | null; serverTime: string; startDate: string; state: "upcoming" | "active" | "full" | "ended" | "cancelled"; targetCount: number; targetPeriod: "weekly" | "monthly"; timezone: string };
     SocialRelationshipActionResponseDto: { action: "blocked" | "cancelled" | "removed" | "unblocked"; requestId: string | null; userId: string };
     SocialUserSummaryDto: { screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     SponsorApplicationDto: { companyName: string; contactEmail: string; targetRegion: string };
@@ -227,6 +229,14 @@ export interface operations {
     parameters: { header: { "Idempotency-Key": string }; path: { sessionId: string } };
     responses: {
       "200": components['schemas']["SessionResponseDto"];
+    };
+  };
+  cancelChallenge: {
+    method: "DELETE";
+    path: "/v1/social/challenges/{challengeId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { challengeId: string } };
+    responses: {
+      "200": components['schemas']["ChallengeCancellationResponseDto"];
     };
   };
   cancelFriendRequest: {
@@ -1267,6 +1277,14 @@ export interface operations {
       "200": components['schemas']["EnrollmentResponseDto"];
     };
   };
+  withdrawFromChallenge: {
+    method: "DELETE";
+    path: "/v1/social/challenges/{challengeId}/members/me";
+    parameters: { header: { "Idempotency-Key": string }; path: { challengeId: string } };
+    responses: {
+      "200": components['schemas']["ChallengeInvitationResponseDto"];
+    };
+  };
 }
 
 export interface paths {
@@ -1584,6 +1602,9 @@ export interface paths {
   "/v1/social/challenges/discover": {
     get: operations["discoverChallenges"];
   };
+  "/v1/social/challenges/{challengeId}": {
+    delete: operations["cancelChallenge"];
+  };
   "/v1/social/challenges/{challengeId}/check-ins": {
     post: operations["checkInToChallenge"];
   };
@@ -1598,6 +1619,9 @@ export interface paths {
   };
   "/v1/social/challenges/{challengeId}/join": {
     post: operations["joinRegionalChallenge"];
+  };
+  "/v1/social/challenges/{challengeId}/members/me": {
+    delete: operations["withdrawFromChallenge"];
   };
   "/v1/social/friend-requests": {
     get: operations["listFriendRequests"];
@@ -1652,7 +1676,9 @@ export type CashFulfillmentRequestDto = components['schemas']["CashFulfillmentRe
 export type CategoryLeaderboardDto = components['schemas']["CategoryLeaderboardDto"];
 export type CategoryLeaderboardRowDto = components['schemas']["CategoryLeaderboardRowDto"];
 export type CategoryPodiumMultipliersResponseDto = components['schemas']["CategoryPodiumMultipliersResponseDto"];
+export type ChallengeCancellationResponseDto = components['schemas']["ChallengeCancellationResponseDto"];
 export type ChallengeCheckInResponseDto = components['schemas']["ChallengeCheckInResponseDto"];
+export type ChallengeContactInputDto = components['schemas']["ChallengeContactInputDto"];
 export type ChallengeContactInvitationPreviewDto = components['schemas']["ChallengeContactInvitationPreviewDto"];
 export type ChallengeContactInvitationResponseDto = components['schemas']["ChallengeContactInvitationResponseDto"];
 export type ChallengeInvitationDecisionDto = components['schemas']["ChallengeInvitationDecisionDto"];

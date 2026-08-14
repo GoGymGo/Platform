@@ -24,8 +24,12 @@ type FriendRequestDecisionResponse = {
 
 type ChallengeInvitationResponse = {
   challengeId: string;
-  status: 'accepted' | 'declined' | 'pending';
-  userId: string;
+  status: 'accepted' | 'declined' | 'pending' | 'withdrawn';
+};
+
+type ChallengeCancellationResponse = {
+  challengeId: string;
+  state: 'cancelled';
 };
 
 type MeResponse = {
@@ -37,6 +41,9 @@ export type SocialRepository = {
   blockMember: (memberUserId: string) => Promise<SocialRelationshipAction>;
   cancelFriendRequest: (requestId: string) => Promise<SocialRelationshipAction>;
   checkInToChallenge: (challengeId: string) => Promise<ChallengeCheckIn>;
+  cancelChallenge: (
+    challengeId: string,
+  ) => Promise<ChallengeCancellationResponse>;
   createChallenge: (
     input: CreateSocialChallengeInput,
   ) => Promise<SocialChallenge>;
@@ -81,6 +88,9 @@ export type SocialRepository = {
   sendFriendRequest: (recipientUserId: string) => Promise<FriendRequest>;
   updateScreenName: (screenName: string) => Promise<SocialProfile>;
   unblockMember: (blockedUserId: string) => Promise<SocialRelationshipAction>;
+  withdrawFromChallenge: (
+    challengeId: string,
+  ) => Promise<ChallengeInvitationResponse>;
 };
 
 export function createSocialRepository(
@@ -134,6 +144,13 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
           { idempotencyKey, method: 'POST' },
         ),
       ),
+    cancelChallenge: (challengeId) =>
+      mutate(`cancel-challenge:${challengeId}`, (idempotencyKey) =>
+        api.request<ChallengeCancellationResponse>(
+          `/v1/social/challenges/${encodeURIComponent(challengeId)}`,
+          { idempotencyKey, method: 'DELETE' },
+        ),
+      ),
     createChallenge: (input) =>
       mutate(
         `create-challenge:${mutationFingerprint(JSON.stringify(input))}`,
@@ -153,7 +170,7 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
         api.request<unknown>('/v1/streaks/me'),
       ]).then(([profile, streaks]) => {
         const parsed = parseStreakSummary(streaks);
-      return parsed ? toSocialProfile(profile, parsed) : null;
+        return parsed ? toSocialProfile(profile, parsed) : null;
       }),
     inviteFriendToChallenge: (challengeId, friendUserId) =>
       mutate(
@@ -295,6 +312,13 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
           { idempotencyKey, method: 'DELETE' },
         ),
       ),
+    withdrawFromChallenge: (challengeId) =>
+      mutate(`withdraw-challenge:${challengeId}`, (idempotencyKey) =>
+        api.request<ChallengeInvitationResponse>(
+          `/v1/social/challenges/${encodeURIComponent(challengeId)}/members/me`,
+          { idempotencyKey, method: 'DELETE' },
+        ),
+      ),
   };
 }
 
@@ -304,6 +328,7 @@ function createUnavailableSocialRepository(): SocialRepository {
 
   return {
     blockMember: unavailable,
+    cancelChallenge: unavailable,
     cancelFriendRequest: unavailable,
     checkInToChallenge: unavailable,
     createChallenge: unavailable,
@@ -325,6 +350,7 @@ function createUnavailableSocialRepository(): SocialRepository {
     sendFriendRequest: unavailable,
     unblockMember: unavailable,
     updateScreenName: unavailable,
+    withdrawFromChallenge: unavailable,
   };
 }
 

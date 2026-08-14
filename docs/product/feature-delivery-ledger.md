@@ -18,14 +18,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4` after PR #97 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-020 — Role-scoped admin access` on
-  `agent/ggg-020-role-scoped-admin-access`; creation follows this ledger merge.
+  `6eb0dc667c0c1489f2cba18125367eae3074352c` after PR #99 on 2026-08-14.
+- Active feature task: `GoGymGo Feature GGG-015 — Brand Rewards and claims` on
+  `agent/ggg-015-brand-rewards-claims`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
-  concurrency where supported, and no more than one Docker-backed task or stack
-  may run at a time.
+  concurrency where supported. The coordinator must pause for user direction
+  before any future Docker command; if resumed, no more than one Docker-backed
+  task or stack may run at a time.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
   Cloudflare, staging, or production inspection, mutation, or deployment is
   authorized here. The eventual AWS task is read-only and must be created only
@@ -547,14 +548,18 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - External providers / feature flag: AES-256-GCM key from secret manager and
   sponsor URLs/codes; no UI flag.
 - Current implementation / missing behavior: inventory triggers, unique slots,
-  cipher, claim reconstruction, and admin workflow exist. Missing production
-  encryption key, real approved inventory/terms, and staging secrecy/claim UAT.
+  cipher, claim reconstruction, and admin workflow exist. A fresh task must
+  verify the complete catalog-to-award-to-claim duty, fail-closed provider and
+  key behavior, and direct confidentiality/concurrency coverage. Production
+  encryption key, real approved inventory/terms, and staging secrecy/claim UAT
+  remain external release gates.
 - Required tests / operations / cloud dependency: insufficient/duplicate codes,
   over-allocation, draw slot bounds, concurrent/idempotent claims, ownership,
   plaintext log/export exclusion, fulfillment transitions; secret manager,
   database, sponsor assets.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-015 — Brand Rewards and
-  claims`; branch/PR/merge `unassigned`; status `AUDITED`.
+  claims`; branch `agent/ggg-015-brand-rewards-claims`; PR/merge `pending`;
+  status `IN_PROGRESS`.
 - Residual risks / blocker: never publish placeholder inventory or expose coupon
   plaintext; business/legal approval is external.
 
@@ -676,17 +681,29 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   partner staff read-only, normal member denied.
 - External providers / feature flag: Firebase and Cloudflare Access in production;
   no public registration or social-provider flag.
-- Current implementation / missing behavior: role-aware API and UI, same-origin
-  allowlisted proxy, and CI safeguards exist. First owner/partner assignments use
-  audited trusted scripts; dual-approval delegation is not implemented.
+- Current implementation / missing behavior: invitation-only password operator
+  entry, bounded identity restoration, authoritative access routing, forced-token
+  retry, and honest denied/expired/retry states are implemented. Firebase role
+  claims are discarded; revoked-token-aware password identity plus active
+  database roles, non-conflicting exact-gym assignments, and active gym state are
+  authoritative. The proxy strictly bounds operator paths, methods, upstreams,
+  headers, queries, JSON bodies, and failure disclosure. Owner bootstrap and
+  assignment/revocation tooling validates provider, identity, role, gym, and
+  assignment conflicts and remains locked, idempotent, reasoned, and audited.
+  No known repository behavior remains missing for this duty.
 - Required tests / operations / cloud dependency: provider restriction, member
   denial, role/scope matrix, cross-gym denial, proxy allowlist, bootstrap/
   assignment audit, revocation; Firebase, database, Cloudflare Access.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-020 — Role-scoped admin
-  access`; branch `agent/ggg-020-role-scoped-admin-access`; PR/merge `pending`;
-  status `IN_PROGRESS`.
-- Residual risks / blocker: adding administrators beyond the owner requires the
-  separately designed dual-approval security workflow or documented deferral.
+  access`; branch `agent/ggg-020-role-scoped-admin-access` (deleted after merge);
+  PR `#99`; merge `6eb0dc667c0c1489f2cba18125367eae3074352c`;
+  status `COMPLETE`.
+- Residual risks / blocker: hosted Firebase email/password and authorized-domain
+  configuration, Cloudflare Access policy, and hydrated environment UAT require
+  separate credentials/deployment authority. Delegation remains deliberately
+  owner-operated and fail-closed; no unapproved dual-approval flow was invented.
+  Four current Dependabot alerts map exactly to the documented temporary
+  exceptions expiring 2026-09-08. No cloud access or deployment occurred.
 
 ### GGG-021 — Contest, region, reward, legal, creator, and gym administration
 
@@ -1073,6 +1090,17 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed `GGG-020` through PR #99. Exact tested head
+  `f679eb4fc2766a5698e2d166bd9c80966706ad7b` was squash-merged as
+  `6eb0dc667c0c1489f2cba18125367eae3074352c`; all seven PR checks and all
+  applicable exact-main workflows passed, the remote branch was deleted, and
+  no cloud access or deployment occurred. Serial validation included the full
+  repository gate, 35 admin tests, 253 API unit tests, 28 API E2E tests, the
+  six-case partner authorization database suite, and the 37-case database
+  journey gate. The later user boundary now requires pausing before every future
+  Docker command. Dependency ordering assigns P0 `GGG-015` next because the
+  authoritative reward catalog, inventory, award, and claim boundary precedes
+  draw publication, pilot cash fulfillment, and the broader admin audit.
 - 2026-08-14 — Completed urgent `GGG-031` through PR #97. Exact tested head
   `7793c28aca7a8ff2c73280c90d3057ea21737bd1` was squash-merged as
   `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4`; every PR and main-push workflow

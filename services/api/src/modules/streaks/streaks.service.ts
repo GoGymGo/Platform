@@ -6,6 +6,7 @@ import { DatabaseService } from '../../database/database.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { ProfilesService } from '../profiles/profiles.service';
+import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
 import type { StreakSummaryResponseDto } from './dto/streak.dto';
 import { calculateStreaks } from './streak-calculation';
 
@@ -62,13 +63,7 @@ export class StreaksService {
       )
       .select('region.timezone')
       .where('verification.user_id', '=', userId)
-      .where('verification.status', '=', 'approved')
-      .where((expression) =>
-        expression.or([
-          expression('verification.expires_at', 'is', null),
-          expression('verification.expires_at', '>', now),
-        ]),
-      )
+      .where(currentRegionVerificationPredicate('verification', 'region', now))
       .orderBy('verification.verified_at', 'desc')
       .orderBy('verification.created_at', 'desc')
       .executeTakeFirst();

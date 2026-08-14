@@ -27,13 +27,17 @@ import type {
   GymScanResultDto,
   InterestSubmissionDto,
   InterestSubmissionResponseDto,
+  MemberRegionWaitlistRequestDto,
   OperatorInterestSubmissionDto,
   OperatorAuditHistoryDto,
   OperatorGymSessionDto,
   RegionWaitlistEntryDto,
+  RegionWaitlistReceiptDto,
   RegionWaitlistRequestDto,
+  UpdateRegionWaitlistStatusDto,
   UpdateGymLocationDto,
 } from './dto/gym.dto';
+import { regionalUpdatesConsentNoticeVersion } from './dto/gym.dto';
 import {
   canCompleteGymSession,
   canStartGymSession,
@@ -74,6 +78,17 @@ interface GymPresenceContext {
 interface DeletedGymJson extends JsonObject {
   id: string;
   status: 'deleted';
+}
+
+interface WaitlistEntryJson extends JsonObject {
+  consentNoticeVersion: string | null;
+  consentedAt: string | null;
+  createdAt: string;
+  email: string;
+  id: string;
+  requestedRegion: string;
+  source: string;
+  status: string;
 }
 
 interface PosterReward {
@@ -1041,34 +1056,101 @@ export class GymsService {
       });
   }
 
-  submitWaitlist(
+  async submitPublicWaitlist(
     input: RegionWaitlistRequestDto,
-  ): Promise<RegionWaitlistEntryDto> {
+  ): Promise<RegionWaitlistReceiptDto> {
+    this.assertWaitlistConsent(input);
+    await this.database.connection.transaction().execute((transaction) =>
+      this.upsertWaitlist(transaction, {
+        ...input,
+        email: input.email,
+        source: 'landing',
+        userId: null,
+      }),
+    );
+    return { status: 'received' };
+  }
+
+  async submitMemberWaitlist(
+    principal: AuthenticatedPrincipal,
+    input: MemberRegionWaitlistRequestDto,
+  ): Promise<RegionWaitlistReceiptDto> {
+    this.assertWaitlistConsent(input);
+    await this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const user = await this.profiles.ensureUser(principal, transaction);
+        this.profiles.requireVerifiedEmail(user);
+        await this.upsertWaitlist(transaction, {
+          ...input,
+          email: user.email,
+          source: 'member_onboarding',
+          userId: user.id,
+        });
+      });
+    return { status: 'received' };
+  }
+
+  private async upsertWaitlist(
+    transaction: Transaction<Database>,
+    input: MemberRegionWaitlistRequestDto & {
+      email: string;
+      source: 'landing' | 'member_onboarding';
+      userId: string | null;
+    },
+  ): Promise<void> {
     const now = new Date();
-    return this.database.connection
+    const requestedRegion = input.requestedRegion.trim().replace(/\s+/g, ' ');
+    if (requestedRegion.length < 2) {
+      throw new BadRequestException({
+        code: 'REGION_WAITLIST_REGION_INVALID',
+        message: 'Enter a city or region with at least two characters.',
+      });
+    }
+    const requestedRegionKey = requestedRegion.toLocaleLowerCase('en-CA');
+    await transaction
       .insertInto('region_waitlist_entries')
       .values({
+        consent_notice_version: input.consentNoticeVersion,
+        consented_at: now,
         country_code: input.countryCode?.trim().toUpperCase() ?? null,
         created_at: now,
         email: input.email.trim().toLowerCase(),
-        requested_region: input.requestedRegion.trim(),
-        source: 'member_onboarding',
+        requested_region: requestedRegion,
+        requested_region_key: requestedRegionKey,
+        source: input.source,
         status: 'waiting',
         subdivision_code: input.subdivisionCode?.trim().toUpperCase() ?? null,
         updated_at: now,
+        user_id: input.userId,
       })
       .onConflict((conflict) =>
-        conflict.columns(['email', 'requested_region']).doUpdateSet({
+        conflict.columns(['email', 'requested_region_key']).doUpdateSet({
+          consent_notice_version: input.consentNoticeVersion,
+          consented_at: now,
           country_code: input.countryCode?.trim().toUpperCase() ?? null,
-          source: 'member_onboarding',
-          status: 'waiting',
+          requested_region: requestedRegion,
           subdivision_code: input.subdivisionCode?.trim().toUpperCase() ?? null,
           updated_at: now,
+          user_id: sql`COALESCE(region_waitlist_entries.user_id, excluded.user_id)`,
         }),
       )
-      .returningAll()
-      .executeTakeFirstOrThrow()
-      .then((entry) => this.mapWaitlist(entry));
+      .executeTakeFirstOrThrow();
+  }
+
+  private assertWaitlistConsent(input: {
+    consent: true;
+    consentNoticeVersion: string;
+  }): void {
+    if (
+      input.consent !== true ||
+      input.consentNoticeVersion !== regionalUpdatesConsentNoticeVersion
+    ) {
+      throw new BadRequestException({
+        code: 'REGIONAL_UPDATES_CONSENT_REQUIRED',
+        message: 'Consent to regional availability emails is required.',
+      });
+    }
   }
 
   async submitInterest(
@@ -1158,6 +1240,82 @@ export class GymsService {
           .execute();
         return entries.map((entry) => this.mapWaitlist(entry));
       });
+  }
+
+  updateWaitlistStatus(
+    principal: AuthenticatedPrincipal,
+    entryId: string,
+    idempotencyKey: string,
+    input: UpdateRegionWaitlistStatusDto,
+  ): Promise<RegionWaitlistEntryDto> {
+    return this.idempotency.execute<WaitlistEntryJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { entryId, reason: input.reason, status: input.status },
+        responseCode: 200,
+        scope: 'operator:region-waitlist:update-status',
+      },
+      async (transaction) => {
+        const admin = await this.adminAuthorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const entry = await transaction
+          .selectFrom('region_waitlist_entries')
+          .selectAll()
+          .where('id', '=', entryId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!entry) {
+          throw new NotFoundException({
+            code: 'REGION_WAITLIST_ENTRY_NOT_FOUND',
+            message: 'The regional waitlist entry was not found.',
+          });
+        }
+        const transitions: Record<string, readonly string[]> = {
+          closed: [],
+          contacted: ['launched', 'closed'],
+          launched: ['closed'],
+          waiting: ['contacted', 'closed'],
+        };
+        if (!(transitions[entry.status] ?? []).includes(input.status)) {
+          throw new ConflictException({
+            code: 'REGION_WAITLIST_STATUS_TRANSITION_INVALID',
+            message: 'That regional waitlist status change is not allowed.',
+          });
+        }
+        if (
+          input.status !== 'closed' &&
+          (!entry.consented_at ||
+            entry.consent_notice_version !==
+              regionalUpdatesConsentNoticeVersion)
+        ) {
+          throw new ConflictException({
+            code: 'REGIONAL_UPDATES_CURRENT_CONSENT_REQUIRED',
+            message:
+              'A current regional-updates consent record is required before outreach.',
+          });
+        }
+        const updated = await transaction
+          .updateTable('region_waitlist_entries')
+          .set({ status: input.status, updated_at: new Date() })
+          .where('id', '=', entryId)
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await this.adminAuthorization.audit(transaction, {
+          action: 'region_waitlist.status_updated',
+          actorUserId: admin.id,
+          entityId: entryId,
+          entityType: 'region_waitlist_entries',
+          nextState: { status: input.status },
+          previousState: { status: entry.status },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return this.mapWaitlist(updated);
+      },
+    );
   }
 
   listInterest(
@@ -1715,14 +1873,18 @@ export class GymsService {
   }
 
   private mapWaitlist(entry: {
+    consent_notice_version: string | null;
+    consented_at: Date | null;
     created_at: Date;
     email: string;
     id: string;
     requested_region: string;
     source: string;
     status: string;
-  }): RegionWaitlistEntryDto {
+  }): WaitlistEntryJson {
     return {
+      consentNoticeVersion: entry.consent_notice_version,
+      consentedAt: entry.consented_at?.toISOString() ?? null,
       createdAt: entry.created_at.toISOString(),
       email: entry.email,
       id: entry.id,

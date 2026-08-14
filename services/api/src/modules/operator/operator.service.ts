@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Transaction } from 'kysely';
 import type { Environment } from '../../config/environment';
+import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { DatabaseService } from '../../database/database.service';
 import type { Database, JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
@@ -14,6 +15,7 @@ import { DrawsService } from '../draws/draws.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { ProfileMediaModerationService } from '../profiles/profile-media-moderation.service';
 import { SessionsService } from '../sessions/sessions.service';
+import { AdminAuthorizationService } from './admin-authorization.service';
 import { resolveWorkerHealth } from '../operations/operational-health';
 import type {
   DecidePartnerApplicationDto,
@@ -31,15 +33,22 @@ import type {
   VerifySessionDto,
 } from './dto/operator.dto';
 
+interface OperatorActionJson extends JsonObject {
+  id: string;
+  status: string;
+}
+
 @Injectable()
 export class OperatorService {
   constructor(
     private readonly database: DatabaseService,
+    private readonly idempotency: IdempotencyService,
     private readonly config: ConfigService<Environment, true>,
     private readonly draws: DrawsService,
     private readonly profiles: ProfilesService,
     private readonly profileMedia: ProfileMediaModerationService,
     private readonly sessions: SessionsService,
+    private readonly adminAuthorization: AdminAuthorizationService,
   ) {}
 
   async getSystemHealth(
@@ -150,6 +159,7 @@ export class OperatorService {
       .transaction()
       .execute(async (transaction) => {
         const operator = await this.requireOperator(principal, transaction);
+        const now = new Date();
         const [sessions, regions, partners, privacy, profileMedia] =
           await Promise.all([
             transaction
@@ -174,6 +184,21 @@ export class OperatorService {
                 'region.code as region_code',
               ])
               .where('verification.status', '=', 'pending')
+              .where('verification.method', '=', 'device_location')
+              .whereRef(
+                'verification.policy_version',
+                '=',
+                'region.policy_version',
+              )
+              .where('region.deleted_at', 'is', null)
+              .where('region.competition_enabled', '=', true)
+              .where('region.valid_from', '<=', now)
+              .where((expression) =>
+                expression.or([
+                  expression('region.valid_to', 'is', null),
+                  expression('region.valid_to', '>', now),
+                ]),
+              )
               .where('verification.user_id', '!=', operator.id)
               .orderBy('verification.created_at')
               .limit(100)
@@ -311,14 +336,45 @@ export class OperatorService {
     requestId: string,
     input: DecideRegionVerificationDto,
   ): Promise<OperatorActionResponseDto> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
-        const operator = await this.requireOperator(principal, transaction);
+    return this.idempotency.execute<OperatorActionJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: {
+          decision: input.decision,
+          expiresAt: input.expiresAt ?? null,
+          reason: input.reason,
+          verificationId,
+        },
+        responseCode: 200,
+        scope: 'operator:region-verification:decision',
+      },
+      async (transaction) => {
+        const operator = await this.adminAuthorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const now = new Date();
         const current = await transaction
-          .selectFrom('region_verifications')
-          .selectAll()
-          .where('id', '=', verificationId)
+          .selectFrom('region_verifications as verification')
+          .innerJoin(
+            'region_policies as policy',
+            'policy.id',
+            'verification.region_policy_id',
+          )
+          .select([
+            'verification.id',
+            'verification.method',
+            'verification.policy_version',
+            'verification.status',
+            'verification.user_id',
+            'policy.deleted_at as policy_deleted_at',
+            'policy.competition_enabled',
+            'policy.policy_version as current_policy_version',
+            'policy.valid_from',
+            'policy.valid_to',
+          ])
+          .where('verification.id', '=', verificationId)
           .forUpdate()
           .executeTakeFirst();
         if (!current) {
@@ -339,12 +395,40 @@ export class OperatorService {
             message: 'Operators cannot review their own region verification.',
           });
         }
+        if (
+          current.method !== 'device_location' ||
+          current.policy_deleted_at !== null ||
+          !current.competition_enabled ||
+          current.valid_from > now ||
+          (current.valid_to !== null && current.valid_to <= now) ||
+          current.policy_version !== current.current_policy_version
+        ) {
+          throw new ConflictException({
+            code: 'REGION_VERIFICATION_POLICY_STALE',
+            message:
+              'The pending verification no longer matches an active region policy.',
+          });
+        }
+        const defaultExpiresAt = new Date(
+          now.getTime() + 30 * 24 * 60 * 60 * 1_000,
+        );
+        const maximumExpiresAt =
+          current.valid_to && current.valid_to < defaultExpiresAt
+            ? current.valid_to
+            : defaultExpiresAt;
         const expiresAt =
           input.decision === 'approved'
             ? input.expiresAt
               ? new Date(input.expiresAt)
-              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000)
+              : maximumExpiresAt
             : null;
+        if (expiresAt && (expiresAt <= now || expiresAt > maximumExpiresAt)) {
+          throw new ConflictException({
+            code: 'REGION_VERIFICATION_EXPIRY_INVALID',
+            message:
+              'Approval expiry must be in the future and within the active policy window.',
+          });
+        }
         await transaction
           .updateTable('region_verifications')
           .set({
@@ -352,7 +436,7 @@ export class OperatorService {
             expires_at: expiresAt,
             reviewed_by_user_id: operator.id,
             status: input.decision,
-            verified_at: new Date(),
+            verified_at: now,
           })
           .where('id', '=', current.id)
           .executeTakeFirstOrThrow();
@@ -367,7 +451,8 @@ export class OperatorService {
           requestId,
         });
         return { id: current.id, status: input.decision };
-      });
+      },
+    );
   }
 
   decidePartnerApplication(

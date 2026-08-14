@@ -2,9 +2,13 @@ const PLATFORM_API_URL = process.env.GOGYMGO_API_URL?.replace(/\/+$/, "");
 
 type RegionalUpdatePayload = {
   contactFax?: unknown;
+  consent?: unknown;
+  consentNoticeVersion?: unknown;
   email?: unknown;
   requestedRegion?: unknown;
 };
+
+const regionalUpdatesConsentNoticeVersion = "regional-updates-2026-08-13-v1";
 
 function clean(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -26,7 +30,10 @@ export async function POST(request: Request) {
   try {
     payload = (await request.json()) as RegionalUpdatePayload;
   } catch {
-    return Response.json({ error: "Enter valid update details." }, { status: 400 });
+    return Response.json(
+      { error: "Enter valid update details." },
+      { status: 400 },
+    );
   }
 
   if (clean(payload.contactFax, 200)) {
@@ -35,23 +42,39 @@ export async function POST(request: Request) {
 
   const email = clean(payload.email, 320);
   const requestedRegion = clean(payload.requestedRegion, 160);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !requestedRegion) {
+  if (
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    requestedRegion.length < 2 ||
+    payload.consent !== true ||
+    payload.consentNoticeVersion !== regionalUpdatesConsentNoticeVersion
+  ) {
     return Response.json(
-      { error: "Enter your email and city or region." },
+      {
+        error:
+          "Enter your email and city or region, then confirm email updates.",
+      },
       { status: 400 },
     );
   }
 
   if (!PLATFORM_API_URL) {
     return Response.json(
-      { error: "Regional updates are temporarily unavailable. Please try again shortly." },
+      {
+        error:
+          "Regional updates are temporarily unavailable. Please try again shortly.",
+      },
       { status: 503 },
     );
   }
 
   try {
     const response = await fetch(`${PLATFORM_API_URL}/v1/region-waitlist`, {
-      body: JSON.stringify({ email, requestedRegion }),
+      body: JSON.stringify({
+        consent: true,
+        consentNoticeVersion: regionalUpdatesConsentNoticeVersion,
+        email,
+        requestedRegion,
+      }),
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",

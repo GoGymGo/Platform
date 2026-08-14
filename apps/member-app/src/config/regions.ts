@@ -110,6 +110,27 @@ export function createCompetitionRegion({
   };
 }
 
+export function isCompetitionRegionVerificationCurrent(
+  verification: CompetitionRegionVerification | null,
+  now = Date.now()
+) {
+  if (!verification) {
+    return false;
+  }
+  const expiresAt = Date.parse(verification.expiresAt);
+  const verifiedAt = Date.parse(verification.verifiedAt);
+  return (
+    Number.isFinite(expiresAt) &&
+    Number.isFinite(verifiedAt) &&
+    verifiedAt <= now + 5 * 60 * 1_000 &&
+    expiresAt > now &&
+    expiresAt > verifiedAt &&
+    Boolean(verification.regionCode.trim()) &&
+    Boolean(verification.regionPolicyId.trim()) &&
+    Boolean(verification.verificationId.trim())
+  );
+}
+
 function parseStoredRegion(value: unknown): CompetitionRegion | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;

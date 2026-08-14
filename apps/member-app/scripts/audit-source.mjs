@@ -631,11 +631,14 @@ function auditAuthoritativeRegionBoundary() {
     );
   }
   if (
-    !regionState.includes('parseCompetitionRegionVerification(storedRegion)') ||
-    !regionState.includes('userStorage.removeItem(competitionRegionStorageKey)')
+    regionState.includes('userStorage.getItem(competitionRegionStorageKey)') ||
+    regionState.includes('parseCompetitionRegionVerification(storedRegion)') ||
+    !regionState.includes('userStorage.removeItem(competitionRegionStorageKey)') ||
+    !regionState.includes('clearCompetitionRegion();') ||
+    !regionState.includes('setRegionError(true)')
   ) {
     issues.push(
-      'src/state/competitionRegion.tsx: invalid or expired server verification must clear the stored region'
+      'src/state/competitionRegion.tsx: local storage must never authorize region eligibility and synchronization failures must fail closed'
     );
   }
   if (!appData.includes('/v1/creator-workouts?region=')) {

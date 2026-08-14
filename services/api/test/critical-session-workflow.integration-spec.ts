@@ -255,7 +255,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       .values({
         evidence_metadata: {},
         expires_at: new Date(Date.now() + 24 * 60 * 60_000),
-        method: 'manual_review',
+        method: 'device_location',
         policy_version: 'policy-v1',
         region_policy_id: competition.region_policy_id,
         status: 'approved',
@@ -1390,7 +1390,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO region_verifications
          (user_id, region_policy_id, method, status, evidence_metadata,
           policy_version, verified_at, expires_at)
-       VALUES ($1, $2, 'manual_review', 'approved', '{}'::jsonb,
+       VALUES ($1, $2, 'device_location', 'approved', '{}'::jsonb,
                'policy-v1', $3, $4)
        RETURNING id`,
       [
@@ -1512,7 +1512,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         `INSERT INTO region_verifications
            (user_id, region_policy_id, method, status, evidence_metadata,
             policy_version, verified_at, expires_at)
-         VALUES ($1, $2, 'manual_review', 'approved', '{}'::jsonb,
+         VALUES ($1, $2, 'device_location', 'approved', '{}'::jsonb,
                  'policy-v1', $3, $4)
          RETURNING id`,
         [
@@ -1586,9 +1586,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await migrated.pool.query(
       `INSERT INTO region_verifications
          (user_id, region_policy_id, method, status, evidence_metadata,
-          policy_version, verified_at)
-       SELECT id, $1, 'manual_review', 'approved', '{}'::jsonb,
-              'policy-v1', current_timestamp
+          policy_version, verified_at, expires_at)
+       SELECT id, $1, 'device_location', 'approved', '{}'::jsonb,
+              'policy-v1', current_timestamp, current_timestamp + interval '1 day'
        FROM users
        WHERE firebase_uid LIKE 'capped-seeded-user-%'`,
       [region.rows[0].id],

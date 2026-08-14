@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { JsonObject } from '../../database/database.types';
@@ -45,6 +46,9 @@ export class AdminRegionConfigurationService {
     input: CreateRegionPolicyDto,
   ): Promise<AdminRegionPolicyResponseDto> {
     const boundary = parseMultiPolygon(input.boundary);
+    const geometrySha256 = createHash('sha256')
+      .update(JSON.stringify(boundary))
+      .digest('hex');
     assertTimezone(input.timezone);
     const validFrom = new Date(input.validFrom);
     const validTo = input.validTo ? new Date(input.validTo) : null;
@@ -133,9 +137,13 @@ export class AdminRegionConfigurationService {
           entityId: policy.id,
           entityType: 'region_policies',
           nextState: {
+            boundaryVersion: input.boundaryVersion,
             code: policy.code,
             competitionEnabled: input.competitionEnabled,
+            geometrySha256,
             policyVersion: policy.policy_version,
+            validFrom: input.validFrom,
+            validTo: input.validTo ?? null,
           },
           previousState: null,
           reason: input.reason,

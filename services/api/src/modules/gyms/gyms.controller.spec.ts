@@ -5,13 +5,16 @@ import type {
   CreateGymLocationDto,
   GymScanRequestDto,
   InterestSubmissionDto,
+  MemberRegionWaitlistRequestDto,
   OperatorReasonDto,
   RegionWaitlistRequestDto,
+  UpdateRegionWaitlistStatusDto,
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import {
   GymOperatorController,
   GymScansController,
+  MemberRegionWaitlistController,
   PilotSubmissionsController,
 } from './gyms.controller';
 import { GymsService } from './gyms.service';
@@ -46,7 +49,9 @@ describe('gym controllers', () => {
       .mockResolvedValue({ id: 'credential-1', status: 'revoked' }),
     scan: jest.fn().mockResolvedValue({ outcome: 'started' }),
     submitInterest: jest.fn().mockResolvedValue({ id: 'interest-1' }),
-    submitWaitlist: jest.fn().mockResolvedValue({ id: 'waitlist-1' }),
+    submitMemberWaitlist: jest.fn().mockResolvedValue({ status: 'received' }),
+    submitPublicWaitlist: jest.fn().mockResolvedValue({ status: 'received' }),
+    updateWaitlistStatus: jest.fn().mockResolvedValue({ id: 'waitlist-1' }),
     updateGymLocation: jest.fn().mockResolvedValue({ id: 'gym-1' }),
   };
   const gyms = mocks as unknown as GymsService;
@@ -72,6 +77,8 @@ describe('gym controllers', () => {
   it('forwards public regional and landing submissions', async () => {
     const controller = new PilotSubmissionsController(gyms);
     const waitlist = {
+      consent: true,
+      consentNoticeVersion: 'regional-updates-2026-08-13-v1',
       email: 'player@example.com',
       requestedRegion: 'Victoria, BC',
     } satisfies RegionWaitlistRequestDto;
@@ -86,13 +93,27 @@ describe('gym controllers', () => {
     } satisfies InterestSubmissionDto;
 
     await expect(controller.submitWaitlist(waitlist)).resolves.toEqual({
-      id: 'waitlist-1',
+      status: 'received',
     });
     await expect(controller.submitInterest(interest)).resolves.toEqual({
       id: 'interest-1',
     });
-    expect(mocks.submitWaitlist).toHaveBeenCalledWith(waitlist);
+    expect(mocks.submitPublicWaitlist).toHaveBeenCalledWith(waitlist);
     expect(mocks.submitInterest).toHaveBeenCalledWith(interest);
+
+    const memberController = new MemberRegionWaitlistController(gyms);
+    const memberInput = {
+      consent: true,
+      consentNoticeVersion: 'regional-updates-2026-08-13-v1',
+      requestedRegion: 'Nanaimo, BC',
+    } satisfies MemberRegionWaitlistRequestDto;
+    await expect(
+      memberController.submitWaitlist(principal, memberInput),
+    ).resolves.toEqual({ status: 'received' });
+    expect(mocks.submitMemberWaitlist).toHaveBeenCalledWith(
+      principal,
+      memberInput,
+    );
   });
 
   it('forwards every operator gym and pilot command', async () => {
@@ -117,6 +138,10 @@ describe('gym controllers', () => {
       reason: 'Cash handed to the winner in person.',
       rewardAwardId: '10000000-0000-4000-8000-000000000003',
     } satisfies CashFulfillmentRequestDto;
+    const waitlistUpdate = {
+      reason: 'Regional update email was sent.',
+      status: 'contacted',
+    } satisfies UpdateRegionWaitlistStatusDto;
 
     await controller.listGyms(principal);
     await controller.createGym(principal, idempotencyKey, create);
@@ -145,6 +170,12 @@ describe('gym controllers', () => {
     );
     await controller.listGymSessions(principal);
     await controller.listWaitlist(principal);
+    await controller.updateWaitlistStatus(
+      principal,
+      '10000000-0000-4000-8000-000000000004',
+      idempotencyKey,
+      waitlistUpdate,
+    );
     await controller.listInterest(principal);
     await controller.recordCashFulfillment(principal, idempotencyKey, cash);
     await controller.listAuditHistory(principal);
@@ -189,6 +220,12 @@ describe('gym controllers', () => {
     );
     expect(mocks.listGymSessions).toHaveBeenCalledWith(principal);
     expect(mocks.listWaitlist).toHaveBeenCalledWith(principal);
+    expect(mocks.updateWaitlistStatus).toHaveBeenCalledWith(
+      principal,
+      '10000000-0000-4000-8000-000000000004',
+      idempotencyKey,
+      waitlistUpdate,
+    );
     expect(mocks.listInterest).toHaveBeenCalledWith(principal);
     expect(mocks.recordCashFulfillment).toHaveBeenCalledWith(
       principal,

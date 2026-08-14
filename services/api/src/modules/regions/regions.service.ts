@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { JsonObject } from '../../database/database.types';
@@ -17,6 +18,7 @@ import type {
   RegionVerificationResponseDto,
 } from './dto/region.dto';
 import { buildRegionEvidence } from './region-evidence';
+import { currentRegionVerificationPredicate } from './current-region-verification';
 
 interface RegionVerificationJson extends JsonObject {
   createdAt: string;
@@ -34,6 +36,9 @@ interface RegionVerificationJson extends JsonObject {
 }
 
 const regionVerificationValidityMilliseconds = 30 * 24 * 60 * 60 * 1_000;
+const maximumLocationAgeMilliseconds = 30_000;
+const maximumLocationFutureSkewMilliseconds = 5_000;
+const maximumLocationAccuracyMeters = 50;
 
 @Injectable()
 export class RegionsService {
@@ -49,6 +54,7 @@ export class RegionsService {
       .selectFrom('region_policies')
       .selectAll()
       .where('deleted_at', 'is', null)
+      .where('competition_enabled', '=', true)
       .where('valid_from', '<=', now)
       .where((expression) =>
         expression.or([
@@ -87,6 +93,7 @@ export class RegionsService {
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        const now = new Date();
         let query = transaction
           .selectFrom('region_verifications as verification')
           .innerJoin(
@@ -110,9 +117,9 @@ export class RegionsService {
             'region.timezone',
           ])
           .where('verification.user_id', '=', user.id)
-          .where('verification.method', '=', 'device_location')
-          .where('verification.status', '=', 'approved')
-          .where('verification.expires_at', '>', new Date());
+          .where(
+            currentRegionVerificationPredicate('verification', 'region', now),
+          );
 
         if (regionCode) {
           query = query.where('region.code', '=', regionCode);
@@ -156,9 +163,11 @@ export class RegionsService {
     request: CreateRegionVerificationDto,
   ): Promise<RegionVerificationResponseDto> {
     const idempotencyRequest: JsonObject = {
+      accuracyMeters: request.accuracyMeters,
       latitude: request.latitude,
       longitude: request.longitude,
       method: request.method,
+      observedAt: request.observedAt,
     };
     const result = await this.idempotency.execute<RegionVerificationJson>(
       {
@@ -171,6 +180,35 @@ export class RegionsService {
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
         const now = new Date();
+        const observedAt = new Date(request.observedAt);
+        if (
+          !Number.isFinite(request.accuracyMeters) ||
+          request.accuracyMeters < 0 ||
+          request.accuracyMeters > maximumLocationAccuracyMeters
+        ) {
+          throw new UnprocessableEntityException({
+            code: 'REGION_LOCATION_ACCURACY_INSUFFICIENT',
+            message: 'A more accurate location reading is required.',
+          });
+        }
+        if (
+          observedAt.getTime() >
+          now.getTime() + maximumLocationFutureSkewMilliseconds
+        ) {
+          throw new UnprocessableEntityException({
+            code: 'REGION_LOCATION_TIMESTAMP_INVALID',
+            message: 'The location reading time could not be verified.',
+          });
+        }
+        if (
+          now.getTime() - observedAt.getTime() >
+          maximumLocationAgeMilliseconds
+        ) {
+          throw new UnprocessableEntityException({
+            code: 'REGION_LOCATION_STALE',
+            message: 'A fresh location reading is required.',
+          });
+        }
         const activePolicies = await transaction
           .selectFrom('region_policies as policy')
           .select([
@@ -182,6 +220,7 @@ export class RegionsService {
             'policy.policy_version',
             'policy.subdivision_code',
             'policy.timezone',
+            'policy.valid_to',
             sql<boolean>`ST_Covers(
               ${sql.ref('policy.boundary')}::geometry,
               ST_SetSRID(
@@ -224,9 +263,12 @@ export class RegionsService {
           });
         }
         const policy = policies[0];
-        const expiresAt = new Date(
+        let expiresAt = new Date(
           now.getTime() + regionVerificationValidityMilliseconds,
         );
+        if (policy.valid_to && policy.valid_to < expiresAt) {
+          expiresAt = policy.valid_to;
+        }
 
         const verification = await transaction
           .insertInto('region_verifications')

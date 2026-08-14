@@ -3,10 +3,16 @@ import { Platform } from 'react-native';
 
 import { assertLiveServicesAllowed } from '@/config/demoMode';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
+import {
+  competitionRegionLocationPolicy,
+  normalizeCompetitionRegionLocation
+} from '@/services/competitionRegionLocation';
 
 export type RegionCoordinates = {
+  accuracyMeters: number;
   latitude: number;
   longitude: number;
+  observedAt: string;
 };
 
 export type DeviceRegionVerificationResult =
@@ -16,6 +22,9 @@ export type DeviceRegionVerificationResult =
     }
   | { status: 'permission-denied' }
   | { status: 'mobile-required' }
+  | { status: 'location-inaccurate' }
+  | { status: 'location-stale' }
+  | { status: 'location-timeout' }
   | { status: 'location-unavailable' };
 
 export async function verifyCompetitionRegionWithDeviceLocation(): Promise<DeviceRegionVerificationResult> {
@@ -36,14 +45,42 @@ export async function verifyCompetitionRegionWithDeviceLocation(): Promise<Devic
       return { status: 'permission-denied' };
     }
 
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const locationResult = await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High
+      }).then((location) => ({ location, status: 'read' as const })),
+      new Promise<{ status: 'timeout' }>((resolve) => {
+        timeout = setTimeout(
+          () => resolve({ status: 'timeout' }),
+          competitionRegionLocationPolicy.timeoutMilliseconds
+        );
+      })
+    ]).finally(() => {
+      if (timeout) clearTimeout(timeout);
     });
+
+    if (locationResult.status === 'timeout') {
+      return { status: 'location-timeout' };
+    }
+
+    const location = normalizeCompetitionRegionLocation({
+      accuracyMeters: locationResult.location.coords.accuracy,
+      latitude: locationResult.location.coords.latitude,
+      longitude: locationResult.location.coords.longitude,
+      observedAtMilliseconds: locationResult.location.timestamp
+    });
+
+    if (location.status !== 'location-read') {
+      return location;
+    }
 
     return {
       coordinates: {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude
+        accuracyMeters: location.accuracyMeters,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        observedAt: location.observedAt
       },
       status: 'location-read'
     };

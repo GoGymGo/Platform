@@ -6,6 +6,9 @@ import { AppLink } from "./AppLink";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
+const regionalUpdatesConsentNoticeVersion =
+  "regional-updates-2026-08-13-v1";
+
 function readErrorMessage(error: unknown, fallbackError: string) {
   if (typeof error === "string" && error.trim()) {
     return error;
@@ -63,6 +66,8 @@ async function submitRegionalUpdates(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       contactFax: formData.get("contactFax"),
+      consent: formData.get("consent") === "on",
+      consentNoticeVersion: regionalUpdatesConsentNoticeVersion,
       email: formData.get("email"),
       requestedRegion: formData.get("region"),
     }),

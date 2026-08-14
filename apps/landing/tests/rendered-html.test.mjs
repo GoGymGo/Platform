@@ -221,7 +221,11 @@ test("regional updates are intentionally short and separate from registration", 
   assert.match(gymForm, /name="region"/);
   assert.doesNotMatch(gymForm, /name="fullName"|name="workoutStyle"|name="goalDays"|name="discoverySource"/);
   assert.match(forms, /regional availability emails/);
+  assert.match(forms, /regional-updates-2026-08-13-v1/);
+  assert.match(forms, /consent: formData\.get\("consent"\) === "on"/);
   assert.match(regionalRoute, /\/v1\/region-waitlist/);
+  assert.match(regionalRoute, /payload\.consent !== true/);
+  assert.match(regionalRoute, /consentNoticeVersion: regionalUpdatesConsentNoticeVersion/);
   assert.doesNotMatch(regionalRoute, /getDb|env\.DB/);
   assert.match(interestRoute, /\/v1\/interest-submissions/);
   assert.match(interestRoute, /Partnership requests are temporarily unavailable/);

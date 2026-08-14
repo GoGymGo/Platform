@@ -4,6 +4,7 @@ import { DatabaseService } from '../../database/database.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { dateKeyInTimezone } from '../competitions/competition-calendar';
 import { ProfilesService } from '../profiles/profiles.service';
+import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
 import { calculateStreaks } from '../streaks/streak-calculation';
 import type {
   CategoryLeaderboardDto,
@@ -40,12 +41,8 @@ export class LeaderboardsService {
           )
           .select(['competition.id', 'region.timezone'])
           .where('verification.user_id', '=', user.id)
-          .where('verification.status', '=', 'approved')
-          .where((expression) =>
-            expression.or([
-              expression('verification.expires_at', 'is', null),
-              expression('verification.expires_at', '>', now),
-            ]),
+          .where(
+            currentRegionVerificationPredicate('verification', 'region', now),
           )
           .where('competition.status', '=', 'active')
           .where('competition.starts_at', '<=', now)

@@ -50,9 +50,11 @@ export type RegionVerification = {
 };
 
 export type CreateRegionVerificationInput = {
+  accuracyMeters: number;
   latitude: number;
   longitude: number;
   method: 'device_location';
+  observedAt: string;
 };
 
 export type CurrentCompetition = {

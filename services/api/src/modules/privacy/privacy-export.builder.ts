@@ -92,6 +92,24 @@ export class PrivacyExportBuilder {
           .orderBy('verification.created_at')
           .execute();
 
+        const regionalUpdateRequests = await transaction
+          .selectFrom('region_waitlist_entries')
+          .select([
+            'id',
+            'requested_region',
+            'country_code',
+            'subdivision_code',
+            'source',
+            'status',
+            'consent_notice_version',
+            'consented_at',
+            'created_at',
+            'updated_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('created_at')
+          .execute();
+
         const enrollments = await transaction
           .selectFrom('competition_enrollments as enrollment')
           .innerJoin(
@@ -591,12 +609,13 @@ export class PrivacyExportBuilder {
           partnerApplications,
           privacyRequests,
           profileMedia,
+          regionalUpdateRequests,
           regionVerifications,
           request: {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 7,
+          schemaVersion: 8,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',

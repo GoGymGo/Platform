@@ -31,7 +31,11 @@ export async function closeCompetitionParticipation(
     .execute();
   await transaction
     .updateTable('weekly_challenge_requests')
-    .set({ responded_at: closedAt, status: 'cancelled' })
+    .set({
+      cancellation_reason: 'competition_cancelled',
+      responded_at: closedAt,
+      status: 'cancelled',
+    })
     .where('competition_id', '=', competitionId)
     .where('status', 'in', ['accepted', 'pending'])
     .execute();

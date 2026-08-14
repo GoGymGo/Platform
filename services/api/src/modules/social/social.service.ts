@@ -487,6 +487,7 @@ export class SocialService {
             message: 'You cannot perform that action on yourself.',
           });
         }
+        await lockSocialPair(transaction, user.id, friendUserId);
         const [userA, userB] = this.canonicalPair(user.id, friendUserId);
         const removed = await transaction
           .deleteFrom('friendships')
@@ -499,6 +500,13 @@ export class SocialService {
             message: 'That friendship was not found.',
           });
         }
+        await this.closeWeeklyChallengePairState(
+          transaction,
+          user.id,
+          friendUserId,
+          new Date(),
+          'friendship_removed',
+        );
         await this.recordSocialRelationshipEvent(transaction, {
           action: 'friendship_removed',
           actorUserId: user.id,
@@ -1839,19 +1847,39 @@ export class SocialService {
         .execute();
     }
 
+    await this.closeWeeklyChallengePairState(
+      transaction,
+      blockerUserId,
+      blockedUserId,
+      now,
+      'member_blocked',
+    );
+  }
+
+  private async closeWeeklyChallengePairState(
+    transaction: Transaction<Database>,
+    leftUserId: string,
+    rightUserId: string,
+    now: Date,
+    reason: 'friendship_removed' | 'member_blocked',
+  ): Promise<void> {
     await transaction
       .updateTable('weekly_challenge_requests')
-      .set({ responded_at: now, status: 'cancelled' })
-      .where('status', '=', 'pending')
+      .set({
+        cancellation_reason: reason,
+        responded_at: now,
+        status: 'cancelled',
+      })
+      .where('status', 'in', ['accepted', 'pending'])
       .where((expression) =>
         expression.or([
           expression.and([
-            expression('requester_user_id', '=', blockerUserId),
-            expression('recipient_user_id', '=', blockedUserId),
+            expression('requester_user_id', '=', leftUserId),
+            expression('recipient_user_id', '=', rightUserId),
           ]),
           expression.and([
-            expression('requester_user_id', '=', blockedUserId),
-            expression('recipient_user_id', '=', blockerUserId),
+            expression('requester_user_id', '=', rightUserId),
+            expression('recipient_user_id', '=', leftUserId),
           ]),
         ]),
       )
@@ -1860,19 +1888,20 @@ export class SocialService {
     await transaction
       .updateTable('competition_matches')
       .set({
-        outcome: { reason: 'member_blocked' },
+        outcome: { reason },
+        settled_at: now,
         status: 'cancelled',
       })
-      .where('status', 'in', ['matched', 'searching'])
+      .where('status', '=', 'matched')
       .where((expression) =>
         expression.or([
           expression.and([
-            expression('user_a_id', '=', blockerUserId),
-            expression('user_b_id', '=', blockedUserId),
+            expression('user_a_id', '=', leftUserId),
+            expression('user_b_id', '=', rightUserId),
           ]),
           expression.and([
-            expression('user_a_id', '=', blockedUserId),
-            expression('user_b_id', '=', blockerUserId),
+            expression('user_a_id', '=', rightUserId),
+            expression('user_b_id', '=', leftUserId),
           ]),
         ]),
       )

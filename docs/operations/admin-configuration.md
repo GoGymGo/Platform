@@ -61,6 +61,17 @@ event records the scoring and entrant snapshot hashes plus the number of
 reconciled progress rows. Retrying the same request and seed commitment returns
 the same locked snapshot; a different commitment is rejected.
 
+Weekly Challenge partners are never an operator selection. Operators configure
+only the versioned Contest multipliers and use the existing lifecycle/finalize
+preflight. Before finalization, verify every paired match references one
+accepted direct request, each player appears in at most one assignment for the
+week, all pending requests for closed weeks are cancelled, and projected member
+values are not counted as banked ledger entries. A provenance, participant, or
+session/ledger reconciliation failure must fail finalization closed; investigate
+the originating request, relationship, enrollment, or session and retry the
+same operation after an audited forward fix. Never insert a partner, edit a
+match outcome, or repair the ledger directly.
+
 Before revealing the seed, operators must verify the entrant count, total
 entries, and both 64-character snapshot hashes shown by the lock response. Do
 not repair `competition_progress`, `entry_ledger`, draw entries, or settlement
@@ -155,7 +166,8 @@ scoped and remain drafts until a GoGymGo administrator publishes them.
    issue or revoke, and a revoked/expired poster immediately fails a member
    enrollment attempt without changing enrollment state.
 9. Rehearse one complete Contest calendar in staging: every local-day and weekly
-   boundary, duplicate and disallowed sessions, late enrollment, one-entrant
-   pairing, Bonus Day, Perfect Month, reconciliation replay, draw-lock replay,
+   boundary, duplicate and disallowed sessions, late enrollment, direct
+   accepted-friend pairing plus solo settlement, Bonus Day, Perfect Month,
+   reconciliation replay, draw-lock replay,
    and recovery from an unresolved review. Retain the scoring/entrant hashes,
    audit event, settlement-input count, and exact release commit as evidence.

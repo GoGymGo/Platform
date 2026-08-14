@@ -19,14 +19,12 @@ import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import {
+  lockSocialPair,
   loadBlockedUserIds,
   requireSocialPairAvailable,
 } from '../social/social-block-policy';
 import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
-import {
-  calculateStreaks,
-  type StreakCounts,
-} from '../streaks/streak-calculation';
+import type { StreakCounts } from '../streaks/streak-calculation';
 import { loadPublicStreaks } from '../streaks/public-streaks';
 import {
   assertMonthKey,
@@ -39,7 +37,7 @@ import {
 } from './competition-registration';
 import { CompetitionLifecycleService } from './competition-lifecycle.service';
 import { parseCompetitionRules } from './competition-rules';
-import { CompetitionScoringService } from './competition-scoring.service';
+import { calculateWeeklyScore } from './competition-scoring';
 import type {
   CompetitionMatchResponseDto,
   CompetitionResponseDto,
@@ -76,13 +74,11 @@ interface EnrollmentWithdrawalJson extends JsonObject {
 
 interface WeeklyChallengeRequestJson extends JsonObject {
   id: string;
-  competitionId: string;
   createdAt: string;
   direction: 'incoming' | 'outgoing';
   goalDays: number;
   partnerAlias: string;
   partnerStreaks: StreakCountsJson;
-  partnerUserId: string;
   periodIndex: 1 | 2 | 3 | 4;
   status: 'accepted' | 'cancelled' | 'declined' | 'pending';
 }
@@ -104,7 +100,6 @@ export class CompetitionsService {
     private readonly legalDocuments: LegalDocumentsService,
     private readonly profiles: ProfilesService,
     private readonly lifecycle: CompetitionLifecycleService,
-    private readonly scoring: CompetitionScoringService,
   ) {}
 
   getCurrent(
@@ -513,12 +508,6 @@ export class CompetitionsService {
                 'This account is already enrolled with different enrollment details.',
             });
           }
-          await this.scoring.ensureWeeklyChallengeMatches(
-            transaction,
-            competition.id,
-            competition.month_key,
-            now,
-          );
           return {
             competitionId: competition.id,
             enrolledAt: existingEnrollment.enrolled_at.toISOString(),
@@ -764,13 +753,6 @@ export class CompetitionsService {
           userId: user.id,
           verifiedDaysDelta: 0,
         });
-        await this.scoring.ensureWeeklyChallengeMatches(
-          transaction,
-          competition.id,
-          competition.month_key,
-          now,
-        );
-
         return {
           competitionId: competition.id,
           enrolledAt: enrollment.enrolled_at.toISOString(),
@@ -857,7 +839,11 @@ export class CompetitionsService {
             .execute();
           await transaction
             .updateTable('weekly_challenge_requests')
-            .set({ responded_at: now, status: 'cancelled' })
+            .set({
+              cancellation_reason: 'enrollment_withdrawn',
+              responded_at: now,
+              status: 'cancelled',
+            })
             .where('competition_id', '=', competitionId)
             .where((expression) =>
               expression.or([
@@ -955,14 +941,15 @@ export class CompetitionsService {
     monthKey: string,
     goalDays: number,
     region: string,
-    competitionId?: string,
+    competitionId: string,
   ): Promise<CompetitionMatchResponseDto[]> {
     assertMonthKey(monthKey);
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        let competitionQuery = transaction
+        const now = new Date();
+        const competition = await transaction
           .selectFrom('competition_enrollments as enrollment')
           .innerJoin(
             'competitions as competition',
@@ -976,46 +963,31 @@ export class CompetitionsService {
           )
           .select([
             'competition.id',
+            'competition.ends_at',
             'competition.month_key',
+            'competition.rules',
+            'competition.rules_version',
+            'competition.starts_at',
+            'enrollment.enrolled_at',
+            'enrollment.goal_days',
             'policy.metro_name',
             'policy.timezone',
           ])
+          .where('competition.id', '=', competitionId)
           .where('enrollment.user_id', '=', user.id)
           .where('enrollment.goal_days', '=', goalDays)
           .where('enrollment.status', '=', 'active')
           .where('competition.month_key', '=', monthKey)
           .where('policy.code', '=', region)
-          .orderBy('competition.starts_at')
-          .orderBy('competition.id');
-        if (competitionId) {
-          competitionQuery = competitionQuery.where(
-            'competition.id',
-            '=',
-            competitionId,
-          );
-        }
-        const competition = await competitionQuery.executeTakeFirst();
+          .executeTakeFirst();
         if (!competition) {
           return [];
         }
-
-        await transaction
-          .selectFrom('competitions')
-          .select('id')
-          .where('id', '=', competition.id)
-          .forUpdate()
-          .executeTakeFirstOrThrow();
-        await this.scoring.ensureWeeklyChallengeMatches(
-          transaction,
-          competition.id,
-          competition.month_key,
-          new Date(),
-        );
-
         const matches = await transaction
           .selectFrom('competition_matches')
           .selectAll()
           .where('competition_id', '=', competition.id)
+          .where('status', '!=', 'cancelled')
           .where((expression) =>
             expression.or([
               expression('user_a_id', '=', user.id),
@@ -1026,86 +998,203 @@ export class CompetitionsService {
         const matchesByPeriod = new Map(
           matches.map((match) => [match.period_index, match]),
         );
-
-        return Promise.all(
-          buildCompetitionPeriods(monthKey).map(async (period) => {
-            const match = matchesByPeriod.get(period.index);
-            const opponentId =
-              match?.user_a_id === user.id
-                ? match.user_b_id
-                : (match?.user_a_id ?? null);
-            if (!match || !opponentId) {
-              return {
-                availability:
-                  match?.status === 'settled' ? 'solo' : 'searching',
-                opponentAlias: 'CHALLENGE_PENDING',
-                opponentBestStreak: 0,
-                opponentCurrentStreak: 0,
-                opponentMonthlyVerifiedDays: 0,
-                opponentStreaks: emptyStreaks(),
-                opponentUserId: null,
-                opponentVerifiedDateKeys: [],
-                periodIndex: period.index,
-                region: competition.metro_name.toUpperCase(),
-              };
-            }
-
-            const [opponent, periodVerifiedSessions, verifiedSessions] =
-              await Promise.all([
-                transaction
-                  .selectFrom('profiles')
-                  .select(['callsign', 'public_identity_mode', 'public_name'])
-                  .where('user_id', '=', opponentId)
-                  .executeTakeFirstOrThrow(),
-                transaction
-                  .selectFrom('workout_sessions')
-                  .select('eligible_date')
-                  .where('competition_id', '=', competition.id)
-                  .where('user_id', '=', opponentId)
-                  .where('status', '=', 'verified')
-                  .where('eligible_date', '>=', period.startDateKey)
-                  .where('eligible_date', '<=', period.endDateKey)
-                  .orderBy('eligible_date')
-                  .execute(),
-                transaction
-                  .selectFrom('workout_sessions')
-                  .select('eligible_date')
-                  .where('user_id', '=', opponentId)
-                  .where('status', '=', 'verified')
-                  .orderBy('eligible_date')
-                  .execute(),
-              ]);
-            const opponentVerifiedDateKeys = verifiedSessions.map((session) =>
-              normalizeDateKey(session.eligible_date),
-            );
-            const opponentStreaks = calculateStreaks(
-              opponentVerifiedDateKeys,
-              dateKeyInTimezone(new Date(), competition.timezone),
-            );
-
-            return {
-              availability: 'matched',
-              opponentAlias:
-                opponent.public_identity_mode === 'private'
-                  ? opponent.callsign
-                  : opponent.public_name || opponent.callsign,
-              opponentBestStreak: longestDailyStreak(opponentVerifiedDateKeys),
-              opponentCurrentStreak: opponentStreaks.daily,
-              opponentMonthlyVerifiedDays: new Set(
-                opponentVerifiedDateKeys.filter((dateKey) =>
-                  dateKey.startsWith(competition.month_key),
-                ),
-              ).size,
-              opponentStreaks,
-              opponentUserId: opponentId,
-              opponentVerifiedDateKeys: periodVerifiedSessions.map((session) =>
-                normalizeDateKey(session.eligible_date),
-              ),
-              periodIndex: period.index,
-              region: competition.metro_name.toUpperCase(),
-            };
-          }),
+        const opponentIds = [
+          ...new Set(
+            matches.flatMap((match) => {
+              const opponentId =
+                match.user_a_id === user.id ? match.user_b_id : match.user_a_id;
+              return opponentId ? [opponentId] : [];
+            }),
+          ),
+        ];
+        const [
+          blockedUserIds,
+          friendshipRows,
+          acceptedRequests,
+          assignmentRows,
+        ] = await Promise.all([
+          loadBlockedUserIds(transaction, user.id),
+          opponentIds.length === 0
+            ? Promise.resolve([])
+            : transaction
+                .selectFrom('friendships')
+                .select(['user_a_id', 'user_b_id'])
+                .where((expression) =>
+                  expression.or([
+                    expression.and([
+                      expression('user_a_id', '=', user.id),
+                      expression('user_b_id', 'in', opponentIds),
+                    ]),
+                    expression.and([
+                      expression('user_b_id', '=', user.id),
+                      expression('user_a_id', 'in', opponentIds),
+                    ]),
+                  ]),
+                )
+                .execute(),
+          transaction
+            .selectFrom('weekly_challenge_requests')
+            .select('id')
+            .where('competition_id', '=', competition.id)
+            .where('status', '=', 'accepted')
+            .execute(),
+          transaction
+            .selectFrom('weekly_challenge_assignment_participants')
+            .select('period_index')
+            .where('competition_id', '=', competition.id)
+            .where('user_id', '=', user.id)
+            .execute(),
+        ]);
+        const friendIds = new Set(
+          friendshipRows.map((friendship) =>
+            friendship.user_a_id === user.id
+              ? friendship.user_b_id
+              : friendship.user_a_id,
+          ),
         );
+        const acceptedRequestIds = new Set(
+          acceptedRequests.map((request) => request.id),
+        );
+        const assignedPeriodIndexes = new Set(
+          assignmentRows.map((assignment) => assignment.period_index),
+        );
+        const visibleOpponentIds = opponentIds.filter(
+          (opponentId) =>
+            friendIds.has(opponentId) && !blockedUserIds.has(opponentId),
+        );
+        const [profiles, streaksByUser, userSessions, opponentSessions] =
+          await Promise.all([
+            visibleOpponentIds.length === 0
+              ? Promise.resolve([])
+              : transaction
+                  .selectFrom('profiles')
+                  .select(['screen_name', 'user_id'])
+                  .where('user_id', 'in', visibleOpponentIds)
+                  .execute(),
+            loadPublicStreaks(transaction, visibleOpponentIds, now),
+            transaction
+              .selectFrom('workout_sessions')
+              .select('eligible_date')
+              .where('competition_id', '=', competition.id)
+              .where('user_id', '=', user.id)
+              .where('status', '=', 'verified')
+              .execute(),
+            visibleOpponentIds.length === 0
+              ? Promise.resolve([])
+              : transaction
+                  .selectFrom('workout_sessions')
+                  .select(['eligible_date', 'user_id'])
+                  .where('competition_id', '=', competition.id)
+                  .where('user_id', 'in', visibleOpponentIds)
+                  .where('status', '=', 'verified')
+                  .execute(),
+          ]);
+        const profileByUserId = new Map(
+          profiles.map((profile) => [profile.user_id, profile]),
+        );
+        const userDateKeys = userSessions.map((session) =>
+          normalizeDateKey(session.eligible_date),
+        );
+        const opponentDateKeysByUserId = new Map<string, string[]>();
+        for (const session of opponentSessions) {
+          const dateKeys = opponentDateKeysByUserId.get(session.user_id) ?? [];
+          dateKeys.push(normalizeDateKey(session.eligible_date));
+          opponentDateKeysByUserId.set(session.user_id, dateKeys);
+        }
+        const rules = parseCompetitionRules(competition.rules);
+
+        return buildCompetitionPeriods(monthKey).map((period) => {
+          const match = matchesByPeriod.get(period.index);
+          const opponentId = match
+            ? match.user_a_id === user.id
+              ? match.user_b_id
+              : match.user_a_id
+            : null;
+          const directPartnerIsVisible = Boolean(
+            opponentId &&
+            match?.weekly_challenge_request_id &&
+            acceptedRequestIds.has(match.weekly_challenge_request_id) &&
+            visibleOpponentIds.includes(opponentId),
+          );
+          const partnerDateKeys =
+            directPartnerIsVisible && opponentId
+              ? (opponentDateKeysByUserId.get(opponentId) ?? [])
+              : [];
+          const userVerifiedCount = uniqueDateCountInsidePeriod(
+            userDateKeys,
+            period.startDateKey,
+            period.endDateKey,
+          );
+          const opponentVerifiedCount = directPartnerIsVisible
+            ? uniqueDateCountInsidePeriod(
+                partnerDateKeys,
+                period.startDateKey,
+                period.endDateKey,
+              )
+            : 0;
+          const settledOutcome =
+            match?.status === 'settled'
+              ? weeklyOutcomeForUser(match.outcome, user.id)
+              : null;
+          const projectedOutcome = calculateWeeklyScore({
+            bothHitMultiplier: rules.weeklyChallengeBothHitMultiplier,
+            entriesPerVerifiedDay: rules.verifiedSessionPrizeDrawEntries,
+            goalDays: competition.goal_days,
+            opponentVerifiedDays: directPartnerIsVisible
+              ? opponentVerifiedCount
+              : null,
+            recoveryMultiplier: rules.weeklyChallengeRecoveryMultiplier,
+            verifiedDays: userVerifiedCount,
+          });
+          const outcome = settledOutcome ?? projectedOutcome;
+          const streaks =
+            directPartnerIsVisible && opponentId
+              ? (streaksByUser.get(opponentId) ?? emptyStreaks())
+              : emptyStreaks();
+          const statisticsAreVisible = Boolean(
+            opponentId && streaksByUser.has(opponentId),
+          );
+
+          return {
+            availability:
+              match?.status === 'settled'
+                ? directPartnerIsVisible && match.user_b_id
+                  ? ('matched' as const)
+                  : ('solo' as const)
+                : directPartnerIsVisible && match?.status === 'matched'
+                  ? ('matched' as const)
+                  : assignedPeriodIndexes.has(period.index)
+                    ? ('solo' as const)
+                    : ('searching' as const),
+            entries: outcome.entries,
+            multiplier: normalizeWeeklyMultiplier(outcome.multiplier),
+            opponentAlias:
+              directPartnerIsVisible && opponentId
+                ? (profileByUserId.get(opponentId)?.screen_name ?? null)
+                : null,
+            opponentBestStreak: statisticsAreVisible
+              ? longestDailyStreak(partnerDateKeys)
+              : 0,
+            opponentCurrentStreak: statisticsAreVisible ? streaks.daily : 0,
+            opponentMonthlyVerifiedDays: statisticsAreVisible
+              ? new Set(
+                  partnerDateKeys.filter((dateKey) =>
+                    dateKey.startsWith(competition.month_key),
+                  ),
+                ).size
+              : 0,
+            opponentStreaks: streaks,
+            opponentVerifiedCount: statisticsAreVisible
+              ? opponentVerifiedCount
+              : 0,
+            periodIndex: period.index,
+            region: competition.metro_name.toUpperCase(),
+            scoringStatus:
+              match?.status === 'settled'
+                ? ('settled' as const)
+                : ('projected' as const),
+          };
+        });
       });
   }
 
@@ -1122,8 +1211,10 @@ export class CompetitionsService {
           transaction,
           principal,
           monthKey,
+          query.competitionId,
           query.goal,
           query.region,
+          query.period,
         );
         if (
           await this.hasWeeklyChallengeMatch(
@@ -1173,7 +1264,7 @@ export class CompetitionsService {
                   .executeTakeFirst(),
                 transaction
                   .selectFrom('profiles')
-                  .select(['callsign', 'public_identity_mode', 'public_name'])
+                  .select('screen_name')
                   .where('user_id', '=', friendUserId)
                   .executeTakeFirst(),
                 this.hasWeeklyChallengeMatch(
@@ -1206,7 +1297,7 @@ export class CompetitionsService {
               return null;
             }
             return {
-              alias: publicAlias(profile),
+              alias: profile.screen_name,
               goalDays: query.goal,
               requestStatus: pendingRequest
                 ? ('pending' as const)
@@ -1238,8 +1329,10 @@ export class CompetitionsService {
           transaction,
           principal,
           monthKey,
+          query.competitionId,
           query.goal,
           query.region,
+          query.period,
         );
         const requests = await transaction
           .selectFrom('weekly_challenge_requests')
@@ -1281,7 +1374,6 @@ export class CompetitionsService {
               return this.toWeeklyChallengeRequestResponse(
                 transaction,
                 request,
-                context.competitionId,
                 direction,
                 partnerUserId,
               );
@@ -1302,6 +1394,7 @@ export class CompetitionsService {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
         request: {
+          competitionId: input.competitionId,
           goal: input.goal,
           monthKey,
           period: input.period,
@@ -1312,12 +1405,17 @@ export class CompetitionsService {
         scope: 'weekly-challenge-requests:create',
       },
       async (transaction) => {
+        const now = new Date();
         const context = await this.requireWeeklyChallengeContext(
           transaction,
           principal,
           monthKey,
+          input.competitionId,
           input.goal,
           input.region,
+          input.period,
+          now,
+          true,
         );
         if (context.userId === input.recipientUserId) {
           throw new UnprocessableEntityException({
@@ -1325,6 +1423,11 @@ export class CompetitionsService {
             message: 'Choose another player for your Weekly Challenge.',
           });
         }
+        await lockSocialPair(
+          transaction,
+          context.userId,
+          input.recipientUserId,
+        );
         await requireSocialPairAvailable(
           transaction,
           context.userId,
@@ -1393,8 +1496,10 @@ export class CompetitionsService {
         const created = await transaction
           .insertInto('weekly_challenge_requests')
           .values({
+            accepted_at: null,
+            cancellation_reason: null,
             competition_id: context.competitionId,
-            created_at: new Date(),
+            created_at: now,
             goal_days: input.goal,
             period_index: input.period,
             recipient_user_id: input.recipientUserId,
@@ -1406,7 +1511,6 @@ export class CompetitionsService {
         return this.toWeeklyChallengeRequestResponse(
           transaction,
           created,
-          context.competitionId,
           'outgoing',
           input.recipientUserId,
         );
@@ -1429,24 +1533,91 @@ export class CompetitionsService {
       },
       async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        const requestSnapshot = await transaction
+          .selectFrom('weekly_challenge_requests')
+          .select([
+            'competition_id',
+            'goal_days',
+            'period_index',
+            'recipient_user_id',
+            'requester_user_id',
+          ])
+          .where('id', '=', requestId)
+          .executeTakeFirst();
+        if (!requestSnapshot) {
+          throw new NotFoundException({
+            code: 'WEEKLY_CHALLENGE_REQUEST_NOT_FOUND',
+            message: 'The Weekly Challenge request was not found.',
+          });
+        }
+        if (requestSnapshot.recipient_user_id !== user.id) {
+          throw new ConflictException({
+            code: 'WEEKLY_CHALLENGE_REQUEST_FORBIDDEN',
+            message: 'Only the invited player can respond to this request.',
+          });
+        }
+        const now = new Date();
+        if (decision === 'declined') {
+          const request = await transaction
+            .selectFrom('weekly_challenge_requests')
+            .selectAll()
+            .where('id', '=', requestId)
+            .forUpdate()
+            .executeTakeFirstOrThrow();
+          if (request.status !== 'pending') {
+            throw new ConflictException({
+              code: 'WEEKLY_CHALLENGE_REQUEST_RESOLVED',
+              message:
+                'This Weekly Challenge request has already been resolved.',
+            });
+          }
+          const updated = await transaction
+            .updateTable('weekly_challenge_requests')
+            .set({ responded_at: now, status: 'declined' })
+            .where('id', '=', request.id)
+            .where('status', '=', 'pending')
+            .returningAll()
+            .executeTakeFirstOrThrow();
+          return this.toWeeklyChallengeRequestResponse(
+            transaction,
+            updated,
+            'incoming',
+            request.requester_user_id,
+          );
+        }
+        const competition = await transaction
+          .selectFrom('competitions as competition')
+          .innerJoin(
+            'region_policies as policy',
+            'policy.id',
+            'competition.region_policy_id',
+          )
+          .select(['competition.month_key', 'policy.code'])
+          .where('competition.id', '=', requestSnapshot.competition_id)
+          .executeTakeFirstOrThrow();
+        const context = await this.requireWeeklyChallengeContext(
+          transaction,
+          principal,
+          competition.month_key,
+          requestSnapshot.competition_id,
+          requestSnapshot.goal_days,
+          competition.code,
+          requestSnapshot.period_index,
+          now,
+          true,
+        );
+        await lockSocialPair(
+          transaction,
+          requestSnapshot.requester_user_id,
+          requestSnapshot.recipient_user_id,
+        );
         const request = await transaction
           .selectFrom('weekly_challenge_requests')
           .selectAll()
           .where('id', '=', requestId)
           .forUpdate()
           .executeTakeFirst();
-        if (!request) {
-          throw new NotFoundException({
-            code: 'WEEKLY_CHALLENGE_REQUEST_NOT_FOUND',
-            message: 'The Weekly Challenge request was not found.',
-          });
-        }
-        if (request.recipient_user_id !== user.id) {
-          throw new ConflictException({
-            code: 'WEEKLY_CHALLENGE_REQUEST_FORBIDDEN',
-            message: 'Only the invited player can respond to this request.',
-          });
-        }
+        if (!request) throw new Error('Weekly Challenge request disappeared.');
         if (request.status !== 'pending') {
           throw new ConflictException({
             code: 'WEEKLY_CHALLENGE_REQUEST_RESOLVED',
@@ -1459,107 +1630,159 @@ export class CompetitionsService {
           request.recipient_user_id,
         );
 
-        const now = new Date();
-        if (decision === 'accepted') {
-          const enrollments = await transaction
-            .selectFrom('competition_enrollments')
-            .select(['goal_days', 'user_id'])
-            .where('competition_id', '=', request.competition_id)
-            .where('status', '=', 'active')
-            .where('goal_days', '=', request.goal_days)
-            .where('user_id', 'in', [
-              request.requester_user_id,
-              request.recipient_user_id,
-            ])
-            .forUpdate()
-            .execute();
-          if (new Set(enrollments.map(({ user_id }) => user_id)).size !== 2) {
-            throw new UnprocessableEntityException({
-              code: 'WEEKLY_CHALLENGE_COMMITMENT_MISMATCH',
-              message:
-                'Both players must remain enrolled with the same Weekly Goal.',
-            });
-          }
-          if (
-            await this.hasWeeklyChallengeMatch(
-              transaction,
-              request.competition_id,
-              request.period_index,
-              [request.requester_user_id, request.recipient_user_id],
-            )
-          ) {
-            throw new ConflictException({
-              code: 'WEEKLY_CHALLENGE_ALREADY_ASSIGNED',
-              message:
-                'One of these players already has a Weekly Challenge for this week.',
-            });
-          }
-          const competition = await transaction
-            .selectFrom('competitions')
-            .select('month_key')
-            .where('id', '=', request.competition_id)
-            .executeTakeFirstOrThrow();
-          const period = buildCompetitionPeriods(competition.month_key).find(
-            ({ index }) => index === request.period_index,
-          );
-          if (!period) {
-            throw new UnprocessableEntityException({
-              code: 'WEEKLY_CHALLENGE_PERIOD_INVALID',
-              message: 'The selected Weekly Challenge week is invalid.',
-            });
-          }
-          const [userAId, userBId] = [
+        await this.requireAcceptedFriendship(
+          transaction,
+          request.requester_user_id,
+          request.recipient_user_id,
+        );
+        const enrollments = await transaction
+          .selectFrom('competition_enrollments')
+          .select(['goal_days', 'user_id'])
+          .where('competition_id', '=', request.competition_id)
+          .where('status', '=', 'active')
+          .where('goal_days', '=', request.goal_days)
+          .where('user_id', 'in', [
             request.requester_user_id,
             request.recipient_user_id,
-          ].sort();
-          await transaction
-            .insertInto('competition_matches')
-            .values({
-              competition_id: request.competition_id,
-              created_at: now,
-              outcome: null,
-              period_end_date: period.endDateKey,
-              period_index: request.period_index,
-              period_start_date: period.startDateKey,
-              settled_at: null,
-              status: 'matched',
-              user_a_id: userAId,
-              user_b_id: userBId,
-            })
-            .execute();
-          await transaction
-            .updateTable('weekly_challenge_requests')
-            .set({ responded_at: now, status: 'cancelled' })
-            .where('id', '!=', request.id)
-            .where('competition_id', '=', request.competition_id)
-            .where('period_index', '=', request.period_index)
-            .where('status', '=', 'pending')
-            .where((expression) =>
-              expression.or([
-                expression('requester_user_id', 'in', [
-                  request.requester_user_id,
-                  request.recipient_user_id,
-                ]),
-                expression('recipient_user_id', 'in', [
-                  request.requester_user_id,
-                  request.recipient_user_id,
-                ]),
+          ])
+          .forUpdate()
+          .execute();
+        if (new Set(enrollments.map(({ user_id }) => user_id)).size !== 2) {
+          throw new UnprocessableEntityException({
+            code: 'WEEKLY_CHALLENGE_COMMITMENT_MISMATCH',
+            message:
+              'Both players must remain enrolled with the same Weekly Goal.',
+          });
+        }
+        if (
+          await this.hasWeeklyChallengeMatch(
+            transaction,
+            request.competition_id,
+            request.period_index,
+            [request.requester_user_id, request.recipient_user_id],
+          )
+        ) {
+          throw new ConflictException({
+            code: 'WEEKLY_CHALLENGE_ALREADY_ASSIGNED',
+            message:
+              'One of these players already has a Weekly Challenge for this week.',
+          });
+        }
+        const [userAId, userBId] = [
+          request.requester_user_id,
+          request.recipient_user_id,
+        ].sort();
+        const updated = await transaction
+          .updateTable('weekly_challenge_requests')
+          .set({ accepted_at: now, responded_at: now, status: 'accepted' })
+          .where('id', '=', request.id)
+          .where('status', '=', 'pending')
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await transaction
+          .insertInto('competition_matches')
+          .values({
+            competition_id: request.competition_id,
+            created_at: now,
+            outcome: null,
+            period_end_date: context.period.endDateKey,
+            period_index: request.period_index,
+            period_start_date: context.period.startDateKey,
+            settled_at: null,
+            status: 'matched',
+            user_a_id: userAId,
+            user_b_id: userBId,
+            weekly_challenge_request_id: request.id,
+          })
+          .executeTakeFirstOrThrow();
+        await transaction
+          .updateTable('weekly_challenge_requests')
+          .set({
+            cancellation_reason: 'conflicting_request_accepted',
+            responded_at: now,
+            status: 'cancelled',
+          })
+          .where('id', '!=', request.id)
+          .where('competition_id', '=', request.competition_id)
+          .where('period_index', '=', request.period_index)
+          .where('status', '=', 'pending')
+          .where((expression) =>
+            expression.or([
+              expression('requester_user_id', 'in', [
+                request.requester_user_id,
+                request.recipient_user_id,
               ]),
-            )
-            .execute();
+              expression('recipient_user_id', 'in', [
+                request.requester_user_id,
+                request.recipient_user_id,
+              ]),
+            ]),
+          )
+          .execute();
+        return this.toWeeklyChallengeRequestResponse(
+          transaction,
+          updated,
+          'incoming',
+          request.requester_user_id,
+        );
+      },
+    );
+  }
+
+  async cancelWeeklyChallengeRequest(
+    principal: AuthenticatedPrincipal,
+    requestId: string,
+    idempotencyKey: string,
+  ): Promise<WeeklyChallengeRequestResponseDto> {
+    return this.idempotency.execute<WeeklyChallengeRequestJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { requestId },
+        scope: 'weekly-challenge-requests:cancel',
+      },
+      async (transaction) => {
+        const user = await this.profiles.ensureUser(principal, transaction);
+        const request = await transaction
+          .selectFrom('weekly_challenge_requests')
+          .selectAll()
+          .where('id', '=', requestId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!request) {
+          throw new NotFoundException({
+            code: 'WEEKLY_CHALLENGE_REQUEST_NOT_FOUND',
+            message: 'The Weekly Challenge request was not found.',
+          });
+        }
+        if (request.requester_user_id !== user.id) {
+          throw new ConflictException({
+            code: 'WEEKLY_CHALLENGE_REQUEST_FORBIDDEN',
+            message: 'Only the inviting player can cancel this request.',
+          });
+        }
+        if (request.status !== 'pending') {
+          throw new ConflictException({
+            code: 'WEEKLY_CHALLENGE_REQUEST_RESOLVED',
+            message: 'This Weekly Challenge request has already been resolved.',
+          });
         }
         const updated = await transaction
           .updateTable('weekly_challenge_requests')
-          .set({ responded_at: now, status: decision })
+          .set({
+            cancellation_reason: 'requester_cancelled',
+            responded_at: new Date(),
+            status: 'cancelled',
+          })
           .where('id', '=', request.id)
+          .where('status', '=', 'pending')
           .returningAll()
           .executeTakeFirstOrThrow();
         return this.toWeeklyChallengeRequestResponse(
           transaction,
           updated,
-          request.competition_id,
-          'incoming',
-          request.requester_user_id,
+          'outgoing',
+          request.recipient_user_id,
         );
       },
     );
@@ -1569,10 +1792,22 @@ export class CompetitionsService {
     transaction: Transaction<Database>,
     principal: AuthenticatedPrincipal,
     monthKey: string,
+    competitionId: string,
     goalDays: number,
     region: string,
+    periodIndex: number,
+    now = new Date(),
+    lockCompetition = false,
   ) {
     const user = await this.profiles.ensureUser(principal, transaction);
+    if (lockCompetition) {
+      await transaction
+        .selectFrom('competitions')
+        .select('id')
+        .where('id', '=', competitionId)
+        .forUpdate()
+        .executeTakeFirst();
+    }
     const competition = await transaction
       .selectFrom('competitions as competition')
       .innerJoin(
@@ -1580,14 +1815,46 @@ export class CompetitionsService {
         'policy.id',
         'competition.region_policy_id',
       )
-      .select(['competition.id'])
+      .select([
+        'competition.ends_at',
+        'competition.id',
+        'competition.starts_at',
+        'competition.status',
+        'policy.timezone',
+      ])
+      .where('competition.id', '=', competitionId)
       .where('competition.month_key', '=', monthKey)
       .where('policy.code', '=', region)
+      .where('competition.deleted_at', 'is', null)
       .executeTakeFirst();
     if (!competition) {
       throw new NotFoundException({
         code: 'COMPETITION_NOT_FOUND',
         message: 'The regional competition was not found.',
+      });
+    }
+    if (
+      competition.status !== 'active' ||
+      competition.starts_at > now ||
+      competition.ends_at <= now
+    ) {
+      throw new UnprocessableEntityException({
+        code: 'WEEKLY_CHALLENGE_CONTEST_NOT_ACTIVE',
+        message: 'Weekly Challenge requests require an active Contest.',
+      });
+    }
+    const period = buildCompetitionPeriods(monthKey).find(
+      ({ index }) => index === periodIndex,
+    );
+    const regionalDateKey = dateKeyInTimezone(now, competition.timezone);
+    if (
+      !period ||
+      regionalDateKey < period.startDateKey ||
+      regionalDateKey > period.endDateKey
+    ) {
+      throw new UnprocessableEntityException({
+        code: 'WEEKLY_CHALLENGE_PERIOD_NOT_CURRENT',
+        message: 'Choose the current seven-day scoring week.',
       });
     }
     const enrollment = await transaction
@@ -1605,7 +1872,7 @@ export class CompetitionsService {
           'Join this competition and Weekly Goal before choosing a partner.',
       });
     }
-    return { competitionId: competition.id, userId: user.id };
+    return { competitionId: competition.id, period, userId: user.id };
   }
 
   private async requireAcceptedFriendship(
@@ -1629,25 +1896,35 @@ export class CompetitionsService {
     }
   }
 
-  private hasWeeklyChallengeMatch(
+  private async hasWeeklyChallengeMatch(
     transaction: Transaction<Database>,
     competitionId: string,
     periodIndex: number,
     userIds: readonly string[],
   ): Promise<boolean> {
-    return transaction
-      .selectFrom('competition_matches')
-      .select('id')
-      .where('competition_id', '=', competitionId)
-      .where('period_index', '=', periodIndex)
-      .where((expression) =>
-        expression.or([
-          expression('user_a_id', 'in', [...userIds]),
-          expression('user_b_id', 'in', [...userIds]),
-        ]),
-      )
-      .executeTakeFirst()
-      .then(Boolean);
+    const [match, assignment] = await Promise.all([
+      transaction
+        .selectFrom('competition_matches')
+        .select('id')
+        .where('competition_id', '=', competitionId)
+        .where('period_index', '=', periodIndex)
+        .where('status', '!=', 'cancelled')
+        .where((expression) =>
+          expression.or([
+            expression('user_a_id', 'in', [...userIds]),
+            expression('user_b_id', 'in', [...userIds]),
+          ]),
+        )
+        .executeTakeFirst(),
+      transaction
+        .selectFrom('weekly_challenge_assignment_participants')
+        .select('request_id')
+        .where('competition_id', '=', competitionId)
+        .where('period_index', '=', periodIndex)
+        .where('user_id', 'in', [...userIds])
+        .executeTakeFirst(),
+    ]);
+    return Boolean(match || assignment);
   }
 
   private async toWeeklyChallengeRequestResponse(
@@ -1659,13 +1936,12 @@ export class CompetitionsService {
       period_index: number;
       status: 'accepted' | 'cancelled' | 'declined' | 'pending';
     },
-    competitionId: string,
     direction: 'incoming' | 'outgoing',
     partnerUserId: string,
   ): Promise<WeeklyChallengeRequestJson> {
     const profile = await transaction
       .selectFrom('profiles')
-      .select(['callsign', 'public_identity_mode', 'public_name'])
+      .select('screen_name')
       .where('user_id', '=', partnerUserId)
       .executeTakeFirstOrThrow();
     const partnerStreaks = toStreaksJson(
@@ -1674,28 +1950,16 @@ export class CompetitionsService {
       ),
     );
     return {
-      competitionId,
       createdAt: request.created_at.toISOString(),
       direction,
       goalDays: request.goal_days,
       id: request.id,
-      partnerAlias: publicAlias(profile),
+      partnerAlias: profile.screen_name,
       partnerStreaks,
-      partnerUserId,
       periodIndex: request.period_index as 1 | 2 | 3 | 4,
       status: request.status,
     };
   }
-}
-
-function publicAlias(profile: {
-  callsign: string;
-  public_identity_mode: 'alias' | 'private' | 'real_name';
-  public_name: string | null;
-}) {
-  return profile.public_identity_mode === 'private'
-    ? profile.callsign
-    : profile.public_name || profile.callsign;
 }
 
 function emptyStreaks(): StreakCountsJson {
@@ -1706,6 +1970,48 @@ function emptyStreaks(): StreakCountsJson {
     weekly: 0,
     yearly: 0,
   };
+}
+
+function uniqueDateCountInsidePeriod(
+  dateKeys: readonly string[],
+  startDateKey: string,
+  endDateKey: string,
+) {
+  return new Set(
+    dateKeys.filter(
+      (dateKey) => dateKey >= startDateKey && dateKey <= endDateKey,
+    ),
+  ).size;
+}
+
+function weeklyOutcomeForUser(
+  value: unknown,
+  userId: string,
+): { entries: number; multiplier: number } | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const results = (value as { results?: unknown }).results;
+  if (!Array.isArray(results)) return null;
+  const result = results.find(
+    (candidate) =>
+      candidate !== null &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate) &&
+      (candidate as { userId?: unknown }).userId === userId,
+  ) as { entries?: unknown; multiplier?: unknown } | undefined;
+  if (
+    !result ||
+    typeof result.entries !== 'number' ||
+    !Number.isInteger(result.entries) ||
+    result.entries < 0 ||
+    typeof result.multiplier !== 'number'
+  ) {
+    return null;
+  }
+  return { entries: result.entries, multiplier: result.multiplier };
+}
+
+function normalizeWeeklyMultiplier(value: number): 0 | 1 | 2 | 3 {
+  return value === 1 || value === 2 || value === 3 ? value : 0;
 }
 
 function toStreaksJson(streaks?: StreakCounts): StreakCountsJson {

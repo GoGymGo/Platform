@@ -99,6 +99,7 @@ type WorkoutProgressContextValue = {
   categoryScore: number;
   cancelActiveWorkout: () => Promise<boolean>;
   completeActiveWorkout: () => Promise<CompleteWorkoutResult>;
+  competitionId: string | null;
   competition: MonthlyCompetitionResult;
   competitionEntryStartDateKey: string;
   competitionEntries: number;
@@ -1032,6 +1033,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       ),
       categoryScore: authoritativeProgress?.categoryScore ?? 0,
       competition,
+      competitionId: authoritativeProgress?.competitionId ?? null,
       competitionEntryStartDateKey,
       competitionEntries,
       currentStreak: calculateCurrentStreak(
@@ -1063,6 +1065,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       cancelActiveWorkout,
       completeActiveWorkout,
       competition: derived.competition,
+      competitionId: derived.competitionId,
       competitionEntryStartDateKey: derived.competitionEntryStartDateKey,
       competitionEntries: derived.competitionEntries,
       competitionRegion: competitionRegion.label,

@@ -39,6 +39,7 @@ describe('new social and creator contracts', () => {
 
   it('validates Weekly Challenge partner requests and contact channels', async () => {
     const weeklyRequest = plainToInstance(CreateWeeklyChallengeRequestDto, {
+      competitionId: '20000000-0000-4000-8000-000000000001',
       goal: 4,
       period: 2,
       recipientUserId: '10000000-0000-4000-8000-000000000002',

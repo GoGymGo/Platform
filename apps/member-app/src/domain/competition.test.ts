@@ -109,7 +109,7 @@ describe('monthly competition scoring', () => {
   it('awards the selected weekly goal for every completed remainder day', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-04',
-      matches: createSoloPeriods(),
+      matches: createSoloPeriods(7),
       referenceDateKey: '2026-05-01',
       userVerifiedDateKeys: [
         ...periodDates(1, 7, '2026-04'),
@@ -130,7 +130,9 @@ describe('monthly competition scoring', () => {
   it('awards only successful periods and removes 10x when one period is missed', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
-      matches: createSoloPeriods(),
+      matches: createSoloPeriods(4).map((match) =>
+        match.periodIndex === 3 ? { ...match, entries: 0, multiplier: 0 as const } : match
+      ),
       referenceDateKey: '2026-08-01',
       userVerifiedDateKeys: [
         ...periodDates(1, 4),
@@ -149,7 +151,7 @@ describe('monthly competition scoring', () => {
   it('awards 3x when the user completes an extra workout and their match fails', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
-      matches: [createMatch(1, 3)],
+      matches: [createMatch(1, 3, 12, 3)],
       referenceDateKey: '2026-07-08',
       userVerifiedDateKeys: periodDates(1, 5),
       weeklyGoal: 4
@@ -159,24 +161,24 @@ describe('monthly competition scoring', () => {
     assert.equal(result.periodResults[0].entries, 12);
   });
 
-  it('awards the seven-day category automatic 3x when its match fails', () => {
+  it('does not project 3x without an eligible extra workout day', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
-      matches: [createMatch(1, 6)],
+      matches: [createMatch(1, 6, 7, 1)],
       referenceDateKey: '2026-07-08',
       userVerifiedDateKeys: periodDates(1, 7),
       weeklyGoal: 7
     });
 
-    assert.equal(result.periodResults[0].bonusWorkoutCompleted, true);
-    assert.equal(result.periodResults[0].finalMultiplier, 3);
-    assert.equal(result.periodResults[0].entries, 21);
+    assert.equal(result.periodResults[0].bonusWorkoutCompleted, false);
+    assert.equal(result.periodResults[0].finalMultiplier, 1);
+    assert.equal(result.periodResults[0].entries, 7);
   });
 
   it('shows live multiplier progress but banks entries only after the period closes', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
-      matches: [createMatch(1, 4)],
+      matches: [createMatch(1, 4, 8, 2, 'projected')],
       referenceDateKey: '2026-07-05',
       userVerifiedDateKeys: periodDates(1, 4),
       weeklyGoal: 4
@@ -190,7 +192,10 @@ describe('monthly competition scoring', () => {
   it('updates the cumulative category score with weekly multipliers after week one settles', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
-      matches: [createMatch(1, 4), createMatch(2, 4)],
+      matches: [
+        createMatch(1, 4, 8, 2),
+        createMatch(2, 4, 8, 2, 'projected')
+      ],
       referenceDateKey: '2026-07-10',
       userVerifiedDateKeys: [
         ...periodDates(1, 4),
@@ -213,7 +218,7 @@ describe('monthly competition scoring', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
       eligibleFromDateKey: '2026-07-03',
-      matches: createSoloPeriods(),
+      matches: createSoloPeriods(5),
       perfectMonthEligible: true,
       referenceDateKey: '2026-08-01',
       userVerifiedDateKeys: [
@@ -241,11 +246,11 @@ describe('monthly competition scoring', () => {
     assert.equal(result.totalCompetitionEntries, 200);
   });
 
-  it('automatically awards 3x when a late entrant fills every remaining first-week day', () => {
+  it('does not award 3x to a late entrant without an eligible extra workout', () => {
     const result = evaluateMonthlyCompetition({
       competitionMonthKey: '2026-07',
       eligibleFromDateKey: '2026-07-03',
-      matches: [createMatch(1, 4)],
+      matches: [createMatch(1, 4, 5, 1)],
       referenceDateKey: '2026-07-08',
       userVerifiedDateKeys: [
         '2026-07-03',
@@ -257,9 +262,9 @@ describe('monthly competition scoring', () => {
       weeklyGoal: 5
     });
 
-    assert.equal(result.periodResults[0].bonusWorkoutCompleted, true);
-    assert.equal(result.periodResults[0].finalMultiplier, 3);
-    assert.equal(result.periodResults[0].entries, 15);
+    assert.equal(result.periodResults[0].bonusWorkoutCompleted, false);
+    assert.equal(result.periodResults[0].finalMultiplier, 1);
+    assert.equal(result.periodResults[0].entries, 5);
   });
 
   it('does not create bonus days in a 28-day month', () => {
@@ -394,14 +399,19 @@ describe('competition clarity labels', () => {
 
 function createMatches(goal: number, opponentCompleted: number) {
   return ([1, 2, 3, 4] as const).map((periodIndex) =>
-    createMatch(periodIndex, Math.min(goal, opponentCompleted))
+    createMatch(periodIndex, Math.min(goal, opponentCompleted), goal * 2, 2)
   );
 }
 
-function createSoloPeriods(): readonly CompetitionMatch[] {
+function createSoloPeriods(goal = 4): readonly CompetitionMatch[] {
   return ([1, 2, 3, 4] as const).map((periodIndex) => ({
     availability: 'solo',
-    opponentAlias: 'SOLO MODE',
+    entries: goal,
+    multiplier: 1,
+    opponentAlias: null,
+    opponentBestStreak: 0,
+    opponentCurrentStreak: 0,
+    opponentMonthlyVerifiedDays: 0,
     opponentStreaks: {
       daily: 0,
       monthly: 0,
@@ -409,19 +419,28 @@ function createSoloPeriods(): readonly CompetitionMatch[] {
       weekly: 0,
       yearly: 0
     },
-    opponentVerifiedDateKeys: [],
+    opponentVerifiedCount: 0,
     periodIndex,
-    region: 'TORONTO'
+    region: 'TORONTO',
+    scoringStatus: 'settled'
   }));
 }
 
 function createMatch(
   periodIndex: CompetitionPeriodIndex,
-  opponentCompleted: number
+  opponentCompleted: number,
+  entries = 8,
+  multiplier: 0 | 1 | 2 | 3 = 2,
+  scoringStatus: 'projected' | 'settled' = 'settled'
 ): CompetitionMatch {
   return {
     availability: 'matched',
+    entries,
+    multiplier,
     opponentAlias: 'TEST_MATCH',
+    opponentBestStreak: opponentCompleted,
+    opponentCurrentStreak: opponentCompleted,
+    opponentMonthlyVerifiedDays: opponentCompleted,
     opponentStreaks: {
       daily: opponentCompleted,
       monthly: opponentCompleted > 0 ? 1 : 0,
@@ -429,9 +448,10 @@ function createMatch(
       weekly: opponentCompleted > 0 ? 1 : 0,
       yearly: opponentCompleted > 0 ? 1 : 0
     },
-    opponentVerifiedDateKeys: periodDates(periodIndex, opponentCompleted),
+    opponentVerifiedCount: opponentCompleted,
     periodIndex,
-    region: 'TORONTO'
+    region: 'TORONTO',
+    scoringStatus
   };
 }
 

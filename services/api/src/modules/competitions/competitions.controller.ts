@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -262,6 +263,25 @@ export class CompetitionsController {
       requestId,
       requireIdempotencyKey(idempotencyKey),
       input.decision,
+    );
+  }
+
+  @Delete('weekly-challenges/requests/:requestId')
+  @ApiBearerAuth('firebase')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({
+    summary: 'Cancel my pending outgoing Weekly Challenge request',
+  })
+  @ApiOkResponse({ type: WeeklyChallengeRequestResponseDto })
+  cancelWeeklyChallengeRequest(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ): Promise<WeeklyChallengeRequestResponseDto> {
+    return this.competitions.cancelWeeklyChallengeRequest(
+      principal,
+      requestId,
+      requireIdempotencyKey(idempotencyKey),
     );
   }
 }

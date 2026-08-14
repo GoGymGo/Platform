@@ -71,8 +71,8 @@ const commitmentRules: readonly CommitmentRule[] = [
   },
   {
     index: '08',
-    title: 'NO EXTRA DAY EXCEPTION',
-    body: 'A seven-day player, or a late entrant who fills every day remaining in scoring week 1, receives 3x automatically if their Weekly Challenge partner misses.',
+    title: 'EXTRA DAY REQUIRED',
+    body: 'The 3x result always requires an eligible workout beyond the Weekly Goal. If no extra eligible day is available, a missed partner leaves the result at 1x.',
     tone: 'amber'
   },
   {

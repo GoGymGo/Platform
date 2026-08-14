@@ -158,12 +158,55 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
     const lifecycle = new CompetitionLifecycleService(
       database,
       {} as NotificationsService,
-      scoring,
     );
     await expect(lifecycle.processDueStarts()).resolves.toEqual({
       activated: 1,
       cancelled: 0,
     });
+    const [friendAId, friendBId] = [userAId, userBId].sort();
+    await migrated.pool.query(
+      `INSERT INTO friendships (user_a_id, user_b_id)
+       VALUES ($1, $2)`,
+      [friendAId, friendBId],
+    );
+    await migrated.pool.query(
+      `WITH accepted_requests AS (
+         INSERT INTO weekly_challenge_requests
+           (competition_id, period_index, requester_user_id,
+            recipient_user_id, goal_days, status, created_at, responded_at,
+            accepted_at)
+         SELECT $1, period_index, $2, $3, 3, 'accepted',
+                accepted_at - interval '1 hour', accepted_at, accepted_at
+         FROM (VALUES
+           (1, '2026-07-01 12:00:00+00'::timestamptz),
+           (2, '2026-07-08 12:00:00+00'::timestamptz),
+           (3, '2026-07-15 12:00:00+00'::timestamptz),
+           (4, '2026-07-22 12:00:00+00'::timestamptz)
+         ) AS periods(period_index, accepted_at)
+         RETURNING id, period_index, accepted_at
+       )
+       INSERT INTO competition_matches
+         (competition_id, period_index, period_start_date, period_end_date,
+          user_a_id, user_b_id, status, created_at,
+          weekly_challenge_request_id)
+       SELECT $1, request.period_index,
+              CASE request.period_index
+                WHEN 1 THEN '2026-07-01'::date
+                WHEN 2 THEN '2026-07-08'::date
+                WHEN 3 THEN '2026-07-15'::date
+                ELSE '2026-07-22'::date
+              END,
+              CASE request.period_index
+                WHEN 1 THEN '2026-07-07'::date
+                WHEN 2 THEN '2026-07-14'::date
+                WHEN 3 THEN '2026-07-21'::date
+                ELSE '2026-07-28'::date
+              END,
+              LEAST($2::uuid, $3::uuid), GREATEST($2::uuid, $3::uuid),
+              'matched', request.accepted_at, request.id
+       FROM accepted_requests AS request`,
+      [competitionId, userAId, userBId],
+    );
 
     const userADates = [
       '2026-07-01',

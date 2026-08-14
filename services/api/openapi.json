@@ -1357,7 +1357,7 @@
           },
           {
             "name": "competitionId",
-            "required": false,
+            "required": true,
             "in": "query",
             "schema": { "format": "uuid", "type": "string" }
           }
@@ -1403,6 +1403,12 @@
             "required": true,
             "in": "query",
             "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "period",
@@ -1452,6 +1458,12 @@
             "required": true,
             "in": "query",
             "schema": { "minimum": 1, "maximum": 7, "type": "number" }
+          },
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "period",
@@ -1563,6 +1575,38 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Accept or decline an incoming Weekly Challenge request",
+        "tags": ["competitions"]
+      },
+      "delete": {
+        "operationId": "cancelWeeklyChallengeRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyChallengeRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Cancel my pending outgoing Weekly Challenge request",
         "tags": ["competitions"]
       }
     },
@@ -5786,33 +5830,37 @@
             "type": "string",
             "enum": ["matched", "searching", "solo"]
           },
-          "opponentAlias": { "type": "string" },
-          "opponentVerifiedDateKeys": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
+          "opponentAlias": { "type": "string", "nullable": true },
           "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
           "region": { "type": "string" },
-          "opponentUserId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
           "opponentCurrentStreak": { "type": "number" },
           "opponentBestStreak": { "type": "number" },
           "opponentMonthlyVerifiedDays": { "type": "number" },
-          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" }
+          "opponentVerifiedCount": {
+            "type": "number",
+            "maximum": 7,
+            "minimum": 0
+          },
+          "opponentStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
+          "entries": { "type": "number", "minimum": 0 },
+          "multiplier": { "type": "number", "enum": [0, 1, 2, 3] },
+          "scoringStatus": {
+            "type": "string",
+            "enum": ["projected", "settled"]
+          }
         },
         "required": [
           "availability",
-          "opponentAlias",
-          "opponentVerifiedDateKeys",
           "periodIndex",
           "region",
           "opponentCurrentStreak",
           "opponentBestStreak",
           "opponentMonthlyVerifiedDays",
-          "opponentStreaks"
+          "opponentVerifiedCount",
+          "opponentStreaks",
+          "entries",
+          "multiplier",
+          "scoringStatus"
         ]
       },
       "EligibleWeeklyChallengePartnerDto": {
@@ -5833,10 +5881,8 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "competitionId": { "type": "string", "format": "uuid" },
           "direction": { "type": "string", "enum": ["incoming", "outgoing"] },
           "partnerAlias": { "type": "string" },
-          "partnerUserId": { "type": "string", "format": "uuid" },
           "partnerStreaks": { "$ref": "#/components/schemas/StreakCountsDto" },
           "periodIndex": { "type": "number", "maximum": 4, "minimum": 1 },
           "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },
@@ -5848,10 +5894,8 @@
         },
         "required": [
           "id",
-          "competitionId",
           "direction",
           "partnerAlias",
-          "partnerUserId",
           "partnerStreaks",
           "periodIndex",
           "goalDays",
@@ -5864,10 +5908,17 @@
         "properties": {
           "region": { "type": "string", "example": "vancouver-bc" },
           "goal": { "type": "number", "maximum": 7, "minimum": 1 },
+          "competitionId": { "type": "string", "format": "uuid" },
           "period": { "type": "number", "maximum": 4, "minimum": 1 },
           "recipientUserId": { "type": "string", "format": "uuid" }
         },
-        "required": ["region", "goal", "period", "recipientUserId"]
+        "required": [
+          "region",
+          "goal",
+          "competitionId",
+          "period",
+          "recipientUserId"
+        ]
       },
       "WeeklyChallengeRequestDecisionDto": {
         "type": "object",

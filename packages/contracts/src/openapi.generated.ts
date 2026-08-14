@@ -40,7 +40,7 @@ export interface components {
     ChallengeInvitationDecisionDto: { decision: "accepted" | "declined" };
     ChallengeInvitationResponseDto: { challengeId: string; status: "pending" | "accepted" | "declined"; userId: string };
     ClaimRewardResponseDto: { awardedAt: string; awardRank: number; claimedAt: string | null; claimUrl: string | null; couponCode: string | null; fulfillmentInstructions: string | null; id: string; imageUrl: string | null; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; status: "awarded" | "cancelled" | "claimed" | "fulfilled" | "redeemed"; title: string };
-    CompetitionMatchResponseDto: { availability: "matched" | "searching" | "solo"; opponentAlias: string; opponentBestStreak: number; opponentCurrentStreak: number; opponentMonthlyVerifiedDays: number; opponentStreaks: components['schemas']["StreakCountsDto"]; opponentUserId?: string | null; opponentVerifiedDateKeys: Array<string>; periodIndex: number; region: string };
+    CompetitionMatchResponseDto: { availability: "matched" | "searching" | "solo"; entries: number; multiplier: 0 | 1 | 2 | 3; opponentAlias?: string | null; opponentBestStreak: number; opponentCurrentStreak: number; opponentMonthlyVerifiedDays: number; opponentStreaks: components['schemas']["StreakCountsDto"]; opponentVerifiedCount: number; periodIndex: number; region: string; scoringStatus: "projected" | "settled" };
     CompetitionProgressResponseDto: { bankedPrizeDrawEntries: number; categoryScore: number; competitionId: string; competitionStatus: "active" | "registration" | "settled" | "settling"; enrolledDateKey: string; goalDays: number; monthKey: string; prizeDrawEntries: number; projectedPrizeDrawEntries: number; referenceDateKey: string; rulesVersion: string; scoringStatus: "final" | "provisional"; serverTime: string; sessions: Array<components['schemas']["CompetitionSessionSummaryDto"]>; settledPeriodCount: number; updatedAt: string; verifiedDateKeys: Array<string>; verifiedDays: number };
     CompetitionResponseDto: { endsAt: string; entrantCap: number | null; goalDays: Array<number>; id: string; minimumEntrants: number; monthKey: string; name: string; regionCode: string; regionName: string; registrationClosesAt: string; registrationOpensAt: string; rules: components['schemas']["CompetitionRulesResponseDto"]; rulesVersion: string; serverTime: string; startsAt: string; status: "draft" | "registration" | "active" | "settling" | "settled" | "cancelled" };
     CompetitionRulesResponseDto: { categoryPodiumMultipliers: components['schemas']["CategoryPodiumMultipliersResponseDto"]; minHeartRateSamples: number; minSessionMinutes: number; perfectMonthMultiplier: number; requireDeviceAttestation: boolean; requireGymQr: boolean; requirePresenceCheck: boolean; signupPrizeDrawEntries: number; verifiedSessionCategoryScore: number; verifiedSessionPrizeDrawEntries: number; weeklyChallengeBothHitMultiplier: number; weeklyChallengeRecoveryMultiplier: number };
@@ -61,7 +61,7 @@ export interface components {
     CreateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
     CreateSessionDto: { clientStartedAt?: string; competitionId: string };
     CreateSocialChallengeDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; challengeType: "friend" | "regional"; description?: string | null; endDate: string; invitedFriendUserIds: Array<string>; locationName?: string; name: string; participantLimit?: number; regionCode?: string; scheduledDays: Array<number>; scheduledTime?: string; startDate: string; targetCount: number; targetPeriod: "weekly" | "monthly" };
-    CreateWeeklyChallengeRequestDto: { goal: number; period: number; recipientUserId: string; region: string };
+    CreateWeeklyChallengeRequestDto: { competitionId: string; goal: number; period: number; recipientUserId: string; region: string };
     CreatorApplicationDto: { channelUrl: string; region: string; sampleWorkoutUrl: string; workoutStyle: string };
     CreatorVideoSubmissionResponseDto: { createdAt: string; id: string; rightsAcceptedAt: string; rightsVersion: string; status: "approved" | "in_review" | "rejected" | "submitted" | "withdrawn"; title: string; videoUrl: string };
     CreatorWorkoutPlanResponseDto: { creatorName: string; durationMinutes: number; id: string; note: string | null; plannedDate: string; workoutId: string; workoutName: string; workoutStyle: string };
@@ -179,7 +179,7 @@ export interface components {
     VerificationConsentStatusResponseDto: { accepted: boolean; acceptedAt: string | null; consentKey: "device_presence_qr_camera"; consentVersion: string; updatedAt: string | null; withdrawnAt: string | null };
     VerifySessionDto: { evidenceSnapshotSha256: string; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
     WeeklyChallengeRequestDecisionDto: { decision: "accepted" | "declined" };
-    WeeklyChallengeRequestResponseDto: { competitionId: string; createdAt: string; direction: "incoming" | "outgoing"; goalDays: number; id: string; partnerAlias: string; partnerStreaks: components['schemas']["StreakCountsDto"]; partnerUserId: string; periodIndex: number; status: "accepted" | "cancelled" | "declined" | "pending" };
+    WeeklyChallengeRequestResponseDto: { createdAt: string; direction: "incoming" | "outgoing"; goalDays: number; id: string; partnerAlias: string; partnerStreaks: components['schemas']["StreakCountsDto"]; periodIndex: number; status: "accepted" | "cancelled" | "declined" | "pending" };
     WithdrawLegalDocumentDto: { reason: string };
   };
 }
@@ -235,6 +235,14 @@ export interface operations {
     parameters: { header: { "Idempotency-Key": string }; path: { requestId: string } };
     responses: {
       "200": components['schemas']["SocialRelationshipActionResponseDto"];
+    };
+  };
+  cancelWeeklyChallengeRequest: {
+    method: "DELETE";
+    path: "/v1/competitions/weekly-challenges/requests/{requestId}";
+    parameters: { header: { "Idempotency-Key": string }; path: { requestId: string } };
+    responses: {
+      "200": components['schemas']["WeeklyChallengeRequestResponseDto"];
     };
   };
   changeCompetitionStatus: {
@@ -635,7 +643,7 @@ export interface operations {
   getMatches: {
     method: "GET";
     path: "/v1/competitions/{monthKey}/matches";
-    parameters: { path: { monthKey: string }; query: { competitionId?: string; goal: number; region: string } };
+    parameters: { path: { monthKey: string }; query: { competitionId: string; goal: number; region: string } };
     responses: {
       "200": Array<components['schemas']["CompetitionMatchResponseDto"]>;
     };
@@ -839,7 +847,7 @@ export interface operations {
   listEligibleWeeklyChallengePartners: {
     method: "GET";
     path: "/v1/competitions/{monthKey}/weekly-challenges/eligible-partners";
-    parameters: { path: { monthKey: string }; query: { goal: number; period: number; region: string } };
+    parameters: { path: { monthKey: string }; query: { competitionId: string; goal: number; period: number; region: string } };
     responses: {
       "200": Array<components['schemas']["EligibleWeeklyChallengePartnerDto"]>;
     };
@@ -927,7 +935,7 @@ export interface operations {
   listWeeklyChallengeRequests: {
     method: "GET";
     path: "/v1/competitions/{monthKey}/weekly-challenges/requests";
-    parameters: { path: { monthKey: string }; query: { goal: number; period: number; region: string } };
+    parameters: { path: { monthKey: string }; query: { competitionId: string; goal: number; period: number; region: string } };
     responses: {
       "200": Array<components['schemas']["WeeklyChallengeRequestResponseDto"]>;
     };
@@ -1273,6 +1281,7 @@ export interface paths {
   };
   "/v1/competitions/weekly-challenges/requests/{requestId}": {
     patch: operations["respondToWeeklyChallengeRequest"];
+    delete: operations["cancelWeeklyChallengeRequest"];
   };
   "/v1/competitions/{competitionId}/enrollment/withdrawal": {
     post: operations["withdrawEnrollment"];

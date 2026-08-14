@@ -95,6 +95,7 @@ export default function HomeScreen() {
   const {
     activeSession,
     competition,
+    competitionId,
     competitionRegion,
     competitionTimeZone,
     currentWeekIndex,
@@ -168,6 +169,7 @@ export default function HomeScreen() {
       ? seenResultsState.key
       : undefined;
   const weeklyChallengeRequestsQuery = useWeeklyChallengeRequests(
+    competitionId ?? '',
     competition.competitionMonthKey,
     weeklyGoal,
     competitionRegionCode,

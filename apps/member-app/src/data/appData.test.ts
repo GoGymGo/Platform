@@ -14,7 +14,12 @@ describe('app data boundary', () => {
     assert.equal(await unavailable.getMyLatestCompetitionResults(), null);
     assert.equal(await unavailable.getCategoryLeaderboard(4), null);
     assert.deepEqual(
-      await unavailable.getCompetitionMatches('2026-08', 4, 'toronto-on'),
+      await unavailable.getCompetitionMatches(
+        '2026-08',
+        4,
+        'toronto-on',
+        '40000000-0000-4000-8000-000000000001'
+      ),
       []
     );
     assert.equal(
@@ -102,7 +107,7 @@ describe('app data boundary', () => {
     });
   });
 
-  it('drops a Weekly Challenge row without the required streak projection', async () => {
+  it('fails closed on a Weekly Challenge row without the required contract', async () => {
     const api: ApiClient = {
       request: <TResponse>() =>
         Promise.resolve([
@@ -116,14 +121,14 @@ describe('app data boundary', () => {
         ]) as Promise<TResponse>
     };
 
-    assert.deepEqual(
-      await createAppDataSource('api', api).getCompetitionMatches(
+    await assert.rejects(
+      () => createAppDataSource('api', api).getCompetitionMatches(
         '2026-07',
         4,
         'vancouver-bc',
         '40000000-0000-4000-8000-000000000001'
       ),
-      []
+      /match response is invalid/i
     );
   });
 
@@ -177,6 +182,131 @@ describe('app data boundary', () => {
         '?competitionId=40000000-0000-4000-8000-000000000001&region=vancouver-bc'
     );
     assert.equal(authenticated, false);
+  });
+
+  it('pins direct partner reads to the exact enrolled Contest and week', async () => {
+    const paths: string[] = [];
+    const api: ApiClient = {
+      request: <TResponse>(path: string) => {
+        paths.push(path);
+        return Promise.resolve([]) as Promise<TResponse>;
+      }
+    };
+    const source = createAppDataSource('api', api);
+
+    await source.getEligibleWeeklyChallengePartners(
+      '40000000-0000-4000-8000-000000000001',
+      '2026-08',
+      4,
+      'vancouver-bc',
+      2
+    );
+    await source.getWeeklyChallengeRequests(
+      '40000000-0000-4000-8000-000000000001',
+      '2026-08',
+      4,
+      'vancouver-bc',
+      2
+    );
+
+    assert.deepEqual(paths, [
+      '/v1/competitions/2026-08/weekly-challenges/eligible-partners' +
+        '?competitionId=40000000-0000-4000-8000-000000000001' +
+        '&goal=4&region=vancouver-bc&period=2',
+      '/v1/competitions/2026-08/weekly-challenges/requests' +
+        '?competitionId=40000000-0000-4000-8000-000000000001' +
+        '&goal=4&region=vancouver-bc&period=2'
+    ]);
+  });
+
+  it('reuses one direct-request idempotency key after a transport failure', async () => {
+    const calls: { path: string; options?: ApiRequestOptions<unknown> }[] = [];
+    let attempt = 0;
+    const api: ApiClient = {
+      request: <TResponse, TBody = never>(
+        path: string,
+        options?: ApiRequestOptions<TBody>
+      ) => {
+        calls.push({
+          path,
+          options: options as ApiRequestOptions<unknown> | undefined
+        });
+        attempt += 1;
+        if (attempt === 1) {
+          return Promise.reject(new Error('response lost')) as Promise<TResponse>;
+        }
+        return Promise.resolve({
+          createdAt: '2026-08-08T12:00:00.000Z',
+          direction: 'outgoing',
+          goalDays: 4,
+          id: '50000000-0000-4000-8000-000000000001',
+          partnerAlias: 'MOVE_MORE',
+          partnerStreaks: {
+            daily: 3,
+            monthly: 1,
+            projectionVersion: 'streaks-v1',
+            weekly: 2,
+            yearly: 0
+          },
+          periodIndex: 2,
+          status: 'pending'
+        }) as Promise<TResponse>;
+      }
+    };
+    const source = createAppDataSource('api', api);
+    const request = () => source.requestWeeklyChallengePartner(
+      '40000000-0000-4000-8000-000000000001',
+      '2026-08',
+      4,
+      'vancouver-bc',
+      2,
+      '60000000-0000-4000-8000-000000000001'
+    );
+
+    await assert.rejects(request, /response lost/i);
+    await assert.doesNotReject(request);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].options?.idempotencyKey, calls[1].options?.idempotencyKey);
+    assert.deepEqual(calls[1].options?.body, {
+      competitionId: '40000000-0000-4000-8000-000000000001',
+      goal: 4,
+      period: 2,
+      recipientUserId: '60000000-0000-4000-8000-000000000001',
+      region: 'vancouver-bc'
+    });
+  });
+
+  it('rejects request payloads that leak an internal partner identifier', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve([{
+        createdAt: '2026-08-08T12:00:00.000Z',
+        direction: 'incoming',
+        goalDays: 4,
+        id: '50000000-0000-4000-8000-000000000001',
+        partnerAlias: 'MOVE_MORE',
+        partnerStreaks: {
+          daily: 3,
+          monthly: 1,
+          projectionVersion: 'streaks-v1',
+          weekly: 2,
+          yearly: 0
+        },
+        partnerUserId: 'private-internal-id',
+        periodIndex: 2,
+        status: 'pending'
+      }]) as Promise<TResponse>
+    };
+
+    await assert.rejects(
+      () => createAppDataSource('api', api).getWeeklyChallengeRequests(
+        '40000000-0000-4000-8000-000000000001',
+        '2026-08',
+        4,
+        'vancouver-bc',
+        2
+      ),
+      /request response is invalid/i
+    );
   });
 
   it('loads participant results from the authenticated API boundary', async () => {

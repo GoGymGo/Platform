@@ -10,7 +10,6 @@ describe('authoritative competition scoring', () => {
   it('removes the weekly entries when the goal is missed', () => {
     expect(
       calculateWeeklyScore({
-        availableDays: 7,
         bothHitMultiplier: 2,
         entriesPerVerifiedDay: 1,
         goalDays: 3,
@@ -29,7 +28,6 @@ describe('authoritative competition scoring', () => {
   it('awards one settled point for a one-day goal at 1x', () => {
     expect(
       calculateWeeklyScore({
-        availableDays: 7,
         bothHitMultiplier: 2,
         entriesPerVerifiedDay: 1,
         goalDays: 1,
@@ -47,7 +45,6 @@ describe('authoritative competition scoring', () => {
 
   it('awards both-hit and recovery outcomes without inventing a partner', () => {
     const base = {
-      availableDays: 7,
       bothHitMultiplier: 2,
       entriesPerVerifiedDay: 1,
       goalDays: 3,
@@ -65,10 +62,9 @@ describe('authoritative competition scoring', () => {
     ).toMatchObject({ entries: 3, multiplier: 1, recovered: false });
   });
 
-  it('applies the no-extra-day recovery rule for a full available week', () => {
+  it('requires a verified extra workout for the 3x recovery result', () => {
     expect(
       calculateWeeklyScore({
-        availableDays: 4,
         bothHitMultiplier: 2,
         entriesPerVerifiedDay: 1,
         goalDays: 4,
@@ -76,7 +72,7 @@ describe('authoritative competition scoring', () => {
         recoveryMultiplier: 3,
         verifiedDays: 4,
       }),
-    ).toMatchObject({ entries: 12, multiplier: 3, recovered: true });
+    ).toMatchObject({ entries: 4, multiplier: 1, recovered: false });
   });
 
   it('uses deterministic category tie-breaks and integer draw weights', () => {

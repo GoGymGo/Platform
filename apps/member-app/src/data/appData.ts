@@ -39,7 +39,7 @@ export type AppDataSource = {
     competitionMonthKey: string,
     weeklyGoal: number,
     regionCode: string,
-    competitionId?: string | null
+    competitionId: string
   ) => Promise<readonly CompetitionMatch[]>;
   getCompetitionEnrollmentCount: (
     competitionId: string,
@@ -51,12 +51,14 @@ export type AppDataSource = {
   ) => Promise<readonly CreatorWorkout[]>;
   getCreatorWorkoutPlans: () => Promise<readonly CreatorWorkoutPlan[]>;
   getEligibleWeeklyChallengePartners: (
+    competitionId: string,
     competitionMonthKey: string,
     weeklyGoal: number,
     regionCode: string,
     periodIndex: number
   ) => Promise<readonly EligibleWeeklyChallengePartner[]>;
   getWeeklyChallengeRequests: (
+    competitionId: string,
     competitionMonthKey: string,
     weeklyGoal: number,
     regionCode: string,
@@ -75,6 +77,7 @@ export type AppDataSource = {
     note?: string
   ) => Promise<CreatorWorkoutPlan>;
   requestWeeklyChallengePartner: (
+    competitionId: string,
     competitionMonthKey: string,
     weeklyGoal: number,
     regionCode: string,
@@ -84,6 +87,9 @@ export type AppDataSource = {
   respondToWeeklyChallengeRequest: (
     requestId: string,
     decision: 'accepted' | 'declined'
+  ) => Promise<WeeklyChallengeRequest>;
+  cancelWeeklyChallengeRequest: (
+    requestId: string
   ) => Promise<WeeklyChallengeRequest>;
   submitCreatorVideo: (
     input: CreateCreatorVideoSubmissionInput
@@ -103,6 +109,20 @@ export function createAppDataSource(
 }
 
 function createApiDataSource(api: ApiClient): AppDataSource {
+  const retryIdempotencyKeys = new Map<string, string>();
+  const runRetryableMutation = <Result>(
+    operationKey: string,
+    action: (idempotencyKey: string) => Promise<Result>
+  ) => {
+    const idempotencyKey = retryIdempotencyKeys.get(operationKey) ??
+      createIdempotencyKey(operationKey);
+    retryIdempotencyKeys.set(operationKey, idempotencyKey);
+    return action(idempotencyKey).then((result) => {
+      retryIdempotencyKeys.delete(operationKey);
+      return result;
+    });
+  };
+
   return {
     claimReward: (awardId, idempotencyKey) => api.request<ClaimedReward>(
       `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
@@ -117,16 +137,10 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       regionCode,
       competitionId
     ) =>
-      (competitionId
-        ? api.request<unknown>(
-            `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
-              `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}` +
-              `&competitionId=${encodeURIComponent(competitionId)}`
-          )
-        : api.request<unknown>(
-            `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
-              `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}`
-          )
+      api.request<unknown>(
+        `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
+          `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}` +
+          `&competitionId=${encodeURIComponent(competitionId)}`
       ).then(normalizeCompetitionMatches),
     getCompetitionEnrollmentCount: (
       competitionId,
@@ -146,23 +160,27 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       '/v1/creator-workouts/plans/me'
     ),
     getEligibleWeeklyChallengePartners: (
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
       periodIndex
-    ) => api.request<readonly EligibleWeeklyChallengePartner[]>(
+    ) => api.request<unknown>(
       `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/eligible-partners` +
-      `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
-    ),
+      `?competitionId=${encodeURIComponent(competitionId)}` +
+      `&goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
+    ).then(normalizeEligibleWeeklyChallengePartners),
     getWeeklyChallengeRequests: (
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
       periodIndex
-    ) => api.request<readonly WeeklyChallengeRequest[]>(
+    ) => api.request<unknown>(
       `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests` +
-      `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
-    ),
+      `?competitionId=${encodeURIComponent(competitionId)}` +
+      `&goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
+    ).then(normalizeWeeklyChallengeRequests),
     getMyRewardAwards: () => api.request<readonly RewardAward[]>(
       '/v1/rewards/awards/me'
     ),
@@ -190,12 +208,16 @@ function createApiDataSource(api: ApiClient): AppDataSource {
         }
       ),
     requestWeeklyChallengePartner: (
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
       periodIndex,
       recipientUserId
-    ) => api.request<WeeklyChallengeRequest, {
+    ) => runRetryableMutation(
+      `weekly-challenge-request:${competitionId}:${periodIndex}:${recipientUserId}`,
+      (idempotencyKey) => api.request<unknown, {
+      competitionId: string;
       goal: number;
       period: number;
       recipientUserId: string;
@@ -204,28 +226,36 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/weekly-challenges/requests`,
       {
         body: {
+          competitionId,
           goal: weeklyGoal,
           period: periodIndex,
           recipientUserId,
           region: regionCode
         },
-        idempotencyKey: createIdempotencyKey('weekly-challenge'),
+        idempotencyKey,
         method: 'POST'
       }
-    ),
+    ).then(normalizeWeeklyChallengeRequest)),
     respondToWeeklyChallengeRequest: (requestId, decision) =>
-      api.request<WeeklyChallengeRequest, {
+      runRetryableMutation(
+        `weekly-challenge-response:${requestId}:${decision}`,
+        (idempotencyKey) => api.request<unknown, {
         decision: 'accepted' | 'declined';
       }>(
         `/v1/competitions/weekly-challenges/requests/${encodeURIComponent(requestId)}`,
         {
           body: { decision },
-          idempotencyKey: createIdempotencyKey(
-            'weekly-challenge-response'
-          ),
+          idempotencyKey,
           method: 'PATCH'
         }
-      ),
+      ).then(normalizeWeeklyChallengeRequest)),
+    cancelWeeklyChallengeRequest: (requestId) => runRetryableMutation(
+      `weekly-challenge-cancel:${requestId}`,
+      (idempotencyKey) => api.request<unknown>(
+        `/v1/competitions/weekly-challenges/requests/${encodeURIComponent(requestId)}`,
+        { idempotencyKey, method: 'DELETE' }
+      ).then(normalizeWeeklyChallengeRequest)
+    ),
     submitCreatorVideo: (input) => api.request<
       CreatorVideoSubmission,
       CreateCreatorVideoSubmissionInput
@@ -271,13 +301,134 @@ function normalizeCategoryLeaderboard(
 }
 
 function normalizeCompetitionMatches(response: unknown): readonly CompetitionMatch[] {
-  if (!Array.isArray(response)) {
-    return [];
+  if (!Array.isArray(response) || !response.every(isCompetitionMatch)) {
+    throw new Error('The Weekly Challenge match response is invalid.');
   }
-  return response.filter(
-    (match): match is CompetitionMatch =>
-      isRecord(match) && isStreakCounts(match.opponentStreaks)
+  return response;
+}
+
+function normalizeEligibleWeeklyChallengePartners(
+  response: unknown
+): readonly EligibleWeeklyChallengePartner[] {
+  if (!Array.isArray(response) || !response.every(isEligibleWeeklyChallengePartner)) {
+    throw new Error('The Weekly Challenge partner response is invalid.');
+  }
+  return response;
+}
+
+function normalizeWeeklyChallengeRequests(
+  response: unknown
+): readonly WeeklyChallengeRequest[] {
+  if (!Array.isArray(response) || !response.every(isWeeklyChallengeRequest)) {
+    throw new Error('The Weekly Challenge request response is invalid.');
+  }
+  return response;
+}
+
+function normalizeWeeklyChallengeRequest(response: unknown): WeeklyChallengeRequest {
+  if (!isWeeklyChallengeRequest(response)) {
+    throw new Error('The Weekly Challenge request response is invalid.');
+  }
+  return response;
+}
+
+function isCompetitionMatch(value: unknown): value is CompetitionMatch {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'availability',
+      'entries',
+      'multiplier',
+      'opponentAlias',
+      'opponentBestStreak',
+      'opponentCurrentStreak',
+      'opponentMonthlyVerifiedDays',
+      'opponentStreaks',
+      'opponentVerifiedCount',
+      'periodIndex',
+      'region',
+      'scoringStatus'
+    ]) &&
+    (value.availability === 'matched' ||
+      value.availability === 'searching' ||
+      value.availability === 'solo') &&
+    isFiniteNonnegativeInteger(value.entries) &&
+    isWeeklyMultiplier(value.multiplier) &&
+    (value.opponentAlias === null || typeof value.opponentAlias === 'string') &&
+    isFiniteNonnegativeInteger(value.opponentBestStreak) &&
+    isFiniteNonnegativeInteger(value.opponentCurrentStreak) &&
+    isFiniteNonnegativeInteger(value.opponentMonthlyVerifiedDays) &&
+    isStreakCounts(value.opponentStreaks) &&
+    isIntegerInRange(value.opponentVerifiedCount, 0, 7) &&
+    isIntegerInRange(value.periodIndex, 1, 4) &&
+    typeof value.region === 'string' &&
+    (value.scoringStatus === 'projected' || value.scoringStatus === 'settled')
   );
+}
+
+function isEligibleWeeklyChallengePartner(
+  value: unknown
+): value is EligibleWeeklyChallengePartner {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'alias',
+      'goalDays',
+      'requestStatus',
+      'streaks',
+      'userId'
+    ]) &&
+    typeof value.alias === 'string' &&
+    isIntegerInRange(value.goalDays, 1, 7) &&
+    (value.requestStatus === 'available' || value.requestStatus === 'pending') &&
+    isStreakCounts(value.streaks) &&
+    typeof value.userId === 'string'
+  );
+}
+
+function isWeeklyChallengeRequest(value: unknown): value is WeeklyChallengeRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'createdAt',
+      'direction',
+      'goalDays',
+      'id',
+      'partnerAlias',
+      'partnerStreaks',
+      'periodIndex',
+      'status'
+    ]) &&
+    typeof value.createdAt === 'string' &&
+    !Number.isNaN(Date.parse(value.createdAt)) &&
+    (value.direction === 'incoming' || value.direction === 'outgoing') &&
+    isIntegerInRange(value.goalDays, 1, 7) &&
+    typeof value.id === 'string' &&
+    typeof value.partnerAlias === 'string' &&
+    isStreakCounts(value.partnerStreaks) &&
+    isIntegerInRange(value.periodIndex, 1, 4) &&
+    (value.status === 'accepted' ||
+      value.status === 'cancelled' ||
+      value.status === 'declined' ||
+      value.status === 'pending')
+  );
+}
+
+function isWeeklyMultiplier(value: unknown): value is 0 | 1 | 2 | 3 {
+  return value === 0 || value === 1 || value === 2 || value === 3;
+}
+
+function isFiniteNonnegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[]
+) {
+  const expected = new Set(keys);
+  const actual = Object.keys(value);
+  return actual.length === expected.size && actual.every((key) => expected.has(key));
 }
 
 function isCategoryLeaderboardRow(
@@ -345,6 +496,7 @@ function createUnavailableDataSource(): AppDataSource {
     planCreatorWorkout: unavailable,
     requestWeeklyChallengePartner: unavailable,
     respondToWeeklyChallengeRequest: unavailable,
+    cancelWeeklyChallengeRequest: unavailable,
     submitCreatorVideo: unavailable,
     mode: 'unavailable'
   };

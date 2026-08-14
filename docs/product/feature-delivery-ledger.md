@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `1c6e73075993742666a15aaf8fe13514a742048b` after PR #86 on 2026-08-13.
-- Active feature task: none while the coordinator records GGG-007 completion and
-  prepares the next dependency-ordered feature assignment.
+- Active feature task: `GoGymGo Feature GGG-008 — Streaks and Alias badges` on
+  `agent/ggg-008-streaks-alias-badges`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -334,7 +334,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   boundaries, grace periods, timezone fallback, zero state, compact
   decomposition, all Alias surfaces; database.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-008 — Streaks and Alias
-  badges`; branch/PR/merge `unassigned`; status `AUDITED`.
+  badges`; branch `agent/ggg-008-streaks-alias-badges`; PR/merge `pending`;
+  status `IN_PROGRESS`.
 - Residual risks / blocker: historical UI may omit badges on a less-visible Alias
   row until the surface audit is complete.
 
@@ -995,6 +996,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-008` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-007 completion ledger merged through PR #87 as
+  `ada4982f9c0e2d001604cd34c73064351c5a5c8d` with green main-push checks.
 - 2026-08-13 — Completed `GGG-007` through PR #86. Exact tested head
   `31b2f47d99a0f7e5a20177f902df26a59c0bac1a` was squash-merged as
   `1c6e73075993742666a15aaf8fe13514a742048b`; all seven PR and six main-push

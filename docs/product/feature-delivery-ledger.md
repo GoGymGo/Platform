@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `265a203e6c613d27d6811226d4eb784dd71b6595` after PR #89 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-009 — Friends and private
-  invitations` on `agent/ggg-009-friends-private-invitations`.
+  `4b7a8d6002b2ca26788f969beef18d6661631338` after PR #92 on 2026-08-14.
+- Active feature task: `GoGymGo Feature GGG-010 — Direct Weekly Challenges` on
+  `agent/ggg-010-direct-weekly-challenges`; creation follows this assignment
+  ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -29,7 +30,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 30 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 31 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -360,20 +361,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Authentication and authorization: all social routes require Firebase; block and
   ownership rules override discovery and invitations; raw destinations are not
   returned.
-- External providers / feature flag: future email/SMS delivery provider is not
-  identified; no UI flag.
-- Current implementation / missing behavior: repository/UI/API contracts and
-  privacy rules exist. Verify whether contact invitations are actually delivered
-  rather than only returning a link; delivery-provider operations are not
-  documented.
-- Required tests / operations / cloud dependency: Alias uniqueness/search bounds,
-  request state, block enforcement, masked destinations, hashed/single-use token,
-  expiry, delivery failure/retry; database plus any approved email/SMS provider.
+- External providers / feature flag: no delivery provider is configured or
+  claimed; member copy/system share is intentionally `link` / `not_sent`; no UI
+  flag.
+- Current implementation / missing behavior: normalized/reserved unique Alias,
+  bounded private discovery, authoritative friendship transitions, durable
+  bidirectional blocks, canonical pair serialization, downstream block
+  precedence, masked/hash-only expiring single-use destination-bound invitation
+  links, explicit redemption consent/auth recovery, privacy export/delete,
+  redaction, retention cleanup, contracts, and operations documentation are
+  connected. No repository behavior is missing for the provider-free duty.
+- Required tests / operations / cloud dependency: Alias bounds, friendship and
+  block ownership/state/concurrency, masked destination, token expiry/rotation/
+  replay/destination binding, deep-link/auth recovery, retention, privacy
+  export/delete, database triggers, journeys, contracts, and artifacts passed
+  locally and in CI. Applying the migration and operating cleanup in an
+  environment require separate deployment authorization.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-009 — Friends and private
-  invitations`; branch `agent/ggg-009-friends-private-invitations`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: product copy must not imply an email or text was sent
-  unless an authoritative delivery provider accepted it.
+  invitations`; branch `agent/ggg-009-friends-private-invitations` deleted; PR
+  #92; exact tested head `c8d67539f745ed6b42b5400a066a4b25465fe523`;
+  merge `4b7a8d6002b2ca26788f969beef18d6661631338`; status `COMPLETE`.
+- Residual risks / blocker: migration application and cleanup-worker operation
+  remain authorized rollout work. Phone redemption deliberately requires
+  explicit destination confirmation because no verified-phone provider/claim
+  was introduced. Product copy remains honest about link-only delivery. GGG-010
+  and GGG-011 consume the completed friendship/block boundary.
 
 ### GGG-010 — Direct Weekly Challenges
 
@@ -387,13 +399,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   accepted friendship, ownership, and conflicting-request rules are server-side.
 - External providers / feature flag: database/worker; no flag.
 - Current implementation / missing behavior: direct pairing and recent timing/
-  workout-access fixes are merged. Missing complete four-week two-account staging
-  rehearsal and independent feature audit.
+  workout-access fixes are merged. Independent duty audit is assigned; complete
+  four-week two-account staging rehearsal remains an external release exercise.
 - Required tests / operations / cloud dependency: eligibility, explicit response,
   conflict cancellation, solo/searching state, 1x/2x/3x settlement, permitted
   partner stats, withdrawal; database/worker.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-010 — Direct Weekly
-  Challenges`; branch/PR/merge `unassigned`; status `AUDITED`.
+  Challenges`; branch `agent/ggg-010-direct-weekly-challenges`; PR/merge
+  `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: pre-settlement projections must never be labeled as
   banked entries.
 
@@ -1005,6 +1018,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed `GGG-009` through PR #92. Exact tested head
+  `c8d67539f745ed6b42b5400a066a4b25465fe523` was squash-merged as
+  `4b7a8d6002b2ca26788f969beef18d6661631338`; all seven PR and six main-push
+  checks passed, the remote feature branch was deleted, and there was no cloud
+  impact. Authoritative Alias/friendship/block state, concurrency-safe privacy
+  precedence, explicit provider-free invitation links, auth/deep-link recovery,
+  retention/privacy operations, contracts, and direct database/client
+  regressions are complete. Assigned the now-unblocked `GGG-010` to its fresh
+  feature task and isolated branch for creation after this ledger merge.
 - 2026-08-14 — Assigned `GGG-009` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-008 completion ledger merged through PR #90 as
   `bbf7ae2f92667b5d61f6e74ebbae5c501ccbd34d` with green main-push checks.

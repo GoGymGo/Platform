@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `1b875c2e77c13a91f21390501f7669fef136b703` after PR #83 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-007 — Competition scoring and
-  rankings` on `agent/ggg-007-competition-scoring-rankings`.
+  `1c6e73075993742666a15aaf8fe13514a742048b` after PR #86 on 2026-08-13.
+- Active feature task: none while the coordinator records GGG-007 completion and
+  prepares the next dependency-ordered feature assignment.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -294,17 +294,26 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   versioned, reasoned, and audited.
 - External providers / feature flag: PostgreSQL and worker; published competition
   rules are the capability boundary.
-- Current implementation / missing behavior: four scoring weeks, late enrollment,
-  score reconciliation, tie inputs, Bonus Days, and single-entrant rules have
-  direct tests. Missing full-month staging rehearsal and bounded feature audit.
+- Current implementation / missing behavior: server-authoritative contest-scoped
+  verified-day scoring, weekly outcomes, Bonus Days, Perfect Month, category and
+  tie ordering, privacy-limited standings, owner-scoped progress, transactional
+  ledger reconciliation, immutable hash-audited settlement inputs, idempotent draw
+  locking, and honest banked/projected states are connected. Missing only the
+  external full-month staging rehearsal and separately owned final draw/results.
 - Required tests / operations / cloud dependency: timezone/calendar edges,
   duplicate verified days, weekly multipliers, bonus/perfect month, goal category
-  tie order, reconciliation migration, lifecycle transitions; database/worker.
+  tie order, disallowed session/enrollment/gym states, reconciliation/backfill,
+  retry/snapshot idempotency, public privacy, lifecycle transitions, member
+  projections, and production artifacts passed locally and in CI. A deployed
+  worker/full-month rehearsal requires separate deployment authority.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-007 — Competition scoring and
-  rankings`; branch `agent/ggg-007-competition-scoring-rankings`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: equal-chance tie-break and final draw publication must
-  remain auditable and cannot be inferred client-side.
+  rankings`; branch `agent/ggg-007-competition-scoring-rankings` deleted; PR #86;
+  exact tested head `31b2f47d99a0f7e5a20177f902df26a59c0bac1a`;
+  merge `1c6e73075993742666a15aaf8fe13514a742048b`; status `COMPLETE`.
+- Residual risks / blocker: the full-month staging rehearsal remains external.
+  GGG-008, GGG-010, GGG-015, and GGG-016 consume these outputs; equal-chance draw
+  execution and final publication remain GGG-016 and must not be inferred
+  client-side. No cloud access or deployment occurred.
 
 ### GGG-008 — Streak calculation and visible Alias badges
 
@@ -986,6 +995,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-007` through PR #86. Exact tested head
+  `31b2f47d99a0f7e5a20177f902df26a59c0bac1a` was squash-merged as
+  `1c6e73075993742666a15aaf8fe13514a742048b`; all seven PR and six main-push
+  checks passed, the remote feature branch was deleted, and there was no cloud
+  impact. Canonical contest-scoped scoring/ranking, privacy-safe progress,
+  ledger reconciliation, immutable settlement snapshots, contracts, migration,
+  client states, and direct regressions are complete; the full-month staging
+  rehearsal remains external.
 - 2026-08-13 — Assigned `GGG-007` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-005 completion ledger merged through PR #84 as
   `8fd2a91e8541f29b674066edf6f483f8e99e3051` with green main-push checks.

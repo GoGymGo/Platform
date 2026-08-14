@@ -19,10 +19,10 @@ The public catalog returns active competition-enabled metadata only. Administrat
 The reviewed repository artifact is `services/api/config/regions/vancouver-island-gulf-islands-bc.geojson`:
 
 - boundary version: `statcan-2021-islands-trust-2026-01-v1`
-- SHA-256: `5615d3c177fb10bed32ee4e6f72ff51e7ea62ac2c490c7cb86cc80778eec6e34`
+- canonical LF repository-byte SHA-256: `5d341887130e81061ec23689ead15aee0c3433d481b90092a143f70a25409aa7`
 - tolerance: zero metres
 
-The API test suite checks that exact byte digest and 20 named representative inside/outside points. Before enabling a deployed policy, an authorized operator must reconcile its boundary version and server-computed geometry digest to the approved artifact and rerun physical-device boundary UAT. A green repository test does not approve or deploy geography.
+The API test suite checks that exact canonical digest and 20 named representative inside/outside points. Before enabling a deployed policy, an authorized operator must reconcile its boundary version and server-computed geometry digest to the approved artifact and rerun physical-device boundary UAT. A green repository test does not approve or deploy geography.
 
 ## Regional update intake
 

@@ -10,7 +10,7 @@ const artifactPath = resolve(
   '../../../config/regions/vancouver-island-gulf-islands-bc.geojson',
 );
 const expectedArtifactSha256 =
-  '5615d3c177fb10bed32ee4e6f72ff51e7ea62ac2c490c7cb86cc80778eec6e34';
+  '5d341887130e81061ec23689ead15aee0c3433d481b90092a143f70a25409aa7';
 
 const representativePoints = [
   ['Victoria', -123.3656, 48.4284, true],
@@ -68,7 +68,8 @@ function geometryContains(
 
 describe('committed competition-region policy artifact', () => {
   const bytes = readFileSync(artifactPath);
-  const artifact = JSON.parse(bytes.toString('utf8')) as {
+  const canonicalBytes = bytes.toString('utf8').replace(/\r\n/g, '\n');
+  const artifact = JSON.parse(canonicalBytes) as {
     geometry: { coordinates: MultiPolygon; type: string };
     properties: {
       boundaryVersion: string;
@@ -79,7 +80,7 @@ describe('committed competition-region policy artifact', () => {
   };
 
   it('has the reviewed immutable digest and minimized policy metadata', () => {
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+    expect(createHash('sha256').update(canonicalBytes).digest('hex')).toBe(
       expectedArtifactSha256,
     );
     expect(artifact.type).toBe('Feature');

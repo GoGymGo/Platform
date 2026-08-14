@@ -95,10 +95,10 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
     }>(
       `INSERT INTO region_verifications
          (user_id, region_policy_id, method, status, evidence_metadata,
-          policy_version, verified_at)
+          policy_version, verified_at, expires_at)
        VALUES
-         ($1, $3, 'manual_review', 'approved', '{}'::jsonb, 'policy-v1', '2026-06-01'),
-         ($2, $3, 'manual_review', 'approved', '{}'::jsonb, 'policy-v1', '2026-06-01')
+         ($1, $3, 'device_location', 'approved', '{}'::jsonb, 'policy-v1', '2026-06-01', '2026-08-01'),
+         ($2, $3, 'device_location', 'approved', '{}'::jsonb, 'policy-v1', '2026-06-01', '2026-08-01')
        RETURNING id, user_id`,
       [userAId, userBId, region.rows[0].id],
     );

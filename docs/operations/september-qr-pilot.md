@@ -3,7 +3,7 @@
 ## Fixed configuration
 
 - Region: Vancouver Island + Gulf Islands
-- Reviewed region artifact SHA-256: `5615d3c177fb10bed32ee4e6f72ff51e7ea62ac2c490c7cb86cc80778eec6e34`
+- Reviewed region artifact canonical LF repository-byte SHA-256: `5d341887130e81061ec23689ead15aee0c3433d481b90092a143f70a25409aa7`
 - Time zone: `America/Vancouver`
 - Competition: September 1, 2026 00:00 through October 1, 2026 00:00
 - Verification: approved static gym QR, live location, 75 m radius

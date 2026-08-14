@@ -18,10 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `11ca6a407c65e6e8fff7dc35685f3b3b74609db5` after PR #94 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-011 — Social activity Challenges`
-  on `agent/ggg-011-social-activity-challenges`; creation follows this assignment
-  ledger merge.
+  `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4` after PR #97 on 2026-08-14.
+- Active feature task: `GoGymGo Feature GGG-020 — Role-scoped admin access` on
+  `agent/ggg-020-role-scoped-admin-access`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +32,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 32 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 33 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -436,18 +435,25 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Authentication and authorization: member ownership, accepted-friend, region,
   membership, capacity, block, and one-check-in-per-day rules; idempotent writes.
 - External providers / feature flag: optional contact-delivery provider; no flag.
-- Current implementation / missing behavior: structured UI/API/data model and
-  integration workflow exist. Independent duty audit is assigned; provider-free
-  invitation behavior from GGG-009 and browser accessibility/failure states must
-  be verified without inventing delivery evidence.
-- Required tests / operations / cloud dependency: validation bounds, discovery,
-  capacity, invitation states, block/privacy, verified-gym derivation, manual
-  non-gym check-in, no Contest credit, exports; database.
+- Current implementation / missing behavior: database-enforced provenance,
+  lifecycle, timezone/date, capacity, membership/block, invitations, and
+  local-day check-ins; current exact-region evidence; atomic provider-free
+  contact links; verified-gym linkage; UUID-safe projections; privacy operations;
+  honest member states; App Tour isolation; and direct accessibility/no-credit
+  evidence are merged. Repository duty is complete; GGG-031 restored the only
+  failed post-merge dependency gate on newer exact-green main.
+- Required tests / operations / cloud dependency: migrated PostgreSQL journeys
+  37/37, member tests 235/235, root checks, governance/dependencies, production/
+  preview artifacts, direct browser semantics, contract/source/security audits,
+  and all exact-head PR checks passed. The original merge had five of six green
+  main workflows; the separate GGG-031 remediation then restored all six on main.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-011 — Social activity
-  Challenges`; branch `agent/ggg-011-social-activity-challenges`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: large combined client component raises regression
-  risk; refactoring is not required unless the feature task needs it.
+  Challenges`; branch `agent/ggg-011-social-activity-challenges` deleted; PR #96;
+  exact tested head `0e715771d62a046bf0f8ad0483ec3f79c2a2e626`; merge
+  `b549ca292e8706985afdc11ee4a9ab6213be32a7`; status `COMPLETE`.
+- Residual risks / blocker: migration/deployment and staging Challenge exercises
+  still require separate deployment authority. The Expo metadata residual was
+  resolved by GGG-031. No cloud access or deployment occurred.
 
 ### GGG-012 — Creator workout catalog and calendar planning
 
@@ -677,7 +683,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   denial, role/scope matrix, cross-gym denial, proxy allowlist, bootstrap/
   assignment audit, revocation; Firebase, database, Cloudflare Access.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-020 — Role-scoped admin
-  access`; branch/PR/merge `unassigned`; status `AUDITED`.
+  access`; branch `agent/ggg-020-role-scoped-admin-access`; PR/merge `pending`;
+  status `IN_PROGRESS`.
 - Residual risks / blocker: adding administrators beyond the owner requires the
   separately designed dual-approval security workflow or documented deferral.
 
@@ -927,6 +934,38 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Residual risks / blocker: cloud deployment is not authorized. Read-only AWS
   reconciliation also requires available credentials and its separate task.
 
+### GGG-031 — Expo SDK patch compatibility and deterministic release checks
+
+- Intended user / duty / owning runtime: member release engineer; keep the
+  declared Expo SDK 57 package set aligned with Expo's supported patch metadata
+  so an unchanged exact-green member release remains reproducibly installable
+  and auditable; member app dependency/tooling boundary.
+- Surfaces: no new product UI; member iOS, Android, web, and browser-preview
+  artifacts must remain behaviorally unchanged.
+- API and worker support / persistence: none; no database change.
+- Authentication and authorization: unchanged; dependency updates must not
+  weaken Firebase, API route, deep-link, permission, or demo-isolation controls.
+- External providers / feature flag: npm/Expo compatibility metadata; existing
+  locked dependencies only; no feature flag.
+- Current implementation / missing behavior: eleven SDK 57 package declarations
+  and their patch-level lockfile chain are aligned through supported Expo
+  tooling. Clean locked installs pass `expo install --check`; all-platform and
+  preview artifacts remain unchanged in behavior. No repository duty is missing.
+- Required tests / operations / cloud dependency: exact declared package/lockfile
+  alignment, dependency/governance audit, member type/lint/tests, Expo install
+  check, iOS/Android/web exports, production/preview bundle and source audits,
+  full repository check, exact-head PR and restored main-push checks. No cloud
+  dependency.
+- Delivery: priority `P0` CI restoration; task `GoGymGo Feature GGG-031 — Expo
+  SDK patch compatibility`; branch `agent/ggg-031-expo-sdk-patch-compatibility`
+  deleted; PR #97; exact tested head
+  `7793c28aca7a8ff2c73280c90d3057ea21737bd1`; merge
+  `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4`; status `COMPLETE`.
+- Residual risks / blocker: Expo compatibility metadata can advance again; the
+  deterministic CI gate must remain enabled. This task did not migrate SDK
+  major/minor versions or alter permissions, plugins, native identifiers, source,
+  runtime configuration, or GGG-028 scope.
+
 ### GGG-900 — Wearable, heart-rate, biometric, and random-presence verification
 
 - Intended user / duty / owning runtime: future member/fraud reviewer; provide
@@ -1034,6 +1073,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Completed urgent `GGG-031` through PR #97. Exact tested head
+  `7793c28aca7a8ff2c73280c90d3057ea21737bd1` was squash-merged as
+  `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4`; every PR and main-push workflow
+  passed, the main Member job explicitly reported Expo dependencies current and
+  passed all-platform/bundle audits, the remote branch was deleted, and there
+  was no cloud impact. The only GGG-011 CI residual is resolved, so GGG-011 is
+  now `COMPLETE`. Dependency ordering assigns foundational P0 `GGG-020` next;
+  its role-scoped authorization boundary precedes reward, settlement, admin,
+  partner-portal, and pilot-fulfillment duties.
+- 2026-08-14 — Merged `GGG-011` through PR #96. Exact tested head
+  `0e715771d62a046bf0f8ad0483ec3f79c2a2e626` was squash-merged as
+  `b549ca292e8706985afdc11ee4a9ab6213be32a7`; all PR checks and five of six
+  main-push workflows passed. Member App CI then failed only because Expo's
+  external compatibility metadata advanced after the PR run and now requires
+  eleven SDK 57 patch updates. Recorded `GGG-011` as `CI_PENDING`, discovered and
+  assigned urgent `GGG-031` as its separate dependency-maintenance task, and did
+  not broaden the social feature or contact any cloud environment.
 - 2026-08-14 — Completed `GGG-010` through PR #94. Exact tested head
   `548b0cdf6e63af839a1fa1ff5f03717965f3595f` was squash-merged as
   `11ca6a407c65e6e8fff7dc35685f3b3b74609db5`; all seven PR and six main-push

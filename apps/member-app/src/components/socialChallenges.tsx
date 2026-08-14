@@ -559,7 +559,7 @@ function ChallengeBuilder({
                 OUTSIDE GOGYMGO // OPTIONAL
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
-                We create an expiring invitation link, then open your phone&apos;s email or text composer. GoGymGo does not store the raw address or number.
+                We create an expiring invitation link, then open your device&apos;s share sheet. GoGymGo does not send the message or retain the raw address or number.
               </TerminalText>
               <AuthTextField
                 autoCapitalize="none"

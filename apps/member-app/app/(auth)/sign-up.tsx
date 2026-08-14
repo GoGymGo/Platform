@@ -30,9 +30,13 @@ import {
   gymScanSetupNext,
   isGymScanContinuation
 } from '@/navigation/gymScanFlow';
+import {
+  contactInvitationAuthRoute,
+  contactInvitationNext,
+  contactInvitationReviewRoute
+} from '@/navigation/contactInvitationFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
 import { useAppTour } from '@/state/appTour';
-import { useAppData } from '@/data/appDataHooks';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -45,7 +49,6 @@ export default function SignUpScreen() {
   }>();
   const gymScanContinuation =
     mobileGymVerificationAvailable && isGymScanContinuation(next);
-  const { social } = useAppData();
   const {
     appleSignInAvailable,
     createAccount,
@@ -60,7 +63,8 @@ export default function SignUpScreen() {
   const [submitting, setSubmitting] = useState(false);
   const completeSocialSignIn = async (result: AuthSignInResult) => {
     if (challengeInvite) {
-      await social.redeemContactInvitation(challengeInvite);
+      router.replace(contactInvitationReviewRoute(challengeInvite));
+      return;
     }
     router.replace(
       gymScanContinuation
@@ -104,7 +108,7 @@ export default function SignUpScreen() {
         params: {
           verificationEmailSent: String(result.verificationEmailSent),
           next: challengeInvite
-            ? `challenge:${challengeInvite}`
+            ? contactInvitationNext(challengeInvite)
             : gymScanContinuation
               ? gymScanSetupNext
               : mobileGymVerificationAvailable
@@ -126,7 +130,9 @@ export default function SignUpScreen() {
         : 'Create your player account.'}
       eyebrow={gymScanContinuation ? 'PARTNER GYM SAVED' : 'ACCOUNT SETUP'}
       onBack={() => router.replace(
-        gymScanContinuation
+        challengeInvite
+          ? contactInvitationAuthRoute('/sign-in', challengeInvite)
+          : gymScanContinuation
           ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
           : '/join'
       )}

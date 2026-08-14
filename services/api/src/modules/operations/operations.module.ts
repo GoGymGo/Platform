@@ -4,6 +4,7 @@ import { GymsModule } from '../gyms/gyms.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PrivacyModule } from '../privacy/privacy.module';
 import { ProfilesModule } from '../profiles/profiles.module';
+import { SocialModule } from '../social/social.module';
 import { OperationsWorkerService } from './operations-worker.service';
 import { WorkerObservabilityService } from './worker-observability.service';
 
@@ -15,6 +16,7 @@ import { WorkerObservabilityService } from './worker-observability.service';
     NotificationsModule,
     PrivacyModule,
     ProfilesModule,
+    SocialModule,
   ],
   providers: [OperationsWorkerService, WorkerObservabilityService],
 })

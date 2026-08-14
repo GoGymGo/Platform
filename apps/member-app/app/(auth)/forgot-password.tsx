@@ -14,11 +14,15 @@ import { getAuthErrorMessage, validateEmail } from '@/domain/auth';
 import { spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
 import { gymScanAuthNext, isGymScanContinuation } from '@/navigation/gymScanFlow';
+import { contactInvitationAuthRoute } from '@/navigation/contactInvitationFlow';
 import { useAuth } from '@/state/auth';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const { next } = useLocalSearchParams<{ next?: string }>();
+  const { challengeInvite, next } = useLocalSearchParams<{
+    challengeInvite?: string;
+    next?: string;
+  }>();
   const gymScanContinuation = isGymScanContinuation(next);
   const { firebaseConfigured, sendPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
@@ -59,7 +63,11 @@ export default function ForgotPasswordScreen() {
           label="BACK TO SIGN IN"
           onPress={() => goBackOrReplace(
             router,
-            gymScanContinuation ? `/sign-in?next=${gymScanAuthNext}` : '/sign-in'
+            challengeInvite
+              ? contactInvitationAuthRoute('/sign-in', challengeInvite)
+              : gymScanContinuation
+                ? `/sign-in?next=${gymScanAuthNext}`
+                : '/sign-in'
           )}
         />
       )}

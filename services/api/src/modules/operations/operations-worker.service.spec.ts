@@ -4,6 +4,7 @@ import { GymsService } from '../gyms/gyms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
 import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
+import { SocialInvitationCleanupService } from '../social/social-invitation-cleanup.service';
 import { OperationsWorkerService } from './operations-worker.service';
 
 function createWorker(overrides?: {
@@ -13,6 +14,7 @@ function createWorker(overrides?: {
   notifications?: jest.Mock;
   privacy?: jest.Mock;
   profileMedia?: jest.Mock;
+  socialInvitations?: jest.Mock;
 }): {
   calls: {
     competitionLifecycle: jest.Mock;
@@ -21,6 +23,7 @@ function createWorker(overrides?: {
     notifications: jest.Mock;
     privacy: jest.Mock;
     profileMedia: jest.Mock;
+    socialInvitations: jest.Mock;
   };
   worker: OperationsWorkerService;
 } {
@@ -42,6 +45,9 @@ function createWorker(overrides?: {
     profileMedia:
       overrides?.profileMedia ??
       jest.fn().mockResolvedValue({ deleted: 8, failed: 9 }),
+    socialInvitations:
+      overrides?.socialInvitations ??
+      jest.fn().mockResolvedValue({ expired: 11, purged: 12 }),
   };
 
   return {
@@ -61,6 +67,9 @@ function createWorker(overrides?: {
       } as unknown as NotificationsService,
       { process: calls.profileMedia } as unknown as ProfileMediaCleanupService,
       { processPending: calls.privacy } as unknown as PrivacyOperationsService,
+      {
+        process: calls.socialInvitations,
+      } as unknown as SocialInvitationCleanupService,
     ),
   };
 }
@@ -80,6 +89,8 @@ describe('OperationsWorkerService', () => {
       privacyOperationsFailed: 7,
       profileMediaCleanupFailed: 9,
       profileMediaDeleted: 8,
+      socialInvitationsExpired: 11,
+      socialInvitationsPurged: 12,
     });
   });
 
@@ -95,5 +106,6 @@ describe('OperationsWorkerService', () => {
     expect(calls.gyms).toHaveBeenCalledTimes(1);
     expect(calls.privacy).toHaveBeenCalledTimes(1);
     expect(calls.notifications).toHaveBeenCalledTimes(1);
+    expect(calls.socialInvitations).toHaveBeenCalledTimes(1);
   });
 });

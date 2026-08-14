@@ -1,9 +1,6 @@
 import type { StreakCounts } from '@/domain/streaks';
 export type SocialRelationship =
-  | 'none'
-  | 'friend'
-  | 'incoming_request'
-  | 'outgoing_request';
+  'none' | 'friend' | 'incoming_request' | 'outgoing_request';
 
 export type SocialUser = {
   screenName: string;
@@ -21,6 +18,10 @@ export type Friend = SocialUser & {
   friendsSince: string;
 };
 
+export type BlockedMember = SocialUser & {
+  blockedAt: string;
+};
+
 export type FriendRequest = {
   createdAt: string;
   direction: 'incoming' | 'outgoing';
@@ -30,6 +31,12 @@ export type FriendRequest = {
 
 export type FriendRequestDecision = 'accepted' | 'declined';
 
+export type SocialRelationshipAction = {
+  action: 'blocked' | 'cancelled' | 'removed' | 'unblocked';
+  requestId: string | null;
+  userId: string;
+};
+
 export const socialChallengeActivities = [
   'gym',
   'running',
@@ -37,10 +44,11 @@ export const socialChallengeActivities = [
   'cycling',
   'hiking',
   'fitness_class',
-  'other'
+  'other',
 ] as const;
 
-export type SocialChallengeActivity = typeof socialChallengeActivities[number];
+export type SocialChallengeActivity =
+  (typeof socialChallengeActivities)[number];
 export type SocialChallengeType = 'friend' | 'regional';
 export type SocialChallengeTargetPeriod = 'monthly' | 'weekly';
 
@@ -114,9 +122,17 @@ export type ChallengeContactInvitation = {
   challengeId: string;
   channel: 'email' | 'phone';
   destinationHint: string;
+  deliveryMode: 'link';
+  deliveryStatus: 'not_sent';
   expiresAt: string;
   id: string;
   joinUrl: string;
+};
+
+export type ChallengeContactInvitationPreview = {
+  channel: 'email' | 'phone';
+  destinationHint: string;
+  expiresAt: string;
 };
 
 export type ChallengeInviteContact = {
@@ -124,18 +140,19 @@ export type ChallengeInviteContact = {
   destination: string;
 };
 
-export const challengeActivityLabels: Record<SocialChallengeActivity, string> = {
-  cycling: 'Cycling',
-  fitness_class: 'Fitness class',
+export const challengeActivityLabels: Record<SocialChallengeActivity, string> =
+  {
+    cycling: 'Cycling',
+    fitness_class: 'Fitness class',
   gym: 'Gym visits',
   hiking: 'Hiking',
-  other: 'Other activity',
-  running: 'Running',
-  walking: 'Walking'
-};
+    other: 'Other activity',
+    running: 'Running',
+    walking: 'Walking',
+  };
 
 export function normalizeScreenName(value: string) {
-  return value.trim();
+  return value.trim().toUpperCase();
 }
 
 export function validateScreenName(value: string): string | null {
@@ -144,8 +161,16 @@ export function validateScreenName(value: string): string | null {
   if (normalized.length < 3 || normalized.length > 24) {
     return 'Use 3-24 characters.';
   }
-  if (!/^[A-Za-z0-9_]+$/.test(normalized)) {
-    return 'Use letters, numbers, and underscores only.';
+  if (!/^[A-Z0-9_]+$/.test(normalized)) {
+    return 'Use ASCII letters, numbers, and underscores only.';
+  }
+  if (
+    /^(GOGYMGO|ADMIN|ADMINISTRATOR|MODERATOR|OFFICIAL|SUPPORT|SYSTEM)(_|$)/.test(
+      normalized,
+    ) ||
+    /^GG_[A-F0-9]{12}$/.test(normalized)
+  ) {
+    return 'Choose an Alias that is not reserved by GoGymGo.';
   }
 
   return null;
@@ -169,7 +194,7 @@ export function validateChallengeName(value: string): string | null {
 }
 
 export function normalizeChallengeInput(
-  input: CreateSocialChallengeInput
+  input: CreateSocialChallengeInput,
 ): CreateSocialChallengeInput {
   return {
     ...input,
@@ -179,25 +204,37 @@ export function normalizeChallengeInput(
     locationName: input.locationName?.trim().replace(/\s+/g, ' ') || undefined,
     name: normalizeChallengeName(input.name),
     regionCode: input.regionCode?.trim().toLowerCase() || undefined,
-    scheduledDays: [...new Set(input.scheduledDays)].sort((left, right) => left - right),
-    scheduledTime: input.scheduledTime?.trim() || undefined
+    scheduledDays: [...new Set(input.scheduledDays)].sort(
+      (left, right) => left - right,
+    ),
+    scheduledTime: input.scheduledTime?.trim() || undefined,
   };
 }
 
 export function validateChallengeInput(
   input: CreateSocialChallengeInput,
-  externalInviteCount = 0
+  externalInviteCount = 0,
 ): string | null {
   const normalized = normalizeChallengeInput(input);
   const nameError = validateChallengeName(normalized.name);
   if (nameError) return nameError;
-  if (normalized.activityLabel.length < 2 || normalized.activityLabel.length > 60) {
+  if (
+    normalized.activityLabel.length < 2 ||
+    normalized.activityLabel.length > 60
+  ) {
     return 'Describe the activity in 2-60 characters.';
   }
-  if (!Number.isInteger(normalized.targetCount) || normalized.targetCount < 1 || normalized.targetCount > 31) {
+  if (
+    !Number.isInteger(normalized.targetCount) ||
+    normalized.targetCount < 1 ||
+    normalized.targetCount > 31
+  ) {
     return 'Choose a target between 1 and 31.';
   }
-  const windowDays = challengeWindowDays(normalized.startDate, normalized.endDate);
+  const windowDays = challengeWindowDays(
+    normalized.startDate,
+    normalized.endDate,
+  );
   if (windowDays < 1 || windowDays > 31) {
     return 'Choose a challenge window between 1 and 31 days.';
   }
@@ -211,10 +248,14 @@ export function validateChallengeInput(
   if (normalized.challengeType === 'regional') {
     if (!normalized.regionCode) return 'Choose a supported region.';
     if (!normalized.locationName) return 'Enter a meeting location.';
-    if (!normalized.scheduledTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(normalized.scheduledTime)) {
+    if (
+      !normalized.scheduledTime ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(normalized.scheduledTime)
+    ) {
       return 'Enter the local start time as HH:MM.';
     }
-    if (normalized.scheduledDays.length === 0) return 'Choose at least one scheduled day.';
+    if (normalized.scheduledDays.length === 0)
+      return 'Choose at least one scheduled day.';
   }
   return null;
 }
@@ -226,9 +267,9 @@ export function buildChallengeMonthWindow(now = new Date(), monthOffset = 0) {
     endDate: formatLocalDateKey(end),
     label: new Intl.DateTimeFormat('en-CA', {
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
     }).format(start),
-    startDate: formatLocalDateKey(start)
+    startDate: formatLocalDateKey(start),
   };
 }
 

@@ -6,7 +6,7 @@ import {
   normalizeScreenName,
   type CreateSocialChallengeInput,
   type ChallengeInviteContact,
-  type FriendRequestDecision
+  type FriendRequestDecision,
 } from '@/domain/social';
 import { useAuth } from '@/state/auth';
 
@@ -15,7 +15,7 @@ export function useMySocialProfile() {
   return useQuery({
     enabled: context.enabled,
     queryFn: () => context.social.getMyProfile(),
-    queryKey: [...context.queryKey, 'profile']
+    queryKey: [...context.queryKey, 'profile'],
   });
 }
 
@@ -27,7 +27,7 @@ export function useSocialUserSearch(screenName: string) {
   return useQuery({
     enabled: context.enabled && validQuery,
     queryFn: () => context.social.searchUsers(query),
-    queryKey: [...context.queryKey, 'search', query.toLowerCase()]
+    queryKey: [...context.queryKey, 'search', query.toLowerCase()],
   });
 }
 
@@ -36,7 +36,16 @@ export function useFriends() {
   return useQuery({
     enabled: context.enabled,
     queryFn: () => context.social.listFriends(),
-    queryKey: [...context.queryKey, 'friends']
+    queryKey: [...context.queryKey, 'friends'],
+  });
+}
+
+export function useBlockedMembers() {
+  const context = useSocialContext();
+  return useQuery({
+    enabled: context.enabled,
+    queryFn: () => context.social.listBlocks(),
+    queryKey: [...context.queryKey, 'blocks'],
   });
 }
 
@@ -45,7 +54,7 @@ export function useFriendRequests() {
   return useQuery({
     enabled: context.enabled,
     queryFn: () => context.social.listFriendRequests(),
-    queryKey: [...context.queryKey, 'friend-requests']
+    queryKey: [...context.queryKey, 'friend-requests'],
   });
 }
 
@@ -54,7 +63,7 @@ export function useSocialChallenges() {
   return useQuery({
     enabled: context.enabled,
     queryFn: () => context.social.listChallenges(),
-    queryKey: [...context.queryKey, 'challenges']
+    queryKey: [...context.queryKey, 'challenges'],
   });
 }
 
@@ -63,25 +72,69 @@ export function useRegionalChallengeDiscovery(regionCode: string) {
   const normalizedRegionCode = regionCode.trim().toLowerCase();
   return useQuery({
     enabled: context.enabled && normalizedRegionCode.length >= 2,
-    queryFn: () => context.social.discoverRegionalChallenges(normalizedRegionCode),
-    queryKey: [...context.queryKey, 'challenges', 'discover', normalizedRegionCode]
+    queryFn: () =>
+      context.social.discoverRegionalChallenges(normalizedRegionCode),
+    queryKey: [
+      ...context.queryKey,
+      'challenges',
+      'discover',
+      normalizedRegionCode,
+    ],
   });
 }
 
 export function useSendFriendRequest() {
   const context = useSocialContext();
   return useSocialMutation(
-    (recipientUserId: string) => context.social.sendFriendRequest(recipientUserId),
-    context.queryKey
+    (recipientUserId: string) =>
+      context.social.sendFriendRequest(recipientUserId),
+    context.queryKey,
+  );
+}
+
+export function useCancelFriendRequest() {
+  const context = useSocialContext();
+  return useSocialMutation(
+    (requestId: string) => context.social.cancelFriendRequest(requestId),
+    context.queryKey,
+  );
+}
+
+export function useRemoveFriend() {
+  const context = useSocialContext();
+  return useSocialMutation(
+    (friendUserId: string) => context.social.removeFriend(friendUserId),
+    context.queryKey,
+  );
+}
+
+export function useBlockMember() {
+  const context = useSocialContext();
+  return useSocialMutation(
+    (memberUserId: string) => context.social.blockMember(memberUserId),
+    context.queryKey,
+  );
+}
+
+export function useUnblockMember() {
+  const context = useSocialContext();
+  return useSocialMutation(
+    (blockedUserId: string) => context.social.unblockMember(blockedUserId),
+    context.queryKey,
   );
 }
 
 export function useRespondToFriendRequest() {
   const context = useSocialContext();
   return useSocialMutation(
-    ({ decision, requestId }: { decision: FriendRequestDecision; requestId: string }) =>
-      context.social.respondToFriendRequest(requestId, decision),
-    context.queryKey
+    ({
+      decision,
+      requestId,
+    }: {
+      decision: FriendRequestDecision;
+      requestId: string;
+    }) => context.social.respondToFriendRequest(requestId, decision),
+    context.queryKey,
   );
 }
 
@@ -90,7 +143,7 @@ export function useCreateSocialChallenge() {
   return useSocialMutation(
     (input: CreateSocialChallengeInput) =>
       context.social.createChallenge(normalizeChallengeInput(input)),
-    context.queryKey
+    context.queryKey,
   );
 }
 
@@ -98,7 +151,7 @@ export function useJoinRegionalChallenge() {
   const context = useSocialContext();
   return useSocialMutation(
     (challengeId: string) => context.social.joinRegionalChallenge(challengeId),
-    context.queryKey
+    context.queryKey,
   );
 }
 
@@ -106,35 +159,48 @@ export function useChallengeCheckIn() {
   const context = useSocialContext();
   return useSocialMutation(
     (challengeId: string) => context.social.checkInToChallenge(challengeId),
-    context.queryKey
+    context.queryKey,
   );
 }
 
 export function useInviteFriendToChallenge() {
   const context = useSocialContext();
   return useSocialMutation(
-    ({ challengeId, friendUserId }: { challengeId: string; friendUserId: string }) =>
-      context.social.inviteFriendToChallenge(challengeId, friendUserId),
-    context.queryKey
+    ({
+      challengeId,
+      friendUserId,
+    }: {
+      challengeId: string;
+      friendUserId: string;
+    }) => context.social.inviteFriendToChallenge(challengeId, friendUserId),
+    context.queryKey,
   );
 }
 
 export function useInviteContactToChallenge() {
   const context = useAppData();
   return useMutation({
-    mutationFn: ({ challengeId, contact }: {
+    mutationFn: ({
+      challengeId,
+      contact,
+    }: {
       challengeId: string;
       contact: ChallengeInviteContact;
-    }) => context.social.inviteContactToChallenge(challengeId, contact)
+    }) => context.social.inviteContactToChallenge(challengeId, contact),
   });
 }
 
 export function useRespondToChallengeInvitation() {
   const context = useSocialContext();
   return useSocialMutation(
-    ({ challengeId, decision }: { challengeId: string; decision: FriendRequestDecision }) =>
-      context.social.respondToChallengeInvitation(challengeId, decision),
-    context.queryKey
+    ({
+      challengeId,
+      decision,
+    }: {
+      challengeId: string;
+      decision: FriendRequestDecision;
+    }) => context.social.respondToChallengeInvitation(challengeId, decision),
+    context.queryKey,
   );
 }
 
@@ -145,17 +211,17 @@ function useSocialContext() {
   return {
     enabled: authenticatedQueriesEnabled && mode !== 'unavailable',
     queryKey: ['social', user?.uid ?? 'anonymous'] as const,
-    social
+    social,
   };
 }
 
 function useSocialMutation<TVariables, TData>(
   mutationFn: (variables: TVariables) => Promise<TData>,
-  queryKey: readonly string[]
+  queryKey: readonly string[],
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKey] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKey] }),
   });
 }

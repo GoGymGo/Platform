@@ -207,15 +207,21 @@ score, and Prize Draw Entry totals reconcile from server progress in API mode.
 ### 3.5 Friends and invitations
 
 - Profile shows the accepted friend list and pending incoming requests.
-- Users can search exact or partial Aliases without exposing email addresses.
-- Friend requests require recipient acceptance and support explicit accept and
-  decline actions.
-- Users can invite someone who is not yet on GoGymGo through an email and/or
-  phone contact flow.
+- Users can search bounded Alias prefixes without exposing contact, location,
+  private-stat, or account identifiers.
+- Friend requests require recipient acceptance and support explicit accept,
+  decline, requester cancellation, and friendship removal actions.
+- Users can create an email- or phone-addressed private invitation link and
+  explicitly copy/share it. GoGymGo does not claim email/SMS delivery unless an
+  approved provider later supplies an authoritative accepted response.
 - Contact invitations reveal only a masked destination hint after submission;
   raw destinations are not retained in social read models.
 - Block and privacy rules override discovery, requests, contact invitations,
   Challenge membership, and shared visibility.
+- Opening an invitation never auto-accepts it. The token survives authentication
+  and email verification, then a signed-in member reviews the masked destination
+  and explicitly accepts. Email binds to the verified principal; phone requires
+  destination confirmation. Links expire and can be redeemed once.
 
 ### 3.6 Weekly Challenges
 
@@ -481,6 +487,9 @@ contract audit, PRD, and backend handoff matrix together.
   social access.
 - Raw email and phone invitation destinations are used only to create the
   invitation and are not returned in social APIs.
+- Logs, telemetry, idempotency response bodies, and privacy exports exclude raw
+  invitation destinations and opaque tokens. Resolved masked metadata is
+  retention-limited and removed by the operations worker.
 - Biometric identifiers and camera frames are not stored or transmitted by the
   current mobile presence and QR flows.
 - Health, region, consent, and session evidence have explicit retention and

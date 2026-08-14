@@ -18,6 +18,10 @@ import {
 import { LedgerService } from '../ledger/ledger.service';
 import { LegalDocumentsService } from '../legal/legal-documents.service';
 import { ProfilesService } from '../profiles/profiles.service';
+import {
+  loadBlockedUserIds,
+  requireSocialPairAvailable,
+} from '../social/social-block-policy';
 import { currentRegionVerificationPredicate } from '../regions/current-region-verification';
 import {
   calculateStreaks,
@@ -1142,11 +1146,17 @@ export class CompetitionsService {
             ]),
           )
           .execute();
-        const friendIds = friendshipRows.map((friendship) =>
-          friendship.user_a_id === context.userId
-            ? friendship.user_b_id
-            : friendship.user_a_id,
+        const blockedUserIds = await loadBlockedUserIds(
+          transaction,
+          context.userId,
         );
+        const friendIds = friendshipRows
+          .map((friendship) =>
+            friendship.user_a_id === context.userId
+              ? friendship.user_b_id
+              : friendship.user_a_id,
+          )
+          .filter((friendUserId) => !blockedUserIds.has(friendUserId));
         const streaksByUser = await loadPublicStreaks(transaction, friendIds);
 
         const candidates = await Promise.all(
@@ -1245,25 +1255,37 @@ export class CompetitionsService {
           )
           .orderBy('created_at', 'desc')
           .execute();
+        const blockedUserIds = await loadBlockedUserIds(
+          transaction,
+          context.userId,
+        );
 
         return Promise.all(
-          requests.map(async (request) => {
-            const direction =
-              request.recipient_user_id === context.userId
-                ? ('incoming' as const)
-                : ('outgoing' as const);
-            const partnerUserId =
-              direction === 'incoming'
-                ? request.requester_user_id
-                : request.recipient_user_id;
-            return this.toWeeklyChallengeRequestResponse(
-              transaction,
-              request,
-              context.competitionId,
-              direction,
-              partnerUserId,
-            );
-          }),
+          requests
+            .filter((request) => {
+              const otherUserId =
+                request.requester_user_id === context.userId
+                  ? request.recipient_user_id
+                  : request.requester_user_id;
+              return !blockedUserIds.has(otherUserId);
+            })
+            .map(async (request) => {
+              const direction =
+                request.recipient_user_id === context.userId
+                  ? ('incoming' as const)
+                  : ('outgoing' as const);
+              const partnerUserId =
+                direction === 'incoming'
+                  ? request.requester_user_id
+                  : request.recipient_user_id;
+              return this.toWeeklyChallengeRequestResponse(
+                transaction,
+                request,
+                context.competitionId,
+                direction,
+                partnerUserId,
+              );
+            }),
         );
       });
   }
@@ -1303,6 +1325,11 @@ export class CompetitionsService {
             message: 'Choose another player for your Weekly Challenge.',
           });
         }
+        await requireSocialPairAvailable(
+          transaction,
+          context.userId,
+          input.recipientUserId,
+        );
         await this.requireAcceptedFriendship(
           transaction,
           context.userId,
@@ -1426,6 +1453,11 @@ export class CompetitionsService {
             message: 'This Weekly Challenge request has already been resolved.',
           });
         }
+        await requireSocialPairAvailable(
+          transaction,
+          request.requester_user_id,
+          request.recipient_user_id,
+        );
 
         const now = new Date();
         if (decision === 'accepted') {

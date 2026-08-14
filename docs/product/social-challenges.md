@@ -17,14 +17,31 @@ mutates social state only through the authenticated API repository.
 
 ## Trust and privacy rules
 
-- Screen names are unique, case-insensitive, and limited to 3-24 letters,
-  numbers, or underscores.
-- Friend search exposes only screen name and relationship state. A friendship
-  exists only after the recipient accepts a request.
+- Aliases are normalized to uppercase, unique case-insensitively, and limited to
+  3-24 ASCII letters, numbers, or underscores. System, support, moderator, and
+  generated private callsigns cannot be claimed as public Aliases.
+- Authenticated Alias search is prefix-only, rate-limited, and bounded to 20
+  results. It exposes only the public Alias, permitted `streaks-v1` projection,
+  and relationship state. It excludes the caller, private identities, and both
+  sides of a block.
+- Friend requests are mutually unique while pending. Only the recipient may
+  accept or decline, only the requester may cancel, and either friend may remove
+  the accepted friendship. These mutations are retry-safe and audited.
+- A block immediately cancels pending requests and incompatible Weekly
+  Challenge state, removes the friendship and shared Challenge membership, and
+  prevents discovery, requests, invitations, and shared projections in either
+  direction. Unblocking never recreates prior state.
 - In-app private challenge invitees must already be accepted friends. A creator
-  can also send an opaque, expiring contact link; raw email addresses and phone
-  numbers are normalized for delivery, then stored only as a hash and masked
-  hint. Invite tokens are stored only as hashes and are single-use.
+  can instead create an opaque, expiring contact link. GoGymGo does not send the
+  link by email or SMS: the API returns `deliveryMode: link` and
+  `deliveryStatus: not_sent`, and the member chooses Copy or the device share
+  sheet. No email/SMS delivery provider is configured or contacted.
+- Raw email addresses and phone numbers are normalized only during intake. The
+  database stores a masked hint plus token-bound destination, creation-key, and
+  token hashes. A signed-in recipient first reviews the masked destination,
+  explicitly accepts, and must match the verified email or confirm the invited
+  phone. Links expire after 31 days, are single-use, and rotate on a completed
+  creation retry so an opaque token never enters the idempotency response store.
 - Challenge windows are 1-31 days. Targets are 1-31 completions and can apply
   weekly or across the full month.
 - Regional challenges require a supported region, a meeting location, a local
@@ -34,8 +51,11 @@ mutates social state only through the authenticated API repository.
   manually claim a gym visit. Other activities use an explicit daily check-in.
 - All retryable mutations require `Idempotency-Key`.
 - Privacy exports include the account's challenge configuration, membership,
-  check-in history, and masked contact-invite metadata. Foreign internal user
-  IDs and raw contact destinations are not included.
+  check-in history, friendship/request/block history, relationship audit events,
+  and masked contact-invite metadata. Foreign internal user IDs, raw contact
+  destinations, destination hashes, creation hashes, and invite tokens are not
+  included. Resolved invitation metadata is purged after 90 days by the
+  operations worker.
 
 Challenges do not change competition eligibility, prize entries, leaderboard
 scores, or sponsor rewards.
@@ -59,6 +79,11 @@ friendships, basic challenges, and challenge membership.
 challenge invitations, consent-based Weekly Challenge partner requests,
 creator video submissions, and creator calendar plans.
 
+`1787101200000_friendship_privacy_integrity.ts` adds blocks, append-only social
+relationship events, reserved-Alias protection, blocked-pair database guards,
+terminal-state guards, link-only/versioned invitation metadata, and indexes for
+expiry processing.
+
 Apply locally:
 
 ```powershell
@@ -81,11 +106,16 @@ Every route requires a Firebase bearer token.
 | Method  | Route                                               | Purpose                                           |
 | ------- | --------------------------------------------------- | ------------------------------------------------- |
 | `PATCH` | `/v1/me`                                            | Set the account screen name.                      |
-| `GET`   | `/v1/social/users?screenName=...`                   | Find users by partial screen name.                |
+| `GET`   | `/v1/social/users?screenName=...`                   | Find public users by Alias prefix.                 |
 | `GET`   | `/v1/social/friends`                                | List accepted friends.                            |
 | `GET`   | `/v1/social/friend-requests`                        | List pending incoming and outgoing requests.      |
 | `POST`  | `/v1/social/friend-requests`                        | Send a friend request.                            |
 | `PATCH` | `/v1/social/friend-requests/:requestId`             | Accept or decline an incoming request.            |
+| `DELETE`| `/v1/social/friend-requests/:requestId`             | Cancel an outgoing pending request.               |
+| `DELETE`| `/v1/social/friends/:friendUserId`                  | Remove an accepted friendship.                    |
+| `GET`   | `/v1/social/blocks`                                 | List members blocked by the caller.               |
+| `POST`  | `/v1/social/blocks`                                 | Block a member and remove incompatible state.     |
+| `DELETE`| `/v1/social/blocks/:blockedUserId`                  | Unblock without restoring prior state.            |
 | `GET`   | `/v1/social/challenges`                             | List owned, joined, and pending challenges.       |
 | `GET`   | `/v1/social/challenges/discover?regionCode=...`     | Discover active regional challenges.              |
 | `POST`  | `/v1/social/challenges`                             | Create a structured friend or regional challenge. |
@@ -93,6 +123,7 @@ Every route requires a Firebase bearer token.
 | `POST`  | `/v1/social/challenges/:challengeId/check-ins`      | Record today's eligible activity.                 |
 | `POST`  | `/v1/social/challenges/:challengeId/invitations`    | Invite an accepted friend to an owned challenge.  |
 | `POST`  | `/v1/social/challenges/:challengeId/contact-invitations` | Create an email or phone invite link.          |
+| `POST`  | `/v1/social/challenge-contact-invitations/inspect`  | Review masked invitation metadata after sign-in.  |
 | `POST`  | `/v1/social/challenge-contact-invitations/redeem`   | Redeem a signed-in contact invitation.             |
 | `PATCH` | `/v1/social/challenges/:challengeId/invitations/me` | Accept or decline the current user's invitation.  |
 

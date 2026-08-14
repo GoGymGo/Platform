@@ -23,7 +23,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
-    "test:journeys": "jest --config ./test/jest-integration.json --runInBand --runTestsByPath test/critical-session-workflow.integration-spec.ts test/gym-qr-workflow.integration-spec.ts test/region-verification.integration-spec.ts",
+    "test:journeys": "jest --config ./test/jest-integration.json --runInBand --runTestsByPath test/critical-session-workflow.integration-spec.ts test/gym-qr-workflow.integration-spec.ts test/region-verification.integration-spec.ts test/social-challenge-workflow.integration-spec.ts",
     "test:smoke:qr": "jest --config ./test/jest-integration.json --runInBand --runTestsByPath test/gym-qr-workflow.integration-spec.ts",
     "migrate:create": "node-pg-migrate create --migration-file-language ts",
     "migrate:up": "node-pg-migrate up --tsx --envPath .env --migrations-dir migrations",

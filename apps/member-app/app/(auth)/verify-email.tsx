@@ -24,6 +24,11 @@ import {
   gymScanSource,
   gymScanWorkoutRoute
 } from '@/navigation/gymScanFlow';
+import {
+  contactInvitationAuthRoute,
+  contactInvitationFromNext,
+  contactInvitationReviewRoute
+} from '@/navigation/contactInvitationFlow';
 import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
 
@@ -53,7 +58,7 @@ export default function VerifyEmailScreen() {
   const [messageTone, setMessageTone] = useState<'green' | 'amber' | 'red'>(
     initialVerificationDeliveryFailed ? 'red' : 'amber'
   );
-  const challengeInvite = next?.startsWith('challenge:') ? next.slice('challenge:'.length) : null;
+  const challengeInvite = contactInvitationFromNext(next);
   const polling = useRef(false);
   const continueAfterVerification = useCallback(() => {
     if (!mobileGymVerificationAvailable && !challengeInvite) {
@@ -62,7 +67,7 @@ export default function VerifyEmailScreen() {
     }
     router.replace(
       challengeInvite
-        ? { pathname: '/join', params: { challengeInvite } }
+        ? contactInvitationReviewRoute(challengeInvite)
         : next === gymScanSetupNext
           ? `/region?source=${gymScanSource}`
           : next === gymScanAuthNext
@@ -152,7 +157,9 @@ export default function VerifyEmailScreen() {
     try {
       await signOutUser();
       router.replace(
-        next === gymScanAuthNext || next === gymScanSetupNext
+        challengeInvite
+          ? contactInvitationAuthRoute('/sign-in', challengeInvite)
+          : next === gymScanAuthNext || next === gymScanSetupNext
           ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
           : '/sign-in'
       );
@@ -184,7 +191,9 @@ export default function VerifyEmailScreen() {
           <FirstRunPrimaryButton
             label="GO TO SIGN IN"
             onPress={() => router.replace(
-              next === gymScanAuthNext || next === gymScanSetupNext
+              challengeInvite
+                ? contactInvitationAuthRoute('/sign-in', challengeInvite)
+                : next === gymScanAuthNext || next === gymScanSetupNext
                 ? { pathname: '/sign-in', params: { next: gymScanAuthNext } }
                 : '/sign-in'
             )}

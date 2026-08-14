@@ -141,4 +141,49 @@ describe('IdempotencyService', () => {
     ).resolves.toEqual(storedResponse);
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it('authorizes inside the transaction before returning a stored response', async () => {
+    const storedResponse = { id: 'request-1', status: 'accepted' };
+    const { service, transaction } = createService({
+      existing: {
+        request_hash: requestHash(request),
+        response_body: storedResponse,
+        state: 'completed',
+      },
+    });
+    const authorize = jest.fn(() => Promise.resolve({ operatorId: 'user-1' }));
+
+    await expect(
+      service.execute(
+        { ...baseOptions, storeResponseBody: true },
+        () => Promise.resolve(storedResponse),
+        authorize,
+      ),
+    ).resolves.toEqual(storedResponse);
+
+    expect(authorize).toHaveBeenCalledWith(transaction);
+  });
+
+  it('does not reserve or replay a request when authorization fails', async () => {
+    const storedResponse = { id: 'request-1', status: 'accepted' };
+    const { service, transaction } = createService({
+      existing: {
+        request_hash: requestHash(request),
+        response_body: storedResponse,
+        state: 'completed',
+      },
+    });
+    const failure = new Error('not authorized');
+
+    await expect(
+      service.execute(
+        { ...baseOptions, storeResponseBody: true },
+        () => Promise.resolve(storedResponse),
+        () => Promise.reject(failure),
+      ),
+    ).rejects.toBe(failure);
+
+    expect(transaction.deleteFrom).not.toHaveBeenCalled();
+    expect(transaction.insertInto).not.toHaveBeenCalled();
+  });
 });

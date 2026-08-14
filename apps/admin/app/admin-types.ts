@@ -30,9 +30,25 @@ export type GoalBracket = {
   label: string;
 };
 
+export type CompetitionDraw = {
+  entrantCount: number;
+  entrantSnapshotHash: string;
+  id: string;
+  lockedAt: string;
+  publicResultSnapshotHash: string;
+  rewardSlotCount: number;
+  rewardSnapshotHash: string;
+  scoringSnapshotHash: string;
+  seedCommitment: string;
+  settledAt: string | null;
+  status: "locked" | "settled";
+  totalEntries: string;
+};
+
 export type Competition = {
   assignedGymIds: string[];
   endsAt: string;
+  draw: CompetitionDraw | null;
   enrollmentCount: number;
   entrantCap: number | null;
   goalBrackets: GoalBracket[];

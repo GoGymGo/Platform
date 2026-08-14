@@ -25,6 +25,7 @@ import type {
   DecideProfileMediaDto,
   DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
+  DrawLockResponseDto,
   LockDrawDto,
   OperatorActionResponseDto,
   ProfileMediaReviewActionDto,
@@ -39,6 +40,19 @@ import type {
 interface OperatorActionJson extends JsonObject {
   id: string;
   status: string;
+}
+
+interface DrawLockJson extends JsonObject {
+  entrantCount: number;
+  entrantSnapshotHash: string;
+  id: string;
+  lockedAt: string;
+  publicResultSnapshotHash: string;
+  rewardSlotCount: number;
+  rewardSnapshotHash: string;
+  scoringSnapshotHash: string;
+  status: 'locked' | 'settled';
+  totalEntries: string;
 }
 
 @Injectable()
@@ -304,16 +318,33 @@ export class OperatorService {
     principal: AuthenticatedPrincipal,
     requestId: string,
     input: LockDrawDto,
-  ): Promise<OperatorActionResponseDto> {
-    const operatorId = await this.getOperatorId(principal);
-    const result = await this.draws.lock({
-      competitionId: input.competitionId,
-      operatorUserId: operatorId,
-      reason: input.reason,
-      requestId,
-      seedCommitment: input.seedCommitment,
-    });
-    return { id: result.drawId, status: 'locked' };
+  ): Promise<DrawLockResponseDto> {
+    return this.idempotency.execute<DrawLockJson, string>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: {
+          competitionId: input.competitionId,
+          reason: input.reason,
+          seedCommitment: input.seedCommitment,
+        },
+        responseCode: 200,
+        scope: 'operator:draws:lock',
+      },
+      async (transaction, operatorUserId) => {
+        const result = await this.draws.lock(transaction, {
+          competitionId: input.competitionId,
+          operatorUserId,
+          reason: input.reason,
+          requestId,
+          seedCommitment: input.seedCommitment,
+        });
+        const { drawId, ...snapshot } = result;
+        return { ...snapshot, id: drawId };
+      },
+      async (transaction) =>
+        (await this.adminAuthorization.requireAdmin(principal, transaction)).id,
+    );
   }
 
   async settleDraw(
@@ -322,15 +353,31 @@ export class OperatorService {
     requestId: string,
     input: SettleDrawDto,
   ): Promise<OperatorActionResponseDto> {
-    const operatorId = await this.getOperatorId(principal);
-    const result = await this.draws.settle({
-      drawId,
-      operatorUserId: operatorId,
-      reason: input.reason,
-      requestId,
-      seedReveal: input.seedReveal,
-    });
-    return { id: result.drawId, status: 'settled' };
+    return this.idempotency.execute<OperatorActionJson, string>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: {
+          drawId,
+          reason: input.reason,
+          seedReveal: input.seedReveal,
+        },
+        responseCode: 200,
+        scope: 'operator:draws:settle',
+      },
+      async (transaction, operatorUserId) => {
+        await this.draws.settle(transaction, {
+          drawId,
+          operatorUserId,
+          reason: input.reason,
+          requestId,
+          seedReveal: input.seedReveal,
+        });
+        return { id: drawId, status: 'settled' };
+      },
+      async (transaction) =>
+        (await this.adminAuthorization.requireAdmin(principal, transaction)).id,
+    );
   }
 
   decideRegionVerification(

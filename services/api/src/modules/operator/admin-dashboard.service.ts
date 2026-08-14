@@ -70,6 +70,11 @@ export class AdminDashboardService {
               'region.id',
               'competition.region_policy_id',
             )
+            .leftJoin(
+              'competition_draws as draw',
+              'draw.competition_id',
+              'competition.id',
+            )
             .select([
               'competition.id',
               'competition.configuration_version',
@@ -85,6 +90,18 @@ export class AdminDashboardService {
               'competition.rules_version',
               'competition.starts_at',
               'competition.status',
+              'draw.id as draw_id',
+              'draw.entrant_count as draw_entrant_count',
+              'draw.entrant_snapshot_hash as draw_entrant_snapshot_hash',
+              'draw.locked_at as draw_locked_at',
+              'draw.public_result_snapshot_hash as draw_public_result_snapshot_hash',
+              'draw.reward_slot_count as draw_reward_slot_count',
+              'draw.reward_snapshot_hash as draw_reward_snapshot_hash',
+              'draw.scoring_snapshot_hash as draw_scoring_snapshot_hash',
+              'draw.seed_commitment as draw_seed_commitment',
+              'draw.settled_at as draw_settled_at',
+              'draw.status as draw_status',
+              'draw.total_entries as draw_total_entries',
               'region.code as region_code',
               'region.metro_name as region_name',
             ])
@@ -400,6 +417,18 @@ export class AdminDashboardService {
   private toCompetition(
     competition: {
       configuration_version: number;
+      draw_entrant_count: number | null;
+      draw_entrant_snapshot_hash: string | null;
+      draw_id: string | null;
+      draw_locked_at: Date | null;
+      draw_public_result_snapshot_hash: string | null;
+      draw_reward_slot_count: number | null;
+      draw_reward_snapshot_hash: string | null;
+      draw_scoring_snapshot_hash: string | null;
+      draw_seed_commitment: string | null;
+      draw_settled_at: Date | null;
+      draw_status: 'cancelled' | 'locked' | 'settled' | null;
+      draw_total_entries: string | null;
       ends_at: Date;
       entrant_cap: number | null;
       id: string;
@@ -424,6 +453,35 @@ export class AdminDashboardService {
     const rewardCount = rewardsByCompetition.get(competition.id);
     return {
       assignedGymIds: gymsByCompetition.get(competition.id) ?? [],
+      draw:
+        competition.draw_id &&
+        competition.draw_status &&
+        competition.draw_status !== 'cancelled' &&
+        competition.draw_locked_at &&
+        competition.draw_seed_commitment &&
+        competition.draw_entrant_snapshot_hash &&
+        competition.draw_scoring_snapshot_hash &&
+        competition.draw_reward_snapshot_hash &&
+        competition.draw_public_result_snapshot_hash &&
+        competition.draw_entrant_count !== null &&
+        competition.draw_reward_slot_count !== null &&
+        competition.draw_total_entries !== null
+          ? {
+              entrantCount: competition.draw_entrant_count,
+              entrantSnapshotHash: competition.draw_entrant_snapshot_hash,
+              id: competition.draw_id,
+              lockedAt: competition.draw_locked_at.toISOString(),
+              publicResultSnapshotHash:
+                competition.draw_public_result_snapshot_hash,
+              rewardSlotCount: competition.draw_reward_slot_count,
+              rewardSnapshotHash: competition.draw_reward_snapshot_hash,
+              scoringSnapshotHash: competition.draw_scoring_snapshot_hash,
+              seedCommitment: competition.draw_seed_commitment,
+              settledAt: competition.draw_settled_at?.toISOString() ?? null,
+              status: competition.draw_status,
+              totalEntries: String(competition.draw_total_entries),
+            }
+          : null,
       endsAt: competition.ends_at.toISOString(),
       enrollmentCount: enrollmentsByCompetition.get(competition.id) ?? 0,
       entrantCap: competition.entrant_cap,

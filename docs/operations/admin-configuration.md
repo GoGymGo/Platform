@@ -61,12 +61,22 @@ Competition publication requires registration to be open already, with its close
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, one locked transaction instead cancels the competition, withdraws active enrollments, cancels active workouts and open Weekly Challenge participation, queues neutral cancellation notifications, and records one append-only audit event. A notification enqueue or audit failure rolls back the whole transition so a worker retry can safely complete it without duplicate effects. Manual cancellation uses the same participation cleanup.
 
 After the contest end and its 15-minute workout completion period, the contest
-home exposes one **Finalize + publish results** confirmation. The dashboard
-generates a cryptographically random draw seed, commits the locked entrant
-snapshot through `POST /v1/operator/draws/lock`, then reveals that same seed
-through `POST /v1/operator/draws/:drawId/settle`. An interrupted publication
-keeps the pending reveal in the signed-in browser so the same audited draw can
-be resumed; do not clear browser storage while a contest says **Draw locked**.
+home exposes **Lock audited draw snapshot**. The dashboard generates a
+cryptographically random draw seed and commits the entrant, scoring, public
+identity, and exact eligible reward-slot snapshots through
+`POST /v1/operator/draws/lock`. Locking does not publish winners. The operator
+must review the returned counts and hashes before using the separate
+**Reveal + publish** action, which sends the same seed to
+`POST /v1/operator/draws/:drawId/settle`.
+
+An interrupted lock or reveal keeps a bounded 30-day recovery record in browser
+storage. That record is scoped to the exact Firebase operator and admin origin,
+and settlement remains disabled if its draw ID or commitment differs from the
+server's locked evidence. Signing out does not destroy recoverable material,
+but another operator or environment cannot load it. Do not clear browser
+storage while a contest says **Draw locked**. If the seed is lost, stop: do not
+create another draw or fabricate a reveal. Follow an independently approved
+forward-recovery procedure.
 Successful settlement changes the contest to `settled` and makes its exact
 participant results available in the member Winners Circle.
 
@@ -77,8 +87,9 @@ entries with the exact eligible verified sessions. It refuses to lock on any
 negative total, session/ledger mismatch, unresolved workout, or invalid scoring
 input. A successful lock stores both the draw-entry snapshot and the complete
 versioned scoring inputs (goal, verified days, category score/rank, longest
-streak, prize entries, rules version, and deterministic tie digest). The audit
-event records the scoring and entrant snapshot hashes plus the number of
+streak, prize entries, rules version, and deterministic tie digest), exact
+published reward inventory slots, and privacy-limited Alias/streak projections.
+The audit event records every snapshot hash, counts, and the number of
 reconciled progress rows. Retrying the same request and seed commitment returns
 the same locked snapshot; a different commitment is rejected.
 
@@ -94,11 +105,19 @@ same operation after an audited forward fix. Never insert a partner, edit a
 match outcome, or repair the ledger directly.
 
 Before revealing the seed, operators must verify the entrant count, total
-entries, and both 64-character snapshot hashes shown by the lock response. Do
+entries, reward-slot count, and all 64-character snapshot hashes shown by the
+lock response. Do
 not repair `competition_progress`, `entry_ledger`, draw entries, or settlement
 inputs with direct database edits. Investigate the originating session or
 ledger event and rerun the idempotent lock after the data-integrity issue has
 been corrected through an audited operational procedure.
+
+The release rehearsal remains external to repository tests: use a full-month
+staging Contest, store the reveal with an independent authorized custodian,
+exercise browser recovery, verify the lock evidence independently, and confirm
+that no participant/public response contains internal user IDs, seed material,
+coupon plaintext, claim URLs, or fulfillment instructions. No staging or cloud
+action is performed by repository validation.
 
 ## First administrator bootstrap
 

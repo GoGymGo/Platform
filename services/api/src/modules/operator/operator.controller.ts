@@ -22,6 +22,7 @@ import {
   DecideProfileMediaDto,
   DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
+  DrawLockResponseDto,
   LockDrawDto,
   OperatorActionResponseDto,
   ProfileMediaReviewActionDto,
@@ -109,12 +110,12 @@ export class OperatorController {
   @Post('draws/lock')
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Lock a competition draw snapshot and commitment' })
-  @ApiOkResponse({ type: OperatorActionResponseDto })
+  @ApiOkResponse({ type: DrawLockResponseDto })
   lockDraw(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: LockDrawDto,
-  ): Promise<OperatorActionResponseDto> {
+  ): Promise<DrawLockResponseDto> {
     return this.operator.lockDraw(
       principal,
       requireIdempotencyKey(idempotencyKey),

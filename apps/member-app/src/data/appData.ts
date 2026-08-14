@@ -19,6 +19,7 @@ import type {
 } from '@/domain/rewards';
 import { isStreakCounts, parseStreakSummary, type StreakSummary } from '@/domain/streaks';
 import type { ApiClient } from '@/services/api/client';
+import { normalizeParticipantCompetitionResults } from '@/data/participantCompetitionResults';
 
 export type {
   CategoryLeaderboard,
@@ -185,9 +186,9 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       '/v1/rewards/awards/me'
     ).then(normalizeRewardAwards),
     getMyLatestCompetitionResults: () =>
-      api.request<ParticipantCompetitionResults | null>(
+      api.request<unknown>(
         '/v1/results/mine/latest'
-      ),
+      ).then(normalizeParticipantCompetitionResults),
     getMyStreaks: () =>
       api.request<unknown>('/v1/streaks/me').then(parseStreakSummary),
     getRewardCatalog: (regionCode, monthKey) => {

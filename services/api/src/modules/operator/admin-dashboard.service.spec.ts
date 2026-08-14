@@ -13,6 +13,18 @@ describe('AdminDashboardService contest gym assignments', () => {
       toCompetition(
         competition: {
           configuration_version: number;
+          draw_entrant_count: number | null;
+          draw_entrant_snapshot_hash: string | null;
+          draw_id: string | null;
+          draw_locked_at: Date | null;
+          draw_public_result_snapshot_hash: string | null;
+          draw_reward_slot_count: number | null;
+          draw_reward_snapshot_hash: string | null;
+          draw_scoring_snapshot_hash: string | null;
+          draw_seed_commitment: string | null;
+          draw_settled_at: Date | null;
+          draw_status: 'cancelled' | 'locked' | 'settled' | null;
+          draw_total_entries: string | null;
           ends_at: Date;
           entrant_cap: number | null;
           id: string;
@@ -37,6 +49,18 @@ describe('AdminDashboardService contest gym assignments', () => {
     };
     const competition = (id: string) => ({
       configuration_version: 1,
+      draw_entrant_count: null,
+      draw_entrant_snapshot_hash: null,
+      draw_id: null,
+      draw_locked_at: null,
+      draw_public_result_snapshot_hash: null,
+      draw_reward_slot_count: null,
+      draw_reward_snapshot_hash: null,
+      draw_scoring_snapshot_hash: null,
+      draw_seed_commitment: null,
+      draw_settled_at: null,
+      draw_status: null,
+      draw_total_entries: null,
       ends_at: new Date('2026-10-01T07:00:00.000Z'),
       entrant_cap: null,
       id,

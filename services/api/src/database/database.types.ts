@@ -632,9 +632,13 @@ export interface CompetitionDrawsTable {
   seed_reveal: string | null;
   entrant_snapshot_hash: string;
   scoring_snapshot_hash: string;
+  reward_snapshot_hash: string;
+  public_result_snapshot_hash: string;
   entrant_count: number;
   total_entries: BigInteger;
+  reward_slot_count: number;
   locked_at: Timestamp;
+  snapshot_finalized_at: NullableTimestamp;
   settled_at: NullableTimestamp;
 }
 
@@ -661,6 +665,41 @@ export interface DrawEntriesTable {
   enrollment_id: string;
   entry_count: number;
   snapshot_position: number;
+  created_at: Timestamp;
+}
+
+export interface DrawRewardCatalogSnapshotsTable {
+  draw_id: string;
+  reward_catalog_item_id: string;
+  catalog_version: number;
+  sponsor_name: string;
+  title: string;
+  reward_type: RewardType;
+  inventory_total: number;
+  display_order: number;
+  available_from: NullableTimestamp;
+  available_until: NullableTimestamp;
+  available_slot_count: number;
+  created_at: Timestamp;
+}
+
+export interface DrawRewardSlotsTable {
+  draw_id: string;
+  slot_position: number;
+  reward_catalog_item_id: string;
+  catalog_slot_position: number;
+  created_at: Timestamp;
+}
+
+export interface DrawPublicIdentitiesTable {
+  draw_id: string;
+  user_id: string;
+  alias: string;
+  streak_daily: number;
+  streak_weekly: number;
+  streak_monthly: number;
+  streak_yearly: number;
+  streak_projection_version: 'streaks-v1';
   created_at: Timestamp;
 }
 
@@ -914,6 +953,9 @@ export interface Database {
   competition_rule_acceptances: CompetitionRuleAcceptancesTable;
   competitions: CompetitionsTable;
   draw_entries: DrawEntriesTable;
+  draw_public_identities: DrawPublicIdentitiesTable;
+  draw_reward_catalog_snapshots: DrawRewardCatalogSnapshotsTable;
+  draw_reward_slots: DrawRewardSlotsTable;
   cash_fulfillments: CashFulfillmentsTable;
   entry_ledger: EntryLedgerTable;
   friend_requests: FriendRequestsTable;

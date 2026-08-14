@@ -7,8 +7,9 @@ export interface components {
     AddRewardCouponCodesDto: { codes: Array<string>; expectedVersion: number; reason: string };
     AddedCouponCodesResponseDto: { added: number; rewardId: string; version: number };
     AdminDashboardAuditEventDto: { action: string; actorEmail: string | null; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
-    AdminDashboardCompetitionDto: { assignedGymIds: Array<string>; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; id: string; minimumEntrants: number; monthKey: string; name: string; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
+    AdminDashboardCompetitionDto: { assignedGymIds: Array<string>; draw: components['schemas']["AdminDashboardDrawDto"] | null; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; id: string; minimumEntrants: number; monthKey: string; name: string; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
     AdminDashboardCreatorWorkoutDto: { creatorName: string; creatorUserId: string | null; durationMinutes: number; id: string; published: boolean; publishedAt: string | null; regionCodes: Array<string>; sponsorName: string | null; thumbnailUrl: string | null; title: string; version: number; videoUrl: string; workoutStyle: string };
+    AdminDashboardDrawDto: { entrantCount: number; entrantSnapshotHash: string; id: string; lockedAt: string; publicResultSnapshotHash: string; rewardSlotCount: number; rewardSnapshotHash: string; scoringSnapshotHash: string; seedCommitment: string; settledAt: string | null; status: "locked" | "settled"; totalEntries: string };
     AdminDashboardGoalBracketDto: { goalDays: number; label: string };
     AdminDashboardIdentityDto: { email: string; id: string; roles: Array<string> };
     AdminDashboardLegalDocumentDto: { content: Record<string, unknown>; contentSha256: string; documentKey: string; effectiveAt: string; id: string; jurisdictionCode: string; locale: string; ownerApprovedAt: string | null; receiptRequirement: string; status: "effective" | "scheduled" | "withdrawn"; title: string; version: string };
@@ -78,6 +79,7 @@ export interface components {
     DecideRegionVerificationDto: { decision: "approved" | "rejected"; expiresAt?: string; reason: string };
     DeleteVersionedAdminEntityDto: { expectedVersion: number; reason: string };
     DeviceAttestationReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniqueTokenCount: number };
+    DrawLockResponseDto: { entrantCount: number; entrantSnapshotHash: string; id: string; lockedAt: string; publicResultSnapshotHash: string; rewardSlotCount: number; rewardSnapshotHash: string; scoringSnapshotHash: string; status: "locked" | "settled"; totalEntries: string };
     EligibleWeeklyChallengePartnerDto: { alias: string; goalDays: number; requestStatus: "available" | "pending"; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     EnrollmentCountResponseDto: { count: number };
     EnrollmentGymPresenceDto: { accuracyMeters: number; credential: string; latitude: number; longitude: number };
@@ -123,7 +125,7 @@ export interface components {
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
     ParticipantCompetitionResultsResponseDto: { categoryLeaderboards: Array<components['schemas']["CategoryLeaderboardDto"]>; competitionId: string; competitionName: string; endedAt: string; monthKey: string; participantGoalDays: number; regionCode: string; regionName: string; resultsStatus: "pending" | "settled"; rewardCount: number; rewardWinners: Array<components['schemas']["RewardWinnerResponseDto"]>; settledAt: string | null };
     PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
-    PartnerCompetitionDto: { assignedGymIds: Array<string>; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string | null; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
+    PartnerCompetitionDto: { assignedGymIds: Array<string>; draw: components['schemas']["AdminDashboardDrawDto"] | null; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string | null; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
     PartnerDashboardSnapshotDto: { competitions: Array<components['schemas']["PartnerCompetitionDto"]>; generatedAt: string; gyms: Array<components['schemas']["PartnerGymDto"]>; operator: components['schemas']["AdminDashboardIdentityDto"]; regions: Array<components['schemas']["AdminDashboardRegionDto"]>; sessions: Array<components['schemas']["OperatorGymSessionDto"]> };
     PartnerGymDto: { accessLevel: "admin" | "staff"; active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string };
     PrivacyDownloadActionDto: { expiresAt: string; url: string };
@@ -965,7 +967,7 @@ export interface operations {
     parameters: { header: { "Idempotency-Key": string } };
     requestBody: components['schemas']["LockDrawDto"];
     responses: {
-      "200": components['schemas']["OperatorActionResponseDto"];
+      "200": components['schemas']["DrawLockResponseDto"];
     };
   };
   planWorkout: {
@@ -1652,6 +1654,7 @@ export type AddedCouponCodesResponseDto = components['schemas']["AddedCouponCode
 export type AdminDashboardAuditEventDto = components['schemas']["AdminDashboardAuditEventDto"];
 export type AdminDashboardCompetitionDto = components['schemas']["AdminDashboardCompetitionDto"];
 export type AdminDashboardCreatorWorkoutDto = components['schemas']["AdminDashboardCreatorWorkoutDto"];
+export type AdminDashboardDrawDto = components['schemas']["AdminDashboardDrawDto"];
 export type AdminDashboardGoalBracketDto = components['schemas']["AdminDashboardGoalBracketDto"];
 export type AdminDashboardIdentityDto = components['schemas']["AdminDashboardIdentityDto"];
 export type AdminDashboardLegalDocumentDto = components['schemas']["AdminDashboardLegalDocumentDto"];
@@ -1721,6 +1724,7 @@ export type DecideProfileMediaDto = components['schemas']["DecideProfileMediaDto
 export type DecideRegionVerificationDto = components['schemas']["DecideRegionVerificationDto"];
 export type DeleteVersionedAdminEntityDto = components['schemas']["DeleteVersionedAdminEntityDto"];
 export type DeviceAttestationReviewDto = components['schemas']["DeviceAttestationReviewDto"];
+export type DrawLockResponseDto = components['schemas']["DrawLockResponseDto"];
 export type EligibleWeeklyChallengePartnerDto = components['schemas']["EligibleWeeklyChallengePartnerDto"];
 export type EnrollmentCountResponseDto = components['schemas']["EnrollmentCountResponseDto"];
 export type EnrollmentGymPresenceDto = components['schemas']["EnrollmentGymPresenceDto"];

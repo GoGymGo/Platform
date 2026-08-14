@@ -5,6 +5,9 @@ export interface WeightedDrawEntry {
   userId: string;
 }
 
+const canonicalSeedPattern = /^[0-9a-f]{64}$/;
+const sha256Range = 1n << 256n;
+
 class FenwickTree {
   private readonly tree: bigint[];
 
@@ -83,7 +86,15 @@ export function selectWeightedWinners(
       }
       return entry;
     })
-    .sort((left, right) => left.userId.localeCompare(right.userId));
+    .sort((left, right) =>
+      left.userId < right.userId ? -1 : left.userId > right.userId ? 1 : 0,
+    );
+  if (
+    new Set(canonicalEntries.map((entry) => entry.userId)).size !==
+    canonicalEntries.length
+  ) {
+    throw new Error('Every draw entry must belong to a unique user.');
+  }
   const weights = canonicalEntries.map((entry) => BigInt(entry.entryCount));
   const tree = new FenwickTree(weights);
   const winners: WeightedDrawEntry[] = [];
@@ -112,8 +123,10 @@ function randomBelow(
     throw new Error('Random upper bound must be positive.');
   }
 
-  const range = 1n << 256n;
-  const acceptanceLimit = range - (range % maximum);
+  if (maximum > sha256Range) {
+    throw new Error('Draw weight exceeds the supported SHA-256 sample range.');
+  }
+  const acceptanceLimit = sha256Range - (sha256Range % maximum);
   let attempt = 0n;
   while (true) {
     const counterBuffer = Buffer.alloc(16);
@@ -132,9 +145,9 @@ function randomBelow(
 }
 
 function assertSeed(seedHex: string): void {
-  if (!/^[a-f0-9]{64}$/i.test(seedHex)) {
+  if (!canonicalSeedPattern.test(seedHex)) {
     throw new Error(
-      'Draw seed must be exactly 32 bytes encoded as hexadecimal.',
+      'Draw seed must be exactly 32 bytes encoded as lowercase hexadecimal.',
     );
   }
 }

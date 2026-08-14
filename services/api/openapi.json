@@ -818,9 +818,7 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OperatorActionResponseDto"
-                }
+                "schema": { "$ref": "#/components/schemas/DrawLockResponseDto" }
               }
             }
           }
@@ -4675,6 +4673,61 @@
         },
         "required": ["goalDays", "label"]
       },
+      "AdminDashboardDrawDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["locked", "settled"] },
+          "seedCommitment": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "lockedAt": { "type": "string", "format": "date-time" },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "entrantCount": { "type": "number", "minimum": 1 },
+          "totalEntries": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+          "entrantSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "scoringSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "rewardSlotCount": { "type": "number", "minimum": 1 },
+          "rewardSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "publicResultSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "seedCommitment",
+          "lockedAt",
+          "settledAt",
+          "entrantCount",
+          "totalEntries",
+          "entrantSnapshotHash",
+          "scoringSnapshotHash",
+          "rewardSlotCount",
+          "rewardSnapshotHash",
+          "publicResultSnapshotHash"
+        ]
+      },
       "AdminDashboardCompetitionDto": {
         "type": "object",
         "properties": {
@@ -4706,7 +4759,12 @@
           "registrationOpensAt": { "type": "string", "format": "date-time" },
           "registrationClosesAt": { "type": "string", "format": "date-time" },
           "startsAt": { "type": "string", "format": "date-time" },
-          "endsAt": { "type": "string", "format": "date-time" }
+          "endsAt": { "type": "string", "format": "date-time" },
+          "draw": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [{ "$ref": "#/components/schemas/AdminDashboardDrawDto" }]
+          }
         },
         "required": [
           "id",
@@ -4729,7 +4787,8 @@
           "registrationOpensAt",
           "registrationClosesAt",
           "startsAt",
-          "endsAt"
+          "endsAt",
+          "draw"
         ]
       },
       "AdminDashboardRewardDto": {
@@ -5495,6 +5554,49 @@
         },
         "required": ["reason", "competitionId", "seedCommitment"]
       },
+      "DrawLockResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["locked", "settled"] },
+          "entrantCount": { "type": "number", "minimum": 1 },
+          "totalEntries": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+          "lockedAt": { "type": "string", "format": "date-time" },
+          "entrantSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "scoringSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "rewardSlotCount": { "type": "number", "minimum": 1 },
+          "rewardSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          },
+          "publicResultSnapshotHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "entrantCount",
+          "totalEntries",
+          "lockedAt",
+          "entrantSnapshotHash",
+          "scoringSnapshotHash",
+          "rewardSlotCount",
+          "rewardSnapshotHash",
+          "publicResultSnapshotHash"
+        ]
+      },
       "SettleDrawDto": {
         "type": "object",
         "properties": {
@@ -5686,6 +5788,11 @@
           "registrationClosesAt": { "type": "string", "format": "date-time" },
           "startsAt": { "type": "string", "format": "date-time" },
           "endsAt": { "type": "string", "format": "date-time" },
+          "draw": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [{ "$ref": "#/components/schemas/AdminDashboardDrawDto" }]
+          },
           "gymLocationId": { "type": "string", "format": "uuid" },
           "gymName": { "type": "string" },
           "proposedByUserId": {
@@ -5716,6 +5823,7 @@
           "registrationClosesAt",
           "startsAt",
           "endsAt",
+          "draw",
           "gymLocationId",
           "gymName",
           "proposedByUserId"

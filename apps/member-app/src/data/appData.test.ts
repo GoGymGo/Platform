@@ -434,6 +434,47 @@ describe('app data boundary', () => {
     assert.notEqual(requestedOptions?.authenticated, false);
   });
 
+  it('runtime-validates an exact settled Winners Circle response', async () => {
+    const response = settledWinnersCircleResponse();
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve(response) as Promise<TResponse>
+    };
+
+    await assert.doesNotReject(() =>
+      createAppDataSource('api', api).getMyLatestCompetitionResults()
+    );
+  });
+
+  it('rejects private winner identifiers and inconsistent pending results', async () => {
+    const leaked = settledWinnersCircleResponse();
+    const winner = leaked.rewardWinners[0]!;
+    const leakedApi: ApiClient = {
+      request: <TResponse>() => Promise.resolve({
+        ...leaked,
+        rewardWinners: [{ ...winner, userId: 'private-user-id' }]
+      }) as Promise<TResponse>
+    };
+    await assert.rejects(
+      () => createAppDataSource('api', leakedApi).getMyLatestCompetitionResults(),
+      /Winners Circle response is invalid/i
+    );
+
+    const pendingApi: ApiClient = {
+      request: <TResponse>() => Promise.resolve({
+        ...leaked,
+        categoryLeaderboards: [],
+        resultsStatus: 'pending',
+        rewardCount: 0,
+        rewardWinners: [],
+        settledAt: leaked.settledAt
+      }) as Promise<TResponse>
+    };
+    await assert.rejects(
+      () => createAppDataSource('api', pendingApi).getMyLatestCompetitionResults(),
+      /pending Winners Circle response is inconsistent/i
+    );
+  });
+
   it('treats a malformed leaderboard response as unavailable', async () => {
     const api: ApiClient = {
       request: <TResponse>() => Promise.resolve({ goal: 4 }) as Promise<TResponse>
@@ -481,6 +522,52 @@ describe('app data boundary', () => {
     assert.equal(leaderboard, null);
   });
 });
+
+function settledWinnersCircleResponse() {
+  const streaks = {
+    daily: 2,
+    monthly: 4,
+    projectionVersion: 'streaks-v1' as const,
+    weekly: 2,
+    yearly: 4
+  };
+  return {
+    categoryLeaderboards: [{
+      competitionId: '40000000-0000-4000-8000-000000000001',
+      goal: 4,
+      rows: [{
+        alias: 'MOVE_MORE',
+        categoryEntries: 42,
+        isCurrentUser: true,
+        rank: 1,
+        streaks,
+        verifiedDays: 20
+      }],
+      rulesVersion: 'rules-v1',
+      scoringStatus: 'final',
+      serverTime: '2026-09-01T08:00:00.000Z',
+      settledPeriodCount: 4
+    }],
+    competitionId: '40000000-0000-4000-8000-000000000001',
+    competitionName: 'August Challenge',
+    endedAt: '2026-09-01T07:00:00.000Z',
+    monthKey: '2026-08',
+    participantGoalDays: 4,
+    regionCode: 'vancouver-bc',
+    regionName: 'Vancouver',
+    resultsStatus: 'settled',
+    rewardCount: 1,
+    rewardWinners: [{
+      alias: 'MOVE_MORE',
+      awardRank: 1,
+      rewardTitle: 'Recovery Kit',
+      rewardType: 'physical',
+      sponsorName: 'GoGymGo',
+      streaks
+    }],
+    settledAt: '2026-09-01T08:00:00.000Z'
+  };
+}
 
 function validRewardCatalogItem() {
   return {

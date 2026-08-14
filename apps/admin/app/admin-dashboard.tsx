@@ -80,8 +80,12 @@ import {
 } from "./contest-schedule.js";
 import {
   buildDrawSeedCommitment,
+  canRevealPendingDraw,
   canFinalizeCompetitionResults,
+  createPendingDrawFinalization,
   createDrawSeed,
+  loadPendingDrawFinalization,
+  savePendingDrawFinalization,
 } from "./draw-finalization.js";
 import {
   assertGymQrCredentialScope,
@@ -122,44 +126,20 @@ type CouponCodesResult = {
   version: number;
 };
 
-type PendingDrawFinalization = {
-  competitionId: string;
-  drawId: string;
-  seedReveal: string;
+type PendingDrawFinalization = ReturnType<typeof createPendingDrawFinalization>;
+
+type DrawLockResult = {
+  entrantCount: number;
+  entrantSnapshotHash: string;
+  id: string;
+  lockedAt: string;
+  publicResultSnapshotHash: string;
+  rewardSlotCount: number;
+  rewardSnapshotHash: string;
+  scoringSnapshotHash: string;
+  status: "locked" | "settled";
+  totalEntries: string;
 };
-
-const pendingDrawStorageKey = "gogymgo.admin.pending-draw-finalization";
-
-function loadPendingDrawFinalization(): PendingDrawFinalization | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(pendingDrawStorageKey) ?? "null",
-    ) as Partial<PendingDrawFinalization> | null;
-    return parsed &&
-      typeof parsed.competitionId === "string" &&
-      typeof parsed.drawId === "string" &&
-      typeof parsed.seedReveal === "string" &&
-      /^[a-f0-9]{64}$/i.test(parsed.seedReveal)
-      ? (parsed as PendingDrawFinalization)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function savePendingDrawFinalization(value: PendingDrawFinalization | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (value) {
-      window.localStorage.setItem(pendingDrawStorageKey, JSON.stringify(value));
-    } else {
-      window.localStorage.removeItem(pendingDrawStorageKey);
-    }
-  } catch {
-    // Settlement still continues in the current session when storage is blocked.
-  }
-}
 
 type NavigationCounts = Partial<Record<AdminSection, number>>;
 
@@ -478,7 +458,7 @@ export function AdminDashboard({
     null,
   );
   const [pendingDrawFinalization, setPendingDrawFinalization] =
-    useState<PendingDrawFinalization | null>(loadPendingDrawFinalization);
+    useState<PendingDrawFinalization | null>(null);
 
   const request = useCallback(
     <T,>(
@@ -622,9 +602,17 @@ export function AdminDashboard({
         setSnapshot(null);
         setPartnerSnapshot(null);
         if (nextUser) {
+          setPendingDrawFinalization(
+            loadPendingDrawFinalization(
+              window.localStorage,
+              nextUser.uid,
+              window.location.origin,
+            ),
+          );
           setAuthStage("checking");
           void refresh(nextUser, nextEpoch);
         } else {
+          setPendingDrawFinalization(null);
           setLoadError("");
           setAuthStage("signed-out");
         }
@@ -712,7 +700,6 @@ export function AdminDashboard({
       await signOut(getAuth());
       authEpoch.current += 1;
       clearAdminRequestSession();
-      savePendingDrawFinalization(null);
       setPendingDrawFinalization(null);
       setUser(null);
       setPortalAccess(null);
@@ -902,6 +889,12 @@ export function AdminDashboard({
     setSubmitting(true);
     setLoadError("");
     try {
+      if (!user) {
+        throw new AdminUserFacingError(
+          "Sign in before finalizing contest results.",
+        );
+      }
+      const environmentOrigin = window.location.origin;
       if (
         pendingDrawFinalization &&
         pendingDrawFinalization.competitionId !== competition.id
@@ -916,46 +909,106 @@ export function AdminDashboard({
           : null;
       if (!recovery && competition.status === "active") {
         const seedReveal = createDrawSeed();
-        recovery = {
-          competitionId: competition.id,
-          drawId: "",
-          seedReveal,
-        };
-        setPendingDrawFinalization(recovery);
-        savePendingDrawFinalization(recovery);
-      }
-      if (recovery && !recovery.drawId) {
-        const seedReveal = recovery.seedReveal;
         const seedCommitment = await buildDrawSeedCommitment(seedReveal);
-        const locked = await request<AdminEntityResult>("operator/draws/lock", {
+        recovery = createPendingDrawFinalization({
+          competitionId: competition.id,
+          environmentOrigin,
+          operatorUserId: user.uid,
+          seedCommitment,
+          seedReveal,
+        });
+        setPendingDrawFinalization(recovery);
+        try {
+          savePendingDrawFinalization(
+            window.localStorage,
+            user.uid,
+            environmentOrigin,
+            recovery,
+          );
+        } catch {
+          // The in-memory record remains usable for this signed-in session.
+        }
+      }
+      if (competition.status === "active" && recovery) {
+        const locked = await request<DrawLockResult>("operator/draws/lock", {
           body: {
             competitionId: competition.id,
             reason,
-            seedCommitment,
+            seedCommitment: recovery.seedCommitment,
           },
           method: "POST",
         });
+        if (
+          locked.status !== "locked" ||
+          !locked.id ||
+          locked.entrantCount < 1 ||
+          locked.rewardSlotCount < 1 ||
+          !/^[1-9][0-9]*$/.test(locked.totalEntries) ||
+          ![
+            locked.entrantSnapshotHash,
+            locked.scoringSnapshotHash,
+            locked.rewardSnapshotHash,
+            locked.publicResultSnapshotHash,
+          ].every((value) => /^[a-f0-9]{64}$/.test(value))
+        ) {
+          throw new AdminUserFacingError(
+            "The server returned incomplete draw-lock evidence. The saved seed was retained; refresh before retrying.",
+          );
+        }
         recovery = {
           ...recovery,
           drawId: locked.id,
         };
         setPendingDrawFinalization(recovery);
-        savePendingDrawFinalization(recovery);
+        try {
+          savePendingDrawFinalization(
+            window.localStorage,
+            user.uid,
+            environmentOrigin,
+            recovery,
+          );
+        } catch {
+          // The in-memory record remains usable for this signed-in session.
+        }
+        await refresh(user);
+        setToast(
+          "Draw snapshot locked. Review the evidence, then reveal and publish.",
+        );
+        return;
       }
-      if (!recovery || recovery.competitionId !== competition.id) {
+      if (
+        competition.status !== "settling" ||
+        !recovery ||
+        !competition.draw ||
+        !canRevealPendingDraw(
+          recovery,
+          competition.draw,
+          user.uid,
+          environmentOrigin,
+        )
+      ) {
         throw new AdminUserFacingError(
-          "This draw was locked in another browser session. Retrieve its saved seed before revealing and publishing the results.",
+          "This draw's exact saved seed is unavailable or does not match the locked commitment. Recover it in the original operator account and environment before publishing.",
         );
       }
       await request<AdminEntityResult>(
-        `operator/draws/${recovery.drawId}/settle`,
+        `operator/draws/${competition.draw.id}/settle`,
         {
           body: { reason, seedReveal: recovery.seedReveal },
           method: "POST",
         },
       );
       setPendingDrawFinalization(null);
-      savePendingDrawFinalization(null);
+      try {
+        savePendingDrawFinalization(
+          window.localStorage,
+          user.uid,
+          environmentOrigin,
+          null,
+        );
+      } catch {
+        // The completed server state remains authoritative.
+      }
       if (user) await refresh(user);
       setToast("Audited results published to the Winners Circle.");
     } catch (error) {
@@ -971,14 +1024,14 @@ export function AdminDashboard({
     setConfirmAction({
       actionLabel:
         competition.status === "settling"
-          ? "Resume results publication"
-          : "Finalize results",
+          ? "Reveal + publish"
+          : "Lock audited draw snapshot",
       auditReason:
         "Finalize the ended contest and publish its audited Winners Circle results.",
       description:
         competition.status === "settling"
-          ? `${competition.name}'s entrant snapshot is locked. Complete the saved seed reveal to publish the results.`
-          : `${competition.name}'s completion period is over. This locks the entrant snapshot, selects winners from published inventory, and publishes the audited results.`,
+          ? `${competition.name}'s entrant and reward snapshots are locked. Verify the evidence, then reveal the matching saved seed and publish the deterministic result.`
+          : `${competition.name}'s completion period is over. This locks one immutable entrant, scoring, identity, and reward snapshot for review; it does not publish winners yet.`,
       execute: (reason) => finalizeContestResults(competition, reason),
       tone: "primary",
     });
@@ -1266,7 +1319,18 @@ export function AdminDashboard({
               onNavigate={navigateToSection}
               onStatus={requestContestStatus}
               pendingDrawCompetitionId={
-                pendingDrawFinalization?.competitionId ?? null
+                user &&
+                pendingDrawFinalization &&
+                canRevealPendingDraw(
+                  pendingDrawFinalization,
+                  snapshot.competitions.find(
+                    ({ id }) => id === pendingDrawFinalization.competitionId,
+                  )?.draw ?? null,
+                  user.uid,
+                  typeof window === "undefined" ? "" : window.location.origin,
+                )
+                  ? pendingDrawFinalization.competitionId
+                  : null
               }
               submitting={submitting}
             />
@@ -2939,10 +3003,10 @@ function Overview({
                               ? "Players can now see the audited results when they return to the app."
                               : competition.status === "settling"
                                 ? pendingDrawCompetitionId === competition.id
-                                  ? "The entrant snapshot is safe. Resume the saved reveal to publish results."
-                                  : "The entrant snapshot was locked in another browser session. Its original seed is required to publish results."
+                                  ? "The immutable draw evidence matches this operator's saved seed. Review it, then reveal once to publish results."
+                                  : "The draw is locked, but its exact saved seed is unavailable in this operator account and environment. Publishing remains disabled until it is recovered."
                                 : canFinalizeCompetitionResults(competition)
-                                  ? "The 15-minute workout completion period has ended. Finalize once to publish every result."
+                                  ? "The 15-minute workout completion period has ended. Lock an immutable audited snapshot, then review it before a separate reveal."
                                   : workoutCutoffs
                                     ? `Finalization opens after ${formatContestDateTime(
                                         workoutCutoffs.completionDeadline,
@@ -2950,6 +3014,43 @@ function Overview({
                                       )}.`
                                     : "Finalization opens after the completion period ends."}
                           </p>
+                          {competition.draw ? (
+                            <dl className="metrics-grid">
+                              <div>
+                                <dt>Entrants / entries</dt>
+                                <dd>
+                                  {competition.draw.entrantCount} /{" "}
+                                  {competition.draw.totalEntries}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt>Reward slots</dt>
+                                <dd>{competition.draw.rewardSlotCount}</dd>
+                              </div>
+                              <div>
+                                <dt>Entrant snapshot</dt>
+                                <dd
+                                  title={competition.draw.entrantSnapshotHash}
+                                >
+                                  {competition.draw.entrantSnapshotHash.slice(
+                                    0,
+                                    12,
+                                  )}
+                                  …
+                                </dd>
+                              </div>
+                              <div>
+                                <dt>Reward snapshot</dt>
+                                <dd title={competition.draw.rewardSnapshotHash}>
+                                  {competition.draw.rewardSnapshotHash.slice(
+                                    0,
+                                    12,
+                                  )}
+                                  …
+                                </dd>
+                              </div>
+                            </dl>
+                          ) : null}
                         </div>
                         {canFinalizeCompetitionResults(competition) ||
                         (competition.status === "settling" &&
@@ -2965,8 +3066,8 @@ function Overview({
                             type="button"
                           >
                             {competition.status === "settling"
-                              ? "RESUME FINALIZING RESULTS"
-                              : "FINALIZE + PUBLISH RESULTS"}
+                              ? "REVEAL + PUBLISH RESULTS"
+                              : "LOCK AUDITED DRAW SNAPSHOT"}
                           </button>
                         ) : null}
                       </div>

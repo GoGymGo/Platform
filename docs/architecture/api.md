@@ -48,12 +48,15 @@ idempotency keys enforce correctness at the database boundary.
 
 Enrollment locks its competition before checking registration state and entrant
 capacity. Workout evidence remains untrusted until a deterministic,
-privacy-minimized review is approved. Draw settlement snapshots eligible users,
-expands the published catalog into exact inventory slots, selects winners, and
-creates reward awards in one transaction. Database constraints require the
-catalog item and settled draw to belong to the same competition and enforce the
-published availability window at allocation time. Unique constraints, row
-locks, and an inventory trigger prevent duplicate or excess awards. Claims and
+privacy-minimized review is approved. Draw lock reconciles final scoring and
+persists immutable, hashed entrant, scoring, public-identity, reward-catalog,
+and exact reward-slot snapshots after the 15-minute workout completion
+boundary. Settlement verifies the canonical commitment reveal, re-hashes every
+snapshot, selects unique winners with a deterministic unbiased weighted
+algorithm, and creates exact-slot reward awards in one transaction. Deferred
+database constraints reconcile snapshot counts, competition/draw lifecycle
+state, and exactly one lock/settle audit event. Unique constraints, row locks,
+and the locked-slot integrity trigger prevent duplicate or excess awards. Claims and
 admin fulfillment transitions are owner/role scoped, row-locked, idempotent,
 optimistically versioned, and preserve exact lifecycle timestamps.
 

@@ -339,6 +339,14 @@ function recordRequest<TBody>(
   };
 }
 
+const emptyStreaks = {
+  daily: 0,
+  monthly: 0,
+  projectionVersion: "streaks-v1" as const,
+  weekly: 0,
+  yearly: 0,
+};
+
 function journeyResponse(path: string, method: string): unknown {
   if (path.startsWith("/v1/legal-documents/current?")) return legalBundle;
   if (path === "/v1/me/legal-receipts") {
@@ -449,7 +457,26 @@ function journeyResponse(path: string, method: string): unknown {
   }
   if (path === "/v1/results/mine/latest") {
     return {
-      categoryLeaderboards: [],
+      categoryLeaderboards: [
+        {
+          competitionId,
+          goal: 4,
+          rows: [
+            {
+              alias: "PILOT_MEMBER",
+              categoryEntries: 20,
+              isCurrentUser: true,
+              rank: 1,
+              streaks: emptyStreaks,
+              verifiedDays: 20,
+            },
+          ],
+          rulesVersion: "rules-v1",
+          scoringStatus: "final",
+          serverTime: "2026-09-01T08:00:00.000Z",
+          settledPeriodCount: 4,
+        },
+      ],
       competitionId,
       competitionName: "August Challenge",
       endedAt: "2026-09-01T07:00:00.000Z",
@@ -459,7 +486,16 @@ function journeyResponse(path: string, method: string): unknown {
       regionName: "Vancouver",
       resultsStatus: "settled",
       rewardCount: 1,
-      rewardWinners: [],
+      rewardWinners: [
+        {
+          alias: "PILOT_MEMBER",
+          awardRank: 1,
+          rewardTitle: "Recovery Kit",
+          rewardType: "physical",
+          sponsorName: "GoGymGo",
+          streaks: emptyStreaks,
+        },
+      ],
       settledAt: "2026-09-01T08:00:00.000Z",
     };
   }

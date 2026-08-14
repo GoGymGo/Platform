@@ -163,6 +163,14 @@ export function useChallengeCheckIn() {
   );
 }
 
+export function useCancelSocialChallenge() {
+  const context = useSocialContext();
+  return useSocialMutation(
+    (challengeId: string) => context.social.cancelChallenge(challengeId),
+    context.queryKey,
+  );
+}
+
 export function useInviteFriendToChallenge() {
   const context = useSocialContext();
   return useSocialMutation(
@@ -178,16 +186,17 @@ export function useInviteFriendToChallenge() {
 }
 
 export function useInviteContactToChallenge() {
-  const context = useAppData();
-  return useMutation({
-    mutationFn: ({
+  const context = useSocialContext();
+  return useSocialMutation(
+    ({
       challengeId,
       contact,
     }: {
       challengeId: string;
       contact: ChallengeInviteContact;
     }) => context.social.inviteContactToChallenge(challengeId, contact),
-  });
+    context.queryKey,
+  );
 }
 
 export function useRespondToChallengeInvitation() {
@@ -200,6 +209,14 @@ export function useRespondToChallengeInvitation() {
       challengeId: string;
       decision: FriendRequestDecision;
     }) => context.social.respondToChallengeInvitation(challengeId, decision),
+    context.queryKey,
+  );
+}
+
+export function useWithdrawFromSocialChallenge() {
+  const context = useSocialContext();
+  return useSocialMutation(
+    (challengeId: string) => context.social.withdrawFromChallenge(challengeId),
     context.queryKey,
   );
 }

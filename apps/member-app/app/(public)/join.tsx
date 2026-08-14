@@ -115,10 +115,16 @@ export default function JoinScreen() {
               <InlineLoadingState label="Checking invitation..." />
             ) : null}
             {user && invitePreview ? (
-              <TerminalText tone="cyan" uppercase={false} variant="body">
-                Invitation for {invitePreview.destinationHint}. Expires{' '}
-                {new Date(invitePreview.expiresAt).toLocaleString()}.
-              </TerminalText>
+              <View style={styles.inviteDetails}>
+                <TerminalText tone="cyan" uppercase={false} variant="body">
+                  {invitePreview.challengeName} from @
+                  {invitePreview.ownerScreenName}
+                </TerminalText>
+                <TerminalText tone="muted" uppercase={false} variant="caption">
+                  Invitation for {invitePreview.destinationHint}. Expires{' '}
+                  {new Date(invitePreview.expiresAt).toLocaleString()}.
+                </TerminalText>
+              </View>
             ) : null}
             {user && invitePreview?.channel === 'phone' ? (
               <AuthTextField
@@ -343,6 +349,9 @@ const styles = StyleSheet.create({
   inviteCard: {
     gap: spacing.md,
     padding: spacing.lg,
+  },
+  inviteDetails: {
+    gap: spacing.xs,
   },
   partnerOptions: {
     gap: spacing.sm,

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, type TransformFnParams } from 'class-transformer';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
@@ -14,6 +14,7 @@ import {
   Matches,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { regionCodePattern } from '../../regions/region-code';
 import type {
@@ -87,6 +88,17 @@ export class FriendRequestDecisionDto {
   decision!: FriendRequestDecision;
 }
 
+export class ChallengeContactInputDto {
+  @ApiProperty({ enum: ['email', 'phone'], type: String })
+  @IsIn(['email', 'phone'])
+  channel!: 'email' | 'phone';
+
+  @ApiProperty({ example: 'friend@example.com', maxLength: 160, type: String })
+  @IsString()
+  @Length(5, 160)
+  destination!: string;
+}
+
 export class CreateSocialChallengeDto {
   @ApiProperty({ example: 'July Strength Sprint', maxLength: 80, type: String })
   @IsString()
@@ -136,6 +148,18 @@ export class CreateSocialChallengeDto {
   endDate!: string;
 
   @ApiProperty({
+    description: 'IANA timezone for a private friend challenge',
+    example: 'America/Vancouver',
+    maxLength: 64,
+    required: false,
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  timezone?: string;
+
+  @ApiProperty({
     example: 'toronto-on',
     maxLength: 64,
     required: false,
@@ -180,6 +204,18 @@ export class CreateSocialChallengeDto {
   @ArrayUnique()
   @IsUUID('4', { each: true })
   invitedFriendUserIds!: string[];
+
+  @ApiProperty({
+    isArray: true,
+    required: false,
+    type: () => ChallengeContactInputDto,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => ChallengeContactInputDto)
+  invitedContacts?: ChallengeContactInputDto[];
 }
 
 export class DiscoverSocialChallengesQueryDto {
@@ -196,16 +232,7 @@ export class InviteChallengeFriendDto {
   friendUserId!: string;
 }
 
-export class InviteChallengeContactDto {
-  @ApiProperty({ enum: ['email', 'phone'], type: String })
-  @IsIn(['email', 'phone'])
-  channel!: 'email' | 'phone';
-
-  @ApiProperty({ example: 'friend@example.com', maxLength: 160, type: String })
-  @IsString()
-  @Length(5, 160)
-  destination!: string;
-}
+export class InviteChallengeContactDto extends ChallengeContactInputDto {}
 
 export class ChallengeContactInvitationResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
@@ -262,6 +289,12 @@ export class ChallengeContactInvitationPreviewDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   expiresAt!: string;
+
+  @ApiProperty({ type: String })
+  challengeName!: string;
+
+  @ApiProperty({ type: String })
+  ownerScreenName!: string;
 }
 
 export class ChallengeInvitationDecisionDto {
@@ -343,12 +376,18 @@ export class SocialChallengeProgressDto {
   targetTotal!: number;
 }
 
-export class SocialChallengeMemberDto extends SocialUserSummaryDto {
+export class SocialChallengeMemberDto {
+  @ApiProperty({ type: String })
+  screenName!: string;
+
+  @ApiProperty({ type: StreakCountsDto })
+  streaks!: StreakCountsDto;
+
   @ApiProperty({ enum: ['owner', 'member'], type: String })
   role!: SocialChallengeMemberRole;
 
-  @ApiProperty({ enum: ['pending', 'accepted', 'declined'], type: String })
-  status!: SocialChallengeMemberStatus;
+  @ApiProperty({ enum: ['pending', 'accepted'], type: String })
+  status!: Extract<SocialChallengeMemberStatus, 'accepted' | 'pending'>;
 
   @ApiProperty({ type: SocialChallengeProgressDto })
   progress!: SocialChallengeProgressDto;
@@ -364,7 +403,7 @@ export class SocialChallengeResponseDto {
   @ApiProperty({ type: SocialChallengeMemberDto, isArray: true })
   members!: SocialChallengeMemberDto[];
 
-  @ApiProperty({ enum: ['owner', 'member'], type: String })
+  @ApiProperty({ enum: ['owner', 'member'], nullable: true, type: String })
   myRole!: SocialChallengeMemberRole | null;
 
   @ApiProperty({ enum: ['pending', 'accepted', 'not_joined'], type: String })
@@ -379,9 +418,6 @@ export class SocialChallengeResponseDto {
 
   @ApiProperty({ type: StreakCountsDto })
   ownerStreaks!: StreakCountsDto;
-
-  @ApiProperty({ format: 'uuid', type: String })
-  ownerUserId!: string;
 
   @ApiProperty({ enum: socialChallengeTypes, type: String })
   challengeType!: SocialChallengeType;
@@ -413,8 +449,8 @@ export class SocialChallengeResponseDto {
   @ApiProperty({ nullable: true, type: String })
   regionName!: string | null;
 
-  @ApiProperty({ nullable: true, type: String })
-  timezone!: string | null;
+  @ApiProperty({ type: String })
+  timezone!: string;
 
   @ApiProperty({ nullable: true, type: String })
   locationName!: string | null;
@@ -433,17 +469,58 @@ export class SocialChallengeResponseDto {
 
   @ApiProperty({ type: SocialChallengeProgressDto })
   myProgress!: SocialChallengeProgressDto;
+
+  @ApiProperty({
+    enum: ['upcoming', 'active', 'full', 'ended', 'cancelled'],
+    type: String,
+  })
+  state!: 'active' | 'cancelled' | 'ended' | 'full' | 'upcoming';
+
+  @ApiProperty({ type: Boolean })
+  canCancel!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  canCheckIn!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  canInvite!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  canJoin!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  canRespond!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  canWithdraw!: boolean;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  serverTime!: string;
+
+  @ApiProperty({
+    isArray: true,
+    type: ChallengeContactInvitationResponseDto,
+  })
+  contactInvitations!: ChallengeContactInvitationResponseDto[];
 }
 
 export class ChallengeInvitationResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   challengeId!: string;
 
-  @ApiProperty({ enum: ['pending', 'accepted', 'declined'], type: String })
+  @ApiProperty({
+    enum: ['pending', 'accepted', 'declined', 'withdrawn'],
+    type: String,
+  })
   status!: SocialChallengeMemberStatus;
+}
 
+export class ChallengeCancellationResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
-  userId!: string;
+  challengeId!: string;
+
+  @ApiProperty({ enum: ['cancelled'], type: String })
+  state!: 'cancelled';
 }
 
 export class ChallengeCheckInResponseDto {

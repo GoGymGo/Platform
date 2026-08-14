@@ -58,16 +58,25 @@ export type SocialChallengeProgress = {
   targetTotal: number;
 };
 
-export type SocialChallengeMember = SocialUser & {
+export type SocialChallengeMember = {
   progress: SocialChallengeProgress;
   role: 'member' | 'owner';
-  status: 'accepted' | 'declined' | 'pending';
+  screenName: string;
+  status: 'accepted' | 'pending';
+  streaks: StreakCounts;
 };
 
 export type SocialChallenge = {
   activity: SocialChallengeActivity;
   activityLabel: string;
+  canCancel: boolean;
+  canCheckIn: boolean;
+  canInvite: boolean;
+  canJoin: boolean;
+  canRespond: boolean;
+  canWithdraw: boolean;
   challengeType: SocialChallengeType;
+  contactInvitations: readonly ChallengeContactInvitation[];
   createdAt: string;
   description: string | null;
   endDate: string;
@@ -80,17 +89,18 @@ export type SocialChallenge = {
   name: string;
   ownerScreenName: string;
   ownerStreaks: StreakCounts;
-  ownerUserId: string;
   participantCount: number;
   participantLimit: number | null;
   regionCode: string | null;
   regionName: string | null;
   scheduledDays: readonly number[];
   scheduledTime: string | null;
+  serverTime: string;
   startDate: string;
+  state: 'active' | 'cancelled' | 'ended' | 'full' | 'upcoming';
   targetCount: number;
   targetPeriod: SocialChallengeTargetPeriod;
-  timezone: string | null;
+  timezone: string;
 };
 
 export type CreateSocialChallengeInput = {
@@ -99,6 +109,7 @@ export type CreateSocialChallengeInput = {
   challengeType: SocialChallengeType;
   description?: string;
   endDate: string;
+  invitedContacts?: readonly ChallengeInviteContact[];
   invitedFriendUserIds: readonly string[];
   locationName?: string;
   name: string;
@@ -109,6 +120,7 @@ export type CreateSocialChallengeInput = {
   startDate: string;
   targetCount: number;
   targetPeriod: SocialChallengeTargetPeriod;
+  timezone?: string;
 };
 
 export type ChallengeCheckIn = {
@@ -131,8 +143,10 @@ export type ChallengeContactInvitation = {
 
 export type ChallengeContactInvitationPreview = {
   channel: 'email' | 'phone';
+  challengeName: string;
   destinationHint: string;
   expiresAt: string;
+  ownerScreenName: string;
 };
 
 export type ChallengeInviteContact = {
@@ -144,8 +158,8 @@ export const challengeActivityLabels: Record<SocialChallengeActivity, string> =
   {
     cycling: 'Cycling',
     fitness_class: 'Fitness class',
-  gym: 'Gym visits',
-  hiking: 'Hiking',
+    gym: 'Gym visits',
+    hiking: 'Hiking',
     other: 'Other activity',
     running: 'Running',
     walking: 'Walking',
@@ -200,6 +214,10 @@ export function normalizeChallengeInput(
     ...input,
     activityLabel: input.activityLabel.trim().replace(/\s+/g, ' '),
     description: input.description?.trim().replace(/\s+/g, ' ') || undefined,
+    invitedContacts: input.invitedContacts?.map((contact) => ({
+      channel: contact.channel,
+      destination: contact.destination.trim(),
+    })),
     invitedFriendUserIds: [...new Set(input.invitedFriendUserIds)],
     locationName: input.locationName?.trim().replace(/\s+/g, ' ') || undefined,
     name: normalizeChallengeName(input.name),
@@ -208,6 +226,7 @@ export function normalizeChallengeInput(
       (left, right) => left - right,
     ),
     scheduledTime: input.scheduledTime?.trim() || undefined,
+    timezone: input.timezone?.trim() || undefined,
   };
 }
 
@@ -238,12 +257,29 @@ export function validateChallengeInput(
   if (windowDays < 1 || windowDays > 31) {
     return 'Choose a challenge window between 1 and 31 days.';
   }
+  if (normalized.startDate < formatLocalDateKey(new Date())) {
+    return 'Start the challenge today or later.';
+  }
   if (
     normalized.challengeType === 'friend' &&
     normalized.invitedFriendUserIds.length === 0 &&
-    externalInviteCount === 0
+    (normalized.invitedContacts?.length ?? externalInviteCount) === 0
   ) {
     return 'Choose a friend or enter an email address or phone number.';
+  }
+  if (normalized.challengeType === 'friend') {
+    if (!normalized.timezone || !isValidTimezone(normalized.timezone)) {
+      return 'Your device timezone is unavailable. Check device settings and retry.';
+    }
+    if (
+      normalized.regionCode ||
+      normalized.locationName ||
+      normalized.scheduledTime ||
+      normalized.scheduledDays.length > 0 ||
+      normalized.participantLimit !== undefined
+    ) {
+      return 'Friend challenges cannot include regional schedule or capacity details.';
+    }
   }
   if (normalized.challengeType === 'regional') {
     if (!normalized.regionCode) return 'Choose a supported region.';
@@ -256,8 +292,25 @@ export function validateChallengeInput(
     }
     if (normalized.scheduledDays.length === 0)
       return 'Choose at least one scheduled day.';
+    if (
+      normalized.invitedFriendUserIds.length > 0 ||
+      (normalized.invitedContacts?.length ?? 0) > 0 ||
+      normalized.timezone
+    ) {
+      return 'Regional challenges use local discovery instead of private invitations.';
+    }
   }
   return null;
+}
+
+export function buildChallengeWindow(now = new Date(), lengthDays = 31) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(start);
+  end.setDate(end.getDate() + Math.max(1, Math.min(31, lengthDays)) - 1);
+  return {
+    endDate: formatLocalDateKey(end),
+    startDate: formatLocalDateKey(start),
+  };
 }
 
 export function buildChallengeMonthWindow(now = new Date(), monthOffset = 0) {
@@ -274,10 +327,29 @@ export function buildChallengeMonthWindow(now = new Date(), monthOffset = 0) {
 }
 
 function challengeWindowDays(startDateKey: string, endDateKey: string) {
+  if (!isDateKey(startDateKey) || !isDateKey(endDateKey)) return 0;
   const start = new Date(`${startDateKey}T00:00:00.000Z`);
   const end = new Date(`${endDateKey}T00:00:00.000Z`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
   return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+}
+
+function isDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
+
+function isValidTimezone(value: string) {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function formatLocalDateKey(date: Date) {

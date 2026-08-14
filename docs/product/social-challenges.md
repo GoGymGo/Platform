@@ -1,13 +1,14 @@
-# Friends and monthly activity challenges
+# Friends and regional activity Challenges
 
 The social system supports consent-based friendships plus two kinds of
-measurable, month-long activity challenge:
+measurable, 1-31-day activity Challenge:
 
 - **Challenge a Friend** is private. The creator selects accepted friends and/or
   creates expiring email or phone invite links, then chooses an activity, a
-  weekly or monthly target, and a calendar-month window. Invitations begin in
-  `pending` state.
-- **Regional Challenge** is discoverable by active competition region. It adds
+  weekly or monthly target, and a bounded local-date window. Invitations begin
+  in `pending` state.
+- **Regional Challenge** is discoverable only with current approved location
+  evidence for the exact enabled region policy. It adds
   a meeting location, one or more scheduled weekdays, a local start time, and
   an optional participant limit. Authenticated users in discovery can join it
   without a friend relationship.
@@ -28,7 +29,7 @@ mutates social state only through the authenticated API repository.
   accept or decline, only the requester may cancel, and either friend may remove
   the accepted friendship. These mutations are retry-safe and audited.
 - A block immediately cancels pending requests and incompatible Weekly
-  Challenge state, removes the friendship and shared Challenge membership, and
+  Challenge state, withdraws incompatible shared Challenge membership, and
   prevents discovery, requests, invitations, and shared projections in either
   direction. Unblocking never recreates prior state.
 - In-app private challenge invitees must already be accepted friends. A creator
@@ -44,11 +45,18 @@ mutates social state only through the authenticated API repository.
   creation retry so an opaque token never enters the idempotency response store.
 - Challenge windows are 1-31 days. Targets are 1-31 completions and can apply
   weekly or across the full month.
-- Regional challenges require a supported region, a meeting location, a local
-  start time, and at least one scheduled weekday. Capacity is 2-500 when set.
+- Regional challenges require a current approved `device_location` verification
+  for the exact enabled, non-deleted policy, a meeting location, a local start
+  time, and at least one scheduled weekday. Capacity is 2-500 when set and is
+  enforced under a database row lock.
+- The owner can cancel an open Challenge and a non-owner accepted member can
+  withdraw. Owner, member, pending, declined, withdrawn, full, upcoming, ended,
+  and cancelled transitions are server projections; the client does not infer
+  permission from cached membership.
 - One check-in can count per user, challenge, and local calendar day.
-- Gym progress is derived from verified `workout_sessions`; a user cannot
-  manually claim a gym visit. Other activities use an explicit daily check-in.
+- Gym progress is derived only from an existing verified `workout_sessions` row
+  for the same member and local date; a user cannot manually claim a gym visit.
+  Other activities use an explicit daily check-in.
 - All retryable mutations require `Idempotency-Key`.
 - Privacy exports include the account's challenge configuration, membership,
   check-in history, friendship/request/block history, relationship audit events,
@@ -57,8 +65,9 @@ mutates social state only through the authenticated API repository.
   included. Resolved invitation metadata is purged after 90 days by the
   operations worker.
 
-Challenges do not change competition eligibility, prize entries, leaderboard
-scores, or sponsor rewards.
+Challenges do not create or mutate workout verification, evidence review,
+Contest ledger/progress, streaks, rankings, Prize Draw Entries, rewards, or
+settlement.
 
 ## Direct Weekly Challenges
 
@@ -113,6 +122,12 @@ permanent assignment participants, and database triggers that enforce exact
 week dates, same-goal active enrollment, accepted friendship, block precedence,
 and one assignment per player/week across both match roles.
 
+`1787274000000_social_activity_challenge_integrity.ts` adds stored Challenge
+timezones and retry provenance, cancelled/withdrawn states, immutable
+configuration, deferred owner/invitation provenance, friendship/block cleanup,
+current-region and row-locked capacity checks, local-day/source/workout guards,
+audited lifecycle actions, and privacy-safe workout retention.
+
 Apply locally:
 
 ```powershell
@@ -150,6 +165,8 @@ Every route requires a Firebase bearer token.
 | `POST`  | `/v1/social/challenges`                             | Create a structured friend or regional challenge. |
 | `POST`  | `/v1/social/challenges/:challengeId/join`           | Join an open regional challenge.                  |
 | `POST`  | `/v1/social/challenges/:challengeId/check-ins`      | Record today's eligible activity.                 |
+| `DELETE`| `/v1/social/challenges/:challengeId`                | Cancel an owned open Challenge.                   |
+| `DELETE`| `/v1/social/challenges/:challengeId/members/me`     | Withdraw the current non-owner member.            |
 | `POST`  | `/v1/social/challenges/:challengeId/invitations`    | Invite an accepted friend to an owned challenge.  |
 | `POST`  | `/v1/social/challenges/:challengeId/contact-invitations` | Create an email or phone invite link.          |
 | `POST`  | `/v1/social/challenge-contact-invitations/inspect`  | Review masked invitation metadata after sign-in.  |
@@ -179,6 +196,7 @@ Example friend challenge request:
   "targetPeriod": "weekly",
   "startDate": "2026-07-01",
   "endDate": "2026-07-31",
+  "timezone": "America/Vancouver",
   "scheduledDays": [],
   "invitedFriendUserIds": ["10000000-0000-4000-8000-000000000002"]
 }

@@ -71,7 +71,7 @@ export type LegalReceiptAction = 'accept' | 'acknowledge';
 export type VerificationConsentAction = 'granted' | 'withdrawn';
 export type FriendRequestStatus =
   'accepted' | 'cancelled' | 'declined' | 'pending';
-export type SocialChallengeStatus = 'active' | 'archived';
+export type SocialChallengeStatus = 'active' | 'archived' | 'cancelled';
 export type SocialChallengeType = 'friend' | 'regional';
 export type SocialChallengeActivity =
   | 'cycling'
@@ -84,7 +84,10 @@ export type SocialChallengeActivity =
 export type SocialChallengeTargetPeriod = 'monthly' | 'weekly';
 export type SocialChallengeCheckinSource = 'manual' | 'verified_workout';
 export type SocialChallengeMemberRole = 'member' | 'owner';
-export type SocialChallengeMemberStatus = 'accepted' | 'declined' | 'pending';
+export type SocialChallengeMemberStatus =
+  'accepted' | 'declined' | 'pending' | 'withdrawn';
+export type SocialChallengeInvitationSource =
+  'contact' | 'friend' | 'owner' | 'regional';
 export type ChallengeContactInvitationChannel = 'email' | 'phone';
 export type ChallengeContactInvitationStatus =
   'claimed' | 'expired' | 'pending' | 'revoked';
@@ -147,6 +150,16 @@ export interface UserBlocksTable {
 }
 
 export type SocialRelationshipEventAction =
+  | 'challenge_cancelled'
+  | 'challenge_checkin_recorded'
+  | 'challenge_contact_link_created'
+  | 'challenge_contact_link_redeemed'
+  | 'challenge_created'
+  | 'challenge_friend_invited'
+  | 'challenge_invitation_accepted'
+  | 'challenge_invitation_declined'
+  | 'challenge_member_withdrawn'
+  | 'challenge_regional_joined'
   | 'friend_request_sent'
   | 'friend_request_accepted'
   | 'friend_request_declined'
@@ -188,11 +201,13 @@ export interface SocialChallengesTable {
   owner_user_id: string;
   name: string;
   challenge_type: SocialChallengeType;
+  creation_key_hash: string | null;
   activity: SocialChallengeActivity;
   activity_label: string;
   description: string | null;
   target_count: number;
   target_period: SocialChallengeTargetPeriod;
+  timezone: string;
   start_date: DateKey;
   end_date: DateKey;
   region_policy_id: string | null;
@@ -217,6 +232,8 @@ export interface SocialChallengeCheckinsTable {
 
 export interface SocialChallengeMembersTable {
   challenge_id: string;
+  contact_invitation_id: string | null;
+  invitation_source: SocialChallengeInvitationSource;
   user_id: string;
   role: SocialChallengeMemberRole;
   status: SocialChallengeMemberStatus;

@@ -32,13 +32,13 @@ import {
 import { useAppData } from '@/data/appDataHooks';
 import {
   useChallengeCheckIn,
+  useCancelSocialChallenge,
   useBlockedMembers,
   useBlockMember,
   useCancelFriendRequest,
   useCreateSocialChallenge,
   useFriendRequests,
   useFriends,
-  useInviteContactToChallenge,
   useInviteFriendToChallenge,
   useJoinRegionalChallenge,
   useMySocialProfile,
@@ -49,10 +49,10 @@ import {
   useSendFriendRequest,
   useSocialChallenges,
   useSocialUserSearch,
-  useUnblockMember
+  useUnblockMember,
+  useWithdrawFromSocialChallenge
 } from '@/data/socialHooks';
 import {
-  type ChallengeInviteContact,
   type CreateSocialChallengeInput,
   type FriendRequestDecision,
   type SocialChallenge,
@@ -105,16 +105,18 @@ export default function SocialChallengesScreen() {
   const unblockMember = useUnblockMember();
   const createChallenge = useCreateSocialChallenge();
   const inviteFriend = useInviteFriendToChallenge();
-  const inviteContact = useInviteContactToChallenge();
   const joinRegionalChallenge = useJoinRegionalChallenge();
   const challengeCheckIn = useChallengeCheckIn();
+  const cancelChallenge = useCancelSocialChallenge();
   const respondToChallenge = useRespondToChallengeInvitation();
+  const withdrawFromChallenge = useWithdrawFromSocialChallenge();
   const [searchValue, setSearchValue] = useScreenMemory(
     'social-challenges:search',
     ''
   );
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [pendingShare, setPendingShare] = useState<PendingInvitationShare | null>(null);
+  const [pendingShare, setPendingShare] =
+    useState<PendingInvitationShare | null>(null);
   const [activeSection, setActiveSection] = useScreenMemory<SocialSection>(
     'social-challenges:section',
     'friends'
@@ -126,8 +128,12 @@ export default function SocialChallengesScreen() {
   const requests = requestsQuery.data ?? [];
   const challenges = challengesQuery.data ?? [];
   const regionalChallenges = regionalChallengesQuery.data ?? [];
-  const incomingRequests = requests.filter(({ direction }) => direction === 'incoming');
-  const outgoingRequests = requests.filter(({ direction }) => direction === 'outgoing');
+  const incomingRequests = requests.filter(
+    ({ direction }) => direction === 'incoming'
+  );
+  const outgoingRequests = requests.filter(
+    ({ direction }) => direction === 'outgoing'
+  );
   const loading = [
     profileQuery,
     friendsQuery,
@@ -135,24 +141,33 @@ export default function SocialChallengesScreen() {
     requestsQuery,
     challengesQuery,
     regionalChallengesQuery
-  ]
-    .some(({ isLoading }) => isLoading);
-  const initialLoading = loading && [
-    profileQuery.data,
-    friendsQuery.data,
-    blocksQuery.data,
-    requestsQuery.data,
-    challengesQuery.data,
-    regionalChallengesQuery.data
-  ].some((data) => data === undefined);
-  const dataError = profileQuery.error ?? friendsQuery.error ?? blocksQuery.error ??
-    requestsQuery.error ?? challengesQuery.error ??
-    regionalChallengesQuery.error ?? searchQuery.error;
+  ].some(({ isLoading }) => isLoading);
+  const initialLoading =
+    loading &&
+    [
+      profileQuery.data,
+      friendsQuery.data,
+      blocksQuery.data,
+      requestsQuery.data,
+      challengesQuery.data,
+      regionalChallengesQuery.data
+    ].some((data) => data === undefined);
+  const dataError =
+    profileQuery.error ??
+    friendsQuery.error ??
+    blocksQuery.error ??
+    requestsQuery.error ??
+    challengesQuery.error ??
+    regionalChallengesQuery.error ??
+    searchQuery.error;
 
   const addFriend = async (result: SocialUserSearchResult) => {
     try {
       await sendFriendRequest.mutateAsync(result.userId);
-      setFeedback({ message: `Friend request sent to @${result.screenName}.`, tone: 'green' });
+      setFeedback({
+        message: `Friend request sent to @${result.screenName}.`,
+        tone: 'green'
+      });
     } catch (mutationError) {
       setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
     }
@@ -166,9 +181,10 @@ export default function SocialChallengesScreen() {
     try {
       await respondToFriendRequest.mutateAsync({ decision, requestId });
       setFeedback({
-        message: decision === 'accepted'
-          ? `@${screenNameValue} is now your friend.`
-          : `Friend request from @${screenNameValue} declined.`,
+        message:
+          decision === 'accepted'
+            ? `@${screenNameValue} is now your friend.`
+            : `Friend request from @${screenNameValue} declined.`,
         tone: decision === 'accepted' ? 'green' : 'cyan'
       });
     } catch (mutationError) {
@@ -191,7 +207,10 @@ export default function SocialChallengesScreen() {
   const remove = async (friendUserId: string, screenNameValue: string) => {
     try {
       await removeFriend.mutateAsync(friendUserId);
-      setFeedback({ message: `@${screenNameValue} removed from friends.`, tone: 'cyan' });
+      setFeedback({
+        message: `@${screenNameValue} removed from friends.`,
+        tone: 'cyan'
+      });
     } catch (mutationError) {
       setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
     }
@@ -242,30 +261,25 @@ export default function SocialChallengesScreen() {
     }
   };
 
-  const submitChallenge = async (
-    input: CreateSocialChallengeInput,
-    contacts: readonly ChallengeInviteContact[]
-  ) => {
+  const submitChallenge = async (input: CreateSocialChallengeInput) => {
     try {
       const challenge = await createChallenge.mutateAsync(input);
       let shareFailed = false;
-      for (const contact of contacts) {
-        const invitation = await inviteContact.mutateAsync({
-          challengeId: challenge.id,
-          contact
-        });
+      for (const invitation of challenge.contactInvitations) {
         const shared = await openInvitationShare({
           challengeName: challenge.name,
           joinUrl: invitation.joinUrl,
           screenName: invitation.destinationHint
         });
         shareFailed ||= !shared;
+        if (!shared) break;
       }
       if (!shareFailed) {
         setFeedback({
-          message: challenge.challengeType === 'friend'
-            ? `${challenge.name} created. ${contacts.length > 0 ? 'The private link is ready in your share sheet; GoGymGo did not send it.' : 'Your in-app friend invitation is pending.'}`
-            : `${challenge.name} is now open in ${challenge.regionName ?? competitionRegion.label}.`,
+          message:
+            challenge.challengeType === 'friend'
+              ? `${challenge.name} created. ${challenge.contactInvitations.length > 0 ? 'The private link is ready in your share sheet; GoGymGo did not send it.' : 'Your in-app friend invitation is pending.'}`
+              : `${challenge.name} is now open in ${challenge.regionName ?? competitionRegion.label}.`,
           tone: 'green'
         });
       }
@@ -283,7 +297,10 @@ export default function SocialChallengesScreen() {
   ) => {
     try {
       await inviteFriend.mutateAsync({ challengeId, friendUserId });
-      setFeedback({ message: `Challenge invitation sent to @${friendScreenName}.`, tone: 'green' });
+      setFeedback({
+        message: `Challenge invitation sent to @${friendScreenName}.`,
+        tone: 'green'
+      });
     } catch (mutationError) {
       setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
     }
@@ -294,11 +311,15 @@ export default function SocialChallengesScreen() {
     decision: FriendRequestDecision
   ) => {
     try {
-      await respondToChallenge.mutateAsync({ challengeId: challenge.id, decision });
+      await respondToChallenge.mutateAsync({
+        challengeId: challenge.id,
+        decision
+      });
       setFeedback({
-        message: decision === 'accepted'
-          ? `You joined ${challenge.name}.`
-          : `${challenge.name} invitation declined.`,
+        message:
+          decision === 'accepted'
+            ? `You joined ${challenge.name}.`
+            : `${challenge.name} invitation declined.`,
         tone: decision === 'accepted' ? 'green' : 'cyan'
       });
     } catch (mutationError) {
@@ -318,7 +339,31 @@ export default function SocialChallengesScreen() {
   const checkIn = async (challenge: SocialChallenge) => {
     try {
       await challengeCheckIn.mutateAsync(challenge.id);
-      setFeedback({ message: `Today's ${challenge.activityLabel.toLowerCase()} Challenge check-in was recorded.`, tone: 'green' });
+      setFeedback({
+        message: `Today's ${challenge.activityLabel.toLowerCase()} Challenge check-in was recorded.`,
+        tone: 'green'
+      });
+    } catch (mutationError) {
+      setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
+    }
+  };
+
+  const cancel = async (challenge: SocialChallenge) => {
+    try {
+      await cancelChallenge.mutateAsync(challenge.id);
+      setFeedback({
+        message: `${challenge.name} was cancelled.`,
+        tone: 'cyan'
+      });
+    } catch (mutationError) {
+      setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
+    }
+  };
+
+  const withdraw = async (challenge: SocialChallenge) => {
+    try {
+      await withdrawFromChallenge.mutateAsync(challenge.id);
+      setFeedback({ message: `You left ${challenge.name}.`, tone: 'cyan' });
     } catch (mutationError) {
       setFeedback({ message: getErrorMessage(mutationError), tone: 'red' });
     }
@@ -370,7 +415,7 @@ export default function SocialChallengesScreen() {
                 void recordFlowMetric(
                   user?.uid,
                   'flow-retry',
-                  'weekly-challenge',
+                  'weekly-challenge'
                 );
                 void Promise.all([
                   profileQuery.refetch(),
@@ -379,7 +424,7 @@ export default function SocialChallengesScreen() {
                   requestsQuery.refetch(),
                   challengesQuery.refetch(),
                   regionalChallengesQuery.refetch(),
-                  ...(searchQuery.isError ? [searchQuery.refetch()] : []),
+                  ...(searchQuery.isError ? [searchQuery.refetch()] : [])
                 ]);
               }}
               retrying={[
@@ -389,7 +434,7 @@ export default function SocialChallengesScreen() {
                 requestsQuery,
                 challengesQuery,
                 regionalChallengesQuery,
-                searchQuery,
+                searchQuery
               ].some(({ isFetching }) => isFetching)}
               title="COULD NOT LOAD SOCIAL DATA"
             />
@@ -515,7 +560,7 @@ export default function SocialChallengesScreen() {
                         decideFriendRequest(
                           request.id,
                           request.user.screenName,
-                          'accepted',
+                          'accepted'
                         )
                       }
                       tone="green"
@@ -535,7 +580,7 @@ export default function SocialChallengesScreen() {
                         decideFriendRequest(
                           request.id,
                           request.user.screenName,
-                          'declined',
+                          'declined'
                         )
                       }
                       tone="muted"
@@ -664,17 +709,19 @@ export default function SocialChallengesScreen() {
           activeSection === 'challenges' ? (
             <ChallengeHub
               busy={
+                cancelChallenge.isPending ||
                 createChallenge.isPending ||
-                inviteContact.isPending ||
                 inviteFriend.isPending ||
                 respondToChallenge.isPending ||
                 joinRegionalChallenge.isPending ||
-                challengeCheckIn.isPending
+                challengeCheckIn.isPending ||
+                withdrawFromChallenge.isPending
               }
               challenges={challenges}
               disabled={false}
               discoveredChallenges={regionalChallenges}
               friends={friends}
+              onCancel={cancel}
               onCheckIn={checkIn}
               onCreate={submitChallenge}
               onDecision={decideChallenge}
@@ -682,6 +729,8 @@ export default function SocialChallengesScreen() {
                 invite(challenge.id, friendUserId, friendScreenName)
               }
               onJoin={joinChallenge}
+              onWithdraw={withdraw}
+              regionAvailable={Boolean(regionVerification?.regionCode)}
               regionCode={regionCode}
             />
           ) : null}
@@ -699,7 +748,7 @@ function SocialSectionTabs({
   challengeCount,
   friendCount,
   onSelect,
-  requestCount,
+  requestCount
 }: {
   activeSection: SocialSection;
   challengeCount: number;
@@ -707,7 +756,11 @@ function SocialSectionTabs({
   onSelect: (section: SocialSection) => void;
   requestCount: number;
 }) {
-  const sections: readonly { count: number; label: string; value: SocialSection }[] = [
+  const sections: readonly {
+    count: number;
+    label: string;
+    value: SocialSection;
+  }[] = [
     { count: friendCount, label: 'FRIENDS', value: 'friends' },
     { count: requestCount, label: 'REQUESTS', value: 'requests' },
     { count: challengeCount, label: 'CHALLENGES', value: 'challenges' }
@@ -719,11 +772,16 @@ function SocialSectionTabs({
         const selected = section.value === activeSection;
         return (
           <Pressable
+            accessibilityLabel={`${section.label} ${section.count}`}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            aria-selected={selected}
             key={section.value}
             onPress={() => onSelect(section.value)}
-            style={[styles.sectionTab, selected ? styles.sectionTabActive : null]}
+            style={[
+              styles.sectionTab,
+              selected ? styles.sectionTabActive : null
+            ]}
           >
             <TerminalText
               glow={selected}
@@ -776,7 +834,7 @@ function UserResultRow({
   busy,
   onAdd,
   onBlock,
-  result,
+  result
 }: {
   busy: boolean;
   onAdd: () => void;
@@ -787,7 +845,7 @@ function UserResultRow({
     friend: { label: 'FRIEND', tone: 'green' as const },
     incoming_request: { label: 'REVIEW REQUEST', tone: 'amber' as const },
     none: { label: 'ADD FRIEND', tone: 'cyan' as const },
-    outgoing_request: { label: 'REQUEST SENT', tone: 'amber' as const },
+    outgoing_request: { label: 'REQUEST SENT', tone: 'amber' as const }
   }[result.relationship];
 
   return (
@@ -813,7 +871,7 @@ function UserResultRow({
 
 function UserIdentity({
   screenName,
-  streaks,
+  streaks
 }: Pick<SocialUser, 'screenName' | 'streaks'>) {
   return (
     <View style={styles.identity}>
@@ -842,7 +900,7 @@ function CompactButton({
   label,
   onPress,
   style,
-  tone,
+  tone
 }: {
   disabled?: boolean;
   label: string;
@@ -864,7 +922,11 @@ function CompactButton({
         style
       ]}
     >
-      <TerminalText glow={!disabled} tone={tone === 'muted' ? 'muted' : tone} variant="micro">
+      <TerminalText
+        glow={!disabled}
+        tone={tone === 'muted' ? 'muted' : tone}
+        variant="micro"
+      >
         {label}
       </TerminalText>
     </Pressable>
@@ -874,14 +936,21 @@ function CompactButton({
 function StatusCard({ message, tone }: Feedback) {
   return (
     <HUDBorderBox style={styles.statusCard} tone={tone}>
-      <TerminalText tone={tone} uppercase={false} variant="body">{message}</TerminalText>
+      <TerminalText tone={tone} uppercase={false} variant="body">
+        {message}
+      </TerminalText>
     </HUDBorderBox>
   );
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <TerminalText style={styles.emptyState} tone="dim" uppercase={false} variant="body">
+    <TerminalText
+      style={styles.emptyState}
+      tone="dim"
+      uppercase={false}
+      variant="body"
+    >
       {children}
     </TerminalText>
   );

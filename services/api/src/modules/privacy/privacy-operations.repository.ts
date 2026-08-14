@@ -314,6 +314,10 @@ export class PrivacyOperationsRepository {
           )
           .execute();
         await transaction
+          .deleteFrom('social_challenge_checkins')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
           .deleteFrom('social_challenge_members')
           .where('user_id', '=', request.user_id)
           .execute();
@@ -397,6 +401,7 @@ export class PrivacyOperationsRepository {
               'fraud_and_eligibility',
               'reward_award_integrity',
               'operator_audit',
+              'social_integrity_audit',
             ],
           },
           nextStatus: 'completed',

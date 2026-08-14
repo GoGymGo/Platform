@@ -371,7 +371,7 @@ describeWithDatabase('critical account legal receipt workflow', () => {
             receipt_action: 'acknowledge',
           }),
         ]),
-        schemaVersion: 9,
+        schemaVersion: 10,
         socialData: expect.objectContaining({
           blocks: [],
           challengeContactInvitations: [],

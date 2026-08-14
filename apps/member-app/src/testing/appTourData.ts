@@ -12,7 +12,10 @@ import type {
   LegalReceiptStatus,
   RegionVerification
 } from '@/domain/accountReadiness';
-import type { AvatarMedia, DevicePresenceConsent } from '@/domain/accountSettings';
+import type {
+  AvatarMedia,
+  DevicePresenceConsent
+} from '@/domain/accountSettings';
 import type { GoalCategory } from '@/domain/campaignEconomics';
 import type {
   CompetitionMatch,
@@ -95,7 +98,8 @@ export function createAppTourPendingGymScan(
   scenario: AppTourScenario,
   now = Date.now()
 ): PendingGymScan {
-  const workoutActive = scenario === 'active-workout' || scenario === 'presence-check';
+  const workoutActive =
+    scenario === 'active-workout' || scenario === 'presence-check';
   const elapsedSeconds = scenario === 'presence-check' ? 31 * 60 : 8 * 60;
   const startedAt = now - elapsedSeconds * 1000;
 
@@ -111,7 +115,9 @@ export function createAppTourPendingGymScan(
       : null,
     competitionId: 'app-tour-competition',
     credential: createAppTourGymQrPayload('entry'),
-    credentialValidUntil: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    credentialValidUntil: new Date(
+      now + 30 * 24 * 60 * 60 * 1000
+    ).toISOString(),
     createdAt: now
   };
 }
@@ -154,10 +160,7 @@ export function createAppTourStartedGymLocationResult(
   };
 }
 
-export function isAppTourGymQrPayload(
-  payload: string,
-  mode: AppTourQrMode
-) {
+export function isAppTourGymQrPayload(payload: string, mode: AppTourQrMode) {
   return payload === createAppTourGymQrPayload(mode);
 }
 
@@ -184,7 +187,8 @@ export function createAppTourDataSource(): AppDataSource {
         claimedAt: nowIso(),
         claimUrl: null,
         couponCode: 'RECOVER20',
-        fulfillmentInstructions: 'Use this sample code during the browser preview.',
+        fulfillmentInstructions:
+          'Use this sample code during the browser preview.',
         status: 'claimed' as const
       };
       awards.splice(0, awards.length, claimed);
@@ -267,7 +271,8 @@ export function createAppTourDataSource(): AppDataSource {
       {
         competitionId: appTourCompetitionId,
         competitionName: 'Monthly GoGymGo Contest',
-        description: 'A recovery-focused coupon reward for active GoGymGo players.',
+        description:
+          'A recovery-focused coupon reward for active GoGymGo players.',
         id: 'app-tour-reward',
         imageUrl: null,
         inventoryRemaining: 12,
@@ -281,16 +286,17 @@ export function createAppTourDataSource(): AppDataSource {
         title: 'Recovery Pack'
       }
     ],
-    planCreatorWorkout: async (workoutId, plannedDate, note) => ({
-      creatorName: 'GoGymGo Coach',
-      durationMinutes: 30,
-      id: `app-tour-plan-${plannedDate}`,
-      note: note ?? null,
-      plannedDate,
-      workoutId,
-      workoutName: 'Full Body Circuit',
-      workoutStyle: 'Strength + conditioning'
-    } satisfies CreatorWorkoutPlan),
+    planCreatorWorkout: async (workoutId, plannedDate, note) =>
+      ({
+        creatorName: 'GoGymGo Coach',
+        durationMinutes: 30,
+        id: `app-tour-plan-${plannedDate}`,
+        note: note ?? null,
+        plannedDate,
+        workoutId,
+        workoutName: 'Full Body Circuit',
+        workoutStyle: 'Strength + conditioning'
+      }) satisfies CreatorWorkoutPlan,
     requestWeeklyChallengePartner: async (
       _competitionId,
       _competitionMonthKey,
@@ -308,23 +314,23 @@ export function createAppTourDataSource(): AppDataSource {
       id: requestId,
       status: 'cancelled'
     }),
-    submitCreatorVideo: async (input) => ({
-      createdAt: nowIso(),
-      id: 'app-tour-video-submission',
-      rightsAcceptedAt: nowIso(),
-      rightsVersion: 'app-tour',
-      status: 'submitted',
-      title: input.title,
-      videoUrl: input.videoUrl
-    } satisfies CreatorVideoSubmission),
+    submitCreatorVideo: async (input) =>
+      ({
+        createdAt: nowIso(),
+        id: 'app-tour-video-submission',
+        rightsAcceptedAt: nowIso(),
+        rightsVersion: 'app-tour',
+        status: 'submitted',
+        title: input.title,
+        videoUrl: input.videoUrl
+      }) satisfies CreatorVideoSubmission,
     mode: 'tour'
   };
 }
 
 export function createAppTourAccountReadinessRepository(
   scenario: AppTourScenario = 'ready'
-):
-AccountReadinessRepository {
+): AccountReadinessRepository {
   const newPlayer = scenario === 'new-player';
   let enrollment: CompetitionEnrollment | null = newPlayer
     ? null
@@ -370,9 +376,14 @@ AccountReadinessRepository {
       ),
     getCurrentEnrollment: async () => enrollment,
     getCurrentRegionVerification: async () => regionVerification,
-    getCurrentLegalDocuments: async (jurisdictionCode = 'GLOBAL', locale = 'en') =>
-      createLegalBundle(jurisdictionCode, locale),
-    getLegalReceiptStatus: async (jurisdictionCode = 'GLOBAL', locale = 'en') => ({
+    getCurrentLegalDocuments: async (
+      jurisdictionCode = 'GLOBAL',
+      locale = 'en'
+    ) => createLegalBundle(jurisdictionCode, locale),
+    getLegalReceiptStatus: async (
+      jurisdictionCode = 'GLOBAL',
+      locale = 'en'
+    ) => ({
       ...legalReceipt,
       jurisdictionCode,
       locale
@@ -410,8 +421,7 @@ AccountReadinessRepository {
   };
 }
 
-export function createAppTourAccountSettingsRepository():
-AccountSettingsRepository {
+export function createAppTourAccountSettingsRepository(): AccountSettingsRepository {
   let accepted = true;
   let avatar: AvatarMedia | null = null;
   let accountProfile: AccountProfile = {
@@ -487,8 +497,7 @@ AccountSettingsRepository {
   };
 }
 
-export function createAppTourWorkoutSessionRepository():
-WorkoutSessionRepository {
+export function createAppTourWorkoutSessionRepository(): WorkoutSessionRepository {
   const sessions = new Map<string, AuthoritativeWorkoutSession>();
 
   return {
@@ -563,6 +572,14 @@ export function createAppTourSocialRepository(): SocialRepository {
       eligibleDate: todayKey(),
       source: 'verified_workout'
     }),
+    cancelChallenge: async (challengeId) => {
+      challenges = challenges.map((challenge) =>
+        challenge.id === challengeId
+          ? { ...challenge, canCancel: false, state: 'cancelled' }
+          : challenge
+      );
+      return { challengeId, state: 'cancelled' };
+    },
     createChallenge: async (input) => {
       const challenge = createSocialChallenge(input);
       challenges = [challenge, ...challenges];
@@ -575,25 +592,26 @@ export function createAppTourSocialRepository(): SocialRepository {
       channel: contact.channel,
       deliveryMode: 'link',
       deliveryStatus: 'not_sent',
-      destinationHint: contact.channel === 'email' ? 't***@example.com' : '***-***-0100',
+      destinationHint:
+        contact.channel === 'email' ? 't***@example.com' : '***-***-0100',
       expiresAt: nowIso(),
       id: 'app-tour-contact-invite',
       joinUrl: 'https://example.invalid/app-tour-invite'
     }),
     inspectContactInvitation: async () => ({
       channel: 'email',
+      challengeName: 'Four Visit Challenge',
       destinationHint: 't***@example.com',
-      expiresAt: nowIso()
+      expiresAt: nowIso(),
+      ownerScreenName: 'PULSE_RIDER'
     }),
-    inviteFriendToChallenge: async (challengeId, friendUserId) => ({
+    inviteFriendToChallenge: async (challengeId) => ({
       challengeId,
-      status: 'pending',
-      userId: friendUserId
+      status: 'pending'
     }),
     joinRegionalChallenge: async (challengeId) => ({
       challengeId,
-      status: 'accepted',
-      userId: appTourUserId
+      status: 'accepted'
     }),
     listChallenges: async () => challenges,
     listBlocks: async () => blocks,
@@ -608,8 +626,7 @@ export function createAppTourSocialRepository(): SocialRepository {
     listFriends: async () => [friend],
     redeemContactInvitation: async () => ({
       challengeId: challenges[0].id,
-      status: 'accepted',
-      userId: appTourUserId
+      status: 'accepted'
     }),
     removeFriend: async (friendUserId) => ({
       action: 'removed',
@@ -618,8 +635,7 @@ export function createAppTourSocialRepository(): SocialRepository {
     }),
     respondToChallengeInvitation: async (challengeId, decision) => ({
       challengeId,
-      status: decision,
-      userId: appTourUserId
+      status: decision
     }),
     respondToFriendRequest: async (requestId, decision) => ({
       requestId,
@@ -646,6 +662,12 @@ export function createAppTourSocialRepository(): SocialRepository {
     unblockMember: async (blockedUserId) => {
       blocks = blocks.filter((block) => block.userId !== blockedUserId);
       return { action: 'unblocked', requestId: null, userId: blockedUserId };
+    },
+    withdrawFromChallenge: async (challengeId) => {
+      challenges = challenges.filter(
+        (challenge) => challenge.id !== challengeId
+      );
+      return { challengeId, status: 'withdrawn' };
     }
   };
 }
@@ -660,7 +682,11 @@ export function createAppTourActiveSession(
 
   const presenceCheck = scenario === 'presence-check';
   const completionReady = scenario === 'workout-complete';
-  const elapsedSeconds = completionReady ? 31 * 60 : presenceCheck ? 15 * 60 : 8 * 60;
+  const elapsedSeconds = completionReady
+    ? 31 * 60
+    : presenceCheck
+      ? 15 * 60
+      : 8 * 60;
   const heartRateObservedSeconds = completionReady ? 30 * 60 : elapsedSeconds;
   const averageHeartRateBpm = 118;
 
@@ -668,7 +694,9 @@ export function createAppTourActiveSession(
     averageHeartRateBpm,
     dateKey: todayKey(),
     heartRateObservedSeconds,
-    heartRateSamplesSubmitted: completionReady ? 60 : Math.floor(elapsedSeconds / 30),
+    heartRateSamplesSubmitted: completionReady
+      ? 60
+      : Math.floor(elapsedSeconds / 30),
     heartRateTotalBpmSeconds: averageHeartRateBpm * heartRateObservedSeconds,
     id: 'app-tour-active-session',
     lastHeartRateSampleElapsedSeconds: heartRateObservedSeconds,
@@ -822,7 +850,9 @@ function createUnacceptedLegalReceipt(): LegalReceiptStatus {
 
 function createCompetitionProgress(): CompetitionProgress {
   const monthKey = currentMonthKey();
-  const verifiedDateKeys = ['02', '05', '09'].map((day) => `${monthKey}-${day}`);
+  const verifiedDateKeys = ['02', '05', '09'].map(
+    (day) => `${monthKey}-${day}`
+  );
   const sessions = verifiedDateKeys.map((dateKey, index) => ({
     completedAt: `${dateKey}T13:30:00.000Z`,
     eligibleDate: dateKey,
@@ -963,20 +993,39 @@ function createSocialChallenge(
   input?: CreateSocialChallengeInput
 ): SocialChallenge {
   const month = monthWindow(currentMonthKey());
+  const challengeId = `app-tour-challenge-${Date.now()}`;
   const targetCount = input?.targetCount ?? 4;
 
   return {
     activity: input?.activity ?? 'gym',
     activityLabel: input?.activityLabel ?? 'Gym visits',
+    canCancel: true,
+    canCheckIn: true,
+    canInvite: (input?.challengeType ?? 'friend') === 'friend',
+    canJoin: false,
+    canRespond: false,
+    canWithdraw: false,
     challengeType: input?.challengeType ?? 'friend',
+    contactInvitations: (input?.invitedContacts ?? []).map(
+      (contact, index) => ({
+        challengeId,
+        channel: contact.channel,
+        deliveryMode: 'link',
+        deliveryStatus: 'not_sent',
+        destinationHint:
+          contact.channel === 'email' ? 't***@example.com' : '***-***-0100',
+        expiresAt: nowIso(),
+        id: `app-tour-contact-invite-${index}`,
+        joinUrl: 'https://example.invalid/app-tour-invite'
+      })
+    ),
     createdAt: nowIso(),
     description: input?.description ?? 'A local four-visit fitness challenge.',
     endDate: input?.endDate ?? month.end.slice(0, 10),
-    id: `app-tour-challenge-${Date.now()}`,
+    id: challengeId,
     locationName: input?.locationName ?? null,
     members: [
       {
-        ...appTourUser,
         progress: {
           completedCount: 2,
           completionPercent: 50,
@@ -985,8 +1034,7 @@ function createSocialChallenge(
         role: 'owner',
         screenName: 'PULSE_RIDER',
         status: 'accepted',
-        streaks: fixedStreaks,
-        userId: appTourUserId
+        streaks: fixedStreaks
       }
     ],
     myProgress: {
@@ -999,14 +1047,15 @@ function createSocialChallenge(
     name: input?.name ?? 'Four Visit Challenge',
     ownerScreenName: 'PULSE_RIDER',
     ownerStreaks: fixedStreaks,
-    ownerUserId: appTourUserId,
     participantCount: 1,
     participantLimit: input?.participantLimit ?? null,
     regionCode: input?.regionCode ?? 'vancouver-island-gulf-islands-bc',
     regionName: 'VANCOUVER ISLAND + GULF ISLANDS',
     scheduledDays: input?.scheduledDays ?? [1, 3, 5],
     scheduledTime: input?.scheduledTime ?? '18:00',
+    serverTime: nowIso(),
     startDate: input?.startDate ?? month.start.slice(0, 10),
+    state: 'active',
     targetCount,
     targetPeriod: input?.targetPeriod ?? 'weekly',
     timezone: 'America/Vancouver'

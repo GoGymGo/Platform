@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildChallengeMonthWindow,
+  buildChallengeWindow,
   normalizeChallengeName,
   normalizeChallengeInput,
   normalizeScreenName,
@@ -37,13 +38,14 @@ describe('social input rules', () => {
       activity: 'gym',
       activityLabel: '  Gym   visits ',
       challengeType: 'friend',
-      endDate: '2026-07-31',
+      endDate: '2090-07-31',
       invitedFriendUserIds: ['friend-1', 'friend-1'],
       name: '  July   4x Gym Crew ',
       scheduledDays: [],
-      startDate: '2026-07-01',
+      startDate: '2090-07-01',
       targetCount: 4,
       targetPeriod: 'weekly',
+      timezone: 'America/Vancouver',
     });
 
     assert.equal(validateChallengeInput(input), null);
@@ -57,13 +59,14 @@ describe('social input rules', () => {
       activity: 'gym' as const,
       activityLabel: 'Gym visits',
       challengeType: 'friend' as const,
-      endDate: '2026-07-31',
+      endDate: '2090-07-31',
       invitedFriendUserIds: [],
       name: 'July Phone Crew',
       scheduledDays: [],
-      startDate: '2026-07-01',
+      startDate: '2090-07-01',
       targetCount: 4,
       targetPeriod: 'weekly' as const,
+      timezone: 'America/Vancouver',
     };
 
     assert.match(
@@ -78,14 +81,14 @@ describe('social input rules', () => {
       activity: 'running' as const,
       activityLabel: 'Group runs',
       challengeType: 'regional' as const,
-      endDate: '2026-07-31',
+      endDate: '2090-07-31',
       invitedFriendUserIds: [],
       locationName: 'Waterfront Trail',
       name: 'Waterfront Run Series',
       regionCode: 'toronto-on',
       scheduledDays: [] as number[],
       scheduledTime: '18:30',
-      startDate: '2026-07-01',
+      startDate: '2090-07-01',
       targetCount: 8,
       targetPeriod: 'monthly' as const,
     };
@@ -103,5 +106,37 @@ describe('social input rules', () => {
     assert.equal(window.startDate, '2026-08-01');
     assert.equal(window.endDate, '2026-08-31');
     assert.match(window.label, /August 2026/i);
+  });
+
+  it('builds a bounded current-day window and rejects invalid calendar dates', () => {
+    assert.deepEqual(buildChallengeWindow(new Date(2090, 6, 15), 31), {
+      endDate: '2090-08-14',
+      startDate: '2090-07-15',
+    });
+    const base = {
+      activity: 'walking' as const,
+      activityLabel: 'Walking',
+      challengeType: 'friend' as const,
+      endDate: '2090-08-14',
+      invitedContacts: [
+        { channel: 'email' as const, destination: 'friend@example.test' },
+      ],
+      invitedFriendUserIds: [],
+      name: 'Future Walk',
+      scheduledDays: [] as number[],
+      startDate: '2090-07-15',
+      targetCount: 31,
+      targetPeriod: 'weekly' as const,
+      timezone: 'America/Vancouver',
+    };
+    assert.equal(validateChallengeInput(base), null);
+    assert.match(
+      validateChallengeInput({ ...base, endDate: '2090-08-15' }) ?? '',
+      /1 and 31 days/i,
+    );
+    assert.match(
+      validateChallengeInput({ ...base, startDate: '2090-02-30' }) ?? '',
+      /1 and 31 days/i,
+    );
   });
 });

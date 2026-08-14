@@ -27,6 +27,12 @@ function principal(name: string): AuthenticatedPrincipal {
   };
 }
 
+function addDateKeyDays(dateKey: string, days: number) {
+  const value = new Date(`${dateKey}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
 describeWithDatabase('social friend and challenge workflow', () => {
   jest.setTimeout(120_000);
 
@@ -99,6 +105,23 @@ describeWithDatabase('social friend and challenge workflow', () => {
         screenName: alias,
       });
     }
+
+    await migrated.pool.query(
+      `INSERT INTO region_verifications (
+        user_id, region_policy_id, method, status, evidence_metadata,
+        policy_version, verified_at, expires_at
+      )
+      SELECT users.id, policy.id, 'device_location', 'approved', '{}'::jsonb,
+             policy.policy_version, now(), now() + interval '1 day'
+      FROM users
+      INNER JOIN region_policies AS policy ON policy.code = 'toronto-on'
+      WHERE users.firebase_uid = ANY($1::text[])`,
+      [
+        [alice, bob, charlie, dave, erin, frank].map(
+          ({ firebaseUid }) => firebaseUid,
+        ),
+      ],
+    );
   });
 
   afterAll(async () => {
@@ -163,6 +186,8 @@ describeWithDatabase('social friend and challenge workflow', () => {
       }),
     ]);
 
+    const challengeDate = dateKeyInTimezone(new Date(), 'America/Toronto');
+    const challengeEndDate = addDateKeyDays(challengeDate, 6);
     const challenge = await social.createChallenge(
       alice,
       'social-challenge-july',
@@ -171,13 +196,14 @@ describeWithDatabase('social friend and challenge workflow', () => {
         activityLabel: 'Gym visits',
         challengeType: 'friend',
         description: 'Four verified workouts each week.',
-        endDate: '2026-07-31',
+        endDate: challengeEndDate,
         invitedFriendUserIds: [bobProfile.id],
         name: '  July   Strength Sprint  ',
         scheduledDays: [],
-        startDate: '2026-07-01',
+        startDate: challengeDate,
         targetCount: 4,
         targetPeriod: 'weekly',
+        timezone: 'America/Toronto',
       },
     );
     const challengeRetry = await social.createChallenge(
@@ -188,13 +214,14 @@ describeWithDatabase('social friend and challenge workflow', () => {
         activityLabel: 'Gym visits',
         challengeType: 'friend',
         description: 'Four verified workouts each week.',
-        endDate: '2026-07-31',
+        endDate: challengeEndDate,
         invitedFriendUserIds: [bobProfile.id],
         name: 'July Strength Sprint',
         scheduledDays: [],
-        startDate: '2026-07-01',
+        startDate: challengeDate,
         targetCount: 4,
         targetPeriod: 'weekly',
+        timezone: 'America/Toronto',
       },
     );
     expect(challengeRetry).toEqual(challenge);
@@ -203,8 +230,86 @@ describeWithDatabase('social friend and challenge workflow', () => {
         myRole: 'owner',
         myStatus: 'accepted',
         name: 'July Strength Sprint',
+        ownerScreenName: 'ALICE_LIFTS',
       }),
     );
+    await expect(
+      social.checkInToChallenge(
+        alice,
+        'social-gym-check-in-before-verification',
+        challenge.id,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'VERIFIED_WORKOUT_REQUIRED' }),
+    });
+
+    const competition = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competitions (
+        region_policy_id, month_key, name, status, rules_version, rules,
+        minimum_entrants, registration_opens_at, registration_closes_at,
+        starts_at, ends_at
+      )
+      SELECT id, $1, 'Social Challenge Workout Fixture', 'active',
+             'social-challenge-rules-v1', '{}'::jsonb, 100,
+             now() - interval '3 days', now() - interval '2 days',
+             now() - interval '1 day', now() + interval '31 days'
+      FROM region_policies WHERE code = 'toronto-on'
+      RETURNING id`,
+      [challengeDate.slice(0, 7)],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_goal_brackets (competition_id, goal_days, label)
+       VALUES ($1, 4, 'Four days')`,
+      [competition.rows[0].id],
+    );
+    const acceptance = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_rule_acceptances (
+        competition_id, user_id, rules_version, age_eligibility_attested,
+        accepted_at
+      ) VALUES ($1, $2, 'social-challenge-rules-v1', true, now())
+      RETURNING id`,
+      [competition.rows[0].id, aliceProfile.id],
+    );
+    const enrollment = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_enrollments (
+        competition_id, user_id, goal_days, region_verification_id,
+        rules_acceptance_id, status, enrolled_at
+      )
+      SELECT $1, $2, 4, verification.id, $3, 'active', now() - interval '1 hour'
+      FROM region_verifications AS verification
+      WHERE verification.user_id = $2
+        AND verification.status = 'approved'
+      ORDER BY verification.verified_at DESC
+      LIMIT 1
+      RETURNING id`,
+      [competition.rows[0].id, aliceProfile.id, acceptance.rows[0].id],
+    );
+    const verifiedWorkout = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions (
+        competition_id, enrollment_id, user_id, eligible_date, status,
+        policy_version, started_at, completed_at, verification_summary
+      ) VALUES ($1, $2, $3, $4, 'verified', 'social-challenge-rules-v1',
+                now() - interval '30 minutes', now(), '{"fixture":true}'::jsonb)
+      RETURNING id`,
+      [
+        competition.rows[0].id,
+        enrollment.rows[0].id,
+        aliceProfile.id,
+        challengeDate,
+      ],
+    );
+    await expect(
+      social.checkInToChallenge(
+        alice,
+        'social-gym-check-in-after-verification',
+        challenge.id,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ source: 'verified_workout' }));
+    await expect(
+      migrated.pool.query('DELETE FROM workout_sessions WHERE id = $1', [
+        verifiedWorkout.rows[0].id,
+      ]),
+    ).rejects.toMatchObject({ code: '23503' });
 
     await expect(
       social.inviteFriendToChallenge(
@@ -232,13 +337,16 @@ describeWithDatabase('social friend and challenge workflow', () => {
         id: challenge.id,
         members: expect.arrayContaining([
           expect.objectContaining({
+            screenName: 'BOB_TRAINS',
             status: 'accepted',
-            userId: bobProfile.id,
           }),
         ]),
         myStatus: 'accepted',
       }),
     ]);
+    expect(JSON.stringify(await social.listChallenges(bob))).not.toContain(
+      bobProfile.id,
+    );
 
     const counts = await migrated.pool.query<{
       challenges: number;
@@ -255,6 +363,17 @@ describeWithDatabase('social friend and challenge workflow', () => {
       friendships: 1,
       memberships: 2,
     });
+    await social.removeFriend(
+      alice,
+      'social-friend-remove-alice-bob',
+      bobProfile.id,
+    );
+    const removedMembership = await migrated.pool.query<{ status: string }>(
+      `SELECT status::text FROM social_challenge_members
+       WHERE challenge_id = $1 AND user_id = $2`,
+      [challenge.id, bobProfile.id],
+    );
+    expect(removedMembership.rows[0]?.status).toBe('withdrawn');
   });
 
   it('publishes, discovers, joins, and tracks a regional activity challenge', async () => {
@@ -281,6 +400,20 @@ describeWithDatabase('social friend and challenge workflow', () => {
       },
     );
 
+    const unverified = principal('unverified');
+    await profiles.updateMe(unverified, {
+      publicIdentityMode: 'alias',
+      publicName: 'UNVERIFIED_LOCAL',
+      screenName: 'UNVERIFIED_LOCAL',
+    });
+    await expect(
+      social.discoverChallenges(unverified, { regionCode: 'toronto-on' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'APPROVED_REGION_VERIFICATION_REQUIRED',
+      }),
+    });
+
     await expect(
       social.discoverChallenges(charlie, { regionCode: 'toronto-on' }),
     ).resolves.toEqual([
@@ -298,6 +431,20 @@ describeWithDatabase('social friend and challenge workflow', () => {
       'social-regional-run-join',
       challenge.id,
     );
+    const creditBefore = await migrated.pool.query<{
+      competition_progress: number;
+      draw_entries: number;
+      entry_ledger: number;
+      reward_awards: number;
+      session_events: number;
+      workout_sessions: number;
+    }>(`SELECT
+      (SELECT count(*)::integer FROM workout_sessions) AS workout_sessions,
+      (SELECT count(*)::integer FROM session_events) AS session_events,
+      (SELECT count(*)::integer FROM entry_ledger) AS entry_ledger,
+      (SELECT count(*)::integer FROM competition_progress) AS competition_progress,
+      (SELECT count(*)::integer FROM draw_entries) AS draw_entries,
+      (SELECT count(*)::integer FROM reward_awards) AS reward_awards`);
     const checkIn = await social.checkInToChallenge(
       charlie,
       'social-regional-run-check-in',
@@ -310,6 +457,27 @@ describeWithDatabase('social friend and challenge workflow', () => {
         source: 'manual',
       }),
     );
+    const retry = await social.checkInToChallenge(
+      charlie,
+      'social-regional-run-check-in-retry',
+      challenge.id,
+    );
+    expect(retry).toEqual(checkIn);
+    const creditAfter = await migrated.pool.query<{
+      competition_progress: number;
+      draw_entries: number;
+      entry_ledger: number;
+      reward_awards: number;
+      session_events: number;
+      workout_sessions: number;
+    }>(`SELECT
+      (SELECT count(*)::integer FROM workout_sessions) AS workout_sessions,
+      (SELECT count(*)::integer FROM session_events) AS session_events,
+      (SELECT count(*)::integer FROM entry_ledger) AS entry_ledger,
+      (SELECT count(*)::integer FROM competition_progress) AS competition_progress,
+      (SELECT count(*)::integer FROM draw_entries) AS draw_entries,
+      (SELECT count(*)::integer FROM reward_awards) AS reward_awards`);
+    expect(creditAfter.rows[0]).toEqual(creditBefore.rows[0]);
     await expect(social.listChallenges(charlie)).resolves.toEqual([
       expect.objectContaining({
         id: challenge.id,
@@ -322,6 +490,42 @@ describeWithDatabase('social friend and challenge workflow', () => {
         participantCount: 2,
       }),
     ]);
+
+    const capacityRace = await Promise.allSettled([
+      social.joinRegionalChallenge(
+        dave,
+        'social-regional-capacity-dave',
+        challenge.id,
+      ),
+      social.joinRegionalChallenge(
+        erin,
+        'social-regional-capacity-erin',
+        challenge.id,
+      ),
+    ]);
+    expect(
+      capacityRace.filter(({ status }) => status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      capacityRace.filter(({ status }) => status === 'rejected'),
+    ).toHaveLength(1);
+    await expect(
+      social.cancelChallenge(
+        charlie,
+        'social-regional-cancel-non-owner',
+        challenge.id,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CHALLENGE_NOT_FOUND' }),
+    });
+    await expect(
+      social.withdrawFromChallenge(
+        charlie,
+        'social-regional-withdraw-charlie',
+        challenge.id,
+      ),
+    ).resolves.toEqual({ challengeId: challenge.id, status: 'withdrawn' });
+    await expect(social.listChallenges(charlie)).resolves.toEqual([]);
   });
 
   it('enforces cancellation, blocks, and one-time destination-bound links', async () => {
@@ -466,21 +670,39 @@ describeWithDatabase('social friend and challenge workflow', () => {
       erinProfile.id,
     );
 
+    const challengeDate = dateKeyInTimezone(new Date(), 'America/Toronto');
     const challenge = await social.createChallenge(
       dave,
       'dave-private-link-challenge',
       {
-        activity: 'gym',
-        activityLabel: 'Gym visits',
+        activity: 'walking',
+        activityLabel: 'Walking',
         challengeType: 'friend',
-        endDate: '2026-08-31',
+        endDate: addDateKeyDays(challengeDate, 6),
+        invitedContacts: [{ channel: 'phone', destination: '+1 250 555 0198' }],
         invitedFriendUserIds: [],
         name: 'Private Link Challenge',
         scheduledDays: [],
-        startDate: '2026-08-01',
+        startDate: challengeDate,
         targetCount: 4,
         targetPeriod: 'weekly',
+        timezone: 'America/Toronto',
       },
+    );
+    expect(challenge.contactInvitations).toEqual([
+      expect.objectContaining({
+        channel: 'phone',
+        deliveryMode: 'link',
+        deliveryStatus: 'not_sent',
+      }),
+    ]);
+    const atomicToken = new URL(
+      challenge.contactInvitations[0].joinUrl,
+    ).searchParams.get('challengeInvite');
+    await social.checkInToChallenge(
+      dave,
+      'dave-private-link-manual-check-in',
+      challenge.id,
     );
     const firstInvitation = await social.inviteContactToChallenge(
       dave,
@@ -570,6 +792,41 @@ describeWithDatabase('social friend and challenge workflow', () => {
     expect(JSON.stringify(stored.rows[0])).not.toContain(
       'erin@integration.test',
     );
+    await social.blockMember(
+      dave,
+      'dave-block-challenge-member',
+      erinProfile.id,
+    );
+    const blockedMembership = await migrated.pool.query<{ status: string }>(
+      `SELECT status::text FROM social_challenge_members
+       WHERE challenge_id = $1 AND user_id = $2`,
+      [challenge.id, erinProfile.id],
+    );
+    expect(blockedMembership.rows[0]?.status).toBe('withdrawn');
+    await social.unblockMember(
+      dave,
+      'dave-unblock-challenge-member',
+      erinProfile.id,
+    );
+    await expect(
+      social.cancelChallenge(
+        dave,
+        'dave-cancel-private-link-challenge',
+        challenge.id,
+      ),
+    ).resolves.toEqual({ challengeId: challenge.id, state: 'cancelled' });
+    await expect(
+      social.inspectContactInvitation(erin, atomicToken!),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'CHALLENGE_CONTACT_INVITATION_NOT_FOUND',
+      }),
+    });
+    await expect(social.listChallenges(dave)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: challenge.id, state: 'cancelled' }),
+      ]),
+    );
 
     const events = await migrated.pool.query<{ action: string }>(
       `SELECT action FROM social_relationship_events
@@ -582,6 +839,8 @@ describeWithDatabase('social friend and challenge workflow', () => {
         'friend_request_sent',
         'member_blocked',
         'member_unblocked',
+        'challenge_cancelled',
+        'challenge_checkin_recorded',
       ]),
     );
 
@@ -612,15 +871,21 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
     expect(privacyExport).toEqual(
       expect.objectContaining({
-        schemaVersion: 9,
+        schemaVersion: 10,
         socialData: expect.objectContaining({
-          challengeContactInvitations: [
+          challengeCheckIns: [
+            expect.objectContaining({
+              eligible_date: challengeDate,
+              verifiedWorkoutLinked: false,
+            }),
+          ],
+          challengeContactInvitations: expect.arrayContaining([
             expect.objectContaining({
               channel: 'email',
               destination_hint: 'e***@integration.test',
               status: 'claimed',
             }),
-          ],
+          ]),
           relationshipEvents: expect.arrayContaining([
             expect.objectContaining({ action: 'member_blocked' }),
           ]),
@@ -634,7 +899,22 @@ describeWithDatabase('social friend and challenge workflow', () => {
     expect(JSON.stringify(privacyExport)).not.toContain(
       stored.rows[0].destination_hash,
     );
+    expect(JSON.stringify(privacyExport.socialData)).not.toContain(
+      'workout_session_id',
+    );
 
+    const cleanupChallenge = await migrated.pool.query<{
+      id: string;
+      owner_user_id: string;
+    }>(
+      `SELECT id, owner_user_id
+       FROM social_challenges
+       WHERE name = 'July Strength Sprint' AND status = 'active'`,
+    );
+    const cleanupChallengeRow = cleanupChallenge.rows[0];
+    if (!cleanupChallengeRow) {
+      throw new Error('Expected the active friend Challenge cleanup fixture');
+    }
     await migrated.pool.query(
       `INSERT INTO challenge_contact_invitations (
         challenge_id, inviter_user_id, channel, destination_hash,
@@ -649,8 +929,8 @@ describeWithDatabase('social friend and challenge workflow', () => {
           'claimed', now() - interval '92 days', $9,
           now() - interval '123 days', now() - interval '91 days')`,
       [
-        challenge.id,
-        daveProfile.id,
+        cleanupChallengeRow.id,
+        cleanupChallengeRow.owner_user_id,
         '1'.repeat(64),
         '2'.repeat(64),
         '3'.repeat(64),
@@ -678,12 +958,15 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
     const deletionCounts = await migrated.pool.query<{
       blocks: number;
+      challenge_checkins: number;
       contact_invitations: number;
       relationship_events: number;
     }>(
       `SELECT
         (SELECT count(*)::integer FROM user_blocks
           WHERE blocker_user_id = $1 OR blocked_user_id = $1) AS blocks,
+        (SELECT count(*)::integer FROM social_challenge_checkins
+          WHERE user_id = $1) AS challenge_checkins,
         (SELECT count(*)::integer FROM challenge_contact_invitations
           WHERE inviter_user_id = $1 OR claimed_by_user_id = $1) AS contact_invitations,
         (SELECT count(*)::integer FROM social_relationship_events
@@ -692,9 +975,141 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
     expect(deletionCounts.rows[0]).toEqual({
       blocks: 0,
+      challenge_checkins: 0,
       contact_invitations: 0,
       relationship_events: expect.any(Number),
     });
     expect(deletionCounts.rows[0].relationship_events).toBeGreaterThan(0);
+  });
+
+  it('enforces bounded creation and provenance at the database boundary', async () => {
+    const today = dateKeyInTimezone(new Date(), 'America/Toronto');
+    const frankProfile = await profiles.getMe(frank);
+    try {
+      void social.createChallenge(frank, 'empty-friend-challenge', {
+        activity: 'walking',
+        activityLabel: 'Walking',
+        challengeType: 'friend',
+        endDate: today,
+        invitedFriendUserIds: [],
+        name: 'Empty Friend Challenge',
+        scheduledDays: [],
+        startDate: today,
+        targetCount: 1,
+        targetPeriod: 'weekly',
+        timezone: 'America/Toronto',
+      });
+      throw new Error('Expected empty friend challenge validation to fail.');
+    } catch (error) {
+      expect(error).toMatchObject({
+        response: expect.objectContaining({
+          code: 'FRIEND_CHALLENGE_INVITATION_REQUIRED',
+        }),
+      });
+    }
+    try {
+      void social.createChallenge(frank, 'long-friend-challenge', {
+        activity: 'walking',
+        activityLabel: 'Walking',
+        challengeType: 'friend',
+        endDate: addDateKeyDays(today, 31),
+        invitedContacts: [
+          { channel: 'email', destination: 'new@example.test' },
+        ],
+        invitedFriendUserIds: [],
+        name: 'Too Long Friend Challenge',
+        scheduledDays: [],
+        startDate: today,
+        targetCount: 1,
+        targetPeriod: 'weekly',
+        timezone: 'America/Toronto',
+      });
+      throw new Error('Expected long challenge validation to fail.');
+    } catch (error) {
+      expect(error).toMatchObject({
+        response: expect.objectContaining({ code: 'CHALLENGE_WINDOW_INVALID' }),
+      });
+    }
+
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO social_challenges (
+          owner_user_id, name, status, activity, activity_label,
+          challenge_type, target_count, target_period, start_date, end_date,
+          scheduled_days, timezone, created_at, updated_at
+        ) VALUES ($1, 'Raw Invalid Window', 'active', 'walking', 'Walking',
+                  'friend', 1, 'weekly', $2, $3, ARRAY[]::smallint[],
+                  'America/Toronto', now(), now())`,
+        [frankProfile.id, today, addDateKeyDays(today, 31)],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO social_challenge_members (
+          challenge_id, user_id, role, status, invited_by_user_id,
+          invitation_source, created_at, updated_at
+        )
+        SELECT challenge.id, $1, 'member', 'pending', challenge.owner_user_id,
+               'friend', now(), now()
+        FROM social_challenges AS challenge
+        WHERE challenge.name = 'July Strength Sprint'`,
+        [frankProfile.id],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    const aliceProfile = await profiles.getMe(alice);
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO social_challenges (
+          owner_user_id, name, status, activity, activity_label,
+          challenge_type, target_count, target_period, start_date, end_date,
+          region_policy_id, location_name, scheduled_days,
+          scheduled_time_local, participant_limit, timezone, created_at,
+          updated_at
+        )
+        SELECT $1, 'Duplicate Regional Day', 'active', 'running', 'Running',
+               'regional', 1, 'weekly', $2, $2, policy.id, 'Trail',
+               ARRAY[1, 1]::smallint[], '09:00', 10, policy.timezone,
+               now(), now()
+        FROM region_policies AS policy WHERE policy.code = 'toronto-on'`,
+        [aliceProfile.id, today],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO challenge_contact_invitations (
+          challenge_id, inviter_user_id, channel, destination_hash,
+          destination_hint, delivery_mode, creation_key_hash,
+          invite_token_hash, token_version, status, expires_at, created_at
+        )
+        SELECT challenge.id, $1, 'email', $2, 'n***@example.test', 'link',
+               $3, $4, 1, 'pending', now() + interval '1 day', now()
+        FROM social_challenges AS challenge
+        WHERE challenge.name = 'July Strength Sprint'`,
+        [frankProfile.id, '7'.repeat(64), '8'.repeat(64), '9'.repeat(64)],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO social_challenge_checkins (
+          challenge_id, user_id, eligible_date, source, workout_session_id,
+          created_at
+        )
+        SELECT challenge.id, $1, $2, 'manual', null, now()
+        FROM social_challenges AS challenge
+        WHERE challenge.name = 'July Strength Sprint'`,
+        [aliceProfile.id, today],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    await expect(
+      migrated.pool.query(
+        `UPDATE social_challenges SET name = 'Mutated Challenge'
+         WHERE name = 'July Strength Sprint'`,
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
   });
 });

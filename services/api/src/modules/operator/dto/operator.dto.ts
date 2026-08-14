@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
@@ -14,8 +14,14 @@ import {
 export class OperatorReasonDto {
   @ApiProperty({ maxLength: 500, minLength: 8, type: String })
   @IsString()
+  @Transform(trimOperatorReason)
   @Length(8, 500)
   reason!: string;
+}
+
+function trimOperatorReason({ value }: TransformFnParams): unknown {
+  const input: unknown = value;
+  return typeof input === 'string' ? input.trim() : input;
 }
 
 export enum SessionEvidenceFindingDto {
@@ -150,14 +156,46 @@ export class LockDrawDto extends OperatorReasonDto {
   competitionId!: string;
 
   @ApiProperty({ maxLength: 64, minLength: 64, type: String })
-  @Matches(/^[a-f0-9]{64}$/i)
+  @Matches(/^[a-f0-9]{64}$/)
   seedCommitment!: string;
 }
 
 export class SettleDrawDto extends OperatorReasonDto {
   @ApiProperty({ maxLength: 64, minLength: 64, type: String })
-  @Matches(/^[a-f0-9]{64}$/i)
+  @Matches(/^[a-f0-9]{64}$/)
   seedReveal!: string;
+}
+
+export class DrawLockResponseDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ enum: ['locked', 'settled'], type: String })
+  status!: 'locked' | 'settled';
+
+  @ApiProperty({ minimum: 1, type: Number })
+  entrantCount!: number;
+
+  @ApiProperty({ pattern: '^[1-9][0-9]*$', type: String })
+  totalEntries!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  lockedAt!: string;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  entrantSnapshotHash!: string;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  scoringSnapshotHash!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  rewardSlotCount!: number;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  rewardSnapshotHash!: string;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  publicResultSnapshotHash!: string;
 }
 
 export enum RegionDecisionDto {

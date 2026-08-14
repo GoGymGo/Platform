@@ -6,7 +6,10 @@ import {
   dateKeyInTimezone,
 } from '../src/modules/competitions/competition-calendar';
 import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
+import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
+import { buildSeedCommitment } from '../src/modules/draws/draw-algorithm';
+import { DrawsService } from '../src/modules/draws/draws.service';
 import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
@@ -148,6 +151,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let adminRewards: AdminRewardsService;
   let competitions: CompetitionsService;
   let database: DatabaseService;
+  let draws: DrawsService;
   let enqueueNotification: jest.Mock;
   let lifecycle: CompetitionLifecycleService;
   let migrated: MigratedPostgisTestDatabase;
@@ -185,9 +189,15 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
     enqueueNotification = jest.fn();
-    lifecycle = new CompetitionLifecycleService(database, {
+    const notifications = {
       enqueue: enqueueNotification,
-    } as unknown as NotificationsService);
+    } as unknown as NotificationsService;
+    lifecycle = new CompetitionLifecycleService(database, notifications);
+    draws = new DrawsService(
+      notifications,
+      rewards,
+      new CompetitionScoringService(database, ledger),
+    );
     competitions = new CompetitionsService(
       database,
       idempotency,
@@ -1340,7 +1350,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await migrated.pool.query(
       `UPDATE competitions
-       SET status = 'active',
+       SET status = 'active', minimum_entrants = 1,
            registration_opens_at = $1,
            registration_closes_at = $2,
            starts_at = $3,
@@ -1367,48 +1377,63 @@ describeWithDatabase('critical session and ledger workflow', () => {
     });
 
     const user = await profiles.ensureUser(userPrincipal, database.connection);
-    await profiles.getMe(userPrincipal);
+    const originalProfile = await profiles.getMe(userPrincipal);
+    const originalAlias =
+      originalProfile.publicIdentityMode === 'private'
+        ? originalProfile.callsign
+        : (originalProfile.publicName ?? originalProfile.callsign);
     await migrated.pool.query(
       `UPDATE competition_progress
        SET category_score = 7, verified_days = 1
        WHERE competition_id = $1 AND user_id = $2`,
       [fixture.competitionId, user.id],
     );
-    const draw = await migrated.pool.query<{ id: string }>(
-      `INSERT INTO competition_draws
-         (competition_id, status, rules_version, seed_commitment, seed_reveal,
-          entrant_snapshot_hash, entrant_count, total_entries, locked_at,
-          settled_at, scoring_snapshot_hash)
-       VALUES ($1, 'settled', 'rules-v1', repeat('a', 64), repeat('b', 64),
-               repeat('c', 64), 1, 5, $2, $2, repeat('d', 64))
-       RETURNING id`,
-      [fixture.competitionId, new Date()],
+    const seedReveal = 'b'.repeat(64);
+    const locked = await database.connection
+      .transaction()
+      .execute((transaction) =>
+        draws.lock(transaction, {
+          competitionId: fixture.competitionId,
+          operatorUserId,
+          reason: 'Lock the participant results integration snapshot.',
+          requestId: 'participant-results-draw-lock',
+          seedCommitment: buildSeedCommitment(seedReveal),
+        }),
+      );
+    await database.connection.transaction().execute((transaction) =>
+      draws.settle(transaction, {
+        drawId: locked.drawId,
+        operatorUserId,
+        reason: 'Settle the participant results integration snapshot.',
+        requestId: 'participant-results-draw-settle',
+        seedReveal,
+      }),
     );
     await migrated.pool.query(
-      `INSERT INTO competition_settlement_inputs
-         (draw_id, competition_id, enrollment_id, user_id, goal_days,
-          verified_days, longest_streak, category_score, category_rank,
-          prize_draw_entries, tie_break_digest, rules_version,
-          snapshot_position)
-       SELECT $1, enrollment.competition_id, enrollment.id,
-              enrollment.user_id, enrollment.goal_days, 1, 1, 7, 1, 1,
-              repeat('e', 64), 'rules-v1', 1
-       FROM competition_enrollments AS enrollment
-       WHERE enrollment.competition_id = $2
-         AND enrollment.user_id = $3`,
-      [draw.rows[0].id, fixture.competitionId, user.id],
+      `UPDATE profiles
+       SET callsign = 'MUTATED_ALIAS', public_name = 'Mutated public name'
+       WHERE user_id = $1`,
+      [user.id],
+    );
+    await expect(
+      migrated.pool.query(
+        `UPDATE reward_catalog_items
+       SET title = 'Mutated reward title'
+       WHERE id = $1`,
+        [reward.rows[0].id],
+      ),
+    ).rejects.toThrow(/published reward configuration is immutable/i);
+    await migrated.pool.query(
+      `UPDATE reward_catalog_items
+       SET status = 'archived', version = version + 1
+       WHERE id = $1`,
+      [reward.rows[0].id],
     );
     const award = await migrated.pool.query<{ id: string }>(
-      `INSERT INTO reward_awards
-         (draw_id, reward_catalog_item_id, user_id, award_rank, status,
-          awarded_at, updated_at)
-       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)
-       RETURNING id`,
-      [draw.rows[0].id, reward.rows[0].id, user.id, new Date()],
-    );
-    await migrated.pool.query(
-      `UPDATE competitions SET status = 'settled' WHERE id = $1`,
-      [fixture.competitionId],
+      `SELECT id
+       FROM reward_awards
+       WHERE draw_id = $1 AND user_id = $2`,
+      [locked.drawId, user.id],
     );
 
     await expect(
@@ -1419,9 +1444,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
           goal: 3,
           rows: [
             {
-              categoryEntries: 7,
+              alias: originalAlias,
+              categoryEntries: 0,
               rank: 1,
-              verifiedDays: 1,
+              verifiedDays: 0,
             },
           ],
         },
@@ -1432,6 +1458,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       rewardCount: 1,
       rewardWinners: [
         {
+          alias: originalAlias,
           awardRank: 1,
           rewardTitle: 'Recovery Kit',
           rewardType: 'physical',
@@ -1441,6 +1468,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
       settledAt: expect.any(String),
     });
 
+    await migrated.pool.query(
+      `UPDATE profiles
+       SET callsign = $1, public_name = $2
+       WHERE user_id = $3`,
+      [originalProfile.callsign, originalProfile.publicName, user.id],
+    );
     await expect(rewards.getMyAwards(userPrincipal)).resolves.toMatchObject([
       {
         id: award.rows[0].id,
@@ -1546,19 +1579,33 @@ describeWithDatabase('critical session and ledger workflow', () => {
       }),
     ]);
 
-    await migrated.pool.query(
-      `UPDATE competitions SET status = 'active' WHERE id = $1`,
-      [fixture.competitionId],
+    await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'coupon-reward-draw-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
     );
-    const draw = await migrated.pool.query<{ id: string }>(
-      `INSERT INTO competition_draws
-         (competition_id, status, rules_version, seed_commitment, seed_reveal,
-          entrant_snapshot_hash, entrant_count, total_entries, locked_at,
-          settled_at, scoring_snapshot_hash)
-       VALUES ($1, 'settled', 'rules-v1', repeat('1', 64), repeat('2', 64),
-               repeat('3', 64), 1, 1, $2, $2, repeat('4', 64))
-       RETURNING id`,
-      [fixture.competitionId, new Date()],
+    const drawReference = new Date();
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET status = 'active', minimum_entrants = 1,
+           registration_opens_at = $1, registration_closes_at = $2,
+           starts_at = $3, ends_at = $4
+       WHERE id = $5`,
+      [
+        new Date(drawReference.getTime() - 90 * 60_000),
+        new Date(drawReference.getTime() - 70 * 60_000),
+        new Date(drawReference.getTime() - 60 * 60_000),
+        new Date(drawReference.getTime() - 16 * 60_000),
+        fixture.competitionId,
+      ],
     );
     const winner = await profiles.ensureUser(
       userPrincipal,
@@ -1568,13 +1615,32 @@ describeWithDatabase('critical session and ledger workflow', () => {
       pairingPrincipal,
       database.connection,
     );
+    const seedReveal = '2'.repeat(64);
+    const locked = await database.connection
+      .transaction()
+      .execute((transaction) =>
+        draws.lock(transaction, {
+          competitionId: fixture.competitionId,
+          operatorUserId,
+          reason: 'Lock the coupon inventory integration snapshot.',
+          requestId: 'coupon-reward-draw-lock',
+          seedCommitment: buildSeedCommitment(seedReveal),
+        }),
+      );
+    await database.connection.transaction().execute((transaction) =>
+      draws.settle(transaction, {
+        drawId: locked.drawId,
+        operatorUserId,
+        reason: 'Settle the coupon inventory integration snapshot.',
+        requestId: 'coupon-reward-draw-settle',
+        seedReveal,
+      }),
+    );
     const award = await migrated.pool.query<{ id: string }>(
-      `INSERT INTO reward_awards
-         (draw_id, reward_catalog_item_id, user_id, award_rank, status,
-          awarded_at, updated_at)
-       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)
-       RETURNING id`,
-      [draw.rows[0].id, created.id, winner.id, new Date()],
+      `SELECT id
+       FROM reward_awards
+       WHERE draw_id = $1 AND user_id = $2`,
+      [locked.drawId, winner.id],
     );
 
     await expect(
@@ -1583,9 +1649,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
            (draw_id, reward_catalog_item_id, user_id, award_rank, status,
             awarded_at, updated_at)
          VALUES ($1, $2, $3, 2, 'awarded', $4, $4)`,
-        [draw.rows[0].id, created.id, otherUser.id, new Date()],
+        [locked.drawId, created.id, otherUser.id, new Date()],
       ),
-    ).rejects.toThrow(/reward inventory exhausted/i);
+    ).rejects.toThrow(/exact locked reward slot/i);
     await expect(
       rewards.claim(
         pairingPrincipal,
@@ -1626,13 +1692,25 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await expect(
       rewards.getCatalog(catalogRegion.rows[0].code, fixture.monthKey),
-    ).resolves.toEqual([
-      expect.objectContaining({
-        id: created.id,
-        inventoryRemaining: 0,
-        inventoryTotal: 1,
-      }),
-    ]);
+    ).resolves.toEqual([]);
+    const allocatedInventory = await migrated.pool.query<{
+      awarded_count: number;
+      inventory_total: number;
+    }>(
+      `SELECT item.inventory_total,
+              count(award.id)::integer AS awarded_count
+       FROM reward_catalog_items AS item
+       LEFT JOIN reward_awards AS award
+         ON award.reward_catalog_item_id = item.id
+        AND award.status <> 'cancelled'
+       WHERE item.id = $1
+       GROUP BY item.id`,
+      [created.id],
+    );
+    expect(allocatedInventory.rows[0]).toEqual({
+      awarded_count: 1,
+      inventory_total: 1,
+    });
 
     const redeemed = await adminRewardAwards.changeStatus(
       operatorPrincipal,

@@ -20,9 +20,13 @@ const redactedResponseBody: JsonObject = { redacted: true };
 export class IdempotencyService {
   constructor(private readonly database: DatabaseService) {}
 
-  async execute<T extends JsonObject>(
+  async execute<T extends JsonObject, Context = undefined>(
     options: IdempotencyOptions,
-    handler: (transaction: Transaction<Database>) => Promise<T>,
+    handler: (
+      transaction: Transaction<Database>,
+      context: Context,
+    ) => Promise<T>,
+    authorize?: (transaction: Transaction<Database>) => Promise<Context>,
   ): Promise<T> {
     const requestHash = createHash('sha256')
       .update(stableJson(options.request))
@@ -32,6 +36,10 @@ export class IdempotencyService {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
+        const context = authorize
+          ? await authorize(transaction)
+          : (undefined as Context);
+
         await transaction
           .deleteFrom('idempotency_keys')
           .where('scope', '=', options.scope)
@@ -78,7 +86,7 @@ export class IdempotencyService {
 
           if (existing.state === 'completed') {
             if (options.storeResponseBody === false) {
-              return handler(transaction);
+              return handler(transaction, context);
             }
             if (
               existing.response_body &&
@@ -96,7 +104,7 @@ export class IdempotencyService {
           });
         }
 
-        const result = await handler(transaction);
+        const result = await handler(transaction, context);
         await transaction
           .updateTable('idempotency_keys')
           .set({

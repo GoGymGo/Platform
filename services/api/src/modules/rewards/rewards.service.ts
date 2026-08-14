@@ -32,14 +32,29 @@ interface ClaimRewardJson extends JsonObject {
 }
 
 export interface RewardAwardSlot {
+  availableFrom: Date | null;
+  availableUntil: Date | null;
+  catalogVersion: number;
+  displayOrder: number;
+  inventoryTotal: number;
   rewardCatalogItemId: string;
+  rewardType: 'cash' | 'coupon' | 'physical';
+  sponsorName: string;
+  title: string;
 }
 
 export function allocateRewardSlots(
   items: readonly {
     awardedCount: number;
+    availableFrom: Date | null;
+    availableUntil: Date | null;
+    catalogVersion: number;
+    displayOrder: number;
     inventoryTotal: number;
     rewardCatalogItemId: string;
+    rewardType: 'cash' | 'coupon' | 'physical';
+    sponsorName: string;
+    title: string;
   }[],
   maximumSlots: number,
 ): RewardAwardSlot[] {
@@ -49,7 +64,17 @@ export function allocateRewardSlots(
     const available = Math.max(item.inventoryTotal - item.awardedCount, 0);
     const count = Math.min(available, limit - slots.length);
     for (let index = 0; index < count; index += 1) {
-      slots.push({ rewardCatalogItemId: item.rewardCatalogItemId });
+      slots.push({
+        availableFrom: item.availableFrom,
+        availableUntil: item.availableUntil,
+        catalogVersion: item.catalogVersion,
+        displayOrder: item.displayOrder,
+        inventoryTotal: item.inventoryTotal,
+        rewardCatalogItemId: item.rewardCatalogItemId,
+        rewardType: item.rewardType,
+        sponsorName: item.sponsorName,
+        title: item.title,
+      });
     }
     if (slots.length >= limit) break;
   }
@@ -314,8 +339,15 @@ export class RewardsService {
     const items = await transaction
       .selectFrom('reward_catalog_items as item')
       .select([
+        'item.available_from',
+        'item.available_until',
+        'item.display_order',
         'item.id',
         'item.inventory_total',
+        'item.reward_type',
+        'item.sponsor_name',
+        'item.title',
+        'item.version',
         sql<string>`(
           SELECT COUNT(*)
           FROM reward_awards AS award
@@ -346,8 +378,15 @@ export class RewardsService {
     return allocateRewardSlots(
       items.map((item) => ({
         awardedCount: Number(item.awarded_count),
+        availableFrom: item.available_from,
+        availableUntil: item.available_until,
+        catalogVersion: item.version,
+        displayOrder: item.display_order,
         inventoryTotal: item.inventory_total,
         rewardCatalogItemId: item.id,
+        rewardType: item.reward_type,
+        sponsorName: item.sponsor_name,
+        title: item.title,
       })),
       maximumSlots,
     );

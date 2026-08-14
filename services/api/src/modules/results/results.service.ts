@@ -5,7 +5,6 @@ import { DatabaseService } from '../../database/database.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import type { CategoryLeaderboardDto } from '../leaderboards/dto/leaderboard.dto';
 import { ProfilesService } from '../profiles/profiles.service';
-import { loadPublicStreaks } from '../streaks/public-streaks';
 import type {
   ParticipantCompetitionResultsResponseDto,
   RewardWinnerResponseDto,
@@ -78,6 +77,7 @@ export class ResultsService {
             'competition.rules_version',
             'competition.status',
             'draw.id as draw_id',
+            'draw.rules_version as draw_rules_version',
             'draw.settled_at',
             'draw.status as draw_status',
             'enrollment.goal_days',
@@ -101,8 +101,9 @@ export class ResultsService {
           ? await Promise.all([
               this.loadCategoryLeaderboards(
                 transaction,
+                competition.draw_id!,
                 competition.id,
-                competition.rules_version,
+                competition.draw_rules_version!,
                 user.id,
                 now,
               ),
@@ -129,60 +130,58 @@ export class ResultsService {
 
   private async loadCategoryLeaderboards(
     transaction: Transaction<Database>,
+    drawId: string,
     competitionId: string,
     rulesVersion: string,
     currentUserId: string,
     now: Date,
   ): Promise<CategoryLeaderboardDto[]> {
-    const [brackets, settlementInputs] = await Promise.all([
-      transaction
-        .selectFrom('competition_goal_brackets')
-        .select('goal_days')
-        .where('competition_id', '=', competitionId)
-        .orderBy('goal_days')
-        .execute(),
-      transaction
-        .selectFrom('competition_settlement_inputs as input')
-        .innerJoin('profiles as profile', 'profile.user_id', 'input.user_id')
-        .select([
-          'profile.callsign',
-          'profile.public_identity_mode',
-          'profile.public_name',
-          'input.category_rank',
-          'input.category_score',
-          'input.goal_days',
-          'input.user_id',
-          'input.verified_days',
-        ])
-        .where('input.competition_id', '=', competitionId)
-        .orderBy('input.goal_days')
-        .orderBy('input.category_rank')
-        .execute(),
-    ]);
-    const streaksByUser = await loadPublicStreaks(
-      transaction,
-      settlementInputs.map((row) => row.user_id),
-    );
+    const settlementInputs = await transaction
+      .selectFrom('competition_settlement_inputs as input')
+      .innerJoin('draw_public_identities as identity', (join) =>
+        join
+          .onRef('identity.draw_id', '=', 'input.draw_id')
+          .onRef('identity.user_id', '=', 'input.user_id'),
+      )
+      .select([
+        'identity.alias',
+        'identity.streak_daily',
+        'identity.streak_monthly',
+        'identity.streak_projection_version',
+        'identity.streak_weekly',
+        'identity.streak_yearly',
+        'input.category_rank',
+        'input.category_score',
+        'input.goal_days',
+        'input.user_id',
+        'input.verified_days',
+      ])
+      .where('input.draw_id', '=', drawId)
+      .where('input.competition_id', '=', competitionId)
+      .orderBy('input.goal_days')
+      .orderBy('input.category_rank')
+      .orderBy('input.snapshot_position')
+      .execute();
+    const goals = [
+      ...new Set(settlementInputs.map(({ goal_days: goalDays }) => goalDays)),
+    ].sort((left, right) => left - right);
 
-    return brackets.map(({ goal_days: goal }) => ({
+    return goals.map((goal) => ({
       competitionId,
       goal,
       rows: settlementInputs
         .filter((row) => row.goal_days === goal)
         .map((row) => ({
-          alias:
-            row.public_identity_mode === 'private'
-              ? row.callsign
-              : (row.public_name ?? row.callsign),
+          alias: row.alias,
           categoryEntries: row.category_score,
           isCurrentUser: row.user_id === currentUserId,
           rank: row.category_rank,
-          streaks: streaksByUser.get(row.user_id) ?? {
-            daily: 0,
-            monthly: 0,
-            projectionVersion: 'streaks-v1',
-            weekly: 0,
-            yearly: 0,
+          streaks: {
+            daily: row.streak_daily,
+            monthly: row.streak_monthly,
+            projectionVersion: row.streak_projection_version,
+            weekly: row.streak_weekly,
+            yearly: row.streak_yearly,
           },
           verifiedDays: row.verified_days,
         })),
@@ -199,47 +198,53 @@ export class ResultsService {
   ): Promise<RewardWinnerResponseDto[]> {
     const winners = await transaction
       .selectFrom('reward_awards as award')
-      .innerJoin('profiles as profile', 'profile.user_id', 'award.user_id')
-      .innerJoin(
-        'reward_catalog_items as reward',
-        'reward.id',
-        'award.reward_catalog_item_id',
+      .innerJoin('draw_reward_slots as slot', (join) =>
+        join
+          .onRef('slot.draw_id', '=', 'award.draw_id')
+          .onRef('slot.slot_position', '=', 'award.award_rank'),
+      )
+      .innerJoin('draw_reward_catalog_snapshots as reward', (join) =>
+        join
+          .onRef('reward.draw_id', '=', 'slot.draw_id')
+          .onRef(
+            'reward.reward_catalog_item_id',
+            '=',
+            'slot.reward_catalog_item_id',
+          ),
+      )
+      .innerJoin('draw_public_identities as identity', (join) =>
+        join
+          .onRef('identity.draw_id', '=', 'award.draw_id')
+          .onRef('identity.user_id', '=', 'award.user_id'),
       )
       .select([
-        'profile.callsign',
-        'profile.public_identity_mode',
-        'profile.public_name',
-        'award.user_id',
+        'identity.alias',
+        'identity.streak_daily',
+        'identity.streak_monthly',
+        'identity.streak_projection_version',
+        'identity.streak_weekly',
+        'identity.streak_yearly',
         'award.award_rank',
         'reward.reward_type',
         'reward.sponsor_name',
         'reward.title',
       ])
       .where('award.draw_id', '=', drawId)
-      .where('award.status', '!=', 'cancelled')
       .orderBy('award.award_rank')
-      .limit(100)
       .execute();
-    const streaksByUser = await loadPublicStreaks(
-      transaction,
-      winners.map((winner) => winner.user_id),
-    );
 
     return winners.map((winner) => ({
-      alias:
-        winner.public_identity_mode === 'private'
-          ? winner.callsign
-          : (winner.public_name ?? winner.callsign),
+      alias: winner.alias,
       awardRank: winner.award_rank,
       rewardTitle: winner.title,
       rewardType: winner.reward_type,
       sponsorName: winner.sponsor_name,
-      streaks: streaksByUser.get(winner.user_id) ?? {
-        daily: 0,
-        monthly: 0,
-        projectionVersion: 'streaks-v1',
-        weekly: 0,
-        yearly: 0,
+      streaks: {
+        daily: winner.streak_daily,
+        monthly: winner.streak_monthly,
+        projectionVersion: winner.streak_projection_version,
+        weekly: winner.streak_weekly,
+        yearly: winner.streak_yearly,
       },
     }));
   }
@@ -261,12 +266,12 @@ export class ResultsService {
           SELECT COUNT(*)
           FROM reward_awards AS award
           WHERE award.draw_id = draw.id
-            AND award.status <> 'cancelled'
         )`.as('reward_count'),
       ])
       .where('draw.status', '=', 'settled')
       .where('competition.status', '=', 'settled')
       .orderBy('draw.settled_at', 'desc')
+      .orderBy('draw.id', 'asc')
       .executeTakeFirst();
   }
 }

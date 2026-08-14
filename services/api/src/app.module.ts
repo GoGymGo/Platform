@@ -75,6 +75,7 @@ import { TelemetryLifecycleService } from './observability/telemetry-lifecycle.s
                 'req.body.latitude',
                 'req.body.longitude',
                 'req.body.reason',
+                'req.body.seedReveal',
                 'res.headers["set-cookie"]',
               ],
               censor: '[REDACTED]',

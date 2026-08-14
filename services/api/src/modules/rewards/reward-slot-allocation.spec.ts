@@ -1,22 +1,47 @@
 import { allocateRewardSlots } from './rewards.service';
 
+function catalogItem(
+  rewardCatalogItemId: string,
+  inventoryTotal: number,
+  awardedCount: number,
+) {
+  return {
+    awardedCount,
+    availableFrom: new Date('2026-07-01T00:00:00.000Z'),
+    availableUntil: new Date('2026-08-31T23:59:59.000Z'),
+    catalogVersion: 3,
+    displayOrder: 1,
+    inventoryTotal,
+    rewardCatalogItemId,
+    rewardType: 'coupon' as const,
+    sponsorName: 'Test sponsor',
+    title: 'Test reward',
+  };
+}
+
+function expectedSlot(rewardCatalogItemId: string, inventoryTotal: number) {
+  const item = catalogItem(rewardCatalogItemId, inventoryTotal, 0);
+  return {
+    availableFrom: item.availableFrom,
+    availableUntil: item.availableUntil,
+    catalogVersion: item.catalogVersion,
+    displayOrder: item.displayOrder,
+    inventoryTotal: item.inventoryTotal,
+    rewardCatalogItemId: item.rewardCatalogItemId,
+    rewardType: item.rewardType,
+    sponsorName: item.sponsorName,
+    title: item.title,
+  };
+}
+
 describe('reward slot allocation', () => {
   it('materializes only as many slots as the draw can award', () => {
     expect(
-      allocateRewardSlots(
-        [
-          {
-            awardedCount: 0,
-            inventoryTotal: 100_000,
-            rewardCatalogItemId: 'reward-1',
-          },
-        ],
-        3,
-      ),
+      allocateRewardSlots([catalogItem('reward-1', 100_000, 0)], 3),
     ).toEqual([
-      { rewardCatalogItemId: 'reward-1' },
-      { rewardCatalogItemId: 'reward-1' },
-      { rewardCatalogItemId: 'reward-1' },
+      expectedSlot('reward-1', 100_000),
+      expectedSlot('reward-1', 100_000),
+      expectedSlot('reward-1', 100_000),
     ]);
   });
 
@@ -24,28 +49,16 @@ describe('reward slot allocation', () => {
     expect(
       allocateRewardSlots(
         [
-          {
-            awardedCount: 2,
-            inventoryTotal: 2,
-            rewardCatalogItemId: 'exhausted',
-          },
-          {
-            awardedCount: 1,
-            inventoryTotal: 3,
-            rewardCatalogItemId: 'reward-2',
-          },
-          {
-            awardedCount: 0,
-            inventoryTotal: 2,
-            rewardCatalogItemId: 'reward-3',
-          },
+          catalogItem('exhausted', 2, 2),
+          catalogItem('reward-2', 3, 1),
+          catalogItem('reward-3', 2, 0),
         ],
         3,
       ),
     ).toEqual([
-      { rewardCatalogItemId: 'reward-2' },
-      { rewardCatalogItemId: 'reward-2' },
-      { rewardCatalogItemId: 'reward-3' },
+      expectedSlot('reward-2', 3),
+      expectedSlot('reward-2', 3),
+      expectedSlot('reward-3', 2),
     ]);
   });
 });

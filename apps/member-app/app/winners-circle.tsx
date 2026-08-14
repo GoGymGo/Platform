@@ -36,6 +36,7 @@ export default function WinnersCircleScreen() {
     data: participantResults,
     isError: resultsUnavailable,
     isPending: resultsPending,
+    isRefetching: resultsRefreshing,
     refetch: refetchResults
   } = useMyLatestCompetitionResults();
   const categoryLeaderboards = participantResults?.categoryLeaderboards ?? [];
@@ -94,7 +95,8 @@ export default function WinnersCircleScreen() {
               Check your connection and try loading the Winners Circle again.
             </TerminalText>
             <CyberButtonPrimary
-              label="TRY AGAIN"
+              disabled={resultsRefreshing}
+              label={resultsRefreshing ? 'RETRYING...' : 'TRY AGAIN'}
               onPress={() => void refetchResults()}
               tone="red"
             />
@@ -221,6 +223,11 @@ export default function WinnersCircleScreen() {
               </View>
 
               <HUDBorderBox style={styles.resultsPanel} tone="cyan">
+                {visibleCategoryChampions.length === 0 ? (
+                  <TerminalText style={styles.rewardFooter} tone="muted" uppercase={false} variant="body">
+                    No category champions were published for this Contest.
+                  </TerminalText>
+                ) : null}
                 {visibleCategoryChampions.map(({ goal, winner }, index) => (
                   <View
                     key={goal}
@@ -257,11 +264,13 @@ export default function WinnersCircleScreen() {
                     </View>
                   </View>
                 ))}
-                <CompactTextButton
-                  label={showAllCategories ? 'SHOW MY GOAL GROUP' : 'VIEW ALL 7 GOAL GROUPS'}
-                  onPress={() => setShowAllCategories((current) => !current)}
-                  tone={showAllCategories ? 'muted' : 'cyan'}
-                />
+                {categoryChampions.length > 1 ? (
+                  <CompactTextButton
+                    label={showAllCategories ? 'SHOW MY GOAL GROUP' : 'VIEW ALL GOAL GROUPS'}
+                    onPress={() => setShowAllCategories((current) => !current)}
+                    tone={showAllCategories ? 'muted' : 'cyan'}
+                  />
+                ) : null}
               </HUDBorderBox>
             </>
           ) : (
@@ -276,6 +285,11 @@ export default function WinnersCircleScreen() {
               </View>
 
               <HUDBorderBox style={styles.resultsPanel} tone="pink">
+                {rewardWinners.length === 0 ? (
+                  <TerminalText style={styles.rewardFooter} tone="muted" uppercase={false} variant="body">
+                    No reward winners were published for this Contest.
+                  </TerminalText>
+                ) : null}
                 {rewardWinners.map((winner, index) => (
                   <View
                     key={`${winner.awardRank}:${winner.alias}`}
@@ -316,10 +330,11 @@ export default function WinnersCircleScreen() {
                     </View>
                   </View>
                 ))}
-                <TerminalText style={styles.rewardFooter} tone="dim" uppercase={false} variant="caption">
-                  Showing {rewardWinners.length} of{' '}
-                  {participantResults.rewardCount.toLocaleString()} reward winners.
-                </TerminalText>
+                {rewardWinners.length > 0 ? (
+                  <TerminalText style={styles.rewardFooter} tone="dim" uppercase={false} variant="caption">
+                    Showing every published reward winner ({participantResults.rewardCount.toLocaleString()}).
+                  </TerminalText>
+                ) : null}
               </HUDBorderBox>
             </>
           )}

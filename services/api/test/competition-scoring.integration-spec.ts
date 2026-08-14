@@ -1,6 +1,7 @@
 import { DatabaseService } from '../src/database/database.service';
 import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
+import { buildSeedCommitment } from '../src/modules/draws/draw-algorithm';
 import { DrawsService } from '../src/modules/draws/draws.service';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LeaderboardsService } from '../src/modules/leaderboards/leaderboards.service';
@@ -83,6 +84,25 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
          (competition_id, goal_days, label)
        VALUES ($1, 3, 'Three days')`,
       [competitionId],
+    );
+    const drawReward = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO reward_catalog_items
+         (competition_id, sponsor_name, title, description, reward_type,
+          status, inventory_total, display_order, version, image_url, terms_url,
+          fulfillment_instructions)
+       VALUES ($1, 'Scoring sponsor', 'Scoring reward',
+               'Draw snapshot integration reward', 'physical', 'draft',
+               1, 1, 1, 'https://cdn.example.com/scoring-reward.jpg',
+               'https://example.com/scoring-reward-terms',
+               'Collect the reward from the Contest operator.')
+       RETURNING id`,
+      [competitionId],
+    );
+    await migrated.pool.query(
+      `UPDATE reward_catalog_items
+       SET status = 'published', version = version + 1
+       WHERE id = $1`,
+      [drawReward.rows[0].id],
     );
 
     const users = await migrated.pool.query<{ id: string }>(
@@ -547,27 +567,69 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
        WHERE competition_id = $1 AND status = 'pending_review'`,
       [competitionId],
     );
+    const enqueueNotification = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('simulated notification failure'))
+      .mockResolvedValue(undefined);
     const draws = new DrawsService(
-      database,
-      {} as NotificationsService,
-      {} as RewardsService,
+      { enqueue: enqueueNotification } as unknown as NotificationsService,
+      {
+        listAvailableAwardSlots: jest.fn().mockResolvedValue([
+          {
+            availableFrom: new Date('2026-07-01T00:00:00.000Z'),
+            availableUntil: new Date('2026-08-31T23:59:59.000Z'),
+            catalogVersion: 2,
+            displayOrder: 1,
+            inventoryTotal: 1,
+            rewardCatalogItemId: drawReward.rows[0].id,
+            rewardType: 'physical',
+            sponsorName: 'Integration sponsor',
+            title: 'Integration reward',
+          },
+        ]),
+      } as unknown as RewardsService,
       scoring,
     );
+    const seedReveal = '9'.repeat(64);
     const lockInput = {
       competitionId,
       operatorUserId: userAId,
       reason: 'Integration settlement-input verification',
       requestId: 'scoring-integration-lock',
-      seedCommitment: 'a'.repeat(64),
+      seedCommitment: buildSeedCommitment(seedReveal),
     };
-    const lockedDraw = await draws.lock(lockInput);
+    const lock = () =>
+      database.connection
+        .transaction()
+        .execute((transaction) =>
+          draws.lock(
+            transaction,
+            lockInput,
+            new Date('2026-08-01T00:15:00.000Z'),
+          ),
+        );
+    const [lockedDraw, concurrentLockReplay] = await Promise.all([
+      lock(),
+      lock(),
+    ]);
     expect(lockedDraw).toMatchObject({
       entrantCount: 2,
       entrantSnapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       scoringSnapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       totalEntries: '1262',
     });
-    await expect(draws.lock(lockInput)).resolves.toEqual(lockedDraw);
+    expect(concurrentLockReplay).toEqual(lockedDraw);
+    await expect(
+      database.connection.transaction().execute((transaction) =>
+        draws.lock(transaction, {
+          ...lockInput,
+          requestId: 'scoring-integration-mismatched-lock',
+          seedCommitment: 'b'.repeat(64),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'DRAW_ALREADY_LOCKED' },
+    });
 
     const storedSnapshot = await migrated.pool.query<{
       draw_id: string;
@@ -606,5 +668,123 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
         user_id: input.userId,
       })),
     );
+    const snapshotCounts = await migrated.pool.query<{
+      identities: string;
+      reward_catalogs: string;
+      reward_slots: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM draw_public_identities WHERE draw_id = $1) AS identities,
+         (SELECT count(*)::text FROM draw_reward_catalog_snapshots WHERE draw_id = $1) AS reward_catalogs,
+         (SELECT count(*)::text FROM draw_reward_slots WHERE draw_id = $1) AS reward_slots`,
+      [lockedDraw.drawId],
+    );
+    expect(snapshotCounts.rows[0]).toEqual({
+      identities: '2',
+      reward_catalogs: '1',
+      reward_slots: '1',
+    });
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO draw_entries
+           (draw_id, user_id, enrollment_id, entry_count, snapshot_position,
+            created_at)
+         SELECT draw_id, user_id, enrollment_id, entry_count,
+                snapshot_position + 10, current_timestamp
+         FROM draw_entries
+         WHERE draw_id = $1
+         LIMIT 1`,
+        [lockedDraw.drawId],
+      ),
+    ).rejects.toThrow(/snapshots are finalized and immutable/i);
+
+    const settleDraw = (reveal = seedReveal) =>
+      database.connection.transaction().execute((transaction) =>
+        draws.settle(transaction, {
+          drawId: lockedDraw.drawId,
+          operatorUserId: userAId,
+          reason: 'Integration deterministic settlement verification',
+          requestId: 'scoring-integration-settle',
+          seedReveal: reveal,
+        }),
+      );
+    await expect(settleDraw()).rejects.toThrow(
+      'simulated notification failure',
+    );
+    const rolledBack = await migrated.pool.query<{
+      awards: string;
+      competition_status: string;
+      draw_status: string;
+      settle_audits: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM reward_awards WHERE draw_id = $1) AS awards,
+         (SELECT status::text FROM competitions WHERE id = $2) AS competition_status,
+         (SELECT status::text FROM competition_draws WHERE id = $1) AS draw_status,
+         (SELECT count(*)::text FROM operator_audit_events
+          WHERE entity_type = 'competition_draws' AND entity_id = $1
+            AND action = 'draw.settled') AS settle_audits`,
+      [lockedDraw.drawId, competitionId],
+    );
+    expect(rolledBack.rows[0]).toEqual({
+      awards: '0',
+      competition_status: 'settling',
+      draw_status: 'locked',
+      settle_audits: '0',
+    });
+
+    const [settled, concurrentSettleReplay] = await Promise.all([
+      settleDraw(),
+      settleDraw(),
+    ]);
+    expect(settled).toEqual({ drawId: lockedDraw.drawId, winnerCount: 1 });
+    expect(concurrentSettleReplay).toEqual(settled);
+    expect(enqueueNotification).toHaveBeenCalledTimes(2);
+    await expect(settleDraw('8'.repeat(64))).rejects.toMatchObject({
+      response: { code: 'DRAW_ALREADY_SETTLED' },
+    });
+
+    const finalState = await migrated.pool.query<{
+      awards: string;
+      competition_status: string;
+      draw_status: string;
+      lock_audits: string;
+      settle_audits: string;
+      unique_award_ranks: string;
+      unique_winners: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM reward_awards WHERE draw_id = $1) AS awards,
+         (SELECT count(DISTINCT award_rank)::text FROM reward_awards
+          WHERE draw_id = $1) AS unique_award_ranks,
+         (SELECT count(DISTINCT user_id)::text FROM reward_awards
+          WHERE draw_id = $1) AS unique_winners,
+         (SELECT status::text FROM competitions WHERE id = $2) AS competition_status,
+         (SELECT status::text FROM competition_draws WHERE id = $1) AS draw_status,
+         (SELECT count(*)::text FROM operator_audit_events
+          WHERE entity_type = 'competition_draws' AND entity_id = $1
+            AND action = 'draw.locked') AS lock_audits,
+         (SELECT count(*)::text FROM operator_audit_events
+          WHERE entity_type = 'competition_draws' AND entity_id = $1
+            AND action = 'draw.settled') AS settle_audits`,
+      [lockedDraw.drawId, competitionId],
+    );
+    expect(finalState.rows[0]).toEqual({
+      awards: '1',
+      competition_status: 'settled',
+      draw_status: 'settled',
+      lock_audits: '1',
+      settle_audits: '1',
+      unique_award_ranks: '1',
+      unique_winners: '1',
+    });
+    await expect(
+      migrated.pool.query(
+        `UPDATE competition_draws
+         SET seed_reveal = $2
+         WHERE id = $1`,
+        [lockedDraw.drawId, '7'.repeat(64)],
+      ),
+    ).rejects.toThrow(/settled draw history is immutable/i);
   });
 });

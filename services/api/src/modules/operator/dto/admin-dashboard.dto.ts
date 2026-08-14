@@ -63,6 +63,44 @@ export class AdminDashboardGoalBracketDto {
   label!: string;
 }
 
+export class AdminDashboardDrawDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
+  @ApiProperty({ enum: ['locked', 'settled'], type: String })
+  status!: 'locked' | 'settled';
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  seedCommitment!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  lockedAt!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  settledAt!: string | null;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  entrantCount!: number;
+
+  @ApiProperty({ pattern: '^[1-9][0-9]*$', type: String })
+  totalEntries!: string;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  entrantSnapshotHash!: string;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  scoringSnapshotHash!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  rewardSlotCount!: number;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  rewardSnapshotHash!: string;
+
+  @ApiProperty({ maxLength: 64, minLength: 64, type: String })
+  publicResultSnapshotHash!: string;
+}
+
 export class AdminDashboardCompetitionDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -126,6 +164,9 @@ export class AdminDashboardCompetitionDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   endsAt!: string;
+
+  @ApiProperty({ nullable: true, type: AdminDashboardDrawDto })
+  draw!: AdminDashboardDrawDto | null;
 }
 
 export class AdminDashboardRewardDto {

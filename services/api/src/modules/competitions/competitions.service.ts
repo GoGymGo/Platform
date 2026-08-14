@@ -86,6 +86,7 @@ interface WeeklyChallengeRequestJson extends JsonObject {
 interface StreakCountsJson extends JsonObject {
   daily: number;
   monthly: number;
+  projectionVersion: 'streaks-v1';
   weekly: number;
   yearly: number;
 }
@@ -1666,7 +1667,13 @@ function publicAlias(profile: {
 }
 
 function emptyStreaks(): StreakCountsJson {
-  return { daily: 0, monthly: 0, weekly: 0, yearly: 0 };
+  return {
+    daily: 0,
+    monthly: 0,
+    projectionVersion: 'streaks-v1',
+    weekly: 0,
+    yearly: 0,
+  };
 }
 
 function toStreaksJson(streaks?: StreakCounts): StreakCountsJson {
@@ -1674,6 +1681,7 @@ function toStreaksJson(streaks?: StreakCounts): StreakCountsJson {
     ? {
         daily: streaks.daily,
         monthly: streaks.monthly,
+        projectionVersion: streaks.projectionVersion,
         weekly: streaks.weekly,
         yearly: streaks.yearly,
       }

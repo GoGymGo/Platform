@@ -5575,9 +5575,20 @@
           "daily": { "type": "number", "example": 3, "minimum": 0 },
           "weekly": { "type": "number", "example": 4, "minimum": 0 },
           "monthly": { "type": "number", "example": 2, "minimum": 0 },
+          "projectionVersion": {
+            "type": "string",
+            "enum": ["streaks-v1"],
+            "example": "streaks-v1"
+          },
           "yearly": { "type": "number", "example": 1, "minimum": 0 }
         },
-        "required": ["daily", "weekly", "monthly", "yearly"]
+        "required": [
+          "daily",
+          "weekly",
+          "monthly",
+          "projectionVersion",
+          "yearly"
+        ]
       },
       "CompetitionMatchResponseDto": {
         "type": "object",

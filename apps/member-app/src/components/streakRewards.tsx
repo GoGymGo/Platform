@@ -9,16 +9,19 @@ import {
   type ViewStyle
 } from 'react-native';
 
-import { HUDBorderBox, TerminalText } from '@/components/cyber';
+import { CyberButtonOutline, HUDBorderBox, TerminalText } from '@/components/cyber';
 import { colors, cyberGlow, fontFamilies, radii, spacing } from '@/constants/theme';
-import { getVisibleStreakUnits } from '@/domain/streakBadges';
-import { emptyStreakCounts, type StreakCounts, type StreakSummary } from '@/domain/streaks';
+import { getVisibleStreakUnits, type StreakBadgeKey } from '@/domain/streakBadges';
+import type { StreakCounts, StreakSummary } from '@/domain/streaks';
 
-type StreakKey = keyof StreakCounts;
+type StreakKey = StreakBadgeKey;
 type StreakTone = 'amber' | 'cyan' | 'green' | 'pink';
 
 type StreakRewardsProps = {
+  isError?: boolean;
   isLoading?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
   style?: StyleProp<ViewStyle>;
   summary?: StreakSummary | null;
 };
@@ -106,9 +109,15 @@ function formatTimeZoneLabel(timeZone: string) {
   }
 }
 
-export function StreakRewards({ isLoading = false, style, summary }: StreakRewardsProps) {
-  const streaks = summary?.streaks ?? emptyStreakCounts;
-  const visibleBadges = getVisibleStreakBadges(streaks);
+export function StreakRewards({
+  isError = false,
+  isLoading = false,
+  onRetry,
+  retrying = false,
+  style,
+  summary
+}: StreakRewardsProps) {
+  const visibleBadges = summary ? getVisibleStreakBadges(summary.streaks) : [];
   const hasActiveStreak = visibleBadges.length > 0;
 
   return (
@@ -124,26 +133,56 @@ export function StreakRewards({ isLoading = false, style, summary }: StreakRewar
         </View>
         <View style={styles.statusPill}>
           <TerminalText glow={hasActiveStreak} tone={hasActiveStreak ? 'green' : 'dim'} variant="micro">
-            {isLoading ? 'SYNCING' : hasActiveStreak ? 'ACTIVE' : 'LOCKED'}
+            {isLoading
+              ? 'SYNCING'
+              : isError || !summary
+                ? 'UNAVAILABLE'
+                : hasActiveStreak
+                  ? 'ACTIVE'
+                  : 'LOCKED'}
           </TerminalText>
         </View>
       </View>
 
-      <View style={styles.badgeGrid}>
-        {(visibleBadges.length > 0
+      {isError ? (
+        <View style={styles.syncState}>
+          <TerminalText live="assertive" tone="red" uppercase={false} variant="body">
+            Your verified streak could not be loaded. No saved or estimated streak is being shown.
+          </TerminalText>
+          {onRetry ? (
+            <CyberButtonOutline
+              disabled={retrying}
+              label={retrying ? 'RETRYING...' : 'RETRY STREAK SYNC'}
+              onPress={onRetry}
+              tone="red"
+            />
+          ) : null}
+        </View>
+      ) : isLoading ? (
+        <TerminalText live="polite" style={styles.syncState} tone="muted" uppercase={false} variant="body">
+          Syncing authoritative verified workout dates...
+        </TerminalText>
+      ) : summary ? (
+        <View style={styles.badgeGrid}>
+          {(visibleBadges.length > 0
           ? visibleBadges
           : [{ badge: badges[0], count: 0 }]
         ).map(({ badge, count }) => (
           <StreakBadge badge={badge} count={count} key={badge.key} />
         ))}
-      </View>
+        </View>
+      ) : (
+        <TerminalText style={styles.syncState} tone="muted" uppercase={false} variant="body">
+          Streak status is unavailable until the server sync completes.
+        </TerminalText>
+      )}
 
       <TerminalText live={isLoading ? 'polite' : undefined} style={styles.asOf} tone="dim" uppercase={false} variant="caption">
         {isLoading
           ? 'Syncing your verified gym logs...'
           : summary
             ? `As of ${formatAsOfDate(summary.asOfDate)} · ${formatTimeZoneLabel(summary.timezone)}`
-            : 'Streaks unlock after your first verified gym log.'}
+            : 'Only an authoritative server response can unlock streak badges.'}
       </TerminalText>
     </HUDBorderBox>
   );
@@ -345,6 +384,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md
+  },
+  syncState: {
+    gap: spacing.sm
   },
   badgeCard: {
     flexGrow: 1,

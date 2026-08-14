@@ -1,6 +1,6 @@
 import type { StreakCounts } from '@/domain/streaks';
 
-export type StreakBadgeKey = keyof StreakCounts;
+export type StreakBadgeKey = Exclude<keyof StreakCounts, 'projectionVersion'>;
 
 const durationUnits: readonly { days: number; key: StreakBadgeKey }[] = [
   { days: 365, key: 'yearly' },

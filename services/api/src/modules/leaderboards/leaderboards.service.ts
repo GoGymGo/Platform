@@ -207,6 +207,7 @@ export class LeaderboardsService {
               streaks: publicStreaks.get(standing.userId) ?? {
                 daily: 0,
                 monthly: 0,
+                projectionVersion: 'streaks-v1',
                 weekly: 0,
                 yearly: 0,
               },

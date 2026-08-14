@@ -53,10 +53,16 @@ to Git, Expo variables, Terraform state, container images, or logs.
 5. Execute the migration task with the new digest and wait for success.
 6. Update the worker service with the same digest.
 7. Deploy the API with ECS circuit-breaker rollback and ALB health checks.
-8. Verify `/v1/health`, `/v1/health/ready`, reward catalog reads, coupon secrecy,
-   operator authorization, and a staging claim.
-9. Complete the rolling replacement while monitoring API failures, worker heartbeat,
-   database saturation, reward-claim failures, notifications, and privacy work.
+8. Verify `/v1/health`, `/v1/health/ready`, one authenticated
+   `/v1/streaks/me` read, one permitted and one `showStats = false` shared Alias
+   projection, reward catalog reads, coupon secrecy, operator authorization, and
+   a staging claim. Confirm the streak response is `streaks-v1`, uses the expected
+   region timezone, and exposes no workout/contact/location fields.
+9. Complete the rolling replacement while monitoring API failures, streak/list
+   request latency, worker heartbeat, database saturation, reward-claim failures,
+   notifications, and privacy work. A shared Alias list must remain bounded to
+   100 streak subjects per database aggregation; investigate slow-query evidence
+   rather than adding per-row reads or client caches.
 
 ## Staging pilot configuration
 

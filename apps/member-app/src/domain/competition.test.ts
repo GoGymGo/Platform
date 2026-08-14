@@ -402,6 +402,13 @@ function createSoloPeriods(): readonly CompetitionMatch[] {
   return ([1, 2, 3, 4] as const).map((periodIndex) => ({
     availability: 'solo',
     opponentAlias: 'SOLO MODE',
+    opponentStreaks: {
+      daily: 0,
+      monthly: 0,
+      projectionVersion: 'streaks-v1',
+      weekly: 0,
+      yearly: 0
+    },
     opponentVerifiedDateKeys: [],
     periodIndex,
     region: 'TORONTO'
@@ -415,6 +422,13 @@ function createMatch(
   return {
     availability: 'matched',
     opponentAlias: 'TEST_MATCH',
+    opponentStreaks: {
+      daily: opponentCompleted,
+      monthly: opponentCompleted > 0 ? 1 : 0,
+      projectionVersion: 'streaks-v1',
+      weekly: opponentCompleted > 0 ? 1 : 0,
+      yearly: opponentCompleted > 0 ? 1 : 0
+    },
     opponentVerifiedDateKeys: periodDates(periodIndex, opponentCompleted),
     periodIndex,
     region: 'TORONTO'

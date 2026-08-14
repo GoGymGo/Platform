@@ -13,6 +13,7 @@ import { SessionUnavailable } from '@/components/session';
 import { WorkoutFlowProgress } from '@/components/workoutFlowProgress';
 import { colors, cyberGlow, fontFamilies, spacing, fontSizes } from '@/constants/theme';
 import { isCompetitionBonusDay } from '@/domain/competition';
+import { useMyStreaks } from '@/data/appDataHooks';
 import {
   type CompleteWorkoutResult,
   useWorkoutProgress
@@ -30,7 +31,6 @@ export default function WorkoutCompleteScreen() {
     activeSession,
     completeActiveWorkout,
     competition,
-    currentStreak,
     currentWeekIndex,
     currentWeekVerified,
     projectedEntries,
@@ -38,6 +38,7 @@ export default function WorkoutCompleteScreen() {
     totalEntries,
     weeklyGoal
   } = useWorkoutProgress();
+  const streaksQuery = useMyStreaks();
   const didCompleteSession = useRef(false);
   const [hadActiveSession] = useState(() => activeSession !== null);
   const [completedDateKey] = useState(() => activeSession?.dateKey ?? null);
@@ -226,7 +227,9 @@ export default function WorkoutCompleteScreen() {
         <View style={styles.statsRow}>
           <HUDBorderBox style={styles.statCard} tone="cyan">
             <TerminalText style={styles.statValue} tone="cyan" variant="body">
-              {currentStreak}
+              {streaksQuery.isPending || streaksQuery.isError
+                ? '—'
+                : String(streaksQuery.data?.streaks.daily ?? '—')}
             </TerminalText>
             <TerminalText style={styles.statLabel} tone="muted" variant="micro">
               PERSONAL STREAK

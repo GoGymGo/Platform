@@ -10,6 +10,9 @@ export class StreakCountsDto {
   @ApiProperty({ example: 2, minimum: 0, type: Number })
   monthly!: number;
 
+  @ApiProperty({ enum: ['streaks-v1'], example: 'streaks-v1' })
+  projectionVersion!: 'streaks-v1';
+
   @ApiProperty({ example: 1, minimum: 0, type: Number })
   yearly!: number;
 }

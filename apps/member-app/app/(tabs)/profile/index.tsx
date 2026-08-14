@@ -13,7 +13,7 @@ import {
 } from '@/components/cyber';
 import { CompactTextButton } from '@/components/onboarding';
 import { ProfileAvatar } from '@/components/profileAvatar';
-import { UserAlias } from '@/components/streakRewards';
+import { StreakRewards, UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useMyStreaks } from '@/data/appDataHooks';
 import {
@@ -95,13 +95,13 @@ export default function ProfileScreen() {
     Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
   const { signOutUser, user } = useAuth();
   const { publicName } = useProfile();
-  const { data: streakSummary } = useMyStreaks();
+  const streaksQuery = useMyStreaks();
+  const streakSummary = streaksQuery.data ?? null;
   const currentEnrollment = useCurrentEnrollment();
   const withdrawFromCompetition = useWithdrawFromCompetition();
   const { competitionRegion, regionVerification } = useCompetitionRegion();
   const publicInitials = getPublicInitials(publicName);
   const {
-    currentStreak,
     remindersEnabled,
     setCompetitionRemindersEnabled,
     totalEntries,
@@ -127,7 +127,14 @@ export default function ProfileScreen() {
     profileImageUri
   } = useProfileImagePicker();
   const profileStats: readonly ProfileStat[] = [
-    { value: String(currentStreak), label: 'PERSONAL STREAK', accent: 'cyan' },
+    {
+      value:
+        streaksQuery.isPending || streaksQuery.isError
+          ? '—'
+          : String(streakSummary?.streaks.daily ?? '—'),
+      label: 'PERSONAL STREAK',
+      accent: 'cyan'
+    },
     { value: String(verifiedSessionCount), label: 'VERIFIED', accent: 'green' },
     {
       value: String(totalEntries),
@@ -321,6 +328,14 @@ export default function ProfileScreen() {
             </HUDBorderBox>
           ))}
         </View>
+
+        <StreakRewards
+          isError={streaksQuery.isError}
+          isLoading={streaksQuery.isPending}
+          onRetry={() => void streaksQuery.refetch()}
+          retrying={streaksQuery.isFetching}
+          summary={streakSummary}
+        />
 
         <CyberButtonOutline
           label="FRIENDS + INVITES ->"

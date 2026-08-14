@@ -32,6 +32,14 @@ rewards.
 | User ID | Firebase UID, internal account ID, screen name, and callsign |
 | Device ID | Push-notification token linked to the signed-in account |
 
+Public streak payloads contain only four nonnegative calendar counts and the
+`streaks-v1` projection version. They contain no account identifier, contact,
+region, location, or workout detail. The owning ranking/social/results response
+supplies the permitted public Alias. When `privacySettings.showStats = false`,
+actual streak counts are suppressed and required list shapes receive a canonical
+all-zero projection that renders no badges; the authenticated member can still
+read their own summary.
+
 ## Precise location handling
 
 The app sends a foreground coordinate pair only when the player explicitly taps

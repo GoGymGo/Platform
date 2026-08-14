@@ -18,7 +18,11 @@ describe('app data boundary', () => {
       []
     );
     assert.equal(
-      await unavailable.getCompetitionEnrollmentCount('toronto-on', '2026-08'),
+      await unavailable.getCompetitionEnrollmentCount(
+        '40000000-0000-4000-8000-000000000001',
+        'toronto-on',
+        '2026-08'
+      ),
       null
     );
     assert.equal(await unavailable.getMyStreaks(), null);
@@ -98,6 +102,35 @@ describe('app data boundary', () => {
       '/v1/competitions/2026-08/matches?goal=1&region=vancouver-bc' +
         '&competitionId=40000000-0000-4000-8000-000000000001'
     );
+  });
+
+  it('pins the public entrant count to one exact competition', async () => {
+    let requestedPath = '';
+    let authenticated: boolean | undefined;
+    const api: ApiClient = {
+      request: <TResponse, TBody = never>(
+        path: string,
+        options?: ApiRequestOptions<TBody>
+      ) => {
+        requestedPath = path;
+        authenticated = options?.authenticated;
+        return Promise.resolve({ count: 17 }) as Promise<TResponse>;
+      }
+    };
+
+    const count = await createAppDataSource('api', api).getCompetitionEnrollmentCount(
+      '40000000-0000-4000-8000-000000000001',
+      'vancouver-bc',
+      '2026-08'
+    );
+
+    assert.equal(count, 17);
+    assert.equal(
+      requestedPath,
+      '/v1/competitions/2026-08/enrollment-count' +
+        '?competitionId=40000000-0000-4000-8000-000000000001&region=vancouver-bc'
+    );
+    assert.equal(authenticated, false);
   });
 
   it('loads participant results from the authenticated API boundary', async () => {

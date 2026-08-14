@@ -3,6 +3,7 @@ import { IdempotencyService } from '../src/common/idempotency/idempotency.servic
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import type { NotificationsService } from '../src/modules/notifications/notifications.service';
+import type { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { AdminAuthorizationService } from '../src/modules/operator/admin-authorization.service';
 import { AdminCompetitionConfigurationService } from '../src/modules/operator/admin-competition-configuration.service';
 import {
@@ -66,6 +67,7 @@ describeWithDatabase('gym partner operator portal', () => {
     competitionConfiguration = new AdminCompetitionConfigurationService(
       authorization,
       idempotency,
+      {} as LegalDocumentsService,
       {} as NotificationsService,
     );
     portal = new OperatorPortalService(database, authorization);

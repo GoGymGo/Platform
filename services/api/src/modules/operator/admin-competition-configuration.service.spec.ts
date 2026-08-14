@@ -2,6 +2,7 @@ import type { Transaction } from 'kysely';
 import type { Database, JsonValue } from '../../database/database.types';
 import type { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { NotificationsService } from '../notifications/notifications.service';
+import type { LegalDocumentsService } from '../legal/legal-documents.service';
 import type { AdminAuthorizationService } from './admin-authorization.service';
 import { AdminCompetitionConfigurationService } from './admin-competition-configuration.service';
 
@@ -11,7 +12,7 @@ const rules: JsonValue = {
   minSessionMinutes: 30,
   perfectMonthMultiplier: 10,
   requireDeviceAttestation: false,
-  requireGymQr: false,
+  requireGymQr: true,
   requirePresenceCheck: false,
   signupPrizeDrawEntries: 1,
   verifiedSessionCategoryScore: 1,
@@ -25,6 +26,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
       {} as IdempotencyService,
+      {} as LegalDocumentsService,
       {} as NotificationsService,
     );
     const cancellable = service as unknown as {
@@ -43,6 +45,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
       {} as IdempotencyService,
+      {} as LegalDocumentsService,
       {} as NotificationsService,
     );
     const draftValidator = service as unknown as {
@@ -78,6 +81,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
       {} as IdempotencyService,
+      {} as LegalDocumentsService,
       {} as NotificationsService,
     );
     const slotCheck = service as unknown as {
@@ -115,9 +119,11 @@ describe('AdminCompetitionConfigurationService publication', () => {
               : result,
           ),
         ),
+        innerJoin: jest.fn(),
         select: jest.fn(),
         where: jest.fn(),
       };
+      builder.innerJoin.mockReturnValue(builder);
       builder.select.mockReturnValue(builder);
       builder.where.mockImplementation((condition: unknown) => {
         if (typeof condition === 'function') {
@@ -133,6 +139,8 @@ describe('AdminCompetitionConfigurationService publication', () => {
         if (table === 'region_policies') {
           return query({
             competition_enabled: true,
+            country_code: 'CA',
+            subdivision_code: 'BC',
             valid_from: new Date('2026-01-01T00:00:00.000Z'),
             valid_to: null,
           });
@@ -143,12 +151,21 @@ describe('AdminCompetitionConfigurationService publication', () => {
         if (table === 'reward_catalog_items') {
           return query({ id: 'reward-1' }, true);
         }
+        if (table === 'competition_gym_locations as competition_gym') {
+          return query({ id: 'credential-1' });
+        }
         throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as Transaction<Database>;
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
       {} as IdempotencyService,
+      {
+        resolveCurrentBundle: jest.fn().mockResolvedValue({
+          configured: true,
+          documents: [{ documentKey: 'official_contest_rules' }],
+        }),
+      } as unknown as LegalDocumentsService,
       {} as NotificationsService,
     );
     const publishable = service as unknown as {
@@ -167,18 +184,56 @@ describe('AdminCompetitionConfigurationService publication', () => {
       ): Promise<'registration'>;
     };
 
+    const now = Date.now();
     await expect(
       publishable.assertPublishable(transaction, {
-        ends_at: new Date('2099-09-01T07:00:00.000Z'),
+        ends_at: new Date(now + 4 * 60 * 60_000),
         id: 'competition-1',
         region_policy_id: 'region-1',
-        registration_closes_at: new Date('2099-09-01T07:00:00.000Z'),
-        registration_opens_at: new Date('2099-08-01T07:00:00.000Z'),
+        registration_closes_at: new Date(now + 2 * 60 * 60_000),
+        registration_opens_at: new Date(now - 60 * 60_000),
         rules,
-        starts_at: new Date('2099-08-01T07:00:00.000Z'),
+        starts_at: new Date(now + 3 * 60 * 60_000),
         status: 'draft',
       }),
     ).resolves.toBe('registration');
     expect(rewardAvailabilityFilterUsed).toBe(false);
+  });
+
+  it('rejects publication before registration opens and without required QR policy', async () => {
+    const service = new AdminCompetitionConfigurationService(
+      {} as AdminAuthorizationService,
+      {} as IdempotencyService,
+      {} as LegalDocumentsService,
+      {} as NotificationsService,
+    );
+    const publishable = service as unknown as {
+      assertPublishable(
+        transaction: Transaction<Database>,
+        competition: Record<string, unknown>,
+      ): Promise<'registration'>;
+    };
+    const now = Date.now();
+    const competition = {
+      ends_at: new Date(now + 4 * 60 * 60_000),
+      id: 'competition-1',
+      region_policy_id: 'region-1',
+      registration_closes_at: new Date(now + 2 * 60 * 60_000),
+      registration_opens_at: new Date(now + 60 * 60_000),
+      rules,
+      starts_at: new Date(now + 3 * 60 * 60_000),
+      status: 'draft',
+    };
+
+    await expect(
+      publishable.assertPublishable({} as Transaction<Database>, competition),
+    ).rejects.toThrow('Registration must already be open');
+    await expect(
+      publishable.assertPublishable({} as Transaction<Database>, {
+        ...competition,
+        registration_opens_at: new Date(now - 60 * 60_000),
+        rules: { ...(rules as Record<string, unknown>), requireGymQr: false },
+      }),
+    ).rejects.toThrow('currently requires Partner gym QR verification');
   });
 });

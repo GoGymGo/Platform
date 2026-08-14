@@ -256,6 +256,7 @@ export class CompetitionsService {
           registrationOpensAt: competition.registration_opens_at.toISOString(),
           rules: parseCompetitionRules(competition.rules),
           rulesVersion: competition.rules_version,
+          serverTime: now.toISOString(),
           startsAt: competition.starts_at.toISOString(),
           status: competition.status,
         };
@@ -764,6 +765,26 @@ export class CompetitionsService {
             )
             .where('status', 'in', ['matched', 'searching'])
             .execute();
+          await transaction
+            .insertInto('operator_audit_events')
+            .values({
+              action: 'competition.enrollment_withdrawn',
+              actor_user_id: user.id,
+              created_at: now,
+              entity_id: enrollment.id,
+              entity_type: 'competition_enrollments',
+              next_state: {
+                competitionId: enrollment.competition_id,
+                status: 'withdrawn',
+              },
+              previous_state: {
+                competitionId: enrollment.competition_id,
+                status: 'active',
+              },
+              reason: 'Member confirmed irreversible Contest withdrawal.',
+              request_id: idempotencyKey,
+            })
+            .executeTakeFirstOrThrow();
         }
 
         return {
@@ -777,8 +798,13 @@ export class CompetitionsService {
     );
   }
 
-  async getEnrollmentCount(monthKey: string, region: string): Promise<number> {
+  async getEnrollmentCount(
+    competitionId: string,
+    monthKey: string,
+    region: string,
+  ): Promise<number> {
     assertMonthKey(monthKey);
+    const now = new Date();
     const row = await this.database.connection
       .selectFrom('competition_enrollments as enrollment')
       .innerJoin(
@@ -793,7 +819,11 @@ export class CompetitionsService {
       )
       .innerJoin('users as user', 'user.id', 'enrollment.user_id')
       .select((expression) => expression.fn.countAll<number>().as('count'))
+      .where('competition.id', '=', competitionId)
       .where('competition.month_key', '=', monthKey)
+      .where('competition.status', 'in', ['registration', 'active'])
+      .where('competition.deleted_at', 'is', null)
+      .where('competition.ends_at', '>', now)
       .where('enrollment.status', '=', 'active')
       .where('user.email', 'is not', null)
       .where('user.email_verified', '=', true)

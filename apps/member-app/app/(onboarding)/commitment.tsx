@@ -36,8 +36,7 @@ import {
 } from '@/domain/campaignEconomics';
 import {
   getCompetitionMonthKey,
-  getCompetitionRegionDateKey,
-  hasCompetitionStarted
+  getCompetitionRegionDateKey
 } from '@/domain/competition';
 import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
 import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
@@ -168,9 +167,10 @@ function MobileCommitmentScreen() {
   const publishedGoalOptions = registration.competition?.goalDays?.filter((day) =>
     dayOptions.includes(day as (typeof dayOptions)[number])
   );
-  const availableGoalOptions =
-    publishedGoalOptions && publishedGoalOptions.length > 0 ? publishedGoalOptions : dayOptions;
-  const maximumSelectableGoal = Math.max(...availableGoalOptions);
+  const availableGoalOptions = publishedGoalOptions ?? [];
+  const maximumSelectableGoal = availableGoalOptions.length > 0
+    ? Math.max(...availableGoalOptions)
+    : weeklyGoal;
   const draftKey = `weekly-goal:${user?.uid ?? 'anonymous'}:${upcomingCompetitionMonthKey}`;
   const [days, setDays] = useScreenMemory(`${draftKey}:days`, () =>
     Math.min(weeklyGoal, maximumSelectableGoal)
@@ -364,9 +364,7 @@ function MobileCommitmentScreen() {
       ].forEach((key) => clearScreenMemory(`${draftKey}:${key}`));
       const selectedContest = registration.competition;
       const selectedContestAcceptsWorkouts =
-        selectedContest != null &&
-        hasCompetitionStarted(selectedContest.startsAt) &&
-        Date.now() < Date.parse(selectedContest.endsAt);
+        selectedContest?.status === 'active';
       if (isGymScanSource && selectedContestAcceptsWorkouts) {
         router.replace('/qr-scanner');
       } else {

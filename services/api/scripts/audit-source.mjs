@@ -245,7 +245,13 @@ for (const dtoName of [
   const dto = competitionDto.match(
     new RegExp(`export class ${dtoName}[\\s\\S]*?\\n\\}`),
   )?.[0];
-  if (!dto?.includes('@Matches(regionCodePattern)')) {
+  const inheritsCanonicalRegionValidation = competitionDto.includes(
+    `export class ${dtoName} extends CompetitionRegionQueryDto`,
+  );
+  if (
+    !dto?.includes('@Matches(regionCodePattern)') &&
+    !inheritsCanonicalRegionValidation
+  ) {
     violations.push(
       `${dtoName} must enforce the canonical backend region code`,
     );

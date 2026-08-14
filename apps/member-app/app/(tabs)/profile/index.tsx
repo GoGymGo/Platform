@@ -447,7 +447,29 @@ export default function ProfileScreen() {
         <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
           ACCOUNT & CONTEST
         </TerminalText>
-        {currentEnrollment.data ? (
+        {currentEnrollment.isLoading ? (
+          <HUDBorderBox style={styles.accountActionCard} tone="muted">
+            <TerminalText tone="muted" variant="label">
+              LOADING CONTEST ENROLLMENT...
+            </TerminalText>
+          </HUDBorderBox>
+        ) : currentEnrollment.isError ? (
+          <HUDBorderBox style={styles.accountActionCard} tone="red">
+            <TerminalText tone="red" variant="label">
+              COULD NOT CHECK CONTEST ENROLLMENT
+            </TerminalText>
+            <TerminalText tone="muted" uppercase={false} variant="body">
+              Withdrawal controls are unavailable until your authoritative Contest entry can be
+              checked.
+            </TerminalText>
+            <CyberButtonOutline
+              disabled={currentEnrollment.isFetching}
+              label={currentEnrollment.isFetching ? 'RETRYING...' : 'RETRY'}
+              onPress={() => void currentEnrollment.refetch()}
+              tone="red"
+            />
+          </HUDBorderBox>
+        ) : currentEnrollment.data ? (
           <HUDBorderBox style={styles.accountActionCard} tone="red">
             <TerminalText tone="red" variant="label">
               WITHDRAW FROM CONTEST

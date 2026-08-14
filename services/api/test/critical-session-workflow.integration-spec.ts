@@ -122,6 +122,8 @@ describeWithDatabase('critical session and ledger workflow', () => {
 
   let competitions: CompetitionsService;
   let database: DatabaseService;
+  let enqueueNotification: jest.Mock;
+  let lifecycle: CompetitionLifecycleService;
   let migrated: MigratedPostgisTestDatabase;
   let legalDocuments: LegalDocumentsService;
   let operatorUserId: string;
@@ -146,9 +148,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
     const scoring = new CompetitionScoringService(database, ledger);
-    const lifecycle = new CompetitionLifecycleService(
+    enqueueNotification = jest.fn();
+    lifecycle = new CompetitionLifecycleService(
       database,
-      { enqueue: jest.fn() } as unknown as NotificationsService,
+      { enqueue: enqueueNotification } as unknown as NotificationsService,
       scoring,
     );
     competitions = new CompetitionsService(
@@ -532,6 +535,22 @@ describeWithDatabase('critical session and ledger workflow', () => {
         activeEnrollment.rows[0].user_id,
       ],
     );
+    const challengeRecipient = await profiles.ensureUser(
+      userPrincipal,
+      database.connection,
+    );
+    const challengeRequest = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO weekly_challenge_requests
+         (competition_id, period_index, requester_user_id, recipient_user_id,
+          goal_days, status)
+       VALUES ($1, 1, $2, $3, 3, 'pending')
+       RETURNING id`,
+      [
+        fixture.competitionId,
+        activeEnrollment.rows[0].user_id,
+        challengeRecipient.id,
+      ],
+    );
     await expect(
       competitions.withdrawEnrollment(
         contestPinningPrincipal,
@@ -553,6 +572,162 @@ describeWithDatabase('critical session and ledger workflow', () => {
       [activeSession.rows[0].id],
     );
     expect(cancelledSession.rows[0].status).toBe('cancelled');
+    const closedParticipation = await migrated.pool.query<{
+      audit_count: number;
+      challenge_status: string;
+      match_count: number;
+    }>(
+      `SELECT
+         (SELECT count(*)::integer
+          FROM operator_audit_events
+          WHERE action = 'competition.enrollment_withdrawn'
+            AND entity_id = $1) AS audit_count,
+         (SELECT status::text
+          FROM weekly_challenge_requests
+          WHERE id = $2) AS challenge_status,
+         (SELECT count(*)::integer
+          FROM competition_matches
+          WHERE competition_id = $3
+            AND (user_a_id = $4 OR user_b_id = $4)
+            AND status = 'cancelled') AS match_count`,
+      [
+        activeEnrollment.rows[0].id,
+        challengeRequest.rows[0].id,
+        fixture.competitionId,
+        activeEnrollment.rows[0].user_id,
+      ],
+    );
+    expect(closedParticipation.rows[0]).toEqual({
+      audit_count: 1,
+      challenge_status: 'cancelled',
+      match_count: 4,
+    });
+    await expect(
+      competitions.withdrawEnrollment(
+        contestPinningPrincipal,
+        fixture.competitionId,
+        'withdraw-scanned-earlier-contest-retry',
+      ),
+    ).resolves.toMatchObject({ status: 'withdrawn' });
+    const auditRetry = await migrated.pool.query<{ count: number }>(
+      `SELECT count(*)::integer AS count
+       FROM operator_audit_events
+       WHERE action = 'competition.enrollment_withdrawn'
+         AND entity_id = $1`,
+      [activeEnrollment.rows[0].id],
+    );
+    expect(auditRetry.rows[0].count).toBe(1);
+    await expect(
+      migrated.pool.query(
+        `UPDATE competition_enrollments SET goal_days = 4 WHERE id = $1`,
+        [activeEnrollment.rows[0].id],
+      ),
+    ).rejects.toThrow('Weekly Goal are immutable');
+    await expect(
+      migrated.pool.query(
+        `UPDATE competition_enrollments SET status = 'active' WHERE id = $1`,
+        [activeEnrollment.rows[0].id],
+      ),
+    ).rejects.toThrow('status is terminal');
+  });
+
+  it('rolls back and safely retries an under-minimum lifecycle cancellation', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const enrollment = await competitions.enroll(
+      userPrincipal,
+      fixture.competitionId,
+      'under-minimum-lifecycle-enrollment',
+      {
+        ageEligibilityAttested: true,
+        goalDays: 3,
+        gymPresence: fixture.gymPresence,
+        legalReceiptBundleId: fixture.legalReceiptBundleId,
+        regionVerificationId: fixture.regionVerificationId,
+        rulesAccepted: true,
+      },
+    );
+    const member = await profiles.ensureUser(
+      userPrincipal,
+      database.connection,
+    );
+    const session = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at)
+       VALUES ($1, $2, $3, CURRENT_DATE, 'active', 'rules-v1', CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [fixture.competitionId, enrollment.id, member.id],
+    );
+    const dueAt = new Date(Date.now() - 1_000);
+    await migrated.pool.query(
+      `UPDATE competitions
+       SET minimum_entrants = 2,
+           registration_closes_at = $1,
+           starts_at = $1
+       WHERE id = $2`,
+      [dueAt, fixture.competitionId],
+    );
+
+    enqueueNotification.mockRejectedValueOnce(
+      new Error('simulated notification enqueue failure'),
+    );
+    await expect(
+      lifecycle.processDueStart(fixture.competitionId, new Date()),
+    ).rejects.toThrow('simulated notification enqueue failure');
+    const rolledBack = await migrated.pool.query<{
+      audit_count: number;
+      competition_status: string;
+      enrollment_status: string;
+      session_status: string;
+    }>(
+      `SELECT
+         (SELECT status::text FROM competitions WHERE id = $1) AS competition_status,
+         (SELECT status::text FROM competition_enrollments WHERE id = $2) AS enrollment_status,
+         (SELECT status::text FROM workout_sessions WHERE id = $3) AS session_status,
+         (SELECT count(*)::integer FROM operator_audit_events
+          WHERE action = 'competition.cancelled_under_minimum'
+            AND entity_id = $1) AS audit_count`,
+      [fixture.competitionId, enrollment.id, session.rows[0].id],
+    );
+    expect(rolledBack.rows[0]).toEqual({
+      audit_count: 0,
+      competition_status: 'registration',
+      enrollment_status: 'active',
+      session_status: 'active',
+    });
+
+    enqueueNotification.mockResolvedValue(undefined);
+    await expect(
+      lifecycle.processDueStart(fixture.competitionId, new Date()),
+    ).resolves.toBe('cancelled');
+    await expect(
+      lifecycle.processDueStart(fixture.competitionId, new Date()),
+    ).resolves.toBeNull();
+    const closed = await migrated.pool.query<{
+      audit_count: number;
+      competition_status: string;
+      enrollment_status: string;
+      match_count: number;
+      session_status: string;
+    }>(
+      `SELECT
+         (SELECT status::text FROM competitions WHERE id = $1) AS competition_status,
+         (SELECT status::text FROM competition_enrollments WHERE id = $2) AS enrollment_status,
+         (SELECT status::text FROM workout_sessions WHERE id = $3) AS session_status,
+         (SELECT count(*)::integer FROM competition_matches
+          WHERE competition_id = $1 AND status = 'cancelled') AS match_count,
+         (SELECT count(*)::integer FROM operator_audit_events
+          WHERE action = 'competition.cancelled_under_minimum'
+            AND entity_id = $1) AS audit_count`,
+      [fixture.competitionId, enrollment.id, session.rows[0].id],
+    );
+    expect(closed.rows[0]).toEqual({
+      audit_count: 1,
+      competition_status: 'cancelled',
+      enrollment_status: 'withdrawn',
+      match_count: 4,
+      session_status: 'cancelled',
+    });
   });
 
   it('enforces registration open and close times for QR resolution and enrollment', async () => {
@@ -1008,25 +1183,6 @@ describeWithDatabase('critical session and ledger workflow', () => {
       [userPrincipal.firebaseUid],
     );
 
-    await migrated.pool.query(
-      `UPDATE competition_enrollments
-       SET status = 'disqualified'
-       WHERE id = $1`,
-      [enrollment.id],
-    );
-    await expect(
-      verifySession(created.id, 'verify-disqualified-session'),
-    ).rejects.toMatchObject({
-      response: { code: 'ACTIVE_ENROLLMENT_REQUIRED' },
-    });
-    await expect(verifiedLedgerCount(created.id)).resolves.toBe(0);
-
-    await migrated.pool.query(
-      `UPDATE competition_enrollments
-       SET status = 'active'
-       WHERE id = $1`,
-      [enrollment.id],
-    );
     const evidenceReview = await sessions.getEvidenceReview(created.id);
     expect(evidenceReview).toMatchObject({
       evidence: {
@@ -1190,6 +1346,35 @@ describeWithDatabase('critical session and ledger workflow', () => {
     });
     await expect(verifiedLedgerCount(duplicateDay.rows[0].id)).resolves.toBe(0);
     await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
+
+    const disqualifiedReview = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO workout_sessions
+         (competition_id, enrollment_id, user_id, eligible_date, status,
+          policy_version, started_at, completed_at)
+       SELECT competition_id, enrollment_id, user_id, eligible_date,
+              'pending_review', policy_version, started_at, completed_at
+       FROM workout_sessions
+       WHERE id = $1
+       RETURNING id`,
+      [created.id],
+    );
+    await migrated.pool.query(
+      `UPDATE competition_enrollments
+       SET status = 'disqualified'
+       WHERE id = $1`,
+      [enrollment.id],
+    );
+    await expect(
+      verifySession(
+        disqualifiedReview.rows[0].id,
+        'verify-disqualified-session',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'ACTIVE_ENROLLMENT_REQUIRED' },
+    });
+    await expect(
+      verifiedLedgerCount(disqualifiedReview.rows[0].id),
+    ).resolves.toBe(0);
   });
 
   it('serializes entrant caps and never resurrects inactive enrollments', async () => {
@@ -1279,6 +1464,64 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).rejects.toMatchObject({
       response: { code: 'COMPETITION_ENROLLMENT_INACTIVE' },
     });
+
+    const losingIndex = winnerIndex === 0 ? 1 : 0;
+    const losingUser = fixture.users[losingIndex];
+    const losingAccount = await profiles.ensureUser(
+      losingUser.principal,
+      database.connection,
+    );
+    const otherCompetition = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competitions
+         (region_policy_id, month_key, name, status, rules_version, rules,
+          minimum_entrants, entrant_cap, registration_opens_at,
+          registration_closes_at, starts_at, ends_at)
+       SELECT region_policy_id, month_key, 'Other same-month Contest', status,
+              rules_version, rules, minimum_entrants, entrant_cap,
+              registration_opens_at, registration_closes_at, starts_at, ends_at
+       FROM competitions
+       WHERE id = $1
+       RETURNING id`,
+      [fixture.competitionId],
+    );
+    const acceptance = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_rule_acceptances
+         (competition_id, user_id, rules_version, age_eligibility_attested)
+       VALUES ($1, $2, 'rules-v1', TRUE)
+       RETURNING id`,
+      [otherCompetition.rows[0].id, losingAccount.id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_goal_brackets (competition_id, goal_days, label)
+       VALUES ($1, 3, 'Three days')`,
+      [otherCompetition.rows[0].id],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_enrollments
+         (competition_id, user_id, goal_days, region_verification_id,
+          rules_acceptance_id, status)
+       VALUES ($1, $2, 3, $3, $4, 'active')`,
+      [
+        otherCompetition.rows[0].id,
+        losingAccount.id,
+        losingUser.regionVerificationId,
+        acceptance.rows[0].id,
+      ],
+    );
+    await expect(
+      competitions.getEnrollmentCount(
+        fixture.competitionId,
+        '2030-02',
+        'critical-capped-enrollment-region',
+      ),
+    ).resolves.toBe(0);
+    await expect(
+      competitions.getEnrollmentCount(
+        otherCompetition.rows[0].id,
+        '2030-02',
+        'critical-capped-enrollment-region',
+      ),
+    ).resolves.toBe(1);
 
     const counts = await migrated.pool.query<{
       acceptances: number;

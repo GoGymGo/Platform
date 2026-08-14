@@ -223,17 +223,24 @@ export function useCompetitionMatches(
 }
 
 export function useCompetitionEnrollmentCount(
+  competitionId: string | null,
   regionCode: string,
   competitionMonthKey: string
 ) {
   const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: apiQueriesEnabled && regionCode.length > 0,
+    enabled: apiQueriesEnabled && Boolean(competitionId) && regionCode.length > 0,
     queryFn: () => source.getCompetitionEnrollmentCount(
+      competitionId!,
       regionCode,
       competitionMonthKey
     ),
-    queryKey: ['competition-enrollment-count', regionCode, competitionMonthKey]
+    queryKey: [
+      'competition-enrollment-count',
+      competitionId,
+      regionCode,
+      competitionMonthKey
+    ]
   });
 }
 

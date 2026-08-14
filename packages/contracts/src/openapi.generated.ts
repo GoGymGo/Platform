@@ -39,7 +39,7 @@ export interface components {
     ClaimRewardResponseDto: { awardedAt: string; awardRank: number; claimedAt: string | null; claimUrl: string | null; couponCode: string | null; fulfillmentInstructions: string | null; id: string; imageUrl: string | null; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; status: "awarded" | "cancelled" | "claimed" | "fulfilled" | "redeemed"; title: string };
     CompetitionMatchResponseDto: { availability: "matched" | "searching" | "solo"; opponentAlias: string; opponentBestStreak: number; opponentCurrentStreak: number; opponentMonthlyVerifiedDays: number; opponentStreaks: components['schemas']["StreakCountsDto"]; opponentUserId?: string | null; opponentVerifiedDateKeys: Array<string>; periodIndex: number; region: string };
     CompetitionProgressResponseDto: { categoryScore: number; competitionId: string; enrolledDateKey: string; goalDays: number; monthKey: string; prizeDrawEntries: number; sessions: Array<components['schemas']["CompetitionSessionSummaryDto"]>; updatedAt: string; verifiedDateKeys: Array<string>; verifiedDays: number };
-    CompetitionResponseDto: { endsAt: string; entrantCap: number | null; goalDays: Array<number>; id: string; minimumEntrants: number; monthKey: string; name: string; regionCode: string; regionName: string; registrationClosesAt: string; registrationOpensAt: string; rules: components['schemas']["CompetitionRulesResponseDto"]; rulesVersion: string; startsAt: string; status: "draft" | "registration" | "active" | "settling" | "settled" | "cancelled" };
+    CompetitionResponseDto: { endsAt: string; entrantCap: number | null; goalDays: Array<number>; id: string; minimumEntrants: number; monthKey: string; name: string; regionCode: string; regionName: string; registrationClosesAt: string; registrationOpensAt: string; rules: components['schemas']["CompetitionRulesResponseDto"]; rulesVersion: string; serverTime: string; startsAt: string; status: "draft" | "registration" | "active" | "settling" | "settled" | "cancelled" };
     CompetitionRulesResponseDto: { categoryPodiumMultipliers: components['schemas']["CategoryPodiumMultipliersResponseDto"]; minHeartRateSamples: number; minSessionMinutes: number; perfectMonthMultiplier: number; requireDeviceAttestation: boolean; requireGymQr: boolean; requirePresenceCheck: boolean; signupPrizeDrawEntries: number; verifiedSessionCategoryScore: number; verifiedSessionPrizeDrawEntries: number; weeklyChallengeBothHitMultiplier: number; weeklyChallengeRecoveryMultiplier: number };
     CompetitionSessionSummaryDto: { completedAt: string | null; eligibleDate: string; id: string; startedAt: string; status: "active" | "cancelled" | "pending_review" | "rejected" | "verified" };
     CompetitionStatusActionDto: { action: "cancel" | "publish"; expectedVersion: number; reason: string };
@@ -588,7 +588,7 @@ export interface operations {
   getEnrollmentCount: {
     method: "GET";
     path: "/v1/competitions/{monthKey}/enrollment-count";
-    parameters: { path: { monthKey: string }; query: { region: string } };
+    parameters: { path: { monthKey: string }; query: { competitionId: string; region: string } };
     responses: {
       "200": components['schemas']["EnrollmentCountResponseDto"];
     };

@@ -6,6 +6,7 @@ import {
   resolveCompetitionStart,
   type CompetitionStartResolution,
 } from './competition-lifecycle';
+import { closeCompetitionParticipation } from './competition-participation';
 import { CompetitionScoringService } from './competition-scoring.service';
 
 export interface CompetitionLifecycleResult {
@@ -86,6 +87,7 @@ export class CompetitionLifecycleService {
           competition.minimum_entrants,
           activeEntrants,
         );
+        let closedEnrollments = 0;
 
         await transaction
           .updateTable('competitions')
@@ -108,22 +110,16 @@ export class CompetitionLifecycleService {
         }
 
         if (nextStatus === 'cancelled') {
-          const enrollments = await transaction
-            .selectFrom('competition_enrollments')
-            .select(['id', 'user_id'])
-            .where('competition_id', '=', competition.id)
-            .where('status', '=', 'active')
-            .execute();
-          await transaction
-            .updateTable('competition_enrollments')
-            .set({ status: 'withdrawn' })
-            .where('competition_id', '=', competition.id)
-            .where('status', '=', 'active')
-            .execute();
+          const enrollments = await closeCompetitionParticipation(
+            transaction,
+            competition.id,
+            now,
+          );
+          closedEnrollments = enrollments.length;
           for (const enrollment of enrollments) {
             await this.notifications.enqueue(
               transaction,
-              enrollment.user_id,
+              enrollment.userId,
               'competition_cancelled',
               { competitionId: competition.id },
             );
@@ -143,6 +139,7 @@ export class CompetitionLifecycleService {
             entity_type: 'competitions',
             next_state: {
               activeEntrants,
+              closedEnrollments,
               status: nextStatus,
               version: competition.configuration_version + 1,
             },

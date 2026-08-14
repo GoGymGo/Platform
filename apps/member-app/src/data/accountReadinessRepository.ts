@@ -70,7 +70,10 @@ function createApiRepository(api: ApiClient): AccountReadinessRepository {
       CreateCompetitionEnrollmentInput
     >(`/v1/competitions/${encodeURIComponent(competitionId)}/enrollments`, {
       body: input,
-      idempotencyKey: createIdempotencyKey('competition-enrollment'),
+      idempotencyKey: createResourceIdempotencyKey(
+        'competition-enrollment',
+        competitionId
+      ),
       method: 'POST'
     }),
     getCurrentCompetition: (expectedMonthKey, regionCode) => {
@@ -147,7 +150,10 @@ function createApiRepository(api: ApiClient): AccountReadinessRepository {
     withdrawFromCompetition: (competitionId) => api.request<CompetitionEnrollment>(
       `/v1/competitions/${encodeURIComponent(competitionId)}/enrollment/withdrawal`,
       {
-        idempotencyKey: createIdempotencyKey('competition-enrollment-withdrawal'),
+        idempotencyKey: createResourceIdempotencyKey(
+          'competition-enrollment-withdrawal',
+          competitionId
+        ),
         method: 'POST'
       }
     )
@@ -192,6 +198,10 @@ let idempotencySequence = 0;
 function createIdempotencyKey(scope: string) {
   idempotencySequence = (idempotencySequence + 1) % Number.MAX_SAFE_INTEGER;
   return `${scope}-${Date.now().toString(36)}-${idempotencySequence.toString(36)}`;
+}
+
+function createResourceIdempotencyKey(scope: string, resourceId: string) {
+  return `${scope}:${resourceId}`;
 }
 
 function requireApi(api: ApiClient | null) {

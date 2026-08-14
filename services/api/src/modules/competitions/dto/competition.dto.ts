@@ -119,6 +119,13 @@ export class CompetitionResponseDto {
   @ApiProperty({ format: 'date-time', type: String })
   registrationOpensAt!: string;
 
+  @ApiProperty({
+    description: 'Server time used to resolve this competition state',
+    format: 'date-time',
+    type: String,
+  })
+  serverTime!: string;
+
   @ApiProperty({ format: 'date-time', type: String })
   registrationClosesAt!: string;
 
@@ -227,10 +234,16 @@ export class EnrollmentResponseDto {
   enrolledAt!: string;
 }
 
-export class EnrollmentCountQueryDto {
+export class CompetitionRegionQueryDto {
   @ApiProperty({ example: 'vancouver-bc', type: String })
   @Matches(regionCodePattern)
   region!: string;
+}
+
+export class EnrollmentCountQueryDto extends CompetitionRegionQueryDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  @IsUUID()
+  competitionId!: string;
 }
 
 export class EnrollmentCountResponseDto {
@@ -238,7 +251,7 @@ export class EnrollmentCountResponseDto {
   count!: number;
 }
 
-export class CompetitionGoalQueryDto extends EnrollmentCountQueryDto {
+export class CompetitionGoalQueryDto extends CompetitionRegionQueryDto {
   @ApiProperty({ maximum: 7, minimum: 1, type: Number })
   @Type(() => Number)
   @IsInt()

@@ -88,6 +88,7 @@ export type CurrentCompetition = {
     weeklyChallengeRecoveryMultiplier: number;
   };
   rulesVersion: string;
+  serverTime: string;
   startsAt: string;
   status: 'active' | 'cancelled' | 'draft' | 'registration' | 'settled' | 'settling';
 };

@@ -774,6 +774,7 @@ export function AdminDashboard({
       snapshot.rewards,
       snapshot.regions,
       pilotData.gyms,
+      snapshot.legalDocuments,
     ),
   );
   const activeCompetitions = snapshot.competitions.filter((competition) =>
@@ -1209,6 +1210,7 @@ export function AdminDashboard({
               competitions={setupCompetitions}
               gyms={pilotData.gyms}
               key={setupCompetition?.id ?? "new"}
+              legalDocuments={snapshot.legalDocuments}
               onCreateRegion={() => setRegionEditor(true)}
               onPublish={publishCompleteContestSetup}
               onSelectCompetition={selectSetupCompetition}

@@ -80,9 +80,10 @@ export function useCurrentCompetition(
       if (competition?.status !== 'registration') return false;
 
       const startsAt = Date.parse(competition.startsAt);
-      if (!Number.isFinite(startsAt)) return false;
+      const serverTime = Date.parse(competition.serverTime);
+      if (!Number.isFinite(startsAt) || !Number.isFinite(serverTime)) return false;
 
-      const millisecondsUntilStart = startsAt - Date.now();
+      const millisecondsUntilStart = startsAt - serverTime;
       if (millisecondsUntilStart <= 0) return 250;
 
       return Math.min(millisecondsUntilStart + 25, 2_147_483_647);
@@ -124,6 +125,9 @@ export function useEnrollInCompetition() {
         [...context.queryKey, 'current-enrollment', enrollment.competitionId],
         enrollment
       );
+      void queryClient.invalidateQueries({
+        queryKey: ['competition-enrollment-count']
+      });
     }
   });
 }
@@ -141,6 +145,9 @@ export function useWithdrawFromCompetition() {
         null
       );
       void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['competition-enrollment-count']
+      });
       void queryClient.invalidateQueries({ queryKey: ['competition-matches'] });
       void queryClient.invalidateQueries({ queryKey: ['weekly-challenge-partners'] });
       void queryClient.invalidateQueries({ queryKey: ['weekly-challenge-requests'] });

@@ -205,4 +205,44 @@ describe('account readiness repository', () => {
       /not configured/i
     );
   });
+
+  it('reuses resource-scoped idempotency keys for enrollment and withdrawal retries', async () => {
+    const keys: (string | undefined)[] = [];
+    const api = {
+      request: <TResponse>(
+        _path: string,
+        options?: { idempotencyKey?: string }
+      ) => {
+        keys.push(options?.idempotencyKey);
+        return Promise.resolve({}) as Promise<TResponse>;
+      }
+    };
+    const competitionId = '40000000-0000-4000-8000-000000000001';
+    const account = createAccountReadinessRepository('api', api);
+    const enrollment = {
+      ageEligibilityAttested: true as const,
+      goalDays: 4,
+      gymPresence: {
+        accuracyMeters: 8,
+        credential: 'partner-gym-credential-000000000001',
+        latitude: 49.2827,
+        longitude: -123.1207
+      },
+      legalReceiptBundleId: '20000000-0000-4000-8000-000000000001',
+      regionVerificationId: '30000000-0000-4000-8000-000000000002',
+      rulesAccepted: true as const
+    };
+
+    await account.enrollInCompetition(competitionId, enrollment);
+    await account.enrollInCompetition(competitionId, enrollment);
+    await account.withdrawFromCompetition(competitionId);
+    await account.withdrawFromCompetition(competitionId);
+
+    assert.deepEqual(keys, [
+      `competition-enrollment:${competitionId}`,
+      `competition-enrollment:${competitionId}`,
+      `competition-enrollment-withdrawal:${competitionId}`,
+      `competition-enrollment-withdrawal:${competitionId}`
+    ]);
+  });
 });

@@ -42,6 +42,7 @@ export type AppDataSource = {
     competitionId?: string | null
   ) => Promise<readonly CompetitionMatch[]>;
   getCompetitionEnrollmentCount: (
+    competitionId: string,
     regionCode: string,
     competitionMonthKey: string
   ) => Promise<number | null>;
@@ -125,10 +126,15 @@ function createApiDataSource(api: ApiClient): AppDataSource {
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
         `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}`
       ),
-    getCompetitionEnrollmentCount: (regionCode, competitionMonthKey) =>
+    getCompetitionEnrollmentCount: (
+      competitionId,
+      regionCode,
+      competitionMonthKey
+    ) =>
       api.request<{ count: number }>(
         `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/enrollment-count` +
-        `?region=${encodeURIComponent(regionCode)}`,
+        `?competitionId=${encodeURIComponent(competitionId)}` +
+        `&region=${encodeURIComponent(regionCode)}`,
         { authenticated: false }
       ).then(({ count }) => count),
     getCreatorWorkouts: (regionCode) => api.request<readonly CreatorWorkout[]>(

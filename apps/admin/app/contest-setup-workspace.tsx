@@ -5,9 +5,11 @@ import type {
   Competition,
   GymLocation,
   GymQrCredential,
+  LegalDocument,
   RegionPolicy,
   Reward,
 } from "./admin-types";
+import { hasPublishableLegalDocuments } from "./contest-launch-flow.js";
 import {
   AdminUserFacingError,
   compactObject,
@@ -66,6 +68,7 @@ type ContestSetupWorkspaceProps = {
   competition: Competition | null;
   competitions: Competition[];
   gyms: GymLocation[];
+  legalDocuments: LegalDocument[];
   onCreateRegion: () => void;
   onPublish: (
     submission: ContestSetupSubmission,
@@ -239,6 +242,7 @@ export function ContestSetupWorkspace({
   competition,
   competitions,
   gyms,
+  legalDocuments,
   onCreateRegion,
   onPublish,
   onSelectCompetition,
@@ -441,6 +445,13 @@ export function ContestSetupWorkspace({
       (selectedRegion.validTo && new Date(selectedRegion.validTo) < endsAt)
     ) {
       errors.region = `${selectedRegion.metroName} does not cover the full contest schedule. Choose another region or create a replacement policy.`;
+    }
+    if (
+      selectedRegion &&
+      !hasPublishableLegalDocuments(selectedRegion, legalDocuments)
+    ) {
+      errors.region ??=
+        "Publish current owner-approved Privacy, Terms and Official Contest Rules for this jurisdiction before launching.";
     }
     if (!publishedReward) {
       const selectedRewardType = String(formData.get("rewardType"));

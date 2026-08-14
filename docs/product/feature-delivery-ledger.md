@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `7268a6bffb2fc06499f6585ffa8a43ca89764d0a` after PR #77 on 2026-08-13.
-- Active feature task: none while the coordinator records GGG-003 completion and
-  advances the queue to GGG-004.
+- Active feature task: `GoGymGo Feature GGG-004 — Competition enrollment and
+  withdrawal` on `agent/ggg-004-competition-enrollment`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -185,8 +185,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   idempotency, immutable goal, one enrollment, withdrawal closing workouts and
   challenge eligibility, worker activation/cancellation; database and deployed
   worker.
-- Delivery: priority `P0`; task `GoGymGo Feature GGG-004 — Competition enrollment
-  and withdrawal`; branch/PR/merge `unassigned`; status `AUDITED`.
+- Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-004 — Competition
+  enrollment and withdrawal`; branch `agent/ggg-004-competition-enrollment`;
+  PR/merge `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: published Contest requires approved legal, reward,
   region, and assigned-gym prerequisites.
 
@@ -961,6 +962,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-004` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-003 completion ledger merged through PR #78 as
+  `4188fe8f0e246b41b4dd0a1191a7245c55a32c9c` with green main-push checks.
 - 2026-08-13 — Completed `GGG-003` through PR #77. Initial CI found a
   platform-dependent raw-byte geometry hash; the corrected canonical-LF exact
   head `48760972e76e2d75d360fce2fe52106fbd0fd6ed` was squash-merged as

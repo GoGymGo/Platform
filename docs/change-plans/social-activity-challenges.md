@@ -6,7 +6,7 @@ Deliver structured, privacy-safe activity Challenges that authenticated members
 can create, invite, discover, join, leave, cancel, and check in to without
 creating verified workouts or any form of Contest credit.
 
-## Authority boundaries
+## Boundaries
 
 - PostgreSQL owns Challenge configuration, owner/member status, invitation
   provenance, capacity, lifecycle, and one-check-in-per-local-day integrity.
@@ -26,7 +26,7 @@ creating verified workouts or any form of Contest credit.
   private workout detail, contact destinations, hashes, tokens, and region
   evidence.
 
-## Delivery sequence
+## Rollout
 
 1. Apply `1787274000000_social_activity_challenge_integrity.ts`. It adds
    timezone and retry provenance, explicit cancelled/withdrawn states,
@@ -58,13 +58,15 @@ creating verified workouts or any form of Contest credit.
   worker tests, browser artifact checks, critical journeys, dependency and
   governance audits, then verify the exact Git head in GitHub checks.
 
-## Observability and recovery
+## Observability
 
 Audit events record lifecycle action, actor, request identity, Challenge ID, and
 non-sensitive metadata. They never include a contact destination, token, join
 URL, private workout detail, or raw region evidence. Operational metrics should
 track generic rejected create/join/check-in outcomes, capacity conflicts,
 invitation expiry/purge, and privacy-worker failures without member attributes.
+
+## Recovery
 
 Keep the additive integrity migration in place during an application rollback.
 Do not weaken triggers or use the down migration in production. Revoke pending

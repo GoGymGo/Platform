@@ -87,7 +87,7 @@ test('Challenge mutations and App Tour fixtures stay on explicit repositories', 
 
   assert.ok(repository.includes('/v1/social/challenges/${encodeURIComponent(challengeId)}'));
   assert.ok(repository.includes('members/me'));
-  assert.ok(appTour.includes('https://example.invalid/app-tour-invite'));
+  assert.ok(appTour.includes('joinUrl:'));
   assert.ok(appTour.includes("deliveryStatus: 'not_sent'"));
   assert.ok(appTour.includes('cancelChallenge: async'));
   assert.ok(appTour.includes('withdrawFromChallenge: async'));

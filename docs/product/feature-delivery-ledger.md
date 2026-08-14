@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `1b875c2e77c13a91f21390501f7669fef136b703` after PR #83 on 2026-08-13.
-- Active feature task: none while the coordinator records GGG-005 completion and
-  prepares the next dependency-ordered feature assignment.
+- Active feature task: `GoGymGo Feature GGG-007 — Competition scoring and
+  rankings` on `agent/ggg-007-competition-scoring-rankings`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -301,7 +301,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   duplicate verified days, weekly multipliers, bonus/perfect month, goal category
   tie order, reconciliation migration, lifecycle transitions; database/worker.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-007 — Competition scoring and
-  rankings`; branch/PR/merge `unassigned`; status `AUDITED`.
+  rankings`; branch `agent/ggg-007-competition-scoring-rankings`; PR/merge
+  `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: equal-chance tie-break and final draw publication must
   remain auditable and cannot be inferred client-side.
 
@@ -985,6 +986,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Assigned `GGG-007` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-005 completion ledger merged through PR #84 as
+  `8fd2a91e8541f29b674066edf6f483f8e99e3051` with green main-push checks.
 - 2026-08-13 — Completed `GGG-005` through PR #83. Exact tested head
   `19e717719cdb9cfce6121545b140dca8f1a492a4` was squash-merged as
   `1b875c2e77c13a91f21390501f7669fef136b703`; all seven PR and six main-push

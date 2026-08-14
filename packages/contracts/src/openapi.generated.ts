@@ -161,7 +161,7 @@ export interface components {
     SocialUserSummaryDto: { screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     SponsorApplicationDto: { companyName: string; contactEmail: string; targetRegion: string };
     StartedSessionResponseDto: { competitionId: string; completedAt: string | null; eligibleDate: string; id: string; policyVersion: string; requirements: components['schemas']["SessionRequirementsResponseDto"]; startedAt: string; status: "active" | "pending_review" | "verified" | "rejected" | "cancelled" };
-    StreakCountsDto: { daily: number; monthly: number; weekly: number; yearly: number };
+    StreakCountsDto: { daily: number; monthly: number; projectionVersion: "streaks-v1"; weekly: number; yearly: number };
     StreakSummaryResponseDto: { asOfDate: string; streaks: components['schemas']["StreakCountsDto"]; timezone: string };
     UpdateCompetitionDraftDto: { endsAt: string; entrantCap?: number | null; expectedVersion: number; goalBrackets: Array<components['schemas']["GoalBracketDto"]>; gymLocationId?: string; minimumEntrants: number; monthKey: string; name: string; reason: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rules: Record<string, unknown>; rulesVersion: string; startsAt: string };
     UpdateCreatorWorkoutDto: { creatorName: string; creatorUserId?: string; durationMinutes: number; expectedVersion: number; reason: string; regionCodes: Array<string>; sponsorName?: string; thumbnailUrl?: string; title: string; videoUrl: string; workoutStyle: string };

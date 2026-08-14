@@ -15,7 +15,7 @@ import { creatorFeaturesEnabled } from '@/config/features';
 import { colors, cyberGlow, fontFamilies, radii, spacing, fontSizes } from '@/constants/theme';
 import { buildCalendarDays } from '@/domain/workoutProgress';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
-import { useCreatorWorkoutPlans } from '@/data/appDataHooks';
+import { useCreatorWorkoutPlans, useMyStreaks } from '@/data/appDataHooks';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
   formatDateKey,
@@ -38,12 +38,12 @@ export default function CalendarScreen() {
     activeSession,
     addManualWorkoutLog,
     competition,
-    currentStreak,
     currentWeekVerified,
     getLogsForDate,
     logs,
     weeklyGoal
   } = useWorkoutProgress();
+  const streaksQuery = useMyStreaks();
   const [displayMonth, setDisplayMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
   const [showManualLogForm, setShowManualLogForm] = useState(false);
@@ -149,7 +149,15 @@ export default function CalendarScreen() {
             tone="cyan"
             value={`${Math.min(currentWeekVerified, weeklyGoal)} OF ${weeklyGoal}`}
           />
-          <StatCard label="PERSONAL STREAK" tone="green" value={String(currentStreak)} />
+          <StatCard
+            label="PERSONAL STREAK"
+            tone="green"
+            value={
+              streaksQuery.isPending || streaksQuery.isError
+                ? '—'
+                : String(streaksQuery.data?.streaks.daily ?? '—')
+            }
+          />
         </View>
 
         <HUDBorderBox style={styles.primaryActionCard} tone="cyan">

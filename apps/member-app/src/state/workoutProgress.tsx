@@ -763,7 +763,10 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     setSessionActionPending(true);
     try {
       const serverCompletion = await sessions.completeSession(activeSession.id);
-      void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['competition-progress'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-streaks'] })
+      ]);
       if (serverCompletion.status === 'rejected') {
         setActiveSession(null);
         setMidSessionAlertsReady(false);

@@ -5,6 +5,7 @@ import { extractGymScanCredential } from '@/domain/gymScan';
 
 import {
   createAppTourAccountReadinessRepository,
+  createAppTourDataSource,
   createAppTourGymQrPayload,
   createAppTourPendingGymScan,
   createAppTourStartedGymLocationResult,
@@ -93,4 +94,15 @@ test('new-player App Tour records each onboarding milestone in memory', async ()
 
   assert.equal(enrollment.goalDays, 4);
   assert.equal((await account.getCurrentEnrollment())?.id, enrollment.id);
+});
+
+test('App Tour Alias projections use the production streak contract', async () => {
+  const source = createAppTourDataSource();
+  const summary = await source.getMyStreaks();
+  const leaderboard = await source.getCategoryLeaderboard(4);
+  const results = await source.getMyLatestCompetitionResults();
+
+  assert.equal(summary?.streaks.projectionVersion, 'streaks-v1');
+  assert.ok(leaderboard?.rows.every(({ streaks }) => streaks.projectionVersion === 'streaks-v1'));
+  assert.ok(results?.rewardWinners.every(({ streaks }) => streaks.projectionVersion === 'streaks-v1'));
 });

@@ -14,6 +14,8 @@ import { ResultsService } from '../src/modules/results/results.service';
 import { RewardCodeCipherService } from '../src/modules/rewards/reward-code-cipher.service';
 import { RewardsService } from '../src/modules/rewards/rewards.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
+import { loadPublicStreaks } from '../src/modules/streaks/public-streaks';
+import { StreaksService } from '../src/modules/streaks/streaks.service';
 import {
   createTestConfig,
   MigratedPostgisTestDatabase,
@@ -142,6 +144,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   let results: ResultsService;
   let rewards: RewardsService;
   let sessions: SessionsService;
+  let streaks: StreaksService;
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
@@ -174,6 +177,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       scoring,
     );
     sessions = new SessionsService(database, idempotency, ledger, profiles);
+    streaks = new StreaksService(database, profiles);
     const operator = await profiles.ensureUser(
       operatorPrincipal,
       database.connection,
@@ -1458,6 +1462,66 @@ describeWithDatabase('critical session and ledger workflow', () => {
     });
     await expect(verifiedLedgerCount(duplicateDay.rows[0].id)).resolves.toBe(0);
     await expect(verifiedLedgerCount(created.id)).resolves.toBe(1);
+
+    const streakIndex = await migrated.pool.query<{ indexdef: string }>(
+      `SELECT indexdef
+       FROM pg_indexes
+       WHERE schemaname = current_schema()
+         AND indexname = 'workout_sessions_user_verified_eligible_date_idx'`,
+    );
+    expect(streakIndex.rows).toHaveLength(1);
+    expect(streakIndex.rows[0].indexdef).toContain(
+      '(user_id, eligible_date DESC)',
+    );
+    expect(streakIndex.rows[0].indexdef).toContain('WHERE');
+    expect(streakIndex.rows[0].indexdef).toContain('verified');
+
+    const ownStreaks = await streaks.getMyStreaks(userPrincipal);
+    expect(ownStreaks).toMatchObject({
+      streaks: {
+        daily: 1,
+        projectionVersion: 'streaks-v1',
+      },
+      timezone: 'America/Vancouver',
+    });
+    const member = await profiles.ensureUser(
+      userPrincipal,
+      database.connection,
+    );
+    await migrated.pool.query(
+      `UPDATE region_verifications
+       SET status = 'expired',
+           expires_at = (
+             SELECT enrollment.enrolled_at + interval '1 second'
+             FROM competition_enrollments AS enrollment
+             WHERE enrollment.region_verification_id = region_verifications.id
+             LIMIT 1
+           )
+       WHERE id = $1`,
+      [fixture.regionVerificationId],
+    );
+    await expect(streaks.getMyStreaks(userPrincipal)).resolves.toMatchObject({
+      streaks: { daily: 1 },
+      timezone: 'America/Vancouver',
+    });
+    await migrated.pool.query(
+      `UPDATE profiles
+       SET privacy_settings = jsonb_set(privacy_settings, '{showStats}', 'false')
+       WHERE user_id = $1`,
+      [member.id],
+    );
+    await expect(
+      loadPublicStreaks(database.connection, [member.id]),
+    ).resolves.toEqual(new Map());
+    await expect(streaks.getMyStreaks(userPrincipal)).resolves.toMatchObject({
+      streaks: { daily: 1 },
+    });
+    await migrated.pool.query(
+      `UPDATE profiles
+       SET privacy_settings = jsonb_set(privacy_settings, '{showStats}', 'true')
+       WHERE user_id = $1`,
+      [member.id],
+    );
 
     const disqualifiedReview = await migrated.pool.query<{ id: string }>(
       `INSERT INTO workout_sessions

@@ -3,9 +3,12 @@ import { normalizeDateKey } from '../../database/date-key';
 export interface StreakCounts {
   daily: number;
   monthly: number;
+  projectionVersion: typeof STREAK_PROJECTION_VERSION;
   weekly: number;
   yearly: number;
 }
+
+export const STREAK_PROJECTION_VERSION = 'streaks-v1' as const;
 
 type PeriodIndexFactory = (date: Date) => number;
 
@@ -17,7 +20,9 @@ export function calculateStreaks(
   asOfDateKey: string,
 ): StreakCounts {
   const asOfDate = parseDateKey(asOfDateKey);
-  const verifiedDates = verifiedDateKeys.map(parseDateKey);
+  const verifiedDates = verifiedDateKeys
+    .map(parseDateKey)
+    .filter((date) => date <= asOfDate);
 
   return {
     daily: calculateConsecutivePeriods(verifiedDates, asOfDate, dayIndex),
@@ -27,6 +32,7 @@ export function calculateStreaks(
       mondayWeekIndex,
     ),
     monthly: calculateConsecutivePeriods(verifiedDates, asOfDate, monthIndex),
+    projectionVersion: STREAK_PROJECTION_VERSION,
     yearly: calculateConsecutivePeriods(verifiedDates, asOfDate, yearIndex),
   };
 }

@@ -54,7 +54,13 @@ describe('social repository', () => {
           myStatus: 'accepted',
           name: 'July Strength Sprint',
           ownerScreenName: 'GHOST_RUNNER',
-          ownerStreaks: { daily: 6, monthly: 1, weekly: 2, yearly: 0 },
+          ownerStreaks: {
+            daily: 6,
+            monthly: 1,
+            projectionVersion: 'streaks-v1',
+            weekly: 2,
+            yearly: 0
+          },
           ownerUserId: 'user-1',
           participantCount: 1,
           participantLimit: null,
@@ -87,7 +93,13 @@ describe('social repository', () => {
         if (path === '/v1/streaks/me') {
           return Promise.resolve({
             asOfDate: '2026-07-15',
-            streaks: { daily: 2, monthly: 0, weekly: 1, yearly: 0 },
+            streaks: {
+              daily: 2,
+              monthly: 0,
+              projectionVersion: 'streaks-v1',
+              weekly: 1,
+              yearly: 0
+            },
             timezone: 'America/Vancouver'
           }) as Promise<TResponse>;
         }

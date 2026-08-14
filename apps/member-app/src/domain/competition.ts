@@ -1,4 +1,4 @@
-import type { StreakCounts } from '@/domain/streaks';
+import { emptyStreakCounts, type StreakCounts } from '@/domain/streaks';
 export type CompetitionPeriodIndex = 1 | 2 | 3 | 4;
 
 export type CurrentWeekProgress = {
@@ -79,7 +79,7 @@ export type CompetitionMatch = {
   opponentBestStreak?: number;
   opponentCurrentStreak?: number;
   opponentMonthlyVerifiedDays?: number;
-  opponentStreaks?: StreakCounts;
+  opponentStreaks: StreakCounts;
   opponentUserId?: string | null;
   opponentVerifiedDateKeys: readonly string[];
   periodIndex: CompetitionPeriodIndex;
@@ -231,12 +231,7 @@ export function evaluateMonthlyCompetition({
       opponentCurrentStreak: match?.opponentCurrentStreak ?? 0,
       opponentGoalMet,
       opponentMonthlyVerifiedDays: match?.opponentMonthlyVerifiedDays ?? 0,
-      opponentStreaks: match?.opponentStreaks ?? {
-        daily: match?.opponentCurrentStreak ?? 0,
-        monthly: 0,
-        weekly: 0,
-        yearly: 0
-      },
+      opponentStreaks: match?.opponentStreaks ?? emptyStreakCounts,
       opponentUserId: match?.opponentUserId ?? null,
       opponentVerifiedCount: opponentDates.length,
       opponentVerifiedDateKeys: opponentDates,

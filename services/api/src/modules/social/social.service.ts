@@ -62,6 +62,7 @@ interface SocialUserJson extends JsonObject {
 interface StreakCountsJson extends JsonObject {
   daily: number;
   monthly: number;
+  projectionVersion: 'streaks-v1';
   weekly: number;
   yearly: number;
 }
@@ -1371,7 +1372,13 @@ export class SocialService {
   }
 
   private emptyStreaks(): StreakCountsJson {
-    return { daily: 0, monthly: 0, weekly: 0, yearly: 0 };
+    return {
+      daily: 0,
+      monthly: 0,
+      projectionVersion: 'streaks-v1',
+      weekly: 0,
+      yearly: 0,
+    };
   }
 
   private toStreaksJson(streaks?: StreakCounts): StreakCountsJson {
@@ -1379,6 +1386,7 @@ export class SocialService {
       ? {
           daily: streaks.daily,
           monthly: streaks.monthly,
+          projectionVersion: streaks.projectionVersion,
           weekly: streaks.weekly,
           yearly: streaks.yearly,
         }

@@ -173,7 +173,8 @@ export default function HomeScreen() {
     competitionRegionCode,
     currentPeriod?.index ?? 1
   );
-  const { data: streakSummary, isPending: streaksPending } = useMyStreaks();
+  const streaksQuery = useMyStreaks();
+  const streakSummary = streaksQuery.data ?? null;
   const currentEntrants = currentEntrantsData ?? null;
   const unclaimedReward = rewardAwards.find((award) => award.status === 'awarded');
   const featuredCreatorWorkout = creatorWorkouts[0] ?? null;
@@ -851,7 +852,10 @@ export default function HomeScreen() {
             </Pressable>
 
             <StreakRewards
-              isLoading={streaksPending}
+              isError={streaksQuery.isError}
+              isLoading={streaksQuery.isPending}
+              onRetry={() => void streaksQuery.refetch()}
+              retrying={streaksQuery.isFetching}
               summary={streakSummary}
             />
 

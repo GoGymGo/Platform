@@ -1,10 +1,12 @@
 import { calculateStreaks } from './streak-calculation';
+import { dateKeyInTimezone } from '../competitions/competition-calendar';
 
 describe('calculateStreaks', () => {
   it('returns zeroes when there are no verified gym logs', () => {
     expect(calculateStreaks([], '2026-07-15')).toEqual({
       daily: 0,
       monthly: 0,
+      projectionVersion: 'streaks-v1',
       weekly: 0,
       yearly: 0,
     });
@@ -30,6 +32,7 @@ describe('calculateStreaks', () => {
     ).toEqual({
       daily: 3,
       monthly: 4,
+      projectionVersion: 'streaks-v1',
       weekly: 4,
       yearly: 3,
     });
@@ -44,6 +47,7 @@ describe('calculateStreaks', () => {
     ).toEqual({
       daily: 3,
       monthly: 1,
+      projectionVersion: 'streaks-v1',
       weekly: 3,
       yearly: 1,
     });
@@ -58,6 +62,7 @@ describe('calculateStreaks', () => {
     ).toEqual({
       daily: 3,
       monthly: 1,
+      projectionVersion: 'streaks-v1',
       weekly: 1,
       yearly: 1,
     });
@@ -69,12 +74,62 @@ describe('calculateStreaks', () => {
     ).toBe(2);
   });
 
+  it('preserves consecutive local dates across the spring DST boundary', () => {
+    const beforeShift = dateKeyInTimezone(
+      new Date('2026-03-08T07:59:59.000Z'),
+      'America/Vancouver',
+    );
+    const afterShift = dateKeyInTimezone(
+      new Date('2026-03-08T10:00:00.000Z'),
+      'America/Vancouver',
+    );
+
+    expect(beforeShift).toBe('2026-03-07');
+    expect(afterShift).toBe('2026-03-08');
+    expect(calculateStreaks([beforeShift, afterShift], afterShift).daily).toBe(
+      2,
+    );
+  });
+
+  it('deduplicates the repeated local hour at the fall DST boundary', () => {
+    const firstHour = dateKeyInTimezone(
+      new Date('2026-11-01T08:30:00.000Z'),
+      'America/Vancouver',
+    );
+    const repeatedHour = dateKeyInTimezone(
+      new Date('2026-11-01T09:30:00.000Z'),
+      'America/Vancouver',
+    );
+
+    expect(firstHour).toBe('2026-11-01');
+    expect(repeatedHour).toBe('2026-11-01');
+    expect(
+      calculateStreaks([firstHour, repeatedHour], repeatedHour).daily,
+    ).toBe(1);
+  });
+
   it('resets every interval whose latest log is stale', () => {
     expect(calculateStreaks(['2024-12-31'], '2026-07-15')).toEqual({
       daily: 0,
       monthly: 0,
+      projectionVersion: 'streaks-v1',
       weekly: 0,
       yearly: 0,
+    });
+  });
+
+  it('ignores future dates instead of letting them anchor a streak', () => {
+    expect(
+      calculateStreaks(
+        ['2026-07-16', '2026-07-15', '2026-07-14'],
+        '2026-07-15',
+      ),
+    ).toEqual({
+      daily: 2,
+      monthly: 1,
+      projectionVersion: 'streaks-v1',
+      weekly: 1,
+      yearly: 1,
     });
   });
 

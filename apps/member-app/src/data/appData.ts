@@ -17,7 +17,7 @@ import type {
   RewardAward,
   RewardCatalogItem
 } from '@/domain/rewards';
-import type { StreakSummary } from '@/domain/streaks';
+import { isStreakCounts, parseStreakSummary, type StreakSummary } from '@/domain/streaks';
 import type { ApiClient } from '@/services/api/client';
 
 export type {
@@ -116,16 +116,18 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       weeklyGoal,
       regionCode,
       competitionId
-    ) => competitionId
-      ? api.request<readonly CompetitionMatch[]>(
-        `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
-        `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}` +
-        `&competitionId=${encodeURIComponent(competitionId)}`
-      )
-      : api.request<readonly CompetitionMatch[]>(
-        `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
-        `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}`
-      ),
+    ) =>
+      (competitionId
+        ? api.request<unknown>(
+            `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
+              `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}` +
+              `&competitionId=${encodeURIComponent(competitionId)}`
+          )
+        : api.request<unknown>(
+            `/v1/competitions/${encodeURIComponent(competitionMonthKey)}/matches` +
+              `?goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}`
+          )
+      ).then(normalizeCompetitionMatches),
     getCompetitionEnrollmentCount: (
       competitionId,
       regionCode,
@@ -168,7 +170,8 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       api.request<ParticipantCompetitionResults | null>(
         '/v1/results/mine/latest'
       ),
-    getMyStreaks: () => api.request<StreakSummary>('/v1/streaks/me'),
+    getMyStreaks: () =>
+      api.request<unknown>('/v1/streaks/me').then(parseStreakSummary),
     getRewardCatalog: (regionCode, monthKey) => {
       const query = new URLSearchParams({ region: regionCode });
       if (monthKey) query.set('monthKey', monthKey);
@@ -267,6 +270,16 @@ function normalizeCategoryLeaderboard(
   };
 }
 
+function normalizeCompetitionMatches(response: unknown): readonly CompetitionMatch[] {
+  if (!Array.isArray(response)) {
+    return [];
+  }
+  return response.filter(
+    (match): match is CompetitionMatch =>
+      isRecord(match) && isStreakCounts(match.opponentStreaks)
+  );
+}
+
 function isCategoryLeaderboardRow(
   value: unknown
 ): value is CategoryLeaderboard['rows'][number] {
@@ -279,6 +292,7 @@ function isCategoryLeaderboardRow(
     isRecord(value.streaks) &&
     isFiniteNumber(value.streaks.daily) &&
     isFiniteNumber(value.streaks.monthly) &&
+    value.streaks.projectionVersion === 'streaks-v1' &&
     isFiniteNumber(value.streaks.weekly) &&
     isFiniteNumber(value.streaks.yearly) &&
     isFiniteNumber(value.verifiedDays)

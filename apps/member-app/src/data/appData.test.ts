@@ -69,7 +69,13 @@ describe('app data boundary', () => {
         requestedPath = path;
         return Promise.resolve({
           asOfDate: '2026-07-15',
-          streaks: { daily: 3, monthly: 2, weekly: 4, yearly: 1 },
+          streaks: {
+            daily: 3,
+            monthly: 2,
+            projectionVersion: 'streaks-v1',
+            weekly: 4,
+            yearly: 1
+          },
           timezone: 'America/Vancouver'
         }) as Promise<TResponse>;
       }
@@ -79,6 +85,46 @@ describe('app data boundary', () => {
 
     assert.equal(requestedPath, '/v1/streaks/me');
     assert.equal(streaks?.streaks.weekly, 4);
+  });
+
+  it('fails closed when the own streak projection is unversioned', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() =>
+        Promise.resolve({
+          asOfDate: '2026-07-15',
+          streaks: { daily: 3, monthly: 2, weekly: 4, yearly: 1 },
+          timezone: 'America/Vancouver'
+        }) as Promise<TResponse>
+    };
+
+    await assert.doesNotReject(async () => {
+      assert.equal(await createAppDataSource('api', api).getMyStreaks(), null);
+    });
+  });
+
+  it('drops a Weekly Challenge row without the required streak projection', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() =>
+        Promise.resolve([
+          {
+            availability: 'matched',
+            opponentAlias: 'LEGACY_ROW',
+            opponentVerifiedDateKeys: ['2026-07-01'],
+            periodIndex: 1,
+            region: 'vancouver-bc'
+          }
+        ]) as Promise<TResponse>
+    };
+
+    assert.deepEqual(
+      await createAppDataSource('api', api).getCompetitionMatches(
+        '2026-07',
+        4,
+        'vancouver-bc',
+        '40000000-0000-4000-8000-000000000001'
+      ),
+      []
+    );
   });
 
   it('pins Weekly Challenge matches to the authoritative enrolled contest', async () => {
@@ -177,7 +223,13 @@ describe('app data boundary', () => {
               categoryEntries: 12,
               isCurrentUser: true,
               rank: 1,
-              streaks: { daily: 1, monthly: 0, weekly: 1, yearly: 0 },
+              streaks: {
+                daily: 1,
+                monthly: 0,
+                projectionVersion: 'streaks-v1',
+                weekly: 1,
+                yearly: 0
+              },
               verifiedDays: 3
             },
             { alias: null, rank: 2 }

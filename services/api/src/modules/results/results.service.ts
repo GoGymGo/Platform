@@ -180,6 +180,7 @@ export class ResultsService {
           streaks: streaksByUser.get(row.user_id) ?? {
             daily: 0,
             monthly: 0,
+            projectionVersion: 'streaks-v1',
             weekly: 0,
             yearly: 0,
           },
@@ -236,6 +237,7 @@ export class ResultsService {
       streaks: streaksByUser.get(winner.user_id) ?? {
         daily: 0,
         monthly: 0,
+        projectionVersion: 'streaks-v1',
         weekly: 0,
         yearly: 0,
       },

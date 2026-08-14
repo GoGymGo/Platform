@@ -11,7 +11,7 @@ import type {
   SocialProfile,
   SocialUserSearchResult
 } from '@/domain/social';
-import type { StreakSummary } from '@/domain/streaks';
+import { parseStreakSummary, type StreakSummary } from '@/domain/streaks';
 import type { ApiClient } from '@/services/api/client';
 
 type FriendRequestDecisionResponse = {
@@ -99,8 +99,11 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
     ),
     getMyProfile: () => Promise.all([
       api.request<MeResponse>('/v1/me'),
-      api.request<StreakSummary>('/v1/streaks/me')
-    ]).then(([profile, streaks]) => toSocialProfile(profile, streaks)),
+      api.request<unknown>('/v1/streaks/me')
+    ]).then(([profile, streaks]) => {
+      const parsed = parseStreakSummary(streaks);
+      return parsed ? toSocialProfile(profile, parsed) : null;
+    }),
     inviteFriendToChallenge: (challengeId, friendUserId) =>
       api.request<ChallengeInvitationResponse, { friendUserId: string }>(
         `/v1/social/challenges/${encodeURIComponent(challengeId)}/invitations`,
@@ -183,8 +186,14 @@ function createApiSocialRepository(api: ApiClient): SocialRepository {
           method: 'PATCH'
         }
       ),
-      api.request<StreakSummary>('/v1/streaks/me')
-    ]).then(([profile, streaks]) => toSocialProfile(profile, streaks))
+      api.request<unknown>('/v1/streaks/me')
+    ]).then(([profile, streaks]) => {
+        const parsed = parseStreakSummary(streaks);
+        if (!parsed) {
+          throw new Error('The streak projection is unavailable.');
+        }
+        return toSocialProfile(profile, parsed);
+      })
   };
 }
 

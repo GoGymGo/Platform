@@ -71,6 +71,7 @@ export const appTourSimulatedHeartRateBpm = 118;
 const fixedStreaks = {
   daily: 4,
   monthly: 2,
+  projectionVersion: 'streaks-v1',
   weekly: 3,
   yearly: 1
 } as const;

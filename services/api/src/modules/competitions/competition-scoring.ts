@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 
 export interface WeeklyScoreInput {
-  availableDays: number;
   bothHitMultiplier: number;
   entriesPerVerifiedDay: number;
   goalDays: number;
@@ -30,7 +29,6 @@ export interface CategoryStanding extends CategoryStandingInput {
 }
 
 export function calculateWeeklyScore({
-  availableDays,
   bothHitMultiplier,
   entriesPerVerifiedDay,
   goalDays,
@@ -46,9 +44,7 @@ export function calculateWeeklyScore({
   const opponentMet =
     opponentVerifiedDays !== null && opponentVerifiedDays >= goalDays;
   const recovered =
-    opponentVerifiedDays !== null &&
-    !opponentMet &&
-    (verifiedDays > goalDays || goalDays >= availableDays);
+    opponentVerifiedDays !== null && !opponentMet && verifiedDays > goalDays;
   const multiplier = opponentMet
     ? bothHitMultiplier
     : recovered

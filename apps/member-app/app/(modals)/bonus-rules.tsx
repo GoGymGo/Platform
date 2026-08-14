@@ -44,7 +44,7 @@ const bonusRules: readonly BonusRule[] = [
     value: 'x3',
     label: 'WEEKLY CHALLENGE PARTNER MISSES + YOU DO EXTRA DAY',
     description:
-      'If your partner misses, one extra Verified workout activates your 3x bonus. The bonus is automatic when your Weekly Goal already uses every available day.',
+      'If your partner misses, one eligible extra Verified workout activates your 3x bonus. Without an extra workout, the result remains 1x.',
     tone: 'pink'
   },
   {
@@ -113,8 +113,8 @@ export default function BonusRulesModal() {
           </TerminalText>
           <TerminalText style={styles.calloutCopy} tone="muted" uppercase={false} variant="body">
             Both hit the goal: 2x each. If your partner misses, complete one
-            extra Verified workout for 3x. The 3x bonus is automatic when no
-            extra day is available.
+            eligible extra Verified workout for 3x. Without an extra workout,
+            the result remains 1x.
           </TerminalText>
         </HUDBorderBox>
 

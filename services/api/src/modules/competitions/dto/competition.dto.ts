@@ -270,30 +270,23 @@ export class CompetitionGoalQueryDto extends CompetitionRegionQueryDto {
 }
 
 export class CompetitionMatchesQueryDto extends CompetitionGoalQueryDto {
-  @ApiPropertyOptional({ format: 'uuid', type: String })
-  @IsOptional()
+  @ApiProperty({ format: 'uuid', type: String })
   @IsUUID()
-  competitionId?: string;
+  competitionId!: string;
 }
 
 export class CompetitionMatchResponseDto {
   @ApiProperty({ enum: ['matched', 'searching', 'solo'], type: String })
   availability!: 'matched' | 'searching' | 'solo';
 
-  @ApiProperty({ type: String })
-  opponentAlias!: string;
-
-  @ApiProperty({ isArray: true, type: String })
-  opponentVerifiedDateKeys!: string[];
+  @ApiPropertyOptional({ nullable: true, type: String })
+  opponentAlias!: string | null;
 
   @ApiProperty({ maximum: 4, minimum: 1, type: Number })
   periodIndex!: 1 | 2 | 3 | 4;
 
   @ApiProperty({ type: String })
   region!: string;
-
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, type: String })
-  opponentUserId!: string | null;
 
   @ApiProperty({ type: Number })
   opponentCurrentStreak!: number;
@@ -304,11 +297,27 @@ export class CompetitionMatchResponseDto {
   @ApiProperty({ type: Number })
   opponentMonthlyVerifiedDays!: number;
 
+  @ApiProperty({ maximum: 7, minimum: 0, type: Number })
+  opponentVerifiedCount!: number;
+
   @ApiProperty({ type: StreakCountsDto })
   opponentStreaks!: StreakCountsDto;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  entries!: number;
+
+  @ApiProperty({ enum: [0, 1, 2, 3], type: Number })
+  multiplier!: 0 | 1 | 2 | 3;
+
+  @ApiProperty({ enum: ['projected', 'settled'], type: String })
+  scoringStatus!: 'projected' | 'settled';
 }
 
 export class WeeklyChallengePeriodQueryDto extends CompetitionGoalQueryDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  @IsUUID()
+  competitionId!: string;
+
   @ApiProperty({ maximum: 4, minimum: 1, type: Number })
   @Type(() => Number)
   @IsInt()
@@ -350,17 +359,11 @@ export class WeeklyChallengeRequestResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
 
-  @ApiProperty({ format: 'uuid', type: String })
-  competitionId!: string;
-
   @ApiProperty({ enum: ['incoming', 'outgoing'], type: String })
   direction!: 'incoming' | 'outgoing';
 
   @ApiProperty({ type: String })
   partnerAlias!: string;
-
-  @ApiProperty({ format: 'uuid', type: String })
-  partnerUserId!: string;
 
   @ApiProperty({ type: StreakCountsDto })
   partnerStreaks!: StreakCountsDto;

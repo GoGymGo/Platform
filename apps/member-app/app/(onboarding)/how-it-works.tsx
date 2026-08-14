@@ -156,7 +156,7 @@ export default function HowItWorksScreen() {
           </TerminalText>
           <TerminalText style={styles.explanation} tone="muted" uppercase={false} variant="body">
             Both hit the goal: 2X each. If your partner misses, complete one extra workout for
-            3X. If your goal uses every available day, 3X applies automatically. Add all four weeks.
+            3X. Without an eligible extra workout, the result remains 1X. Add all four weeks.
           </TerminalText>
           <TerminalText style={styles.sectionHeading} tone="cyan" variant="label">
             02 // TOP THREE GOAL-GROUP FINISHERS

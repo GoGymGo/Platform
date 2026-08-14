@@ -201,16 +201,19 @@ export function useCompetitionMatches(
   competitionMonthKey: string,
   weeklyGoal: number,
   regionCode: string,
-  competitionId?: string | null
+  competitionId: string | null | undefined
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled && regionCode.length > 0,
+    enabled:
+      authenticatedQueriesEnabled &&
+      regionCode.length > 0 &&
+      Boolean(competitionId),
     queryFn: () => source.getCompetitionMatches(
       competitionMonthKey,
       weeklyGoal,
       regionCode,
-      competitionId
+      competitionId!
     ),
     queryKey: [
       'competition-matches',
@@ -288,6 +291,7 @@ export function useSubmitCreatorVideo() {
 }
 
 export function useEligibleWeeklyChallengePartners(
+  competitionId: string,
   competitionMonthKey: string,
   weeklyGoal: number,
   regionCode: string,
@@ -295,8 +299,9 @@ export function useEligibleWeeklyChallengePartners(
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled && regionCode.length > 0,
+    enabled: authenticatedQueriesEnabled && competitionId.length > 0 && regionCode.length > 0,
     queryFn: () => source.getEligibleWeeklyChallengePartners(
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
@@ -304,6 +309,7 @@ export function useEligibleWeeklyChallengePartners(
     ),
     queryKey: [
       'weekly-challenge-partners',
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
@@ -313,6 +319,7 @@ export function useEligibleWeeklyChallengePartners(
 }
 
 export function useWeeklyChallengeRequests(
+  competitionId: string,
   competitionMonthKey: string,
   weeklyGoal: number,
   regionCode: string,
@@ -320,8 +327,9 @@ export function useWeeklyChallengeRequests(
 ) {
   const { authenticatedQueriesEnabled, source } = useAppData();
   return useQuery({
-    enabled: authenticatedQueriesEnabled && regionCode.length > 0,
+    enabled: authenticatedQueriesEnabled && competitionId.length > 0 && regionCode.length > 0,
     queryFn: () => source.getWeeklyChallengeRequests(
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
@@ -329,6 +337,7 @@ export function useWeeklyChallengeRequests(
     ),
     queryKey: [
       'weekly-challenge-requests',
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
@@ -341,19 +350,33 @@ export function useRequestWeeklyChallengePartner() {
   const { source } = useAppData();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ competitionMonthKey, periodIndex, recipientUserId, regionCode, weeklyGoal }: {
+    mutationFn: ({ competitionId, competitionMonthKey, periodIndex, recipientUserId, regionCode, weeklyGoal }: {
+      competitionId: string;
       competitionMonthKey: string;
       periodIndex: number;
       recipientUserId: string;
       regionCode: string;
       weeklyGoal: number;
     }) => source.requestWeeklyChallengePartner(
+      competitionId,
       competitionMonthKey,
       weeklyGoal,
       regionCode,
       periodIndex,
       recipientUserId
     ),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['weekly-challenge-partners'] }),
+      queryClient.invalidateQueries({ queryKey: ['weekly-challenge-requests'] })
+    ])
+  });
+}
+
+export function useCancelWeeklyChallengeRequest() {
+  const { source } = useAppData();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (requestId: string) => source.cancelWeeklyChallengeRequest(requestId),
     onSuccess: () => Promise.all([
       queryClient.invalidateQueries({ queryKey: ['weekly-challenge-partners'] }),
       queryClient.invalidateQueries({ queryKey: ['weekly-challenge-requests'] })

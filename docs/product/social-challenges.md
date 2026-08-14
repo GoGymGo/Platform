@@ -60,6 +60,29 @@ mutates social state only through the authenticated API repository.
 Challenges do not change competition eligibility, prize entries, leaderboard
 scores, or sponsor rewards.
 
+## Direct Weekly Challenges
+
+Direct Weekly Challenges are a separate Contest feature from the general
+friend/regional Challenges above. During the current seven-day scoring week,
+an enrolled member may request an accepted, unblocked friend who has the same
+active Contest, region, and immutable Weekly Goal. The recipient explicitly
+accepts or declines; an outgoing pending request can be cancelled. Enrollment,
+activation, reads, and settlement never assign a stranger or infer consent.
+
+The API returns eligible command handles only on the eligible-partner list.
+Request and match detail omit internal user IDs and private workout dates. A
+matched detail contains the partner Alias, privacy-permitted `streaks-v1`
+badges/current/best streak, monthly verified-day total, and the current week's
+verified count. Friend removal, either-direction block, withdrawal, or Contest
+cancellation closes incompatible open state transactionally without deleting
+history. One accepted assignment remains consumed for that player/week.
+
+Weekly outcome values are server projections until the scoring worker settles
+canonical eligible sessions into the append-only ledger: 0x for a missed goal,
+1x for a met solo goal or a met goal when the partner misses without an extra
+workout, 2x when both meet the goal, and 3x only when the user meets the goal,
+the partner misses, and the user completes an eligible extra workout.
+
 ## Database migrations
 
 `1783951200000_social_challenges.ts` introduces screen names, friend requests,
@@ -83,6 +106,12 @@ creator video submissions, and creator calendar plans.
 relationship events, reserved-Alias protection, blocked-pair database guards,
 terminal-state guards, link-only/versioned invitation metadata, and indexes for
 expiry processing.
+
+`1787187600000_direct_weekly_challenges.ts` adds accepted/cancellation evidence,
+accepted-request match provenance, normalized active match participants,
+permanent assignment participants, and database triggers that enforce exact
+week dates, same-goal active enrollment, accepted friendship, block precedence,
+and one assignment per player/week across both match roles.
 
 Apply locally:
 
@@ -126,6 +155,17 @@ Every route requires a Firebase bearer token.
 | `POST`  | `/v1/social/challenge-contact-invitations/inspect`  | Review masked invitation metadata after sign-in.  |
 | `POST`  | `/v1/social/challenge-contact-invitations/redeem`   | Redeem a signed-in contact invitation.             |
 | `PATCH` | `/v1/social/challenges/:challengeId/invitations/me` | Accept or decline the current user's invitation.  |
+
+Direct Weekly Challenge routes are under `/v1/competitions`:
+
+| Method   | Route                                                                    | Purpose                                      |
+| -------- | ------------------------------------------------------------------------ | -------------------------------------------- |
+| `GET`    | `/:monthKey/matches?competitionId=...&goal=...&region=...`              | Read privacy-safe weekly state/outcomes.     |
+| `GET`    | `/:monthKey/weekly-challenges/eligible-partners?...`                    | List currently eligible accepted friends.   |
+| `GET`    | `/:monthKey/weekly-challenges/requests?...`                             | List owned incoming/outgoing requests.       |
+| `POST`   | `/:monthKey/weekly-challenges/requests`                                 | Create an idempotent direct request.         |
+| `PATCH`  | `/weekly-challenges/requests/:requestId`                                | Explicitly accept or decline an invite.      |
+| `DELETE` | `/weekly-challenges/requests/:requestId`                                | Cancel an owned pending outgoing invite.     |
 
 Example friend challenge request:
 

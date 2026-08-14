@@ -445,9 +445,11 @@ export interface CompetitionMatchesTable {
   >;
   created_at: Timestamp;
   settled_at: NullableTimestamp;
+  weekly_challenge_request_id: string | null;
 }
 
 export interface WeeklyChallengeRequestsTable {
+  accepted_at: NullableTimestamp;
   id: Generated<string>;
   competition_id: string;
   period_index: number;
@@ -457,6 +459,23 @@ export interface WeeklyChallengeRequestsTable {
   status: WeeklyChallengeRequestStatus;
   created_at: Timestamp;
   responded_at: NullableTimestamp;
+  cancellation_reason: string | null;
+}
+
+export interface WeeklyChallengeAssignmentParticipantsTable {
+  request_id: string;
+  competition_id: string;
+  period_index: number;
+  user_id: string;
+}
+
+export interface CompetitionMatchParticipantsTable {
+  match_id: string;
+  competition_id: string;
+  period_index: number;
+  user_id: string;
+  participant_role: 'a' | 'b';
+  active: boolean;
 }
 
 export interface WorkoutSessionsTable {
@@ -868,7 +887,9 @@ export interface Database {
   competition_enrollments: CompetitionEnrollmentsTable;
   competition_goal_brackets: CompetitionGoalBracketsTable;
   competition_matches: CompetitionMatchesTable;
+  competition_match_participants: CompetitionMatchParticipantsTable;
   weekly_challenge_requests: WeeklyChallengeRequestsTable;
+  weekly_challenge_assignment_participants: WeeklyChallengeAssignmentParticipantsTable;
   competition_progress: CompetitionProgressTable;
   competition_settlement_inputs: CompetitionSettlementInputsTable;
   competition_rule_acceptances: CompetitionRuleAcceptancesTable;

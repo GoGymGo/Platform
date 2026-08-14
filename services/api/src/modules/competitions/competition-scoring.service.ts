@@ -25,7 +25,6 @@ import {
   parseCompetitionRules,
   type CompetitionRules,
 } from './competition-rules';
-import { buildAutomaticWeeklyChallengePairingPlan } from './weekly-challenge-pairing';
 
 interface ScoringCompetition {
   id: string;
@@ -110,25 +109,6 @@ export class CompetitionScoringService {
     for (const row of competitions) {
       const competition = toScoringCompetition(row);
       const periods = buildCompetitionPeriods(competition.monthKey);
-      await this.database.connection
-        .transaction()
-        .execute(async (transaction) => {
-          const activeCompetition = await transaction
-            .selectFrom('competitions')
-            .select('status')
-            .where('id', '=', competition.id)
-            .forUpdate()
-            .executeTakeFirst();
-          if (activeCompetition?.status === 'active') {
-            await this.ensureWeeklyChallengeMatches(
-              transaction,
-              competition.id,
-              competition.monthKey,
-              now,
-              periods,
-            );
-          }
-        });
       const regionalDateKey = dateKeyInTimezone(now, competition.timezone);
       for (const period of periods) {
         if (settled >= settlementLimit) {
@@ -208,121 +188,148 @@ export class CompetitionScoringService {
     };
   }
 
-  async ensureWeeklyChallengeMatches(
+  private async prepareWeeklyChallengeSettlementRows(
     transaction: Transaction<Database>,
     competitionId: string,
-    monthKey: string,
+    period: CompetitionPeriod,
     now: Date,
-    periods: readonly CompetitionPeriod[] = buildCompetitionPeriods(monthKey),
   ): Promise<number> {
-    if (periods.length === 0) {
-      return 0;
-    }
-
     const enrollments = await this.loadEnrollments(transaction, competitionId);
-    if (enrollments.length === 0) {
-      return 0;
-    }
+    const enrollmentByUserId = new Map(
+      enrollments.map((enrollment) => [enrollment.userId, enrollment]),
+    );
     const existingMatches = await transaction
       .selectFrom('competition_matches')
-      .select(['id', 'period_index', 'status', 'user_a_id', 'user_b_id'])
+      .select([
+        'id',
+        'status',
+        'user_a_id',
+        'user_b_id',
+        'weekly_challenge_request_id',
+      ])
       .where('competition_id', '=', competitionId)
-      .where(
-        'period_index',
-        'in',
-        periods.map((period) => period.index),
-      )
+      .where('period_index', '=', period.index)
+      .where('status', '!=', 'cancelled')
+      .orderBy('id')
       .execute();
+    const validMatches: typeof existingMatches = [];
     let changes = 0;
 
-    for (const period of periods) {
-      const assignedUserIds = new Set<string>();
-      const periodMatches = existingMatches.filter(
-        (match) => match.period_index === period.index,
-      );
-      const waitingMatches = periodMatches
-        .filter(
-          (match) => match.status === 'searching' && match.user_b_id === null,
-        )
-        .map((match) => ({ id: match.id, userId: match.user_a_id }));
-      for (const match of periodMatches) {
-        if (match.status === 'searching' && match.user_b_id === null) {
-          continue;
-        }
-        assignedUserIds.add(match.user_a_id);
-        if (match.user_b_id) assignedUserIds.add(match.user_b_id);
+    for (const match of existingMatches) {
+      if (match.status !== 'matched' || !match.user_b_id) {
+        validMatches.push(match);
+        continue;
       }
-
-      const pairingPlan = buildAutomaticWeeklyChallengePairingPlan(
-        enrollments,
-        waitingMatches,
-        assignedUserIds,
-      );
-      const affectedUserIds = new Set<string>();
-
-      if (pairingPlan.deleteMatchIds.length > 0) {
-        await transaction
-          .deleteFrom('competition_matches')
-          .where('id', 'in', pairingPlan.deleteMatchIds)
-          .where('status', '=', 'searching')
-          .where('user_b_id', 'is', null)
-          .execute();
-        changes += pairingPlan.deleteMatchIds.length;
-      }
-
-      for (const update of pairingPlan.matchWaitingUsers) {
-        await transaction
-          .updateTable('competition_matches')
-          .set({ status: 'matched', user_b_id: update.userBId })
-          .where('id', '=', update.matchId)
-          .where('status', '=', 'searching')
-          .where('user_a_id', '=', update.userAId)
-          .where('user_b_id', 'is', null)
-          .executeTakeFirstOrThrow();
-        affectedUserIds.add(update.userAId);
-        affectedUserIds.add(update.userBId);
-        changes += 1;
-      }
-
-      for (const pair of pairingPlan.create) {
-        await transaction
-          .insertInto('competition_matches')
-          .values({
-            competition_id: competitionId,
-            created_at: now,
-            outcome: null,
-            period_end_date: period.endDateKey,
-            period_index: period.index,
-            period_start_date: period.startDateKey,
-            settled_at: null,
-            status: pair.userBId ? 'matched' : 'searching',
-            user_a_id: pair.userAId,
-            user_b_id: pair.userBId,
-          })
-          .executeTakeFirstOrThrow();
-        affectedUserIds.add(pair.userAId);
-        if (pair.userBId) affectedUserIds.add(pair.userBId);
-        changes += 1;
-      }
-
-      if (affectedUserIds.size > 0) {
-        const userIds = [...affectedUserIds];
-        await transaction
-          .updateTable('weekly_challenge_requests')
-          .set({ responded_at: now, status: 'cancelled' })
+      const [userAId, userBId] = [match.user_a_id, match.user_b_id].sort();
+      const [request, friendship, block] = await Promise.all([
+        transaction
+          .selectFrom('weekly_challenge_requests')
+          .select(['goal_days', 'id'])
+          .where('id', '=', match.weekly_challenge_request_id ?? '')
           .where('competition_id', '=', competitionId)
           .where('period_index', '=', period.index)
-          .where('status', '=', 'pending')
+          .where('status', '=', 'accepted')
+          .executeTakeFirst(),
+        transaction
+          .selectFrom('friendships')
+          .select('created_at')
+          .where('user_a_id', '=', userAId)
+          .where('user_b_id', '=', userBId)
+          .executeTakeFirst(),
+        transaction
+          .selectFrom('user_blocks')
+          .select('id')
           .where((expression) =>
             expression.or([
-              expression('requester_user_id', 'in', userIds),
-              expression('recipient_user_id', 'in', userIds),
+              expression.and([
+                expression('blocker_user_id', '=', userAId),
+                expression('blocked_user_id', '=', userBId),
+              ]),
+              expression.and([
+                expression('blocker_user_id', '=', userBId),
+                expression('blocked_user_id', '=', userAId),
+              ]),
             ]),
           )
+          .executeTakeFirst(),
+      ]);
+      const userA = enrollmentByUserId.get(match.user_a_id);
+      const userB = enrollmentByUserId.get(match.user_b_id);
+      const directMatchIsEligible =
+        request &&
+        friendship &&
+        !block &&
+        userA &&
+        userB &&
+        userA.goalDays === request.goal_days &&
+        userB.goalDays === request.goal_days;
+
+      if (directMatchIsEligible) {
+        validMatches.push(match);
+        continue;
+      }
+      if (match.weekly_challenge_request_id) {
+        await transaction
+          .updateTable('weekly_challenge_requests')
+          .set({
+            cancellation_reason: 'period_eligibility_lost',
+            responded_at: now,
+            status: 'cancelled',
+          })
+          .where('id', '=', match.weekly_challenge_request_id)
+          .where('status', '=', 'accepted')
           .execute();
       }
+      await transaction
+        .updateTable('competition_matches')
+        .set({
+          outcome: { reason: 'direct_partner_eligibility_lost' },
+          settled_at: now,
+          status: 'cancelled',
+        })
+        .where('id', '=', match.id)
+        .where('status', '=', 'matched')
+        .executeTakeFirstOrThrow();
+      changes += 1;
     }
 
+    const assignedUserIds = new Set<string>();
+    for (const match of validMatches) {
+      assignedUserIds.add(match.user_a_id);
+      if (match.user_b_id) assignedUserIds.add(match.user_b_id);
+    }
+    for (const enrollment of enrollments) {
+      if (assignedUserIds.has(enrollment.userId)) continue;
+      await transaction
+        .insertInto('competition_matches')
+        .values({
+          competition_id: competitionId,
+          created_at: now,
+          outcome: null,
+          period_end_date: period.endDateKey,
+          period_index: period.index,
+          period_start_date: period.startDateKey,
+          settled_at: null,
+          status: 'searching',
+          user_a_id: enrollment.userId,
+          user_b_id: null,
+          weekly_challenge_request_id: null,
+        })
+        .executeTakeFirstOrThrow();
+      changes += 1;
+    }
+
+    await transaction
+      .updateTable('weekly_challenge_requests')
+      .set({
+        cancellation_reason: 'period_closed',
+        responded_at: now,
+        status: 'cancelled',
+      })
+      .where('competition_id', '=', competitionId)
+      .where('period_index', '=', period.index)
+      .where('status', '=', 'pending')
+      .execute();
     return changes;
   }
 
@@ -340,12 +347,11 @@ export class CompetitionScoringService {
       return false;
     }
 
-    await this.ensureWeeklyChallengeMatches(
+    await this.prepareWeeklyChallengeSettlementRows(
       transaction,
       competition.id,
-      competition.monthKey,
+      period,
       now,
-      [period],
     );
 
     const enrollments = await this.loadEnrollments(transaction, competition.id);
@@ -366,6 +372,7 @@ export class CompetitionScoringService {
       .select(['id', 'status', 'user_a_id', 'user_b_id'])
       .where('competition_id', '=', competition.id)
       .where('period_index', '=', period.index)
+      .where('status', '!=', 'cancelled')
       .orderBy('id')
       .execute();
     const matches: ScoringMatch[] = matchRows.map((match) => ({
@@ -429,6 +436,7 @@ export class CompetitionScoringService {
           status: 'searching',
           user_a_id: enrollment.userId,
           user_b_id: null,
+          weekly_challenge_request_id: null,
         })
         .returning(['id', 'status', 'user_a_id', 'user_b_id'])
         .executeTakeFirstOrThrow();
@@ -450,16 +458,6 @@ export class CompetitionScoringService {
       changed = true;
     }
 
-    if (changed) {
-      await transaction
-        .updateTable('weekly_challenge_requests')
-        .set({ responded_at: now, status: 'cancelled' })
-        .where('competition_id', '=', competition.id)
-        .where('period_index', '=', period.index)
-        .where('status', '=', 'pending')
-        .execute();
-    }
-
     return changed;
   }
 
@@ -479,7 +477,6 @@ export class CompetitionScoringService {
       : null;
     const userAOutcome = this.calculateUserWeeklyOutcome(
       competition,
-      period,
       userA,
       userAVerifiedDays,
       userBVerifiedDays,
@@ -489,7 +486,6 @@ export class CompetitionScoringService {
       outcomes.push(
         this.calculateUserWeeklyOutcome(
           competition,
-          period,
           userB,
           userBVerifiedDays,
           userAVerifiedDays,
@@ -554,25 +550,11 @@ export class CompetitionScoringService {
 
   private calculateUserWeeklyOutcome(
     competition: ScoringCompetition,
-    period: CompetitionPeriod,
     enrollment: ScoringEnrollment,
     verifiedDays: number,
     opponentVerifiedDays: number | null,
   ): UserWeeklyOutcome {
-    const enrollmentDateKey = dateKeyInTimezone(
-      enrollment.enrolledAt,
-      competition.timezone,
-    );
-    const availableStartDateKey =
-      enrollmentDateKey > period.startDateKey
-        ? enrollmentDateKey
-        : period.startDateKey;
-    const availableDays = inclusiveDayCount(
-      availableStartDateKey,
-      period.endDateKey,
-    );
     const score = calculateWeeklyScore({
-      availableDays,
       bothHitMultiplier: competition.rules.weeklyChallengeBothHitMultiplier,
       entriesPerVerifiedDay: competition.rules.verifiedSessionPrizeDrawEntries,
       goalDays: enrollment.goalDays,
@@ -1109,12 +1091,6 @@ function toJsonOutcome(outcome: UserWeeklyOutcome): JsonObject {
     userId: outcome.userId,
     verifiedDays: outcome.verifiedDays,
   };
-}
-
-function inclusiveDayCount(startDateKey: string, endDateKey: string): number {
-  const start = Date.parse(`${startDateKey}T00:00:00.000Z`);
-  const end = Date.parse(`${endDateKey}T00:00:00.000Z`);
-  return Math.max(0, Math.floor((end - start) / 86_400_000) + 1);
 }
 
 function sumByUser(

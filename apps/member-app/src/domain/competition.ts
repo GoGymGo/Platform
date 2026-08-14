@@ -75,18 +75,25 @@ export type CompetitionPeriod = {
 
 export type CompetitionMatch = {
   availability: MatchAvailability;
-  opponentAlias: string;
-  opponentBestStreak?: number;
-  opponentCurrentStreak?: number;
-  opponentMonthlyVerifiedDays?: number;
+  entries: number;
+  multiplier: 0 | 1 | 2 | 3;
+  opponentAlias: string | null;
+  opponentBestStreak: number;
+  opponentCurrentStreak: number;
+  opponentMonthlyVerifiedDays: number;
   opponentStreaks: StreakCounts;
-  opponentUserId?: string | null;
-  opponentVerifiedDateKeys: readonly string[];
+  opponentVerifiedCount: number;
   periodIndex: CompetitionPeriodIndex;
   region: string;
+  scoringStatus: 'projected' | 'settled';
 };
 
-export type CompetitionPeriodStatus = 'future' | 'in-progress' | 'settled' | 'ineligible';
+export type CompetitionPeriodStatus =
+  | 'future'
+  | 'in-progress'
+  | 'pending-settlement'
+  | 'settled'
+  | 'ineligible';
 
 export type CompetitionPeriodResult = {
   availability: MatchAvailability;
@@ -101,11 +108,11 @@ export type CompetitionPeriodResult = {
   opponentGoalMet: boolean;
   opponentMonthlyVerifiedDays: number;
   opponentStreaks: StreakCounts;
-  opponentUserId: string | null;
   opponentVerifiedCount: number;
-  opponentVerifiedDateKeys: readonly string[];
   period: CompetitionPeriod;
+  projectedEntries: number;
   region: string;
+  scoringStatus: 'projected' | 'settled';
   status: CompetitionPeriodStatus;
   userGoalMet: boolean;
   userVerifiedCount: number;
@@ -183,46 +190,30 @@ export function evaluateMonthlyCompetition({
   const periodResults = calendar.periods.map((period) => {
     const periodEligible = period.endDateKey >= eligibleFromDateKey;
     const match = matches.find((candidate) => candidate.periodIndex === period.index);
-    const availability = match?.availability ?? 'solo';
-    const eligiblePeriodDateKeys = period.dateKeys.filter(
-      (dateKey) => dateKey >= eligibleFromDateKey
-    );
+    const availability = match?.availability ?? 'searching';
     const userDates = periodEligible ? datesInsidePeriod(visibleUserDates, period) : [];
-    const opponentDates = periodEligible
-      ? datesInsidePeriod(
-          uniqueDateKeys(match?.opponentVerifiedDateKeys ?? []).filter(
-            (dateKey) => dateKey <= referenceDateKey
-          ),
-          period
-        )
-      : [];
-    const status = periodEligible
+    const calendarStatus = periodEligible
       ? getPeriodStatus(period, referenceDateKey)
       : 'ineligible';
+    const status = calendarStatus === 'settled' && match?.scoringStatus !== 'settled'
+      ? 'pending-settlement'
+      : calendarStatus;
     const userGoalMet = userDates.length >= goal;
-    const opponentGoalMet = availability === 'matched' && opponentDates.length >= goal;
-    const bonusWorkoutCompleted =
-      userGoalMet &&
-      (goal >= eligiblePeriodDateKeys.length || userDates.length > goal);
-    const liveMultiplier = getLiveMultiplier({
-      availability,
-      bonusWorkoutCompleted,
-      opponentGoalMet,
-      userGoalMet
-    });
-    const finalMultiplier = status === 'settled'
-      ? getFinalMultiplier({
-          availability,
-          bonusWorkoutCompleted,
-          opponentGoalMet,
-          userGoalMet
-        })
+    const opponentVerifiedCount = periodEligible
+      ? (match?.opponentVerifiedCount ?? 0)
+      : 0;
+    const opponentGoalMet =
+      availability === 'matched' && opponentVerifiedCount >= goal;
+    const bonusWorkoutCompleted = userGoalMet && userDates.length > goal;
+    const liveMultiplier = match?.multiplier ?? 0;
+    const finalMultiplier = match?.scoringStatus === 'settled'
+      ? match.multiplier
       : 0;
 
     return {
       availability,
       bonusWorkoutCompleted,
-      entries: goal * finalMultiplier,
+      entries: match?.scoringStatus === 'settled' ? match.entries : 0,
       finalMultiplier,
       index: period.index,
       liveMultiplier,
@@ -232,11 +223,11 @@ export function evaluateMonthlyCompetition({
       opponentGoalMet,
       opponentMonthlyVerifiedDays: match?.opponentMonthlyVerifiedDays ?? 0,
       opponentStreaks: match?.opponentStreaks ?? emptyStreakCounts,
-      opponentUserId: match?.opponentUserId ?? null,
-      opponentVerifiedCount: opponentDates.length,
-      opponentVerifiedDateKeys: opponentDates,
+      opponentVerifiedCount,
       period,
+      projectedEntries: match?.entries ?? 0,
       region: match?.region ?? 'YOUR REGION',
+      scoringStatus: match?.scoringStatus ?? 'projected',
       status,
       userGoalMet,
       userVerifiedCount: userDates.length,
@@ -296,14 +287,12 @@ export type EligibleWeeklyChallengePartner = {
 };
 
 export type WeeklyChallengeRequest = {
-  competitionId: string;
   createdAt: string;
   direction: 'incoming' | 'outgoing';
   goalDays: number;
   id: string;
   partnerAlias: string;
   partnerStreaks: StreakCounts;
-  partnerUserId: string;
   periodIndex: CompetitionPeriodIndex;
   status: 'accepted' | 'cancelled' | 'declined' | 'pending';
 };
@@ -440,58 +429,6 @@ function getPeriodStatus(
   }
 
   return referenceDateKey <= period.endDateKey ? 'in-progress' : 'settled';
-}
-
-function getLiveMultiplier({
-  availability,
-  bonusWorkoutCompleted,
-  opponentGoalMet,
-  userGoalMet
-}: {
-  availability: MatchAvailability;
-  bonusWorkoutCompleted: boolean;
-  opponentGoalMet: boolean;
-  userGoalMet: boolean;
-}): 0 | 1 | 2 | 3 {
-  if (!userGoalMet) {
-    return 0;
-  }
-
-  if (availability !== 'matched') {
-    return 1;
-  }
-
-  if (opponentGoalMet) {
-    return 2;
-  }
-
-  return bonusWorkoutCompleted ? 3 : 1;
-}
-
-function getFinalMultiplier({
-  availability,
-  bonusWorkoutCompleted,
-  opponentGoalMet,
-  userGoalMet
-}: {
-  availability: MatchAvailability;
-  bonusWorkoutCompleted: boolean;
-  opponentGoalMet: boolean;
-  userGoalMet: boolean;
-}): 0 | 1 | 2 | 3 {
-  if (!userGoalMet) {
-    return 0;
-  }
-
-  if (availability !== 'matched') {
-    return 1;
-  }
-
-  if (opponentGoalMet) {
-    return 2;
-  }
-
-  return bonusWorkoutCompleted ? 3 : 1;
 }
 
 function datesInsidePeriod(

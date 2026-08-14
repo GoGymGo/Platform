@@ -7,7 +7,6 @@ import {
   type CompetitionStartResolution,
 } from './competition-lifecycle';
 import { closeCompetitionParticipation } from './competition-participation';
-import { CompetitionScoringService } from './competition-scoring.service';
 
 export interface CompetitionLifecycleResult {
   activated: number;
@@ -19,7 +18,6 @@ export class CompetitionLifecycleService {
   constructor(
     private readonly database: DatabaseService,
     private readonly notifications: NotificationsService,
-    private readonly scoring: CompetitionScoringService,
   ) {}
 
   async processDueStarts(limit = 50): Promise<CompetitionLifecycleResult> {
@@ -99,15 +97,6 @@ export class CompetitionLifecycleService {
           .where('id', '=', competition.id)
           .where('status', '=', 'registration')
           .executeTakeFirstOrThrow();
-
-        if (nextStatus === 'active') {
-          await this.scoring.ensureWeeklyChallengeMatches(
-            transaction,
-            competition.id,
-            competition.month_key,
-            now,
-          );
-        }
 
         if (nextStatus === 'cancelled') {
           const enrollments = await closeCompetitionParticipation(

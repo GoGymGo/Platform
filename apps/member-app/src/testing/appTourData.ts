@@ -220,6 +220,7 @@ export function createAppTourDataSource(): AppDataSource {
       }
     ],
     getWeeklyChallengeRequests: async (
+      _competitionId,
       _competitionMonthKey,
       goalDays,
       _region,
@@ -291,6 +292,7 @@ export function createAppTourDataSource(): AppDataSource {
       workoutStyle: 'Strength + conditioning'
     } satisfies CreatorWorkoutPlan),
     requestWeeklyChallengePartner: async (
+      _competitionId,
       _competitionMonthKey,
       goalDays,
       _region,
@@ -300,6 +302,11 @@ export function createAppTourDataSource(): AppDataSource {
       ...createWeeklyChallengeRequest(4, 1),
       id: requestId,
       status: decision
+    }),
+    cancelWeeklyChallengeRequest: async (requestId) => ({
+      ...createWeeklyChallengeRequest(4, 1),
+      id: requestId,
+      status: 'cancelled'
     }),
     submitCreatorVideo: async (input) => ({
       createdAt: nowIso(),
@@ -910,24 +917,22 @@ function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
 }
 
 function createCompetitionMatches(
-  monthKey: string,
+  _monthKey: string,
   region: string
 ): readonly CompetitionMatch[] {
   return ([1, 2, 3, 4] as const).map((periodIndex) => ({
     availability: 'matched',
+    entries: 0,
+    multiplier: 1,
     opponentAlias: periodIndex % 2 === 0 ? 'MOVE_MORE' : 'NORTH_STAR',
     opponentBestStreak: 8,
     opponentCurrentStreak: 3,
     opponentMonthlyVerifiedDays: 14,
     opponentStreaks: fixedStreaks,
-    opponentUserId: `app-tour-opponent-${periodIndex}`,
-    opponentVerifiedDateKeys: [
-      `${monthKey}-${String((periodIndex - 1) * 7 + 2).padStart(2, '0')}`,
-      `${monthKey}-${String((periodIndex - 1) * 7 + 4).padStart(2, '0')}`,
-      `${monthKey}-${String((periodIndex - 1) * 7 + 6).padStart(2, '0')}`
-    ],
+    opponentVerifiedCount: 3,
     periodIndex,
-    region
+    region,
+    scoringStatus: 'projected'
   }));
 }
 
@@ -936,14 +941,12 @@ function createWeeklyChallengeRequest(
   periodIndex: number
 ): WeeklyChallengeRequest {
   return {
-    competitionId: appTourCompetitionId,
     createdAt: nowIso(),
     direction: 'incoming',
     goalDays,
     id: 'app-tour-weekly-request',
     partnerAlias: 'MOVE_MORE',
     partnerStreaks: fixedStreaks,
-    partnerUserId: 'app-tour-friend',
     periodIndex: normalizePeriodIndex(periodIndex),
     status: 'pending'
   };

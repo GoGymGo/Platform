@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `7268a6bffb2fc06499f6585ffa8a43ca89764d0a` after PR #77 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-004 — Competition enrollment and
-  withdrawal` on `agent/ggg-004-competition-enrollment`.
+  `b4e98a63933143b2a7eed70bab02c0aeb879c1d7` after PR #80 on 2026-08-13.
+- Active feature task: none while the coordinator records GGG-004 completion and
+  prepares the next dependency-ordered feature assignment.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -178,18 +178,29 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   role/version/reason/idempotency protected.
 - External providers / feature flag: Firebase and database; competition status is
   server configuration, not a client flag.
-- Current implementation / missing behavior: connected late enrollment, entrant
-  cap, single-entrant launch, immutable goal, and withdrawal cleanup. Missing
-  staging lifecycle and real-pilot configuration evidence.
+- Current implementation / missing behavior: server-authoritative Contest time,
+  status, and exact-contest count; immutable Weekly Goal and enrollment evidence;
+  stable idempotent enroll/withdraw identity; irreversible audited withdrawal;
+  transactional dependent cleanup; locked/idempotent under-minimum lifecycle
+  cancellation; and fail-closed publication prerequisites are connected. Missing
+  only authorized rollout, real-pilot configuration, and deployed-worker staging
+  observation.
 - Required tests / operations / cloud dependency: registration timing, cap,
   idempotency, immutable goal, one enrollment, withdrawal closing workouts and
-  challenge eligibility, worker activation/cancellation; database and deployed
-  worker.
+  challenge eligibility, exact-contest count isolation, database integrity,
+  rollback-safe worker activation/cancellation, admin preflight, and generated
+  contracts passed locally and in CI. Production migration application and
+  deployed-worker observation require separate deployment authorization.
 - Delivery: priority `P0`; assigned task `GoGymGo Feature GGG-004 — Competition
-  enrollment and withdrawal`; branch `agent/ggg-004-competition-enrollment`;
-  PR/merge `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: published Contest requires approved legal, reward,
-  region, and assigned-gym prerequisites.
+  enrollment and withdrawal`; branch `agent/ggg-004-competition-enrollment`
+  deleted; PR #80; exact tested head
+  `bbaa881f2b1dfd458aa13a6e41da2f0725dd1081`; merge
+  `b4e98a63933143b2a7eed70bab02c0aeb879c1d7`; status `COMPLETE`.
+- Residual risks / blocker: migration application, real pilot legal/reward/
+  region/gym approvals and schedule, deployed worker, and staging lifecycle
+  observation remain external release gates. GGG-005, GGG-006, GGG-007, and
+  GGG-010 retain their separately owned duties. No cloud access or deployment
+  occurred.
 
 ### GGG-005 — Partner gym selection and contest QR enrollment
 
@@ -962,6 +973,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-004` through PR #80. Exact tested head
+  `bbaa881f2b1dfd458aa13a6e41da2f0725dd1081` was squash-merged as
+  `b4e98a63933143b2a7eed70bab02c0aeb879c1d7`; all PR and six main-push checks
+  passed, the remote feature branch was deleted, and there was no cloud impact.
+  Server-authoritative Contest state/counts, immutable enrollment evidence,
+  idempotent enrollment/withdrawal, audited transactional cleanup, lifecycle
+  cancellation safety, publication prerequisites, contracts, and direct
+  regressions are complete; authorized rollout and staging observation remain.
 - 2026-08-13 — Assigned `GGG-004` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-003 completion ledger merged through PR #78 as
   `4188fe8f0e246b41b4dd0a1191a7245c55a32c9c` with green main-push checks.

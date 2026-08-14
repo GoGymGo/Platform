@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import type { Transaction } from 'kysely';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { sql, type Transaction } from 'kysely';
 import type {
   Database,
   JsonObject,
@@ -11,6 +11,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import {
   applyCategoryMultiplier,
   calculateWeeklyScore,
+  competitionTieBreakDigest,
   longestConsecutiveDateStreak,
   rankCategoryStandings,
 } from './competition-scoring';
@@ -55,6 +56,24 @@ interface UserWeeklyOutcome {
   recovered: boolean;
   userId: string;
   verifiedDays: number;
+}
+
+export interface CompetitionSettlementInput {
+  categoryRank: number;
+  categoryScore: number;
+  enrollmentId: string;
+  goalDays: number;
+  longestStreak: number;
+  prizeDrawEntries: number;
+  rulesVersion: string;
+  tieBreakDigest: string;
+  userId: string;
+  verifiedDays: number;
+}
+
+export interface FinalizedCompetitionScoring {
+  reconciledProgressRows: number;
+  settlementInputs: CompetitionSettlementInput[];
 }
 
 @Injectable()
@@ -151,7 +170,7 @@ export class CompetitionScoringService {
     transaction: Transaction<Database>,
     competitionId: string,
     now: Date,
-  ): Promise<void> {
+  ): Promise<FinalizedCompetitionScoring> {
     const row = await transaction
       .selectFrom('competitions as competition')
       .innerJoin(
@@ -167,13 +186,26 @@ export class CompetitionScoringService {
         'region.timezone',
       ])
       .where('competition.id', '=', competitionId)
+      .forUpdate()
       .executeTakeFirstOrThrow();
     const competition = toScoringCompetition(row);
 
     for (const period of buildCompetitionPeriods(competition.monthKey)) {
       await this.settlePeriod(transaction, competition, period, now, false);
     }
+    const reconciledProgressRows = await this.reconcileProgressFromLedger(
+      transaction,
+      competition,
+      now,
+    );
     await this.applyFinalAdjustments(transaction, competition);
+    return {
+      reconciledProgressRows,
+      settlementInputs: await this.buildSettlementInputs(
+        transaction,
+        competition,
+      ),
+    };
   }
 
   async ensureWeeklyChallengeMatches(
@@ -587,6 +619,209 @@ export class CompetitionScoringService {
     };
   }
 
+  private async reconcileProgressFromLedger(
+    transaction: Transaction<Database>,
+    competition: ScoringCompetition,
+    now: Date,
+  ): Promise<number> {
+    const enrollments = await this.loadEnrollments(transaction, competition.id);
+    const [ledgerRows, progressRows, verifiedDateKeys] = await Promise.all([
+      transaction
+        .selectFrom('entry_ledger')
+        .select((expression) => [
+          'enrollment_id',
+          'user_id',
+          expression.fn
+            .sum<number>('category_score_delta')
+            .as('category_score'),
+          expression.fn
+            .sum<number>('prize_draw_entries_delta')
+            .as('prize_draw_entries'),
+          expression.fn.sum<number>('verified_days_delta').as('verified_days'),
+        ])
+        .where('competition_id', '=', competition.id)
+        .groupBy(['enrollment_id', 'user_id'])
+        .execute(),
+      transaction
+        .selectFrom('competition_progress')
+        .select([
+          'category_score',
+          'enrollment_id',
+          'goal_days',
+          'prize_draw_entries',
+          'user_id',
+          'verified_days',
+        ])
+        .where('competition_id', '=', competition.id)
+        .execute(),
+      this.loadVerifiedDateKeys(
+        transaction,
+        competition.id,
+        `${competition.monthKey}-01`,
+        competitionMonthEndDateKey(competition.monthKey),
+      ),
+    ]);
+    const ledgerByUser = new Map(ledgerRows.map((row) => [row.user_id, row]));
+    const progressByUser = new Map(
+      progressRows.map((row) => [row.user_id, row]),
+    );
+    let reconciled = 0;
+
+    for (const enrollment of enrollments) {
+      const ledger = ledgerByUser.get(enrollment.userId);
+      if (!ledger || ledger.enrollment_id !== enrollment.id) {
+        throw scoringIntegrityConflict(
+          'SCORING_LEDGER_ENROLLMENT_MISMATCH',
+          'The scoring ledger does not match the active Contest enrollment.',
+        );
+      }
+      const totals = {
+        categoryScore: Number(ledger.category_score ?? 0),
+        prizeDrawEntries: Number(ledger.prize_draw_entries ?? 0),
+        verifiedDays: Number(ledger.verified_days ?? 0),
+      };
+      if (
+        totals.categoryScore < 0 ||
+        totals.prizeDrawEntries < 0 ||
+        totals.verifiedDays < 0 ||
+        totals.verifiedDays !==
+          (verifiedDateKeys.get(enrollment.userId)?.length ?? 0)
+      ) {
+        throw scoringIntegrityConflict(
+          'SCORING_LEDGER_VERIFIED_DAY_MISMATCH',
+          'Verified workout days and the append-only scoring ledger require reconciliation before settlement.',
+        );
+      }
+      const current = progressByUser.get(enrollment.userId);
+      if (
+        current?.enrollment_id === enrollment.id &&
+        current.goal_days === enrollment.goalDays &&
+        current.category_score === totals.categoryScore &&
+        current.prize_draw_entries === totals.prizeDrawEntries &&
+        current.verified_days === totals.verifiedDays
+      ) {
+        continue;
+      }
+
+      await transaction
+        .insertInto('competition_progress')
+        .values({
+          category_score: totals.categoryScore,
+          competition_id: competition.id,
+          enrollment_id: enrollment.id,
+          goal_days: enrollment.goalDays,
+          prize_draw_entries: totals.prizeDrawEntries,
+          updated_at: now,
+          user_id: enrollment.userId,
+          verified_days: totals.verifiedDays,
+        })
+        .onConflict((conflict) =>
+          conflict.columns(['competition_id', 'user_id']).doUpdateSet({
+            category_score: totals.categoryScore,
+            enrollment_id: enrollment.id,
+            goal_days: enrollment.goalDays,
+            prize_draw_entries: totals.prizeDrawEntries,
+            updated_at: now,
+            verified_days: totals.verifiedDays,
+          }),
+        )
+        .executeTakeFirstOrThrow();
+      reconciled += 1;
+    }
+
+    return reconciled;
+  }
+
+  private async buildSettlementInputs(
+    transaction: Transaction<Database>,
+    competition: ScoringCompetition,
+  ): Promise<CompetitionSettlementInput[]> {
+    const enrollments = await this.loadEnrollments(transaction, competition.id);
+    const [progressRows, verifiedDateKeys] = await Promise.all([
+      transaction
+        .selectFrom('competition_progress')
+        .select([
+          'category_score',
+          'prize_draw_entries',
+          'user_id',
+          'verified_days',
+        ])
+        .where('competition_id', '=', competition.id)
+        .execute(),
+      this.loadVerifiedDateKeys(
+        transaction,
+        competition.id,
+        `${competition.monthKey}-01`,
+        competitionMonthEndDateKey(competition.monthKey),
+      ),
+    ]);
+    const progressByUser = new Map(
+      progressRows.map((row) => [row.user_id, row]),
+    );
+    const rankByUser = new Map<string, number>();
+
+    for (const goalDays of new Set(
+      enrollments.map((enrollment) => enrollment.goalDays),
+    )) {
+      const standings = rankCategoryStandings(
+        competition.id,
+        competition.rulesVersion,
+        enrollments
+          .filter((enrollment) => enrollment.goalDays === goalDays)
+          .map((enrollment) => {
+            const progress = progressByUser.get(enrollment.userId);
+            const dateKeys = verifiedDateKeys.get(enrollment.userId) ?? [];
+            if (!progress || progress.verified_days !== dateKeys.length) {
+              throw scoringIntegrityConflict(
+                'SCORING_PROGRESS_VERIFIED_DAY_MISMATCH',
+                'Contest progress does not match its verified-day evidence.',
+              );
+            }
+            return {
+              categoryScore: progress.category_score,
+              goalDays,
+              longestStreak: longestConsecutiveDateStreak(dateKeys),
+              userId: enrollment.userId,
+              verifiedDays: progress.verified_days,
+            };
+          }),
+      );
+      for (const standing of standings) {
+        rankByUser.set(standing.userId, standing.rank);
+      }
+    }
+
+    return enrollments
+      .map((enrollment) => {
+        const progress = progressByUser.get(enrollment.userId);
+        const categoryRank = rankByUser.get(enrollment.userId);
+        const dateKeys = verifiedDateKeys.get(enrollment.userId) ?? [];
+        if (!progress || !categoryRank || progress.prize_draw_entries <= 0) {
+          throw scoringIntegrityConflict(
+            'SCORING_SETTLEMENT_INPUT_MISSING',
+            'Every active entrant requires positive, reconciled settlement input.',
+          );
+        }
+        return {
+          categoryRank,
+          categoryScore: progress.category_score,
+          enrollmentId: enrollment.id,
+          goalDays: enrollment.goalDays,
+          longestStreak: longestConsecutiveDateStreak(dateKeys),
+          prizeDrawEntries: progress.prize_draw_entries,
+          rulesVersion: competition.rulesVersion,
+          tieBreakDigest: competitionTieBreakDigest(
+            competition.id,
+            competition.rulesVersion,
+            enrollment.userId,
+          ),
+          userId: enrollment.userId,
+          verifiedDays: progress.verified_days,
+        } satisfies CompetitionSettlementInput;
+      })
+      .sort((left, right) => left.userId.localeCompare(right.userId));
+  }
+
   private async applyFinalAdjustments(
     transaction: Transaction<Database>,
     competition: ScoringCompetition,
@@ -624,6 +859,7 @@ export class CompetitionScoringService {
     )) {
       const standings = rankCategoryStandings(
         competition.id,
+        competition.rulesVersion,
         enrollments
           .filter((enrollment) => enrollment.goalDays === goalDays)
           .map((enrollment) => {
@@ -683,13 +919,22 @@ export class CompetitionScoringService {
         competitionMonthEndDateKey(competition.monthKey),
       );
       const bonusCategoryScoreAdjustment = -provisionalBonusValue.categoryScore;
-      const perfectMonth = buildCompetitionPeriods(competition.monthKey).every(
-        (period) =>
-          firstFourWeekDays.filter(
-            (dateKey) =>
-              dateKey >= period.startDateKey && dateKey <= period.endDateKey,
-          ).length >= enrollment.goalDays,
+      const enrollmentDateKey = dateKeyInTimezone(
+        enrollment.enrolledAt,
+        competition.timezone,
       );
+      const eligiblePeriods = buildCompetitionPeriods(
+        competition.monthKey,
+      ).filter((period) => period.endDateKey >= enrollmentDateKey);
+      const perfectMonth =
+        eligiblePeriods.length > 0 &&
+        eligiblePeriods.every(
+          (period) =>
+            firstFourWeekDays.filter(
+              (dateKey) =>
+                dateKey >= period.startDateKey && dateKey <= period.endDateKey,
+            ).length >= enrollment.goalDays,
+        );
       const perfectMonthBase = categoryAdjustedEntries + bonusEntries;
       const perfectMonthAdjustment = perfectMonth
         ? perfectMonthBase * (competition.rules.perfectMonthMultiplier - 1)
@@ -796,13 +1041,36 @@ export class CompetitionScoringService {
     endDateKey: string,
   ): Promise<Map<string, string[]>> {
     const rows = await transaction
-      .selectFrom('workout_sessions')
-      .select(['eligible_date', 'user_id'])
-      .where('competition_id', '=', competitionId)
-      .where('eligible_date', '>=', startDateKey)
-      .where('eligible_date', '<=', endDateKey)
-      .where('status', '=', 'verified')
-      .orderBy('eligible_date')
+      .selectFrom('workout_sessions as session')
+      .innerJoin('competition_enrollments as enrollment', (join) =>
+        join
+          .onRef('enrollment.id', '=', 'session.enrollment_id')
+          .onRef('enrollment.competition_id', '=', 'session.competition_id')
+          .onRef('enrollment.user_id', '=', 'session.user_id'),
+      )
+      .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'session.competition_id',
+      )
+      .select(['session.eligible_date', 'session.user_id'])
+      .distinct()
+      .where('session.competition_id', '=', competitionId)
+      .where('session.eligible_date', '>=', startDateKey)
+      .where('session.eligible_date', '<=', endDateKey)
+      .whereRef('session.started_at', '>=', 'enrollment.enrolled_at')
+      .whereRef('session.started_at', '>=', 'competition.starts_at')
+      .whereRef('session.started_at', '<', 'competition.ends_at')
+      .whereRef('session.policy_version', '=', 'competition.rules_version')
+      .where(
+        sql<boolean>`session.gym_location_id IS NOT DISTINCT FROM enrollment.gym_location_id`,
+      )
+      .where(
+        sql<boolean>`session.gym_credential_version IS NOT DISTINCT FROM enrollment.gym_credential_version`,
+      )
+      .where('session.status', '=', 'verified')
+      .where('enrollment.status', '=', 'active')
+      .orderBy('session.eligible_date')
       .execute();
     const byUser = new Map<string, string[]>();
 
@@ -863,4 +1131,8 @@ function sumByUser(
     );
   }
   return totals;
+}
+
+function scoringIntegrityConflict(code: string, message: string) {
+  return new ConflictException({ code, message });
 }

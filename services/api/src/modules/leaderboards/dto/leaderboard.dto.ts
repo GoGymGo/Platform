@@ -29,11 +29,29 @@ export class CategoryLeaderboardRowDto {
 
   @ApiProperty({ type: Number })
   verifiedDays!: number;
+
+  @ApiProperty({ type: Boolean })
+  isCurrentUser!: boolean;
 }
 
 export class CategoryLeaderboardDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
   @ApiProperty({ maximum: 7, minimum: 1, type: Number })
   goal!: number;
+
+  @ApiProperty({ type: String })
+  rulesVersion!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  serverTime!: string;
+
+  @ApiProperty({ enum: ['final', 'provisional'], type: String })
+  scoringStatus!: 'final' | 'provisional';
+
+  @ApiProperty({ maximum: 4, minimum: 0, type: Number })
+  settledPeriodCount!: number;
 
   @ApiProperty({ isArray: true, type: CategoryLeaderboardRowDto })
   rows!: CategoryLeaderboardRowDto[];
@@ -55,6 +73,19 @@ export class CompetitionProgressResponseDto {
   @ApiProperty({ type: Number })
   prizeDrawEntries!: number;
 
+  @ApiProperty({
+    description: 'Entries settled into the append-only ledger result so far',
+    type: Number,
+  })
+  bankedPrizeDrawEntries!: number;
+
+  @ApiProperty({
+    description:
+      'Current server projection including verified days in an unsettled scoring period',
+    type: Number,
+  })
+  projectedPrizeDrawEntries!: number;
+
   @ApiProperty({ type: String })
   monthKey!: string;
 
@@ -63,6 +94,27 @@ export class CompetitionProgressResponseDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   updatedAt!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  serverTime!: string;
+
+  @ApiProperty({ type: String })
+  referenceDateKey!: string;
+
+  @ApiProperty({ type: String })
+  rulesVersion!: string;
+
+  @ApiProperty({
+    enum: ['active', 'registration', 'settled', 'settling'],
+    type: String,
+  })
+  competitionStatus!: 'active' | 'registration' | 'settled' | 'settling';
+
+  @ApiProperty({ enum: ['final', 'provisional'], type: String })
+  scoringStatus!: 'final' | 'provisional';
+
+  @ApiProperty({ maximum: 4, minimum: 0, type: Number })
+  settledPeriodCount!: number;
 
   @ApiProperty({ isArray: true, type: String })
   verifiedDateKeys!: string[];

@@ -123,6 +123,7 @@ interface CompetitionFixture {
     longitude: number;
   };
   legalReceiptBundleId: string;
+  monthKey: string;
   regionVerificationId: string;
 }
 
@@ -352,7 +353,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       .executeTakeFirstOrThrow();
     const repairedMatches = await competitions.getMatches(
       pairingPrincipal,
-      '2030-01',
+      fixture.monthKey,
       3,
       region.code,
       fixture.competitionId,
@@ -592,8 +593,16 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const activeSession = await migrated.pool.query<{ id: string }>(
       `INSERT INTO workout_sessions
          (competition_id, enrollment_id, user_id, eligible_date, status,
-          policy_version, started_at)
-       VALUES ($1, $2, $3, CURRENT_DATE, 'active', 'rules-v1', CURRENT_TIMESTAMP)
+          policy_version, started_at, gym_location_id, gym_credential_version)
+       SELECT $1, $2, $3,
+              (competition.starts_at AT TIME ZONE region.timezone)::date,
+              'active', 'rules-v1', competition.starts_at,
+              enrollment.gym_location_id, enrollment.gym_credential_version
+       FROM competition_enrollments AS enrollment
+       INNER JOIN competitions AS competition ON competition.id = $1
+       INNER JOIN region_policies AS region
+         ON region.id = competition.region_policy_id
+       WHERE enrollment.id = $2
        RETURNING id`,
       [
         fixture.competitionId,
@@ -732,8 +741,16 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const session = await migrated.pool.query<{ id: string }>(
       `INSERT INTO workout_sessions
          (competition_id, enrollment_id, user_id, eligible_date, status,
-          policy_version, started_at)
-       VALUES ($1, $2, $3, CURRENT_DATE, 'active', 'rules-v1', CURRENT_TIMESTAMP)
+          policy_version, started_at, gym_location_id, gym_credential_version)
+       SELECT $1, $2, $3,
+              (competition.starts_at AT TIME ZONE region.timezone)::date,
+              'active', 'rules-v1', competition.starts_at,
+              enrollment.gym_location_id, enrollment.gym_credential_version
+       FROM competition_enrollments AS enrollment
+       INNER JOIN competitions AS competition ON competition.id = $1
+       INNER JOIN region_policies AS region
+         ON region.id = competition.region_policy_id
+       WHERE enrollment.id = $2
        RETURNING id`,
       [fixture.competitionId, enrollment.id, member.id],
     );
@@ -959,11 +976,25 @@ describeWithDatabase('critical session and ledger workflow', () => {
       `INSERT INTO competition_draws
          (competition_id, status, rules_version, seed_commitment, seed_reveal,
           entrant_snapshot_hash, entrant_count, total_entries, locked_at,
-          settled_at)
+          settled_at, scoring_snapshot_hash)
        VALUES ($1, 'settled', 'rules-v1', repeat('a', 64), repeat('b', 64),
-               repeat('c', 64), 1, 5, $2, $2)
+               repeat('c', 64), 1, 5, $2, $2, repeat('d', 64))
        RETURNING id`,
       [fixture.competitionId, new Date()],
+    );
+    await migrated.pool.query(
+      `INSERT INTO competition_settlement_inputs
+         (draw_id, competition_id, enrollment_id, user_id, goal_days,
+          verified_days, longest_streak, category_score, category_rank,
+          prize_draw_entries, tie_break_digest, rules_version,
+          snapshot_position)
+       SELECT $1, enrollment.competition_id, enrollment.id,
+              enrollment.user_id, enrollment.goal_days, 1, 1, 7, 1, 1,
+              repeat('e', 64), 'rules-v1', 1
+       FROM competition_enrollments AS enrollment
+       WHERE enrollment.competition_id = $2
+         AND enrollment.user_id = $3`,
+      [draw.rows[0].id, fixture.competitionId, user.id],
     );
     const award = await migrated.pool.query<{ id: string }>(
       `INSERT INTO reward_awards
@@ -1350,9 +1381,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const duplicateDay = await migrated.pool.query<{ id: string }>(
       `INSERT INTO workout_sessions
          (competition_id, enrollment_id, user_id, eligible_date, status,
-          policy_version, started_at, completed_at)
+          policy_version, started_at, completed_at, gym_location_id,
+          gym_credential_version)
        SELECT competition_id, enrollment_id, user_id, eligible_date,
-              'pending_review', policy_version, started_at, completed_at
+              'pending_review', policy_version, started_at, completed_at,
+              gym_location_id, gym_credential_version
        FROM workout_sessions
        WHERE id = $1
        RETURNING id`,
@@ -1429,9 +1462,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     const disqualifiedReview = await migrated.pool.query<{ id: string }>(
       `INSERT INTO workout_sessions
          (competition_id, enrollment_id, user_id, eligible_date, status,
-          policy_version, started_at, completed_at)
+          policy_version, started_at, completed_at, gym_location_id,
+          gym_credential_version)
        SELECT competition_id, enrollment_id, user_id, eligible_date,
-              'pending_review', policy_version, started_at, completed_at
+              'pending_review', policy_version, started_at, completed_at,
+              gym_location_id, gym_credential_version
        FROM workout_sessions
        WHERE id = $1
        RETURNING id`,
@@ -1683,6 +1718,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     principal: AuthenticatedPrincipal = userPrincipal,
   ): Promise<CompetitionFixture> {
     const now = Date.now();
+    const monthKey = new Intl.DateTimeFormat('en-CA', {
+      month: '2-digit',
+      timeZone: 'America/Vancouver',
+      year: 'numeric',
+    }).format(new Date(now));
     const fixtureSequence = ++registrationFixtureSequence;
     const user = await profiles.ensureUser(principal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(
@@ -1727,11 +1767,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
          (region_policy_id, month_key, name, status, rules_version,
           rules, minimum_entrants, registration_opens_at,
           registration_closes_at, starts_at, ends_at)
-       VALUES ($1, '2030-01', 'Critical Session Competition', 'registration',
-               'rules-v1', $2::jsonb, 100, $3, $4, $5, $6)
+       VALUES ($1, $2, 'Critical Session Competition', 'registration',
+               'rules-v1', $3::jsonb, 100, $4, $5, $6, $7)
        RETURNING id`,
       [
         region.rows[0].id,
+        monthKey,
         JSON.stringify(competitionRules),
         new Date(now - 60 * 60_000),
         new Date(now + 60 * 60_000),
@@ -1783,6 +1824,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         longitude: -123.1207,
       },
       legalReceiptBundleId,
+      monthKey,
       regionVerificationId: verification.rows[0].id,
     };
   }
@@ -2062,12 +2104,39 @@ describeWithDatabase('critical session and ledger workflow', () => {
   }
 
   async function backdateSession(sessionId: string): Promise<void> {
-    await migrated.pool.query(
-      `UPDATE workout_sessions
-       SET started_at = $1, updated_at = $1
-       WHERE id = $2`,
-      [new Date(Date.now() - 11 * 60_000), sessionId],
-    );
+    const client = await migrated.pool.connect();
+    const startedAt = new Date(Date.now() - 11 * 60_000);
+    try {
+      await client.query('BEGIN');
+      // Simulate elapsed server time without weakening the production identity
+      // triggers; keep enrollment time and the regional date internally valid.
+      await client.query("SET LOCAL session_replication_role = 'replica'");
+      const session = await client.query<{ enrollment_id: string }>(
+        `UPDATE workout_sessions AS session
+         SET started_at = $1,
+             eligible_date = ($1::timestamptz AT TIME ZONE region.timezone)::date,
+             updated_at = $1
+         FROM competitions AS competition
+         INNER JOIN region_policies AS region
+           ON region.id = competition.region_policy_id
+         WHERE session.id = $2
+           AND competition.id = session.competition_id
+         RETURNING session.enrollment_id`,
+        [startedAt, sessionId],
+      );
+      await client.query(
+        `UPDATE competition_enrollments
+         SET enrolled_at = LEAST(enrolled_at, $1::timestamptz - INTERVAL '1 minute')
+         WHERE id = $2`,
+        [startedAt, session.rows[0].enrollment_id],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   function buildEvidenceTimes(): [string, string, string, string, string] {

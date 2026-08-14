@@ -49,6 +49,25 @@ be resumed; do not clear browser storage while a contest says **Draw locked**.
 Successful settlement changes the contest to `settled` and makes its exact
 participant results available in the member Winners Circle.
 
+Locking the draw is also the scoring reconciliation boundary. In the same
+transaction, the API settles every remaining scoring period, reconstructs each
+member's progress from the append-only entry ledger, and compares verified-day
+entries with the exact eligible verified sessions. It refuses to lock on any
+negative total, session/ledger mismatch, unresolved workout, or invalid scoring
+input. A successful lock stores both the draw-entry snapshot and the complete
+versioned scoring inputs (goal, verified days, category score/rank, longest
+streak, prize entries, rules version, and deterministic tie digest). The audit
+event records the scoring and entrant snapshot hashes plus the number of
+reconciled progress rows. Retrying the same request and seed commitment returns
+the same locked snapshot; a different commitment is rejected.
+
+Before revealing the seed, operators must verify the entrant count, total
+entries, and both 64-character snapshot hashes shown by the lock response. Do
+not repair `competition_progress`, `entry_ledger`, draw entries, or settlement
+inputs with direct database edits. Investigate the originating session or
+ledger event and rerun the idempotent lock after the data-integrity issue has
+been corrected through an audited operational procedure.
+
 ## First administrator bootstrap
 
 There is deliberately no public role-grant endpoint. A user must verify their Firebase email and sign in once so the database identity exists. Then an infrastructure owner with direct secret-manager and production database access runs the audited, one-time bootstrap command from a trusted administrative environment:
@@ -135,3 +154,8 @@ scoped and remain drafts until a GoGymGo administrator publishes them.
 8. Confirm poster history contains no QR payload, a scoped staff account cannot
    issue or revoke, and a revoked/expired poster immediately fails a member
    enrollment attempt without changing enrollment state.
+9. Rehearse one complete Contest calendar in staging: every local-day and weekly
+   boundary, duplicate and disallowed sessions, late enrollment, one-entrant
+   pairing, Bonus Day, Perfect Month, reconciliation replay, draw-lock replay,
+   and recovery from an unresolved review. Retain the scoring/entrant hashes,
+   audit event, settlement-input count, and exact release commit as evidence.

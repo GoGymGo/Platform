@@ -33,17 +33,25 @@ export type WorkoutSessionCompletion = AuthoritativeWorkoutSession & {
 };
 
 export type CompetitionProgress = {
+  bankedPrizeDrawEntries: number;
   categoryScore: number;
   competitionId: string;
+  competitionStatus: 'active' | 'registration' | 'settled' | 'settling';
   enrolledDateKey: string;
   goalDays: number;
   monthKey: string;
   prizeDrawEntries: number;
+  projectedPrizeDrawEntries: number;
+  referenceDateKey: string;
+  rulesVersion: string;
+  scoringStatus: 'final' | 'provisional';
+  serverTime: string;
   sessions: readonly Pick<
     AuthoritativeWorkoutSession,
     'completedAt' | 'eligibleDate' | 'id' | 'startedAt' | 'status'
   >[];
   updatedAt: string;
+  settledPeriodCount: number;
   verifiedDateKeys: readonly string[];
   verifiedDays: number;
 };

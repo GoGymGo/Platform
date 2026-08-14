@@ -225,6 +225,7 @@ export class GymsService {
             'competition.rules_version',
             'competition.status as competition_status',
             'enrollment.goal_days',
+            'enrollment.gym_credential_version',
             'enrollment.id as enrollment_id',
           ])
           .where('eligible_gym.gym_location_id', '=', credential.gym_id)
@@ -262,6 +263,11 @@ export class GymsService {
           .executeTakeFirst();
 
         if (!active) {
+          if (
+            enrollment.gym_credential_version !== credential.credential_version
+          ) {
+            return this.rejected(now, 'competition_unavailable', credential);
+          }
           if (
             enrollment.competition_status !== 'active' ||
             !canStartGymSession({

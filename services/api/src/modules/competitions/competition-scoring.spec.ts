@@ -1,6 +1,7 @@
 import {
   applyCategoryMultiplier,
   calculateWeeklyScore,
+  competitionTieBreakDigest,
   longestConsecutiveDateStreak,
   rankCategoryStandings,
 } from './competition-scoring';
@@ -79,7 +80,7 @@ describe('authoritative competition scoring', () => {
   });
 
   it('uses deterministic category tie-breaks and integer draw weights', () => {
-    const first = rankCategoryStandings('competition-1', [
+    const first = rankCategoryStandings('competition-1', 'rules-v1', [
       {
         categoryScore: 10,
         goalDays: 3,
@@ -95,10 +96,19 @@ describe('authoritative competition scoring', () => {
         verifiedDays: 11,
       },
     ]);
-    const second = rankCategoryStandings('competition-1', [...first].reverse());
+    const second = rankCategoryStandings(
+      'competition-1',
+      'rules-v1',
+      [...first].reverse(),
+    );
 
     expect(first.map(({ userId }) => userId)).toEqual(['user-a', 'user-b']);
     expect(second.map(({ userId }) => userId)).toEqual(['user-a', 'user-b']);
+    expect(
+      competitionTieBreakDigest('competition-1', 'rules-v1', 'user-a'),
+    ).not.toBe(
+      competitionTieBreakDigest('competition-1', 'rules-v2', 'user-a'),
+    );
     expect(applyCategoryMultiplier(3, 1.5)).toBe(4);
   });
 

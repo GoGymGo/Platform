@@ -33,6 +33,7 @@ export default function WorkoutCompleteScreen() {
     currentStreak,
     currentWeekIndex,
     currentWeekVerified,
+    projectedEntries,
     sessionActionError,
     totalEntries,
     weeklyGoal
@@ -164,7 +165,7 @@ export default function WorkoutCompleteScreen() {
         />
         <HUDBorderBox glow style={styles.badge} tone={entriesAwarded > 0 ? 'pink' : 'green'}>
           <TerminalText glow style={styles.badgeText} tone={entriesAwarded > 0 ? 'pink' : 'green'} variant="display">
-            {entriesAwarded > 0 ? `+${entriesAwarded}` : 'OK'}
+            {entriesAwarded > 0 ? `+${entriesAwarded}*` : 'OK'}
           </TerminalText>
         </HUDBorderBox>
 
@@ -174,7 +175,7 @@ export default function WorkoutCompleteScreen() {
         <TerminalText style={styles.title} tone="text" variant="title">
           {completionResult === 'completed'
             ? entriesAwarded > 0
-              ? `+${entriesAwarded} BONUS DAY PRIZE DRAW ${entriesAwarded === 1 ? 'ENTRY' : 'ENTRIES'}`
+              ? 'BONUS DAY VERIFIED'
               : competitionNotStarted
                 ? 'PERSONAL WORKOUT VERIFIED'
                 : 'WORKOUT CREDIT SECURED'
@@ -183,7 +184,7 @@ export default function WorkoutCompleteScreen() {
         <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
           {completionResult === 'completed'
             ? entriesAwarded > 0
-              ? `Today is a Bonus Day. This Verified workout adds ${entriesAwarded} Prize Draw ${entriesAwarded === 1 ? 'Entry' : 'Entries'}, equal to your Weekly Goal.`
+              ? `Today is a Bonus Day. This Verified workout projects ${entriesAwarded} Prize Draw ${entriesAwarded === 1 ? 'Entry' : 'Entries'}, equal to your Weekly Goal. The projection is not banked until final settlement.`
               : competitionNotStarted
                 ? 'Today is checked off in your Workout Calendar. Contest scoring has not opened yet, so this workout does not add contest credit.'
                 : 'Today is checked off. This Verified workout counts toward your current scoring week; entries settle when the week closes.'
@@ -213,7 +214,7 @@ export default function WorkoutCompleteScreen() {
           </View>
           <TerminalText style={styles.progressNote} tone="dim" uppercase={false} variant="caption">
             {competition.phase === 'bonus-days'
-              ? `Each verified Bonus Day workout adds ${weeklyGoal} ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before a Perfect Month 10x.`
+              ? `Each verified Bonus Day workout projects ${weeklyGoal} ${weeklyGoal === 1 ? 'Entry' : 'Entries'} before the final Perfect Month decision.`
               : competitionNotStarted
                 ? 'This workout builds your personal workout history only. Contest credit begins when scoring opens.'
               : remainingSessions > 0
@@ -236,10 +237,15 @@ export default function WorkoutCompleteScreen() {
               {totalEntries}
             </TerminalText>
             <TerminalText style={styles.statLabel} tone="muted" variant="micro">
-              PRIZE DRAW ENTRIES
+              BANKED DRAW ENTRIES
             </TerminalText>
           </HUDBorderBox>
         </View>
+
+        <TerminalText tone="muted" uppercase={false} variant="caption">
+          {projectedEntries} Prize Draw {projectedEntries === 1 ? 'Entry is' : 'Entries are'}{' '}
+          currently projected; only the banked total above sets draw odds.
+        </TerminalText>
 
         <CyberButtonPrimary
           label="GO TO HOME"

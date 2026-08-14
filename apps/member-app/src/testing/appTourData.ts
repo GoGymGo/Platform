@@ -797,13 +797,21 @@ function createCompetitionProgress(): CompetitionProgress {
   }));
 
   return {
+    bankedPrizeDrawEntries: 4,
     categoryScore: 3,
     competitionId: appTourCompetitionId,
+    competitionStatus: 'active',
     enrolledDateKey: `${monthKey}-01`,
     goalDays: 4,
     monthKey,
-    prizeDrawEntries: 12,
+    prizeDrawEntries: 4,
+    projectedPrizeDrawEntries: 12,
+    referenceDateKey: todayKey(),
+    rulesVersion: 'app-tour',
+    scoringStatus: 'provisional',
+    serverTime: nowIso(),
     sessions,
+    settledPeriodCount: 2,
     updatedAt: nowIso(),
     verifiedDateKeys,
     verifiedDays: verifiedDateKeys.length
@@ -838,11 +846,13 @@ function getOrCreateSession(
 
 function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
   return {
+    competitionId: appTourCompetitionId,
     goal,
     rows: [
       {
         alias: 'NORTH_STAR',
         categoryEntries: 84,
+        isCurrentUser: true,
         rank: 1,
         streaks: fixedStreaks,
         verifiedDays: 18
@@ -850,6 +860,7 @@ function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
       {
         alias: 'PULSE_RIDER',
         categoryEntries: 72,
+        isCurrentUser: false,
         rank: 2,
         streaks: { ...fixedStreaks, daily: 4 },
         verifiedDays: 16
@@ -857,11 +868,16 @@ function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
       {
         alias: 'MOVE_MORE',
         categoryEntries: 63,
+        isCurrentUser: false,
         rank: 3,
         streaks: { ...fixedStreaks, daily: 3 },
         verifiedDays: 15
       }
-    ]
+    ],
+    rulesVersion: 'app-tour',
+    scoringStatus: 'provisional',
+    serverTime: nowIso(),
+    settledPeriodCount: 2
   };
 }
 

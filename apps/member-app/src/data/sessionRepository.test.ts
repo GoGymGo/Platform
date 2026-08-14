@@ -22,6 +22,28 @@ describe('workout session repository', () => {
           method: options?.method,
           path
         });
+        if (path === '/v1/me/progress') {
+          return Promise.resolve({
+            bankedPrizeDrawEntries: 1,
+            categoryScore: 1,
+            competitionId: '40000000-0000-4000-8000-000000000001',
+            competitionStatus: 'active',
+            enrolledDateKey: '2026-07-01',
+            goalDays: 3,
+            monthKey: '2026-07',
+            prizeDrawEntries: 1,
+            projectedPrizeDrawEntries: 2,
+            referenceDateKey: '2026-07-16',
+            rulesVersion: 'rules-v1',
+            scoringStatus: 'provisional',
+            serverTime: '2026-07-16T12:00:00.000Z',
+            sessions: [],
+            settledPeriodCount: 2,
+            updatedAt: '2026-07-16T12:00:00.000Z',
+            verifiedDateKeys: [],
+            verifiedDays: 0
+          }) as Promise<TResponse>;
+        }
         return Promise.resolve({
           completedAt: null,
           competitionId: '40000000-0000-4000-8000-000000000001',
@@ -95,6 +117,77 @@ describe('workout session repository', () => {
       ),
       ['heart_rate_sample', 'gym_qr_scan', 'presence_check']
     );
+  });
+
+  it('rejects progress that labels a projection as banked', async () => {
+    const api = {
+      request: <TResponse>() =>
+        Promise.resolve({
+          bankedPrizeDrawEntries: 4,
+          categoryScore: 3,
+          competitionId: '40000000-0000-4000-8000-000000000001',
+          competitionStatus: 'active',
+          enrolledDateKey: '2026-07-01',
+          goalDays: 3,
+          monthKey: '2026-07',
+          prizeDrawEntries: 9,
+          projectedPrizeDrawEntries: 9,
+          referenceDateKey: '2026-07-16',
+          rulesVersion: 'rules-v1',
+          scoringStatus: 'provisional',
+          serverTime: '2026-07-16T12:00:00.000Z',
+          sessions: [],
+          settledPeriodCount: 2,
+          updatedAt: '2026-07-16T12:00:00.000Z',
+          verifiedDateKeys: [],
+          verifiedDays: 0
+        }) as Promise<TResponse>
+    };
+
+    await assert.rejects(
+      () => createWorkoutSessionRepository('api', api).getCompetitionProgress(),
+      /progress response is invalid/i
+    );
+  });
+
+  it('rejects final totals that still differ and duplicate verified dates', async () => {
+    const base = {
+      bankedPrizeDrawEntries: 4,
+      categoryScore: 3,
+      competitionId: '40000000-0000-4000-8000-000000000001',
+      competitionStatus: 'settled',
+      enrolledDateKey: '2026-07-01',
+      goalDays: 3,
+      monthKey: '2026-07',
+      prizeDrawEntries: 4,
+      projectedPrizeDrawEntries: 4,
+      referenceDateKey: '2026-07-31',
+      rulesVersion: 'rules-v1',
+      scoringStatus: 'final',
+      serverTime: '2026-08-01T12:00:00.000Z',
+      sessions: [],
+      settledPeriodCount: 4,
+      updatedAt: '2026-08-01T12:00:00.000Z',
+      verifiedDateKeys: ['2026-07-15'],
+      verifiedDays: 1
+    } as const;
+
+    for (const response of [
+      { ...base, projectedPrizeDrawEntries: 5 },
+      {
+        ...base,
+        verifiedDateKeys: ['2026-07-15', '2026-07-15']
+      }
+    ]) {
+      const api = {
+        request: <TResponse>() => Promise.resolve(response) as Promise<TResponse>
+      };
+      await assert.rejects(
+        () =>
+          createWorkoutSessionRepository('api', api).getCompetitionProgress(),
+        /progress response is invalid/i
+      );
+    }
   });
 
   it('does not fabricate a workout lifecycle when the API is unavailable', async () => {

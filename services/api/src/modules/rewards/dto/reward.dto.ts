@@ -56,6 +56,9 @@ export class RewardCatalogItemResponseDto {
   @ApiProperty({ type: String })
   regionName!: string;
 
+  @ApiProperty({ example: 'America/Vancouver', type: String })
+  regionTimezone!: string;
+
   @ApiProperty({ type: String })
   sponsorName!: string;
 
@@ -68,17 +71,23 @@ export class RewardCatalogItemResponseDto {
   @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
   rewardType!: RewardType;
 
-  @ApiProperty({ format: 'uri', nullable: true, type: String })
-  imageUrl!: string | null;
+  @ApiProperty({ format: 'uri', type: String })
+  imageUrl!: string;
 
-  @ApiProperty({ format: 'uri', nullable: true, type: String })
-  termsUrl!: string | null;
+  @ApiProperty({ format: 'uri', type: String })
+  termsUrl!: string;
 
   @ApiProperty({ minimum: 0, type: Number })
   inventoryRemaining!: number;
 
   @ApiProperty({ minimum: 1, type: Number })
   inventoryTotal!: number;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  availableFrom!: string | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  availableUntil!: string | null;
 }
 
 export class RewardAwardResponseDto {
@@ -229,6 +238,11 @@ export class AddRewardCouponCodesDto extends OperatorReasonDto {
   @IsString({ each: true })
   @Length(3, 256, { each: true })
   codes!: string[];
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export class AdminRewardResponseDto {
@@ -248,6 +262,9 @@ export class AddedCouponCodesResponseDto {
 
   @ApiProperty({ format: 'uuid', type: String })
   rewardId!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }
 
 export enum RewardAwardStatusAction {
@@ -260,6 +277,11 @@ export class RewardAwardStatusActionDto extends OperatorReasonDto {
   @ApiProperty({ enum: RewardAwardStatusAction, type: String })
   @IsEnum(RewardAwardStatusAction)
   action!: RewardAwardStatusAction;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export class AdminRewardAwardResponseDto {
@@ -270,4 +292,7 @@ export class AdminRewardAwardResponseDto {
     enum: ['awarded', 'cancelled', 'claimed', 'fulfilled', 'redeemed'],
   })
   status!: RewardAwardStatus;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }

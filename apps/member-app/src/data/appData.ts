@@ -28,10 +28,7 @@ export type {
 export type AppDataMode = 'api' | 'tour' | 'unavailable';
 
 export type AppDataSource = {
-  claimReward: (
-    awardId: string,
-    idempotencyKey: string
-  ) => Promise<ClaimedReward>;
+  claimReward: (awardId: string) => Promise<ClaimedReward>;
   getCategoryLeaderboard: (
     goal: GoalCategory
   ) => Promise<CategoryLeaderboard | null>;
@@ -124,9 +121,12 @@ function createApiDataSource(api: ApiClient): AppDataSource {
   };
 
   return {
-    claimReward: (awardId, idempotencyKey) => api.request<ClaimedReward>(
-      `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
-      { idempotencyKey, method: 'POST' }
+    claimReward: (awardId) => runRetryableMutation(
+      `reward-claim:${awardId}`,
+      (idempotencyKey) => api.request<unknown>(
+        `/v1/rewards/awards/${encodeURIComponent(awardId)}/claim`,
+        { idempotencyKey, method: 'POST' }
+      ).then(normalizeClaimedReward)
     ),
     getCategoryLeaderboard: (goal) => api.request<unknown>(
       `/v1/leaderboards/current?goal=${goal}`
@@ -181,9 +181,9 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       `?competitionId=${encodeURIComponent(competitionId)}` +
       `&goal=${weeklyGoal}&region=${encodeURIComponent(regionCode)}&period=${periodIndex}`
     ).then(normalizeWeeklyChallengeRequests),
-    getMyRewardAwards: () => api.request<readonly RewardAward[]>(
+    getMyRewardAwards: () => api.request<unknown>(
       '/v1/rewards/awards/me'
-    ),
+    ).then(normalizeRewardAwards),
     getMyLatestCompetitionResults: () =>
       api.request<ParticipantCompetitionResults | null>(
         '/v1/results/mine/latest'
@@ -193,10 +193,10 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     getRewardCatalog: (regionCode, monthKey) => {
       const query = new URLSearchParams({ region: regionCode });
       if (monthKey) query.set('monthKey', monthKey);
-      return api.request<readonly RewardCatalogItem[]>(
+      return api.request<unknown>(
         `/v1/rewards/catalog?${query.toString()}`,
         { authenticated: false }
-      );
+      ).then(normalizeRewardCatalog);
     },
     planCreatorWorkout: (workoutId, plannedDate, note) =>
       api.request<CreatorWorkoutPlan, { note?: string; plannedDate: string }>(
@@ -269,6 +269,194 @@ function createApiDataSource(api: ApiClient): AppDataSource {
     ),
     mode: 'api'
   };
+}
+
+function normalizeRewardCatalog(response: unknown): readonly RewardCatalogItem[] {
+  if (!Array.isArray(response) || !response.every(isRewardCatalogItem)) {
+    throw new Error('The reward catalog response is invalid.');
+  }
+  return response;
+}
+
+function normalizeRewardAwards(response: unknown): readonly RewardAward[] {
+  if (!Array.isArray(response) || !response.every(isRewardAward)) {
+    throw new Error('The reward award response is invalid.');
+  }
+  return response;
+}
+
+function normalizeClaimedReward(response: unknown): ClaimedReward {
+  if (!isClaimedReward(response)) {
+    throw new Error('The reward claim response is invalid.');
+  }
+  return response;
+}
+
+function isRewardCatalogItem(value: unknown): value is RewardCatalogItem {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'availableFrom',
+      'availableUntil',
+      'competitionId',
+      'competitionName',
+      'description',
+      'id',
+      'imageUrl',
+      'inventoryRemaining',
+      'inventoryTotal',
+      'monthKey',
+      'regionCode',
+      'regionName',
+      'regionTimezone',
+      'rewardType',
+      'sponsorName',
+      'termsUrl',
+      'title'
+    ]) &&
+    isNullableIsoDate(value.availableFrom) &&
+    isNullableIsoDate(value.availableUntil) &&
+    typeof value.competitionId === 'string' &&
+    isUuid(value.competitionId) &&
+    typeof value.competitionName === 'string' &&
+    typeof value.description === 'string' &&
+    typeof value.id === 'string' &&
+    isUuid(value.id) &&
+    isHttpsUrl(value.imageUrl) &&
+    isFiniteNonnegativeInteger(value.inventoryRemaining) &&
+    isIntegerInRange(value.inventoryTotal, 1, 100_000) &&
+    value.inventoryRemaining <= value.inventoryTotal &&
+    typeof value.monthKey === 'string' &&
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(value.monthKey) &&
+    typeof value.regionCode === 'string' &&
+    typeof value.regionName === 'string' &&
+    typeof value.regionTimezone === 'string' &&
+    value.regionTimezone.length > 0 &&
+    isRewardType(value.rewardType) &&
+    typeof value.sponsorName === 'string' &&
+    isHttpsUrl(value.termsUrl) &&
+    typeof value.title === 'string'
+  );
+}
+
+function isRewardAward(value: unknown): value is RewardAward {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'awardRank',
+      'awardedAt',
+      'claimedAt',
+      'id',
+      'imageUrl',
+      'rewardType',
+      'sponsorName',
+      'status',
+      'title'
+    ]) &&
+    isIntegerInRange(value.awardRank, 1, 100_000) &&
+    isIsoDate(value.awardedAt) &&
+    isNullableIsoDate(value.claimedAt) &&
+    isUuid(value.id) &&
+    isNullableHttpsUrl(value.imageUrl) &&
+    isRewardType(value.rewardType) &&
+    typeof value.sponsorName === 'string' &&
+    isRewardAwardStatus(value.status) &&
+    typeof value.title === 'string' &&
+    ((value.status === 'awarded' || value.status === 'cancelled')
+      ? value.claimedAt === null
+      : value.claimedAt !== null)
+  );
+}
+
+function isClaimedReward(value: unknown): value is ClaimedReward {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      'awardRank',
+      'awardedAt',
+      'claimUrl',
+      'claimedAt',
+      'couponCode',
+      'fulfillmentInstructions',
+      'id',
+      'imageUrl',
+      'rewardType',
+      'sponsorName',
+      'status',
+      'title'
+    ]) ||
+    !isIntegerInRange(value.awardRank, 1, 100_000) ||
+    !isIsoDate(value.awardedAt) ||
+    !isIsoDate(value.claimedAt) ||
+    !isUuid(value.id) ||
+    !isNullableHttpsUrl(value.imageUrl) ||
+    !isRewardType(value.rewardType) ||
+    typeof value.sponsorName !== 'string' ||
+    !['claimed', 'fulfilled', 'redeemed'].includes(String(value.status)) ||
+    typeof value.title !== 'string'
+  ) {
+    return false;
+  }
+
+  if (value.rewardType === 'coupon') {
+    return (
+      typeof value.couponCode === 'string' &&
+      value.couponCode.length > 0 &&
+      value.claimUrl === null &&
+      value.fulfillmentInstructions === null
+    );
+  }
+  if (value.rewardType === 'physical') {
+    const hasUrl = isHttpsUrl(value.claimUrl);
+    const hasInstructions =
+      typeof value.fulfillmentInstructions === 'string' &&
+      value.fulfillmentInstructions.trim().length > 0;
+    return value.couponCode === null && hasUrl !== hasInstructions;
+  }
+  return false;
+}
+
+function isRewardType(value: unknown): value is RewardCatalogItem['rewardType'] {
+  return value === 'cash' || value === 'coupon' || value === 'physical';
+}
+
+function isRewardAwardStatus(value: unknown): value is RewardAward['status'] {
+  return (
+    value === 'awarded' ||
+    value === 'cancelled' ||
+    value === 'claimed' ||
+    value === 'fulfilled' ||
+    value === 'redeemed'
+  );
+}
+
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+function isNullableIsoDate(value: unknown): value is string | null {
+  return value === null || isIsoDate(value);
+}
+
+function isHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isNullableHttpsUrl(value: unknown): value is string | null {
+  return value === null || isHttpsUrl(value);
 }
 
 function normalizeCategoryLeaderboard(

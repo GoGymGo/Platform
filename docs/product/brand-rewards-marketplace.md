@@ -9,9 +9,14 @@ single region and month.
 
 - `reward_catalog_items` stores the sponsor, display content, reward type,
   availability window, inventory, claim path, publication status, and version.
+  Public reads include only published, undeleted items whose competition,
+  enabled region policy, region validity, month, and availability window all
+  match the request. Responses expose bounded total/remaining counts, never
+  coupon rows or allocation details.
 - `reward_awards` records the immutable draw, winner, catalog item, rank, and
-  claim/fulfillment status. Unique constraints prevent a user or rank from
-  winning twice in one draw.
+  versioned claim/fulfillment status. Database constraints require a settled
+  draw and published inventory from the same competition. Unique constraints
+  prevent a user or rank from winning twice in one draw.
 - `reward_coupon_codes` stores AES-256-GCM ciphertext and a SHA-256 fingerprint.
   Plaintext codes are accepted only by the authenticated operator endpoint and
   returned only to the authenticated winner after claiming an assigned award.
@@ -20,10 +25,13 @@ single region and month.
 - A database trigger locks inventory and rejects over-allocation. Draw
   settlement expands published catalog inventory into exact reward slots and
   remains retry-safe.
-- Physical rewards require an HTTPS sponsor claim URL or fulfillment
-  instructions. GoGymGo does not collect shipping addresses in this version.
+- Published rewards require an approved HTTPS image and terms URL. Physical
+  rewards require exactly one HTTPS sponsor claim URL or fulfillment
+  instructions; coupon rewards permit neither. GoGymGo does not collect
+  shipping addresses in this version.
 
-Use a random 32-byte base64 key for `REWARD_CODE_ENCRYPTION_KEY`. Generate one
+Use a random 32-byte canonical standard-base64 key for
+`REWARD_CODE_ENCRYPTION_KEY` (exactly 44 characters ending in `=`). Generate one
 without placing it in shell history:
 
 ```powershell
@@ -63,16 +71,26 @@ POST /v1/operator/configuration/rewards/{rewardId}/status-action
 POST /v1/operator/reward-awards/{awardId}/status-action
 ```
 
-Every mutation requires Firebase authentication, a database-backed operator or
-admin role, an `Idempotency-Key`, and an audit reason. Create and edit rewards
-while they are drafts. For coupon rewards, upload at least `inventoryTotal`
-unique codes before publishing. Publish at least one reward before publishing
-its competition. Published catalog records are immutable except for archival.
+Every mutation requires Firebase authentication, the exact database-backed
+platform `admin` role, an `Idempotency-Key`, and a specific audit reason. Updates, coupon
+uploads, publication, archival, deletion, fulfillment, redemption, and
+cancellation also require the last observed `expectedVersion`; every successful
+mutation advances the authoritative version. Create and edit rewards while they
+are drafts. For coupon rewards, upload at least `inventoryTotal` unique codes
+before publishing. Codes are trimmed, Unicode NFKC-normalized, rejected when
+duplicate after normalization, encrypted before persistence, and never returned
+by an admin read. Publish at least one reward before publishing its competition.
+Published catalog records are immutable except for archival.
 
 After a winner claims, an administrator records `fulfill` for a physical reward
 or `redeem` for a coupon. Only an unclaimed award may be cancelled. These
 row-locked, idempotent transitions update the corresponding fulfillment time and
 append an operator audit event.
+
+The operator dashboard lists only fulfillment-safe award metadata: winner
+callsign, rank, reward type/title, lifecycle status, timestamps, and version.
+It never returns coupon plaintext, ciphertext, fingerprints, or private member
+claim instructions.
 
 Example draft physical reward body:
 
@@ -92,14 +110,18 @@ Example draft physical reward body:
 }
 ```
 
-For a coupon reward, use `rewardType: "coupon"`, omit the physical claim path,
-then upload codes using `{ "codes": ["CODE-ONE", "CODE-TWO"], "reason":
-"Load sponsor-approved inventory." }`.
+For a coupon reward, use `rewardType: "coupon"`, omit both physical claim
+fields, then upload codes using `{ "codes": ["CODE-ONE", "CODE-TWO"],
+"expectedVersion": 1, "reason": "Load sponsor-approved inventory." }`. Use
+the returned version for publication. Award status actions likewise send the
+award's current `expectedVersion`.
 
 ## Migration and release
 
-Migration `1783954800000_brand_rewards_marketplace.ts` is intentionally
-focused on the regional reward catalog, awards, and encrypted coupon inventory.
+Migration `1783954800000_brand_rewards_marketplace.ts` creates the regional
+reward catalog, awards, and encrypted coupon inventory. Migration
+`1787360400000_brand_reward_integrity.ts` adds exact catalog, draw, award,
+coupon-assignment, lifecycle timestamp, and optimistic-version invariants.
 Because GoGymGo has not deployed a production database, the preproduction
 migration baseline was cleaned before launch: a fresh database never creates
 payment-provider, cash-winner, or demo-verification schema. The integration

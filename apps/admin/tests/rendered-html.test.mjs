@@ -162,6 +162,14 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /showModal\(\)/);
   assert.match(dashboard, /onCancel=/);
   assert.match(dashboard, /Filter rewards/);
+  assert.match(dashboard, /snapshot\.rewardAwards/);
+  assert.match(
+    dashboard,
+    /operator\/reward-awards\/\$\{award\.id\}\/status-action/,
+  );
+  assert.match(dashboard, /expectedVersion: award\.version/);
+  assert.match(dashboard, /reward\.couponCodeCount >= reward\.inventoryTotal/);
+  assert.match(dashboard, /AWARDS &amp; FULFILLMENT/);
   assert.match(dashboard, /Filter work queue/);
   assert.match(dashboard, /Filter audit history/);
   assert.match(dashboard, /useStoredPreference/);
@@ -182,6 +190,11 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(contestSetupWorkspace, /USE MY LOCATION/);
   assert.match(contestSetupWorkspace, /CREATE A DIFFERENT REGION/);
   assert.match(contestSetupWorkspace, /PUBLISH CONTEST/);
+  assert.match(contestSetupWorkspace, /if \(!imageUrl \|\| !termsUrl\)/);
+  assert.match(
+    contestSetupWorkspace,
+    /Boolean\(claimUrl\) === Boolean\(fulfillment\)/,
+  );
   assert.match(contestSetupWorkspace, /setup-section-error/);
   assert.match(contestSetupWorkspace, /minimumEntrants: 1/);
   assert.match(contestSetupWorkspace, /AT LEAST 30 MINUTES/);

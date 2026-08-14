@@ -160,6 +160,12 @@ describe('environment validation', () => {
         REWARD_CODE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       }).REWARD_CODE_ENCRYPTION_KEY,
     ).toBeDefined();
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'test',
+        REWARD_CODE_ENCRYPTION_KEY: `!!!!${Buffer.alloc(32, 7).toString('base64')}`,
+      }),
+    ).toThrow(/base64-encoded 32-byte key/i);
   });
 
   it('requires a private bucket and pseudonymization key for privacy execution', () => {

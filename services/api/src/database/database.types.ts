@@ -694,10 +694,12 @@ export interface RewardAwardsTable {
   award_rank: number;
   status: RewardAwardStatus;
   awarded_at: Timestamp;
+  cancelled_at: NullableTimestamp;
   claimed_at: NullableTimestamp;
   fulfilled_at: NullableTimestamp;
   redeemed_at: NullableTimestamp;
   updated_at: Timestamp;
+  version: Generated<number>;
 }
 
 export interface RewardCouponCodesTable {

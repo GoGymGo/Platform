@@ -124,10 +124,7 @@ describe("critical member product journeys", () => {
     const progress = await sessions.getCompetitionProgress();
     const results = await appData.getMyLatestCompetitionResults();
     const awards = await appData.getMyRewardAwards();
-    const claimed = await appData.claimReward(
-      awards[0].id,
-      "critical-journey-reward-claim",
-    );
+    const claimed = await appData.claimReward(awards[0].id);
 
     assert.equal(completed.eligibleForReview, true);
     assert.equal(progress?.verifiedDays, 1);
@@ -169,9 +166,9 @@ describe("critical member product journeys", () => {
       requests.find(({ path }) => path === "/v1/sessions")?.idempotencyKey,
       "session-create-critical-journey-attempt",
     );
-    assert.equal(
-      requests.at(-1)?.idempotencyKey,
-      "critical-journey-reward-claim",
+    assert.match(
+      requests.at(-1)?.idempotencyKey ?? "",
+      new RegExp(`^reward-claim:${awardId}-`),
     );
   });
 

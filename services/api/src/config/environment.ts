@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Buffer } from 'node:buffer';
+import { decodeRewardCodeEncryptionKey } from './reward-code-encryption-key';
 
 const booleanString = z
   .enum(['true', 'false'])
@@ -268,8 +268,9 @@ export const environmentSchema = z
     }
 
     if (environment.REWARD_CODE_ENCRYPTION_KEY) {
-      const key = Buffer.from(environment.REWARD_CODE_ENCRYPTION_KEY, 'base64');
-      if (key.length !== 32) {
+      if (
+        !decodeRewardCodeEncryptionKey(environment.REWARD_CODE_ENCRYPTION_KEY)
+      ) {
         context.addIssue({
           code: 'custom',
           message:

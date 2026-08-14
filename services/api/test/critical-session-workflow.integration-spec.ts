@@ -12,8 +12,16 @@ import { LedgerService } from '../src/modules/ledger/ledger.service';
 import { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { hashLegalDocumentContent } from '../src/modules/legal/legal-document';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
+import { AdminAuthorizationService } from '../src/modules/operator/admin-authorization.service';
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { ResultsService } from '../src/modules/results/results.service';
+import { AdminRewardAwardsService } from '../src/modules/rewards/admin-reward-awards.service';
+import { AdminRewardsService } from '../src/modules/rewards/admin-rewards.service';
+import {
+  RewardAwardStatusAction,
+  RewardCatalogStatusAction,
+  RewardTypeDto,
+} from '../src/modules/rewards/dto/reward.dto';
 import { RewardCodeCipherService } from '../src/modules/rewards/reward-code-cipher.service';
 import { RewardsService } from '../src/modules/rewards/rewards.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
@@ -136,6 +144,8 @@ interface CompetitionFixture {
 describeWithDatabase('critical session and ledger workflow', () => {
   jest.setTimeout(120_000);
 
+  let adminRewardAwards: AdminRewardAwardsService;
+  let adminRewards: AdminRewardsService;
   let competitions: CompetitionsService;
   let database: DatabaseService;
   let enqueueNotification: jest.Mock;
@@ -153,16 +163,25 @@ describeWithDatabase('critical session and ledger workflow', () => {
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
-    database = new DatabaseService(createTestConfig(migrated.databaseUrl));
+    const config = createTestConfig(migrated.databaseUrl, {
+      REWARD_CODE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+    });
+    database = new DatabaseService(config);
     const idempotency = new IdempotencyService(database);
     const ledger = new LedgerService();
     profiles = new ProfilesService(database);
     results = new ResultsService(database, profiles);
-    rewards = new RewardsService(
-      {} as RewardCodeCipherService,
-      database,
+    const rewardCipher = new RewardCodeCipherService(config);
+    const adminAuthorization = new AdminAuthorizationService(profiles);
+    rewards = new RewardsService(rewardCipher, database, idempotency, profiles);
+    adminRewards = new AdminRewardsService(
+      adminAuthorization,
+      rewardCipher,
       idempotency,
-      profiles,
+    );
+    adminRewardAwards = new AdminRewardAwardsService(
+      adminAuthorization,
+      idempotency,
     );
     legalDocuments = new LegalDocumentsService(database, idempotency, profiles);
     enqueueNotification = jest.fn();
@@ -1300,6 +1319,25 @@ describeWithDatabase('critical session and ledger workflow', () => {
         rulesAccepted: true,
       },
     );
+    const reward = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO reward_catalog_items
+         (competition_id, sponsor_name, title, description, reward_type,
+          status, inventory_total, display_order, version, image_url,
+          terms_url, fulfillment_instructions)
+       VALUES ($1, 'GoGymGo', 'Recovery Kit', 'Participant result test reward',
+               'physical', 'draft', 1, 1, 1,
+               'https://cdn.example.com/recovery-kit.jpg',
+               'https://example.com/recovery-kit-terms',
+               'Collect at the partner gym.')
+       RETURNING id`,
+      [fixture.competitionId],
+    );
+    await migrated.pool.query(
+      `UPDATE reward_catalog_items
+       SET status = 'published', version = version + 1
+       WHERE id = $1`,
+      [reward.rows[0].id],
+    );
     await migrated.pool.query(
       `UPDATE competitions
        SET status = 'active',
@@ -1335,17 +1373,6 @@ describeWithDatabase('critical session and ledger workflow', () => {
        SET category_score = 7, verified_days = 1
        WHERE competition_id = $1 AND user_id = $2`,
       [fixture.competitionId, user.id],
-    );
-    const reward = await migrated.pool.query<{ id: string }>(
-      `INSERT INTO reward_catalog_items
-         (competition_id, sponsor_name, title, description, reward_type,
-          status, inventory_total, display_order, version,
-          fulfillment_instructions)
-       VALUES ($1, 'GoGymGo', 'Recovery Kit', 'Participant result test reward',
-               'physical', 'published', 1, 1, 1,
-               'Collect at the partner gym.')
-       RETURNING id`,
-      [fixture.competitionId],
     );
     const draw = await migrated.pool.query<{ id: string }>(
       `INSERT INTO competition_draws
@@ -1439,6 +1466,265 @@ describeWithDatabase('critical session and ledger workflow', () => {
       id: award.rows[0].id,
       status: 'claimed',
     });
+  });
+
+  it('keeps coupon inventory confidential while allocating and claiming exactly once', async () => {
+    const fixture = await seedRegistrationCompetition();
+    const canonicalCouponCode = 'WIN-ABC-001';
+    const created = await adminRewards.create(
+      operatorPrincipal,
+      'coupon-reward-create',
+      {
+        competitionId: fixture.competitionId,
+        description: 'Single-use recovery sponsor coupon.',
+        imageUrl: 'https://cdn.example.com/recovery-coupon.jpg',
+        inventoryTotal: 1,
+        reason: 'Configure the tested sponsor coupon inventory.',
+        rewardType: RewardTypeDto.COUPON,
+        sponsorName: 'Recovery Sponsor',
+        termsUrl: 'https://example.com/recovery-coupon-terms',
+        title: 'Recovery coupon',
+      },
+    );
+    const uploaded = await adminRewards.addCouponCodes(
+      operatorPrincipal,
+      created.id,
+      'coupon-reward-upload',
+      {
+        codes: ['  WIN-ＡＢＣ-001  '],
+        expectedVersion: created.version,
+        reason: 'Upload the approved single-use sponsor coupon.',
+      },
+    );
+    expect(uploaded).toEqual({
+      added: 1,
+      rewardId: created.id,
+      version: 2,
+    });
+    await expect(
+      adminRewards.addCouponCodes(
+        operatorPrincipal,
+        created.id,
+        'coupon-reward-duplicate-upload',
+        {
+          codes: [canonicalCouponCode],
+          expectedVersion: uploaded.version,
+          reason: 'Reject a duplicate sponsor coupon upload.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'REWARD_COUPON_CODE_DUPLICATE' },
+    });
+    const published = await adminRewards.changeStatus(
+      operatorPrincipal,
+      created.id,
+      'coupon-reward-publish',
+      {
+        action: RewardCatalogStatusAction.PUBLISH,
+        expectedVersion: uploaded.version,
+        reason: 'Publish the complete approved sponsor coupon.',
+      },
+    );
+    expect(published).toMatchObject({ status: 'published', version: 3 });
+
+    const catalogRegion = await migrated.pool.query<{ code: string }>(
+      `SELECT region.code
+       FROM competitions AS competition
+       JOIN region_policies AS region ON region.id = competition.region_policy_id
+       WHERE competition.id = $1`,
+      [fixture.competitionId],
+    );
+    await expect(
+      rewards.getCatalog(catalogRegion.rows[0].code, fixture.monthKey),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: created.id,
+        inventoryRemaining: 1,
+        inventoryTotal: 1,
+        regionTimezone: 'America/Vancouver',
+        rewardType: 'coupon',
+      }),
+    ]);
+
+    await migrated.pool.query(
+      `UPDATE competitions SET status = 'active' WHERE id = $1`,
+      [fixture.competitionId],
+    );
+    const draw = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO competition_draws
+         (competition_id, status, rules_version, seed_commitment, seed_reveal,
+          entrant_snapshot_hash, entrant_count, total_entries, locked_at,
+          settled_at, scoring_snapshot_hash)
+       VALUES ($1, 'settled', 'rules-v1', repeat('1', 64), repeat('2', 64),
+               repeat('3', 64), 1, 1, $2, $2, repeat('4', 64))
+       RETURNING id`,
+      [fixture.competitionId, new Date()],
+    );
+    const winner = await profiles.ensureUser(
+      userPrincipal,
+      database.connection,
+    );
+    const otherUser = await profiles.ensureUser(
+      pairingPrincipal,
+      database.connection,
+    );
+    const award = await migrated.pool.query<{ id: string }>(
+      `INSERT INTO reward_awards
+         (draw_id, reward_catalog_item_id, user_id, award_rank, status,
+          awarded_at, updated_at)
+       VALUES ($1, $2, $3, 1, 'awarded', $4, $4)
+       RETURNING id`,
+      [draw.rows[0].id, created.id, winner.id, new Date()],
+    );
+
+    await expect(
+      migrated.pool.query(
+        `INSERT INTO reward_awards
+           (draw_id, reward_catalog_item_id, user_id, award_rank, status,
+            awarded_at, updated_at)
+         VALUES ($1, $2, $3, 2, 'awarded', $4, $4)`,
+        [draw.rows[0].id, created.id, otherUser.id, new Date()],
+      ),
+    ).rejects.toThrow(/reward inventory exhausted/i);
+    await expect(
+      rewards.claim(
+        pairingPrincipal,
+        award.rows[0].id,
+        'coupon-reward-wrong-owner-claim',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'REWARD_AWARD_NOT_FOUND' },
+    });
+
+    const claims = await Promise.all([
+      rewards.claim(
+        userPrincipal,
+        award.rows[0].id,
+        'coupon-reward-owner-claim-a',
+      ),
+      rewards.claim(
+        userPrincipal,
+        award.rows[0].id,
+        'coupon-reward-owner-claim-b',
+      ),
+    ]);
+    expect(claims[0]).toMatchObject({
+      claimUrl: null,
+      couponCode: canonicalCouponCode,
+      fulfillmentInstructions: null,
+      id: award.rows[0].id,
+      status: 'claimed',
+    });
+    expect(claims[1]).toEqual(claims[0]);
+    await expect(rewards.getMyAwards(userPrincipal)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: award.rows[0].id,
+          status: 'claimed',
+        }),
+      ]),
+    );
+    await expect(
+      rewards.getCatalog(catalogRegion.rows[0].code, fixture.monthKey),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: created.id,
+        inventoryRemaining: 0,
+        inventoryTotal: 1,
+      }),
+    ]);
+
+    const redeemed = await adminRewardAwards.changeStatus(
+      operatorPrincipal,
+      award.rows[0].id,
+      'coupon-reward-redeem',
+      {
+        action: RewardAwardStatusAction.REDEEM,
+        expectedVersion: 2,
+        reason: 'Record the sponsor-confirmed coupon redemption.',
+      },
+    );
+    expect(redeemed).toEqual({
+      id: award.rows[0].id,
+      status: 'redeemed',
+      version: 3,
+    });
+    await expect(
+      adminRewardAwards.changeStatus(
+        operatorPrincipal,
+        award.rows[0].id,
+        'coupon-reward-redeem',
+        {
+          action: RewardAwardStatusAction.REDEEM,
+          expectedVersion: 2,
+          reason: 'Record the sponsor-confirmed coupon redemption.',
+        },
+      ),
+    ).resolves.toEqual(redeemed);
+    await expect(
+      adminRewardAwards.changeStatus(
+        operatorPrincipal,
+        award.rows[0].id,
+        'coupon-reward-stale-redeem',
+        {
+          action: RewardAwardStatusAction.REDEEM,
+          expectedVersion: 2,
+          reason: 'Reject a stale duplicate redemption attempt.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'REWARD_AWARD_VERSION_CONFLICT' },
+    });
+
+    const persisted = await migrated.pool.query<{
+      award_status: string;
+      award_version: number;
+      code_fingerprint: string;
+      encrypted_code: string;
+      redeemed_at: Date | null;
+    }>(
+      `SELECT award.status::text AS award_status,
+              award.version AS award_version,
+              code.code_fingerprint,
+              code.encrypted_code,
+              code.redeemed_at
+       FROM reward_awards AS award
+       JOIN reward_coupon_codes AS code
+         ON code.assigned_award_id = award.id
+       WHERE award.id = $1`,
+      [award.rows[0].id],
+    );
+    expect(persisted.rows[0]).toMatchObject({
+      award_status: 'redeemed',
+      award_version: 3,
+      code_fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      redeemed_at: expect.any(Date),
+    });
+    expect(persisted.rows[0].encrypted_code).not.toContain(canonicalCouponCode);
+
+    const claimKeys = await migrated.pool.query<{ response_body: unknown }>(
+      `SELECT response_body
+       FROM idempotency_keys
+       WHERE scope = $1
+       ORDER BY idempotency_key`,
+      [`reward-awards:${award.rows[0].id}:claim`],
+    );
+    expect(claimKeys.rows).toEqual([
+      { response_body: { redacted: true } },
+      { response_body: { redacted: true } },
+    ]);
+    const audit = await migrated.pool.query<{ event: string }>(
+      `SELECT jsonb_build_object(
+                'action', action,
+                'next', next_state,
+                'previous', previous_state,
+                'reason', reason
+              )::text AS event
+       FROM operator_audit_events
+       WHERE entity_id IN ($1, $2)`,
+      [created.id, award.rows[0].id],
+    );
+    expect(JSON.stringify(audit.rows)).not.toContain(canonicalCouponCode);
   });
 
   it('accepts evidence once and awards the verified day exactly once', async () => {

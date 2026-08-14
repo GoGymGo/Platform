@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type {
   JsonObject,
@@ -15,6 +21,7 @@ import { transitionRewardAwardStatus } from './reward-award-status';
 interface AdminRewardAwardJson extends JsonObject {
   id: string;
   status: RewardAwardStatus;
+  version: number;
 }
 
 @Injectable()
@@ -30,6 +37,13 @@ export class AdminRewardAwardsService {
     idempotencyKey: string,
     input: RewardAwardStatusActionDto,
   ): Promise<AdminRewardAwardResponseDto> {
+    if (input.reason.trim().length < 8) {
+      throw new BadRequestException({
+        code: 'OPERATOR_REASON_INVALID',
+        message:
+          'Provide a specific audit reason of at least eight characters.',
+      });
+    }
     return this.idempotency.execute<AdminRewardAwardJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -49,7 +63,12 @@ export class AdminRewardAwardsService {
             'item.id',
             'award.reward_catalog_item_id',
           )
-          .select(['award.id', 'award.status', 'item.reward_type'])
+          .select([
+            'award.id',
+            'award.status',
+            'award.version',
+            'item.reward_type',
+          ])
           .where('award.id', '=', awardId)
           .forUpdate()
           .executeTakeFirst();
@@ -59,6 +78,12 @@ export class AdminRewardAwardsService {
             message: 'The reward award was not found.',
           });
         }
+        if (award.version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'REWARD_AWARD_VERSION_CONFLICT',
+            message: 'The reward award changed; reload it before retrying.',
+          });
+        }
 
         const nextStatus = transitionRewardAwardStatus(
           award.status,
@@ -66,35 +91,58 @@ export class AdminRewardAwardsService {
           input.action,
         );
         const now = new Date();
-        await transaction
+        const updated = await transaction
           .updateTable('reward_awards')
           .set({
+            cancelled_at: nextStatus === 'cancelled' ? now : undefined,
             fulfilled_at: nextStatus === 'fulfilled' ? now : undefined,
             redeemed_at: nextStatus === 'redeemed' ? now : undefined,
             status: nextStatus,
             updated_at: now,
+            version: sql<number>`version + 1`,
           })
           .where('id', '=', award.id)
           .where('status', '=', award.status)
-          .executeTakeFirstOrThrow();
+          .where('version', '=', input.expectedVersion)
+          .returning(['status', 'version'])
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'REWARD_AWARD_VERSION_CONFLICT',
+            message: 'The reward award changed; reload it before retrying.',
+          });
+        }
         if (nextStatus === 'redeemed') {
-          await transaction
+          const coupon = await transaction
             .updateTable('reward_coupon_codes')
             .set({ redeemed_at: now })
             .where('assigned_award_id', '=', award.id)
-            .executeTakeFirstOrThrow();
+            .where('redeemed_at', 'is', null)
+            .returning('id')
+            .executeTakeFirst();
+          if (!coupon) {
+            throw new ConflictException({
+              code: 'REWARD_COUPON_NOT_ASSIGNED',
+              message:
+                'The coupon award has no unredeemed assigned code and cannot be redeemed.',
+            });
+          }
         }
         await this.authorization.audit(transaction, {
           action: `reward_award.${nextStatus}`,
           actorUserId: admin.id,
           entityId: award.id,
           entityType: 'reward_awards',
-          nextState: { status: nextStatus },
-          previousState: { status: award.status },
+          nextState: { status: updated.status, version: updated.version },
+          previousState: { status: award.status, version: award.version },
           reason: input.reason,
           requestId: idempotencyKey,
         });
-        return { id: award.id, status: nextStatus };
+        return {
+          id: award.id,
+          status: updated.status,
+          version: updated.version,
+        };
       },
     );
   }

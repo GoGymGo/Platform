@@ -59,10 +59,7 @@ export default function MyAwardsScreen() {
       return;
     }
     void recordFlowMetric(user?.uid, 'flow-retry', 'my-rewards');
-    claim.mutate({
-      awardId,
-      idempotencyKey: `${awardId}:${Date.now()}`
-    });
+    claim.mutate({ awardId });
   };
 
   return (
@@ -117,10 +114,7 @@ export default function MyAwardsScreen() {
                   busy={claim.isPending && claim.variables?.awardId === award.id}
                   disabled={claim.isPending}
                   key={award.id}
-                  onClaim={() => claim.mutate({
-                    awardId: award.id,
-                    idempotencyKey: `${award.id}:${Date.now()}`
-                  })}
+                  onClaim={() => claim.mutate({ awardId: award.id })}
                 />
               ))}
             </View>

@@ -39,6 +39,7 @@ interface AdminRewardJson extends JsonObject {
 interface AddedCodesJson extends JsonObject {
   added: number;
   rewardId: string;
+  version: number;
 }
 
 interface DeletedRewardJson extends JsonObject {
@@ -61,6 +62,7 @@ export class AdminRewardsService {
   ): Promise<AdminRewardResponseDto> {
     this.assertClaimPath(input);
     this.assertAvailabilityWindow(input.availableFrom, input.availableUntil);
+    this.assertReason(input.reason);
     return this.idempotency.execute<AdminRewardJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -127,6 +129,7 @@ export class AdminRewardsService {
   ): Promise<AdminRewardResponseDto> {
     this.assertClaimPath(input);
     this.assertAvailabilityWindow(input.availableFrom, input.availableUntil);
+    this.assertReason(input.reason);
     return this.idempotency.execute<AdminRewardJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -230,6 +233,7 @@ export class AdminRewardsService {
     idempotencyKey: string,
     input: RewardCatalogStatusActionDto,
   ): Promise<AdminRewardResponseDto> {
+    this.assertReason(input.reason);
     return this.idempotency.execute<AdminRewardJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -262,6 +266,7 @@ export class AdminRewardsService {
             transaction,
             current.competition_id,
           );
+          this.assertPublicationAssets(current);
           if (current.reward_type === 'coupon') {
             const codeInventory = await transaction
               .selectFrom('reward_coupon_codes')
@@ -321,6 +326,7 @@ export class AdminRewardsService {
     idempotencyKey: string,
     input: DeleteVersionedAdminEntityDto,
   ): Promise<AdminDeletedEntityResponseDto> {
+    this.assertReason(input.reason);
     return this.idempotency.execute<DeletedRewardJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
@@ -386,11 +392,33 @@ export class AdminRewardsService {
     idempotencyKey: string,
     input: AddRewardCouponCodesDto,
   ): Promise<AddedCouponCodesResponseDto> {
+    this.assertReason(input.reason);
+    const normalizedCodes = input.codes.map((code) =>
+      code.trim().normalize('NFKC'),
+    );
+    if (normalizedCodes.some((code) => code.length < 3 || code.length > 256)) {
+      throw new BadRequestException({
+        code: 'REWARD_COUPON_CODE_INVALID',
+        message:
+          'Coupon codes must contain between three and 256 normalized non-space characters.',
+      });
+    }
+    if (new Set(normalizedCodes).size !== normalizedCodes.length) {
+      throw new BadRequestException({
+        code: 'REWARD_COUPON_CODE_DUPLICATE',
+        message: 'Coupon codes must be unique after normalization.',
+      });
+    }
     return this.idempotency.execute<AddedCodesJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
-        request: { rewardId, codes: input.codes },
+        request: {
+          codes: normalizedCodes,
+          expectedVersion: input.expectedVersion,
+          reason: input.reason.trim(),
+          rewardId,
+        },
         responseCode: 201,
         scope: `admin-rewards:${rewardId}:coupon-codes`,
       },
@@ -400,52 +428,24 @@ export class AdminRewardsService {
           transaction,
         );
         const reward = await this.getForUpdate(transaction, rewardId);
+        this.assertVersion(reward.version, input.expectedVersion);
         if (reward.reward_type !== 'coupon') {
           throw new BadRequestException({
             code: 'REWARD_NOT_COUPON',
             message: 'Coupon codes can only be added to coupon rewards.',
           });
         }
-        if (reward.status === 'archived') {
+        if (reward.status !== 'draft') {
           throw new ConflictException({
-            code: 'REWARD_ARCHIVED',
-            message: 'Coupon codes cannot be added to an archived reward.',
-          });
-        }
-        const normalizedCodes = input.codes.map((code) => code.trim());
-        if (normalizedCodes.some((code) => code.length < 3)) {
-          throw new BadRequestException({
-            code: 'REWARD_COUPON_CODE_INVALID',
-            message:
-              'Coupon codes must contain at least three non-space characters.',
-          });
-        }
-        if (new Set(normalizedCodes).size !== normalizedCodes.length) {
-          throw new BadRequestException({
-            code: 'REWARD_COUPON_CODE_DUPLICATE',
-            message: 'Coupon codes must be unique after whitespace is trimmed.',
+            code: 'REWARD_COUPON_CONFIGURATION_LOCKED',
+            message: 'Coupon codes can only be added to a draft reward.',
           });
         }
         const encrypted = normalizedCodes.map((code) =>
           this.cipher.encrypt(code),
         );
-        const existing = await transaction
-          .selectFrom('reward_coupon_codes')
-          .select('code_fingerprint')
-          .where(
-            'code_fingerprint',
-            'in',
-            encrypted.map((code) => code.fingerprint),
-          )
-          .execute();
-        if (existing.length > 0) {
-          throw new ConflictException({
-            code: 'REWARD_COUPON_CODE_DUPLICATE',
-            message: 'One or more coupon codes were already uploaded.',
-          });
-        }
         const now = new Date();
-        await transaction
+        const inserted = await transaction
           .insertInto('reward_coupon_codes')
           .values(
             encrypted.map((code) => ({
@@ -458,18 +458,46 @@ export class AdminRewardsService {
               reward_catalog_item_id: rewardId,
             })),
           )
+          .onConflict((conflict) =>
+            conflict.column('code_fingerprint').doNothing(),
+          )
+          .returning('id')
           .execute();
+        if (inserted.length !== encrypted.length) {
+          throw new ConflictException({
+            code: 'REWARD_COUPON_CODE_DUPLICATE',
+            message: 'One or more coupon codes were already uploaded.',
+          });
+        }
+        const updated = await transaction
+          .updateTable('reward_catalog_items')
+          .set({
+            updated_at: now,
+            version: sql<number>`version + 1`,
+          })
+          .where('id', '=', rewardId)
+          .where('version', '=', input.expectedVersion)
+          .returning('version')
+          .executeTakeFirst();
+        if (!updated) throw this.versionConflict();
         await this.authorization.audit(transaction, {
           action: 'reward.coupon_codes_added',
           actorUserId: admin.id,
           entityId: rewardId,
           entityType: 'reward_catalog_items',
-          nextState: { codesAdded: encrypted.length },
-          previousState: null,
+          nextState: {
+            codesAdded: encrypted.length,
+            version: updated.version,
+          },
+          previousState: { version: reward.version },
           reason: input.reason,
           requestId: idempotencyKey,
         });
-        return { added: encrypted.length, rewardId };
+        return {
+          added: encrypted.length,
+          rewardId,
+          version: updated.version,
+        };
       },
     );
   }
@@ -557,16 +585,36 @@ export class AdminRewardsService {
   }
 
   private assertClaimPath(input: CreateRewardCatalogItemDto): void {
-    if (
-      (input.rewardType === RewardTypeDto.PHYSICAL ||
-        input.rewardType === RewardTypeDto.CASH) &&
-      !input.claimUrl &&
-      !input.fulfillmentInstructions?.trim()
-    ) {
+    const hasClaimUrl = Boolean(input.claimUrl);
+    const hasInstructions = Boolean(input.fulfillmentInstructions?.trim());
+    if (input.rewardType === RewardTypeDto.COUPON) {
+      if (hasClaimUrl || hasInstructions) {
+        throw new BadRequestException({
+          code: 'REWARD_COUPON_CLAIM_PATH_FORBIDDEN',
+          message:
+            'Coupon rewards reveal only their assigned encrypted code and cannot define a physical claim path.',
+        });
+      }
+      return;
+    }
+    if (hasClaimUrl === hasInstructions) {
       throw new BadRequestException({
         code: 'REWARD_FULFILLMENT_PATH_REQUIRED',
         message:
-          'Physical and cash rewards require a secure claim URL or fulfillment instructions.',
+          'Physical and cash rewards require exactly one secure claim URL or fulfillment instruction path.',
+      });
+    }
+  }
+
+  private assertPublicationAssets(input: {
+    image_url: string | null;
+    terms_url: string | null;
+  }): void {
+    if (!input.image_url || !input.terms_url) {
+      throw new ConflictException({
+        code: 'REWARD_PUBLICATION_ASSETS_REQUIRED',
+        message:
+          'Add an approved HTTPS image and terms link before publishing the reward.',
       });
     }
   }
@@ -576,6 +624,16 @@ export class AdminRewardsService {
       throw new BadRequestException({
         code: 'REWARD_AVAILABILITY_WINDOW_INVALID',
         message: 'Reward availability must end after it starts.',
+      });
+    }
+  }
+
+  private assertReason(reason: string): void {
+    if (reason.trim().length < 8) {
+      throw new BadRequestException({
+        code: 'OPERATOR_REASON_INVALID',
+        message:
+          'Provide a specific audit reason of at least eight characters.',
       });
     }
   }

@@ -50,19 +50,26 @@ Enrollment locks its competition before checking registration state and entrant
 capacity. Workout evidence remains untrusted until a deterministic,
 privacy-minimized review is approved. Draw settlement snapshots eligible users,
 expands the published catalog into exact inventory slots, selects winners, and
-creates reward awards in one transaction. Unique constraints and an inventory
-trigger prevent duplicate or excess awards.
+creates reward awards in one transaction. Database constraints require the
+catalog item and settled draw to belong to the same competition and enforce the
+published availability window at allocation time. Unique constraints, row
+locks, and an inventory trigger prevent duplicate or excess awards. Claims and
+admin fulfillment transitions are owner/role scoped, row-locked, idempotent,
+optimistically versioned, and preserve exact lifecycle timestamps.
 
-Coupon codes are encrypted with AES-256-GCM using an API-only secret. Database
-rows contain ciphertext and a one-way duplicate fingerprint. Plaintext is never
+Coupon codes are NFKC-normalized and encrypted with AES-256-GCM using an
+API-only, canonical 32-byte standard-base64 secret. Database rows contain
+ciphertext and a one-way duplicate fingerprint. Plaintext is never
 logged, exported, returned in catalog data, or available to workers; it is
-revealed only to the authenticated award owner during an idempotent claim.
-Physical rewards use sponsor claim instructions or an HTTPS claim URL and do
+revealed only to the authenticated award owner during an idempotent claim, and
+claim idempotency records store a redacted response marker. Published rewards
+require approved HTTPS image and terms URLs. Physical rewards use exactly one
+sponsor instruction path or HTTPS claim URL; coupon rewards use neither and do
 not require GoGymGo to collect a shipping address.
 
 There is no cash-value field, payment provider, payee onboarding, bank-account
 collection, payment webhook, or transfer reconciliation in the current model.
-See [brand rewards marketplace](brand-rewards-marketplace.md).
+See [brand rewards marketplace](../product/brand-rewards-marketplace.md).
 
 ## Identity, secrets, and privacy
 

@@ -39,6 +39,7 @@ import type {
   PartnerDashboardSnapshot,
   RegionPolicy,
   Reward,
+  RewardAward,
   SystemHealth,
   WorkQueueItem,
 } from "./admin-types";
@@ -112,6 +113,12 @@ type ConfirmAction = {
 type AdminEntityResult = {
   id: string;
   status: string;
+  version: number;
+};
+
+type CouponCodesResult = {
+  added: number;
+  rewardId: string;
   version: number;
 };
 
@@ -1018,25 +1025,28 @@ export function AdminDashboard({
             method: submission.reward ? "PUT" : "POST",
           },
         );
+        let rewardVersion = rewardResult.version;
         if (submission.couponCodes.length > 0) {
-          await request(
+          const couponResult = await request<CouponCodesResult>(
             `operator/configuration/rewards/${rewardResult.id}/coupon-codes`,
             {
               body: {
                 codes: submission.couponCodes,
+                expectedVersion: rewardVersion,
                 reason:
                   "Add the approved coupon inventory during contest launch.",
               },
               method: "POST",
             },
           );
+          rewardVersion = couponResult.version;
         }
         await request<AdminEntityResult>(
           `operator/configuration/rewards/${rewardResult.id}/status-action`,
           {
             body: {
               action: "publish",
-              expectedVersion: rewardResult.version,
+              expectedVersion: rewardVersion,
               reason:
                 "Publish the approved reward as part of the complete contest launch.",
             },
@@ -1361,6 +1371,7 @@ export function AdminDashboard({
           ) : null}
           {section === "rewards" ? (
             <RewardsPanel
+              awards={snapshot.rewardAwards}
               competition={setupCompetition}
               onCouponCodes={setCouponReward}
               onCreate={() => setRewardEditor("new")}
@@ -1379,6 +1390,36 @@ export function AdminDashboard({
                 })
               }
               onEdit={setRewardEditor}
+              onAwardStatus={(award, action) =>
+                setConfirmAction({
+                  actionLabel:
+                    action === "cancel"
+                      ? "Cancel award"
+                      : action === "fulfill"
+                        ? "Record fulfillment"
+                        : "Record redemption",
+                  description:
+                    action === "cancel"
+                      ? `${award.title} for ${award.winnerCallsign} will become unavailable. This cannot be reversed.`
+                      : `${award.title} for ${award.winnerCallsign} will be recorded as ${action === "fulfill" ? "fulfilled" : "redeemed"}. No coupon plaintext is displayed in this dashboard.`,
+                  execute: (reason) =>
+                    mutate(
+                      action === "cancel"
+                        ? "Reward award cancelled."
+                        : action === "fulfill"
+                          ? "Physical reward fulfillment recorded."
+                          : "Coupon redemption recorded.",
+                      `operator/reward-awards/${award.id}/status-action`,
+                      "POST",
+                      {
+                        action,
+                        expectedVersion: award.version,
+                        reason,
+                      },
+                    ),
+                  tone: action === "cancel" ? "danger" : "primary",
+                })
+              }
               onStatus={(reward, action) =>
                 setConfirmAction({
                   actionLabel:
@@ -1594,7 +1635,7 @@ export function AdminDashboard({
               `${codes.length} coupon code${codes.length === 1 ? "" : "s"} added.`,
               `operator/configuration/rewards/${couponReward.id}/coupon-codes`,
               "POST",
-              { codes, reason },
+              { codes, expectedVersion: couponReward.version, reason },
             );
             setCouponReward(null);
           }}
@@ -3093,19 +3134,26 @@ function Metric({
 }
 
 function RewardsPanel({
+  awards,
   competition,
   onCouponCodes,
   onCreate,
   onDelete,
   onEdit,
+  onAwardStatus,
   onStatus,
   rewards,
 }: {
+  awards: RewardAward[];
   competition: Competition | null;
   onCouponCodes: (reward: Reward) => void;
   onCreate: () => void;
   onDelete: (reward: Reward) => void;
   onEdit: (reward: Reward) => void;
+  onAwardStatus: (
+    award: RewardAward,
+    action: "cancel" | "fulfill" | "redeem",
+  ) => void;
   onStatus: (reward: Reward, action: "archive" | "publish") => void;
   rewards: Reward[];
 }) {
@@ -3129,6 +3177,10 @@ function RewardsPanel({
   const contestRewards = competition
     ? rewards.filter((reward) => reward.competitionId === competition.id)
     : rewards;
+  const contestRewardIds = new Set(contestRewards.map((reward) => reward.id));
+  const contestAwards = awards.filter((award) =>
+    contestRewardIds.has(award.rewardId),
+  );
   const normalizedQuery = query.trim().toLowerCase();
   const filteredRewards = contestRewards.filter((reward) => {
     const matchesStatus =
@@ -3313,7 +3365,11 @@ function RewardsPanel({
                 {pagedRewards.map((reward) => {
                   const couponReady =
                     reward.rewardType !== "coupon" ||
-                    reward.couponCodeCount > 0;
+                    reward.couponCodeCount >= reward.inventoryTotal;
+                  const assetsReady = Boolean(
+                    reward.imageUrl && reward.termsUrl,
+                  );
+                  const publishReady = couponReady && assetsReady;
                   const publishGateId = `reward-${reward.id}-publish-gate`;
                   return (
                     <tr key={reward.id}>
@@ -3362,20 +3418,22 @@ function RewardsPanel({
                           ) : null}
                           {reward.status === "draft" ? (
                             <>
-                              {!couponReady ? (
+                              {!publishReady ? (
                                 <span
                                   className="action-guidance compact"
                                   id={publishGateId}
                                 >
-                                  Add coupon codes before publishing.
+                                  {!assetsReady
+                                    ? "Add an approved image and terms link before publishing."
+                                    : "Add enough coupon codes for every inventory unit before publishing."}
                                 </span>
                               ) : null}
                               <button
                                 aria-describedby={
-                                  !couponReady ? publishGateId : undefined
+                                  !publishReady ? publishGateId : undefined
                                 }
                                 className="text-button accent"
-                                disabled={!couponReady}
+                                disabled={!publishReady}
                                 onClick={() => onStatus(reward, "publish")}
                                 type="button"
                               >
@@ -3416,6 +3474,94 @@ function RewardsPanel({
             pageCount={pageCount}
           />
         </>
+      )}
+      <div className="panel-heading section-heading">
+        <div>
+          <p className="eyebrow">AWARDS &amp; FULFILLMENT</p>
+          <h3>Winner awards</h3>
+          <p>
+            Record bounded award transitions without displaying coupon codes or
+            private fulfillment details.
+          </p>
+        </div>
+      </div>
+      {contestAwards.length === 0 ? (
+        <EmptyState
+          body="Awards appear here only after an audited draw settles."
+          title="No winner awards"
+        />
+      ) : (
+        <div
+          aria-label="Reward awards and fulfillment table"
+          className="table-wrap compact"
+          role="region"
+          tabIndex={0}
+        >
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Winner</th>
+                <th scope="col">Reward</th>
+                <th scope="col">Awarded</th>
+                <th scope="col">Status</th>
+                <th aria-label="Actions" scope="col" />
+              </tr>
+            </thead>
+            <tbody>
+              {contestAwards.map((award) => (
+                <tr key={award.id}>
+                  <td>
+                    <strong>{award.winnerCallsign}</strong>
+                    <small>Rank #{award.awardRank}</small>
+                  </td>
+                  <td>
+                    <strong>{award.title}</strong>
+                    <small>{award.sponsorName}</small>
+                  </td>
+                  <td>{formatDateTime(award.awardedAt)}</td>
+                  <td>
+                    <span className={`status-tag ${award.status}`}>
+                      {award.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="inline-actions">
+                      {award.status === "awarded" ? (
+                        <button
+                          className="text-button danger-text"
+                          onClick={() => onAwardStatus(award, "cancel")}
+                          type="button"
+                        >
+                          Cancel
+                        </button>
+                      ) : null}
+                      {award.status === "claimed" &&
+                      award.rewardType === "physical" ? (
+                        <button
+                          className="text-button accent"
+                          onClick={() => onAwardStatus(award, "fulfill")}
+                          type="button"
+                        >
+                          Record fulfilled
+                        </button>
+                      ) : null}
+                      {award.status === "claimed" &&
+                      award.rewardType === "coupon" ? (
+                        <button
+                          className="text-button accent"
+                          onClick={() => onAwardStatus(award, "redeem")}
+                          type="button"
+                        >
+                          Record redeemed
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
@@ -4694,11 +4840,18 @@ function RewardForm({
       );
       if (
         selectedRewardType !== "coupon" &&
-        !claimUrl &&
-        !fulfillmentInstructions
+        Boolean(claimUrl) === Boolean(fulfillmentInstructions)
       ) {
         throw new AdminUserFacingError(
-          "Add either a secure claim URL or fulfillment instructions.",
+          "Choose exactly one secure claim URL or fulfillment instruction path.",
+        );
+      }
+      if (
+        selectedRewardType === "coupon" &&
+        (claimUrl || fulfillmentInstructions)
+      ) {
+        throw new AdminUserFacingError(
+          "Coupon rewards reveal only the assigned encrypted code; remove physical fulfillment fields.",
         );
       }
       const body = compactObject({
@@ -4802,7 +4955,7 @@ function RewardForm({
                   ? "CASH FULFILLMENT"
                   : "PHYSICAL REWARD FULFILLMENT"}
               </legend>
-              <p>Add at least one way for a winner to receive this reward.</p>
+              <p>Choose exactly one way for a winner to receive this reward.</p>
               <div className="reward-fulfillment-fields">
                 <Field
                   label={

@@ -4785,6 +4785,57 @@
           "version"
         ]
       },
+      "AdminDashboardRewardAwardDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "rewardId": { "type": "string", "format": "uuid" },
+          "rewardType": {
+            "type": "string",
+            "enum": ["cash", "coupon", "physical"]
+          },
+          "sponsorName": { "type": "string" },
+          "title": { "type": "string" },
+          "winnerCallsign": { "type": "string" },
+          "awardRank": { "type": "number", "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
+          },
+          "awardedAt": { "type": "string", "format": "date-time" },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "fulfilledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "redeemedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": [
+          "id",
+          "rewardId",
+          "rewardType",
+          "sponsorName",
+          "title",
+          "winnerCallsign",
+          "awardRank",
+          "status",
+          "awardedAt",
+          "claimedAt",
+          "fulfilledAt",
+          "redeemedAt",
+          "version"
+        ]
+      },
       "AdminDashboardCreatorWorkoutDto": {
         "type": "object",
         "properties": {
@@ -4911,6 +4962,12 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/AdminDashboardRewardDto" }
           },
+          "rewardAwards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardRewardAwardDto"
+            }
+          },
           "creatorWorkouts": {
             "type": "array",
             "items": {
@@ -4936,6 +4993,7 @@
           "regions",
           "competitions",
           "rewards",
+          "rewardAwards",
           "creatorWorkouts",
           "legalDocuments",
           "auditEvents",
@@ -6266,9 +6324,10 @@
           "action": {
             "type": "string",
             "enum": ["cancel", "fulfill", "redeem"]
-          }
+          },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason", "action"]
+        "required": ["reason", "action", "expectedVersion"]
       },
       "AdminRewardAwardResponseDto": {
         "type": "object",
@@ -6277,9 +6336,10 @@
           "status": {
             "type": "string",
             "enum": ["awarded", "cancelled", "claimed", "fulfilled", "redeemed"]
-          }
+          },
+          "version": { "type": "number", "minimum": 1 }
         },
-        "required": ["id", "status"]
+        "required": ["id", "status", "version"]
       },
       "CreateRewardCatalogItemDto": {
         "type": "object",
@@ -6382,17 +6442,19 @@
             "maxItems": 10000,
             "type": "array",
             "items": { "type": "string" }
-          }
+          },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason", "codes"]
+        "required": ["reason", "codes", "expectedVersion"]
       },
       "AddedCouponCodesResponseDto": {
         "type": "object",
         "properties": {
           "added": { "type": "number", "minimum": 1 },
-          "rewardId": { "type": "string", "format": "uuid" }
+          "rewardId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number", "minimum": 1 }
         },
-        "required": ["added", "rewardId"]
+        "required": ["added", "rewardId", "version"]
       },
       "RewardCatalogItemResponseDto": {
         "type": "object",
@@ -6403,6 +6465,10 @@
           "monthKey": { "type": "string" },
           "regionCode": { "type": "string" },
           "regionName": { "type": "string" },
+          "regionTimezone": {
+            "type": "string",
+            "example": "America/Vancouver"
+          },
           "sponsorName": { "type": "string" },
           "title": { "type": "string" },
           "description": { "type": "string" },
@@ -6410,10 +6476,20 @@
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
           },
-          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
-          "termsUrl": { "type": "string", "format": "uri", "nullable": true },
+          "imageUrl": { "type": "string", "format": "uri" },
+          "termsUrl": { "type": "string", "format": "uri" },
           "inventoryRemaining": { "type": "number", "minimum": 0 },
-          "inventoryTotal": { "type": "number", "minimum": 1 }
+          "inventoryTotal": { "type": "number", "minimum": 1 },
+          "availableFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "availableUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         },
         "required": [
           "id",
@@ -6422,6 +6498,7 @@
           "monthKey",
           "regionCode",
           "regionName",
+          "regionTimezone",
           "sponsorName",
           "title",
           "description",
@@ -6429,7 +6506,9 @@
           "imageUrl",
           "termsUrl",
           "inventoryRemaining",
-          "inventoryTotal"
+          "inventoryTotal",
+          "availableFrom",
+          "availableUntil"
         ]
       },
       "RewardAwardResponseDto": {

@@ -13,6 +13,27 @@ All routes use the `/v1/operator/configuration` prefix:
 - `POST /creator-workouts` creates an unpublished workout.
 - `PUT /creator-workouts/:id` replaces an unpublished workout when `expectedVersion` matches.
 - `POST /creator-workouts/:id/status-action` publishes or unpublishes a workout when `expectedVersion` matches.
+- `POST /rewards` creates a draft sponsor reward with an approved image, terms,
+  exact inventory, availability window, and one permitted claim path.
+- `PUT /rewards/:id` replaces a draft when `expectedVersion` matches.
+- `POST /rewards/:id/coupon-codes` adds NFKC-normalized, encrypted codes to a
+  draft coupon reward when `expectedVersion` matches and returns the advanced
+  version. It never returns plaintext inventory.
+- `POST /rewards/:id/status-action` publishes or archives a reward when
+  `expectedVersion` matches. Publication requires complete coupon inventory,
+  approved HTTPS image and terms, and an eligible competition/region.
+
+Reward fulfillment routes use the `/v1/operator` prefix:
+
+- `POST /reward-awards/:awardId/status-action` cancels an unclaimed award,
+  fulfills a claimed physical reward, or redeems a claimed coupon. The request
+  includes `expectedVersion` and a specific audit reason.
+
+The dashboard award list is fulfillment-safe metadata only. Verify winner
+callsign, rank, reward type, status, and version before confirming an action.
+Coupon plaintext, ciphertext, fingerprints, and member claim instructions are
+intentionally absent. Retrying a lost response must reuse the same
+`Idempotency-Key`; a stale version requires refresh and review.
 
 Contest-specific Partner-gym poster routes use the `/v1/operator` prefix:
 

@@ -76,6 +76,22 @@ export type Reward = {
   version: number;
 };
 
+export type RewardAward = {
+  awardRank: number;
+  awardedAt: string;
+  claimedAt: string | null;
+  fulfilledAt: string | null;
+  id: string;
+  redeemedAt: string | null;
+  rewardId: string;
+  rewardType: "cash" | "coupon" | "physical";
+  sponsorName: string;
+  status: "awarded" | "cancelled" | "claimed" | "fulfilled" | "redeemed";
+  title: string;
+  version: number;
+  winnerCallsign: string;
+};
+
 export type CreatorWorkout = {
   creatorName: string;
   creatorUserId: string | null;
@@ -131,6 +147,7 @@ export type DashboardSnapshot = {
   generatedAt: string;
   legalDocuments: LegalDocument[];
   regions: RegionPolicy[];
+  rewardAwards: RewardAward[];
   rewards: Reward[];
 };
 

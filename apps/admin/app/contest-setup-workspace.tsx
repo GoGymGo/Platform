@@ -459,9 +459,20 @@ export function ContestSetupWorkspace({
       const fulfillment = optionalString(
         formData.get("fulfillmentInstructions"),
       );
-      if (selectedRewardType !== "coupon" && !claimUrl && !fulfillment) {
+      const imageUrl = optionalString(formData.get("imageUrl"));
+      const termsUrl = optionalString(formData.get("termsUrl"));
+      if (!imageUrl || !termsUrl) {
         errors.reward =
-          "Add a secure claim URL or fulfillment instructions for the reward.";
+          "Add an approved HTTPS image and terms link before publishing.";
+      } else if (
+        selectedRewardType !== "coupon" &&
+        Boolean(claimUrl) === Boolean(fulfillment)
+      ) {
+        errors.reward =
+          "Choose exactly one secure claim URL or fulfillment instruction path.";
+      } else if (selectedRewardType === "coupon" && (claimUrl || fulfillment)) {
+        errors.reward =
+          "Coupon rewards cannot include a physical claim URL or instructions.";
       }
       if (selectedRewardType === "coupon") {
         const total = Number(formData.get("inventoryTotal"));
@@ -877,7 +888,7 @@ export function ContestSetupWorkspace({
                 ) : (
                   <fieldset className="reward-fulfillment setup-reward-fulfillment">
                     <legend>FULFILLMENT</legend>
-                    <p>Add at least one way for a winner to receive this reward.</p>
+                    <p>Choose exactly one way for a winner to receive this reward.</p>
                     <div className="reward-fulfillment-fields">
                       <SetupField label="SECURE CLAIM URL">
                         <input

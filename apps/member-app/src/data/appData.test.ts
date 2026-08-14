@@ -67,6 +67,111 @@ describe('app data boundary', () => {
     assert.equal(authenticated, false);
   });
 
+  it('validates exact availability and inventory fields in the public reward contract', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve([
+        validRewardCatalogItem()
+      ]) as Promise<TResponse>
+    };
+
+    const rewards = await createAppDataSource('api', api)
+      .getRewardCatalog('toronto', '2026-08');
+
+    assert.equal(rewards[0].inventoryRemaining, 1);
+    assert.equal(rewards[0].regionTimezone, 'America/Vancouver');
+    assert.equal(rewards[0].availableFrom, '2026-08-01T07:00:00.000Z');
+  });
+
+  it('rejects malformed or over-counted reward catalog responses', async () => {
+    let response: unknown = [{
+      ...validRewardCatalogItem(),
+      inventoryRemaining: 2
+    }];
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve(response) as Promise<TResponse>
+    };
+    const production = createAppDataSource('api', api);
+
+    await assert.rejects(
+      () => production.getRewardCatalog('toronto'),
+      /reward catalog response is invalid/i
+    );
+    response = [{
+      ...validRewardCatalogItem(),
+      imageUrl: 'http://insecure.example.test/reward.jpg'
+    }];
+    await assert.rejects(
+      () => production.getRewardCatalog('toronto'),
+      /reward catalog response is invalid/i
+    );
+  });
+
+  it('rejects award lists that expose claim-only fields', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve([{
+        awardRank: 1,
+        awardedAt: '2026-08-15T12:00:00.000Z',
+        claimedAt: null,
+        couponCode: 'MUST-NOT-APPEAR',
+        id: '70000000-0000-4000-8000-000000000001',
+        imageUrl: null,
+        rewardType: 'coupon',
+        sponsorName: 'Sponsor',
+        status: 'awarded',
+        title: 'Recovery coupon'
+      }]) as Promise<TResponse>
+    };
+
+    await assert.rejects(
+      () => createAppDataSource('api', api).getMyRewardAwards(),
+      /reward award response is invalid/i
+    );
+  });
+
+  it('reuses one claim idempotency key after a lost response and validates the secret path', async () => {
+    const idempotencyKeys: string[] = [];
+    let attempt = 0;
+    const api: ApiClient = {
+      request: <TResponse, TBody = never>(
+        _path: string,
+        options?: ApiRequestOptions<TBody>
+      ) => {
+        idempotencyKeys.push(options?.idempotencyKey ?? '');
+        attempt += 1;
+        if (attempt === 1) {
+          return Promise.reject(new Error('response lost'));
+        }
+        return Promise.resolve({
+          awardRank: 1,
+          awardedAt: '2026-08-15T12:00:00.000Z',
+          claimedAt: '2026-08-15T12:05:00.000Z',
+          claimUrl: null,
+          couponCode: 'WIN-ABC-001',
+          fulfillmentInstructions: null,
+          id: '70000000-0000-4000-8000-000000000001',
+          imageUrl: null,
+          rewardType: 'coupon',
+          sponsorName: 'Sponsor',
+          status: 'claimed',
+          title: 'Recovery coupon'
+        }) as Promise<TResponse>;
+      }
+    };
+    const production = createAppDataSource('api', api);
+
+    await assert.rejects(
+      () => production.claimReward('70000000-0000-4000-8000-000000000001'),
+      /response lost/i
+    );
+    const claimed = await production.claimReward(
+      '70000000-0000-4000-8000-000000000001'
+    );
+
+    assert.equal(claimed.couponCode, 'WIN-ABC-001');
+    assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
+    assert.match(idempotencyKeys[0], /^reward-claim:/);
+  });
+
   it('loads streak rewards from the authenticated API boundary', async () => {
     let requestedPath = '';
     const api: ApiClient = {
@@ -376,3 +481,25 @@ describe('app data boundary', () => {
     assert.equal(leaderboard, null);
   });
 });
+
+function validRewardCatalogItem() {
+  return {
+    availableFrom: '2026-08-01T07:00:00.000Z',
+    availableUntil: '2026-09-01T07:00:00.000Z',
+    competitionId: '40000000-0000-4000-8000-000000000001',
+    competitionName: 'August contest',
+    description: 'A sponsor-funded recovery reward.',
+    id: '70000000-0000-4000-8000-000000000001',
+    imageUrl: 'https://cdn.example.test/reward.jpg',
+    inventoryRemaining: 1,
+    inventoryTotal: 1,
+    monthKey: '2026-08',
+    regionCode: 'toronto',
+    regionName: 'Toronto',
+    regionTimezone: 'America/Vancouver',
+    rewardType: 'coupon',
+    sponsorName: 'Sponsor',
+    termsUrl: 'https://sponsor.example.test/terms',
+    title: 'Recovery coupon'
+  };
+}

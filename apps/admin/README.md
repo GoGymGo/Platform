@@ -14,6 +14,13 @@ social-provider login on this surface. GoGymGo creates each operator's
 email/password account directly in the existing Firebase project and distributes
 the initial credentials through an approved private channel.
 
+The login form never asks the browser to choose a workspace. After Firebase
+sign-in, the app waits for `GET /v1/operator/access`; only that response selects
+the platform or partner surface. A missing, unavailable, or denied access
+response cannot fall back to a dashboard. The app exposes retry, expired-session,
+denied-access, and complete sign-out states without retaining pending mutation
+keys or draw-reveal material for the next account.
+
 Authentication alone does not grant access: every request is authorized again
 by the GoGymGo API, which requires an active, email-verified database user and a
 Firebase token whose sign-in provider is `password`. Full configuration routes
@@ -73,4 +80,8 @@ allowed indefinitely.
 The same-origin `/api/gogymgo/*` proxy forwards only `/v1/operator/*` requests
 to `GOGYMGO_API_URL`. Firebase ID tokens are forwarded as bearer tokens; the
 backend remains the sole authority for roles, validation, publication state,
-and data persistence.
+and data persistence. A `401` causes one forced Firebase token refresh and one
+retry with the same idempotency key. Other failures are not retried
+automatically. The proxy accepts only HTTPS upstream origins (plus loopback HTTP
+for local development), allowlisted bearer/JSON/idempotency headers, bounded
+JSON bodies, safe query names, and nonredirecting JSON responses.

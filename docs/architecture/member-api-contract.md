@@ -29,6 +29,32 @@ flowchart LR
   require append-only audit events.
 - Coupon plaintext is encrypted at the API boundary, redacted from logs, and
   revealed only to the authenticated award owner after claim.
+
+## Operator access contract
+
+`GET /v1/operator/access` is the only workspace-selection contract for the
+admin client. It requires a revoked-token-aware Firebase bearer token, a
+password sign-in provider, an active and email-verified PostgreSQL user, and an
+unambiguous database role state. Firebase custom role claims are ignored.
+
+- `admin` receives the global GoGymGo workspace only when it has no partner role
+  or active partner assignment. Specialist `operator` and `fraud_operator`
+  roles are subject to the same unscoped requirement on their global routes.
+- `gym_partner_admin` receives exact-gym writes only for active `admin`
+  assignments whose gym is active and nondeleted.
+- `gym_partner_staff` receives read-only data only for active `staff`
+  assignments. Mixed admin/staff assignments retain their per-gym levels rather
+  than being unioned.
+- Ordinary members, unverified/suspended identities, social-provider sessions,
+  missing or revoked assignments, inactive gyms, role conflicts, and cross-gym
+  requests fail closed.
+
+Every downstream operator read/write repeats the relevant database role and
+scope check. Client navigation is presentation only and cannot authorize an
+operation. The same-origin admin proxy accepts only bounded JSON requests for
+`/v1/operator/*` at the configured API origin and forwards no cookies, origin,
+redirects, or arbitrary headers.
+
 - Physical fulfillment uses a sponsor HTTPS claim URL or instructions. The app
   does not collect a shipping address.
 - AsyncStorage is only a convenience cache and never the source of truth for

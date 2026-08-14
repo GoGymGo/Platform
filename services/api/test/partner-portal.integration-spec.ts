@@ -1,6 +1,7 @@
-import { sql } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
 import { DatabaseService } from '../src/database/database.service';
+import type { Database } from '../src/database/database.types';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import { GymsService } from '../src/modules/gyms/gyms.service';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
@@ -50,22 +51,39 @@ const adminPrincipal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 
+function testPrincipal(
+  firebaseUid: string,
+  overrides: Partial<AuthenticatedPrincipal> = {},
+): AuthenticatedPrincipal {
+  return {
+    email: `${firebaseUid}@integration.test`,
+    emailVerified: true,
+    firebaseUid,
+    roles: [],
+    signInProvider: 'password',
+    tokenIssuedAt: 1,
+    ...overrides,
+  };
+}
+
 describeWithDatabase('gym partner operator portal', () => {
   jest.setTimeout(120_000);
 
   let competitionConfiguration: AdminCompetitionConfigurationService;
+  let authorization: AdminAuthorizationService;
   let database: DatabaseService;
   let gyms: GymsService;
   let gymId: string;
   let migrated: MigratedPostgisTestDatabase;
   let portal: OperatorPortalService;
+  let profiles: ProfilesService;
   let regionId: string;
 
   beforeAll(async () => {
     migrated = await startMigratedPostgisTestDatabase();
     database = new DatabaseService(createTestConfig(migrated.databaseUrl));
-    const profiles = new ProfilesService(database);
-    const authorization = new AdminAuthorizationService(profiles);
+    profiles = new ProfilesService(database);
+    authorization = new AdminAuthorizationService(profiles);
     const idempotency = new IdempotencyService(database);
     gyms = new GymsService(
       database,
@@ -167,6 +185,16 @@ describeWithDatabase('gym partner operator portal', () => {
   });
 
   it('creates a gym-owned draft with server rules and isolates it from platform competitions', async () => {
+    await expect(portal.getAccess(adminPrincipal)).resolves.toMatchObject({
+      assignments: [],
+      portal: 'gogymgo',
+      roles: ['admin'],
+    });
+    await expect(
+      portal.getPartnerDashboard(adminPrincipal),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_PARTNER_ACCESS_REQUIRED' },
+    });
     const proposal = await competitionConfiguration.create(
       partnerPrincipal,
       'partner-proposal-create',
@@ -245,6 +273,195 @@ describeWithDatabase('gym partner operator portal', () => {
       ),
     ).rejects.toMatchObject({
       response: { code: 'PARTNER_COMPETITION_ADMIN_REQUIRED' },
+    });
+  });
+
+  it('denies members, unverified or suspended users, social providers, and partners without an active assignment', async () => {
+    const memberPrincipal = testPrincipal('ordinary-member');
+    const member = await profiles.ensureUser(
+      memberPrincipal,
+      database.connection,
+    );
+    await expect(portal.getAccess(memberPrincipal)).rejects.toMatchObject({
+      response: { code: 'OPERATOR_PORTAL_ACCESS_REQUIRED' },
+    });
+    await expect(
+      portal.getAccess({ ...memberPrincipal, roles: ['admin'] }),
+    ).rejects.toMatchObject({
+      response: { code: 'OPERATOR_PORTAL_ACCESS_REQUIRED' },
+    });
+    await expect(
+      portal.getAccess({
+        ...memberPrincipal,
+        roles: ['admin'],
+        signInProvider: 'google.com',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED' },
+    });
+
+    const unverifiedPrincipal = testPrincipal('unverified-operator', {
+      emailVerified: false,
+    });
+    await profiles.ensureUser(unverifiedPrincipal, database.connection);
+    await expect(portal.getAccess(unverifiedPrincipal)).rejects.toMatchObject({
+      response: { code: 'VERIFIED_EMAIL_REQUIRED' },
+    });
+
+    const suspendedPrincipal = testPrincipal('suspended-operator');
+    const suspended = await profiles.ensureUser(
+      suspendedPrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'], status: 'suspended' })
+      .where('id', '=', suspended.id)
+      .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(suspendedPrincipal)).rejects.toMatchObject({
+      response: { code: 'ACCOUNT_NOT_ACTIVE' },
+    });
+
+    const unassignedPrincipal = testPrincipal('unassigned-partner');
+    const unassigned = await profiles.ensureUser(
+      unassignedPrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['gym_partner_staff'] })
+      .where('id', '=', unassigned.id)
+      .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(unassignedPrincipal)).rejects.toMatchObject({
+      response: { code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED' },
+    });
+
+    expect(member.roles).toEqual(['user']);
+  });
+
+  it('keeps mixed assignment levels exact and observes assignment or gym revocation immediately', async () => {
+    const secondGym = await database.connection
+      .insertInto('gym_locations')
+      .values({
+        active: true,
+        address: '2 Partner Test Way',
+        coordinates: sql`ST_SetSRID(ST_MakePoint(-123.37, 48.43), 4326)::geography`,
+        name: 'Partner Staff-Scope Gym',
+        radius_meters: 75,
+        region_policy_id: regionId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const mixedPrincipal = testPrincipal('mixed-partner');
+    const mixed = await profiles.ensureUser(
+      mixedPrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['gym_partner_admin', 'gym_partner_staff'] })
+      .where('id', '=', mixed.id)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('gym_partner_assignments')
+      .values([
+        {
+          access_level: 'admin',
+          active: true,
+          gym_location_id: gymId,
+          user_id: mixed.id,
+        },
+        {
+          access_level: 'staff',
+          active: true,
+          gym_location_id: secondGym.id,
+          user_id: mixed.id,
+        },
+      ])
+      .execute();
+
+    const mixedAccess = await portal.getAccess(mixedPrincipal);
+    expect(mixedAccess.portal).toBe('partner');
+    expect(mixedAccess.assignments).toHaveLength(2);
+    expect(mixedAccess.assignments).toEqual(
+      expect.arrayContaining([
+        { accessLevel: 'admin', gymLocationId: gymId },
+        { accessLevel: 'staff', gymLocationId: secondGym.id },
+      ]),
+    );
+    await expect(
+      authorization.requireGymAccess(
+        mixedPrincipal,
+        database.connection as unknown as Transaction<Database>,
+        secondGym.id,
+        'admin',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'GYM_SCOPE_FORBIDDEN' } });
+    await expect(
+      competitionConfiguration.create(
+        partnerPrincipal,
+        'cross-gym-body-attempt',
+        {
+          ...competitionInput('Cross-gym body attempt', true),
+          gymLocationId: secondGym.id,
+          monthKey: '2027-11',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PARTNER_COMPETITION_ADMIN_REQUIRED' },
+    });
+
+    await database.connection
+      .updateTable('gym_partner_assignments')
+      .set({ active: false })
+      .where('user_id', '=', mixed.id)
+      .where('gym_location_id', '=', gymId)
+      .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(mixedPrincipal)).resolves.toMatchObject({
+      assignments: [{ accessLevel: 'staff', gymLocationId: secondGym.id }],
+    });
+
+    await database.connection
+      .updateTable('gym_locations')
+      .set({ active: false })
+      .where('id', '=', secondGym.id)
+      .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(mixedPrincipal)).rejects.toMatchObject({
+      response: { code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED' },
+    });
+  });
+
+  it('fails closed for a platform role combined with partner state', async () => {
+    const conflictPrincipal = testPrincipal('conflicting-admin');
+    const conflict = await profiles.ensureUser(
+      conflictPrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin', 'gym_partner_staff'] })
+      .where('id', '=', conflict.id)
+      .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(conflictPrincipal)).rejects.toMatchObject({
+      response: { code: 'OPERATOR_ROLE_CONFLICT' },
+    });
+
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', conflict.id)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('gym_partner_assignments')
+      .values({
+        access_level: 'staff',
+        active: true,
+        gym_location_id: gymId,
+        user_id: conflict.id,
+      })
+      .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(conflictPrincipal)).rejects.toMatchObject({
+      response: { code: 'OPERATOR_ROLE_CONFLICT' },
     });
   });
 

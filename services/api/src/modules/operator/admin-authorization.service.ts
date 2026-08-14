@@ -19,6 +19,18 @@ export type PortalAccess =
       user: Awaited<ReturnType<ProfilesService['ensureUser']>>;
     };
 
+export function assertOperatorPasswordPrincipal(
+  principal: AuthenticatedPrincipal,
+): void {
+  if (principal.signInProvider !== 'password') {
+    throw new ForbiddenException({
+      code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
+      message:
+        'Use the email and password credentials issued directly by GoGymGo.',
+    });
+  }
+}
+
 @Injectable()
 export class AdminAuthorizationService {
   constructor(private readonly profiles: ProfilesService) {}
@@ -34,6 +46,7 @@ export class AdminAuthorizationService {
         message: 'An administrator role is required for configuration changes.',
       });
     }
+    await this.assertGlobalOperatorIsUnscoped(user, transaction);
     return user;
   }
 
@@ -43,6 +56,7 @@ export class AdminAuthorizationService {
   ): Promise<PortalAccess> {
     const user = await this.requirePasswordUser(principal, transaction);
     if (user.roles.includes('admin')) {
+      await this.assertGlobalOperatorIsUnscoped(user, transaction);
       return { assignments: [], kind: 'platform_admin', user };
     }
 
@@ -56,11 +70,14 @@ export class AdminAuthorizationService {
     }
 
     const assignments = await transaction
-      .selectFrom('gym_partner_assignments')
-      .select(['access_level', 'gym_location_id'])
-      .where('user_id', '=', user.id)
-      .where('active', '=', true)
-      .orderBy('gym_location_id')
+      .selectFrom('gym_partner_assignments as assignment')
+      .innerJoin('gym_locations as gym', 'gym.id', 'assignment.gym_location_id')
+      .select(['assignment.access_level', 'assignment.gym_location_id'])
+      .where('assignment.user_id', '=', user.id)
+      .where('assignment.active', '=', true)
+      .where('gym.active', '=', true)
+      .where('gym.deleted_at', 'is', null)
+      .orderBy('assignment.gym_location_id')
       .execute();
     const authorizedAssignments = assignments
       .filter(
@@ -148,17 +165,41 @@ export class AdminAuthorizationService {
       .executeTakeFirstOrThrow();
   }
 
+  async assertGlobalOperatorIsUnscoped(
+    user: Awaited<ReturnType<ProfilesService['ensureUser']>>,
+    transaction: Transaction<Database>,
+  ): Promise<void> {
+    const hasPartnerRole = user.roles.some((role) =>
+      ['gym_partner_admin', 'gym_partner_staff'].includes(role),
+    );
+    if (hasPartnerRole) {
+      throw new ForbiddenException({
+        code: 'OPERATOR_ROLE_CONFLICT',
+        message:
+          'Platform operations and gym-partner access cannot be combined.',
+      });
+    }
+    const assignment = await transaction
+      .selectFrom('gym_partner_assignments')
+      .select('gym_location_id')
+      .where('user_id', '=', user.id)
+      .where('active', '=', true)
+      .limit(1)
+      .executeTakeFirst();
+    if (assignment) {
+      throw new ForbiddenException({
+        code: 'OPERATOR_ROLE_CONFLICT',
+        message:
+          'Platform operations and gym-partner access cannot be combined.',
+      });
+    }
+  }
+
   private async requirePasswordUser(
     principal: AuthenticatedPrincipal,
     transaction: Transaction<Database>,
   ) {
-    if (principal.signInProvider !== 'password') {
-      throw new ForbiddenException({
-        code: 'OPERATOR_PASSWORD_SIGN_IN_REQUIRED',
-        message:
-          'Use the email and password credentials issued directly by GoGymGo.',
-      });
-    }
+    assertOperatorPasswordPrincipal(principal);
     const user = await this.profiles.ensureUser(principal, transaction);
     this.profiles.requireVerifiedEmail(user);
     return user;

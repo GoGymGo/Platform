@@ -15,7 +15,10 @@ import { DrawsService } from '../draws/draws.service';
 import { ProfilesService } from '../profiles/profiles.service';
 import { ProfileMediaModerationService } from '../profiles/profile-media-moderation.service';
 import { SessionsService } from '../sessions/sessions.service';
-import { AdminAuthorizationService } from './admin-authorization.service';
+import {
+  AdminAuthorizationService,
+  assertOperatorPasswordPrincipal,
+} from './admin-authorization.service';
 import { resolveWorkerHealth } from '../operations/operational-health';
 import type {
   DecidePartnerApplicationDto,
@@ -528,6 +531,7 @@ export class OperatorService {
     principal: AuthenticatedPrincipal,
     transaction: Transaction<Database>,
   ) {
+    assertOperatorPasswordPrincipal(principal);
     const user = await this.profiles.ensureUser(principal, transaction);
     this.profiles.requireVerifiedEmail(user);
     if (
@@ -540,6 +544,10 @@ export class OperatorService {
         message: 'An operator role is required for this action.',
       });
     }
+    await this.adminAuthorization.assertGlobalOperatorIsUnscoped(
+      user,
+      transaction,
+    );
     return user;
   }
 

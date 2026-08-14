@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { loadTrustedFirebaseOperatorAccount } from '../src/modules/auth/trusted-operator-account-loader';
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
@@ -37,8 +38,13 @@ async function main(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const user = await client.query<{ id: string; roles: string[] }>(
-      `SELECT id, roles
+    const user = await client.query<{
+      email_verified: boolean;
+      firebase_uid: string;
+      id: string;
+      roles: string[];
+    }>(
+      `SELECT email_verified, firebase_uid, id, roles
        FROM users
        WHERE lower(email) = $1
          AND status = 'active'
@@ -51,6 +57,35 @@ async function main(): Promise<void> {
       );
     }
     const current = user.rows[0];
+    if (!current.email_verified) {
+      throw new Error('The configured owner must verify their email first.');
+    }
+    await loadTrustedFirebaseOperatorAccount({
+      email: administratorEmail,
+      firebaseUid: current.firebase_uid,
+    });
+    if (
+      current.roles.some((role) =>
+        ['gym_partner_admin', 'gym_partner_staff'].includes(role),
+      )
+    ) {
+      throw new Error(
+        'The configured owner must not retain a gym-partner role.',
+      );
+    }
+    const activeAssignments = await client.query(
+      `SELECT gym_location_id
+       FROM gym_partner_assignments
+       WHERE user_id = $1 AND active = true
+       LIMIT 1
+       FOR UPDATE`,
+      [current.id],
+    );
+    if (activeAssignments.rowCount !== 0) {
+      throw new Error(
+        'The configured owner must not retain an active gym assignment.',
+      );
+    }
     if (current.roles.includes('admin')) {
       await client.query('COMMIT');
       console.log('Administrator role is already present; no change was made.');

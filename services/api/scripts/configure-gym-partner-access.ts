@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { loadTrustedFirebaseOperatorAccount } from '../src/modules/auth/trusted-operator-account-loader';
+import {
+  partnerAssignmentNeedsChange,
+  rolesForActivePartnerAssignments,
+} from '../src/modules/operator/trusted-partner-access';
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
@@ -58,10 +63,11 @@ async function main(): Promise<void> {
     await client.query('BEGIN');
     const userResult = await client.query<{
       email_verified: boolean;
+      firebase_uid: string;
       id: string;
       roles: string[];
     }>(
-      `SELECT id, email_verified, roles
+      `SELECT id, email_verified, firebase_uid, roles
        FROM users
        WHERE lower(email) = $1
          AND status = 'active'
@@ -77,16 +83,36 @@ async function main(): Promise<void> {
     if (!user.email_verified) {
       throw new Error('The partner user must verify their email first.');
     }
+    await loadTrustedFirebaseOperatorAccount({
+      email,
+      firebaseUid: user.firebase_uid,
+    });
+    const unexpectedRoles = user.roles.filter(
+      (role) =>
+        !['user', 'gym_partner_admin', 'gym_partner_staff'].includes(role),
+    );
+    if (unexpectedRoles.length > 0) {
+      throw new Error(
+        'A platform or specialist operator role cannot be combined with gym-partner access.',
+      );
+    }
     const gymResult = await client.query<{ id: string; name: string }>(
       `SELECT id, name
        FROM gym_locations
        WHERE id = $1
-         AND active = true
+         AND (
+           $2 = 'revoke'
+           OR (active = true AND deleted_at IS NULL)
+         )
        FOR SHARE`,
-      [gymLocationId],
+      [gymLocationId, action],
     );
     if (gymResult.rowCount !== 1) {
-      throw new Error('The partner gym must exist and be active.');
+      throw new Error(
+        action === 'grant'
+          ? 'The partner gym must exist, be active, and not be deleted.'
+          : 'The partner gym must exist before its assignment can be revoked.',
+      );
     }
     const previousResult = await client.query<{
       access_level: 'admin' | 'staff';
@@ -103,6 +129,7 @@ async function main(): Promise<void> {
     if (
       action === 'revoke' &&
       previous &&
+      previous.active &&
       previous.access_level !== accessLevel
     ) {
       throw new Error(
@@ -110,7 +137,15 @@ async function main(): Promise<void> {
       );
     }
 
-    if (action === 'grant') {
+    const assignmentChanged = partnerAssignmentNeedsChange({
+      accessLevel,
+      action,
+      previous: previous
+        ? { accessLevel: previous.access_level, active: previous.active }
+        : null,
+    });
+
+    if (action === 'grant' && assignmentChanged) {
       await client.query(
         `INSERT INTO gym_partner_assignments
            (user_id, gym_location_id, access_level, active,
@@ -122,16 +157,13 @@ async function main(): Promise<void> {
                        updated_at = current_timestamp`,
         [user.id, gymLocationId, accessLevel],
       );
-    } else {
-      const revoked = await client.query(
+    } else if (action === 'revoke' && assignmentChanged) {
+      await client.query(
         `UPDATE gym_partner_assignments
          SET active = false, updated_at = current_timestamp
          WHERE user_id = $1 AND gym_location_id = $2 AND active = true`,
         [user.id, gymLocationId],
       );
-      if (revoked.rowCount !== 1) {
-        throw new Error('No active partner assignment exists to revoke.');
-      }
     }
 
     const activeLevels = await client.query<{
@@ -142,31 +174,34 @@ async function main(): Promise<void> {
        WHERE user_id = $1 AND active = true`,
       [user.id],
     );
-    const preservedRoles = user.roles.filter(
-      (role) => role !== 'gym_partner_admin' && role !== 'gym_partner_staff',
+    const nextRoles = rolesForActivePartnerAssignments(
+      user.roles,
+      activeLevels.rows.map((row) => row.access_level),
     );
-    const nextRoles = [
-      ...preservedRoles,
-      ...(activeLevels.rows.some((row) => row.access_level === 'admin')
-        ? ['gym_partner_admin']
-        : []),
-      ...(activeLevels.rows.some((row) => row.access_level === 'staff')
-        ? ['gym_partner_staff']
-        : []),
-    ].sort();
-    await client.query(
-      `UPDATE users
-       SET roles = $1, updated_at = current_timestamp
-       WHERE id = $2`,
-      [nextRoles, user.id],
-    );
+    const rolesChanged =
+      JSON.stringify([...user.roles].sort()) !== JSON.stringify(nextRoles);
+    if (!assignmentChanged && !rolesChanged) {
+      await client.query('COMMIT');
+      console.log('Partner access is already in the requested state.');
+      return;
+    }
+    if (rolesChanged) {
+      await client.query(
+        `UPDATE users
+         SET roles = $1, updated_at = current_timestamp
+         WHERE id = $2`,
+        [nextRoles, user.id],
+      );
+    }
     await client.query(
       `INSERT INTO operator_audit_events
          (actor_user_id, action, entity_type, entity_id, previous_state,
           next_state, reason, request_id)
        VALUES (NULL, $1, 'gym_partner_assignments', $2, $3, $4, $5, $6)`,
       [
-        `gym_partner_assignment.${action === 'grant' ? 'granted' : 'revoked'}`,
+        assignmentChanged
+          ? `gym_partner_assignment.${action === 'grant' ? 'granted' : 'revoked'}`
+          : 'gym_partner_access.roles_reconciled',
         user.id,
         previous
           ? JSON.stringify({

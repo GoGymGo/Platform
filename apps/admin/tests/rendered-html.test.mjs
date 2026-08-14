@@ -50,6 +50,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   const [
     dashboard,
     dashboardUtils,
+    authRequest,
     contestLaunchFlow,
     pilot,
     posterJpeg,
@@ -57,6 +58,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     layout,
     packageJson,
     environmentExample,
+    upstreamUrl,
     styles,
     formValidation,
     contestSetupWorkspace,
@@ -66,6 +68,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
       new URL("../app/admin-dashboard-utils.ts", import.meta.url),
       "utf8",
     ),
+    readFile(new URL("../app/admin-auth-request.mjs", import.meta.url), "utf8"),
     readFile(new URL("../app/contest-launch-flow.js", import.meta.url), "utf8"),
     readFile(new URL("../app/pilot-operations.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/poster-jpeg.ts", import.meta.url), "utf8"),
@@ -76,6 +79,10 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/api/gogymgo/[...path]/upstream-url.mjs", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/form-validation.ts", import.meta.url), "utf8"),
     readFile(
@@ -84,18 +91,31 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     ),
   ]);
 
-  assert.match(dashboardUtils, /getIdToken\(\)/);
+  assert.match(authRequest, /getIdToken\(forceRefresh\)/);
+  assert.match(authRequest, /response\.status !== 401/);
+  assert.match(authRequest, /getToken\(activeUser, true\)/);
   assert.match(dashboardUtils, /authorization:\s*`Bearer \$\{token\}`/);
   assert.match(dashboard, /Role-based workspaces/);
-  assert.match(dashboard, /GOGYMGO TEAM EMAIL/);
-  assert.match(dashboard, /PARTNER EMAIL/);
+  assert.match(dashboard, /OPERATOR EMAIL/);
+  assert.match(dashboard, /SIGN IN SECURELY/);
+  assert.match(dashboard, /SIGNING IN…/);
   assert.match(dashboard, /browserSessionPersistence/);
   assert.match(dashboard, /Keep me signed in on this device/);
   assert.match(dashboard, /CHECKING YOUR SESSION/);
+  assert.match(dashboard, /authStateTimeout/);
+  assert.match(dashboard, /8_000/);
+  assert.match(dashboard, /session could not be restored/);
   assert.match(dashboard, /operator\/access/);
   assert.match(dashboard, /operator\/partner-dashboard/);
-  assert.match(dashboard, /adminRequestStatus\(error\) !== 404/);
-  assert.match(dashboard, /portal: "gogymgo"/);
+  assert.doesNotMatch(dashboard, /expectedStatuses:\s*\[404\]/);
+  assert.doesNotMatch(dashboard, /portal: "gogymgo"/);
+  assert.match(dashboard, /RETRY ACCESS CHECK/);
+  assert.match(dashboard, /Your session expired/);
+  assert.match(dashboard, /authEpoch\.current/);
+  assert.match(dashboard, /clearAdminRequestSession\(\)/);
+  assert.match(dashboard, /savePendingDrawFinalization\(null\)/);
+  assert.match(dashboard, /SIGNING OUT/);
+  assert.match(dashboard, /error \|\|/);
   assert.match(dashboard, /Your gyms, without the platform-wide controls/);
   assert.match(dashboard, /AWAITING GOGYMGO REVIEW/);
   assert.doesNotMatch(
@@ -353,7 +373,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /scroll horizontally for more columns/);
   assert.doesNotMatch(pilot, /dangerouslySetInnerHTML/);
 
-  assert.match(proxy, /path\[0\]\s*!==\s*"operator"/);
+  assert.match(proxy, /isAllowedAdminProxyPath\(path\)/);
   assert.match(proxy, /This administrative route is not available/);
   assert.match(proxy, /GOGYMGO_API_URL/);
   assert.match(
@@ -361,7 +381,16 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     /buildUpstreamUrl\(baseUrl, path, request\.nextUrl\.search\)/,
   );
   assert.match(proxy, /export function DELETE/);
+  assert.match(proxy, /maximumBodyBytes = 1_048_576/);
+  assert.match(proxy, /A valid operator session is required/);
+  assert.match(proxy, /redirect: "manual"/);
+  assert.match(proxy, /invalid redirect/);
+  assert.match(proxy, /could not be reached/);
   assert.doesNotMatch(proxy, /firebase.*private|serviceAccount/i);
+  assert.match(upstreamUrl, /path\[0\] === "operator"/);
+  assert.match(upstreamUrl, /parsed\.username \|\| parsed\.password/);
+  assert.match(upstreamUrl, /sensitiveQueryNames/);
+  assert.match(upstreamUrl, /parsed\.protocol !== "https:"/);
 
   assert.match(environmentExample, /GOGYMGO_API_URL=/);
   assert.match(environmentExample, /NEXT_PUBLIC_FIREBASE_API_KEY=/);

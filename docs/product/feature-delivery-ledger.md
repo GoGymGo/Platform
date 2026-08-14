@@ -19,8 +19,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
   `265a203e6c613d27d6811226d4eb784dd71b6595` after PR #89 on 2026-08-14.
-- Active feature task: none while the coordinator records GGG-008 completion and
-  prepares the next dependency-ordered feature assignment.
+- Active feature task: `GoGymGo Feature GGG-009 — Friends and private
+  invitations` on `agent/ggg-009-friends-private-invitations`.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -370,7 +370,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   request state, block enforcement, masked destinations, hashed/single-use token,
   expiry, delivery failure/retry; database plus any approved email/SMS provider.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-009 — Friends and private
-  invitations`; branch/PR/merge `unassigned`; status `AUDITED`.
+  invitations`; branch `agent/ggg-009-friends-private-invitations`; PR/merge
+  `pending`; status `IN_PROGRESS`.
 - Residual risks / blocker: product copy must not imply an email or text was sent
   unless an authoritative delivery provider accepted it.
 
@@ -1004,6 +1005,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-14 — Assigned `GGG-009` to its fresh feature task and isolated branch
+  from `origin/main` after the GGG-008 completion ledger merged through PR #90 as
+  `bbf7ae2f92667b5d61f6e74ebbae5c501ccbd34d` with green main-push checks.
 - 2026-08-14 — Completed `GGG-008` through PR #89. Exact tested head
   `8e2b6871d20bc0a1d88c18e5273bc8bc064a1f65` was squash-merged as
   `265a203e6c613d27d6811226d4eb784dd71b6595`; all seven PR and six main-push

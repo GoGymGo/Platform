@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `b4e98a63933143b2a7eed70bab02c0aeb879c1d7` after PR #80 on 2026-08-13.
-- Active feature task: `GoGymGo Feature GGG-005 — Partner gym QR enrollment` on
-  `agent/ggg-005-partner-gym-qr-enrollment`.
+  `1b875c2e77c13a91f21390501f7669fef136b703` after PR #83 on 2026-08-13.
+- Active feature task: none while the coordinator records GGG-005 completion and
+  prepares the next dependency-ordered feature assignment.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
@@ -217,17 +217,28 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   contest-scoped, location-bound, replay-safe, and audited.
 - External providers / feature flag: camera, geolocation, Firebase; `partnerGymQr`
   is enabled for the pilot while legacy methods are disabled.
-- Current implementation / missing behavior: persistent contest posters and
-  enrollment pinning are connected. Missing real gym/coordinates, physical
-  poster issuance, camera UAT, and native app-link identifiers.
+- Current implementation / missing behavior: contest/gym/region-scoped QR
+  issuance, recovery, secret-free history, expiry-aware poster rendering,
+  revocation, audit/idempotency, exact fail-closed resolution, immutable
+  enrollment gym/version evidence, and post-enrollment QR-secret removal are
+  connected. Missing only real-gym configuration, physical poster/device UAT,
+  final native identifiers/associations, and authorized deployment.
 - Required tests / operations / cloud dependency: QR tamper/replay/expiry,
   contest and gym mismatch, scoped partner authorization, poster render, camera
-  permissions, exact enrollment gym persistence; real gym and devices.
+  permissions, exact enrollment gym persistence, credential lifecycle migration,
+  concurrency/idempotency, configuration drift, secret minimization, and
+  production-artifact isolation passed locally and in CI. Real gym, signed
+  devices, and poster placement remain external release requirements.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-005 — Partner gym QR
-  enrollment`; branch `agent/ggg-005-partner-gym-qr-enrollment`; PR/merge
-  `pending`; status `IN_PROGRESS`.
-- Residual risks / blocker: production QR must never use sample gym data or
-  placeholder native identifiers.
+  enrollment`; branch `agent/ggg-005-partner-gym-qr-enrollment` deleted; PR #83;
+  exact tested head `19e717719cdb9cfce6121545b140dca8f1a492a4`;
+  merge `1b875c2e77c13a91f21390501f7669fef136b703`; status `COMPLETE`.
+- Residual risks / blocker: verified real gym/name/coordinates, printed poster
+  placement and revocation rehearsal, final Apple/Android identifiers and
+  association/signing values, signed-device camera/App Link UAT, migration
+  rollout, and deployment require separate authorization. GGG-028 owns final
+  native identifiers/association publication. No cloud access or deployment
+  occurred.
 
 ### GGG-006 — Verified workout lifecycle, cancellation, and recovery
 
@@ -974,6 +985,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-13 — Completed `GGG-005` through PR #83. Exact tested head
+  `19e717719cdb9cfce6121545b140dca8f1a492a4` was squash-merged as
+  `1b875c2e77c13a91f21390501f7669fef136b703`; all seven PR and six main-push
+  checks passed, the remote feature branch was deleted, and there was no cloud
+  impact. Authoritative expiring/scoped credentials, immutable enrollment gym
+  evidence, idempotent audited operator flows, secret-free history, member
+  secret minimization, contracts, migration, and direct regressions are complete;
+  real-gym/poster/signed-device/native-identifier rollout gates remain external.
 - 2026-08-13 — Assigned `GGG-005` to its fresh feature task and isolated branch
   from `origin/main` after the GGG-004 completion ledger merged through PR #81 as
   `f011ba0cc0cd1ac875eb58aa8178e6a25eaf82c9` with green main-push checks.

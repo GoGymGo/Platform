@@ -225,6 +225,8 @@ export class ResultsService {
         'identity.streak_weekly',
         'identity.streak_yearly',
         'award.award_rank',
+        'reward.cash_amount_cents',
+        'reward.cash_currency',
         'reward.reward_type',
         'reward.sponsor_name',
         'reward.title',
@@ -236,6 +238,8 @@ export class ResultsService {
     return winners.map((winner) => ({
       alias: winner.alias,
       awardRank: winner.award_rank,
+      cashAmountCents: winner.cash_amount_cents,
+      cashCurrency: winner.cash_currency,
       rewardTitle: winner.title,
       rewardType: winner.reward_type,
       sponsorName: winner.sponsor_name,

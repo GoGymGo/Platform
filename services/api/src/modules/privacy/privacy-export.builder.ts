@@ -299,10 +299,19 @@ export class PrivacyExportBuilder {
         const rewardAwards = await transaction
           .selectFrom('reward_awards as award')
           .innerJoin('competition_draws as draw', 'draw.id', 'award.draw_id')
-          .innerJoin(
-            'reward_catalog_items as reward',
-            'reward.id',
-            'award.reward_catalog_item_id',
+          .innerJoin('draw_reward_slots as slot', (join) =>
+            join
+              .onRef('slot.draw_id', '=', 'award.draw_id')
+              .onRef('slot.slot_position', '=', 'award.award_rank'),
+          )
+          .innerJoin('draw_reward_catalog_snapshots as reward', (join) =>
+            join
+              .onRef('reward.draw_id', '=', 'slot.draw_id')
+              .onRef(
+                'reward.reward_catalog_item_id',
+                '=',
+                'slot.reward_catalog_item_id',
+              ),
           )
           .select([
             'award.id',
@@ -317,6 +326,8 @@ export class PrivacyExportBuilder {
             'reward.sponsor_name',
             'reward.title',
             'reward.reward_type',
+            'reward.cash_amount_cents',
+            'reward.cash_currency',
           ])
           .where('award.user_id', '=', job.userId)
           .orderBy('award.awarded_at')
@@ -644,7 +655,7 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 10,
+          schemaVersion: 11,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',

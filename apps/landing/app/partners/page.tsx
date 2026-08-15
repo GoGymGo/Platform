@@ -56,8 +56,8 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
             GoGymGo reviews Partner gym and fitness-brand inquiries for future
             regional programs. Gym operators can explore active-poster
             verification, while brands can propose rewards and approved
-            campaigns. The current September pilot reward is sponsored by
-            GoGymGo.
+            campaigns. If the September pilot Contest is approved and published,
+            its planned cash reward is sponsored by GoGymGo.
           </p>
           <div aria-label="Choose a partnership path" className="partner-choices">
             <Link

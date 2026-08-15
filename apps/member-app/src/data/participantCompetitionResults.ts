@@ -78,6 +78,25 @@ export function normalizeParticipantCompetitionResults(
   ) {
     throw new Error('The settled Winners Circle categories are inconsistent.');
   }
+  if (
+    response.monthKey === "2026-09" &&
+    response.competitionName === "GoGymGo September 2026 Island Pilot" &&
+    response.regionCode === "vancouver-island-gulf-islands-bc"
+  ) {
+    const winner = response.rewardWinners[0];
+    if (
+      response.rewardCount !== 1 ||
+      !winner ||
+      winner.awardRank !== 1 ||
+      winner.rewardType !== "cash" ||
+      winner.sponsorName !== "GoGymGo" ||
+      winner.rewardTitle !== "GoGymGo $100 CAD Cash Reward" ||
+      winner.cashAmountCents !== 10000 ||
+      winner.cashCurrency !== "CAD"
+    ) {
+      throw new Error("The September pilot reward snapshot is inconsistent.");
+    }
+  }
   return response as ParticipantCompetitionResults;
 }
 
@@ -87,17 +106,24 @@ function isRewardWinner(
   return (
     isRecord(value) &&
     hasExactKeys(value, [
-      'alias',
-      'awardRank',
-      'rewardTitle',
-      'rewardType',
-      'sponsorName',
-      'streaks'
+      "alias",
+      "awardRank",
+      "cashAmountCents",
+      "cashCurrency",
+      "rewardTitle",
+      "rewardType",
+      "sponsorName",
+      "streaks",
     ]) &&
     typeof value.alias === 'string' &&
     value.alias.trim().length > 0 &&
     isIntegerInRange(value.awardRank, 1, 100_000) &&
-    typeof value.rewardTitle === 'string' &&
+    (value.rewardType === "cash"
+      ? isIntegerInRange(value.cashAmountCents, 1, 10_000_000) &&
+        typeof value.cashCurrency === "string" &&
+        /^[A-Z]{3}$/.test(value.cashCurrency)
+      : value.cashAmountCents === null && value.cashCurrency === null) &&
+    typeof value.rewardTitle === "string" &&
     value.rewardTitle.trim().length > 0 &&
     (value.rewardType === 'cash' ||
       value.rewardType === 'coupon' ||

@@ -22,8 +22,11 @@ storage, and a durable operations worker. The server owns identity, consent,
 verification, entries, draws, catalog inventory, awards, coupon encryption,
 claims, social permissions, and audit records.
 
-The MVP deliberately has no cash prizes, wallet, payment processor, bank-account
-setup, payee onboarding, transfer, or tax-form workflow. Coupon codes are
+The September pilot has one GoGymGo-sponsored $100 CAD cash reward that is
+handed over in person and recorded manually after the audited draw settles. The
+MVP deliberately has no wallet, payment processor, bank-account setup, payee
+onboarding, automated payout, transfer, balance, webhook, or tax-form workflow.
+Recording the handoff cannot move money. Coupon codes are
 AES-256-GCM encrypted at rest and revealed only to the authenticated winner.
 Physical rewards use sponsor-provided claim instructions or an HTTPS claim link;
 GoGymGo does not collect shipping addresses in this version.

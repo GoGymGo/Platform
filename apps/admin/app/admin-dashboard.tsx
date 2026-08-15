@@ -1353,6 +1353,11 @@ export function AdminDashboard({
           {section === "pilot" && setupCompetition ? (
             <PilotOperationsPanel
               {...pilotData}
+              cashAwards={snapshot.rewardAwards.filter(
+                (award) =>
+                  award.competitionId === setupCompetition.id &&
+                  award.rewardType === "cash",
+              )}
               key={setupCompetition.id}
               onAssignGym={async (competitionId, gymId, body) => {
                 await mutate(
@@ -4940,11 +4945,19 @@ function RewardForm({
         form.get("fulfillmentInstructions"),
       );
       if (
-        selectedRewardType !== "coupon" &&
+        selectedRewardType === "physical" &&
         Boolean(claimUrl) === Boolean(fulfillmentInstructions)
       ) {
         throw new AdminUserFacingError(
           "Choose exactly one secure claim URL or fulfillment instruction path.",
+        );
+      }
+      if (
+        selectedRewardType === "cash" &&
+        (claimUrl || !fulfillmentInstructions)
+      ) {
+        throw new AdminUserFacingError(
+          "Cash rewards require manual in-person fulfillment instructions and cannot use a payment or claim URL.",
         );
       }
       if (
@@ -4959,6 +4972,14 @@ function RewardForm({
         availableFrom: optionalIso(form.get("availableFrom")),
         availableUntil: optionalIso(form.get("availableUntil")),
         claimUrl,
+        cashAmountCents:
+          selectedRewardType === "cash"
+            ? Number(form.get("cashAmountCents"))
+            : undefined,
+        cashCurrency:
+          selectedRewardType === "cash"
+            ? String(form.get("cashCurrency") ?? "").toUpperCase()
+            : undefined,
         competitionId: String(form.get("competitionId")),
         description: String(form.get("description")),
         displayOrder: Number(form.get("displayOrder") || 0),
@@ -5041,6 +5062,29 @@ function RewardForm({
               type="number"
             />
           </Field>
+          {rewardType === "cash" ? (
+            <>
+              <Field label="CASH AMOUNT (CENTS)">
+                <input
+                  defaultValue={reward?.cashAmountCents ?? 10000}
+                  max={10000000}
+                  min={1}
+                  name="cashAmountCents"
+                  required
+                  type="number"
+                />
+              </Field>
+              <Field label="CURRENCY">
+                <input
+                  defaultValue={reward?.cashCurrency ?? "CAD"}
+                  maxLength={3}
+                  minLength={3}
+                  name="cashCurrency"
+                  required
+                />
+              </Field>
+            </>
+          ) : null}
           <Field label="DESCRIPTION" wide>
             <textarea
               defaultValue={reward?.description}
@@ -5056,30 +5100,33 @@ function RewardForm({
                   ? "CASH FULFILLMENT"
                   : "PHYSICAL REWARD FULFILLMENT"}
               </legend>
-              <p>Choose exactly one way for a winner to receive this reward.</p>
+              <p>
+                {rewardType === "cash"
+                  ? "Describe the manual in-person handoff. This records an already-completed handoff and never initiates payment."
+                  : "Choose exactly one way for a winner to receive this reward."}
+              </p>
               <div className="reward-fulfillment-fields">
-                <Field
-                  label={
-                    rewardType === "cash" ? "PAYMENT / CLAIM URL" : "CLAIM URL"
-                  }
-                >
-                  <input
-                    defaultValue={reward?.claimUrl ?? ""}
-                    name="claimUrl"
-                    placeholder="https://"
-                    type="url"
-                  />
-                </Field>
+                {rewardType === "physical" ? (
+                  <Field label="CLAIM URL">
+                    <input
+                      defaultValue={reward?.claimUrl ?? ""}
+                      name="claimUrl"
+                      placeholder="https://"
+                      type="url"
+                    />
+                  </Field>
+                ) : null}
                 <Field
                   label={
                     rewardType === "cash"
-                      ? "PAYMENT INSTRUCTIONS"
+                      ? "MANUAL HANDOFF INSTRUCTIONS"
                       : "FULFILLMENT INSTRUCTIONS"
                   }
                 >
                   <textarea
                     defaultValue={reward?.fulfillmentInstructions ?? ""}
                     name="fulfillmentInstructions"
+                    required={rewardType === "cash"}
                     rows={3}
                   />
                 </Field>

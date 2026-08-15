@@ -4801,6 +4801,17 @@
           "title": { "type": "string" },
           "description": { "type": "string" },
           "rewardType": { "type": "string" },
+          "cashAmountCents": {
+            "type": "number",
+            "minimum": 1,
+            "nullable": true
+          },
+          "cashCurrency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "nullable": true
+          },
           "status": { "type": "string" },
           "imageUrl": { "type": "string", "format": "uri", "nullable": true },
           "termsUrl": { "type": "string", "format": "uri", "nullable": true },
@@ -4830,6 +4841,8 @@
           "title",
           "description",
           "rewardType",
+          "cashAmountCents",
+          "cashCurrency",
           "status",
           "imageUrl",
           "termsUrl",
@@ -4849,9 +4862,26 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "rewardId": { "type": "string", "format": "uuid" },
+          "competitionId": { "type": "string", "format": "uuid" },
           "rewardType": {
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
+          },
+          "cashAmountCents": {
+            "type": "number",
+            "minimum": 1,
+            "nullable": true
+          },
+          "cashCurrency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "nullable": true
+          },
+          "cashFulfillmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
           "sponsorName": { "type": "string" },
           "title": { "type": "string" },
@@ -4882,7 +4912,11 @@
         "required": [
           "id",
           "rewardId",
+          "competitionId",
           "rewardType",
+          "cashAmountCents",
+          "cashCurrency",
+          "cashFulfillmentId",
           "sponsorName",
           "title",
           "winnerCallsign",
@@ -6461,6 +6495,17 @@
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
           },
+          "cashAmountCents": {
+            "type": "number",
+            "maximum": 10000000,
+            "minimum": 1
+          },
+          "cashCurrency": {
+            "type": "string",
+            "example": "CAD",
+            "maxLength": 3,
+            "minLength": 3
+          },
           "imageUrl": { "type": "string", "format": "uri" },
           "termsUrl": { "type": "string", "format": "uri" },
           "claimUrl": { "type": "string", "format": "uri" },
@@ -6507,6 +6552,17 @@
           "rewardType": {
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
+          },
+          "cashAmountCents": {
+            "type": "number",
+            "maximum": 10000000,
+            "minimum": 1
+          },
+          "cashCurrency": {
+            "type": "string",
+            "example": "CAD",
+            "maxLength": 3,
+            "minLength": 3
           },
           "imageUrl": { "type": "string", "format": "uri" },
           "termsUrl": { "type": "string", "format": "uri" },
@@ -6584,6 +6640,17 @@
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
           },
+          "cashAmountCents": {
+            "type": "number",
+            "minimum": 1,
+            "nullable": true
+          },
+          "cashCurrency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "nullable": true
+          },
           "imageUrl": { "type": "string", "format": "uri" },
           "termsUrl": { "type": "string", "format": "uri" },
           "inventoryRemaining": { "type": "number", "minimum": 0 },
@@ -6611,6 +6678,8 @@
           "title",
           "description",
           "rewardType",
+          "cashAmountCents",
+          "cashCurrency",
           "imageUrl",
           "termsUrl",
           "inventoryRemaining",
@@ -6631,6 +6700,17 @@
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
           },
+          "cashAmountCents": {
+            "type": "number",
+            "minimum": 1,
+            "nullable": true
+          },
+          "cashCurrency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "nullable": true
+          },
           "sponsorName": { "type": "string" },
           "title": { "type": "string" },
           "imageUrl": { "type": "string", "format": "uri", "nullable": true },
@@ -6640,18 +6720,26 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "fulfilledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
           "id",
           "status",
           "rewardType",
+          "cashAmountCents",
+          "cashCurrency",
           "sponsorName",
           "title",
           "imageUrl",
           "awardRank",
           "awardedAt",
-          "claimedAt"
+          "claimedAt",
+          "fulfilledAt"
         ]
       },
       "ClaimRewardResponseDto": {
@@ -6666,12 +6754,28 @@
             "type": "string",
             "enum": ["cash", "coupon", "physical"]
           },
+          "cashAmountCents": {
+            "type": "number",
+            "minimum": 1,
+            "nullable": true
+          },
+          "cashCurrency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "nullable": true
+          },
           "sponsorName": { "type": "string" },
           "title": { "type": "string" },
           "imageUrl": { "type": "string", "format": "uri", "nullable": true },
           "awardRank": { "type": "number", "minimum": 1 },
           "awardedAt": { "type": "string", "format": "date-time" },
           "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "fulfilledAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -6684,12 +6788,15 @@
           "id",
           "status",
           "rewardType",
+          "cashAmountCents",
+          "cashCurrency",
           "sponsorName",
           "title",
           "imageUrl",
           "awardRank",
           "awardedAt",
           "claimedAt",
+          "fulfilledAt",
           "couponCode",
           "claimUrl",
           "fulfillmentInstructions"
@@ -7090,6 +7197,7 @@
         "properties": {
           "reason": { "type": "string", "minLength": 8, "maxLength": 500 },
           "rewardAwardId": { "type": "string", "format": "uuid" },
+          "expectedVersion": { "type": "number", "minimum": 1 },
           "amountCents": { "type": "number", "example": 10000, "minimum": 1 },
           "currency": {
             "type": "string",
@@ -7098,13 +7206,20 @@
             "minLength": 3
           }
         },
-        "required": ["reason", "rewardAwardId", "amountCents", "currency"]
+        "required": [
+          "reason",
+          "rewardAwardId",
+          "expectedVersion",
+          "amountCents",
+          "currency"
+        ]
       },
       "CashFulfillmentRecordDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "rewardAwardId": { "type": "string", "format": "uuid" },
+          "rewardAwardVersion": { "type": "number", "minimum": 1 },
           "competitionId": { "type": "string", "format": "uuid" },
           "winnerUserId": { "type": "string", "format": "uuid" },
           "amountCents": { "type": "number" },
@@ -7115,6 +7230,7 @@
         "required": [
           "id",
           "rewardAwardId",
+          "rewardAwardVersion",
           "competitionId",
           "winnerUserId",
           "amountCents",
@@ -8101,6 +8217,17 @@
         "properties": {
           "alias": { "type": "string" },
           "awardRank": { "type": "number" },
+          "cashAmountCents": {
+            "type": "number",
+            "minimum": 1,
+            "nullable": true
+          },
+          "cashCurrency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "nullable": true
+          },
           "sponsorName": { "type": "string" },
           "rewardTitle": { "type": "string" },
           "rewardType": {
@@ -8112,6 +8239,8 @@
         "required": [
           "alias",
           "awardRank",
+          "cashAmountCents",
+          "cashCurrency",
           "sponsorName",
           "rewardTitle",
           "rewardType",

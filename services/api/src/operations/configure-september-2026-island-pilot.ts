@@ -28,6 +28,13 @@ import {
   RewardCatalogStatusAction,
   RewardTypeDto,
 } from '../modules/rewards/dto/reward.dto';
+import {
+  requireSeptemberPilotRewardApproval,
+  septemberPilotCashReward,
+  septemberPilotRewardApprovalSha256,
+  septemberPilotRewardConfigurationErrors,
+  type SeptemberPilotCashRewardConfiguration,
+} from '../modules/rewards/september-pilot-cash-policy';
 
 const databaseUrl =
   process.env.DATABASE_URL?.trim() ??
@@ -900,64 +907,107 @@ async function configurePilotReward(
   principal: AuthenticatedPrincipal,
   competitionId: string,
 ): Promise<string> {
-  const title = 'GoGymGo $100 CAD Cash Reward';
+  const fulfillmentInstructions =
+    'An authorized GoGymGo administrator records only an already-completed ' +
+    'in-person $100 CAD cash handoff. GoGymGo does not initiate a transfer.';
+  const approvedConfiguration = {
+    cashAmountCents: septemberPilotCashReward.amountCents,
+    cashCurrency: septemberPilotCashReward.currency,
+    claimUrl: null,
+    fulfillmentInstructions,
+    imageUrl: process.env.PILOT_REWARD_IMAGE_URL?.trim(),
+    inventoryTotal: septemberPilotCashReward.inventoryTotal,
+    rewardType: RewardTypeDto.CASH,
+    sponsorName: septemberPilotCashReward.sponsorName,
+    termsUrl: process.env.PILOT_REWARD_TERMS_URL?.trim(),
+    title: septemberPilotCashReward.title,
+  } satisfies SeptemberPilotCashRewardConfiguration;
+  const approvalSha256 = requireSeptemberPilotRewardApproval(
+    approvedConfiguration,
+    process.env.CONFIRM_PILOT_REWARD_APPROVAL_SHA256,
+  );
   const existing = await database.connection
     .selectFrom('reward_catalog_items')
-    .select(['id', 'status', 'version'])
+    .selectAll()
     .where('competition_id', '=', competitionId)
-    .where('title', '=', title)
+    .where('title', '=', septemberPilotCashReward.title)
     .executeTakeFirst();
-  const reward =
-    existing ??
-    (await service.create(
+  let reward = existing;
+  if (!reward) {
+    const created = await service.create(
       principal,
-      'configure-september-2026-100-cash-reward-v1',
+      `configure-september-2026-100-cash-reward-${approvalSha256}`,
       {
         availableFrom: '2026-09-01T07:00:00.000Z',
         availableUntil: '2026-10-02T07:00:00.000Z',
+        cashAmountCents: septemberPilotCashReward.amountCents,
+        cashCurrency: septemberPilotCashReward.currency,
         competitionId,
         description:
           'One $100 CAD cash prize sponsored by GoGymGo and fulfilled by an audited in-person handoff.',
         displayOrder: 1,
-        fulfillmentInstructions:
-          'Administrator records the in-person $100 CAD handoff, timestamp and fulfillment note in GoGymGo admin.',
+        fulfillmentInstructions,
+        imageUrl: approvedConfiguration.imageUrl,
         inventoryTotal: 1,
-        reason:
-          'Configure the single $100 CAD GoGymGo-sponsored cash reward for the September 2026 pilot.',
+        reason: `Configure the approved single $100 CAD GoGymGo-sponsored cash reward ${approvalSha256}.`,
         rewardType: RewardTypeDto.CASH,
         sponsorName: 'GoGymGo',
-        title,
+        termsUrl: approvedConfiguration.termsUrl,
+        title: septemberPilotCashReward.title,
       },
-    ));
+    );
+    reward = await database.connection
+      .selectFrom('reward_catalog_items')
+      .selectAll()
+      .where('id', '=', created.id)
+      .executeTakeFirstOrThrow();
+  } else {
+    const existingConfiguration = {
+      cashAmountCents: reward.cash_amount_cents,
+      cashCurrency: reward.cash_currency,
+      claimUrl: reward.claim_url,
+      fulfillmentInstructions: reward.fulfillment_instructions,
+      imageUrl: reward.image_url,
+      inventoryTotal: reward.inventory_total,
+      rewardType: reward.reward_type,
+      sponsorName: reward.sponsor_name,
+      termsUrl: reward.terms_url,
+      title: reward.title,
+    } satisfies SeptemberPilotCashRewardConfiguration;
+    const errors = septemberPilotRewardConfigurationErrors(
+      existingConfiguration,
+    );
+    const existingApproval = septemberPilotRewardApprovalSha256(
+      existingConfiguration,
+    );
+    if (errors.length > 0 || existingApproval !== approvalSha256) {
+      throw new Error(
+        'The existing September pilot cash reward does not match the exact approved configuration; ' +
+          'review it in admin without publishing or mutating historical published data.',
+      );
+    }
+  }
+  const conflictingPublished = await database.connection
+    .selectFrom('reward_catalog_items')
+    .select('id')
+    .where('competition_id', '=', competitionId)
+    .where('status', '=', 'published')
+    .where('id', '!=', reward.id)
+    .executeTakeFirst();
+  if (conflictingPublished) {
+    throw new Error(
+      'The September pilot must have exactly one published reward; review and archive the conflicting reward in admin before applying this approved configuration.',
+    );
+  }
   if (reward.status === 'draft') {
     await service.changeStatus(
       principal,
       reward.id,
-      'publish-september-2026-100-cash-reward-v1',
+      `publish-september-2026-100-cash-reward-${approvalSha256}`,
       {
         action: RewardCatalogStatusAction.PUBLISH,
         expectedVersion: reward.version,
-        reason:
-          'Publish the single funded $100 CAD pilot reward before competition publication.',
-      },
-    );
-  }
-  const legacyReward = await database.connection
-    .selectFrom('reward_catalog_items')
-    .select(['id', 'status', 'version'])
-    .where('competition_id', '=', competitionId)
-    .where('title', '=', 'GoGymGo $50 CAD Cash Reward')
-    .executeTakeFirst();
-  if (legacyReward?.status === 'published') {
-    await service.changeStatus(
-      principal,
-      legacyReward.id,
-      'archive-september-2026-50-cash-reward-v1',
-      {
-        action: RewardCatalogStatusAction.ARCHIVE,
-        expectedVersion: legacyReward.version,
-        reason:
-          'Replace the earlier $50 pilot reward with the owner-requested $100 CAD reward.',
+        reason: `Publish the exact owner- and counsel-approved $100 CAD pilot reward ${approvalSha256}.`,
       },
     );
   }

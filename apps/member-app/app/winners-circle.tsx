@@ -19,10 +19,11 @@ import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useMyLatestCompetitionResults } from '@/data/appDataHooks';
 import {
   formatCompetitionMonth,
-  getWinnersCirclePresentationKey
-} from '@/domain/winnersCircle';
-import { markWinnersCircleSeen } from '@/services/winnersCircle';
-import { useAuth } from '@/state/auth';
+  getWinnersCirclePresentationKey,
+} from "@/domain/winnersCircle";
+import type { RewardWinner } from "@/domain/rewards";
+import { markWinnersCircleSeen } from "@/services/winnersCircle";
+import { useAuth } from "@/state/auth";
 
 export default function WinnersCircleScreen() {
   const router = useRouter();
@@ -280,7 +281,9 @@ export default function WinnersCircleScreen() {
                   PRIZE DRAW WINNERS
                 </TerminalText>
                 <TerminalText tone="muted" uppercase={false} variant="caption">
-                  Every selected player receives the physical prize or coupon shown.
+                  Every selected player receives the settled reward shown. Cash
+                  is handed over in person and recorded by an authorized
+                  administrator; the app does not initiate a transfer.
                 </TerminalText>
               </View>
 
@@ -322,7 +325,9 @@ export default function WinnersCircleScreen() {
                     </View>
                     <View style={styles.rewardName}>
                       <TerminalText tone="pink" variant="body">
-                        {winner.rewardTitle}
+                        {winner.rewardType === "cash"
+                          ? `${formatCashWinnerValue(winner)} // ${winner.rewardTitle}`
+                          : winner.rewardTitle}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
                         {winner.sponsorName}
@@ -358,6 +363,18 @@ export default function WinnersCircleScreen() {
       </ScreenContainer>
     </AuthGate>
   );
+}
+
+function formatCashWinnerValue(winner: RewardWinner) {
+  if (winner.cashAmountCents === null || !winner.cashCurrency) {
+    return "CASH VALUE UNAVAILABLE";
+  }
+  return `${new Intl.NumberFormat("en-CA", {
+    currency: winner.cashCurrency,
+    currencyDisplay: "narrowSymbol",
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(winner.cashAmountCents / 100)} ${winner.cashCurrency}`;
 }
 
 function ResultTab({

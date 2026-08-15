@@ -75,6 +75,8 @@ export type Reward = {
   availableFrom: string | null;
   availableUntil: string | null;
   claimUrl: string | null;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
   competitionId: string;
   competitionName: string;
   couponCodeCount: number;
@@ -95,7 +97,11 @@ export type Reward = {
 export type RewardAward = {
   awardRank: number;
   awardedAt: string;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
+  cashFulfillmentId: string | null;
   claimedAt: string | null;
+  competitionId: string;
   fulfilledAt: string | null;
   id: string;
   redeemedAt: string | null;

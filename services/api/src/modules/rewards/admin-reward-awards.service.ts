@@ -14,6 +14,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
 import {
   type AdminRewardAwardResponseDto,
+  RewardAwardStatusAction,
   type RewardAwardStatusActionDto,
 } from './dto/reward.dto';
 import { transitionRewardAwardStatus } from './reward-award-status';
@@ -82,6 +83,16 @@ export class AdminRewardAwardsService {
           throw new ConflictException({
             code: 'REWARD_AWARD_VERSION_CONFLICT',
             message: 'The reward award changed; reload it before retrying.',
+          });
+        }
+        if (
+          award.reward_type === 'cash' &&
+          input.action === RewardAwardStatusAction.FULFILL
+        ) {
+          throw new ConflictException({
+            code: 'CASH_REWARD_MANUAL_HANDOFF_REQUIRED',
+            message:
+              'Cash fulfillment must use the audited in-person handoff workflow.',
           });
         }
 

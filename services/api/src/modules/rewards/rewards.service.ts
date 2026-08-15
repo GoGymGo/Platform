@@ -21,7 +21,10 @@ interface ClaimRewardJson extends JsonObject {
   awardedAt: string;
   claimUrl: string | null;
   claimedAt: string | null;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
   couponCode: string | null;
+  fulfilledAt: string | null;
   fulfillmentInstructions: string | null;
   id: string;
   imageUrl: string | null;
@@ -35,6 +38,8 @@ export interface RewardAwardSlot {
   availableFrom: Date | null;
   availableUntil: Date | null;
   catalogVersion: number;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
   displayOrder: number;
   inventoryTotal: number;
   rewardCatalogItemId: string;
@@ -49,6 +54,8 @@ export function allocateRewardSlots(
     availableFrom: Date | null;
     availableUntil: Date | null;
     catalogVersion: number;
+    cashAmountCents: number | null;
+    cashCurrency: string | null;
     displayOrder: number;
     inventoryTotal: number;
     rewardCatalogItemId: string;
@@ -68,6 +75,8 @@ export function allocateRewardSlots(
         availableFrom: item.availableFrom,
         availableUntil: item.availableUntil,
         catalogVersion: item.catalogVersion,
+        cashAmountCents: item.cashAmountCents,
+        cashCurrency: item.cashCurrency,
         displayOrder: item.displayOrder,
         inventoryTotal: item.inventoryTotal,
         rewardCatalogItemId: item.rewardCatalogItemId,
@@ -113,6 +122,8 @@ export class RewardsService {
         'competition.name as competition_name',
         'item.available_from',
         'item.available_until',
+        'item.cash_amount_cents',
+        'item.cash_currency',
         'item.description',
         'item.id',
         'item.image_url',
@@ -150,6 +161,15 @@ export class RewardsService {
       .where('item.status', '=', 'published')
       .where((expression) =>
         expression.or([
+          expression('item.reward_type', '!=', 'cash'),
+          expression.and([
+            expression('item.cash_amount_cents', 'is not', null),
+            expression('item.cash_currency', 'is not', null),
+          ]),
+        ]),
+      )
+      .where((expression) =>
+        expression.or([
           expression('item.available_from', 'is', null),
           expression('item.available_from', '<=', now),
         ]),
@@ -174,6 +194,8 @@ export class RewardsService {
     return items.map((item) => ({
       availableFrom: item.available_from?.toISOString() ?? null,
       availableUntil: item.available_until?.toISOString() ?? null,
+      cashAmountCents: item.cash_amount_cents,
+      cashCurrency: item.cash_currency,
       competitionId: item.competition_id,
       competitionName: item.competition_name,
       description: item.description,
@@ -201,21 +223,33 @@ export class RewardsService {
         const user = await this.profiles.ensureUser(principal, transaction);
         const awards = await transaction
           .selectFrom('reward_awards as award')
-          .innerJoin(
-            'reward_catalog_items as item',
-            'item.id',
-            'award.reward_catalog_item_id',
+          .innerJoin('draw_reward_slots as slot', (join) =>
+            join
+              .onRef('slot.draw_id', '=', 'award.draw_id')
+              .onRef('slot.slot_position', '=', 'award.award_rank'),
+          )
+          .innerJoin('draw_reward_catalog_snapshots as snapshot', (join) =>
+            join
+              .onRef('snapshot.draw_id', '=', 'slot.draw_id')
+              .onRef(
+                'snapshot.reward_catalog_item_id',
+                '=',
+                'slot.reward_catalog_item_id',
+              ),
           )
           .select([
             'award.award_rank',
             'award.awarded_at',
             'award.claimed_at',
+            'award.fulfilled_at',
             'award.id',
             'award.status',
-            'item.image_url',
-            'item.reward_type',
-            'item.sponsor_name',
-            'item.title',
+            sql<string | null>`NULL`.as('image_url'),
+            'snapshot.cash_amount_cents',
+            'snapshot.cash_currency',
+            'snapshot.reward_type',
+            'snapshot.sponsor_name',
+            'snapshot.title',
           ])
           .where('award.user_id', '=', user.id)
           .orderBy('award.awarded_at', 'desc')
@@ -251,10 +285,13 @@ export class RewardsService {
             'award.award_rank',
             'award.awarded_at',
             'award.claimed_at',
+            'award.fulfilled_at',
             'award.id',
             'award.reward_catalog_item_id',
             'award.status',
             'item.claim_url',
+            'item.cash_amount_cents',
+            'item.cash_currency',
             'item.fulfillment_instructions',
             'item.image_url',
             'item.reward_type',
@@ -315,10 +352,13 @@ export class RewardsService {
         return {
           awardRank: award.award_rank,
           awardedAt: award.awarded_at.toISOString(),
+          cashAmountCents: award.cash_amount_cents,
+          cashCurrency: award.cash_currency,
           claimUrl: award.claim_url,
           claimedAt: claimedAt.toISOString(),
           couponCode,
           fulfillmentInstructions: award.fulfillment_instructions,
+          fulfilledAt: award.fulfilled_at?.toISOString() ?? null,
           id: award.id,
           imageUrl: award.image_url,
           rewardType: award.reward_type,
@@ -341,6 +381,8 @@ export class RewardsService {
       .select([
         'item.available_from',
         'item.available_until',
+        'item.cash_amount_cents',
+        'item.cash_currency',
         'item.display_order',
         'item.id',
         'item.inventory_total',
@@ -381,6 +423,8 @@ export class RewardsService {
         availableFrom: item.available_from,
         availableUntil: item.available_until,
         catalogVersion: item.version,
+        cashAmountCents: item.cash_amount_cents,
+        cashCurrency: item.cash_currency,
         displayOrder: item.display_order,
         inventoryTotal: item.inventory_total,
         rewardCatalogItemId: item.id,
@@ -431,7 +475,10 @@ export class RewardsService {
   private awardResponse(award: {
     award_rank: number;
     awarded_at: Date;
+    cash_amount_cents: number | null;
+    cash_currency: string | null;
     claimed_at: Date | null;
+    fulfilled_at: Date | null;
     id: string;
     image_url: string | null;
     reward_type: 'cash' | 'coupon' | 'physical';
@@ -442,7 +489,10 @@ export class RewardsService {
     return {
       awardRank: award.award_rank,
       awardedAt: award.awarded_at.toISOString(),
+      cashAmountCents: award.cash_amount_cents,
+      cashCurrency: award.cash_currency,
       claimedAt: award.claimed_at?.toISOString() ?? null,
+      fulfilledAt: award.fulfilled_at?.toISOString() ?? null,
       id: award.id,
       imageUrl: award.image_url,
       rewardType: award.reward_type,

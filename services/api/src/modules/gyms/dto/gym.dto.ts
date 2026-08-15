@@ -517,13 +517,21 @@ export class CashFulfillmentRequestDto extends OperatorReasonDto {
   @IsUUID()
   rewardAwardId!: string;
 
+  @ApiProperty({ minimum: 1, type: Number })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+
   @ApiProperty({ example: 10000, minimum: 1, type: Number })
   @Type(() => Number)
+  @Equals(10000)
   @IsInt()
   @Min(1)
   amountCents!: number;
 
   @ApiProperty({ example: 'CAD', maxLength: 3, minLength: 3, type: String })
+  @Equals('CAD')
   @IsString()
   @Length(3, 3)
   currency!: string;
@@ -535,6 +543,9 @@ export class CashFulfillmentRecordDto {
 
   @ApiProperty({ format: 'uuid', type: String })
   rewardAwardId!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  rewardAwardVersion!: number;
 
   @ApiProperty({ format: 'uuid', type: String })
   competitionId!: string;

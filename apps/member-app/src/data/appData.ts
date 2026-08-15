@@ -297,27 +297,34 @@ function isRewardCatalogItem(value: unknown): value is RewardCatalogItem {
   return (
     isRecord(value) &&
     hasExactKeys(value, [
-      'availableFrom',
-      'availableUntil',
-      'competitionId',
-      'competitionName',
-      'description',
-      'id',
-      'imageUrl',
-      'inventoryRemaining',
-      'inventoryTotal',
-      'monthKey',
-      'regionCode',
-      'regionName',
-      'regionTimezone',
-      'rewardType',
-      'sponsorName',
-      'termsUrl',
-      'title'
+      "availableFrom",
+      "availableUntil",
+      "cashAmountCents",
+      "cashCurrency",
+      "competitionId",
+      "competitionName",
+      "description",
+      "id",
+      "imageUrl",
+      "inventoryRemaining",
+      "inventoryTotal",
+      "monthKey",
+      "regionCode",
+      "regionName",
+      "regionTimezone",
+      "rewardType",
+      "sponsorName",
+      "termsUrl",
+      "title",
     ]) &&
     isNullableIsoDate(value.availableFrom) &&
     isNullableIsoDate(value.availableUntil) &&
-    typeof value.competitionId === 'string' &&
+    isRewardCashValue(
+      value.rewardType,
+      value.cashAmountCents,
+      value.cashCurrency,
+    ) &&
+    typeof value.competitionId === "string" &&
     isUuid(value.competitionId) &&
     typeof value.competitionName === 'string' &&
     typeof value.description === 'string' &&
@@ -344,26 +351,38 @@ function isRewardAward(value: unknown): value is RewardAward {
   return (
     isRecord(value) &&
     hasExactKeys(value, [
-      'awardRank',
-      'awardedAt',
-      'claimedAt',
-      'id',
-      'imageUrl',
-      'rewardType',
-      'sponsorName',
-      'status',
-      'title'
+      "awardRank",
+      "awardedAt",
+      "cashAmountCents",
+      "cashCurrency",
+      "claimedAt",
+      "fulfilledAt",
+      "id",
+      "imageUrl",
+      "rewardType",
+      "sponsorName",
+      "status",
+      "title",
     ]) &&
     isIntegerInRange(value.awardRank, 1, 100_000) &&
     isIsoDate(value.awardedAt) &&
+    isRewardCashValue(
+      value.rewardType,
+      value.cashAmountCents,
+      value.cashCurrency,
+    ) &&
     isNullableIsoDate(value.claimedAt) &&
+    isNullableIsoDate(value.fulfilledAt) &&
     isUuid(value.id) &&
     isNullableHttpsUrl(value.imageUrl) &&
     isRewardType(value.rewardType) &&
     typeof value.sponsorName === 'string' &&
     isRewardAwardStatus(value.status) &&
-    typeof value.title === 'string' &&
-    ((value.status === 'awarded' || value.status === 'cancelled')
+    typeof value.title === "string" &&
+    (value.status === "fulfilled"
+      ? value.fulfilledAt !== null
+      : value.fulfilledAt === null) &&
+    (value.status === "awarded" || value.status === "cancelled"
       ? value.claimedAt === null
       : value.claimedAt !== null)
   );
@@ -373,22 +392,31 @@ function isClaimedReward(value: unknown): value is ClaimedReward {
   if (
     !isRecord(value) ||
     !hasExactKeys(value, [
-      'awardRank',
-      'awardedAt',
-      'claimUrl',
-      'claimedAt',
-      'couponCode',
-      'fulfillmentInstructions',
-      'id',
-      'imageUrl',
-      'rewardType',
-      'sponsorName',
-      'status',
-      'title'
+      "awardRank",
+      "awardedAt",
+      "cashAmountCents",
+      "cashCurrency",
+      "claimUrl",
+      "claimedAt",
+      "couponCode",
+      "fulfilledAt",
+      "fulfillmentInstructions",
+      "id",
+      "imageUrl",
+      "rewardType",
+      "sponsorName",
+      "status",
+      "title",
     ]) ||
     !isIntegerInRange(value.awardRank, 1, 100_000) ||
     !isIsoDate(value.awardedAt) ||
+    !isRewardCashValue(
+      value.rewardType,
+      value.cashAmountCents,
+      value.cashCurrency,
+    ) ||
     !isIsoDate(value.claimedAt) ||
+    !isNullableIsoDate(value.fulfilledAt) ||
     !isUuid(value.id) ||
     !isNullableHttpsUrl(value.imageUrl) ||
     !isRewardType(value.rewardType) ||
@@ -421,7 +449,19 @@ function isRewardType(value: unknown): value is RewardCatalogItem['rewardType'] 
   return value === 'cash' || value === 'coupon' || value === 'physical';
 }
 
-function isRewardAwardStatus(value: unknown): value is RewardAward['status'] {
+function isRewardCashValue(
+  rewardType: unknown,
+  amountCents: unknown,
+  currency: unknown,
+): boolean {
+  return rewardType === "cash"
+    ? isIntegerInRange(amountCents, 1, 10_000_000) &&
+        typeof currency === "string" &&
+        /^[A-Z]{3}$/.test(currency)
+    : amountCents === null && currency === null;
+}
+
+function isRewardAwardStatus(value: unknown): value is RewardAward["status"] {
   return (
     value === 'awarded' ||
     value === 'cancelled' ||

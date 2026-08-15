@@ -8,13 +8,15 @@ import {
 } from '@/domain/rewards';
 
 const reward: RewardCatalogItem = {
-  availableFrom: '2026-08-01T07:00:00.000Z',
-  availableUntil: '2026-09-01T07:00:00.000Z',
-  competitionId: '40000000-0000-4000-8000-000000000001',
-  competitionName: 'August Challenge',
-  description: 'Sponsor-provided recovery kit.',
-  id: '50000000-0000-4000-8000-000000000001',
-  imageUrl: 'https://cdn.example.com/reward.jpg',
+  availableFrom: "2026-08-01T07:00:00.000Z",
+  availableUntil: "2026-09-01T07:00:00.000Z",
+  cashAmountCents: null,
+  cashCurrency: null,
+  competitionId: "40000000-0000-4000-8000-000000000001",
+  competitionName: "August Challenge",
+  description: "Sponsor-provided recovery kit.",
+  id: "50000000-0000-4000-8000-000000000001",
+  imageUrl: "https://cdn.example.com/reward.jpg",
   inventoryRemaining: 2,
   inventoryTotal: 3,
   monthKey: '2026-08',

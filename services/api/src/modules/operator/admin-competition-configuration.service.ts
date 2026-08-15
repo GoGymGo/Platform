@@ -17,6 +17,10 @@ import { closeCompetitionParticipation } from '../competitions/competition-parti
 import { LegalDocumentsService } from '../legal/legal-documents.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
+  isSeptemberPilotCompetition,
+  septemberPilotRewardConfigurationErrors,
+} from '../rewards/september-pilot-cash-policy';
+import {
   canCancelCompetition,
   canDeleteCompetition,
   requiresExclusiveCompetitionSlot,
@@ -737,6 +741,8 @@ export class AdminCompetitionConfigurationService {
     competition: {
       ends_at: Date;
       id: string;
+      month_key: string;
+      name: string;
       region_policy_id: string;
       registration_closes_at: Date;
       registration_opens_at: Date;
@@ -786,6 +792,7 @@ export class AdminCompetitionConfigurationService {
     const region = await transaction
       .selectFrom('region_policies')
       .select([
+        'code',
         'competition_enabled',
         'country_code',
         'subdivision_code',
@@ -818,7 +825,7 @@ export class AdminCompetitionConfigurationService {
     }
 
     const jurisdictionCode = `${region.country_code}-${region.subdivision_code}`;
-    const [bracket, reward, activePoster, legalBundle] = await Promise.all([
+    const [bracket, rewards, activePoster, legalBundle] = await Promise.all([
       transaction
         .selectFrom('competition_goal_brackets')
         .select('goal_days')
@@ -826,10 +833,23 @@ export class AdminCompetitionConfigurationService {
         .executeTakeFirst(),
       transaction
         .selectFrom('reward_catalog_items')
-        .select('id')
+        .select([
+          'cash_amount_cents',
+          'cash_currency',
+          'claim_url',
+          'fulfillment_instructions',
+          'id',
+          'image_url',
+          'inventory_total',
+          'reward_type',
+          'sponsor_name',
+          'terms_url',
+          'title',
+        ])
         .where('competition_id', '=', competition.id)
         .where('status', '=', 'published')
-        .executeTakeFirst(),
+        .where('deleted_at', 'is', null)
+        .execute(),
       rules.requireGymQr
         ? transaction
             .selectFrom('competition_gym_locations as competition_gym')
@@ -870,12 +890,41 @@ export class AdminCompetitionConfigurationService {
         message: 'At least one goal bracket is required before publishing.',
       });
     }
-    if (!reward) {
+    if (rewards.length === 0) {
       throw new ConflictException({
         code: 'COMPETITION_REWARD_REQUIRED',
         message:
           'Publish at least one reward before publishing the competition.',
       });
+    }
+    if (
+      isSeptemberPilotCompetition({
+        monthKey: competition.month_key,
+        name: competition.name,
+        regionCode: region.code,
+      })
+    ) {
+      const errors =
+        rewards.length === 1
+          ? septemberPilotRewardConfigurationErrors({
+              cashAmountCents: rewards[0].cash_amount_cents,
+              cashCurrency: rewards[0].cash_currency,
+              claimUrl: rewards[0].claim_url,
+              fulfillmentInstructions: rewards[0].fulfillment_instructions,
+              imageUrl: rewards[0].image_url,
+              inventoryTotal: rewards[0].inventory_total,
+              rewardType: rewards[0].reward_type,
+              sponsorName: rewards[0].sponsor_name,
+              termsUrl: rewards[0].terms_url,
+              title: rewards[0].title,
+            })
+          : ['exactly one published reward is required'];
+      if (errors.length > 0) {
+        throw new ConflictException({
+          code: 'SEPTEMBER_PILOT_REWARD_INVALID',
+          message: `The September pilot cannot be published: ${errors.join('; ')}.`,
+        });
+      }
     }
     if (!legalBundle.configured) {
       throw new ConflictException({

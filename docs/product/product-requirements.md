@@ -28,6 +28,15 @@ No purchase is required. The pilot has one administrator-recorded $100 CAD cash
 reward and no wallet, bank-account, payee, payment-processor, transfer,
 stored-value, or tax-form flow.
 
+That pilot reward must be the sole published reward for the exact September
+competition: GoGymGo sponsor, 10,000 cents CAD, inventory one, approved image
+and terms, manual instructions, and no claim/provider URL. Draw lock freezes the
+value in one slot. Only its exact settled winning Award may receive one manual
+handoff record. The authorized operator records an already-completed in-person
+handoff with a body-bound idempotency key, expected Award version, bounded
+reason and server time; the transaction and append-only audit do not send or
+promise payment.
+
 ### Product principles
 
 - The server is authoritative for eligibility, enrollment, verified workouts,
@@ -331,6 +340,9 @@ Weekly scoring:
 - An operator creates a draft Brand Reward for an existing competition.
 - A physical reward requires fulfillment instructions or an HTTPS sponsor claim
   URL.
+- The September cash reward requires manual instructions, immutable amount and
+  currency, and no claim URL. Other cash rewards are outside the approved
+  product scope.
 - A coupon reward requires at least as many encrypted unique codes as declared
   inventory before publication.
 - Operator mutations require role authorization, audit reason, idempotency key,
@@ -350,6 +362,10 @@ Weekly scoring:
 - Coupon plaintext is returned only to its assigned winner after claim.
 - Physical claims return only the sponsor claim URL or fulfillment instructions;
   GoGymGo does not collect a shipping address.
+- Cash is not member-claimable. My Rewards shows pending or fulfilled from the
+  authoritative settled snapshot, while the exact admin records one completed
+  in-person handoff. Public/member responses exclude the private reason,
+  fulfillment-row identifier, operator identifier and winner account UUID.
 - Coupon codes and claim secrets never appear in logs, public results, other
   users' APIs, analytics, or privacy exports.
 

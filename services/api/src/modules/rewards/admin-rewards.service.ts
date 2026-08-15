@@ -29,6 +29,10 @@ import {
   type UpdateRewardCatalogItemDto,
 } from './dto/reward.dto';
 import { RewardCodeCipherService } from './reward-code-cipher.service';
+import {
+  isSeptemberPilotCompetition,
+  septemberPilotRewardConfigurationErrors,
+} from './september-pilot-cash-policy';
 
 interface AdminRewardJson extends JsonObject {
   id: string;
@@ -61,6 +65,7 @@ export class AdminRewardsService {
     input: CreateRewardCatalogItemDto,
   ): Promise<AdminRewardResponseDto> {
     this.assertClaimPath(input);
+    this.assertCashConfiguration(input);
     this.assertAvailabilityWindow(input.availableFrom, input.availableUntil);
     this.assertReason(input.reason);
     return this.idempotency.execute<AdminRewardJson>(
@@ -88,6 +93,8 @@ export class AdminRewardsService {
               ? new Date(input.availableUntil)
               : null,
             claim_url: input.claimUrl ?? null,
+            cash_amount_cents: input.cashAmountCents ?? null,
+            cash_currency: input.cashCurrency?.trim().toUpperCase() ?? null,
             competition_id: input.competitionId,
             created_at: now,
             description: input.description.trim(),
@@ -128,6 +135,7 @@ export class AdminRewardsService {
     input: UpdateRewardCatalogItemDto,
   ): Promise<AdminRewardResponseDto> {
     this.assertClaimPath(input);
+    this.assertCashConfiguration(input);
     this.assertAvailabilityWindow(input.availableFrom, input.availableUntil);
     this.assertReason(input.reason);
     return this.idempotency.execute<AdminRewardJson>(
@@ -188,6 +196,8 @@ export class AdminRewardsService {
               ? new Date(input.availableUntil)
               : null,
             claim_url: input.claimUrl ?? null,
+            cash_amount_cents: input.cashAmountCents ?? null,
+            cash_currency: input.cashCurrency?.trim().toUpperCase() ?? null,
             competition_id: input.competitionId,
             description: input.description.trim(),
             display_order: input.displayOrder ?? 0,
@@ -267,6 +277,7 @@ export class AdminRewardsService {
             current.competition_id,
           );
           this.assertPublicationAssets(current);
+          await this.assertSeptemberPilotPublication(transaction, current);
           if (current.reward_type === 'coupon') {
             const codeInventory = await transaction
               .selectFrom('reward_coupon_codes')
@@ -597,11 +608,106 @@ export class AdminRewardsService {
       }
       return;
     }
+    if (input.rewardType === RewardTypeDto.CASH) {
+      if (hasClaimUrl || !hasInstructions) {
+        throw new BadRequestException({
+          code: 'CASH_REWARD_MANUAL_HANDOFF_REQUIRED',
+          message:
+            'Cash rewards require in-person fulfillment instructions and cannot define a payment or claim URL.',
+        });
+      }
+      return;
+    }
     if (hasClaimUrl === hasInstructions) {
       throw new BadRequestException({
         code: 'REWARD_FULFILLMENT_PATH_REQUIRED',
         message:
-          'Physical and cash rewards require exactly one secure claim URL or fulfillment instruction path.',
+          'Physical rewards require exactly one secure claim URL or fulfillment instruction path.',
+      });
+    }
+  }
+
+  private assertCashConfiguration(input: CreateRewardCatalogItemDto): void {
+    if (input.rewardType === RewardTypeDto.CASH) {
+      if (
+        !Number.isInteger(input.cashAmountCents) ||
+        !input.cashAmountCents ||
+        input.cashAmountCents <= 0 ||
+        !/^[A-Za-z]{3}$/.test(input.cashCurrency ?? '')
+      ) {
+        throw new BadRequestException({
+          code: 'CASH_REWARD_VALUE_REQUIRED',
+          message:
+            'Cash rewards require a positive immutable amount and a three-letter currency.',
+        });
+      }
+      return;
+    }
+    if (
+      input.cashAmountCents !== undefined ||
+      input.cashCurrency !== undefined
+    ) {
+      throw new BadRequestException({
+        code: 'NON_CASH_REWARD_VALUE_FORBIDDEN',
+        message: 'Cash amount and currency apply only to cash rewards.',
+      });
+    }
+  }
+
+  private async assertSeptemberPilotPublication(
+    transaction: Transaction<Database>,
+    reward: Awaited<ReturnType<AdminRewardsService['getForUpdate']>>,
+  ): Promise<void> {
+    const competition = await transaction
+      .selectFrom('competitions as competition')
+      .innerJoin(
+        'region_policies as region',
+        'region.id',
+        'competition.region_policy_id',
+      )
+      .select([
+        'competition.month_key',
+        'competition.name',
+        'region.code as region_code',
+      ])
+      .where('competition.id', '=', reward.competition_id)
+      .executeTakeFirstOrThrow();
+    if (
+      !isSeptemberPilotCompetition({
+        monthKey: competition.month_key,
+        name: competition.name,
+        regionCode: competition.region_code,
+      })
+    ) {
+      return;
+    }
+    const errors = septemberPilotRewardConfigurationErrors({
+      cashAmountCents: reward.cash_amount_cents,
+      cashCurrency: reward.cash_currency,
+      claimUrl: reward.claim_url,
+      fulfillmentInstructions: reward.fulfillment_instructions,
+      imageUrl: reward.image_url,
+      inventoryTotal: reward.inventory_total,
+      rewardType: reward.reward_type,
+      sponsorName: reward.sponsor_name,
+      termsUrl: reward.terms_url,
+      title: reward.title,
+    });
+    const otherPublished = await transaction
+      .selectFrom('reward_catalog_items')
+      .select('id')
+      .where('competition_id', '=', reward.competition_id)
+      .where('status', '=', 'published')
+      .where('deleted_at', 'is', null)
+      .where('id', '!=', reward.id)
+      .executeTakeFirst();
+    if (otherPublished) {
+      errors.push('the pilot already has another published reward');
+    }
+    if (errors.length > 0) {
+      throw new ConflictException({
+        code: 'SEPTEMBER_PILOT_REWARD_INVALID',
+        message: `The September pilot reward cannot be published: ${errors.join('; ')}.`,
       });
     }
   }
@@ -656,6 +762,8 @@ export class AdminRewardsService {
   ): JsonObject {
     return {
       competitionId: input.competitionId,
+      cashAmountCents: input.cashAmountCents ?? null,
+      cashCurrency: input.cashCurrency?.trim().toUpperCase() ?? null,
       inventoryTotal: input.inventoryTotal,
       rewardType: input.rewardType,
       sponsorName: input.sponsorName,

@@ -11,7 +11,8 @@
 - Completion period: 15 minutes after the competition ends for workouts started in time
 - Session expiry: the earlier of four hours or the completion-period deadline
 - Minimum entrants: one
-- Reward: one $100 CAD cash reward sponsored by GoGymGo
+- Reward: exactly one $100 CAD cash reward sponsored by GoGymGo, 10,000 cents
+  CAD, inventory one and settled slot one
 - Daily limit: one verified competition day per local calendar date
 
 Run the idempotent configuration command only against the intended environment:
@@ -20,6 +21,9 @@ Run the idempotent configuration command only against the intended environment:
 $env:DATABASE_URL='<secret-managed target connection>'
 $env:APPLY_PILOT_CONFIGURATION='yes'
 $env:CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256='<owner- and counsel-approved exact digest>'
+$env:PILOT_REWARD_IMAGE_URL='<approved public HTTPS image URL>'
+$env:PILOT_REWARD_TERMS_URL='<approved public HTTPS reward terms URL>'
+$env:CONFIRM_PILOT_REWARD_APPROVAL_SHA256='<owner-approved exact reward digest>'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
@@ -27,6 +31,10 @@ The command refuses to publish the public legal bundle unless the approval
 digest matches the exact committed content. Run it once without the value to
 obtain the expected digest, complete owner and counsel review, then rerun with
 that exact value. Never copy the digest forward after legal content changes.
+The reward has its own printed digest bound to sponsor, title, type, 10,000-cent
+CAD value, inventory, manual instructions, image and terms. The command also
+refuses placeholder URLs, a claim/provider URL, a second published reward or a
+digest mismatch. No real approval value belongs in source control.
 
 ## Staging order
 
@@ -52,6 +60,27 @@ that exact value. Never copy the digest forward after legal content changes.
 10. Rehearse draw settlement and the audited $100 cash handoff record.
 11. Only after the legal, gym, reward and UAT gates pass, rerun the command with
     `PUBLISH_PILOT_COMPETITION=yes` to open registration.
+
+## Manual cash handoff record
+
+1. Confirm Winners Circle is settled and the admin panel shows exactly one
+   pending September cash Award with the immutable value `$100 CAD`.
+2. Hand the cash to that displayed winner in person, outside GoGymGo. Do not
+   enter or collect bank, payee, card, wallet, tax, balance or transfer details.
+3. Immediately select that authoritative Award in Pilot Operations, enter a
+   bounded operational reason, and record the already-completed handoff.
+4. A retry with the same request key and identical body returns the same record.
+   A changed body, stale version, second attempt, wrong winner/contest/reward,
+   revoked or unsettled Award fails closed. Reload the panel before deciding
+   whether any retry is appropriate.
+5. Confirm the panel and the winner's My Rewards view show fulfilled at the
+   server timestamp. The action records evidence only: it sends no webhook,
+   contacts no payment provider and does not claim GoGymGo initiated a transfer.
+
+Never edit or delete a cash fulfillment or its audit evidence. If the panel
+reports an integrity error, stop the handoff workflow and escalate for database
+review; use a forward-only corrective change while preserving the original
+record.
 
 ## Poster control and recovery
 

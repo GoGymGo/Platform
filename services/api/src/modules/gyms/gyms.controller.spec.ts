@@ -135,6 +135,7 @@ describe('gym controllers', () => {
     const cash = {
       amountCents: 10_000,
       currency: 'CAD',
+      expectedVersion: 1,
       reason: 'Cash handed to the winner in person.',
       rewardAwardId: '10000000-0000-4000-8000-000000000003',
     } satisfies CashFulfillmentRequestDto;

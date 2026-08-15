@@ -110,11 +110,15 @@ const questions = [
   {
     answer: (
       <p>
-        The September pilot has one {septemberCampaign.reward} cash reward
-        sponsored by {septemberCampaign.rewardSponsor}. Verified workouts add
-        Prize Draw Entries under the published scoring rules, but category
-        placement never guarantees the reward. An audited draw determines the
-        reward winner after results settle. The published{" "}
+        If the approved September Contest is published, its configuration
+        permits exactly one {septemberCampaign.reward} cash reward sponsored by{" "}
+        {septemberCampaign.rewardSponsor}. The app and published rules confirm
+        whether it is available. Verified workouts add Prize Draw Entries under
+        the published scoring rules, but category placement never guarantees the
+        reward. An audited draw determines the winner after results settle.
+        GoGymGo records an already-completed in-person cash handoff; the app
+        does not initiate a bank, card, wallet, or provider transfer. The
+        published{" "}
         <AppLink href={siteLinks.officialRules}>Official Contest Rules</AppLink>{" "}
         control
         if any summary differs.

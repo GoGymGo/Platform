@@ -44,7 +44,15 @@ test("campaign facts have one landing-owned source of truth", async () => {
   assert.match(faq, /septemberCampaign\.competitionWindow/);
   assert.match(faq, /Bowen Island/);
   assert.match(faq, /Gambier Island Local Trust Area/);
-  assert.match(faq, /audited draw determines the\s+reward winner/);
+  assert.match(faq, /audited draw determines the winner after results settle/);
+  assert.match(faq, /If the approved September Contest is published/);
+  assert.match(faq, /already-completed in-person cash handoff/);
+  assert.match(
+    faq,
+    /does\s+not initiate a bank, card, wallet, or provider transfer/,
+  );
+  assert.match(page, /PLANNED REWARD — CHECK APP/);
+  assert.doesNotMatch(page, /ONE PUBLISHED REWARD/);
 });
 
 test("home offers direct next steps without repeating long feature sections", async () => {
@@ -241,8 +249,14 @@ test("brand inquiry remains detailed and isolated from the regional list", async
     read("app/components/InterestForms.tsx"),
   ]);
 
-  assert.ok(brandPage.indexOf('id="brand-form"') < brandPage.indexOf("audience-details"));
-  assert.match(brandPage, /current\s+September pilot reward is sponsored by GoGymGo/);
+  assert.ok(
+    brandPage.indexOf('id="brand-form"') <
+      brandPage.indexOf("audience-details"),
+  );
+  assert.match(
+    brandPage,
+    /September pilot Contest is approved and published,[\s\S]*sole planned[\s\S]*cash reward is sponsored by GoGymGo/,
+  );
   assert.match(forms, /fetch\("\/api\/interest"/);
   assert.match(forms, /name="partnershipInterest"/);
   assert.match(forms, /name="companyName"/);

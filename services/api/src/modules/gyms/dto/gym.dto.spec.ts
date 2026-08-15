@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { GymScanRequestDto } from './gym.dto';
+import { CashFulfillmentRequestDto, GymScanRequestDto } from './gym.dto';
 
 const locationCheck = {
   accuracyMeters: 8,
@@ -33,5 +33,37 @@ describe('GymScanRequestDto', () => {
       'competitionId',
       'credential',
     ]);
+  });
+});
+
+describe('CashFulfillmentRequestDto', () => {
+  const valid = {
+    amountCents: 10000,
+    currency: 'CAD',
+    expectedVersion: 1,
+    reason: 'Handed to the settled winner in person.',
+    rewardAwardId: '10000000-0000-4000-8000-000000000003',
+  };
+
+  it('accepts only the exact bounded pilot handoff body', async () => {
+    await expect(
+      validate(plainToInstance(CashFulfillmentRequestDto, valid)),
+    ).resolves.toHaveLength(0);
+  });
+
+  it.each([
+    ['wrong amount', { amountCents: 9999 }],
+    ['wrong currency', { currency: 'USD' }],
+    ['lowercase currency', { currency: 'cad' }],
+    ['stale-shaped version', { expectedVersion: 0 }],
+    ['short reason', { reason: 'handed' }],
+    ['oversized reason', { reason: 'x'.repeat(501) }],
+    ['invalid award id', { rewardAwardId: 'winner-1' }],
+  ])('rejects %s', async (_label, override) => {
+    const errors = await validate(
+      plainToInstance(CashFulfillmentRequestDto, { ...valid, ...override }),
+    );
+
+    expect(errors).not.toHaveLength(0);
   });
 });

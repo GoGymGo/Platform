@@ -202,6 +202,18 @@ const pilotConfiguration = await readFile(
   join(root, 'src/operations/configure-september-2026-island-pilot.ts'),
   'utf8',
 );
+const septemberCashPolicy = await readFile(
+  join(root, 'src/modules/rewards/september-pilot-cash-policy.ts'),
+  'utf8',
+);
+const cashFulfillmentService = await readFile(
+  join(root, 'src/modules/gyms/gyms.service.ts'),
+  'utf8',
+);
+const cashFulfillmentMigration = await readFile(
+  join(root, 'migrations/1787533200000_september_pilot_cash_fulfillment.ts'),
+  'utf8',
+);
 const legalDocumentPolicy = await readFile(
   join(root, 'src/modules/legal/legal-document.ts'),
   'utf8',
@@ -412,6 +424,43 @@ for (const marker of [
   if (!(pilotConfiguration + legalDocumentPolicy).includes(marker)) {
     violations.push(
       `public legal publication is missing approval-boundary marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'CONFIRM_PILOT_REWARD_APPROVAL_SHA256',
+  'PILOT_REWARD_IMAGE_URL',
+  'PILOT_REWARD_TERMS_URL',
+  'requireSeptemberPilotRewardApproval',
+]) {
+  if (!(pilotConfiguration + septemberCashPolicy).includes(marker)) {
+    violations.push(
+      `September cash reward configuration is missing fail-closed marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'scope: `operator:cash-fulfillments:${input.rewardAwardId}`',
+  'expectedVersion: input.expectedVersion',
+  'recordedHandoffOnly: true',
+  "action: 'cash_fulfillment.recorded'",
+]) {
+  if (!cashFulfillmentService.includes(marker)) {
+    violations.push(
+      `manual cash fulfillment is missing transactional marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'cash_fulfillments_append_only',
+  'gogymgo_enforce_cash_fulfillment_write',
+  'gogymgo_enforce_cash_fulfillment_commit',
+  'gogymgo_require_cash_record_for_award_fulfillment',
+  'gogymgo_enforce_september_pilot_reward',
+]) {
+  if (!cashFulfillmentMigration.includes(marker)) {
+    violations.push(
+      `manual cash fulfillment migration is missing invariant marker ${marker}`,
     );
   }
 }

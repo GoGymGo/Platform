@@ -40,6 +40,7 @@ interface GymsServiceInternals {
     fulfilled_at: Date;
     fulfillment_note: string;
     id: string;
+    reward_award_version: number;
     reward_award_id: string;
     winner_user_id: string;
   }): CashFulfillmentRecordDto;
@@ -246,6 +247,7 @@ describe('gym service privacy-safe presentation helpers', () => {
         fulfilled_at: updatedAt,
         fulfillment_note: 'Cash handed to the winner in person.',
         id: 'fulfillment-1',
+        reward_award_version: 3,
         reward_award_id: 'award-1',
         winner_user_id: 'winner-1',
       }),
@@ -256,6 +258,7 @@ describe('gym service privacy-safe presentation helpers', () => {
       fulfilledAt: updatedAt.toISOString(),
       fulfillmentNote: 'Cash handed to the winner in person.',
       id: 'fulfillment-1',
+      rewardAwardVersion: 3,
       rewardAwardId: 'award-1',
       winnerUserId: 'winner-1',
     });

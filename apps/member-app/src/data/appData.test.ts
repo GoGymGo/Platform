@@ -143,12 +143,15 @@ describe('app data boundary', () => {
         }
         return Promise.resolve({
           awardRank: 1,
-          awardedAt: '2026-08-15T12:00:00.000Z',
-          claimedAt: '2026-08-15T12:05:00.000Z',
+          awardedAt: "2026-08-15T12:00:00.000Z",
+          cashAmountCents: null,
+          cashCurrency: null,
+          claimedAt: "2026-08-15T12:05:00.000Z",
           claimUrl: null,
           couponCode: 'WIN-ABC-001',
           fulfillmentInstructions: null,
-          id: '70000000-0000-4000-8000-000000000001',
+          fulfilledAt: null,
+          id: "70000000-0000-4000-8000-000000000001",
           imageUrl: null,
           rewardType: 'coupon',
           sponsorName: 'Sponsor',
@@ -445,7 +448,46 @@ describe('app data boundary', () => {
     );
   });
 
-  it('rejects private winner identifiers and inconsistent pending results', async () => {
+  it("accepts only the exact September pilot cash snapshot", async () => {
+    const base = settledWinnersCircleResponse();
+    const pilot = {
+      ...base,
+      competitionName: "GoGymGo September 2026 Island Pilot",
+      monthKey: "2026-09",
+      regionCode: "vancouver-island-gulf-islands-bc",
+      rewardWinners: [
+        {
+          ...base.rewardWinners[0]!,
+          cashAmountCents: 10000,
+          cashCurrency: "CAD",
+          rewardTitle: "GoGymGo $100 CAD Cash Reward",
+          rewardType: "cash",
+          sponsorName: "GoGymGo",
+        },
+      ],
+    };
+    const validApi: ApiClient = {
+      request: <TResponse>() => Promise.resolve(pilot) as Promise<TResponse>,
+    };
+    await assert.doesNotReject(() =>
+      createAppDataSource("api", validApi).getMyLatestCompetitionResults(),
+    );
+
+    const invalidApi: ApiClient = {
+      request: <TResponse>() =>
+        Promise.resolve({
+          ...pilot,
+          rewardWinners: [{ ...pilot.rewardWinners[0], cashAmountCents: 9999 }],
+        }) as Promise<TResponse>,
+    };
+    await assert.rejects(
+      () =>
+        createAppDataSource("api", invalidApi).getMyLatestCompetitionResults(),
+      /September pilot reward snapshot is inconsistent/i,
+    );
+  });
+
+  it("rejects private winner identifiers and inconsistent pending results", async () => {
     const leaked = settledWinnersCircleResponse();
     const winner = leaked.rewardWinners[0]!;
     const leakedApi: ApiClient = {
@@ -557,27 +599,33 @@ function settledWinnersCircleResponse() {
     regionName: 'Vancouver',
     resultsStatus: 'settled',
     rewardCount: 1,
-    rewardWinners: [{
-      alias: 'MOVE_MORE',
-      awardRank: 1,
-      rewardTitle: 'Recovery Kit',
-      rewardType: 'physical',
-      sponsorName: 'GoGymGo',
-      streaks
-    }],
-    settledAt: '2026-09-01T08:00:00.000Z'
+    rewardWinners: [
+      {
+        alias: "MOVE_MORE",
+        awardRank: 1,
+        cashAmountCents: null,
+        cashCurrency: null,
+        rewardTitle: "Recovery Kit",
+        rewardType: "physical",
+        sponsorName: "GoGymGo",
+        streaks,
+      },
+    ],
+    settledAt: "2026-09-01T08:00:00.000Z",
   };
 }
 
 function validRewardCatalogItem() {
   return {
-    availableFrom: '2026-08-01T07:00:00.000Z',
-    availableUntil: '2026-09-01T07:00:00.000Z',
-    competitionId: '40000000-0000-4000-8000-000000000001',
-    competitionName: 'August contest',
-    description: 'A sponsor-funded recovery reward.',
-    id: '70000000-0000-4000-8000-000000000001',
-    imageUrl: 'https://cdn.example.test/reward.jpg',
+    availableFrom: "2026-08-01T07:00:00.000Z",
+    availableUntil: "2026-09-01T07:00:00.000Z",
+    cashAmountCents: null,
+    cashCurrency: null,
+    competitionId: "40000000-0000-4000-8000-000000000001",
+    competitionName: "August contest",
+    description: "A sponsor-funded recovery reward.",
+    id: "70000000-0000-4000-8000-000000000001",
+    imageUrl: "https://cdn.example.test/reward.jpg",
     inventoryRemaining: 1,
     inventoryTotal: 1,
     monthKey: '2026-08',

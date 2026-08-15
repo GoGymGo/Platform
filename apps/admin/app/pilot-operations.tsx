@@ -35,6 +35,7 @@ import type {
   PilotAuditEvent,
   RegionPolicy,
   RegionWaitlistEntry,
+  RewardAward,
 } from "./admin-types";
 
 export type PilotData = {
@@ -47,6 +48,7 @@ export type PilotData = {
 };
 
 type PilotOperationsProps = PilotData & {
+  cashAwards: RewardAward[];
   onAssignGym: (
     competitionId: string,
     gymId: string,
@@ -157,6 +159,7 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
   const [assignGymError, setAssignGymError] = useState("");
   const [assignGymSuccess, setAssignGymSuccess] = useState("");
   const [cashFormError, setCashFormError] = useState("");
+  const [cashFormSuccess, setCashFormSuccess] = useState("");
   const [createGymOpen, setCreateGymOpen] = useState(props.gyms.length === 0);
   const [pilotAuditHidden, setPilotAuditHidden] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -461,13 +464,32 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     }
     const form = new FormData(event.currentTarget);
     try {
+      const rewardAwardId = String(form.get("rewardAwardId") ?? "").trim();
+      const award = props.cashAwards.find(
+        (candidate) => candidate.id === rewardAwardId,
+      );
+      if (!award || award.status !== "awarded") {
+        throw new AdminUserFacingError(
+          "Choose an authoritative pending cash Award and reload if its state changed.",
+        );
+      }
+      if (award.cashAmountCents !== 10000 || award.cashCurrency !== "CAD") {
+        throw new AdminUserFacingError(
+          "The selected Award is not the exact $100 CAD pilot reward. Do not record a handoff.",
+        );
+      }
+      setCashFormSuccess("");
       await props.onRecordCash({
-        amountCents: Number(form.get("amountCents")),
-        currency: String(form.get("currency") ?? "CAD").toUpperCase(),
+        amountCents: award.cashAmountCents,
+        currency: award.cashCurrency,
+        expectedVersion: award.version,
         reason: String(form.get("reason") ?? "").trim(),
-        rewardAwardId: String(form.get("rewardAwardId") ?? "").trim(),
+        rewardAwardId,
       });
       event.currentTarget.reset();
+      setCashFormSuccess(
+        "The completed in-person $100 CAD handoff was recorded. No transfer was initiated.",
+      );
     } catch (error) {
       setCashFormError(formErrorMessage(error));
     }
@@ -823,44 +845,40 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               <p className="eyebrow">IN-PERSON CASH HANDOFF</p>
               <h2>Record fulfillment</h2>
               <p>
-                The draw must already be settled. This action is permanent and
-                audited.
+                Record only an already-completed in-person $100 CAD handoff for
+                the exact settled September pilot winner. This permanent,
+                audited action does not send money or initiate a transfer.
               </p>
             </div>
           </summary>
           <div className="pilot-collapsible-body">
             <form className="pilot-form" noValidate onSubmit={recordCash}>
               <label className="pilot-form-wide">
-                <span>AWARD ID</span>
-                <input
-                  name="rewardAwardId"
-                  placeholder="Award ID from the settled draw"
-                  required
-                />
+                <span>SETTLED CASH AWARD</span>
+                <select name="rewardAwardId" required>
+                  <option value="">Choose a pending winner</option>
+                  {props.cashAwards
+                    .filter((award) => award.status === "awarded")
+                    .map((award) => (
+                      <option key={award.id} value={award.id}>
+                        {award.winnerCallsign} — {award.title} — version{" "}
+                        {award.version}
+                      </option>
+                    ))}
+                </select>
               </label>
               <label>
                 <span>AMOUNT (CENTS)</span>
-                <input
-                  defaultValue="10000"
-                  min="1"
-                  name="amountCents"
-                  required
-                  type="number"
-                />
+                <input defaultValue="10000" readOnly type="number" />
               </label>
               <label>
                 <span>CURRENCY</span>
-                <input
-                  defaultValue="CAD"
-                  maxLength={3}
-                  minLength={3}
-                  name="currency"
-                  required
-                />
+                <input defaultValue="CAD" readOnly />
               </label>
               <label className="pilot-form-wide">
                 <span>FULFILLMENT NOTE + REASON</span>
                 <input
+                  maxLength={500}
                   minLength={8}
                   name="reason"
                   placeholder="Cash handed to winner in person by …"
@@ -869,7 +887,15 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
               </label>
               <button
                 className="danger-button"
-                disabled={props.submitting}
+                disabled={
+                  props.submitting ||
+                  !props.cashAwards.some(
+                    (award) =>
+                      award.status === "awarded" &&
+                      award.cashAmountCents === 10000 &&
+                      award.cashCurrency === "CAD",
+                  )
+                }
                 type="submit"
               >
                 RECORD CASH HANDOFF
@@ -879,7 +905,49 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
                   {cashFormError}
                 </p>
               ) : null}
+              {cashFormSuccess ? (
+                <p
+                  aria-live="polite"
+                  className="pilot-form-message form-success"
+                >
+                  {cashFormSuccess}
+                </p>
+              ) : null}
+              {props.cashAwards.length === 0 ? (
+                <p className="pilot-form-message" role="status">
+                  No authoritative settled September cash Award is available.
+                  Settle the audited draw before recording a handoff.
+                </p>
+              ) : null}
+              {props.cashAwards.some(
+                (award) =>
+                  award.cashAmountCents !== 10000 ||
+                  award.cashCurrency !== "CAD" ||
+                  (award.status === "fulfilled" && !award.cashFulfillmentId),
+              ) ? (
+                <p className="pilot-form-message form-error" role="alert">
+                  A cash Award failed the authoritative value or
+                  fulfillment-record integrity check. Do not hand off cash;
+                  escalate for database review.
+                </p>
+              ) : null}
             </form>
+            {props.cashAwards.some((award) => award.status === "fulfilled") ? (
+              <div className="pilot-form-message form-success" role="status">
+                {props.cashAwards
+                  .filter((award) => award.status === "fulfilled")
+                  .map((award) => (
+                    <p key={award.id}>
+                      {award.winnerCallsign}: $100 CAD in-person handoff
+                      recorded{" "}
+                      {award.fulfilledAt
+                        ? formatDateTime(award.fulfilledAt)
+                        : "at server time"}
+                      .
+                    </p>
+                  ))}
+              </div>
+            ) : null}
           </div>
         </details>
       </section>

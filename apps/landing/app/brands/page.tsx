@@ -38,9 +38,9 @@ export default function BrandsPage() {
           </h1>
           <p>
             GoGymGo is preparing future approved regional campaigns for fitness
-            brands that can support real product or coupon rewards. The current
-            September pilot reward is sponsored by GoGymGo, not an outside
-            brand.
+            brands that can support real product or coupon rewards. If the
+            September pilot Contest is approved and published, its sole planned
+            cash reward is sponsored by GoGymGo, not an outside brand.
           </p>
           <div className="audience-actions">
             <Link

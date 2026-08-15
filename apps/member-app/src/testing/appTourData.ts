@@ -169,8 +169,11 @@ export function createAppTourDataSource(): AppDataSource {
     {
       awardRank: 1,
       awardedAt: nowIso(),
+      cashAmountCents: null,
+      cashCurrency: null,
       claimedAt: null,
-      id: 'app-tour-award',
+      fulfilledAt: null,
+      id: "app-tour-award",
       imageUrl: null,
       rewardType: 'coupon',
       sponsorName: 'Northline Wellness',
@@ -245,19 +248,23 @@ export function createAppTourDataSource(): AppDataSource {
         {
           alias: 'NORTH_STAR',
           awardRank: 1,
-          rewardTitle: 'Recovery Pack',
-          rewardType: 'coupon',
-          sponsorName: 'Northline Wellness',
-          streaks: fixedStreaks
+          cashAmountCents: null,
+          cashCurrency: null,
+          rewardTitle: "Recovery Pack",
+          rewardType: "coupon",
+          sponsorName: "Northline Wellness",
+          streaks: fixedStreaks,
         },
         {
           alias: 'MOVE_MORE',
           awardRank: 2,
-          rewardTitle: 'Training Credit',
-          rewardType: 'coupon',
-          sponsorName: 'Northline Wellness',
-          streaks: { ...fixedStreaks, daily: 3 }
-        }
+          cashAmountCents: null,
+          cashCurrency: null,
+          rewardTitle: "Training Credit",
+          rewardType: "coupon",
+          sponsorName: "Northline Wellness",
+          streaks: { ...fixedStreaks, daily: 3 },
+        },
       ],
       settledAt: nowIso()
     }),
@@ -270,6 +277,8 @@ export function createAppTourDataSource(): AppDataSource {
       {
         availableFrom: null,
         availableUntil: null,
+        cashAmountCents: null,
+        cashCurrency: null,
         competitionId: appTourCompetitionId,
         competitionName: 'Monthly GoGymGo Contest',
         description:

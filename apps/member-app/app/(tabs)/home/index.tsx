@@ -141,18 +141,19 @@ export default function HomeScreen() {
         competitionTimeZone
       )
     : null;
-  const [competitionYear, competitionMonth] = competition.competitionMonthKey.split('-').map(Number);
-  const competitionStartMonth = new Intl.DateTimeFormat('en-CA', { month: 'long' }).format(
-    new Date(competitionYear, competitionMonth - 1, 1, 12)
-  );
-  const {
-    data: currentEntrantsData,
-    isPending: currentEntrantsPending
-  } = useCompetitionEnrollmentCount(
+  const [competitionYear, competitionMonth] = competition.competitionMonthKey
+    .split("-")
+    .map(Number);
+  const competitionStartMonth = new Intl.DateTimeFormat("en-CA", {
+    month: "long",
+  }).format(new Date(competitionYear, competitionMonth - 1, 1, 12));
+  const currentEntrantsQuery = useCompetitionEnrollmentCount(
     currentCompetition?.id ?? null,
     competitionRegionCode,
-    competition.competitionMonthKey
+    competition.competitionMonthKey,
   );
+  const { data: currentEntrantsData, isPending: currentEntrantsPending } =
+    currentEntrantsQuery;
   const { data: creatorWorkouts = [] } = useCreatorWorkouts(
     competitionRegionCode
   );
@@ -727,7 +728,11 @@ export default function HomeScreen() {
 
         {unclaimedReward ? (
           <Pressable
-            accessibilityHint="Open My Awards to claim this Award"
+            accessibilityHint={
+              unclaimedReward.rewardType === "cash"
+                ? "Open My Awards to review the pending in-person cash handoff"
+                : "Open My Awards to claim this Award"
+            }
             accessibilityRole="button"
             onPress={() => router.push('/rewards/awards')}
             style={({ pressed }) => [styles.pressableCard, pressed ? styles.pressed : null]}
@@ -735,10 +740,14 @@ export default function HomeScreen() {
             <HUDBorderBox glow style={styles.rewardAlert} tone="pink">
               <View style={styles.rewardAlertCopy}>
                 <TerminalText glow tone="pink" variant="label">
-                  AWARD READY // {unclaimedReward.title}
+                  {unclaimedReward.rewardType === "cash"
+                    ? "CASH AWARD // HANDOFF PENDING"
+                    : `AWARD READY // ${unclaimedReward.title}`}
                 </TerminalText>
                 <TerminalText tone="text" uppercase={false} variant="body">
-                  Open My Awards to claim it.
+                  {unclaimedReward.rewardType === "cash"
+                    ? "Open My Awards to review the settled result and manual handoff status."
+                    : "Open My Awards to claim it."}
                 </TerminalText>
               </View>
               <TerminalText glow tone="pink" variant="button">

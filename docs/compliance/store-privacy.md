@@ -75,7 +75,9 @@ deployed infrastructure and production logging policy before submission.
 - Camera frames, face geometry, Face ID data, voice, and microphone audio
 - Raw precise-location coordinates after a region or gym-presence request completes
 - Address-book contacts
-- Payment-card or bank-account information
+- Payment-card, bank-account, payee, wallet, balance, tax or transfer information;
+  the September cash handoff is completed in person and the app records only
+  its reward value, status and server time for the winner
 - Advertising identifiers or cross-app tracking data
 
 ## Required submission URLs

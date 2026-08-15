@@ -70,8 +70,12 @@ require approved HTTPS image and terms URLs. Physical rewards use exactly one
 sponsor instruction path or HTTPS claim URL; coupon rewards use neither and do
 not require GoGymGo to collect a shipping address.
 
-There is no cash-value field, payment provider, payee onboarding, bank-account
-collection, payment webhook, or transfer reconciliation in the current model.
+Cash value and currency exist only for the exact manual September pilot reward
+and its immutable draw snapshot. Its fulfillment row records an
+already-completed in-person handoff against the settled Award, expected version
+and exact admin, with append-only audit evidence. There is no payment provider,
+payee onboarding, bank-account collection, payment webhook, wallet, balance,
+automated payout, transfer initiation or transfer reconciliation in the model.
 See [brand rewards marketplace](../product/brand-rewards-marketplace.md).
 
 ## Identity, secrets, and privacy

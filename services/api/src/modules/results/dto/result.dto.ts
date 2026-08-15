@@ -9,6 +9,12 @@ export class RewardWinnerResponseDto {
   @ApiProperty({ type: Number })
   awardRank!: number;
 
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
+  cashAmountCents!: number | null;
+
+  @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
+  cashCurrency!: string | null;
+
   @ApiProperty({ type: String })
   sponsorName!: string;
 

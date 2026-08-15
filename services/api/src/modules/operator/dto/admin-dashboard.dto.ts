@@ -191,6 +191,12 @@ export class AdminDashboardRewardDto {
   @ApiProperty({ type: String })
   rewardType!: string;
 
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
+  cashAmountCents!: number | null;
+
+  @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
+  cashCurrency!: string | null;
+
   @ApiProperty({ type: String })
   status!: string;
 
@@ -235,8 +241,20 @@ export class AdminDashboardRewardAwardDto {
   @ApiProperty({ format: 'uuid', type: String })
   rewardId!: string;
 
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
   @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
   rewardType!: 'cash' | 'coupon' | 'physical';
+
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
+  cashAmountCents!: number | null;
+
+  @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
+  cashCurrency!: string | null;
+
+  @ApiProperty({ format: 'uuid', nullable: true, type: String })
+  cashFulfillmentId!: string | null;
 
   @ApiProperty({ type: String })
   sponsorName!: string;

@@ -6,6 +6,8 @@ export type RewardType = 'cash' | 'coupon' | 'physical';
 export type RewardCatalogItem = {
   availableFrom: string | null;
   availableUntil: string | null;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
   competitionId: string;
   competitionName: string;
   description: string;
@@ -26,7 +28,10 @@ export type RewardCatalogItem = {
 export type RewardAward = {
   awardRank: number;
   awardedAt: string;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
   claimedAt: string | null;
+  fulfilledAt: string | null;
   id: string;
   imageUrl: string | null;
   rewardType: RewardType;
@@ -44,6 +49,8 @@ export type ClaimedReward = RewardAward & {
 export type RewardWinner = {
   alias: string;
   awardRank: number;
+  cashAmountCents: number | null;
+  cashCurrency: string | null;
   rewardTitle: string;
   rewardType: RewardType;
   sponsorName: string;

@@ -14,6 +14,7 @@ import {
   Matches,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type {
@@ -71,6 +72,12 @@ export class RewardCatalogItemResponseDto {
   @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
   rewardType!: RewardType;
 
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
+  cashAmountCents!: number | null;
+
+  @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
+  cashCurrency!: string | null;
+
   @ApiProperty({ format: 'uri', type: String })
   imageUrl!: string;
 
@@ -102,6 +109,12 @@ export class RewardAwardResponseDto {
   @ApiProperty({ enum: ['cash', 'coupon', 'physical'], type: String })
   rewardType!: RewardType;
 
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
+  cashAmountCents!: number | null;
+
+  @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
+  cashCurrency!: string | null;
+
   @ApiProperty({ type: String })
   sponsorName!: string;
 
@@ -119,6 +132,9 @@ export class RewardAwardResponseDto {
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   claimedAt!: string | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  fulfilledAt!: string | null;
 }
 
 export class ClaimRewardResponseDto extends RewardAwardResponseDto {
@@ -161,6 +177,32 @@ export class CreateRewardCatalogItemDto extends OperatorReasonDto {
   @ApiProperty({ enum: RewardTypeDto, type: String })
   @IsEnum(RewardTypeDto)
   rewardType!: RewardTypeDto;
+
+  @ApiPropertyOptional({ maximum: 10_000_000, minimum: 1, type: Number })
+  @ValidateIf(
+    (input: CreateRewardCatalogItemDto) =>
+      input.rewardType === RewardTypeDto.CASH ||
+      input.cashAmountCents !== undefined,
+  )
+  @IsInt()
+  @Min(1)
+  @Max(10_000_000)
+  cashAmountCents?: number;
+
+  @ApiPropertyOptional({
+    example: 'CAD',
+    maxLength: 3,
+    minLength: 3,
+    type: String,
+  })
+  @ValidateIf(
+    (input: CreateRewardCatalogItemDto) =>
+      input.rewardType === RewardTypeDto.CASH ||
+      input.cashCurrency !== undefined,
+  )
+  @IsString()
+  @Matches(/^[A-Za-z]{3}$/)
+  cashCurrency?: string;
 
   @ApiPropertyOptional({ format: 'uri', type: String })
   @IsOptional()

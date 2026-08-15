@@ -35,7 +35,9 @@ export default function MyAwardsScreen() {
   const claimedReward = claim.data;
   const viewedRewardsRef = useRef(false);
   const completedClaimRef = useRef<string | null>(null);
-  const hasClaimableReward = awards.some(({ status }) => status === 'awarded');
+  const hasClaimableReward = awards.some(
+    ({ rewardType, status }) => rewardType !== "cash" && status === "awarded",
+  );
 
   useEffect(() => {
     if (!hasClaimableReward || viewedRewardsRef.current) {
@@ -78,7 +80,7 @@ export default function MyAwardsScreen() {
           />
           <BrandScreenHeader
             accent="pink"
-            description="Claim an Award to reveal physical-prize instructions or an awarded coupon code. GoGymGo will never ask for banking information."
+            description="Claim a physical Award or coupon here. A cash Award stays pending until an authorized administrator records the completed in-person handoff; this app never initiates a transfer or asks for banking information."
             eyebrow="CONTEST AWARDS"
             title="MY AWARDS"
           />
@@ -147,12 +149,18 @@ function AwardCard({
   disabled: boolean;
   onClaim: () => void;
 }) {
-  const claimable = award.status === 'awarded' || award.status === 'claimed';
+  const claimable =
+    award.rewardType !== "cash" &&
+    (award.status === "awarded" || award.status === "claimed");
   return (
     <HUDBorderBox style={styles.awardCard} tone="pink">
       <TerminalText tone="pink" variant="micro">
-        #{award.awardRank} {' // '}
-        {award.rewardType === 'coupon' ? 'COUPON CODE' : 'PHYSICAL PRIZE'}
+        #{award.awardRank} {" // "}
+        {award.rewardType === "coupon"
+          ? "COUPON CODE"
+          : award.rewardType === "cash"
+            ? "CASH PRIZE"
+            : "PHYSICAL PRIZE"}
       </TerminalText>
       <TerminalText style={styles.awardTitle} tone="text" variant="body">
         {award.title}
@@ -161,8 +169,14 @@ function AwardCard({
         OFFERED BY {award.sponsorName}
       </TerminalText>
       <TerminalText tone="muted" variant="micro">
-        STATUS {'//'} {getAwardStatusLabel(award.status)}
+        STATUS {"//"} {getAwardStatusLabel(award)}
       </TerminalText>
+      {award.rewardType === "cash" ? (
+        <TerminalText tone="muted" uppercase={false} variant="body">
+          {formatCashAward(award)}. GoGymGo records only the completed in-person
+          cash handoff; no transfer is initiated in the app.
+        </TerminalText>
+      ) : null}
       {claimable ? (
         <CyberButtonPrimary
           accessibilityHint={award.status === 'claimed'
@@ -179,19 +193,34 @@ function AwardCard({
   );
 }
 
-function getAwardStatusLabel(status: RewardAward['status']) {
-  switch (status) {
-    case 'awarded':
-      return 'READY TO CLAIM';
-    case 'claimed':
-      return 'CLAIMED // VIEW DETAILS';
-    case 'fulfilled':
-      return 'FULFILLED';
-    case 'redeemed':
-      return 'REDEEMED';
-    case 'cancelled':
-      return 'UNAVAILABLE';
+function getAwardStatusLabel(award: RewardAward) {
+  switch (award.status) {
+    case "awarded":
+      return award.rewardType === "cash"
+        ? "PENDING IN-PERSON HANDOFF"
+        : "READY TO CLAIM";
+    case "claimed":
+      return "CLAIMED // VIEW DETAILS";
+    case "fulfilled":
+      return award.rewardType === "cash" && award.fulfilledAt
+        ? `IN-PERSON HANDOFF RECORDED ${new Date(award.fulfilledAt).toLocaleDateString("en-CA")}`
+        : "FULFILLED";
+    case "redeemed":
+      return "REDEEMED";
+    case "cancelled":
+      return "UNAVAILABLE";
   }
+}
+
+function formatCashAward(award: RewardAward) {
+  if (award.cashAmountCents === null || !award.cashCurrency) {
+    return "Cash value unavailable";
+  }
+  return `${new Intl.NumberFormat("en-CA", {
+    currency: award.cashCurrency,
+    currencyDisplay: "narrowSymbol",
+    style: "currency",
+  }).format(award.cashAmountCents / 100)} ${award.cashCurrency}`;
 }
 
 function ClaimResult({ reward }: { reward: ClaimedReward }) {

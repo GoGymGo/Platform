@@ -390,6 +390,37 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.doesNotMatch(pilot, /DOWNLOAD SVG FOR PRINTING/);
   assert.match(pilot, /Sessions \+ incomplete visits/);
   assert.match(pilot, /owner|cash handoff/i);
+  assert.match(
+    pilot,
+    /Record only an already-completed in-person \$100 CAD handoff/,
+  );
+  assert.match(pilot, /does not send money or initiate a transfer/);
+  assert.match(pilot, /expectedVersion: award\.version/);
+  assert.match(pilot, /award\.cashAmountCents === 10000/);
+  assert.match(pilot, /award\.cashCurrency === "CAD"/);
+  assert.match(
+    pilot,
+    /No authoritative settled September cash Award is available/,
+  );
+  assert.match(
+    pilot,
+    /fulfilled with no cashFulfillmentId|!award\.cashFulfillmentId/,
+  );
+  for (const privatePaymentField of [
+    "bank",
+    "payee",
+    "card",
+    "wallet",
+    "tax",
+    "balance",
+    "transfer",
+    "provider",
+  ]) {
+    assert.doesNotMatch(
+      pilot,
+      new RegExp(`(?:^|\\s)name="${privatePaymentField}`, "i"),
+    );
+  }
   assert.match(pilot, /scope="col"/);
   assert.match(pilot, /scroll horizontally for more columns/);
   assert.doesNotMatch(pilot, /dangerouslySetInnerHTML/);

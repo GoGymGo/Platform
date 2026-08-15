@@ -14,6 +14,8 @@ export const septemberCampaign = {
     "The app confirms current availability. Registration can close when the Contest ends, reaches an entrant cap, or is cancelled.",
   reward: "$100 CAD",
   rewardSponsor: "GoGymGo",
+  rewardAvailabilityNote:
+    "The member app and published Official Contest Rules are authoritative. The reward is available only after the approved September Contest and reward are published.",
   startDate: "September 1, 2026 at 12:00 a.m. PDT",
   supportedIslands: [
     "Denman Island",

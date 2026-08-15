@@ -158,6 +158,8 @@ export class AdminDashboardService {
               'reward.available_from',
               'reward.available_until',
               'reward.claim_url',
+              'reward.cash_amount_cents',
+              'reward.cash_currency',
               'reward.competition_id',
               'reward.description',
               'reward.display_order',
@@ -189,15 +191,30 @@ export class AdminDashboardService {
             .execute(),
           transaction
             .selectFrom('reward_awards as award')
-            .innerJoin(
-              'reward_catalog_items as reward',
-              'reward.id',
-              'award.reward_catalog_item_id',
+            .innerJoin('competition_draws as draw', 'draw.id', 'award.draw_id')
+            .innerJoin('draw_reward_slots as slot', (join) =>
+              join
+                .onRef('slot.draw_id', '=', 'award.draw_id')
+                .onRef('slot.slot_position', '=', 'award.award_rank'),
             )
-            .innerJoin(
-              'profiles as profile',
-              'profile.user_id',
-              'award.user_id',
+            .innerJoin('draw_reward_catalog_snapshots as reward', (join) =>
+              join
+                .onRef('reward.draw_id', '=', 'slot.draw_id')
+                .onRef(
+                  'reward.reward_catalog_item_id',
+                  '=',
+                  'slot.reward_catalog_item_id',
+                ),
+            )
+            .innerJoin('draw_public_identities as identity', (join) =>
+              join
+                .onRef('identity.draw_id', '=', 'award.draw_id')
+                .onRef('identity.user_id', '=', 'award.user_id'),
+            )
+            .leftJoin(
+              'cash_fulfillments as cash',
+              'cash.reward_award_id',
+              'award.id',
             )
             .select([
               'award.id',
@@ -209,7 +226,11 @@ export class AdminDashboardService {
               'award.reward_catalog_item_id',
               'award.status',
               'award.version',
-              'profile.callsign as winner_callsign',
+              'cash.id as cash_fulfillment_id',
+              'draw.competition_id',
+              'identity.alias as winner_callsign',
+              'reward.cash_amount_cents',
+              'reward.cash_currency',
               'reward.reward_type',
               'reward.sponsor_name',
               'reward.title',
@@ -378,6 +399,8 @@ export class AdminDashboardService {
               availableFrom: reward.available_from?.toISOString() ?? null,
               availableUntil: reward.available_until?.toISOString() ?? null,
               claimUrl: reward.claim_url,
+              cashAmountCents: reward.cash_amount_cents,
+              cashCurrency: reward.cash_currency,
               competitionId: reward.competition_id,
               competitionName: reward.competition_name,
               couponCodeCount: coupons?.total ?? 0,
@@ -398,7 +421,11 @@ export class AdminDashboardService {
           rewardAwards: rewardAwards.map((award) => ({
             awardRank: award.award_rank,
             awardedAt: award.awarded_at.toISOString(),
+            cashAmountCents: award.cash_amount_cents,
+            cashCurrency: award.cash_currency,
+            cashFulfillmentId: award.cash_fulfillment_id,
             claimedAt: award.claimed_at?.toISOString() ?? null,
+            competitionId: award.competition_id,
             fulfilledAt: award.fulfilled_at?.toISOString() ?? null,
             id: award.id,
             redeemedAt: award.redeemed_at?.toISOString() ?? null,

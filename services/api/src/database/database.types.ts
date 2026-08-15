@@ -675,6 +675,8 @@ export interface DrawRewardCatalogSnapshotsTable {
   sponsor_name: string;
   title: string;
   reward_type: RewardType;
+  cash_amount_cents: number | null;
+  cash_currency: string | null;
   inventory_total: number;
   display_order: number;
   available_from: NullableTimestamp;
@@ -710,6 +712,8 @@ export interface RewardCatalogItemsTable {
   title: string;
   description: string;
   reward_type: RewardType;
+  cash_amount_cents: number | null;
+  cash_currency: string | null;
   status: RewardCatalogStatus;
   image_url: string | null;
   terms_url: string | null;
@@ -803,6 +807,7 @@ export interface InterestSubmissionsTable {
 export interface CashFulfillmentsTable {
   id: Generated<string>;
   reward_award_id: string;
+  reward_award_version: number;
   competition_id: string;
   winner_user_id: string;
   amount_cents: number;

@@ -112,6 +112,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
         { or: (values: unknown[]) => values },
       );
       const builder = {
+        execute: jest.fn(() => Promise.resolve(result ? [result] : [])),
         executeTakeFirst: jest.fn(() =>
           Promise.resolve(
             rewardAvailabilityFilterUsed && trackRewardAvailability

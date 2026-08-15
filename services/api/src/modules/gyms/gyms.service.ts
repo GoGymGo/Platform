@@ -17,6 +17,10 @@ import { LedgerService } from '../ledger/ledger.service';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
 import { canDeleteGym } from '../operator/admin-deletion-policy';
 import { ProfilesService } from '../profiles/profiles.service';
+import {
+  isSeptemberPilotCompetition,
+  septemberPilotCashReward,
+} from '../rewards/september-pilot-cash-policy';
 import type {
   CashFulfillmentRecordDto,
   CashFulfillmentRequestDto,
@@ -112,6 +116,18 @@ interface WaitlistEntryJson extends JsonObject {
   requestedRegion: string;
   source: string;
   status: string;
+}
+
+interface CashFulfillmentJson extends JsonObject {
+  amountCents: number;
+  competitionId: string;
+  currency: string;
+  fulfilledAt: string;
+  fulfillmentNote: string;
+  id: string;
+  rewardAwardId: string;
+  rewardAwardVersion: number;
+  winnerUserId: string;
 }
 
 interface PosterReward {
@@ -1534,31 +1550,76 @@ export class GymsService {
 
   recordCashFulfillment(
     principal: AuthenticatedPrincipal,
-    requestId: string,
+    idempotencyKey: string,
     input: CashFulfillmentRequestDto,
   ): Promise<CashFulfillmentRecordDto> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
-        const admin = await this.adminAuthorization.requireAdmin(
-          principal,
-          transaction,
-        );
+    const currency = input.currency.trim().toUpperCase();
+    const reason = input.reason.trim();
+    return this.idempotency.execute<
+      CashFulfillmentJson,
+      Awaited<ReturnType<AdminAuthorizationService['requireAdmin']>>
+    >(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: {
+          amountCents: input.amountCents,
+          currency,
+          expectedVersion: input.expectedVersion,
+          reason,
+          rewardAwardId: input.rewardAwardId,
+        },
+        responseCode: 201,
+        scope: `operator:cash-fulfillments:${input.rewardAwardId}`,
+      },
+      async (transaction, admin) => {
         const award = await transaction
           .selectFrom('reward_awards as award')
           .innerJoin('competition_draws as draw', 'draw.id', 'award.draw_id')
           .innerJoin(
-            'reward_catalog_items as reward',
-            'reward.id',
-            'award.reward_catalog_item_id',
+            'competitions as competition',
+            'competition.id',
+            'draw.competition_id',
+          )
+          .innerJoin(
+            'region_policies as region',
+            'region.id',
+            'competition.region_policy_id',
+          )
+          .innerJoin('draw_reward_slots as slot', (join) =>
+            join
+              .onRef('slot.draw_id', '=', 'award.draw_id')
+              .onRef('slot.slot_position', '=', 'award.award_rank'),
+          )
+          .innerJoin('draw_reward_catalog_snapshots as reward', (join) =>
+            join
+              .onRef('reward.draw_id', '=', 'slot.draw_id')
+              .onRef(
+                'reward.reward_catalog_item_id',
+                '=',
+                'slot.reward_catalog_item_id',
+              ),
           )
           .select([
+            'award.award_rank',
             'award.id',
+            'award.reward_catalog_item_id',
             'award.status',
             'award.user_id',
+            'award.version',
             'draw.competition_id',
             'draw.status as draw_status',
+            'competition.month_key',
+            'competition.name as competition_name',
+            'region.code as region_code',
+            'reward.available_slot_count',
+            'reward.cash_amount_cents',
+            'reward.cash_currency',
+            'reward.inventory_total',
             'reward.reward_type',
+            'reward.sponsor_name',
+            'reward.title',
+            'slot.reward_catalog_item_id as slot_reward_catalog_item_id',
           ])
           .where('award.id', '=', input.rewardAwardId)
           .forUpdate()
@@ -1575,13 +1636,35 @@ export class GymsService {
             message: 'Cash can be fulfilled only after the draw is settled.',
           });
         }
-        if (award.reward_type !== 'cash') {
+        const pilotIdentityMatches = isSeptemberPilotCompetition({
+          monthKey: award.month_key,
+          name: award.competition_name,
+          regionCode: award.region_code,
+        });
+        if (
+          !pilotIdentityMatches ||
+          award.reward_type !== septemberPilotCashReward.rewardType ||
+          award.sponsor_name !== septemberPilotCashReward.sponsorName ||
+          award.title !== septemberPilotCashReward.title ||
+          award.cash_amount_cents !== septemberPilotCashReward.amountCents ||
+          award.cash_currency !== septemberPilotCashReward.currency ||
+          award.inventory_total !== septemberPilotCashReward.inventoryTotal ||
+          award.available_slot_count !== 1 ||
+          award.slot_reward_catalog_item_id !== award.reward_catalog_item_id
+        ) {
           throw new ConflictException({
-            code: 'CASH_REWARD_REQUIRED',
-            message: 'Only a cash reward can use the cash handoff workflow.',
+            code: 'SEPTEMBER_PILOT_CASH_AWARD_REQUIRED',
+            message:
+              'Only the exact settled September pilot $100 CAD winning award can use this manual handoff workflow.',
           });
         }
-        if (award.status !== 'awarded' && award.status !== 'claimed') {
+        if (award.version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'REWARD_AWARD_VERSION_CONFLICT',
+            message: 'The reward award changed; reload it before retrying.',
+          });
+        }
+        if (award.status !== 'awarded') {
           throw new ConflictException({
             code: 'REWARD_AWARD_NOT_FULFILLABLE',
             message:
@@ -1590,7 +1673,9 @@ export class GymsService {
         }
         if (
           input.amountCents !== 10_000 ||
-          input.currency.trim().toUpperCase() !== 'CAD'
+          currency !== 'CAD' ||
+          input.amountCents !== award.cash_amount_cents ||
+          currency !== award.cash_currency
         ) {
           throw new BadRequestException({
             code: 'PILOT_CASH_AMOUNT_INVALID',
@@ -1610,11 +1695,12 @@ export class GymsService {
             fulfilled_by_user_id: admin.id,
             fulfillment_note: input.reason.trim(),
             reward_award_id: award.id,
+            reward_award_version: award.version,
             winner_user_id: award.user_id,
           })
           .returningAll()
           .executeTakeFirstOrThrow();
-        await transaction
+        const updatedAward = await transaction
           .updateTable('reward_awards')
           .set({
             claimed_at: now,
@@ -1624,7 +1710,16 @@ export class GymsService {
             version: sql<number>`version + 1`,
           })
           .where('id', '=', award.id)
-          .executeTakeFirstOrThrow();
+          .where('status', '=', 'awarded')
+          .where('version', '=', input.expectedVersion)
+          .returning('version')
+          .executeTakeFirst();
+        if (!updatedAward) {
+          throw new ConflictException({
+            code: 'REWARD_AWARD_VERSION_CONFLICT',
+            message: 'The reward award changed; reload it before retrying.',
+          });
+        }
         await this.adminAuthorization.audit(transaction, {
           action: 'cash_fulfillment.recorded',
           actorUserId: admin.id,
@@ -1634,13 +1729,21 @@ export class GymsService {
             amountCents: fulfillment.amount_cents,
             currency: fulfillment.currency,
             rewardAwardId: fulfillment.reward_award_id,
+            rewardAwardVersion: updatedAward.version,
+            recordedHandoffOnly: true,
           },
-          previousState: { rewardAwardStatus: award.status },
-          reason: input.reason,
-          requestId,
+          previousState: {
+            rewardAwardStatus: award.status,
+            rewardAwardVersion: award.version,
+          },
+          reason,
+          requestId: idempotencyKey,
         });
-        return this.mapFulfillment(fulfillment);
-      });
+        return this.mapFulfillment(fulfillment, updatedAward.version);
+      },
+      (transaction) =>
+        this.adminAuthorization.requireAdmin(principal, transaction),
+    );
   }
 
   listAuditHistory(
@@ -2064,16 +2167,20 @@ export class GymsService {
     };
   }
 
-  private mapFulfillment(fulfillment: {
-    amount_cents: number;
-    competition_id: string;
-    currency: string;
-    fulfilled_at: Date;
-    fulfillment_note: string;
-    id: string;
-    reward_award_id: string;
-    winner_user_id: string;
-  }): CashFulfillmentRecordDto {
+  private mapFulfillment(
+    fulfillment: {
+      amount_cents: number;
+      competition_id: string;
+      currency: string;
+      fulfilled_at: Date;
+      fulfillment_note: string;
+      id: string;
+      reward_award_id: string;
+      reward_award_version?: number;
+      winner_user_id: string;
+    },
+    rewardAwardVersion = fulfillment.reward_award_version ?? 1,
+  ): CashFulfillmentJson {
     return {
       amountCents: fulfillment.amount_cents,
       competitionId: fulfillment.competition_id,
@@ -2082,6 +2189,7 @@ export class GymsService {
       fulfillmentNote: fulfillment.fulfillment_note,
       id: fulfillment.id,
       rewardAwardId: fulfillment.reward_award_id,
+      rewardAwardVersion,
       winnerUserId: fulfillment.winner_user_id,
     };
   }

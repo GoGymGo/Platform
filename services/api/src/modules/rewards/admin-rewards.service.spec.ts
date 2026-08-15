@@ -71,6 +71,33 @@ describe('AdminRewardsService validation', () => {
     );
   });
 
+  it('requires bounded cash value and a manual-only fulfillment path', () => {
+    const cashReward = {
+      ...physicalReward,
+      cashAmountCents: 10000,
+      cashCurrency: 'CAD',
+      claimUrl: undefined,
+      fulfillmentInstructions: 'Hand cash to the settled winner in person.',
+      rewardType: RewardTypeDto.CASH,
+    };
+    expectBadRequest(
+      () =>
+        service.create(principal, 'cash-wrong-value', {
+          ...cashReward,
+          cashAmountCents: undefined,
+        }),
+      'CASH_REWARD_VALUE_REQUIRED',
+    );
+    expectBadRequest(
+      () =>
+        service.create(principal, 'cash-claim-url', {
+          ...cashReward,
+          claimUrl: 'https://provider.example.test/claim',
+        }),
+      'CASH_REWARD_MANUAL_HANDOFF_REQUIRED',
+    );
+  });
+
   it('requires a specific audit reason', () => {
     expectBadRequest(
       () =>

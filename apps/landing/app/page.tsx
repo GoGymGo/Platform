@@ -39,8 +39,8 @@ const readinessFacts = [
 
 const transparencyFacts = [
   {
-    title: "ONE DISCLOSED REWARD",
-    copy: `The September pilot has one ${septemberCampaign.reward} reward sponsored by ${septemberCampaign.rewardSponsor}. No outside brand sponsors the current reward.`,
+    title: "ONE PLANNED REWARD",
+    copy: `If the approved September Contest is published, its configuration permits exactly one ${septemberCampaign.reward} cash reward sponsored by ${septemberCampaign.rewardSponsor}. Check the member app and Official Contest Rules for authoritative availability.`,
   },
   {
     title: "NO PURCHASE REQUIRED",
@@ -84,9 +84,10 @@ function SeptemberCompetitionPanel() {
         <span>CONTEST SNAPSHOT</span>
       </div>
       <div className="pilot-console__reward">
-        <span>ONE PUBLISHED REWARD</span>
+        <span>PLANNED REWARD — CHECK APP</span>
         <strong>{septemberCampaign.reward}</strong>
         <p>Sponsored by {septemberCampaign.rewardSponsor}</p>
+        <p>{septemberCampaign.rewardAvailabilityNote}</p>
       </div>
       <div className="pilot-console__window">
         <span>CONTEST WINDOW</span>

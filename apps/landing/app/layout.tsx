@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const socialDescription =
     campaignState.phase === "ended"
       ? "The September 2026 beta has ended. Review the pilot and request future Regional updates."
-      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. One ${septemberCampaign.reward} Reward.`;
+      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. Planned ${septemberCampaign.reward} Reward; check the app and rules for availability.`;
 
   return {
     metadataBase,

@@ -490,6 +490,8 @@ function journeyResponse(path: string, method: string): unknown {
         {
           alias: "PILOT_MEMBER",
           awardRank: 1,
+          cashAmountCents: null,
+          cashCurrency: null,
           rewardTitle: "Recovery Kit",
           rewardType: "physical",
           sponsorName: "GoGymGo",
@@ -504,7 +506,10 @@ function journeyResponse(path: string, method: string): unknown {
       {
         awardRank: 1,
         awardedAt: "2026-09-01T08:00:00.000Z",
+        cashAmountCents: null,
+        cashCurrency: null,
         claimedAt: null,
+        fulfilledAt: null,
         id: awardId,
         imageUrl: null,
         rewardType: "physical",
@@ -518,10 +523,13 @@ function journeyResponse(path: string, method: string): unknown {
     return {
       awardRank: 1,
       awardedAt: "2026-09-01T08:00:00.000Z",
+      cashAmountCents: null,
+      cashCurrency: null,
       claimUrl: null,
       claimedAt: "2026-09-01T08:05:00.000Z",
       couponCode: null,
       fulfillmentInstructions: "Collect at the partner gym.",
+      fulfilledAt: null,
       id: awardId,
       imageUrl: null,
       rewardType: "physical",

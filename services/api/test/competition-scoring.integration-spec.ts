@@ -579,6 +579,8 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
             availableFrom: new Date('2026-07-01T00:00:00.000Z'),
             availableUntil: new Date('2026-08-31T23:59:59.000Z'),
             catalogVersion: 2,
+            cashAmountCents: null,
+            cashCurrency: null,
             displayOrder: 1,
             inventoryTotal: 1,
             rewardCatalogItemId: drawReward.rows[0].id,

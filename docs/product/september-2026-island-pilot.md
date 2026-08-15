@@ -56,11 +56,14 @@ The generated GeoJSON is stored at
 - Contest QR flow: scan once to select the Partner gym, then use fresh start and finish location checks around the 30-minute workout
 - Completion period: a workout started in time may finish up to 15 minutes after the competition ends
 - Session expiry: the earlier of four hours or the completion-period deadline; a missing finish location check earns no credit
-- Reward: one $100 CAD cash reward sponsored by GoGymGo
+- Reward: exactly one $100 CAD cash reward sponsored by GoGymGo, with one
+  inventory unit and one settled draw slot
 
-The competition remains a draft until at least one real, in-stock reward has
-been created and published. Do not use placeholder sponsor, prize, coupon or
-fulfillment data to bypass this publication gate.
+The competition remains a draft until the exact real cash reward has been
+created and published with immutable `10000`-cent/CAD value, approved public
+image and terms, and manual-handoff instructions. Do not use placeholder
+sponsor, prize, asset, provider, coupon or fulfillment data to bypass this
+publication gate.
 
 ## Rebuild and verify
 
@@ -78,6 +81,9 @@ has been bootstrapped:
 ```powershell
 $env:APPLY_PILOT_CONFIGURATION = 'yes'
 $env:CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256 = '<exact digest printed by the command>'
+$env:PILOT_REWARD_IMAGE_URL = '<approved public HTTPS image URL>'
+$env:PILOT_REWARD_TERMS_URL = '<approved public HTTPS reward terms URL>'
+$env:CONFIRM_PILOT_REWARD_APPROVAL_SHA256 = '<exact reward digest printed by the command>'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
 
@@ -85,9 +91,12 @@ The configuration command is idempotent for the region policy and competition
 month. Its first apply attempt prints the exact canonical public legal
 configuration SHA-256 and refuses publication. After the configured owner and
 counsel approve that exact content, rerun with the digest in
-`CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256`. A content change produces a different
-digest and requires new approval. The command uses the backend's audited
-operator services for database writes.
+`CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256`. The reward image, terms, exact amount,
+currency, sponsor, inventory, and manual instructions have a separate canonical
+digest in `CONFIRM_PILOT_REWARD_APPROVAL_SHA256`; changing any approved value
+requires a new digest. These examples are intentionally placeholders and must
+not be copied into a real apply. The command uses the backend's audited operator
+services for database writes.
 
 After the real gym has been assigned and the legal, reward and UAT gates pass,
 publish the competition through the same audited competition service.
@@ -96,6 +105,9 @@ Publication immediately opens registration:
 ```powershell
 $env:APPLY_PILOT_CONFIGURATION = 'yes'
 $env:CONFIRM_PUBLIC_LEGAL_APPROVAL_SHA256 = '<same approved exact digest>'
+$env:PILOT_REWARD_IMAGE_URL = '<same approved public HTTPS image URL>'
+$env:PILOT_REWARD_TERMS_URL = '<same approved public HTTPS reward terms URL>'
+$env:CONFIRM_PILOT_REWARD_APPROVAL_SHA256 = '<same approved reward digest>'
 $env:PUBLISH_PILOT_COMPETITION = 'yes'
 npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 ```
@@ -103,3 +115,9 @@ npm.cmd run configure:september-2026-island-pilot --workspace @gogymgo/api
 The command creates and publishes the sole real $100 CAD cash reward and refuses
 to publish if any additional pilot reward is published. It never creates
 placeholder sponsor or fulfillment data.
+
+The settled draw snapshot freezes the title, sponsor, cash value, currency and
+slot. The winner sees that snapshot in Winners Circle and My Rewards. Cash is
+handed over outside the software, in person. The authorized admin action only
+records an already-completed handoff once; it does not initiate a transfer,
+contact a payout provider, or collect bank, card, wallet, payee or tax data.

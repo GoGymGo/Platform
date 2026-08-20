@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `fef37d9a552ecb68b90b57d13f7b0082234172ae` after PR #103 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-024 — September pilot cash reward`
-  on `agent/ggg-024-pilot-cash-fulfillment`; creation follows this ledger merge.
+  `5886931dea855f4a60ddbac94d0c2d38e18ba9d6` after PR #105 on 2026-08-15.
+- Active feature task: `GoGymGo Feature GGG-021 — Administrative configuration`
+  on `agent/ggg-021-administrative-configuration`; creation follows this ledger
+  merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 40 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 41 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -808,21 +809,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   admin-only audited manual fulfillment.
 - External providers / feature flag: no payment provider; pilot configuration is
   explicit and idempotent.
-- Current implementation / missing behavior: sole-reward publication guard and
-  manual fulfillment record exist. A fresh task must prove that the exact pilot
-  exception consumes only authoritative GGG-016 settled results, permits no
-  payment/wallet/bank data or automated payout, keeps fulfillment admin-only and
-  audited/idempotent, and presents consistent conditional copy without implying
-  an unapproved live cash offer. Final legal/financial approval and real reward
-  configuration remain external and must fail closed.
-- Required tests / operations / cloud dependency: exactly-one reward, no wallet/
-  payout schema, fair settlement, duplicate fulfillment, public copy consistency,
-  manual receipt/audit; real approved reward and staging database.
+- Current implementation / missing behavior: the exact September pilot policy
+  now binds one published GoGymGo-sponsored 10000-cent CAD manual-only reward to
+  the approved competition, assets, terms, draw reward slot, settled award, and
+  immutable public snapshot. Database constraints preserve the live sole reward
+  and its amount/currency and enforce one append-only handoff linked to the exact
+  winner/slot. The admin route reauthorizes the database admin on every replay,
+  uses body-bound idempotency and optimistic award versioning, and atomically
+  records the handoff, award transition, and minimized audit; generic cash
+  fulfillment is rejected. Member/admin projections are authoritative and
+  privacy-limited, landing copy fails closed until availability is proven, and
+  no payment, wallet, bank, payee, tax, transfer, webhook, or provider boundary
+  exists. No known repository behavior remains missing for this duty.
+- Required tests / operations / cloud dependency: exact pilot/reward/snapshot/
+  winner linkage, amount/currency, admin denial, version conflict, stable retry,
+  concurrency, rollback, append-only audit, privacy export, copy/source/provider
+  boundaries, and full migrated PostgreSQL suite; real approved reward assets,
+  legal/financial approval, and staging database rehearsal remain external.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-024 — September pilot cash
-  reward`; branch `agent/ggg-024-pilot-cash-fulfillment`; PR/merge `pending`;
-  status `IN_PROGRESS`.
-- Residual risks / blocker: legal/financial authority for the cash reward and
-  winner fulfillment is outside repository authority.
+  reward`; branch `agent/ggg-024-pilot-cash-fulfillment` (deleted after merge);
+  PR `#105`; merge `5886931dea855f4a60ddbac94d0c2d38e18ba9d6`;
+  status `COMPLETE`.
+- Residual risks / blocker: final legal/financial approval, approved public
+  assets/terms and real reward configuration, plus a separately authorized
+  staging settlement and in-person handoff rehearsal remain release gates. The
+  repository stays fail closed meanwhile; no cloud or money movement occurred.
 
 ### GGG-025 — Public marketing, product demo, and join conversion
 
@@ -1110,6 +1121,19 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-15 — Completed `GGG-024` through PR #105. Exact tested head
+  `c5bfb50c6fc0fff8f998dd0d80296bafbe2553b9` was squash-merged as
+  `5886931dea855f4a60ddbac94d0c2d38e18ba9d6`; all seven PR checks and all six
+  exact-main workflows passed, the remote branch was deleted, and there was no
+  cloud or payment-provider impact. Serial validation included the complete
+  repository gate, 298 API unit tests, 28 API E2E tests, 244 member tests, 37
+  admin tests, 15 landing tests, the focused five-case cash workflow and 70
+  database integration tests across 11 suites. Authorized Docker gates ran one
+  at a time and cleaned fully. Dependency ordering assigns launch-critical P0
+  `GGG-021` next because the consolidated administrative configuration duty is
+  the remaining authoritative operator prerequisite for staging; real legal/
+  financial approval and production configuration remain outside repository
+  authority. Future Docker use again pauses for user direction.
 - 2026-08-14 — Completed `GGG-016` through PR #103. Exact tested head
   `16d6968cfc4009a9199d462ce327be18cfdfc6b6` was squash-merged as
   `fef37d9a552ecb68b90b57d13f7b0082234172ae`; all seven PR checks and all six

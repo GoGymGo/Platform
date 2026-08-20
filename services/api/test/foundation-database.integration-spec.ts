@@ -476,6 +476,7 @@ describeWithDatabase('database migrations', () => {
         'reward_catalog_row_integrity',
         'reward_coupon_code_integrity',
         'privacy_request_events_append_only',
+        'privacy_request_transition_integrity',
         'session_events_append_only',
         'workout_sessions_scoring_identity',
       ]),
@@ -511,16 +512,18 @@ describeWithDatabase('database migrations', () => {
        RETURNING id`,
     );
     const privacyRequest = await pool.query<{ id: string }>(
-      `INSERT INTO privacy_requests (user_id, request_type)
-       VALUES ($1, 'export')
+      `INSERT INTO privacy_requests
+         (user_id, request_type, confirmation_code, confirmed_at)
+       VALUES ($1, 'export', 'EXPORT_MY_DATA', current_timestamp)
        RETURNING id`,
       [user.rows[0].id],
     );
 
     await expect(
       pool.query(
-        `INSERT INTO privacy_requests (user_id, request_type)
-         VALUES ($1, 'delete')`,
+        `INSERT INTO privacy_requests
+           (user_id, request_type, confirmation_code, confirmed_at)
+         VALUES ($1, 'delete', 'DELETE_MY_ACCOUNT', current_timestamp)`,
         [user.rows[0].id],
       ),
     ).rejects.toThrow(/privacy_requests_one_active_per_user/i);
@@ -538,6 +541,56 @@ describeWithDatabase('database migrations', () => {
         [event.rows[0].id],
       ),
     ).rejects.toThrow(/append-only/i);
+  });
+
+  it('requires exact privacy confirmation and versioned lifecycle transitions', async () => {
+    const user = await pool.query<{ id: string }>(
+      `INSERT INTO users (firebase_uid)
+       VALUES ('privacy-confirmation-user')
+       RETURNING id`,
+    );
+    await expect(
+      pool.query(
+        `INSERT INTO privacy_requests
+           (user_id, request_type, confirmation_code, confirmed_at)
+         VALUES ($1, 'delete', 'EXPORT_MY_DATA', current_timestamp)`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/privacy_requests_confirmation_matches_operation/i);
+
+    const request = await pool.query<{ id: string }>(
+      `INSERT INTO privacy_requests
+         (user_id, request_type, confirmation_code, confirmed_at)
+       VALUES ($1, 'delete', 'DELETE_MY_ACCOUNT', current_timestamp)
+       RETURNING id`,
+      [user.rows[0].id],
+    );
+    await expect(
+      pool.query(
+        `UPDATE privacy_requests SET status = 'processing' WHERE id = $1`,
+        [request.rows[0].id],
+      ),
+    ).rejects.toThrow(/status transition must advance version/i);
+    await pool.query(
+      `UPDATE privacy_requests
+       SET status = 'processing', version = version + 1
+       WHERE id = $1`,
+      [request.rows[0].id],
+    );
+    await pool.query(
+      `UPDATE privacy_requests
+       SET status = 'rejected', version = version + 1
+       WHERE id = $1`,
+      [request.rows[0].id],
+    );
+    await expect(
+      pool.query(
+        `UPDATE privacy_requests
+         SET status = 'processing', version = version + 1
+         WHERE id = $1`,
+        [request.rows[0].id],
+      ),
+    ).rejects.toThrow(/terminal privacy request status is immutable/i);
   });
 
   it('constrains profile-media sizes and moderated states', async () => {

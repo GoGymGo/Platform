@@ -12,7 +12,10 @@ import {
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
 import { getUserFacingErrorMessage } from '@/components/reliability';
-import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
+import {
+  BrandScreenHeader,
+  brandScreenStyles
+} from '@/components/screenLayout';
 import { spacing } from '@/constants/theme';
 import { useAppData } from '@/data/appDataHooks';
 import type { PrivacyRequest } from '@/domain/accountSettings';
@@ -21,7 +24,9 @@ import { goBackOrReplace } from '@/navigation/goBack';
 export default function AccountDataScreen() {
   const router = useRouter();
   const { accountSettings } = useAppData();
-  const [busyAction, setBusyAction] = useState<'delete' | 'export' | null>(null);
+  const [busyAction, setBusyAction] = useState<'delete' | 'export' | null>(
+    null
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -29,13 +34,22 @@ export default function AccountDataScreen() {
     queryFn: () => accountSettings.listPrivacyRequests(),
     queryKey: ['privacy-requests']
   });
+  const capabilitiesQuery = useQuery({
+    queryFn: () => accountSettings.getPrivacyCapabilities(),
+    queryKey: ['privacy-capabilities']
+  });
   const requests: readonly PrivacyRequest[] = requestsQuery.data ?? [];
+  const requestCreationAvailable =
+    capabilitiesQuery.data?.requestCreationAvailable === true;
 
   async function createRequest(requestType: 'delete' | 'export') {
     setBusyAction(requestType);
     setMessage(null);
     try {
-      await accountSettings.createPrivacyRequest(requestType);
+      await accountSettings.createPrivacyRequest(
+        requestType,
+        requestType === 'delete' ? 'DELETE_MY_ACCOUNT' : 'EXPORT_MY_DATA'
+      );
       setConfirmDelete(false);
       setMessage(
         requestType === 'export'
@@ -78,6 +92,36 @@ export default function AccountDataScreen() {
           title="PRIVACY REQUESTS"
         />
 
+        {capabilitiesQuery.isPending ? (
+          <TerminalText
+            live="polite"
+            tone="dim"
+            uppercase={false}
+            variant="body"
+          >
+            Checking privacy operation availability...
+          </TerminalText>
+        ) : capabilitiesQuery.isError ? (
+          <HUDBorderBox style={styles.emptyCard} tone="red">
+            <TerminalText tone="red" uppercase={false} variant="body">
+              Privacy operation availability could not be verified. Requests are
+              disabled until the check succeeds.
+            </TerminalText>
+            <CyberButtonOutline
+              label="TRY AGAIN"
+              onPress={() => void capabilitiesQuery.refetch()}
+              tone="red"
+            />
+          </HUDBorderBox>
+        ) : !requestCreationAvailable ? (
+          <HUDBorderBox style={styles.emptyCard} tone="amber">
+            <TerminalText tone="amber" uppercase={false} variant="body">
+              Privacy export and deletion processing is not available in this
+              deployment. No request will be submitted.
+            </TerminalText>
+          </HUDBorderBox>
+        ) : null}
+
         <HUDBorderBox style={styles.actionCard} tone="cyan">
           <TerminalText tone="cyan" variant="label">
             EXPORT MY DATA
@@ -87,8 +131,10 @@ export default function AccountDataScreen() {
             link is short-lived and available only to your signed-in account.
           </TerminalText>
           <CyberButtonOutline
-            disabled={busyAction !== null}
-            label={busyAction === 'export' ? 'REQUESTING...' : 'REQUEST DATA EXPORT'}
+            disabled={busyAction !== null || !requestCreationAvailable}
+            label={
+              busyAction === 'export' ? 'REQUESTING...' : 'REQUEST DATA EXPORT'
+            }
             onPress={() => void createRequest('export')}
           />
         </HUDBorderBox>
@@ -104,14 +150,18 @@ export default function AccountDataScreen() {
           {confirmDelete ? (
             <View style={styles.confirmActions}>
               <CyberButtonOutline
-                disabled={busyAction !== null}
+                disabled={busyAction !== null || !requestCreationAvailable}
                 label="KEEP ACCOUNT"
                 onPress={() => setConfirmDelete(false)}
                 style={styles.confirmButton}
               />
               <CyberButtonOutline
-                disabled={busyAction !== null}
-                label={busyAction === 'delete' ? 'SUBMITTING...' : 'CONFIRM DELETE REQUEST'}
+                disabled={busyAction !== null || !requestCreationAvailable}
+                label={
+                  busyAction === 'delete'
+                    ? 'SUBMITTING...'
+                    : 'CONFIRM DELETE REQUEST'
+                }
                 onPress={() => void createRequest('delete')}
                 style={styles.confirmButton}
                 tone="red"
@@ -119,7 +169,7 @@ export default function AccountDataScreen() {
             </View>
           ) : (
             <CyberButtonOutline
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || !requestCreationAvailable}
               label="REQUEST ACCOUNT DELETION"
               onPress={() => setConfirmDelete(true)}
               tone="red"
@@ -128,7 +178,13 @@ export default function AccountDataScreen() {
         </HUDBorderBox>
 
         {message ? (
-          <TerminalText live="polite" style={styles.message} tone="amber" uppercase={false} variant="caption">
+          <TerminalText
+            live="polite"
+            style={styles.message}
+            tone="amber"
+            uppercase={false}
+            variant="caption"
+          >
             {message}
           </TerminalText>
         ) : null}
@@ -143,7 +199,8 @@ export default function AccountDataScreen() {
         ) : requestsQuery.isError ? (
           <HUDBorderBox style={styles.emptyCard} tone="red">
             <TerminalText tone="red" uppercase={false} variant="body">
-              Privacy request history could not load. Check your connection and try again.
+              Privacy request history could not load. Check your connection and
+              try again.
             </TerminalText>
             <CyberButtonOutline
               label="TRY AGAIN"
@@ -157,31 +214,66 @@ export default function AccountDataScreen() {
               You have no account-data requests.
             </TerminalText>
           </HUDBorderBox>
-        ) : requests.map((request) => (
-          <HUDBorderBox key={request.id} style={styles.requestCard} tone="muted">
-            <View style={styles.requestHeader}>
-              <TerminalText tone="text" variant="label">
-                {request.requestType === 'export' ? 'DATA EXPORT' : 'ACCOUNT DELETION'}
+        ) : (
+          requests.map((request) => (
+            <HUDBorderBox
+              key={request.id}
+              style={styles.requestCard}
+              tone="muted"
+            >
+              <View style={styles.requestHeader}>
+                <TerminalText tone="text" variant="label">
+                  {request.requestType === 'export'
+                    ? 'DATA EXPORT'
+                    : 'ACCOUNT DELETION'}
+                </TerminalText>
+                <TerminalText
+                  glow={request.status === 'completed'}
+                  tone={
+                    request.failureCode || request.status === 'rejected'
+                      ? 'red'
+                      : request.status === 'completed'
+                        ? 'green'
+                        : 'amber'
+                  }
+                  variant="micro"
+                >
+                  {request.failureCode
+                    ? 'FAILED — RETRY SCHEDULED'
+                    : request.status.replace('_', ' ')}
+                </TerminalText>
+              </View>
+              <TerminalText tone="dim" uppercase={false} variant="caption">
+                Requested {new Date(request.requestedAt).toLocaleString()}
               </TerminalText>
-              <TerminalText
-                glow={request.status === 'completed'}
-                tone={request.status === 'completed' ? 'green' : 'amber'}
-                variant="micro"
-              >
-                {request.status.replace('_', ' ')}
-              </TerminalText>
-            </View>
-            <TerminalText tone="dim" uppercase={false} variant="caption">
-              Requested {new Date(request.requestedAt).toLocaleString()}
-            </TerminalText>
-            {request.downloadAvailable ? (
-              <CyberButtonOutline
-                label="OPEN PRIVATE DOWNLOAD"
-                onPress={() => void downloadExport(request.id)}
-              />
-            ) : null}
-          </HUDBorderBox>
-        ))}
+              {request.nextAttemptAt ? (
+                <TerminalText tone="red" uppercase={false} variant="caption">
+                  Processing failed safely. The server will retry after{' '}
+                  {new Date(request.nextAttemptAt).toLocaleString()}.
+                </TerminalText>
+              ) : null}
+              {request.requestType === 'export' && request.exportExpiresAt ? (
+                <TerminalText tone="dim" uppercase={false} variant="caption">
+                  Private export expires{' '}
+                  {new Date(request.exportExpiresAt).toLocaleString()}.
+                </TerminalText>
+              ) : null}
+              {request.requestType === 'delete' &&
+              request.status === 'processing' ? (
+                <TerminalText tone="amber" uppercase={false} variant="caption">
+                  Deletion is being processed. Your account remains available
+                  unless and until secure processing completes.
+                </TerminalText>
+              ) : null}
+              {request.downloadAvailable ? (
+                <CyberButtonOutline
+                  label="OPEN PRIVATE DOWNLOAD"
+                  onPress={() => void downloadExport(request.id)}
+                />
+              ) : null}
+            </HUDBorderBox>
+          ))
+        )}
       </ScreenScrollView>
     </ScreenContainer>
   );

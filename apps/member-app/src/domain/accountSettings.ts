@@ -2,13 +2,21 @@ export const devicePresenceConsentVersion = '2026-07-05';
 
 export type PrivacyRequest = {
   completedAt: string | null;
+  confirmedAt: string | null;
   downloadAvailable: boolean;
   exportExpiresAt: string | null;
   failureCode: string | null;
   id: string;
+  nextAttemptAt: string | null;
   requestedAt: string;
   requestType: 'delete' | 'export';
   status: 'completed' | 'processing' | 'rejected' | 'requested';
+  version: number;
+};
+
+export type PrivacyCapabilities = {
+  requestCreationAvailable: boolean;
+  status: 'disabled' | 'enabled';
 };
 
 export type PrivacyDownloadAction = {
@@ -43,7 +51,8 @@ export type AvatarMedia = {
   id: string;
   readUrl: string | null;
   readUrlExpiresAt: string | null;
-  status: 'approved' | 'pending_review' | 'pending_upload' | 'rejected' | 'removed';
+  status:
+    'approved' | 'pending_review' | 'pending_upload' | 'rejected' | 'removed';
 };
 
 export type AvatarState = {

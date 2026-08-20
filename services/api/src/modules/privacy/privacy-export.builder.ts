@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeDateKey } from '../../database/date-key';
 import { DatabaseService } from '../../database/database.service';
+import type { JsonValue } from '../../database/database.types';
 import type { ClaimedPrivacyJob } from './privacy-operations.types';
 import { PrivacyOperationError } from './privacy-operations.types';
+import { privacyExportSchemaVersion } from './privacy-data-map';
 
 @Injectable()
 export class PrivacyExportBuilder {
@@ -15,7 +17,7 @@ export class PrivacyExportBuilder {
       .execute(async (transaction) => {
         const request = await transaction
           .selectFrom('privacy_requests')
-          .select(['id', 'requested_at'])
+          .select(['id', 'processing_started_at', 'requested_at'])
           .where('id', '=', job.id)
           .where('user_id', '=', job.userId)
           .where('status', '=', 'processing')
@@ -79,7 +81,6 @@ export class PrivacyExportBuilder {
             'verification.status',
             'verification.evidence_metadata',
             'verification.policy_version',
-            'verification.decision_reason',
             'verification.verified_at',
             'verification.expires_at',
             'verification.created_at',
@@ -171,6 +172,7 @@ export class PrivacyExportBuilder {
             'bundle.jurisdiction_code',
             'bundle.locale',
             'bundle.bundle_sha256',
+            'bundle.acceptance_context_at',
             'bundle.accepted_at as bundle_accepted_at',
             'document.document_key',
             'document.version',
@@ -178,11 +180,26 @@ export class PrivacyExportBuilder {
             'document.content_sha256',
             'document.effective_at',
             'receipt.receipt_action',
+            'receipt.presented_content_sha256',
             'receipt.accepted_at',
           ])
           .where('bundle.user_id', '=', job.userId)
           .orderBy('bundle.accepted_at')
           .orderBy('document.document_key')
+          .execute();
+
+        const accountVerificationConsents = await transaction
+          .selectFrom('account_verification_consent_events')
+          .select([
+            'id',
+            'consent_key',
+            'consent_version',
+            'action',
+            'created_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('created_at')
+          .orderBy('id')
           .execute();
 
         const sessions = await transaction
@@ -196,7 +213,6 @@ export class PrivacyExportBuilder {
             'client_started_at',
             'started_at',
             'completed_at',
-            'verification_summary',
             'created_at',
             'updated_at',
           ])
@@ -224,6 +240,22 @@ export class PrivacyExportBuilder {
           .orderBy('event.received_at')
           .execute();
 
+        const gymScanEvents = await transaction
+          .selectFrom('gym_scan_events')
+          .select([
+            'id',
+            'session_id',
+            'gym_location_id',
+            'credential_version',
+            'scan_type',
+            'outcome',
+            'server_timestamp',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('server_timestamp')
+          .orderBy('id')
+          .execute();
+
         const progress = await transaction
           .selectFrom('competition_progress')
           .select([
@@ -236,6 +268,28 @@ export class PrivacyExportBuilder {
             'updated_at',
           ])
           .where('user_id', '=', job.userId)
+          .orderBy('competition_id')
+          .execute();
+
+        const settlementInputs = await transaction
+          .selectFrom('competition_settlement_inputs')
+          .select([
+            'draw_id',
+            'competition_id',
+            'enrollment_id',
+            'goal_days',
+            'verified_days',
+            'longest_streak',
+            'category_score',
+            'category_rank',
+            'prize_draw_entries',
+            'rules_version',
+            'snapshot_position',
+            'created_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('created_at')
+          .orderBy('draw_id')
           .execute();
 
         const entryLedger = await transaction
@@ -250,7 +304,6 @@ export class PrivacyExportBuilder {
             'category_score_delta',
             'prize_draw_entries_delta',
             'policy_version',
-            'metadata',
             'created_at',
           ])
           .where('user_id', '=', job.userId)
@@ -278,6 +331,28 @@ export class PrivacyExportBuilder {
           .orderBy('created_at')
           .execute();
 
+        const matchParticipants = await transaction
+          .selectFrom('competition_match_participants as participant')
+          .innerJoin(
+            'competition_matches as match',
+            'match.id',
+            'participant.match_id',
+          )
+          .select([
+            'participant.match_id',
+            'participant.competition_id',
+            'participant.period_index',
+            'participant.participant_role',
+            'participant.active',
+            'match.status',
+            'match.created_at',
+            'match.settled_at',
+          ])
+          .where('participant.user_id', '=', job.userId)
+          .orderBy('match.created_at')
+          .orderBy('participant.match_id')
+          .execute();
+
         const drawEntries = await transaction
           .selectFrom('draw_entries as entry')
           .innerJoin('competition_draws as draw', 'draw.id', 'entry.draw_id')
@@ -294,6 +369,23 @@ export class PrivacyExportBuilder {
           ])
           .where('entry.user_id', '=', job.userId)
           .orderBy('entry.created_at')
+          .execute();
+
+        const drawPublicIdentities = await transaction
+          .selectFrom('draw_public_identities')
+          .select([
+            'draw_id',
+            'alias',
+            'streak_daily',
+            'streak_weekly',
+            'streak_monthly',
+            'streak_yearly',
+            'streak_projection_version',
+            'created_at',
+          ])
+          .where('user_id', '=', job.userId)
+          .orderBy('created_at')
+          .orderBy('draw_id')
           .execute();
 
         const rewardAwards = await transaction
@@ -333,6 +425,22 @@ export class PrivacyExportBuilder {
           .orderBy('award.awarded_at')
           .execute();
 
+        const cashFulfillments = await transaction
+          .selectFrom('cash_fulfillments')
+          .select([
+            'id',
+            'reward_award_id',
+            'competition_id',
+            'amount_cents',
+            'currency',
+            'fulfilled_at',
+            'created_at',
+          ])
+          .where('winner_user_id', '=', job.userId)
+          .orderBy('created_at')
+          .orderBy('id')
+          .execute();
+
         const partnerApplications = await transaction
           .selectFrom('partner_applications')
           .select([
@@ -357,7 +465,6 @@ export class PrivacyExportBuilder {
             'payload',
             'status',
             'attempt_count',
-            'last_error',
             'scheduled_at',
             'sent_at',
             'created_at',
@@ -365,6 +472,70 @@ export class PrivacyExportBuilder {
           ])
           .where('user_id', '=', job.userId)
           .orderBy('created_at')
+          .execute();
+
+        const gymPartnerAssignments = await transaction
+          .selectFrom('gym_partner_assignments as assignment')
+          .innerJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'assignment.gym_location_id',
+          )
+          .select([
+            'assignment.gym_location_id',
+            'assignment.access_level',
+            'assignment.active',
+            'assignment.created_at',
+            'assignment.updated_at',
+            'gym.name as gym_name',
+          ])
+          .where('assignment.user_id', '=', job.userId)
+          .orderBy('assignment.created_at')
+          .orderBy('assignment.gym_location_id')
+          .execute();
+
+        const partnerCompetitionProposals = await transaction
+          .selectFrom('partner_competition_proposals as proposal')
+          .innerJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'proposal.gym_location_id',
+          )
+          .select([
+            'proposal.competition_id',
+            'proposal.gym_location_id',
+            'proposal.month_key',
+            'proposal.created_at',
+            'proposal.updated_at',
+            'gym.name as gym_name',
+          ])
+          .where('proposal.proposed_by_user_id', '=', job.userId)
+          .orderBy('proposal.created_at')
+          .orderBy('proposal.competition_id')
+          .execute();
+
+        const gymCredentialActions = await transaction
+          .selectFrom('gym_qr_credentials')
+          .select([
+            'id',
+            'competition_id',
+            'gym_location_id',
+            'credential_version',
+            'status',
+            'issued_by_user_id',
+            'revoked_by_user_id',
+            'issued_at',
+            'expires_at',
+            'revoked_at',
+          ])
+          .where((expression) =>
+            expression.or([
+              expression('issued_by_user_id', '=', job.userId),
+              expression('revoked_by_user_id', '=', job.userId),
+            ]),
+          )
+          .orderBy('issued_at')
+          .orderBy('id')
           .execute();
 
         const pushDevices = await transaction
@@ -614,25 +785,59 @@ export class PrivacyExportBuilder {
           .orderBy('created_at')
           .execute();
 
+        const weeklyChallengeAssignments = await transaction
+          .selectFrom('weekly_challenge_assignment_participants as participant')
+          .innerJoin(
+            'weekly_challenge_requests as request',
+            'request.id',
+            'participant.request_id',
+          )
+          .select([
+            'participant.request_id',
+            'participant.competition_id',
+            'participant.period_index',
+            'request.goal_days',
+            'request.status',
+            'request.created_at',
+            'request.responded_at',
+            'request.accepted_at',
+          ])
+          .where('participant.user_id', '=', job.userId)
+          .orderBy('request.created_at')
+          .orderBy('participant.request_id')
+          .execute();
+
         return {
           account,
           accountLegalReceipts,
+          accountVerificationConsents,
           competitionData: {
+            cashFulfillments,
             drawEntries,
+            drawPublicIdentities,
             enrollments,
             entryLedger,
+            gymScanEvents,
             matchHistory: matchHistory.map((match) => ({
               ...match,
               period_end_date: normalizeDateKey(match.period_end_date),
               period_start_date: normalizeDateKey(match.period_start_date),
             })),
+            matchParticipants,
             progress,
             rulesAcceptances,
-            sessionEvents,
+            sessionEvents: sessionEvents.map((event) => ({
+              ...event,
+              payload: minimizePrivacySessionEventPayload(
+                event.event_type,
+                event.payload,
+              ),
+            })),
             sessions: sessions.map((session) => ({
               ...session,
               eligible_date: normalizeDateKey(session.eligible_date),
             })),
+            settlementInputs,
             rewardAwards,
           },
           creatorContent: {
@@ -644,9 +849,28 @@ export class PrivacyExportBuilder {
           },
           creatorWorkouts,
           deliveryPreferences: { pushDevices },
-          generatedAt: new Date().toISOString(),
+          generatedAt: (
+            request.processing_started_at ?? request.requested_at
+          ).toISOString(),
           notificationHistory,
           partnerApplications,
+          partnerOperations: {
+            credentialActions: gymCredentialActions.map(
+              ({
+                issued_by_user_id: issuedByUserId,
+                revoked_by_user_id: revokedByUserId,
+                ...credential
+              }) => ({
+                ...credential,
+                accountRoles: [
+                  ...(issuedByUserId === job.userId ? ['issuer'] : []),
+                  ...(revokedByUserId === job.userId ? ['revoker'] : []),
+                ],
+              }),
+            ),
+            gymAssignments: gymPartnerAssignments,
+            proposals: partnerCompetitionProposals,
+          },
           privacyRequests,
           profileMedia,
           regionalUpdateRequests,
@@ -655,13 +879,13 @@ export class PrivacyExportBuilder {
             id: request.id,
             requestedAt: request.requested_at,
           },
-          schemaVersion: 11,
+          schemaVersion: privacyExportSchemaVersion,
           securityExclusions: [
             'Firebase identifiers and bearer credentials',
             'Push notification tokens',
             'Encrypted coupon inventory and unassigned coupon codes',
             "Other users' identifiers and internal operator case material",
-            'Raw device-attestation and reusable QR credentials',
+            'Raw or hashed device-attestation and reusable QR credentials',
             'Raw contact-invitation destinations, hashes, and invite tokens',
           ],
           socialData: {
@@ -727,8 +951,25 @@ export class PrivacyExportBuilder {
                   requesterUserId === job.userId ? 'outgoing' : 'incoming',
               }),
             ),
+            weeklyChallengeAssignments,
           },
         };
       });
   }
+}
+
+export function minimizePrivacySessionEventPayload(
+  eventType: string,
+  payload: JsonValue,
+): Record<string, unknown> {
+  if (
+    eventType === 'heart_rate_sample' &&
+    payload !== null &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    typeof payload.heartRateBpm === 'number'
+  ) {
+    return { heartRateBpm: payload.heartRateBpm };
+  }
+  return {};
 }

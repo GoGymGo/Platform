@@ -852,6 +852,8 @@ export interface PrivacyRequestsTable {
   id: Generated<string>;
   user_id: string;
   request_type: PrivacyRequestType;
+  confirmation_code: 'DELETE_MY_ACCOUNT' | 'EXPORT_MY_DATA' | null;
+  confirmed_at: NullableTimestamp;
   status: PrivacyRequestStatus;
   reason: string | null;
   result_object_key: string | null;
@@ -867,6 +869,7 @@ export interface PrivacyRequestsTable {
   requested_at: Timestamp;
   completed_at: NullableTimestamp;
   updated_at: Timestamp;
+  version: Generated<number>;
 }
 
 export interface PrivacyRequestEventsTable {

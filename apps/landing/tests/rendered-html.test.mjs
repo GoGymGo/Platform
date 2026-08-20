@@ -336,6 +336,11 @@ test("FAQ, contact and public information pages are scannable and discoverable",
   assert.match(deletionPage, /href=\{siteLinks\.accountData\}/);
   assert.match(deletionPage, /href=\{siteLinks\.forgotPassword\}/);
   assert.match(deletionPage, /Limited pseudonymous records/);
+  assert.match(deletionPage, /explicitly confirm/);
+  assert.match(deletionPage, /DELETE_MY_ACCOUNT/);
+  assert.match(deletionPage, /Local reset is not account deletion/);
+  assert.match(deletionPage, /It does not submit a deletion request/);
+  assert.match(deletionPage, /no request has been submitted/);
   assert.match(layout, /href=\{siteLinks\.accountDeletion\}>Account deletion/);
   assert.match(robots, /sitemap: "https:\/\/gogymgo\.com\/sitemap\.xml"/);
   assert.match(sitemap, /"\/accessibility"/);

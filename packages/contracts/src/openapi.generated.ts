@@ -62,7 +62,7 @@ export interface components {
     CreateCreatorWorkoutPlanDto: { note?: string; plannedDate: string };
     CreateEnrollmentDto: { ageEligibilityAttested: true; goalDays: number; gymPresence: components['schemas']["EnrollmentGymPresenceDto"]; legalReceiptBundleId: string; regionVerificationId: string; rulesAccepted: true };
     CreateGymLocationDto: { address?: string; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
-    CreatePrivacyRequestDto: { reason?: string; requestType: "delete" | "export" };
+    CreatePrivacyRequestDto: { confirmation: "DELETE_MY_ACCOUNT" | "EXPORT_MY_DATA"; reason?: string; requestType: "delete" | "export" };
     CreateRegionPolicyDto: { boundary: Record<string, unknown>; boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: "CAD" | "MXN" | "USD"; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; reason: string; subdivisionCode: string; timezone: string; validFrom: string; validTo?: string };
     CreateRegionVerificationDto: { accuracyMeters: number; latitude: number; longitude: number; method: "device_location"; observedAt: string };
     CreateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; cashAmountCents?: number; cashCurrency?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
@@ -77,7 +77,7 @@ export interface components {
     CurrentLegalDocumentsResponseDto: { bundleSha256: string; configured: boolean; documents: Array<components['schemas']["LegalDocumentResponseDto"]>; jurisdictionCode: string; locale: string };
     CurrentRegionVerificationResponseDto: { createdAt: string; expiresAt: string; id: string; jurisdictionCode: string; method: "device_location"; policyVersion: string; regionCode: string; regionName: string; regionPolicyId: string; reviewedAt: string; status: "approved"; timezone: string };
     DecidePartnerApplicationDto: { decision: "approved" | "in_review" | "rejected"; reason: string };
-    DecidePrivacyRequestDto: { decision: "processing" | "rejected"; reason: string };
+    DecidePrivacyRequestDto: { decision: "processing" | "rejected"; expectedVersion: number; reason: string };
     DecideProfileMediaDto: { decision: "approved" | "rejected"; reason: string };
     DecideRegionVerificationDto: { decision: "approved" | "rejected"; expiresAt?: string; reason: string };
     DeleteGymLocationDto: { expectedVersion: number; reason: string };
@@ -125,15 +125,18 @@ export interface components {
     OperatorQueueDepthsDto: { competitionStartsDue: number; notificationsPending: number; privacyOperationsPending: number; profileMediaCleanupPending: number };
     OperatorReasonDto: { reason: string };
     OperatorSystemHealthResponseDto: { checkedAt: string; database: "ok"; queues: components['schemas']["OperatorQueueDepthsDto"]; worker: components['schemas']["OperatorWorkerHealthDto"] };
-    OperatorWorkQueueItemDto: { createdAt: string; id: string; kind: "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "workout_session"; regionCode?: string; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code" };
+    OperatorWorkQueueItemDto: { createdAt: string; failureCode?: string; id: string; kind: "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "workout_session"; nextAttemptAt?: string; regionCode?: string; requestType?: "delete" | "export"; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code"; version?: number };
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
     ParticipantCompetitionResultsResponseDto: { categoryLeaderboards: Array<components['schemas']["CategoryLeaderboardDto"]>; competitionId: string; competitionName: string; endedAt: string; monthKey: string; participantGoalDays: number; regionCode: string; regionName: string; resultsStatus: "pending" | "settled"; rewardCount: number; rewardWinners: Array<components['schemas']["RewardWinnerResponseDto"]>; settledAt: string | null };
     PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
     PartnerCompetitionDto: { assignedGymIds: Array<string>; draw: components['schemas']["AdminDashboardDrawDto"] | null; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; minimumEntrants: number; monthKey: string; name: string; proposedByUserId: string | null; publishedRewardCount: number; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; rewardCount: number; rules: Record<string, unknown>; rulesVersion: string; startsAt: string; status: string; version: number };
     PartnerDashboardSnapshotDto: { competitions: Array<components['schemas']["PartnerCompetitionDto"]>; generatedAt: string; gyms: Array<components['schemas']["PartnerGymDto"]>; operator: components['schemas']["AdminDashboardIdentityDto"]; regions: Array<components['schemas']["AdminDashboardRegionDto"]>; sessions: Array<components['schemas']["OperatorGymSessionDto"]> };
     PartnerGymDto: { accessLevel: "admin" | "staff"; active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string; version: number };
+    PrivacyCapabilitiesResponseDto: { requestCreationAvailable: boolean; status: "disabled" | "enabled" };
     PrivacyDownloadActionDto: { expiresAt: string; url: string };
-    PrivacyRequestResponseDto: { completedAt: string | null; downloadAvailable: boolean; exportExpiresAt: string | null; failureCode: string | null; id: string; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested" };
+    PrivacyRequestDetailResponseDto: { completedAt: string | null; confirmedAt: string | null; downloadAvailable: boolean; events: Array<components['schemas']["PrivacyRequestEventDto"]>; exportExpiresAt: string | null; failureCode: string | null; id: string; nextAttemptAt: string | null; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested"; version: number };
+    PrivacyRequestEventDto: { createdAt: string; nextStatus: "completed" | "processing" | "rejected" | "requested"; previousStatus: "completed" | "processing" | "rejected" | "requested" | null };
+    PrivacyRequestResponseDto: { completedAt: string | null; confirmedAt: string | null; downloadAvailable: boolean; exportExpiresAt: string | null; failureCode: string | null; id: string; nextAttemptAt: string | null; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested"; version: number };
     PrivacySettingsDto: { showRegion: boolean; showStats: boolean };
     ProfileMediaReviewActionDto: { contentLength: number; contentType: string; expiresAt: string; id: string; submittedAt: string; url: string };
     PublishLegalDocumentDto: { content: components['schemas']["LegalDocumentContentDto"]; documentKey: string; effectiveAt: string; jurisdictionCode: string; locale: string; ownerApprovalConfirmed: boolean; reason: string; receiptRequirement: "accept" | "acknowledge" | "none"; title: string; version: string };
@@ -261,6 +264,14 @@ export interface operations {
     parameters: { header: { "Idempotency-Key": string }; path: { requestId: string } };
     responses: {
       "200": components['schemas']["WeeklyChallengeRequestResponseDto"];
+    };
+  };
+  capabilities: {
+    method: "GET";
+    path: "/v1/me/privacy-requests/capabilities";
+    parameters: Record<string, never>;
+    responses: {
+      "200": components['schemas']["PrivacyCapabilitiesResponseDto"];
     };
   };
   changeCompetitionStatus: {
@@ -561,6 +572,14 @@ export interface operations {
     requestBody: components['schemas']["CreateEnrollmentDto"];
     responses: {
       "201": components['schemas']["EnrollmentResponseDto"];
+    };
+  };
+  get: {
+    method: "GET";
+    path: "/v1/me/privacy-requests/{privacyRequestId}";
+    parameters: { path: { privacyRequestId: string } };
+    responses: {
+      "200": components['schemas']["PrivacyRequestDetailResponseDto"];
     };
   };
   getAccess: {
@@ -1402,6 +1421,12 @@ export interface paths {
     get: operations["list_get_v1_me_privacy_requests"];
     post: operations["create_post_v1_me_privacy_requests"];
   };
+  "/v1/me/privacy-requests/capabilities": {
+    get: operations["capabilities"];
+  };
+  "/v1/me/privacy-requests/{privacyRequestId}": {
+    get: operations["get"];
+  };
   "/v1/me/privacy-requests/{privacyRequestId}/download-action": {
     post: operations["downloadAction"];
   };
@@ -1805,7 +1830,10 @@ export type PartnerApplicationResponseDto = components['schemas']["PartnerApplic
 export type PartnerCompetitionDto = components['schemas']["PartnerCompetitionDto"];
 export type PartnerDashboardSnapshotDto = components['schemas']["PartnerDashboardSnapshotDto"];
 export type PartnerGymDto = components['schemas']["PartnerGymDto"];
+export type PrivacyCapabilitiesResponseDto = components['schemas']["PrivacyCapabilitiesResponseDto"];
 export type PrivacyDownloadActionDto = components['schemas']["PrivacyDownloadActionDto"];
+export type PrivacyRequestDetailResponseDto = components['schemas']["PrivacyRequestDetailResponseDto"];
+export type PrivacyRequestEventDto = components['schemas']["PrivacyRequestEventDto"];
 export type PrivacyRequestResponseDto = components['schemas']["PrivacyRequestResponseDto"];
 export type PrivacySettingsDto = components['schemas']["PrivacySettingsDto"];
 export type ProfileMediaReviewActionDto = components['schemas']["ProfileMediaReviewActionDto"];

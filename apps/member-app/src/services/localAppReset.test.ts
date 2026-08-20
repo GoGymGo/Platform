@@ -4,16 +4,23 @@ import { describe, it } from 'node:test';
 import { clearLocalAppData } from './localAppReset';
 
 describe('local app reset', () => {
-  it('clears app storage, browser storage, accessible cookies and caches', async () => {
+  it('clears only GoGymGo storage, accessible cookies and caches', async () => {
     const events: string[] = [];
-    let cookie = 'session=one; preference=two';
+    let cookie = 'gogymgo-session=one; unrelated=two';
+    const browserStorage = (keys: string[], scope: string) => ({
+      get length() {
+        return keys.length;
+      },
+      key: (index: number) => keys[index] ?? null,
+      removeItem: (key: string) => events.push(`${scope}:${key}`)
+    });
     const browser = {
       caches: {
         delete: async (key: string) => {
           events.push(`cache:${key}`);
           return true;
         },
-        keys: async () => ['app-shell', 'images']
+        keys: async () => ['gogymgo:app-shell', 'unrelated-images']
       },
       document: {
         get cookie() {
@@ -24,27 +31,36 @@ describe('local app reset', () => {
           cookie = value;
         }
       },
-      localStorage: { clear: () => events.push('local-storage') },
-      sessionStorage: { clear: () => events.push('session-storage') }
+      localStorage: browserStorage(
+        ['gogymgo:profile', 'unrelated-local'],
+        'local-storage'
+      ),
+      sessionStorage: browserStorage(
+        ['firebase:authUser:member', 'unrelated-session'],
+        'session-storage'
+      )
     };
 
     await clearLocalAppData({
       browser,
       storage: {
-        clear: async () => {
-          events.push('async-storage');
+        getAllKeys: async () => [
+          '@gogymgo/pending-gym-scan',
+          'firebase:authUser:member',
+          'other-app-key'
+        ],
+        multiRemove: async (keys) => {
+          events.push(`async-storage:${keys.join(',')}`);
         }
       }
     });
 
     assert.deepEqual(events, [
-      'async-storage',
-      'local-storage',
-      'session-storage',
-      'cookie:session=; Max-Age=0; path=/; SameSite=Lax',
-      'cookie:preference=; Max-Age=0; path=/; SameSite=Lax',
-      'cache:app-shell',
-      'cache:images'
+      'async-storage:@gogymgo/pending-gym-scan,firebase:authUser:member',
+      'local-storage:gogymgo:profile',
+      'session-storage:firebase:authUser:member',
+      'cookie:gogymgo-session=; Max-Age=0; path=/; SameSite=Lax',
+      'cache:gogymgo:app-shell'
     ]);
   });
 });

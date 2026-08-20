@@ -125,6 +125,7 @@ export class PrivacyOperationsService {
     );
     const sha256 = createHash('sha256').update(data).digest('hex');
     const objectKey = `privacy-exports/${job.userId}/${job.id}.json`;
+    await this.renewLease(job);
     const stored = await this.objectStorage.putJsonIfAbsent({
       bucket: exportBucket,
       data,
@@ -132,6 +133,7 @@ export class PrivacyOperationsService {
       objectKey,
       sha256,
     });
+    await this.renewLease(job);
     const expiresAt = new Date(
       Date.now() + this.exportRetentionDays * 24 * 60 * 60 * 1_000,
     );
@@ -145,6 +147,7 @@ export class PrivacyOperationsService {
 
   private async processDeletion(job: ClaimedPrivacyJob): Promise<void> {
     const context = await this.repository.getDeletionContext(job);
+    await this.renewLease(job);
     if (context.hasOpenRewardClaim) {
       throw new PrivacyOperationError('OPEN_REWARD_CLAIM_REQUIRES_REVIEW');
     }
@@ -162,16 +165,22 @@ export class PrivacyOperationsService {
         throw new PrivacyOperationError('USER_CONTENT_BUCKET_REQUIRED');
       }
       for (const objectKey of context.avatarObjectKeys) {
+        await this.renewLease(job);
         await this.objectStorage.deleteObject(this.contentBucket, objectKey);
+        await this.renewLease(job);
       }
     }
 
     const exportBucket = this.requireExportBucket();
     for (const objectKey of new Set(context.exportObjectKeys)) {
+      await this.renewLease(job);
       await this.objectStorage.deleteObject(exportBucket, objectKey);
+      await this.renewLease(job);
     }
     if (context.userStatus !== 'deleted') {
+      await this.renewLease(job);
       await this.identityAdmin.deleteAccount(context.firebaseUid);
+      await this.renewLease(job);
     }
 
     const pseudonymizer = this.pseudonymizer;
@@ -183,6 +192,10 @@ export class PrivacyOperationsService {
       pseudonymizer.firebaseUid(context.firebaseUid),
       pseudonymizer.callsign(context.userId),
     );
+  }
+
+  private renewLease(job: ClaimedPrivacyJob): Promise<void> {
+    return this.repository.renewLease(job, new Date(), this.leaseSeconds);
   }
 
   private assertConfigured(): void {

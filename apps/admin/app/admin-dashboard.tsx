@@ -2,6 +2,7 @@
 
 import { resolveFeatureCapabilities } from "@gogymgo/contracts/feature-capabilities";
 import type {
+  DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
   UpdateRegionWaitlistStatusDto,
 } from "@gogymgo/contracts";
@@ -1761,6 +1762,14 @@ export function AdminDashboard({
             <OperationsPanel
               events={snapshot.auditEvents}
               health={health}
+              onDecidePrivacy={async (privacyRequestId, body) => {
+                await mutate(
+                  "Privacy request decision recorded.",
+                  `operator/privacy-requests/${privacyRequestId}/decision`,
+                  "POST",
+                  body,
+                );
+              }}
               onDecideRegion={async (verificationId, body) => {
                 await mutate(
                   "Region verification decision recorded.",
@@ -4321,12 +4330,17 @@ function ContentPanel({
 function OperationsPanel({
   events,
   health,
+  onDecidePrivacy,
   onDecideRegion,
   onNavigate,
   queue,
 }: {
   events: AuditEvent[];
   health: SystemHealth | null;
+  onDecidePrivacy: (
+    privacyRequestId: string,
+    body: DecidePrivacyRequestDto,
+  ) => Promise<void>;
   onDecideRegion: (
     verificationId: string,
     body: DecideRegionVerificationDto,
@@ -4500,6 +4514,23 @@ function OperationsPanel({
                         </dd>
                       </div>
                     ) : null}
+                    {selectedItem.requestType ? (
+                      <div>
+                        <dt>OPERATION</dt>
+                        <dd>{selectedItem.requestType}</dd>
+                      </div>
+                    ) : null}
+                    {selectedItem.failureCode ? (
+                      <div className="wide">
+                        <dt>SAFE FAILURE</dt>
+                        <dd>
+                          {selectedItem.failureCode.replaceAll("_", " ")}
+                          {selectedItem.nextAttemptAt
+                            ? ` · retry after ${formatDateTime(selectedItem.nextAttemptAt)}`
+                            : ""}
+                        </dd>
+                      </div>
+                    ) : null}
                     <div className="wide">
                       <dt>RECORD ID</dt>
                       <dd className="record-id">{selectedItem.id}</dd>
@@ -4534,6 +4565,13 @@ function OperationsPanel({
                       onDecide={onDecideRegion}
                     />
                   ) : null}
+                  {selectedItem.kind === "privacy_request" &&
+                  selectedItem.status === "requested" ? (
+                    <PrivacyRequestDecisionControl
+                      item={selectedItem}
+                      onDecide={onDecidePrivacy}
+                    />
+                  ) : null}
                   {selectedDestination ? (
                     <button
                       className="primary-button full"
@@ -4566,6 +4604,96 @@ function OperationsPanel({
         )}
       </section>
     </div>
+  );
+}
+
+function PrivacyRequestDecisionControl({
+  item,
+  onDecide,
+}: {
+  item: WorkQueueItem;
+  onDecide: (
+    privacyRequestId: string,
+    body: DecidePrivacyRequestDto,
+  ) => Promise<void>;
+}) {
+  const [decision, setDecision] =
+    useState<DecidePrivacyRequestDto["decision"]>("processing");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <form
+      className="queue-decision-form"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        const validationError = formValidationError(event.currentTarget);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+        if (!item.version) {
+          setError(
+            "Refresh the queue to load the authoritative request version.",
+          );
+          return;
+        }
+        setSubmitting(true);
+        setError("");
+        void onDecide(item.id, {
+          decision,
+          expectedVersion: item.version,
+          reason,
+        })
+          .catch((cause) => setError(errorMessage(cause)))
+          .finally(() => setSubmitting(false));
+      }}
+    >
+      <p className="queue-review-note">
+        {item.requestType === "delete"
+          ? "Starting deletion authorizes the worker to revoke access and remove direct account data after external cleanup succeeds."
+          : "Starting export authorizes a minimized private JSON export with a short retention window."}
+      </p>
+      <label>
+        <span>DECISION</span>
+        <select
+          onChange={(event) =>
+            setDecision(
+              event.target.value as DecidePrivacyRequestDto["decision"],
+            )
+          }
+          value={decision}
+        >
+          <option value="processing">Approve and start processing</option>
+          <option value="rejected">Reject request</option>
+        </select>
+      </label>
+      <label>
+        <span>AUDIT REASON</span>
+        <textarea
+          maxLength={500}
+          minLength={8}
+          onChange={(event) => setReason(event.target.value)}
+          required
+          rows={3}
+          value={reason}
+        />
+      </label>
+      <button
+        className="primary-button full"
+        disabled={submitting}
+        type="submit"
+      >
+        {submitting ? "RECORDING..." : "RECORD PRIVACY DECISION"}
+      </button>
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
   );
 }
 

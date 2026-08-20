@@ -513,7 +513,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
 
   const dashboardForms = dashboard.match(/<form\b[\s\S]*?>/g) ?? [];
   const pilotForms = pilot.match(/<form\b[\s\S]*?>/g) ?? [];
-  assert.equal(dashboardForms.length, 9);
+  assert.equal(dashboardForms.length, 10);
   assert.equal(pilotForms.length, 5);
   dashboardForms.forEach((form) => assert.match(form, /noValidate/));
   pilotForms.forEach((form) => assert.match(form, /noValidate/));
@@ -531,6 +531,16 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(formValidation, /invalidControls\[0\]\?\.focus\(\)/);
   assert.match(styles, /\.form-error \{[\s\S]*border:/);
   assert.match(styles, /input\[aria-invalid="true"\]/);
+  assert.match(dashboard, /RECORD PRIVACY DECISION/);
+  assert.match(dashboard, /expectedVersion: item\.version/);
+  assert.match(
+    dashboard,
+    /Refresh the queue to load the authoritative request version/,
+  );
+  assert.match(
+    dashboard,
+    /Starting deletion authorizes the worker to revoke access/,
+  );
 
   assert.match(layout, /GoGymGo Admin/);
   assert.match(layout, /new URL\("\/og\.png", origin\)/);

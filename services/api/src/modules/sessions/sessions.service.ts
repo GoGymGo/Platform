@@ -638,8 +638,6 @@ export class SessionsService {
           goalDays: session.goal_days,
           metadata: {
             eligibleDate,
-            evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
-            reviewReason: input.reason,
           },
           policyVersion: session.rules_version,
           prizeDrawEntriesDelta: rules.verifiedSessionPrizeDrawEntries,

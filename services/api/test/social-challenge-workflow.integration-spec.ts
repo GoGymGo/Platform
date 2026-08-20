@@ -5,6 +5,7 @@ import { dateKeyInTimezone } from '../src/modules/competitions/competition-calen
 import { ProfilesService } from '../src/modules/profiles/profiles.service';
 import { PrivacyExportBuilder } from '../src/modules/privacy/privacy-export.builder';
 import { PrivacyOperationsRepository } from '../src/modules/privacy/privacy-operations.repository';
+import type { ClaimedPrivacyJob } from '../src/modules/privacy/privacy-operations.types';
 import { SocialService } from '../src/modules/social/social.service';
 import { SocialInvitationCleanupService } from '../src/modules/social/social-invitation-cleanup.service';
 import {
@@ -848,6 +849,9 @@ describeWithDatabase('social friend and challenge workflow', () => {
     const deletionRequest = await database.connection
       .insertInto('privacy_requests')
       .values({
+        attempt_count: 1,
+        confirmation_code: 'DELETE_MY_ACCOUNT',
+        confirmed_at: new Date(),
         lease_expires_at: new Date(Date.now() + 60_000),
         lease_token: leaseToken,
         next_attempt_at: new Date(),
@@ -859,7 +863,7 @@ describeWithDatabase('social friend and challenge workflow', () => {
       })
       .returning('id')
       .executeTakeFirstOrThrow();
-    const deletionJob = {
+    let deletionJob: ClaimedPrivacyJob = {
       attemptCount: 1,
       id: deletionRequest.id,
       leaseToken,
@@ -871,7 +875,7 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
     expect(privacyExport).toEqual(
       expect.objectContaining({
-        schemaVersion: 11,
+        schemaVersion: 12,
         socialData: expect.objectContaining({
           challengeCheckIns: [
             expect.objectContaining({
@@ -951,7 +955,46 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
     expect(expiredMetadata.rows[0]?.status).toBe('expired');
 
-    await new PrivacyOperationsRepository(database).completeDeletion(
+    const privacyOperations = new PrivacyOperationsRepository(database);
+    await database.connection
+      .updateTable('privacy_requests')
+      .set({ lease_expires_at: new Date(Date.now() + 60 * 60_000) })
+      .where('status', '=', 'processing')
+      .where('id', '!=', deletionJob.id)
+      .execute();
+    await database.connection
+      .updateTable('privacy_requests')
+      .set({ lease_expires_at: new Date(Date.now() - 1_000) })
+      .where('id', '=', deletionJob.id)
+      .executeTakeFirstOrThrow();
+    await expect(
+      privacyOperations.completeDeletion(
+        deletionJob,
+        `deleted:${'a'.repeat(64)}`,
+        'GG-DELETED-ABCDEF123456',
+      ),
+    ).rejects.toMatchObject({ code: 'PRIVACY_JOB_LEASE_LOST' });
+    const beforeTakeover = await database.connection
+      .selectFrom('users')
+      .select('status')
+      .where('id', '=', daveProfile.id)
+      .executeTakeFirstOrThrow();
+    expect(beforeTakeover.status).toBe('active');
+    const reclaimed = await privacyOperations.claimNext(new Date(), 600);
+    expect(reclaimed).toEqual(
+      expect.objectContaining({
+        attemptCount: 2,
+        id: deletionJob.id,
+        requestType: 'delete',
+      }),
+    );
+    if (!reclaimed) {
+      throw new Error('Expected the expired deletion lease to be reclaimed');
+    }
+    expect(reclaimed.leaseToken).not.toBe(deletionJob.leaseToken);
+    deletionJob = reclaimed;
+
+    await privacyOperations.completeDeletion(
       deletionJob,
       `deleted:${'a'.repeat(64)}`,
       'GG-DELETED-ABCDEF123456',

@@ -75,6 +75,28 @@ export class PrivacyOperationsRepository {
       });
   }
 
+  async renewLease(
+    job: ClaimedPrivacyJob,
+    now: Date,
+    leaseSeconds: number,
+  ): Promise<void> {
+    const renewed = await this.database.connection
+      .updateTable('privacy_requests')
+      .set({
+        lease_expires_at: new Date(now.getTime() + leaseSeconds * 1_000),
+        updated_at: now,
+      })
+      .where('id', '=', job.id)
+      .where('status', '=', 'processing')
+      .where('lease_token', '=', job.leaseToken)
+      .where('lease_expires_at', '>', now)
+      .returning('id')
+      .executeTakeFirst();
+    if (!renewed) {
+      throw new PrivacyOperationError('PRIVACY_JOB_LEASE_LOST');
+    }
+  }
+
   async getDeletionContext(
     job: ClaimedPrivacyJob,
   ): Promise<PrivacyDeletionContext> {
@@ -179,10 +201,12 @@ export class PrivacyOperationsRepository {
             result_sha256: sha256,
             status: 'completed',
             updated_at: now,
+            version: sql<number>`version + 1`,
           })
           .where('id', '=', job.id)
           .where('status', '=', 'processing')
           .where('lease_token', '=', job.leaseToken)
+          .where('lease_expires_at', '>', now)
           .returning('id')
           .executeTakeFirst();
         if (!updated) {
@@ -211,12 +235,14 @@ export class PrivacyOperationsRepository {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
+        const leaseCheckAt = new Date();
         const request = await transaction
           .selectFrom('privacy_requests')
           .select(['id', 'user_id'])
           .where('id', '=', job.id)
           .where('status', '=', 'processing')
           .where('lease_token', '=', job.leaseToken)
+          .where('lease_expires_at', '>', leaseCheckAt)
           .forUpdate()
           .executeTakeFirst();
         if (!request) {
@@ -249,6 +275,17 @@ export class PrivacyOperationsRepository {
               redacted: true,
               retainedFor: 'rules_acceptance_audit',
             },
+          })
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .updateTable('workout_sessions')
+          .set({
+            verification_summary: {
+              redacted: true,
+              retainedFor: 'competition_integrity',
+            },
+            updated_at: now,
           })
           .where('user_id', '=', request.user_id)
           .execute();
@@ -297,8 +334,25 @@ export class PrivacyOperationsRepository {
           .where('user_id', '=', request.user_id)
           .execute();
         await transaction
-          .deleteFrom('challenge_contact_invitations')
+          .deleteFrom('creator_workout_plans')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .deleteFrom('creator_video_submissions')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .deleteFrom('gym_partner_assignments')
+          .where('user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .updateTable('challenge_contact_invitations')
+          .set({ claimed_by_user_id: null })
           .where('claimed_by_user_id', '=', request.user_id)
+          .execute();
+        await transaction
+          .deleteFrom('challenge_contact_invitations')
+          .where('inviter_user_id', '=', request.user_id)
           .execute();
         await transaction
           .deleteFrom('social_challenges')
@@ -378,7 +432,7 @@ export class PrivacyOperationsRepository {
           })
           .where('id', '=', request.user_id)
           .executeTakeFirstOrThrow();
-        await transaction
+        const completed = await transaction
           .updateTable('privacy_requests')
           .set({
             completed_at: now,
@@ -387,18 +441,28 @@ export class PrivacyOperationsRepository {
             lease_token: null,
             status: 'completed',
             updated_at: now,
+            version: sql<number>`version + 1`,
           })
           .where('id', '=', request.id)
+          .where('status', '=', 'processing')
           .where('lease_token', '=', job.leaseToken)
-          .executeTakeFirstOrThrow();
+          .where('lease_expires_at', '>', new Date())
+          .returning('id')
+          .executeTakeFirst();
+        if (!completed) {
+          throw new PrivacyOperationError('PRIVACY_JOB_LEASE_LOST');
+        }
 
         await this.insertEvent(transaction, {
           metadata: {
             directIdentifiersRemoved: true,
             retainedRecordClasses: [
               'account_legal_receipts',
+              'account_verification_consents',
               'competition_integrity',
+              'draw_and_settlement_integrity',
               'fraud_and_eligibility',
+              'gym_scan_integrity',
               'reward_award_integrity',
               'operator_audit',
               'social_integrity_audit',
@@ -488,6 +552,7 @@ export class PrivacyOperationsRepository {
           .where('id', '=', job.id)
           .where('status', '=', 'processing')
           .where('lease_token', '=', job.leaseToken)
+          .where('lease_expires_at', '>', new Date())
           .returning('id')
           .executeTakeFirst();
         if (!updated) {

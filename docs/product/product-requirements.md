@@ -123,8 +123,9 @@ Registration requirements:
   Contest, retains the historical record for Contest integrity, and immediately
   ends active workouts, ranking, Weekly Challenge, and prize eligibility.
 - Profile offers a separate local-device reset that signs out and clears app
-  storage, app-accessible browser cookies, and caches. It does not delete the
-  account or authoritative server history.
+  namespaced storage/recovery data, app-owned browser cookies, query state, and
+  caches. It preserves unrelated device/browser data and does not create a
+  deletion request or delete the account or authoritative server history.
 - The current competition, legal receipt, approved region verification, age
   attestation, and accepted rules must all agree before enrollment succeeds.
 - Successful registration returns directly to Home with a short confirmation
@@ -416,6 +417,11 @@ decision outside the V1 user application.
   deletion.
 - Account deletion requires an explicit confirmation step and is processed by
   the server rather than immediately erasing local UI state.
+- Privacy request creation fails closed while processing is disabled. Operator
+  decisions require an authoritative database role, reason, idempotency key,
+  and current version; worker completion requires the same renewable live
+  lease. The portable export format is versioned and its table disposition is
+  exhaustive for the current schema.
 
 ## 8. Architecture and data requirements
 

@@ -20,7 +20,9 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
   CreatePrivacyRequestDto,
+  PrivacyCapabilitiesResponseDto,
   PrivacyDownloadActionDto,
+  PrivacyRequestDetailResponseDto,
   PrivacyRequestResponseDto,
 } from './dto/privacy-request.dto';
 import { PrivacyService } from './privacy.service';
@@ -54,6 +56,23 @@ export class PrivacyController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<PrivacyRequestResponseDto[]> {
     return this.privacy.listRequests(principal);
+  }
+
+  @Get('capabilities')
+  @ApiOperation({ summary: 'Return privacy operation availability' })
+  @ApiOkResponse({ type: PrivacyCapabilitiesResponseDto })
+  capabilities(): PrivacyCapabilitiesResponseDto {
+    return this.privacy.getCapabilities();
+  }
+
+  @Get(':privacyRequestId')
+  @ApiOperation({ summary: 'Read one owned privacy request and its history' })
+  @ApiOkResponse({ type: PrivacyRequestDetailResponseDto })
+  get(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('privacyRequestId', ParseUUIDPipe) privacyRequestId: string,
+  ): Promise<PrivacyRequestDetailResponseDto> {
+    return this.privacy.getRequest(principal, privacyRequestId);
   }
 
   @Post(':privacyRequestId/download-action')

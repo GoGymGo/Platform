@@ -12,6 +12,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/member-app-ci.yml"
+      - ".github/workflows/member-expo-compatibility-advisory.yml"
 
 permissions:
   contents: read
@@ -37,7 +38,8 @@ jobs:
       - run: npm ci --ignore-scripts
         working-directory: .
       - run: npm run check
-      - run: npx expo install --check
+      - name: Check Expo compatibility from committed SDK metadata
+        run: npm run check:expo-compatibility
       - run: npx expo export --platform all --output-dir .expo-ci-export
         env:
           CI: "1"

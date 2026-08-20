@@ -17,11 +17,11 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   GitHub issue inventory. Open pull requests 57-66 are Dependabot updates.
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
-- Latest completed delivery: `origin/main` at
-  `197c6ea489215a6746123a857882df85b485e906` after PR #110 on 2026-08-20.
-- Active feature task: `GoGymGo Feature GGG-019 — Privacy operations and local
-  reset` on `agent/ggg-019-privacy-operations-local-reset`; creation follows this
-  ledger merge.
+- Latest merged repository delivery: `origin/main` at
+  `b1b3e7b741467ae7eb16e60f269ca9a2fe8d4068` after PR #112 on 2026-08-20.
+- Active feature task: `GoGymGo Feature GGG-022 — Review queues and operational
+  health` on `agent/ggg-022-review-queues-operational-health`; creation follows
+  this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -34,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 42 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 43 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -672,17 +672,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   admin decision; short-lived private download; pseudonymization key is secret.
 - External providers / feature flag: private S3; `PRIVACY_OPERATIONS_ENABLED`
   defaults false.
-- Current implementation / missing behavior: service, worker, pseudonymization,
-  event history, download action, and local reset exist. Missing production keys/
-  bucket lifecycle, deployed end-to-end export/deletion, restore/incident rehearsal.
+- Current implementation / missing behavior: repository behavior is complete.
+  Member requests require explicit operation-bound confirmation and expose owned,
+  versioned status/event history; operator decisions are body-bound idempotent and
+  optimistic-versioned; worker leases renew by token-bound compare-and-swap around
+  every external boundary; export schema v12 is exhaustively mapped to the current
+  database and excludes secrets/security hashes; deletion covers current private
+  data while retaining only documented pseudonymous legal/contest integrity; and
+  local reset removes only GoGymGo-owned namespaces. Production keys, private
+  bucket lifecycle, deployed worker/provider cleanup, reconciliation and restore/
+  incident rehearsal remain unconfigured and unproven.
 - Required tests / operations / cloud dependency: ownership, confirmation,
   retry/lease recovery, export completeness and minimization, deletion graph,
   retained integrity, object purge, short-lived URL, local-only reset; S3,
   database, worker, secrets.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-019 — Privacy operations and
-  local reset`; branch/PR/merge `unassigned`; status `READY`.
-- Residual risks / blocker: privacy operations cannot be marked complete while
-  disabled in the release environment.
+  local reset`; branch `agent/ggg-019-privacy-operations-local-reset` (deleted
+  after merge); PR `#112`; merge
+  `b1b3e7b741467ae7eb16e60f269ca9a2fe8d4068`; status `BLOCKED`.
+- Residual risks / blocker: `PRIVACY_OPERATIONS_ENABLED` remains false. No
+  production AWS/Firebase configuration or credentials were accessed; private
+  bucket lifecycle/purge, deployed worker processing, external object/identity
+  cleanup and reconciliation, restore/incident rehearsal, signing/app IDs,
+  API/legal URLs, Firebase public configuration, and EAS project/owner remain
+  external release gates. The repository and CI are green, but the production
+  privacy path must not be represented as live.
 
 ### GGG-020 — Admin authentication and role-scoped platform access
 
@@ -781,7 +795,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   counts, lease recovery, every decision authorization/state conflict, audit
   search/redaction, OTLP failure safety; deployed worker/monitoring.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-022 — Review queues and
-  operational health`; branch/PR/merge `unassigned`; status `AUDITED`.
+  operational health`; branch/PR/merge `unassigned`; status `READY`.
 - Residual risks / blocker: observability is measurable in code but production
   alerts cannot be verified without authorized environment access.
 
@@ -1136,6 +1150,25 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-20 — Merged the complete repository implementation for `GGG-019`
+  through PR #112. Exact tested head
+  `f2d6402dcacc32358f2f072c65881a23659a03de` was squash-merged as
+  `b1b3e7b741467ae7eb16e60f269ca9a2fe8d4068`; all seven PR checks passed,
+  the feature branches were deleted, and Docker cleaned to zero running
+  containers. Delivery added explicit confirmed member requests, owned
+  versioned status/events, body-bound idempotent/versioned operator decisions,
+  renewable token-bound worker leases, exhaustive minimized export schema v12,
+  a current-schema deletion graph with documented pseudonymous integrity
+  retention, and namespace-only local reset. Serial validation included 253
+  member tests, 320 API unit tests, 28 API E2E tests, 37 admin tests, 15 landing
+  tests, focused PostGIS proof 22/22 and full integration 74/74, plus all
+  governance/dependency/contracts/source/build/artifact/secret gates. No cloud
+  access or deployment occurred. Status remains `BLOCKED`, not `COMPLETE`,
+  because the production flag, private storage lifecycle, worker/provider
+  cleanup, reconciliation and operational rehearsals remain unauthorized and
+  unproven. Dependency ordering assigns `GGG-022` next because its human review,
+  audit and worker-health duty consumes the now-hardened privacy operations and
+  other completed operator workflows.
 - 2026-08-20 — Completed `GGG-021` through PR #110. Exact tested head
   `fc6636956ce4eebb17401af50c44f65f2874cae4` was squash-merged as
   `197c6ea489215a6746123a857882df85b485e906`; all seven PR checks and all six

@@ -23,6 +23,7 @@ export type RegionPolicy = {
   timezone: string;
   validFrom: string;
   validTo: string | null;
+  version: number;
 };
 
 export type GoalBracket = {
@@ -138,6 +139,7 @@ export type LegalDocument = {
   id: string;
   jurisdictionCode: string;
   locale: string;
+  lifecycleVersion: number;
   ownerApprovedAt: string | null;
   receiptRequirement: string;
   status: "effective" | "scheduled" | "withdrawn";
@@ -162,6 +164,10 @@ export type DashboardSnapshot = {
     email: string;
     id: string;
     roles: string[];
+  };
+  capabilities: {
+    creatorConfigurationEnabled: boolean;
+    legalPublicationOwner: boolean;
   };
   auditEvents: AuditEvent[];
   competitions: Competition[];

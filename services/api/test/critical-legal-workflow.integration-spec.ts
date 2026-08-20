@@ -213,7 +213,10 @@ describeWithDatabase('critical account legal receipt workflow', () => {
         otherAdminPrincipal,
         regionalTerms.id,
         'legal-non-owner-withdrawal',
-        { reason: 'A non-owner admin must not withdraw legal text' },
+        {
+          expectedVersion: regionalTerms.lifecycleVersion,
+          reason: 'A non-owner admin must not withdraw legal text',
+        },
       ),
     ).rejects.toMatchObject({
       response: { code: 'LEGAL_OWNER_APPROVAL_REQUIRED' },
@@ -281,9 +284,68 @@ describeWithDatabase('critical account legal receipt workflow', () => {
       adminPrincipal,
       regionalTerms.id,
       'legal-withdraw-regional-terms',
-      { reason: 'Counsel withdrew the regional version before launch' },
+      {
+        expectedVersion: regionalTerms.lifecycleVersion,
+        reason: 'Counsel withdrew the regional version before launch',
+      },
     );
-    expect(withdrawn.status).toBe('withdrawn');
+    expect(withdrawn).toMatchObject({
+      lifecycleVersion: regionalTerms.lifecycleVersion + 1,
+      status: 'withdrawn',
+    });
+    await expect(
+      adminLegal.withdraw(
+        adminPrincipal,
+        regionalTerms.id,
+        'legal-withdraw-regional-terms',
+        {
+          expectedVersion: regionalTerms.lifecycleVersion,
+          reason: 'Counsel withdrew the regional version before launch',
+        },
+      ),
+    ).resolves.toEqual(withdrawn);
+    await expect(
+      adminLegal.withdraw(
+        adminPrincipal,
+        regionalTerms.id,
+        'legal-withdraw-regional-terms',
+        {
+          expectedVersion: withdrawn.lifecycleVersion,
+          reason: 'A reused key cannot authorize another legal body',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+    });
+    await expect(
+      adminLegal.withdraw(
+        adminPrincipal,
+        regionalTerms.id,
+        'legal-withdraw-regional-terms-stale',
+        {
+          expectedVersion: regionalTerms.lifecycleVersion,
+          reason: 'A stale legal version must fail closed after withdrawal',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'LEGAL_DOCUMENT_VERSION_CONFLICT' },
+    });
+    const withdrawalAudit = await database.connection
+      .selectFrom('operator_audit_events')
+      .select(['next_state', 'previous_state'])
+      .where('entity_id', '=', regionalTerms.id)
+      .where('action', '=', 'legal_document.withdrawn')
+      .executeTakeFirstOrThrow();
+    expect(withdrawalAudit).toMatchObject({
+      next_state: {
+        state: 'withdrawn',
+        version: withdrawn.lifecycleVersion,
+      },
+      previous_state: {
+        state: 'published',
+        version: regionalTerms.lifecycleVersion,
+      },
+    });
     const reverted = await legal.getCurrent({
       jurisdictionCode: 'CA-BC',
       locale: 'en-CA',

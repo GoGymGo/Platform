@@ -15,17 +15,28 @@ import {
   parseMultiPolygon,
 } from './admin-configuration.validation';
 import { AdminAuthorizationService } from './admin-authorization.service';
-import type {
-  AdminDeletedEntityResponseDto,
-  AdminRegionPolicyResponseDto,
-  CreateRegionPolicyDto,
+import {
+  RegionPolicyStatusAction,
+  type AdminDeletedEntityResponseDto,
+  type AdminEntityResponseDto,
+  type AdminRegionPolicyResponseDto,
+  type CreateRegionPolicyDto,
+  type DeleteVersionedAdminEntityDto,
+  type RegionPolicyStatusActionDto,
 } from './dto/admin-configuration.dto';
-import type { OperatorReasonDto } from './dto/operator.dto';
 
 interface RegionPolicyJson extends JsonObject {
   code: string;
+  competitionEnabled: boolean;
   id: string;
   policyVersion: string;
+  version: number;
+}
+
+interface RegionPolicyStatusJson extends JsonObject {
+  id: string;
+  status: 'disabled' | 'enabled';
+  version: number;
 }
 
 interface DeletedRegionJson extends JsonObject {
@@ -129,7 +140,13 @@ export class AdminRegionConfigurationService {
             valid_from: validFrom,
             valid_to: validTo,
           })
-          .returning(['code', 'id', 'policy_version'])
+          .returning([
+            'code',
+            'competition_enabled',
+            'configuration_version',
+            'id',
+            'policy_version',
+          ])
           .executeTakeFirstOrThrow();
         await this.authorization.audit(transaction, {
           action: 'region_policy.created',
@@ -151,8 +168,115 @@ export class AdminRegionConfigurationService {
         });
         return {
           code: policy.code,
+          competitionEnabled: policy.competition_enabled,
           id: policy.id,
           policyVersion: policy.policy_version,
+          version: policy.configuration_version,
+        };
+      },
+    );
+  }
+
+  changeStatus(
+    principal: AuthenticatedPrincipal,
+    regionPolicyId: string,
+    idempotencyKey: string,
+    input: RegionPolicyStatusActionDto,
+  ): Promise<AdminEntityResponseDto> {
+    return this.idempotency.execute<RegionPolicyStatusJson>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { ...input, regionPolicyId },
+        scope: `admin-region-policies:${regionPolicyId}:status`,
+      },
+      async (transaction) => {
+        const admin = await this.authorization.requireAdmin(
+          principal,
+          transaction,
+        );
+        const region = await transaction
+          .selectFrom('region_policies')
+          .selectAll()
+          .where('id', '=', regionPolicyId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!region) {
+          throw new NotFoundException({
+            code: 'REGION_POLICY_NOT_FOUND',
+            message: 'The region policy was not found.',
+          });
+        }
+        this.assertVersion(region.configuration_version, input.expectedVersion);
+        const shouldEnable = input.action === RegionPolicyStatusAction.ENABLE;
+        if (region.competition_enabled === shouldEnable) {
+          throw new ConflictException({
+            code: 'REGION_POLICY_STATUS_UNCHANGED',
+            message: `The region policy is already ${shouldEnable ? 'enabled' : 'disabled'}.`,
+          });
+        }
+        const now = new Date();
+        if (
+          shouldEnable &&
+          region.valid_to !== null &&
+          region.valid_to <= now
+        ) {
+          throw new ConflictException({
+            code: 'REGION_POLICY_EXPIRED',
+            message: 'An expired region policy cannot be enabled.',
+          });
+        }
+        if (!shouldEnable) {
+          const liveCompetition = await transaction
+            .selectFrom('competitions')
+            .select('id')
+            .where('region_policy_id', '=', regionPolicyId)
+            .where('status', 'in', ['registration', 'active'])
+            .where('deleted_at', 'is', null)
+            .executeTakeFirst();
+          if (liveCompetition) {
+            throw new ConflictException({
+              code: 'REGION_POLICY_DISABLE_HAS_LIVE_COMPETITION',
+              message:
+                'Cancel or settle live competitions before disabling their region policy.',
+            });
+          }
+        }
+
+        const updated = await transaction
+          .updateTable('region_policies')
+          .set({
+            competition_enabled: shouldEnable,
+            configuration_version: sql<number>`configuration_version + 1`,
+          })
+          .where('id', '=', regionPolicyId)
+          .where('configuration_version', '=', input.expectedVersion)
+          .returning(['configuration_version', 'id'])
+          .executeTakeFirst();
+        if (!updated) throw this.versionConflict();
+        await this.authorization.audit(transaction, {
+          action: shouldEnable
+            ? 'region_policy.enabled'
+            : 'region_policy.disabled',
+          actorUserId: admin.id,
+          entityId: regionPolicyId,
+          entityType: 'region_policies',
+          nextState: {
+            competitionEnabled: shouldEnable,
+            version: updated.configuration_version,
+          },
+          previousState: {
+            competitionEnabled: region.competition_enabled,
+            version: region.configuration_version,
+          },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return {
+          id: updated.id,
+          status: shouldEnable ? 'enabled' : 'disabled',
+          version: updated.configuration_version,
         };
       },
     );
@@ -162,13 +286,13 @@ export class AdminRegionConfigurationService {
     principal: AuthenticatedPrincipal,
     regionPolicyId: string,
     idempotencyKey: string,
-    input: OperatorReasonDto,
+    input: DeleteVersionedAdminEntityDto,
   ): Promise<AdminDeletedEntityResponseDto> {
     return this.idempotency.execute<DeletedRegionJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
-        request: { reason: input.reason, regionPolicyId },
+        request: { ...input, regionPolicyId },
         scope: `admin-region-policies:${regionPolicyId}:delete`,
       },
       async (transaction) => {
@@ -189,6 +313,7 @@ export class AdminRegionConfigurationService {
             message: 'The region policy was not found.',
           });
         }
+        this.assertVersion(region.configuration_version, input.expectedVersion);
         const now = new Date();
         if (
           !canDeleteRegionPolicy({
@@ -227,11 +352,16 @@ export class AdminRegionConfigurationService {
 
         const deleted = await transaction
           .updateTable('region_policies')
-          .set({ deleted_at: now })
+          .set({
+            configuration_version: sql<number>`configuration_version + 1`,
+            deleted_at: now,
+          })
           .where('id', '=', regionPolicyId)
+          .where('configuration_version', '=', input.expectedVersion)
           .where('deleted_at', 'is', null)
           .returning('id')
-          .executeTakeFirstOrThrow();
+          .executeTakeFirst();
+        if (!deleted) throw this.versionConflict();
         await this.authorization.audit(transaction, {
           action: 'region_policy.deleted',
           actorUserId: admin.id,
@@ -242,6 +372,7 @@ export class AdminRegionConfigurationService {
             code: region.code,
             competitionEnabled: region.competition_enabled,
             policyVersion: region.policy_version,
+            version: region.configuration_version,
           },
           reason: input.reason,
           requestId: idempotencyKey,
@@ -249,5 +380,16 @@ export class AdminRegionConfigurationService {
         return { id: deleted.id, status: 'deleted' };
       },
     );
+  }
+
+  private assertVersion(actual: number, expected: number): void {
+    if (actual !== expected) throw this.versionConflict();
+  }
+
+  private versionConflict(): ConflictException {
+    return new ConflictException({
+      code: 'REGION_POLICY_VERSION_CONFLICT',
+      message: 'The region policy changed; reload it before retrying.',
+    });
   }
 }

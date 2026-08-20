@@ -127,7 +127,11 @@ describe('gym controllers', () => {
       reason: 'Configure the approved pilot gym.',
       regionPolicyId: '10000000-0000-4000-8000-000000000002',
     } satisfies CreateGymLocationDto;
-    const update = { ...create, active: true } satisfies UpdateGymLocationDto;
+    const update = {
+      ...create,
+      active: true,
+      expectedVersion: 1,
+    } satisfies UpdateGymLocationDto;
     const reason = {
       reason: 'Configure the approved pilot gym.',
     } satisfies OperatorReasonDto;

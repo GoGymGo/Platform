@@ -115,17 +115,19 @@ export class AdminLegalDocumentsService {
           })
           .returning('id')
           .executeTakeFirstOrThrow();
-        await transaction
+        const event = await transaction
           .insertInto('legal_document_events')
           .values({
             actor_user_id: admin.id,
             created_at: now,
             legal_document_id: document.id,
+            lifecycle_version: 1,
             next_state: 'published',
             previous_state: null,
             reason: input.reason.trim(),
             request_id: idempotencyKey,
           })
+          .returning('lifecycle_version')
           .executeTakeFirstOrThrow();
         await this.authorization.audit(transaction, {
           action: 'legal_document.published',
@@ -137,6 +139,7 @@ export class AdminLegalDocumentsService {
             documentKey: input.documentKey,
             effectiveAt: effectiveAt.toISOString(),
             jurisdictionCode,
+            lifecycleVersion: event.lifecycle_version,
             locale,
             ownerApprovedAt: now.toISOString(),
             ownerApprovedByUserId: admin.id,
@@ -150,6 +153,7 @@ export class AdminLegalDocumentsService {
         return {
           contentSha256,
           id: document.id,
+          lifecycleVersion: event.lifecycle_version,
           status: effectiveAt <= now ? 'effective' : 'scheduled',
         };
       },
@@ -167,7 +171,7 @@ export class AdminLegalDocumentsService {
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
-        request: { legalDocumentId, reason: input.reason },
+        request: { ...input, legalDocumentId },
         scope: 'admin-legal-documents:withdraw',
       },
       async (transaction) => {
@@ -187,45 +191,58 @@ export class AdminLegalDocumentsService {
         }
         const event = await transaction
           .selectFrom('legal_document_events')
-          .select('next_state')
+          .select(['lifecycle_version', 'next_state'])
           .where('legal_document_id', '=', document.id)
-          .orderBy('created_at', 'desc')
-          .orderBy('id', 'desc')
+          .orderBy('lifecycle_version', 'desc')
           .executeTakeFirstOrThrow();
+        if (event.lifecycle_version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'LEGAL_DOCUMENT_VERSION_CONFLICT',
+            message: 'The legal document changed; reload it before retrying.',
+          });
+        }
         if (event.next_state === 'withdrawn') {
-          return {
-            contentSha256: document.content_sha256,
-            id: document.id,
-            status: 'withdrawn',
-          };
+          throw new ConflictException({
+            code: 'LEGAL_DOCUMENT_STATUS_UNCHANGED',
+            message: 'The legal document is already withdrawn.',
+          });
         }
 
         const now = new Date();
-        await transaction
+        const withdrawnEvent = await transaction
           .insertInto('legal_document_events')
           .values({
             actor_user_id: admin.id,
             created_at: now,
             legal_document_id: document.id,
+            lifecycle_version: event.lifecycle_version + 1,
             next_state: 'withdrawn',
             previous_state: 'published',
             reason: input.reason.trim(),
             request_id: idempotencyKey,
           })
+          .returning('lifecycle_version')
           .executeTakeFirstOrThrow();
         await this.authorization.audit(transaction, {
           action: 'legal_document.withdrawn',
           actorUserId: admin.id,
           entityId: document.id,
           entityType: 'legal_documents',
-          nextState: { state: 'withdrawn' },
-          previousState: { state: 'published' },
+          nextState: {
+            state: 'withdrawn',
+            version: withdrawnEvent.lifecycle_version,
+          },
+          previousState: {
+            state: 'published',
+            version: event.lifecycle_version,
+          },
           reason: input.reason,
           requestId: idempotencyKey,
         });
         return {
           contentSha256: document.content_sha256,
           id: document.id,
+          lifecycleVersion: withdrawnEvent.lifecycle_version,
           status: 'withdrawn',
         };
       },
@@ -239,7 +256,7 @@ export class AdminLegalDocumentsService {
   ) {
     const admin = await this.authorization.requireAdmin(principal, transaction);
     const ownerEmail = this.config.get('GOGYMGO_OWNER_EMAIL', { infer: true });
-    if (!ownerEmail || principal.email?.trim().toLowerCase() !== ownerEmail) {
+    if (!ownerEmail || admin.email?.trim().toLowerCase() !== ownerEmail) {
       throw new ForbiddenException({
         code: 'LEGAL_OWNER_APPROVAL_REQUIRED',
         message:

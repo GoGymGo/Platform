@@ -11,6 +11,14 @@ export class AdminDashboardIdentityDto {
   roles!: string[];
 }
 
+export class AdminDashboardCapabilitiesDto {
+  @ApiProperty({ type: Boolean })
+  creatorConfigurationEnabled!: boolean;
+
+  @ApiProperty({ type: Boolean })
+  legalPublicationOwner!: boolean;
+}
+
 export class AdminDashboardRegionDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -53,6 +61,9 @@ export class AdminDashboardRegionDto {
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   validTo!: string | null;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }
 
 export class AdminDashboardGoalBracketDto {
@@ -367,6 +378,9 @@ export class AdminDashboardLegalDocumentDto {
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   ownerApprovedAt!: string | null;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  lifecycleVersion!: number;
 }
 
 export class AdminDashboardAuditEventDto {
@@ -388,6 +402,12 @@ export class AdminDashboardAuditEventDto {
   @ApiProperty({ type: String })
   reason!: string;
 
+  @ApiProperty({ nullable: true, type: Object })
+  before!: Record<string, unknown> | null;
+
+  @ApiProperty({ nullable: true, type: Object })
+  after!: Record<string, unknown> | null;
+
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 }
@@ -395,6 +415,9 @@ export class AdminDashboardAuditEventDto {
 export class AdminDashboardSnapshotDto {
   @ApiProperty({ type: AdminDashboardIdentityDto })
   admin!: AdminDashboardIdentityDto;
+
+  @ApiProperty({ type: AdminDashboardCapabilitiesDto })
+  capabilities!: AdminDashboardCapabilitiesDto;
 
   @ApiProperty({ isArray: true, type: AdminDashboardRegionDto })
   regions!: AdminDashboardRegionDto[];

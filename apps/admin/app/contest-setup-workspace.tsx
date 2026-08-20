@@ -69,6 +69,7 @@ type ContestSetupWorkspaceProps = {
   competitions: Competition[];
   gyms: GymLocation[];
   legalDocuments: LegalDocument[];
+  onCreateGym: () => void;
   onCreateRegion: () => void;
   onPublish: (
     submission: ContestSetupSubmission,
@@ -243,6 +244,7 @@ export function ContestSetupWorkspace({
   competitions,
   gyms,
   legalDocuments,
+  onCreateGym,
   onCreateRegion,
   onPublish,
   onSelectCompetition,
@@ -1082,6 +1084,13 @@ export function ContestSetupWorkspace({
                 </small>
               </SetupField>
             </div>
+            <button
+              className="text-button setup-create-region"
+              onClick={onCreateGym}
+              type="button"
+            >
+              + ADD AN APPROVED PARTNER GYM
+            </button>
             <button
               className="text-button setup-create-region"
               onClick={onCreateRegion}

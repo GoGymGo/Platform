@@ -9,11 +9,13 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import type { LegalReceiptRequirement } from '../../../database/database.types';
@@ -124,7 +126,12 @@ export class PublishLegalDocumentDto extends OperatorReasonDto {
   effectiveAt!: string;
 }
 
-export class WithdrawLegalDocumentDto extends OperatorReasonDto {}
+export class WithdrawLegalDocumentDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
 
 export class LegalDocumentResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
@@ -264,4 +271,7 @@ export class AdminLegalDocumentResponseDto {
 
   @ApiProperty({ minLength: 64, maxLength: 64, type: String })
   contentSha256!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  lifecycleVersion!: number;
 }

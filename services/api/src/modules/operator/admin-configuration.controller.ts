@@ -27,6 +27,7 @@ import { AdminWorkoutConfigurationService } from './admin-workout-configuration.
 import { AdminDashboardSnapshotDto } from './dto/admin-dashboard.dto';
 import {
   AdminEntityResponseDto,
+  AdminCompetitionPublicationPreflightDto,
   AdminDeletedEntityResponseDto,
   AdminRegionPolicyResponseDto,
   CompetitionStatusActionDto,
@@ -35,10 +36,10 @@ import {
   CreateRegionPolicyDto,
   CreatorWorkoutStatusActionDto,
   DeleteVersionedAdminEntityDto,
+  RegionPolicyStatusActionDto,
   UpdateCompetitionDraftDto,
   UpdateCreatorWorkoutDto,
 } from './dto/admin-configuration.dto';
-import { OperatorReasonDto } from './dto/operator.dto';
 
 @ApiTags('operator-configuration')
 @ApiBearerAuth('firebase')
@@ -79,6 +80,24 @@ export class AdminConfigurationController {
     );
   }
 
+  @Post('region-policies/:regionPolicyId/status-action')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Enable or disable a regional operating policy' })
+  @ApiOkResponse({ type: AdminEntityResponseDto })
+  changeRegionPolicyStatus(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('regionPolicyId', ParseUUIDPipe) regionPolicyId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: RegionPolicyStatusActionDto,
+  ): Promise<AdminEntityResponseDto> {
+    return this.regions.changeStatus(
+      principal,
+      regionPolicyId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
   @Delete('region-policies/:regionPolicyId')
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({
@@ -89,7 +108,7 @@ export class AdminConfigurationController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('regionPolicyId', ParseUUIDPipe) regionPolicyId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() input: OperatorReasonDto,
+    @Body() input: DeleteVersionedAdminEntityDto,
   ): Promise<AdminDeletedEntityResponseDto> {
     return this.regions.delete(
       principal,
@@ -149,6 +168,18 @@ export class AdminConfigurationController {
       requireIdempotencyKey(idempotencyKey),
       input,
     );
+  }
+
+  @Get('competitions/:competitionId/publication-preflight')
+  @ApiOperation({
+    summary: 'Evaluate authoritative competition publication prerequisites',
+  })
+  @ApiOkResponse({ type: AdminCompetitionPublicationPreflightDto })
+  getCompetitionPublicationPreflight(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('competitionId', ParseUUIDPipe) competitionId: string,
+  ): Promise<AdminCompetitionPublicationPreflightDto> {
+    return this.competitions.getPublicationPreflight(principal, competitionId);
   }
 
   @Delete('competitions/:competitionId')

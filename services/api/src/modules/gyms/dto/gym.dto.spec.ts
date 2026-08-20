@@ -1,6 +1,11 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CashFulfillmentRequestDto, GymScanRequestDto } from './gym.dto';
+import {
+  CashFulfillmentRequestDto,
+  DeleteGymLocationDto,
+  GymScanRequestDto,
+  UpdateGymLocationDto,
+} from './gym.dto';
 
 const locationCheck = {
   accuracyMeters: 8,
@@ -66,4 +71,47 @@ describe('CashFulfillmentRequestDto', () => {
 
     expect(errors).not.toHaveLength(0);
   });
+});
+
+describe('versioned Partner gym administration DTOs', () => {
+  const update = {
+    active: false,
+    address: '1 Pilot Way',
+    expectedVersion: 3,
+    latitude: 48.4284,
+    longitude: -123.3656,
+    name: 'Condo Gym',
+    radiusMeters: 75,
+    reason: 'Deactivate the location after the Contest closes.',
+    regionPolicyId: '10000000-0000-4000-8000-000000000002',
+  };
+
+  it('accepts an exact current version for update and deletion', async () => {
+    await expect(
+      validate(plainToInstance(UpdateGymLocationDto, update)),
+    ).resolves.toHaveLength(0);
+    await expect(
+      validate(
+        plainToInstance(DeleteGymLocationDto, {
+          expectedVersion: 3,
+          reason: 'Delete the retired location after dependency review.',
+        }),
+      ),
+    ).resolves.toHaveLength(0);
+  });
+
+  it.each([undefined, 0, -1, 1.5])(
+    'rejects an invalid update version %s',
+    async (expectedVersion) => {
+      const errors = await validate(
+        plainToInstance(UpdateGymLocationDto, {
+          ...update,
+          expectedVersion,
+        }),
+      );
+      expect(errors.map((error) => error.property)).toContain(
+        'expectedVersion',
+      );
+    },
+  );
 });

@@ -66,6 +66,7 @@ export class OperatorPortalService {
             .select([
               'gym.active',
               'gym.address',
+              'gym.configuration_version',
               'gym.created_at',
               'gym.id',
               'gym.name',
@@ -229,6 +230,7 @@ export class OperatorPortalService {
                   'boundary_version',
                   'code',
                   'competition_enabled',
+                  'configuration_version',
                   'country_code',
                   'currency',
                   'language_codes',
@@ -290,6 +292,7 @@ export class OperatorPortalService {
             regionCode: gym.region_code,
             regionPolicyId: gym.region_policy_id,
             updatedAt: gym.updated_at.toISOString(),
+            version: gym.configuration_version,
           })),
           operator: {
             email: access.user.email ?? principal.email ?? '',
@@ -311,6 +314,7 @@ export class OperatorPortalService {
             timezone: region.timezone,
             validFrom: region.valid_from.toISOString(),
             validTo: region.valid_to?.toISOString() ?? null,
+            version: region.configuration_version,
           })),
           sessions: sessions.map((session) => ({
             completedAt: session.completed_at?.toISOString() ?? null,

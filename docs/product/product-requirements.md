@@ -469,6 +469,20 @@ or claims.
 - Coupon fingerprints are unique, ciphertext uses a random IV, and plaintext is
   absent outside the authorized claim response.
 - Administrative actions are authorized, versioned, reasoned, and audited.
+- The production administration surface exposes every required Contest, region,
+  reward, legal, Creator-workout, and Partner-gym step; it never substitutes a
+  client-only readiness result or hides a mandatory prerequisite workflow.
+- Contest publication inspects the exact current database schedule, policy and
+  boundary version, owner-approved legal versions/digests, reward inventory,
+  active exact-region gym/QR coverage, and rules. Missing, stale, disabled, or
+  unavailable evidence fails closed.
+- Region, gym, legal, and other stateful lifecycle commands use the version
+  returned by the authoritative read. Destructive actions preserve settlement,
+  receipt, enrollment, workout, QR, reward, and audit history according to the
+  deletion policy.
+- The configured legal owner remains the only publisher/withdrawer. Partner
+  roles remain exact-gym scoped and cannot obtain platform configuration. A
+  Creator admin build flag does not override the API release flag.
 - Account deletion preserves only approved pseudonymous contest and reward
   integrity records.
 - Historical migrations remain replayable and production migrations are

@@ -99,6 +99,7 @@ export const environmentSchema = z
     PRIVATE_CONTENT_BUCKET: optionalTrimmedString,
     AWS_REGION: awsRegion,
     PROFILE_MEDIA_ENABLED: booleanString.default(false),
+    CREATOR_FEATURES_ENABLED: booleanString.default(false),
     PROFILE_MEDIA_MAX_BYTES: z.coerce
       .number()
       .int()

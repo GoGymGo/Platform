@@ -56,6 +56,23 @@ email/password users; the console exposes no self-registration or social-login
 path. Keep the Cloudflare allow policy synchronized with the private operator
 access register whenever an account is issued or revoked.
 
+## Administrative command defense
+
+Cloudflare and Firebase authenticate entry, but authorization remains the
+current database user role and active exact-gym assignment resolved by the API.
+Never add platform or gym authority to token claims, public frontend variables,
+or client storage. Legal publication/withdrawal additionally compares the
+database administrator identity with the protected owner configuration.
+
+The browser may retain only a scoped retry identity for a response-lost
+mutation. The API binds that idempotency key to the exact request body and
+actor, requires the current optimistic version for stateful commands, validates
+the bounded audit reason, and writes the state change plus minimized before and
+after audit in one transaction. A stale version, mismatched retry body,
+unavailable preflight, disabled release flag, or role/scope conflict fails
+closed. Do not bypass these failures with direct database edits or a client-side
+success marker.
+
 ## GitHub deployment environments
 
 Create separate `staging` and `production` environments. Production deployment

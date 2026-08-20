@@ -94,6 +94,22 @@ export class CreateRegionPolicyDto extends OperatorReasonDto {
   boundary!: Record<string, unknown>;
 }
 
+export enum RegionPolicyStatusAction {
+  DISABLE = 'disable',
+  ENABLE = 'enable',
+}
+
+export class RegionPolicyStatusActionDto extends OperatorReasonDto {
+  @ApiProperty({ enum: RegionPolicyStatusAction, type: String })
+  @IsEnum(RegionPolicyStatusAction)
+  action!: RegionPolicyStatusAction;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
+
 export class GoalBracketDto {
   @ApiProperty({ maximum: 7, minimum: 1, type: Number })
   @IsInt()
@@ -295,6 +311,37 @@ export class AdminEntityResponseDto {
   version!: number;
 }
 
+export class AdminCompetitionPublicationCheckDto {
+  @ApiProperty({ type: String })
+  key!: string;
+
+  @ApiProperty({ type: Boolean })
+  satisfied!: boolean;
+
+  @ApiProperty({ type: String })
+  detail!: string;
+}
+
+export class AdminCompetitionPublicationPreflightDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  competitionId!: string;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  evaluatedAt!: string;
+
+  @ApiProperty({ type: Boolean })
+  ready!: boolean;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
+
+  @ApiProperty({ isArray: true, type: AdminCompetitionPublicationCheckDto })
+  checks!: AdminCompetitionPublicationCheckDto[];
+
+  @ApiProperty({ type: Object })
+  evidence!: Record<string, unknown>;
+}
+
 export class AdminRegionPolicyResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -304,4 +351,10 @@ export class AdminRegionPolicyResponseDto {
 
   @ApiProperty({ type: String })
   policyVersion!: string;
+
+  @ApiProperty({ type: Boolean })
+  competitionEnabled!: boolean;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }

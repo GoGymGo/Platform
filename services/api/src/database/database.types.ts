@@ -265,6 +265,7 @@ export interface ProfileMediaTable {
 
 export interface RegionPoliciesTable {
   id: Generated<string>;
+  configuration_version: Generated<number>;
   code: string;
   country_code: string;
   subdivision_code: string;
@@ -394,6 +395,7 @@ export interface LegalDocumentsTable {
 
 export interface LegalDocumentEventsTable {
   id: Generated<string>;
+  lifecycle_version: Generated<number>;
   legal_document_id: string;
   previous_state: LegalDocumentState | null;
   next_state: LegalDocumentState;
@@ -521,6 +523,7 @@ export interface WorkoutSessionsTable {
 
 export interface GymLocationsTable {
   id: Generated<string>;
+  configuration_version: Generated<number>;
   region_policy_id: string;
   name: string;
   address: string;

@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { sql } from 'kysely';
+import type { Environment } from '../../config/environment';
 import { DatabaseService } from '../../database/database.service';
-import type { JsonObject } from '../../database/database.types';
+import type { JsonObject, JsonValue } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { AdminAuthorizationService } from './admin-authorization.service';
 import type {
@@ -14,6 +16,7 @@ export class AdminDashboardService {
   constructor(
     private readonly database: DatabaseService,
     private readonly authorization: AdminAuthorizationService,
+    private readonly config: ConfigService<Environment, true>,
   ) {}
 
   async getSnapshot(
@@ -49,6 +52,7 @@ export class AdminDashboardService {
               'boundary_version',
               'code',
               'competition_enabled',
+              'configuration_version',
               'country_code',
               'currency',
               'language_codes',
@@ -251,9 +255,8 @@ export class AdminDashboardService {
             .execute(),
           transaction
             .selectFrom('legal_document_events')
-            .select(['legal_document_id', 'next_state'])
-            .orderBy('created_at', 'desc')
-            .orderBy('id', 'desc')
+            .select(['legal_document_id', 'lifecycle_version', 'next_state'])
+            .orderBy('lifecycle_version', 'desc')
             .execute(),
           transaction
             .selectFrom('operator_audit_events as audit')
@@ -264,6 +267,8 @@ export class AdminDashboardService {
               'audit.created_at',
               'audit.entity_id',
               'audit.entity_type',
+              'audit.next_state',
+              'audit.previous_state',
               'audit.reason',
               'actor.email as actor_email',
             ])
@@ -306,10 +311,16 @@ export class AdminDashboardService {
             { assigned: row.assigned_count, total: row.count },
           ]),
         );
-        const legalStateByDocument = new Map<string, string>();
+        const legalStateByDocument = new Map<
+          string,
+          { state: string; version: number }
+        >();
         for (const event of legalDocumentEvents) {
           if (!legalStateByDocument.has(event.legal_document_id)) {
-            legalStateByDocument.set(event.legal_document_id, event.next_state);
+            legalStateByDocument.set(event.legal_document_id, {
+              state: event.next_state,
+              version: event.lifecycle_version,
+            });
           }
         }
 
@@ -319,9 +330,23 @@ export class AdminDashboardService {
             id: admin.id,
             roles: admin.roles,
           },
+          capabilities: {
+            creatorConfigurationEnabled: this.config.get(
+              'CREATOR_FEATURES_ENABLED',
+              { infer: true },
+            ),
+            legalPublicationOwner:
+              Boolean(
+                this.config.get('GOGYMGO_OWNER_EMAIL', { infer: true }),
+              ) &&
+              admin.email?.trim().toLowerCase() ===
+                this.config.get('GOGYMGO_OWNER_EMAIL', { infer: true }),
+          },
           auditEvents: auditEvents.map((event) => ({
             action: event.action,
             actorEmail: event.actor_email,
+            after: this.minimizeAuditState(event.next_state),
+            before: this.minimizeAuditState(event.previous_state),
             createdAt: event.created_at.toISOString(),
             entityId: event.entity_id,
             entityType: event.entity_type,
@@ -354,7 +379,14 @@ export class AdminDashboardService {
           })),
           generatedAt: now.toISOString(),
           legalDocuments: legalDocuments.map((document) => {
-            const state = legalStateByDocument.get(document.id);
+            const lifecycle = legalStateByDocument.get(document.id);
+            if (!lifecycle) {
+              throw new InternalServerErrorException({
+                code: 'LEGAL_DOCUMENT_LIFECYCLE_MISSING',
+                message:
+                  'A legal document is missing its authoritative lifecycle evidence.',
+              });
+            }
             return {
               content: document.content as JsonObject,
               contentSha256: document.content_sha256,
@@ -363,11 +395,12 @@ export class AdminDashboardService {
               id: document.id,
               jurisdictionCode: document.jurisdiction_code,
               locale: document.locale,
+              lifecycleVersion: lifecycle.version,
               ownerApprovedAt:
                 document.owner_approved_at?.toISOString() ?? null,
               receiptRequirement: document.receipt_requirement,
               status:
-                state === 'withdrawn'
+                lifecycle.state === 'withdrawn'
                   ? ('withdrawn' as const)
                   : document.effective_at <= now
                     ? ('effective' as const)
@@ -391,6 +424,7 @@ export class AdminDashboardService {
             timezone: region.timezone,
             validFrom: region.valid_from.toISOString(),
             validTo: region.valid_to?.toISOString() ?? null,
+            version: region.configuration_version,
           })),
           rewards: rewards.map((reward) => {
             const coupons = couponsByReward.get(reward.id);
@@ -439,6 +473,41 @@ export class AdminDashboardService {
           })),
         };
       });
+  }
+
+  private minimizeAuditState(value: unknown): JsonObject | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const sensitiveKey =
+      /(?:actor|winner)?userId|email|firebase|password|secret|token|qrPayload|(?:coupon|reward|redemption)Code|codeFingerprint|encrypted|claimUrl|fulfillmentInstructions|seedReveal/i;
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => !sensitiveKey.test(key))
+        .slice(0, 16)
+        .map(([key, entry]) => [key, this.minimizeAuditValue(entry)]),
+    );
+  }
+
+  private minimizeAuditValue(value: unknown): JsonValue {
+    if (value === null) return null;
+    if (
+      typeof value === 'boolean' ||
+      typeof value === 'number' ||
+      typeof value === 'string'
+    ) {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value
+        .slice(0, 20)
+        .filter(
+          (entry): entry is boolean | number | string | null =>
+            entry === null ||
+            ['boolean', 'number', 'string'].includes(typeof entry),
+        );
+    }
+    return this.minimizeAuditState(value);
   }
 
   private toCompetition(

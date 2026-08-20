@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `fef37d9a552ecb68b90b57d13f7b0082234172ae` after PR #103 on 2026-08-14.
-- Active feature task: `GoGymGo Feature GGG-024 — September pilot cash reward`
-  on `agent/ggg-024-pilot-cash-fulfillment`; creation follows this ledger merge.
+  `b81b4326ef550b7e87a4cd5e24968828e78f7463` after PR #109 on 2026-08-20.
+- Active feature task: `GoGymGo Feature GGG-021 — Administrative configuration`
+  on `agent/ggg-021-administrative-configuration`; creation follows this ledger
+  merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 40 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 41 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -808,21 +809,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   admin-only audited manual fulfillment.
 - External providers / feature flag: no payment provider; pilot configuration is
   explicit and idempotent.
-- Current implementation / missing behavior: sole-reward publication guard and
-  manual fulfillment record exist. A fresh task must prove that the exact pilot
-  exception consumes only authoritative GGG-016 settled results, permits no
-  payment/wallet/bank data or automated payout, keeps fulfillment admin-only and
-  audited/idempotent, and presents consistent conditional copy without implying
-  an unapproved live cash offer. Final legal/financial approval and real reward
-  configuration remain external and must fail closed.
-- Required tests / operations / cloud dependency: exactly-one reward, no wallet/
-  payout schema, fair settlement, duplicate fulfillment, public copy consistency,
-  manual receipt/audit; real approved reward and staging database.
+- Current implementation / missing behavior: the exact September pilot policy
+  now binds one published GoGymGo-sponsored 10000-cent CAD manual-only reward to
+  the approved competition, assets, terms, draw reward slot, settled award, and
+  immutable public snapshot. Database constraints preserve the live sole reward
+  and its amount/currency and enforce one append-only handoff linked to the exact
+  winner/slot. The admin route reauthorizes the database admin on every replay,
+  uses body-bound idempotency and optimistic award versioning, and atomically
+  records the handoff, award transition, and minimized audit; generic cash
+  fulfillment is rejected. Member/admin projections are authoritative and
+  privacy-limited, landing copy fails closed until availability is proven, and
+  no payment, wallet, bank, payee, tax, transfer, webhook, or provider boundary
+  exists. No known repository behavior remains missing for this duty.
+- Required tests / operations / cloud dependency: exact pilot/reward/snapshot/
+  winner linkage, amount/currency, admin denial, version conflict, stable retry,
+  concurrency, rollback, append-only audit, privacy export, copy/source/provider
+  boundaries, and full migrated PostgreSQL suite; real approved reward assets,
+  legal/financial approval, and staging database rehearsal remain external.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-024 — September pilot cash
-  reward`; branch `agent/ggg-024-pilot-cash-fulfillment`; PR/merge `pending`;
-  status `IN_PROGRESS`.
-- Residual risks / blocker: legal/financial authority for the cash reward and
-  winner fulfillment is outside repository authority.
+  reward`; branch `agent/ggg-024-pilot-cash-fulfillment` (deleted after merge);
+  PR `#105`; merge `5886931dea855f4a60ddbac94d0c2d38e18ba9d6`;
+  status `COMPLETE`.
+- Residual risks / blocker: final legal/financial approval, approved public
+  assets/terms and real reward configuration, plus a separately authorized
+  staging settlement and in-person handoff rehearsal remain release gates. The
+  repository stays fail closed meanwhile; no cloud or money movement occurred.
 
 ### GGG-025 — Public marketing, product demo, and join conversion
 
@@ -984,20 +995,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   weaken Firebase, API route, deep-link, permission, or demo-isolation controls.
 - External providers / feature flag: npm/Expo compatibility metadata; existing
   locked dependencies only; no feature flag.
-- Current implementation / missing behavior: eleven SDK 57 package declarations
-  and their patch-level lockfile chain are aligned through supported Expo
-  tooling. Clean locked installs pass `expo install --check`; all-platform and
-  preview artifacts remain unchanged in behavior. No repository duty is missing.
+- Current implementation / missing behavior: the current SDK 57 patch set is
+  aligned through supported Expo tooling. Required PR/main CI now runs the
+  strict locked compatibility check with `EXPO_OFFLINE=1`, binding it to the
+  installed Expo SDK metadata and exact lock while still rejecting tampered
+  packages. A separate weekly/manual online advisory fails visibly when Expo
+  recommends newer compatible patches and never mutates dependencies. Unchanged
+  locked releases are deterministic and no repository duty remains missing.
 - Required tests / operations / cloud dependency: exact declared package/lockfile
   alignment, dependency/governance audit, member type/lint/tests, Expo install
   check, iOS/Android/web exports, production/preview bundle and source audits,
   full repository check, exact-head PR and restored main-push checks. No cloud
   dependency.
 - Delivery: priority `P0` CI restoration; task `GoGymGo Feature GGG-031 — Expo
-  SDK patch compatibility`; branch `agent/ggg-031-expo-sdk-patch-compatibility`
-  deleted; PR #97; exact tested head
-  `7793c28aca7a8ff2c73280c90d3057ea21737bd1`; merge
-  `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4`; status `COMPLETE`.
+  SDK patch compatibility`; latest branch
+  `agent/ggg-031-expo-sdk-deterministic-check-3` (deleted after merge); PR #109;
+  exact tested head `110bd70ba3ee7a5d8ed005e17a37bb498b644040`;
+  merge `b81b4326ef550b7e87a4cd5e24968828e78f7463`; status `COMPLETE`.
 - Residual risks / blocker: Expo compatibility metadata can advance again; the
   deterministic CI gate must remain enabled. This task did not migrate SDK
   major/minor versions or alter permissions, plugins, native identifiers, source,
@@ -1110,6 +1124,45 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-20 — Completed the deterministic `GGG-031` repair through PR #109.
+  Exact tested head `110bd70ba3ee7a5d8ed005e17a37bb498b644040`
+  was squash-merged as `b81b4326ef550b7e87a4cd5e24968828e78f7463`;
+  all seven PR checks and all six exact-main workflows passed and the remote
+  branch was deleted. Required CI now strictly validates the exact locked SDK
+  against installed Expo metadata offline, with a tampered-package regression;
+  a separate weekly/manual online advisory reports future compatible patches
+  without blocking unrelated releases or mutating dependencies. The bounded
+  five-file change also aligned the current eleven SDK 57 patches. Serial proof
+  included clean install, 249 member tests/audits, iOS/Android/web and preview
+  exports, governance, dependency audit, non-database journeys, and the full
+  repository check. No local Docker, cloud access, deployment, SDK major/minor,
+  product source/configuration, permission, plugin, or native-ID change occurred.
+  `GGG-021` remains the next launch-critical P0 feature.
+- 2026-08-20 — Recompleted `GGG-031` after Expo's external SDK 57 compatibility
+  metadata advanced again. Exact tested head
+  `403475b911416b390125d9e13c07a98b97139d62` changed only the member package
+  declaration and root lockfile, was squash-merged through PR #108 as
+  `3398b47621096805cc044682a613975c3cc53df9`, and restored the previously failing
+  Expo check. All seven PR checks and all six exact-main workflows passed; the
+  remote branch was deleted. Serial validation included a clean locked install,
+  244 member tests and audits, iOS/Android/web and preview exports, governance,
+  dependency audit, non-database journeys, and the full non-Docker repository
+  check. No local Docker, cloud access, deployment, SDK major/minor migration,
+  source/configuration, permission, plugin, or native-identifier change occurred.
+  `GGG-021` remains the next launch-critical P0 feature.
+- 2026-08-15 — Completed `GGG-024` through PR #105. Exact tested head
+  `c5bfb50c6fc0fff8f998dd0d80296bafbe2553b9` was squash-merged as
+  `5886931dea855f4a60ddbac94d0c2d38e18ba9d6`; all seven PR checks and all six
+  exact-main workflows passed, the remote branch was deleted, and there was no
+  cloud or payment-provider impact. Serial validation included the complete
+  repository gate, 298 API unit tests, 28 API E2E tests, 244 member tests, 37
+  admin tests, 15 landing tests, the focused five-case cash workflow and 70
+  database integration tests across 11 suites. Authorized Docker gates ran one
+  at a time and cleaned fully. Dependency ordering assigns launch-critical P0
+  `GGG-021` next because the consolidated administrative configuration duty is
+  the remaining authoritative operator prerequisite for staging; real legal/
+  financial approval and production configuration remain outside repository
+  authority. Future Docker use again pauses for user direction.
 - 2026-08-14 — Completed `GGG-016` through PR #103. Exact tested head
   `16d6968cfc4009a9199d462ce327be18cfdfc6b6` was squash-merged as
   `fef37d9a552ecb68b90b57d13f7b0082234172ae`; all seven PR checks and all six

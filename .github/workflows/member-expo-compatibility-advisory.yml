@@ -1,0 +1,38 @@
+name: Member Expo Compatibility Advisory
+
+on:
+  schedule:
+    - cron: "23 16 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: member-expo-compatibility-advisory
+  cancel-in-progress: true
+
+jobs:
+  compatible-patch-advisory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/member-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          cache: npm
+          cache-dependency-path: package-lock.json
+          node-version: 24
+      - name: Install the exact committed dependency set
+        run: npm ci --ignore-scripts
+        working-directory: .
+      - name: Check current Expo online compatibility recommendations
+        run: npm run advisory:expo-compatibility
+      - name: Explain compatible patch maintenance
+        if: failure()
+        run: |
+          echo "### Expo-compatible patch maintenance is available" >> "$GITHUB_STEP_SUMMARY"
+          echo "Review the advisory output, use supported Expo install tooling on a focused branch, and rerun member release validation." >> "$GITHUB_STEP_SUMMARY"

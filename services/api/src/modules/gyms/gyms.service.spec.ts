@@ -52,6 +52,7 @@ interface GymsServiceInternals {
       credentialVersion: number;
     }>;
     address: string;
+    configuration_version: number;
     created_at: Date;
     id: string;
     latitude: number;
@@ -62,6 +63,7 @@ interface GymsServiceInternals {
     region_policy_id: string;
     updated_at: Date;
   }): GymLocationResponseDto;
+  assertGymVersion(actual: number, expected: number): void;
   mapWaitlist(entry: {
     consent_notice_version: string | null;
     consented_at: Date | null;
@@ -184,6 +186,7 @@ describe('gym service privacy-safe presentation helpers', () => {
         { competitionId: 'competition-1', credentialVersion: 2 },
       ],
       address: '1 Pilot Way',
+      configuration_version: 4,
       created_at: createdAt,
       id: 'gym-1',
       latitude: 48.4284,
@@ -210,6 +213,7 @@ describe('gym service privacy-safe presentation helpers', () => {
       regionCode: 'vancouver-island-gulf-islands-bc',
       regionPolicyId: 'region-1',
       updatedAt: updatedAt.toISOString(),
+      version: 4,
     });
     expect(service.gymAuditState(gym)).toEqual({
       active: true,
@@ -217,6 +221,7 @@ describe('gym service privacy-safe presentation helpers', () => {
       name: 'Condo Gym',
       radiusMeters: 75,
       regionPolicyId: 'region-1',
+      version: 4,
     });
     expect(
       service.mapWaitlist({
@@ -262,6 +267,20 @@ describe('gym service privacy-safe presentation helpers', () => {
       rewardAwardId: 'award-1',
       winnerUserId: 'winner-1',
     });
+  });
+
+  it('rejects stale Partner gym mutations with a stable conflict code', () => {
+    try {
+      service.assertGymVersion(4, 3);
+      throw new Error('Expected a stale version conflict.');
+    } catch (error) {
+      expect(error).toMatchObject({
+        response: expect.objectContaining({
+          code: 'GYM_LOCATION_VERSION_CONFLICT',
+        }),
+      });
+    }
+    expect(() => service.assertGymVersion(4, 4)).not.toThrow();
   });
 
   it('generates a printable non-executable poster with an escaped gym name', async () => {

@@ -183,6 +183,9 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /useStoredPreference/);
   assert.match(dashboard, /Saved on this device/);
   assert.match(dashboard, /className="nav-count"/);
+  assert.match(dashboard, /label: "Regions"/);
+  assert.match(dashboard, /label: "Rewards"/);
+  assert.match(dashboard, /label: "Partner gyms"/);
   assert.doesNotMatch(dashboard, /GUIDED CONTEST LAUNCH/);
   assert.doesNotMatch(dashboard, /TESTING SHORTCUT|SET 30-MINUTE TEST WINDOW/);
   assert.doesNotMatch(dashboard, /Opens registration now/);
@@ -193,10 +196,14 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /<ContestSetupWorkspace/);
   assert.match(dashboard, /gogymgo\.admin\.setup\.competition-id/);
   assert.match(dashboard, /publishCompleteContestSetup/);
+  assert.match(dashboard, /publication-preflight/);
+  assert.match(dashboard, /preflight\.version !== expectedVersion/);
+  assert.match(dashboard, /The authoritative publication prerequisites/);
   assert.match(dashboard, /setContestHomeId\(competitionId\)/);
   assert.match(contestSetupWorkspace, /ONE-PAGE CONTEST SETUP/);
   assert.match(contestSetupWorkspace, /USE MY LOCATION/);
   assert.match(contestSetupWorkspace, /CREATE A DIFFERENT REGION/);
+  assert.match(contestSetupWorkspace, /ADD AN APPROVED PARTNER GYM/);
   assert.match(contestSetupWorkspace, /PUBLISH CONTEST/);
   assert.match(contestSetupWorkspace, /if \(!imageUrl \|\| !termsUrl\)/);
   assert.match(
@@ -240,18 +247,24 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /className="column-menu"/);
   assert.match(dashboard, /className="pagination"/);
   assert.match(dashboard, /className="audit-diff"/);
-  assert.match(dashboardUtils, /event\.before \|\| event\.after/);
+  assert.match(dashboardUtils, /summarizeAuditState\(event\.after\)/);
+  assert.match(dashboardUtils, /No resulting state recorded by server/);
+  assert.doesNotMatch(dashboardUtils, /scheduled or open|existing record/);
   assert.match(dashboard, /No regions added/);
   assert.match(dashboard, /No legal documents published/);
   assert.match(dashboard, /No audit events recorded/);
   assert.match(dashboard, /Delete contest/);
   assert.match(dashboard, /Delete reward/);
   assert.match(dashboard, /Delete region/);
+  assert.match(dashboard, /region-policies\/\$\{region\.id\}\/status-action/);
+  assert.match(dashboard, /expectedVersion: region\.version/);
   assert.doesNotMatch(dashboard, /Delete legal version/);
   assert.match(dashboard, /History retained/);
   assert.match(dashboard, /Delete workout/);
   assert.doesNotMatch(dashboard, /remain preserved/);
   assert.match(dashboard, /operator\/gym-locations/);
+  assert.match(dashboard, /expectedVersion: gym\.version/);
+  assert.match(pilot, /expectedVersion: gym\.version/);
   assert.match(dashboard, /operator\/gym-sessions/);
   assert.match(dashboard, /operator\/region-waitlist/);
   assert.match(
@@ -263,6 +276,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /operator\/interest-submissions/);
   assert.match(dashboard, /operator\/partner-applications/);
   assert.match(dashboard, /operator\/cash-fulfillments/);
+  assert.match(
+    dashboard,
+    /snapshot\.capabilities\.creatorConfigurationEnabled/,
+  );
+  assert.match(dashboard, /snapshot\.capabilities\.legalPublicationOwner/);
+  assert.match(dashboard, /expectedVersion: document\.lifecycleVersion/);
   assert.match(pilot, /STATIC QR PILOT/);
   assert.match(pilot, /onUpdateWaitlist/);
   assert.match(pilot, /legacy \/ not recorded/);
@@ -494,7 +513,7 @@ test("keeps authorization and mutation safeguards in the implementation", async 
 
   const dashboardForms = dashboard.match(/<form\b[\s\S]*?>/g) ?? [];
   const pilotForms = pilot.match(/<form\b[\s\S]*?>/g) ?? [];
-  assert.equal(dashboardForms.length, 8);
+  assert.equal(dashboardForms.length, 9);
   assert.equal(pilotForms.length, 5);
   dashboardForms.forEach((form) => assert.match(form, /noValidate/));
   pilotForms.forEach((form) => assert.match(form, /noValidate/));

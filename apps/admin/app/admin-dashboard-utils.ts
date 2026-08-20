@@ -49,29 +49,14 @@ export function formatQueueAge(value: string) {
 }
 
 export function getAuditChange(event: AuditEvent) {
-  if (event.before || event.after) {
-    return {
-      after: summarizeAuditState(event.after) || "No resulting state recorded",
-      before: summarizeAuditState(event.before) || "No previous state recorded",
-    };
-  }
-  const action = event.action.toLowerCase();
-  const transitions: Array<[string, string, string]> = [
-    ["publish", "draft", "published"],
-    ["archive", "published", "archived"],
-    ["cancel", "scheduled or open", "cancelled"],
-    ["withdraw", "effective or scheduled", "withdrawn"],
-    ["revoke", "active", "revoked"],
-    ["approve", "pending review", "approved"],
-    ["reject", "pending review", "rejected"],
-    ["delete", "retired record", "deleted from dashboard"],
-    ["create", "not present", "created"],
-    ["update", "previous version", "updated version"],
-  ];
-  const transition = transitions.find(([token]) => action.includes(token));
-  return transition
-    ? { after: transition[2], before: transition[1] }
-    : { after: event.action.replaceAll("_", " "), before: "existing record" };
+  return {
+    after:
+      summarizeAuditState(event.after) ||
+      "No resulting state recorded by server",
+    before:
+      summarizeAuditState(event.before) ||
+      "No previous state recorded by server",
+  };
 }
 
 function summarizeAuditState(value?: Record<string, unknown> | null) {

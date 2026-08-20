@@ -7,12 +7,25 @@ GoGymGo configuration changes are authenticated server operations, not direct da
 All routes use the `/v1/operator/configuration` prefix:
 
 - `POST /region-policies` creates one immutable, time-bounded policy version. PostgreSQL rejects overlapping versions for the same region code and invalid PostGIS boundaries.
+- `POST /region-policies/:id/status-action` enables or disables a policy when
+  `expectedVersion` matches. Disable fails while a registration or active
+  Contest depends on the policy; an expired policy cannot be re-enabled.
+- `DELETE /region-policies/:id` retires a disabled or expired policy when
+  `expectedVersion` matches and deletion-policy dependency checks pass.
 - `POST /competitions` creates a draft with its complete rules, schedule, entrant limits, and goal brackets.
 - `PUT /competitions/:id` replaces a draft when `expectedVersion` matches.
+- `GET /competitions/:id/publication-preflight` returns the current database
+  version, evaluation instant, pass/fail checks, and minimized region, legal,
+  reward, gym/QR, rules, and schedule evidence. A failed or unavailable read is
+  never permission to publish.
 - `POST /competitions/:id/status-action` publishes or cancels a competition when `expectedVersion` matches.
 - `POST /creator-workouts` creates an unpublished workout.
 - `PUT /creator-workouts/:id` replaces an unpublished workout when `expectedVersion` matches.
 - `POST /creator-workouts/:id/status-action` publishes or unpublishes a workout when `expectedVersion` matches.
+- `DELETE /creator-workouts/:id` deletes only an unpublished workout when
+  `expectedVersion` matches. All Creator mutations fail closed unless the API
+  `CREATOR_FEATURES_ENABLED` flag is true; the admin build flag alone grants no
+  capability.
 - `POST /rewards` creates a draft sponsor reward with an approved image, terms,
   exact inventory, availability window, and one permitted claim path.
 - `PUT /rewards/:id` replaces a draft when `expectedVersion` matches.
@@ -37,6 +50,14 @@ intentionally absent. Retrying a lost response must reuse the same
 
 Contest-specific Partner-gym poster routes use the `/v1/operator` prefix:
 
+- `POST /gym-locations` creates an active gym only when its coordinates are
+  covered by the exact current enabled region policy.
+- `PUT /gym-locations/:gymId` requires `expectedVersion`; moving regions
+  requires an inactive gym with no Contest history, and deactivation rejects
+  open workouts or live Contest dependencies before revoking active posters.
+- `DELETE /gym-locations/:gymId` requires the current `expectedVersion`, an
+  inactive gym, and no live dependency. It preserves historical sessions,
+  assignments, poster records, and audit evidence.
 - `POST /competitions/:competitionId/gym-locations/:gymId` assigns one active
   gym in the exact Contest region; this remains platform-admin only.
 - `POST /competitions/:competitionId/gym-locations/:gymId/qr-credentials`
@@ -55,6 +76,13 @@ Issue, assignment, and revocation commands require a reason and an
 in-progress response must reuse the same key. Verify the preview's exact
 Contest, gym, version, and expiry before printing; revoke all test-era posters
 before distributing a real artifact.
+
+Every retryable create, update, status, withdrawal, archive, and deletion body
+is bound to its `Idempotency-Key`. Reuse the same key only for the exact same
+body after a lost or retryable response; a body mismatch is rejected. Stateful
+commands require the version from the latest authoritative dashboard read.
+Refresh and review after a version conflict rather than incrementing a client
+value. Audit reasons are required and bounded to 8–500 characters.
 
 Competition publication requires registration to be open already, with its close and Contest start still in the future. The enabled region policy must cover the full lifecycle; current owner-approved Privacy, Terms, and Official Contest Rules must resolve for its exact jurisdiction; at least one goal bracket and published catalog reward must exist; and the currently supported verification policy must require an assigned active Partner gym with an active contest-specific QR credential. A future registration window remains a draft until an operator intentionally publishes it after the window opens. Creator workout publication requires absolute HTTPS media URLs and currently enabled target regions.
 
@@ -150,6 +178,15 @@ exact immutable version. Unapproved legacy documents are not returned by the
 member legal API. Legal records cannot be deleted from the operator API or
 dashboard; withdrawal preserves immutable content, approvals, events, and
 receipt history while returning resolution to the prior current version.
+Withdrawal also requires the document's current `lifecycleVersion`; the owner
+gate is resolved server-side from the database administrator identity and the
+protected owner configuration, never from a client capability claim.
+
+The dashboard audit projection comes from stored append-only `previous_state`
+and `next_state`. It intentionally removes identities, email, tokens, QR
+payloads, reward/coupon codes, claim URLs, fulfillment instructions, encrypted
+material, and seed reveals. When an older event has no state projection, the UI
+states that the server did not record it and does not fabricate a transition.
 
 After the first bootstrap, administrator delegation remains deliberately
 fail-closed and owner-operated. A separate, explicitly approved product and

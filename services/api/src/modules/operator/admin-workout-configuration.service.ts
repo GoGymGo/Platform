@@ -5,7 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { sql, type Transaction } from 'kysely';
+import { ConfigService } from '@nestjs/config';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import type { Environment } from '../../config/environment';
 import type { Database, JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { canDeleteCreatorWorkout } from './admin-deletion-policy';
@@ -36,6 +38,7 @@ export class AdminWorkoutConfigurationService {
   constructor(
     private readonly authorization: AdminAuthorizationService,
     private readonly idempotency: IdempotencyService,
+    private readonly config: ConfigService<Environment, true>,
   ) {}
 
   create(
@@ -58,6 +61,7 @@ export class AdminWorkoutConfigurationService {
           principal,
           transaction,
         );
+        this.assertCreatorConfigurationEnabled();
         await this.assertReferences(transaction, input);
         const now = new Date();
         const workout = await transaction
@@ -114,6 +118,7 @@ export class AdminWorkoutConfigurationService {
           principal,
           transaction,
         );
+        this.assertCreatorConfigurationEnabled();
         const current = await transaction
           .selectFrom('creator_workouts')
           .selectAll()
@@ -195,6 +200,7 @@ export class AdminWorkoutConfigurationService {
           principal,
           transaction,
         );
+        this.assertCreatorConfigurationEnabled();
         const current = await transaction
           .selectFrom('creator_workouts')
           .selectAll()
@@ -282,6 +288,7 @@ export class AdminWorkoutConfigurationService {
           principal,
           transaction,
         );
+        this.assertCreatorConfigurationEnabled();
         const workout = await transaction
           .selectFrom('creator_workouts')
           .selectAll()
@@ -360,6 +367,16 @@ export class AdminWorkoutConfigurationService {
     await this.assertKnownRegions(transaction, input.regionCodes);
   }
 
+  private assertCreatorConfigurationEnabled(): void {
+    if (!this.config.get('CREATOR_FEATURES_ENABLED', { infer: true })) {
+      throw new ConflictException({
+        code: 'CREATOR_FEATURES_DISABLED',
+        message:
+          'Creator-workout configuration is disabled for this API release.',
+      });
+    }
+  }
+
   private async assertKnownRegions(
     transaction: Transaction<Database>,
     regionCodes: string[],
@@ -369,6 +386,7 @@ export class AdminWorkoutConfigurationService {
       .select('code')
       .distinct()
       .where('code', 'in', regionCodes)
+      .where('deleted_at', 'is', null)
       .execute();
     if (
       new Set(regions.map((region) => region.code)).size !== regionCodes.length
@@ -390,6 +408,7 @@ export class AdminWorkoutConfigurationService {
       .select('code')
       .distinct()
       .where('code', 'in', regionCodes)
+      .where('deleted_at', 'is', null)
       .where('competition_enabled', '=', true)
       .where('valid_from', '<=', now)
       .where((expression) =>

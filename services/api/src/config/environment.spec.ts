@@ -26,6 +26,7 @@ describe('environment validation', () => {
     expect(environment.DATABASE_URL).toContain('localhost:5432');
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
+    expect(environment.CREATOR_FEATURES_ENABLED).toBe(false);
     expect(environment.PRIVATE_OBJECT_STORAGE_PROVIDER).toBe('aws-s3');
     expect(environment.AWS_REGION).toBe('ca-central-1');
     expect(environment.PROFILE_MEDIA_MAX_BYTES).toBe(2 * 1_024 * 1_024);

@@ -1,3 +1,5 @@
+import type { ConfigService } from '@nestjs/config';
+import type { Environment } from '../../config/environment';
 import type { DatabaseService } from '../../database/database.service';
 import type { AdminAuthorizationService } from './admin-authorization.service';
 import { AdminDashboardService } from './admin-dashboard.service';
@@ -8,6 +10,7 @@ describe('AdminDashboardService contest gym assignments', () => {
     const service = new AdminDashboardService(
       {} as DatabaseService,
       {} as AdminAuthorizationService,
+      {} as ConfigService<Environment, true>,
     );
     const presenter = service as unknown as {
       toCompetition(
@@ -92,5 +95,29 @@ describe('AdminDashboardService contest gym assignments', () => {
 
     expect(present('contest-one').assignedGymIds).toEqual(['gym-skygate']);
     expect(present('contest-two').assignedGymIds).toEqual(['gym-skygate']);
+  });
+
+  it('projects useful before/after audit state without operator or reward secrets', () => {
+    const service = new AdminDashboardService(
+      {} as DatabaseService,
+      {} as AdminAuthorizationService,
+      {} as ConfigService<Environment, true>,
+    ) as unknown as {
+      minimizeAuditState(value: unknown): Record<string, unknown> | null;
+    };
+
+    expect(
+      service.minimizeAuditState({
+        couponCodes: ['WINNER-SECRET'],
+        nested: { token: 'private-token', verified: true },
+        ownerApprovedByUserId: 'owner-1',
+        status: 'published',
+        version: 4,
+      }),
+    ).toEqual({
+      nested: { verified: true },
+      status: 'published',
+      version: 4,
+    });
   });
 });

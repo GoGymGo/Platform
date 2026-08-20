@@ -40,6 +40,7 @@ import {
   AssignCompetitionGymDto,
   CashFulfillmentRequestDto,
   CreateGymLocationDto,
+  DeleteGymLocationDto,
   GymScanRequestDto,
   InterestSubmissionDto,
   MemberRegionWaitlistRequestDto,
@@ -181,13 +182,13 @@ export class GymOperatorController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() input: OperatorReasonDto,
+    @Body() input: DeleteGymLocationDto,
   ): Promise<{ id: string; status: 'deleted' }> {
     return this.gyms.deleteGymLocation(
       principal,
       gymId,
       requireIdempotencyKey(idempotencyKey),
-      input.reason,
+      input,
     );
   }
 

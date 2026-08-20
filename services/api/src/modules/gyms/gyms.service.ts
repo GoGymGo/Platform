@@ -25,6 +25,7 @@ import type {
   CashFulfillmentRecordDto,
   CashFulfillmentRequestDto,
   CreateGymLocationDto,
+  DeleteGymLocationDto,
   GymLocationResponseDto,
   GymQrCredentialHistoryDto,
   GymQrCredentialResponseDto,
@@ -569,13 +570,20 @@ export class GymsService {
     requestId: string,
     input: CreateGymLocationDto,
   ): Promise<GymLocationResponseDto> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    return this.idempotency.execute<JsonObject>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: input as unknown as JsonObject,
+        responseCode: 201,
+        scope: 'admin-gym-locations:create',
+      },
+      async (transaction) => {
         const admin = await this.adminAuthorization.requireAdmin(
           principal,
           transaction,
         );
+        await this.assertGymActivationAllowed(transaction, input);
         const now = new Date();
         const gym = await transaction
           .insertInto('gym_locations')
@@ -589,7 +597,7 @@ export class GymsService {
             region_policy_id: input.regionPolicyId,
             updated_at: now,
           })
-          .returning('id')
+          .returning(['configuration_version', 'id'])
           .executeTakeFirstOrThrow();
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_location.created',
@@ -602,13 +610,18 @@ export class GymsService {
             name: input.name.trim(),
             radiusMeters: input.radiusMeters,
             regionPolicyId: input.regionPolicyId,
+            version: gym.configuration_version,
           },
           previousState: null,
           reason: input.reason,
           requestId,
         });
-        return this.getGymLocation(transaction, gym.id);
-      });
+        return (await this.getGymLocation(
+          transaction,
+          gym.id,
+        )) as unknown as JsonObject;
+      },
+    ) as unknown as Promise<GymLocationResponseDto>;
   }
 
   updateGymLocation(
@@ -617,54 +630,104 @@ export class GymsService {
     requestId: string,
     input: UpdateGymLocationDto,
   ): Promise<GymLocationResponseDto> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    return this.idempotency.execute<JsonObject>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: { ...(input as unknown as JsonObject), gymId },
+        scope: `admin-gym-locations:${gymId}:update`,
+      },
+      async (transaction) => {
         const admin = await this.adminAuthorization.requireAdmin(
           principal,
           transaction,
         );
+        const current = await transaction
+          .selectFrom('gym_locations')
+          .selectAll()
+          .where('id', '=', gymId)
+          .where('deleted_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!current) {
+          throw new NotFoundException({
+            code: 'GYM_LOCATION_NOT_FOUND',
+            message: 'The gym location was not found.',
+          });
+        }
+        this.assertGymVersion(
+          current.configuration_version,
+          input.expectedVersion,
+        );
+        if (input.active) {
+          await this.assertGymActivationAllowed(transaction, input);
+        }
+        await this.assertGymUpdateDependencies(transaction, current, input);
         const previous = await this.getGymLocation(transaction, gymId);
         const now = new Date();
-        await transaction
+        const updated = await transaction
           .updateTable('gym_locations')
           .set({
             active: input.active,
             address: input.address?.trim() ?? '',
             coordinates: sql`ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)::geography`,
+            configuration_version: sql<number>`configuration_version + 1`,
             name: input.name.trim(),
             radius_meters: input.radiusMeters,
             region_policy_id: input.regionPolicyId,
             updated_at: now,
           })
           .where('id', '=', gymId)
-          .executeTakeFirstOrThrow();
+          .where('configuration_version', '=', input.expectedVersion)
+          .returning('id')
+          .executeTakeFirst();
+        if (!updated) throw this.gymVersionConflict();
+        let revokedCredentials = 0;
+        if (current.active && !input.active) {
+          const revoked = await transaction
+            .updateTable('gym_qr_credentials')
+            .set({
+              revocation_reason: input.reason.trim(),
+              revoked_at: now,
+              revoked_by_user_id: admin.id,
+              status: 'revoked',
+            })
+            .where('gym_location_id', '=', gymId)
+            .where('status', '=', 'active')
+            .returning('id')
+            .execute();
+          revokedCredentials = revoked.length;
+        }
         const next = await this.getGymLocation(transaction, gymId);
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_location.updated',
           actorUserId: admin.id,
           entityId: gymId,
           entityType: 'gym_locations',
-          nextState: this.gymAuditState(next),
+          nextState: {
+            ...this.gymAuditState(next),
+            revokedCredentials,
+          },
           previousState: this.gymAuditState(previous),
           reason: input.reason,
           requestId,
         });
-        return next;
-      });
+        return next as unknown as JsonObject;
+      },
+    ) as unknown as Promise<GymLocationResponseDto>;
   }
 
   deleteGymLocation(
     principal: AuthenticatedPrincipal,
     gymId: string,
     requestId: string,
-    reason: string,
+    input: DeleteGymLocationDto,
   ): Promise<{ id: string; status: 'deleted' }> {
     return this.idempotency.execute<DeletedGymJson>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: requestId,
-        request: { gymId, reason },
+        request: { ...input, gymId },
         scope: `admin-gym-locations:${gymId}:delete`,
       },
       async (transaction) => {
@@ -685,12 +748,14 @@ export class GymsService {
             message: 'The gym location was not found.',
           });
         }
+        this.assertGymVersion(gym.configuration_version, input.expectedVersion);
         if (!canDeleteGym(gym.active)) {
           throw new ConflictException({
             code: 'GYM_DELETE_REQUIRES_INACTIVE',
             message: 'Deactivate the gym before deleting it.',
           });
         }
+        await this.assertGymHasNoLiveDependencies(transaction, gymId);
 
         const deletedAt = new Date();
         await transaction
@@ -712,11 +777,17 @@ export class GymsService {
           .execute();
         const deleted = await transaction
           .updateTable('gym_locations')
-          .set({ deleted_at: deletedAt, updated_at: deletedAt })
+          .set({
+            configuration_version: sql<number>`configuration_version + 1`,
+            deleted_at: deletedAt,
+            updated_at: deletedAt,
+          })
           .where('id', '=', gymId)
+          .where('configuration_version', '=', input.expectedVersion)
           .where('deleted_at', 'is', null)
           .returning('id')
-          .executeTakeFirstOrThrow();
+          .executeTakeFirst();
+        if (!deleted) throw this.gymVersionConflict();
         await this.adminAuthorization.audit(transaction, {
           action: 'gym_location.deleted',
           actorUserId: admin.id,
@@ -730,8 +801,9 @@ export class GymsService {
             active: gym.active,
             name: gym.name,
             regionPolicyId: gym.region_policy_id,
+            version: gym.configuration_version,
           },
-          reason,
+          reason: input.reason,
           requestId,
         });
         return { id: deleted.id, status: 'deleted' };
@@ -2027,6 +2099,146 @@ export class GymsService {
     };
   }
 
+  private async assertGymActivationAllowed(
+    transaction: Transaction<Database>,
+    input: Pick<
+      CreateGymLocationDto,
+      'latitude' | 'longitude' | 'regionPolicyId'
+    >,
+  ): Promise<void> {
+    const now = new Date();
+    const region = await transaction
+      .selectFrom('region_policies as region')
+      .select([
+        'region.competition_enabled',
+        'region.id',
+        'region.valid_from',
+        'region.valid_to',
+        sql<boolean>`ST_Covers(
+          region.boundary::geometry,
+          ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)
+        )`.as('contains_gym'),
+      ])
+      .where('region.id', '=', input.regionPolicyId)
+      .where('region.deleted_at', 'is', null)
+      .executeTakeFirst();
+    if (!region) {
+      throw new NotFoundException({
+        code: 'REGION_POLICY_NOT_FOUND',
+        message: 'The Partner gym region policy was not found.',
+      });
+    }
+    if (
+      !region.competition_enabled ||
+      region.valid_from > now ||
+      (region.valid_to !== null && region.valid_to <= now)
+    ) {
+      throw new ConflictException({
+        code: 'GYM_REGION_POLICY_INACTIVE',
+        message:
+          'An active Partner gym requires a currently enabled region policy.',
+      });
+    }
+    if (!region.contains_gym) {
+      throw new BadRequestException({
+        code: 'GYM_OUTSIDE_REGION_BOUNDARY',
+        message:
+          'The Partner gym coordinates must be inside the selected region boundary.',
+      });
+    }
+  }
+
+  private async assertGymUpdateDependencies(
+    transaction: Transaction<Database>,
+    current: {
+      active: boolean;
+      id: string;
+      region_policy_id: string;
+    },
+    input: UpdateGymLocationDto,
+  ): Promise<void> {
+    if (current.active && !input.active) {
+      await this.assertGymHasNoLiveDependencies(transaction, current.id);
+    }
+    if (current.region_policy_id === input.regionPolicyId) return;
+    if (current.active || input.active) {
+      throw new ConflictException({
+        code: 'GYM_REGION_CHANGE_REQUIRES_INACTIVE',
+        message:
+          'Deactivate the Partner gym before moving it to another region policy.',
+      });
+    }
+    const assignment = await transaction
+      .selectFrom('competition_gym_locations as assignment')
+      .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'assignment.competition_id',
+      )
+      .select('assignment.competition_id')
+      .where('assignment.gym_location_id', '=', current.id)
+      .where('competition.deleted_at', 'is', null)
+      .executeTakeFirst();
+    if (assignment) {
+      throw new ConflictException({
+        code: 'GYM_REGION_CHANGE_HAS_CONTEST_HISTORY',
+        message:
+          'A Partner gym with Contest assignments cannot be moved to another region policy.',
+      });
+    }
+  }
+
+  private async assertGymHasNoLiveDependencies(
+    transaction: Transaction<Database>,
+    gymId: string,
+  ): Promise<void> {
+    const [session, competition] = await Promise.all([
+      transaction
+        .selectFrom('workout_sessions')
+        .select('id')
+        .where('gym_location_id', '=', gymId)
+        .where('status', 'in', ['active', 'pending_review'])
+        .executeTakeFirst(),
+      transaction
+        .selectFrom('competition_gym_locations as assignment')
+        .innerJoin(
+          'competitions as competition',
+          'competition.id',
+          'assignment.competition_id',
+        )
+        .select('competition.id')
+        .where('assignment.gym_location_id', '=', gymId)
+        .where('competition.status', 'in', ['registration', 'active'])
+        .where('competition.deleted_at', 'is', null)
+        .executeTakeFirst(),
+    ]);
+    if (session) {
+      throw new ConflictException({
+        code: 'GYM_HAS_OPEN_WORKOUT_SESSIONS',
+        message:
+          'Resolve active or pending-review workouts before deactivating this Partner gym.',
+      });
+    }
+    if (competition) {
+      throw new ConflictException({
+        code: 'GYM_HAS_LIVE_COMPETITION',
+        message:
+          'Cancel or settle assigned live competitions before deactivating this Partner gym.',
+      });
+    }
+  }
+
+  private assertGymVersion(actual: number, expected: number): void {
+    if (actual !== expected) throw this.gymVersionConflict();
+  }
+
+  private gymVersionConflict(): ConflictException {
+    return new ConflictException({
+      code: 'GYM_LOCATION_VERSION_CONFLICT',
+      message: 'The Partner gym changed; reload it before retrying.',
+    });
+  }
+
   private gymLocationQuery(transaction: Transaction<Database>) {
     return transaction
       .selectFrom('gym_locations as gym')
@@ -2066,6 +2278,7 @@ export class GymsService {
         ), '[]'::json)`.as('active_qr_credentials'),
         'gym.active',
         'gym.address',
+        'gym.configuration_version',
         'gym.created_at',
         'gym.id',
         'gym.name',
@@ -2108,6 +2321,7 @@ export class GymsService {
       expiresAt: string;
     }>;
     address: string;
+    configuration_version: number;
     created_at: Date;
     id: string;
     latitude: number;
@@ -2132,6 +2346,7 @@ export class GymsService {
       regionCode: gym.region_code,
       regionPolicyId: gym.region_policy_id,
       updatedAt: gym.updated_at.toISOString(),
+      version: gym.configuration_version,
     };
   }
 
@@ -2142,6 +2357,7 @@ export class GymsService {
       name: gym.name,
       radiusMeters: gym.radiusMeters,
       regionPolicyId: gym.regionPolicyId,
+      version: gym.version,
     };
   }
 

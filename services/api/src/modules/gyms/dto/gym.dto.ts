@@ -153,6 +153,12 @@ export class UpdateGymLocationDto extends CreateGymLocationDto {
   @ApiProperty({ type: Boolean })
   @IsBoolean()
   active!: boolean;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export class GymLocationResponseDto {
@@ -194,6 +200,9 @@ export class GymLocationResponseDto {
 
   @ApiProperty({ format: 'date-time', type: String })
   updatedAt!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }
 
 export class ActiveGymQrCredentialDto {
@@ -270,6 +279,14 @@ export class OperatorReasonDto {
   @IsString()
   @Length(8, 500)
   reason!: string;
+}
+
+export class DeleteGymLocationDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export class AssignCompetitionGymDto extends OperatorReasonDto {}

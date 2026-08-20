@@ -1158,6 +1158,7 @@ function GymCard({
       await onUpdate({
         active: form.get("active") === "on",
         address: String(form.get("address") ?? "").trim(),
+        expectedVersion: gym.version,
         latitude: Number(form.get("latitude")),
         longitude: Number(form.get("longitude")),
         name: String(form.get("name") ?? "").trim(),

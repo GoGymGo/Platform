@@ -56,6 +56,7 @@ import {
   formatQueueAge,
   getAuditChange,
   getQueueUrgency,
+  isOperationalCompetition,
   isRewardConfigurableCompetition,
   optionalIso,
   optionalNumber,
@@ -99,6 +100,7 @@ import {
   ReasonPresetChips,
 } from "./reason-presets";
 import { formValidationError } from "./form-validation";
+import { parseCoordinate } from "./coordinate-input.js";
 import {
   ContestSetupWorkspace,
   type ContestSetupSubmission,
@@ -123,6 +125,15 @@ type AdminEntityResult = {
 type CouponCodesResult = {
   added: number;
   rewardId: string;
+  version: number;
+};
+
+type CompetitionPublicationPreflight = {
+  checks: Array<{ detail: string; key: string; satisfied: boolean }>;
+  competitionId: string;
+  evaluatedAt: string;
+  evidence: Record<string, unknown>;
+  ready: boolean;
   version: number;
 };
 
@@ -167,6 +178,25 @@ const navigation: {
     short: "CS",
   },
   {
+    description: "Create policy artifacts and enable or retire launch regions.",
+    id: "regions",
+    label: "Regions",
+    short: "RG",
+  },
+  {
+    description: "Configure approved inventory and winner fulfillment states.",
+    id: "rewards",
+    label: "Rewards",
+    short: "RW",
+  },
+  {
+    description:
+      "Create and maintain Partner gyms, Contest assignments and QR posters.",
+    id: "pilot",
+    label: "Partner gyms",
+    short: "PG",
+  },
+  {
     description: "Manage Creator workouts and published legal content.",
     id: "content",
     label: "Content + Legal",
@@ -193,9 +223,10 @@ const mobilePrimarySections = new Set<AdminSection>([
   "competitions",
   "operations",
 ]);
-const { creatorFeaturesEnabled } = resolveFeatureCapabilities({
-  creatorFeaturesEnabled: process.env.NEXT_PUBLIC_ENABLE_CREATOR_FEATURES,
-});
+const { creatorFeaturesEnabled: creatorAdminBuildEnabled } =
+  resolveFeatureCapabilities({
+    creatorFeaturesEnabled: process.env.NEXT_PUBLIC_ENABLE_CREATOR_FEATURES,
+  });
 
 const emptyPilotData: PilotData = {
   auditEvents: [],
@@ -441,6 +472,7 @@ export function AdminDashboard({
   const authEpoch = useRef(0);
   const [rewardEditor, setRewardEditor] = useState<Reward | "new" | null>(null);
   const [regionEditor, setRegionEditor] = useState(false);
+  const [gymEditor, setGymEditor] = useState(false);
   const [setupCompetitionId, setSetupCompetitionId] = useStoredPreference(
     "gogymgo.admin.setup.competition-id",
     "",
@@ -807,6 +839,21 @@ export function AdminDashboard({
   const setupCompetitions = snapshot.competitions.filter(
     (competition) => competition.status === "draft",
   );
+  const operationalCompetitions = snapshot.competitions.filter(
+    isOperationalCompetition,
+  );
+  const pilotCompetition =
+    operationalCompetitions.find(
+      (competition) => competition.id === setupCompetitionId,
+    ) ??
+    operationalCompetitions.find(
+      (competition) => competition.status === "active",
+    ) ??
+    operationalCompetitions.find(
+      (competition) => competition.status === "registration",
+    ) ??
+    operationalCompetitions[0] ??
+    null;
 
   function navigateToSection(nextSection: AdminSection) {
     setSection(nextSection);
@@ -871,15 +918,46 @@ export function AdminDashboard({
         action === "publish"
           ? `${competition.name} will become visible and joinable in the player app immediately.`
           : `${competition.name} will stop immediately. Active workouts, rankings, and prize eligibility will close. Players will be notified, and you can then delete it from the dashboard.`,
-      execute: (reason) =>
-        mutate(
+      execute: async (reason) => {
+        if (action === "publish") {
+          await requireCompetitionPublicationPreflight(
+            competition.id,
+            competition.version,
+          );
+        }
+        await mutate(
           action === "publish" ? "Contest published." : "Contest cancelled.",
           `operator/configuration/competitions/${competition.id}/status-action`,
           "POST",
           { action, expectedVersion: competition.version, reason },
-        ),
+        );
+      },
       tone: action === "cancel" ? "danger" : "primary",
     });
+  }
+
+  async function requireCompetitionPublicationPreflight(
+    competitionId: string,
+    expectedVersion: number,
+  ): Promise<CompetitionPublicationPreflight> {
+    const preflight = await request<CompetitionPublicationPreflight>(
+      `operator/configuration/competitions/${competitionId}/publication-preflight`,
+    );
+    if (!preflight.ready || preflight.version !== expectedVersion) {
+      const blocker = preflight.checks.find((check) => !check.satisfied);
+      const error = new AdminUserFacingError(
+        preflight.version !== expectedVersion
+          ? "The Contest changed during publication review. Refresh and inspect the current draft before retrying."
+          : blocker?.detail ||
+              "The authoritative publication prerequisites are not satisfied.",
+      );
+      Object.assign(error, {
+        code: "COMPETITION_PUBLICATION_PREFLIGHT_BLOCKED",
+        status: 409,
+      });
+      throw error;
+    }
+    return preflight;
   }
 
   async function finalizeContestResults(
@@ -1144,6 +1222,11 @@ export function AdminDashboard({
         );
       }
 
+      reportProgress("Checking authoritative launch prerequisites...");
+      await requireCompetitionPublicationPreflight(
+        competitionId,
+        competitionResult.version,
+      );
       reportProgress("Publishing the contest...");
       await request<AdminEntityResult>(
         `operator/configuration/competitions/${competitionId}/status-action`,
@@ -1342,6 +1425,7 @@ export function AdminDashboard({
               gyms={pilotData.gyms}
               key={setupCompetition?.id ?? "new"}
               legalDocuments={snapshot.legalDocuments}
+              onCreateGym={() => setGymEditor(true)}
               onCreateRegion={() => setRegionEditor(true)}
               onPublish={publishCompleteContestSetup}
               onSelectCompetition={selectSetupCompetition}
@@ -1350,93 +1434,138 @@ export function AdminDashboard({
               submitting={submitting}
             />
           ) : null}
-          {section === "pilot" && setupCompetition ? (
-            <PilotOperationsPanel
-              {...pilotData}
-              cashAwards={snapshot.rewardAwards.filter(
-                (award) =>
-                  award.competitionId === setupCompetition.id &&
-                  award.rewardType === "cash",
-              )}
-              key={setupCompetition.id}
-              onAssignGym={async (competitionId, gymId, body) => {
-                await mutate(
-                  "Gym assigned to contest.",
-                  `operator/competitions/${competitionId}/gym-locations/${gymId}`,
-                  "POST",
-                  body,
-                );
-              }}
-              onCreateGym={async (body) => {
-                await mutate(
-                  "Partner gym created.",
-                  "operator/gym-locations",
-                  "POST",
-                  body,
-                );
-              }}
-              onDeleteGym={(gym) =>
-                setConfirmAction({
-                  actionLabel: "Delete Partner gym",
-                  description: `${gym.name} will be removed from the dashboard. Existing visit and audit records will not be affected.`,
-                  execute: (reason) =>
+          {section === "pilot" ? (
+            pilotCompetition ? (
+              <>
+                <section className="panel pilot-contest-selector">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">PARTNER GYM SCOPE</p>
+                      <h2>Choose the Contest to manage</h2>
+                      <p>
+                        Assignment and QR actions remain locked to this exact
+                        Contest. Gym records themselves remain platform-wide.
+                      </p>
+                    </div>
+                    <label className="filter-field compact">
+                      <span>CONTEST</span>
+                      <select
+                        onChange={(event) =>
+                          setSetupCompetitionId(event.target.value)
+                        }
+                        value={pilotCompetition.id}
+                      >
+                        {operationalCompetitions.map((competition) => (
+                          <option key={competition.id} value={competition.id}>
+                            {competition.name} · {competition.status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+                <PilotOperationsPanel
+                  {...pilotData}
+                  cashAwards={snapshot.rewardAwards.filter(
+                    (award) =>
+                      award.competitionId === pilotCompetition.id &&
+                      award.rewardType === "cash",
+                  )}
+                  key={pilotCompetition.id}
+                  onAssignGym={async (competitionId, gymId, body) => {
+                    await mutate(
+                      "Gym assigned to contest.",
+                      `operator/competitions/${competitionId}/gym-locations/${gymId}`,
+                      "POST",
+                      body,
+                    );
+                  }}
+                  onCreateGym={async (body) => {
+                    await mutate(
+                      "Partner gym created.",
+                      "operator/gym-locations",
+                      "POST",
+                      body,
+                    );
+                  }}
+                  onDeleteGym={(gym) =>
+                    setConfirmAction({
+                      actionLabel: "Delete Partner gym",
+                      description: `${gym.name} will be removed from the dashboard. Existing visit and audit records will not be affected.`,
+                      execute: (reason) =>
+                        mutate(
+                          "Partner gym deleted from the dashboard.",
+                          `operator/gym-locations/${gym.id}`,
+                          "DELETE",
+                          { expectedVersion: gym.version, reason },
+                        ),
+                      tone: "danger",
+                    })
+                  }
+                  onIssueQr={(competitionId, gymId, body) =>
                     mutate(
-                      "Partner gym deleted from the dashboard.",
-                      `operator/gym-locations/${gym.id}`,
-                      "DELETE",
-                      { reason },
-                    ),
-                  tone: "danger",
-                })
-              }
-              onIssueQr={(competitionId, gymId, body) =>
-                mutate(
-                  "Printable QR poster issued.",
-                  `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
-                  "POST",
-                  body,
-                )
-              }
-              onLoadActiveQr={loadActiveQr}
-              onRecordCash={async (body) => {
-                await mutate(
-                  "Cash handoff recorded.",
-                  "operator/cash-fulfillments",
-                  "POST",
-                  body,
-                );
-              }}
-              onRevokeQr={async (competitionId, gymId, body) => {
-                await mutate(
-                  "QR poster revoked.",
-                  `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/revoke`,
-                  "POST",
-                  body,
-                );
-              }}
-              onUpdateGym={async (gymId, body) => {
-                await mutate(
-                  "Partner gym updated.",
-                  `operator/gym-locations/${gymId}`,
-                  "PUT",
-                  body,
-                );
-              }}
-              onUpdateWaitlist={async (
-                entryId,
-                body: UpdateRegionWaitlistStatusDto,
-              ) => {
-                await mutate(
-                  "Regional waitlist status updated.",
-                  `operator/region-waitlist/${entryId}/status`,
-                  "POST",
-                  body,
-                );
-              }}
-              regions={snapshot.regions}
-              selectedCompetition={setupCompetition}
-              submitting={submitting}
-            />
+                      "Printable QR poster issued.",
+                      `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
+                      "POST",
+                      body,
+                    )
+                  }
+                  onLoadActiveQr={loadActiveQr}
+                  onRecordCash={async (body) => {
+                    await mutate(
+                      "Cash handoff recorded.",
+                      "operator/cash-fulfillments",
+                      "POST",
+                      body,
+                    );
+                  }}
+                  onRevokeQr={async (competitionId, gymId, body) => {
+                    await mutate(
+                      "QR poster revoked.",
+                      `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/revoke`,
+                      "POST",
+                      body,
+                    );
+                  }}
+                  onUpdateGym={async (gymId, body) => {
+                    await mutate(
+                      "Partner gym updated.",
+                      `operator/gym-locations/${gymId}`,
+                      "PUT",
+                      body,
+                    );
+                  }}
+                  onUpdateWaitlist={async (
+                    entryId,
+                    body: UpdateRegionWaitlistStatusDto,
+                  ) => {
+                    await mutate(
+                      "Regional waitlist status updated.",
+                      `operator/region-waitlist/${entryId}/status`,
+                      "POST",
+                      body,
+                    );
+                  }}
+                  regions={snapshot.regions}
+                  selectedCompetition={pilotCompetition}
+                  submitting={submitting}
+                />
+              </>
+            ) : (
+              <section className="panel">
+                <EmptyState
+                  body="Create a Contest draft before assigning Partner gyms or issuing Contest-specific QR posters."
+                  title="No configurable Contest"
+                />
+                <button
+                  className="primary-button"
+                  onClick={() => setSection("competitions")}
+                  type="button"
+                >
+                  CREATE CONTEST DRAFT
+                </button>
+              </section>
+            )
           ) : null}
           {section === "rewards" ? (
             <RewardsPanel
@@ -1530,9 +1659,29 @@ export function AdminDashboard({
                       "Region deleted from the dashboard.",
                       `operator/configuration/region-policies/${region.id}`,
                       "DELETE",
-                      { reason },
+                      { expectedVersion: region.version, reason },
                     ),
                   tone: "danger",
+                })
+              }
+              onStatus={(region, action) =>
+                setConfirmAction({
+                  actionLabel:
+                    action === "enable" ? "Enable region" : "Disable region",
+                  description:
+                    action === "enable"
+                      ? `${region.metroName} will become available to server-validated Contest and Creator configuration.`
+                      : `${region.metroName} will stop accepting new configuration. Live contests must be cancelled or settled first.`,
+                  execute: (reason) =>
+                    mutate(
+                      action === "enable"
+                        ? "Region enabled."
+                        : "Region disabled.",
+                      `operator/configuration/region-policies/${region.id}/status-action`,
+                      "POST",
+                      { action, expectedVersion: region.version, reason },
+                    ),
+                  tone: action === "disable" ? "danger" : "primary",
                 })
               }
               regions={snapshot.regions}
@@ -1541,8 +1690,14 @@ export function AdminDashboard({
           ) : null}
           {section === "content" ? (
             <ContentPanel
-              creatorFeaturesEnabled={creatorFeaturesEnabled}
+              creatorFeaturesEnabled={
+                creatorAdminBuildEnabled &&
+                snapshot.capabilities.creatorConfigurationEnabled
+              }
               documents={snapshot.legalDocuments}
+              legalPublicationOwner={
+                snapshot.capabilities.legalPublicationOwner
+              }
               onCreateDocument={() => setLegalEditor(true)}
               onCreateWorkout={() => setWorkoutEditor("new")}
               onDeleteWorkout={(workout) =>
@@ -1591,7 +1746,10 @@ export function AdminDashboard({
                       "Legal document withdrawn.",
                       `operator/configuration/legal-documents/${document.id}/withdrawal`,
                       "POST",
-                      { reason },
+                      {
+                        expectedVersion: document.lifecycleVersion,
+                        reason,
+                      },
                     ),
                   tone: "danger",
                 })
@@ -1657,6 +1815,23 @@ export function AdminDashboard({
             );
             setRegionEditor(false);
           }}
+          submitting={submitting}
+        />
+      ) : null}
+      {gymEditor ? (
+        <GymLocationForm
+          evaluatedAt={snapshot.generatedAt}
+          onClose={() => setGymEditor(false)}
+          onSubmit={async (body) => {
+            await mutate(
+              "Partner gym created.",
+              "operator/gym-locations",
+              "POST",
+              body,
+            );
+            setGymEditor(false);
+          }}
+          regions={snapshot.regions}
           submitting={submitting}
         />
       ) : null}
@@ -3677,12 +3852,14 @@ function RegionsPanel({
   evaluatedAt,
   onCreate,
   onDelete,
+  onStatus,
   regions,
   selectedRegionId,
 }: {
   evaluatedAt: string;
   onCreate: () => void;
   onDelete: (region: RegionPolicy) => void;
+  onStatus: (region: RegionPolicy, action: "disable" | "enable") => void;
   regions: RegionPolicy[];
   selectedRegionId?: string;
 }) {
@@ -3709,11 +3886,11 @@ function RegionsPanel({
       ) : (
         <div className="card-list">
           {regions.map((region) => {
-            const deletable =
-              !region.competitionEnabled ||
-              (region.validTo !== null &&
-                new Date(region.validTo).getTime() <=
-                  new Date(evaluatedAt).getTime());
+            const expired =
+              region.validTo !== null &&
+              new Date(region.validTo).getTime() <=
+                new Date(evaluatedAt).getTime();
+            const deletable = !region.competitionEnabled || expired;
             const countryName =
               region.countryCode === "CA"
                 ? "Canada"
@@ -3775,6 +3952,27 @@ function RegionsPanel({
                     </dd>
                   </div>
                 </dl>
+                <button
+                  className={
+                    region.competitionEnabled
+                      ? "text-button danger-text"
+                      : "text-button accent"
+                  }
+                  disabled={expired}
+                  onClick={() =>
+                    onStatus(
+                      region,
+                      region.competitionEnabled ? "disable" : "enable",
+                    )
+                  }
+                  type="button"
+                >
+                  {expired
+                    ? "Expired"
+                    : region.competitionEnabled
+                      ? "Disable"
+                      : "Enable"}
+                </button>
                 {deletable ? (
                   <button
                     className="text-button danger-text"
@@ -3796,6 +3994,7 @@ function RegionsPanel({
 function ContentPanel({
   creatorFeaturesEnabled,
   documents,
+  legalPublicationOwner,
   onCreateDocument,
   onCreateWorkout,
   onDeleteWorkout,
@@ -3806,6 +4005,7 @@ function ContentPanel({
 }: {
   creatorFeaturesEnabled: boolean;
   documents: LegalDocument[];
+  legalPublicationOwner: boolean;
   onCreateDocument: () => void;
   onCreateWorkout: () => void;
   onDeleteWorkout: (workout: CreatorWorkout) => void;
@@ -3915,6 +4115,7 @@ function ContentPanel({
                   {!workout.published ? (
                     <button
                       className="text-button danger-text"
+                      disabled={!creatorFeaturesEnabled}
                       onClick={() => onDeleteWorkout(workout)}
                       type="button"
                     >
@@ -3956,12 +4157,22 @@ function ContentPanel({
           </div>
           <button
             className="primary-button"
+            disabled={!legalPublicationOwner}
             onClick={onCreateDocument}
             type="button"
           >
-            + PUBLISH VERSION
+            {legalPublicationOwner ? "+ PUBLISH VERSION" : "OWNER ONLY"}
           </button>
         </div>
+        {!legalPublicationOwner ? (
+          <div className="alert warning compact" role="status">
+            <span>!</span>
+            <p>
+              Legal publication and withdrawal are restricted to the configured
+              GoGymGo owner. This administrator has read-only legal access.
+            </p>
+          </div>
+        ) : null}
         {documents.length === 0 ? (
           <EmptyState
             body="Publish the first owner-approved document version when the legal text is ready."
@@ -4075,6 +4286,7 @@ function ContentPanel({
                         {document.status !== "withdrawn" ? (
                           <button
                             className="text-button danger-text"
+                            disabled={!legalPublicationOwner}
                             onClick={() => onWithdrawDocument(document)}
                             type="button"
                           >
@@ -5298,6 +5510,152 @@ function automaticRegionVersion(validFrom: string): string {
   return `effective-${validFrom.replace(/[-:.]/g, "").replace("Z", "z")}`;
 }
 
+function GymLocationForm({
+  evaluatedAt,
+  onClose,
+  onSubmit,
+  regions,
+  submitting,
+}: {
+  evaluatedAt: string;
+  onClose: () => void;
+  onSubmit: (body: Record<string, unknown>) => Promise<void>;
+  regions: RegionPolicy[];
+  submitting: boolean;
+}) {
+  const [formError, setFormError] = useState("");
+  const evaluatedAtMs = Date.parse(evaluatedAt);
+  const availableRegions = regions.filter((region) => {
+    const validFrom = Date.parse(region.validFrom);
+    const validTo = region.validTo ? Date.parse(region.validTo) : null;
+    return (
+      region.competitionEnabled &&
+      validFrom <= evaluatedAtMs &&
+      (validTo === null || validTo > evaluatedAtMs)
+    );
+  });
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError("");
+    const validationError = formValidationError(event.currentTarget);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    const form = new FormData(event.currentTarget);
+    try {
+      await onSubmit({
+        address: String(form.get("address") ?? "").trim(),
+        latitude: parseCoordinate(
+          String(form.get("latitude") ?? ""),
+          "latitude",
+        ),
+        longitude: parseCoordinate(
+          String(form.get("longitude") ?? ""),
+          "longitude",
+        ),
+        name: String(form.get("name") ?? "").trim(),
+        radiusMeters: Number(form.get("radiusMeters")),
+        reason: String(form.get("reason") ?? "").trim(),
+        regionPolicyId: String(form.get("regionPolicyId") ?? ""),
+      });
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
+  }
+
+  return (
+    <ModalShell onClose={onClose} title="Add an approved partner gym">
+      <form
+        className="editor-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+      >
+        <div className="alert warning compact">
+          <span>!</span>
+          <p>
+            The server verifies that the coordinates are inside the selected
+            active region. Creating this location makes it eligible for contest
+            assignment; poster credentials are issued separately.
+          </p>
+        </div>
+        {availableRegions.length === 0 ? (
+          <div className="empty-state" role="status">
+            <strong>NO ACTIVE REGION IS AVAILABLE</strong>
+            <p>
+              Create and enable the approved region before adding a partner gym.
+            </p>
+          </div>
+        ) : null}
+        <FormGrid>
+          <Field label="ACTIVE REGION" wide>
+            <select
+              defaultValue={availableRegions[0]?.id ?? ""}
+              name="regionPolicyId"
+              required
+            >
+              {availableRegions.length === 0 ? (
+                <option value="">No active region</option>
+              ) : null}
+              {availableRegions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.metroName} · {region.subdivisionCode}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="GYM NAME" wide>
+            <input maxLength={160} minLength={2} name="name" required />
+          </Field>
+          <Field label="STREET ADDRESS" wide>
+            <input maxLength={500} name="address" />
+          </Field>
+          <Field label="LATITUDE">
+            <input
+              inputMode="decimal"
+              name="latitude"
+              placeholder="49.2827 or 49°16′58″N"
+              required
+            />
+          </Field>
+          <Field label="LONGITUDE">
+            <input
+              inputMode="decimal"
+              name="longitude"
+              placeholder="-123.1207 or 123°7′15″W"
+              required
+            />
+          </Field>
+          <Field label="CHECK-IN RADIUS (METRES)">
+            <input
+              defaultValue={75}
+              max={500}
+              min={10}
+              name="radiusMeters"
+              required
+              type="number"
+            />
+          </Field>
+          <ReasonField defaultValue="Add an approved partner gym for contest check-ins." />
+        </FormGrid>
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
+        <FormActions
+          disabled={availableRegions.length === 0}
+          onClose={onClose}
+          submitLabel="ADD PARTNER GYM"
+          submitting={submitting}
+        />
+      </form>
+    </ModalShell>
+  );
+}
+
 function RegionForm({
   onClose,
   onSubmit,
@@ -6166,10 +6524,12 @@ function ReasonField({ defaultValue }: { defaultValue: string }) {
 }
 
 function FormActions({
+  disabled,
   onClose,
   submitLabel,
   submitting,
 }: {
+  disabled?: boolean;
   onClose: () => void;
   submitLabel: string;
   submitting: boolean;
@@ -6179,7 +6539,11 @@ function FormActions({
       <button className="secondary-button" onClick={onClose} type="button">
         CANCEL
       </button>
-      <button className="primary-button" disabled={submitting} type="submit">
+      <button
+        className="primary-button"
+        disabled={submitting || disabled}
+        type="submit"
+      >
         {submitting ? "SAVING…" : submitLabel}
       </button>
     </div>

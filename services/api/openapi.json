@@ -259,6 +259,50 @@
         "tags": ["operator-configuration"]
       }
     },
+    "/v1/operator/configuration/region-policies/{regionPolicyId}/status-action": {
+      "post": {
+        "operationId": "changeRegionPolicyStatus",
+        "parameters": [
+          {
+            "name": "regionPolicyId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegionPolicyStatusActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Enable or disable a regional operating policy",
+        "tags": ["operator-configuration"]
+      }
+    },
     "/v1/operator/configuration/region-policies/{regionPolicyId}": {
       "delete": {
         "operationId": "deleteRegionPolicy",
@@ -280,7 +324,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/OperatorReasonDto" }
+              "schema": {
+                "$ref": "#/components/schemas/DeleteVersionedAdminEntityDto"
+              }
             }
           }
         },
@@ -466,6 +512,34 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Publish or cancel a competition",
+        "tags": ["operator-configuration"]
+      }
+    },
+    "/v1/operator/configuration/competitions/{competitionId}/publication-preflight": {
+      "get": {
+        "operationId": "getCompetitionPublicationPreflight",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCompetitionPublicationPreflightDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Evaluate authoritative competition publication prerequisites",
         "tags": ["operator-configuration"]
       }
     },
@@ -2473,7 +2547,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/OperatorReasonDto" }
+              "schema": { "$ref": "#/components/schemas/DeleteGymLocationDto" }
             }
           }
         },
@@ -4626,6 +4700,14 @@
         },
         "required": ["id", "email", "roles"]
       },
+      "AdminDashboardCapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "creatorConfigurationEnabled": { "type": "boolean" },
+          "legalPublicationOwner": { "type": "boolean" }
+        },
+        "required": ["creatorConfigurationEnabled", "legalPublicationOwner"]
+      },
       "AdminDashboardRegionDto": {
         "type": "object",
         "properties": {
@@ -4646,7 +4728,8 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
-          }
+          },
+          "version": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
@@ -4662,7 +4745,8 @@
           "boundaryVersion",
           "policyVersion",
           "validFrom",
-          "validTo"
+          "validTo",
+          "version"
         ]
       },
       "AdminDashboardGoalBracketDto": {
@@ -4995,7 +5079,8 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
-          }
+          },
+          "lifecycleVersion": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
@@ -5009,7 +5094,8 @@
           "receiptRequirement",
           "status",
           "effectiveAt",
-          "ownerApprovedAt"
+          "ownerApprovedAt",
+          "lifecycleVersion"
         ]
       },
       "AdminDashboardAuditEventDto": {
@@ -5025,6 +5111,8 @@
           "entityType": { "type": "string" },
           "entityId": { "type": "string", "format": "uuid" },
           "reason": { "type": "string" },
+          "before": { "type": "object", "nullable": true },
+          "after": { "type": "object", "nullable": true },
           "createdAt": { "type": "string", "format": "date-time" }
         },
         "required": [
@@ -5034,6 +5122,8 @@
           "entityType",
           "entityId",
           "reason",
+          "before",
+          "after",
           "createdAt"
         ]
       },
@@ -5041,6 +5131,9 @@
         "type": "object",
         "properties": {
           "admin": { "$ref": "#/components/schemas/AdminDashboardIdentityDto" },
+          "capabilities": {
+            "$ref": "#/components/schemas/AdminDashboardCapabilitiesDto"
+          },
           "regions": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/AdminDashboardRegionDto" }
@@ -5083,6 +5176,7 @@
         },
         "required": [
           "admin",
+          "capabilities",
           "regions",
           "competitions",
           "rewards",
@@ -5142,16 +5236,43 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "code": { "type": "string" },
-          "policyVersion": { "type": "string" }
+          "policyVersion": { "type": "string" },
+          "competitionEnabled": { "type": "boolean" },
+          "version": { "type": "number", "minimum": 1 }
         },
-        "required": ["id", "code", "policyVersion"]
+        "required": [
+          "id",
+          "code",
+          "policyVersion",
+          "competitionEnabled",
+          "version"
+        ]
       },
-      "OperatorReasonDto": {
+      "RegionPolicyStatusActionDto": {
         "type": "object",
         "properties": {
-          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "action": { "type": "string", "enum": ["disable", "enable"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason"]
+        "required": ["reason", "action", "expectedVersion"]
+      },
+      "AdminEntityResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string" },
+          "version": { "type": "number", "minimum": 1 }
+        },
+        "required": ["id", "status", "version"]
+      },
+      "DeleteVersionedAdminEntityDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "expectedVersion"]
       },
       "AdminDeletedEntityResponseDto": {
         "type": "object",
@@ -5205,15 +5326,6 @@
           "goalBrackets"
         ]
       },
-      "AdminEntityResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "status": { "type": "string" },
-          "version": { "type": "number", "minimum": 1 }
-        },
-        "required": ["id", "status", "version"]
-      },
       "UpdateCompetitionDraftDto": {
         "type": "object",
         "properties": {
@@ -5261,13 +5373,38 @@
         },
         "required": ["reason", "action", "expectedVersion"]
       },
-      "DeleteVersionedAdminEntityDto": {
+      "AdminCompetitionPublicationCheckDto": {
         "type": "object",
         "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "expectedVersion": { "type": "number", "minimum": 1 }
+          "key": { "type": "string" },
+          "satisfied": { "type": "boolean" },
+          "detail": { "type": "string" }
         },
-        "required": ["reason", "expectedVersion"]
+        "required": ["key", "satisfied", "detail"]
+      },
+      "AdminCompetitionPublicationPreflightDto": {
+        "type": "object",
+        "properties": {
+          "competitionId": { "type": "string", "format": "uuid" },
+          "evaluatedAt": { "type": "string", "format": "date-time" },
+          "ready": { "type": "boolean" },
+          "version": { "type": "number", "minimum": 1 },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminCompetitionPublicationCheckDto"
+            }
+          },
+          "evidence": { "type": "object" }
+        },
+        "required": [
+          "competitionId",
+          "evaluatedAt",
+          "ready",
+          "version",
+          "checks",
+          "evidence"
+        ]
       },
       "CreateCreatorWorkoutDto": {
         "type": "object",
@@ -5746,6 +5883,7 @@
           },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" },
+          "version": { "type": "number", "minimum": 1 },
           "accessLevel": { "type": "string", "enum": ["admin", "staff"] }
         },
         "required": [
@@ -5762,6 +5900,7 @@
           "activeQrCredentials",
           "createdAt",
           "updatedAt",
+          "version",
           "accessLevel"
         ]
       },
@@ -6401,16 +6540,18 @@
             "type": "string",
             "minLength": 64,
             "maxLength": 64
-          }
+          },
+          "lifecycleVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["id", "status", "contentSha256"]
+        "required": ["id", "status", "contentSha256", "lifecycleVersion"]
       },
       "WithdrawLegalDocumentDto": {
         "type": "object",
         "properties": {
-          "reason": { "type": "string", "maxLength": 500, "minLength": 8 }
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason"]
+        "required": ["reason", "expectedVersion"]
       },
       "VerificationConsentStatusResponseDto": {
         "type": "object",
@@ -6999,7 +7140,8 @@
             "items": { "$ref": "#/components/schemas/ActiveGymQrCredentialDto" }
           },
           "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "version": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
@@ -7014,7 +7156,8 @@
           "activeCredentialVersion",
           "activeQrCredentials",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "version"
         ]
       },
       "CreateGymLocationDto": {
@@ -7057,7 +7200,8 @@
             "minimum": 10
           },
           "reason": { "type": "string", "minLength": 8, "maxLength": 500 },
-          "active": { "type": "boolean" }
+          "active": { "type": "boolean" },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
         "required": [
           "regionPolicyId",
@@ -7066,8 +7210,24 @@
           "longitude",
           "radiusMeters",
           "reason",
-          "active"
+          "active",
+          "expectedVersion"
         ]
+      },
+      "DeleteGymLocationDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "expectedVersion"]
+      },
+      "OperatorReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+        },
+        "required": ["reason"]
       },
       "GymQrCredentialResponseDto": {
         "type": "object",

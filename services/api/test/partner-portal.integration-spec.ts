@@ -9,8 +9,10 @@ import type { NotificationsService } from '../src/modules/notifications/notifica
 import type { LegalDocumentsService } from '../src/modules/legal/legal-documents.service';
 import { AdminAuthorizationService } from '../src/modules/operator/admin-authorization.service';
 import { AdminCompetitionConfigurationService } from '../src/modules/operator/admin-competition-configuration.service';
+import { AdminRegionConfigurationService } from '../src/modules/operator/admin-region-configuration.service';
 import {
   CompetitionStatusAction,
+  RegionPolicyStatusAction,
   type CreateCompetitionDraftDto,
 } from '../src/modules/operator/dto/admin-configuration.dto';
 import { OperatorPortalService } from '../src/modules/operator/operator-portal.service';
@@ -74,9 +76,11 @@ describeWithDatabase('gym partner operator portal', () => {
   let database: DatabaseService;
   let gyms: GymsService;
   let gymId: string;
+  let idempotency: IdempotencyService;
   let migrated: MigratedPostgisTestDatabase;
   let portal: OperatorPortalService;
   let profiles: ProfilesService;
+  let regionConfiguration: AdminRegionConfigurationService;
   let regionId: string;
 
   beforeAll(async () => {
@@ -84,7 +88,7 @@ describeWithDatabase('gym partner operator portal', () => {
     database = new DatabaseService(createTestConfig(migrated.databaseUrl));
     profiles = new ProfilesService(database);
     authorization = new AdminAuthorizationService(profiles);
-    const idempotency = new IdempotencyService(database);
+    idempotency = new IdempotencyService(database);
     gyms = new GymsService(
       database,
       idempotency,
@@ -94,9 +98,20 @@ describeWithDatabase('gym partner operator portal', () => {
     );
     competitionConfiguration = new AdminCompetitionConfigurationService(
       authorization,
+      database,
       idempotency,
-      {} as LegalDocumentsService,
+      {
+        resolveCurrentBundle: jest.fn().mockResolvedValue({
+          bundleSha256: null,
+          configured: false,
+          documents: [],
+        }),
+      } as unknown as LegalDocumentsService,
       {} as NotificationsService,
+    );
+    regionConfiguration = new AdminRegionConfigurationService(
+      authorization,
+      idempotency,
     );
     portal = new OperatorPortalService(database, authorization);
 
@@ -274,6 +289,49 @@ describeWithDatabase('gym partner operator portal', () => {
     ).rejects.toMatchObject({
       response: { code: 'PARTNER_COMPETITION_ADMIN_REQUIRED' },
     });
+  });
+
+  it('reports current database publication blockers without granting partner preflight access', async () => {
+    const proposal = await database.connection
+      .selectFrom('competitions')
+      .select(['configuration_version', 'id'])
+      .where('name', '=', 'Partner Proposal')
+      .executeTakeFirstOrThrow();
+    const preflight = await competitionConfiguration.getPublicationPreflight(
+      adminPrincipal,
+      proposal.id,
+    );
+
+    expect(preflight).toMatchObject({
+      competitionId: proposal.id,
+      ready: false,
+      version: proposal.configuration_version,
+    });
+    expect(preflight.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'schedule', satisfied: false }),
+        expect.objectContaining({ key: 'rewards', satisfied: false }),
+        expect.objectContaining({ key: 'legal', satisfied: false }),
+        expect.objectContaining({ key: 'gym_qr', satisfied: false }),
+      ]),
+    );
+    expect(preflight.evidence).toMatchObject({
+      goalBracketCount: 1,
+      gymQr: { activeCredentialCount: 0 },
+      region: {
+        boundaryVersion: 'partner-boundary-v1',
+        competitionEnabled: true,
+        policyVersion: 'partner-policy-v1',
+      },
+      rewards: { inventoryTotal: 0, publishedCount: 0 },
+      status: 'draft',
+    });
+    await expect(
+      competitionConfiguration.getPublicationPreflight(
+        partnerPrincipal,
+        proposal.id,
+      ),
+    ).rejects.toMatchObject({ response: { code: 'ADMIN_REQUIRED' } });
   });
 
   it('denies members, unverified or suspended users, social providers, and partners without an active assignment', async () => {
@@ -462,6 +520,244 @@ describeWithDatabase('gym partner operator portal', () => {
       .executeTakeFirstOrThrow();
     await expect(portal.getAccess(conflictPrincipal)).rejects.toMatchObject({
       response: { code: 'OPERATOR_ROLE_CONFLICT' },
+    });
+  });
+
+  it('versions, body-binds, audits, and safely retires an unused region policy', async () => {
+    const created = await regionConfiguration.create(
+      adminPrincipal,
+      'region-lifecycle-create',
+      {
+        boundary: {
+          coordinates: [
+            [
+              [
+                [-122.5, 48],
+                [-122, 48],
+                [-122, 48.5],
+                [-122.5, 48.5],
+                [-122.5, 48],
+              ],
+            ],
+          ],
+          type: 'MultiPolygon',
+        },
+        boundaryVersion: 'admin-lifecycle-boundary-v1',
+        code: 'admin-lifecycle-region',
+        competitionEnabled: true,
+        countryCode: 'CA',
+        currency: 'CAD',
+        languageCodes: ['en-CA'],
+        metroName: 'Admin Lifecycle Region',
+        minimumAge: 19,
+        policyVersion: 'admin-lifecycle-policy-v1',
+        reason: 'Create an isolated region for lifecycle verification.',
+        subdivisionCode: 'BC',
+        timezone: 'America/Vancouver',
+        validFrom: '2026-01-01T00:00:00.000Z',
+        validTo: '2028-01-01T00:00:00.000Z',
+      },
+    );
+    expect(created).toMatchObject({
+      competitionEnabled: true,
+      version: 1,
+    });
+
+    const disabled = await regionConfiguration.changeStatus(
+      adminPrincipal,
+      created.id,
+      'region-lifecycle-disable',
+      {
+        action: RegionPolicyStatusAction.DISABLE,
+        expectedVersion: created.version,
+        reason: 'Disable the isolated region before retiring it.',
+      },
+    );
+    await expect(
+      regionConfiguration.changeStatus(
+        adminPrincipal,
+        created.id,
+        'region-lifecycle-disable',
+        {
+          action: RegionPolicyStatusAction.DISABLE,
+          expectedVersion: created.version,
+          reason: 'Disable the isolated region before retiring it.',
+        },
+      ),
+    ).resolves.toEqual(disabled);
+    await expect(
+      regionConfiguration.changeStatus(
+        adminPrincipal,
+        created.id,
+        'region-lifecycle-disable',
+        {
+          action: RegionPolicyStatusAction.ENABLE,
+          expectedVersion: disabled.version,
+          reason: 'A reused key must not authorize another region command.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+    });
+    await expect(
+      regionConfiguration.delete(
+        adminPrincipal,
+        created.id,
+        'region-lifecycle-delete-stale',
+        {
+          expectedVersion: created.version,
+          reason: 'A stale region version must fail before deletion.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'REGION_POLICY_VERSION_CONFLICT' },
+    });
+    await expect(
+      regionConfiguration.delete(
+        adminPrincipal,
+        created.id,
+        'region-lifecycle-delete',
+        {
+          expectedVersion: disabled.version,
+          reason: 'Retire the isolated region after dependency review.',
+        },
+      ),
+    ).resolves.toEqual({ id: created.id, status: 'deleted' });
+
+    const [stored, audits] = await Promise.all([
+      database.connection
+        .selectFrom('region_policies')
+        .select(['configuration_version', 'deleted_at'])
+        .where('id', '=', created.id)
+        .executeTakeFirstOrThrow(),
+      database.connection
+        .selectFrom('operator_audit_events')
+        .select(['action', 'next_state', 'previous_state'])
+        .where('entity_id', '=', created.id)
+        .orderBy('created_at')
+        .orderBy('id')
+        .execute(),
+    ]);
+    expect(stored.configuration_version).toBe(3);
+    expect(stored.deleted_at).toBeInstanceOf(Date);
+    expect(audits.map((audit) => audit.action)).toEqual([
+      'region_policy.created',
+      'region_policy.disabled',
+      'region_policy.deleted',
+    ]);
+    expect(audits[1]).toMatchObject({
+      next_state: { competitionEnabled: false, version: 2 },
+      previous_state: { competitionEnabled: true, version: 1 },
+    });
+  });
+
+  it('rolls back invalid gym creation and versions every valid gym mutation', async () => {
+    const createInput = {
+      address: '9 Configuration Test Way',
+      latitude: 48.45,
+      longitude: -123.35,
+      name: 'Configuration Lifecycle Gym',
+      radiusMeters: 75,
+      reason: 'Create an isolated Partner gym for lifecycle verification.',
+      regionPolicyId: regionId,
+    };
+    await expect(
+      gyms.createGymLocation(adminPrincipal, 'gym-lifecycle-create', {
+        ...createInput,
+        longitude: -120,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_OUTSIDE_REGION_BOUNDARY' },
+    });
+    await expect(
+      database.connection
+        .selectFrom('gym_locations')
+        .select('id')
+        .where('name', '=', createInput.name)
+        .executeTakeFirst(),
+    ).resolves.toBeUndefined();
+
+    const created = await gyms.createGymLocation(
+      adminPrincipal,
+      'gym-lifecycle-create',
+      createInput,
+    );
+    await expect(
+      gyms.createGymLocation(
+        adminPrincipal,
+        'gym-lifecycle-create',
+        createInput,
+      ),
+    ).resolves.toEqual(created);
+    await expect(
+      gyms.createGymLocation(adminPrincipal, 'gym-lifecycle-create', {
+        ...createInput,
+        name: 'Different gym body',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+    });
+    expect(created.version).toBe(1);
+
+    const updateInput = {
+      ...createInput,
+      active: false,
+      expectedVersion: created.version,
+      reason: 'Deactivate the isolated Partner gym before deletion.',
+    };
+    const updated = await gyms.updateGymLocation(
+      adminPrincipal,
+      created.id,
+      'gym-lifecycle-deactivate',
+      updateInput,
+    );
+    expect(updated).toMatchObject({ active: false, version: 2 });
+    await expect(
+      gyms.updateGymLocation(
+        adminPrincipal,
+        created.id,
+        'gym-lifecycle-stale-update',
+        updateInput,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_LOCATION_VERSION_CONFLICT' },
+    });
+    await expect(
+      gyms.deleteGymLocation(
+        adminPrincipal,
+        created.id,
+        'gym-lifecycle-delete',
+        {
+          expectedVersion: updated.version,
+          reason: 'Delete the isolated gym after dependency review.',
+        },
+      ),
+    ).resolves.toEqual({ id: created.id, status: 'deleted' });
+
+    const [stored, audits] = await Promise.all([
+      database.connection
+        .selectFrom('gym_locations')
+        .select(['configuration_version', 'deleted_at'])
+        .where('id', '=', created.id)
+        .executeTakeFirstOrThrow(),
+      database.connection
+        .selectFrom('operator_audit_events')
+        .select(['action', 'next_state', 'previous_state'])
+        .where('entity_id', '=', created.id)
+        .orderBy('created_at')
+        .orderBy('id')
+        .execute(),
+    ]);
+    expect(stored.configuration_version).toBe(3);
+    expect(stored.deleted_at).toBeInstanceOf(Date);
+    expect(audits.map((audit) => audit.action)).toEqual([
+      'gym_location.created',
+      'gym_location.updated',
+      'gym_location.deleted',
+    ]);
+    expect(audits[1]).toMatchObject({
+      next_state: expect.objectContaining({ active: false, version: 2 }),
+      previous_state: expect.objectContaining({ active: true, version: 1 }),
     });
   });
 

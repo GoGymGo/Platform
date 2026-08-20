@@ -1,5 +1,6 @@
 import type { Transaction } from 'kysely';
 import type { Database, JsonValue } from '../../database/database.types';
+import type { DatabaseService } from '../../database/database.service';
 import type { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { NotificationsService } from '../notifications/notifications.service';
 import type { LegalDocumentsService } from '../legal/legal-documents.service';
@@ -25,6 +26,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
   it('allows active competitions to be cancelled by an operator', () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
+      {} as DatabaseService,
       {} as IdempotencyService,
       {} as LegalDocumentsService,
       {} as NotificationsService,
@@ -44,6 +46,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
   it('enforces one entrant as the platform-wide start minimum', () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
+      {} as DatabaseService,
       {} as IdempotencyService,
       {} as LegalDocumentsService,
       {} as NotificationsService,
@@ -80,6 +83,7 @@ describe('AdminCompetitionConfigurationService publication', () => {
     } as unknown as Transaction<Database>;
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
+      {} as DatabaseService,
       {} as IdempotencyService,
       {} as LegalDocumentsService,
       {} as NotificationsService,
@@ -100,8 +104,13 @@ describe('AdminCompetitionConfigurationService publication', () => {
 
   it('accepts a published reward without applying a hidden availability-window gate', async () => {
     let rewardAvailabilityFilterUsed = false;
+    const qrFilters: unknown[][] = [];
 
-    function query(result: unknown, trackRewardAvailability = false) {
+    function query(
+      result: unknown,
+      trackRewardAvailability = false,
+      trackQrFilters = false,
+    ) {
       const expression = Object.assign(
         (column: string) => {
           if (trackRewardAvailability && column.startsWith('available_')) {
@@ -126,7 +135,9 @@ describe('AdminCompetitionConfigurationService publication', () => {
       };
       builder.innerJoin.mockReturnValue(builder);
       builder.select.mockReturnValue(builder);
-      builder.where.mockImplementation((condition: unknown) => {
+      builder.where.mockImplementation((...args: unknown[]) => {
+        if (trackQrFilters) qrFilters.push(args);
+        const condition = args[0];
         if (typeof condition === 'function') {
           (condition as (input: typeof expression) => unknown)(expression);
         }
@@ -153,13 +164,14 @@ describe('AdminCompetitionConfigurationService publication', () => {
           return query({ id: 'reward-1' }, true);
         }
         if (table === 'competition_gym_locations as competition_gym') {
-          return query({ id: 'credential-1' });
+          return query({ id: 'credential-1' }, false, true);
         }
         throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as Transaction<Database>;
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
+      {} as DatabaseService,
       {} as IdempotencyService,
       {
         resolveCurrentBundle: jest.fn().mockResolvedValue({
@@ -186,9 +198,10 @@ describe('AdminCompetitionConfigurationService publication', () => {
     };
 
     const now = Date.now();
+    const endsAt = new Date(now + 4 * 60 * 60_000);
     await expect(
       publishable.assertPublishable(transaction, {
-        ends_at: new Date(now + 4 * 60 * 60_000),
+        ends_at: endsAt,
         id: 'competition-1',
         region_policy_id: 'region-1',
         registration_closes_at: new Date(now + 2 * 60 * 60_000),
@@ -199,11 +212,14 @@ describe('AdminCompetitionConfigurationService publication', () => {
       }),
     ).resolves.toBe('registration');
     expect(rewardAvailabilityFilterUsed).toBe(false);
+    expect(qrFilters).toContainEqual(['gym.region_policy_id', '=', 'region-1']);
+    expect(qrFilters).toContainEqual(['credential.expires_at', '>=', endsAt]);
   });
 
   it('rejects publication before registration opens and without required QR policy', async () => {
     const service = new AdminCompetitionConfigurationService(
       {} as AdminAuthorizationService,
+      {} as DatabaseService,
       {} as IdempotencyService,
       {} as LegalDocumentsService,
       {} as NotificationsService,
@@ -236,5 +252,80 @@ describe('AdminCompetitionConfigurationService publication', () => {
         rules: { ...(rules as Record<string, unknown>), requireGymQr: false },
       }),
     ).rejects.toThrow('currently requires Partner gym QR verification');
+  });
+
+  it('reports exact publication evidence without treating a failed check as ready', () => {
+    const service = new AdminCompetitionConfigurationService(
+      {} as AdminAuthorizationService,
+      {} as DatabaseService,
+      {} as IdempotencyService,
+      {} as LegalDocumentsService,
+      {} as NotificationsService,
+    ) as unknown as {
+      publicationChecks(
+        evidence: Record<string, unknown>,
+        blockingIssue: { code: string; message: string } | null,
+        evaluatedAt: Date,
+      ): Array<{ detail: string; key: string; satisfied: boolean }>;
+    };
+    const evaluatedAt = new Date('2026-08-20T18:00:00.000Z');
+    const evidence = {
+      goalBracketCount: 2,
+      gymQr: {
+        activeAssignedGymCount: 1,
+        activeCredentialCount: 1,
+        credentialExpiresAt: ['2026-10-01T07:00:00.000Z'],
+      },
+      legal: {
+        bundleSha256: 'a'.repeat(64),
+        configured: true,
+        documents: [
+          {
+            contentSha256: 'b'.repeat(64),
+            documentKey: 'official_contest_rules',
+            version: '2026-09-v1',
+          },
+        ],
+      },
+      region: {
+        boundaryVersion: 'boundary-2026-09-v1',
+        competitionEnabled: true,
+        policyVersion: '2026-09-v1',
+        validFrom: '2026-08-01T07:00:00.000Z',
+        validTo: '2026-10-02T07:00:00.000Z',
+      },
+      rewards: { inventoryTotal: 3, publishedCount: 1 },
+      rules: { requireGymQr: true },
+      schedule: {
+        endsAt: '2026-10-01T07:00:00.000Z',
+        registrationClosesAt: '2026-09-01T07:00:00.000Z',
+        registrationOpensAt: '2026-08-01T07:00:00.000Z',
+        startsAt: '2026-09-01T07:00:00.000Z',
+      },
+      status: 'draft',
+    };
+
+    const checks = service.publicationChecks(
+      evidence,
+      {
+        code: 'COMPETITION_QR_REQUIRED',
+        message: 'A full-window QR credential is missing.',
+      },
+      evaluatedAt,
+    );
+
+    expect(checks.find((check) => check.key === 'region_policy')).toMatchObject(
+      {
+        satisfied: true,
+      },
+    );
+    expect(checks.find((check) => check.key === 'legal')).toMatchObject({
+      satisfied: true,
+    });
+    expect(checks).toContainEqual({
+      detail: 'A full-window QR credential is missing.',
+      key: 'COMPETITION_QR_REQUIRED',
+      satisfied: false,
+    });
   });
 });

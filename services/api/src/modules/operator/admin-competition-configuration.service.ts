@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { sql } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import { DatabaseService } from '../../database/database.service';
 import type {
   CompetitionStatus,
   JsonObject,
@@ -33,6 +35,7 @@ import {
 import { AdminAuthorizationService } from './admin-authorization.service';
 import {
   CompetitionStatusAction,
+  type AdminCompetitionPublicationPreflightDto,
   type AdminDeletedEntityResponseDto,
   type AdminEntityResponseDto,
   type CompetitionStatusActionDto,
@@ -51,6 +54,43 @@ interface DeletedEntityJson extends JsonObject {
   id: string;
   status: 'deleted';
 }
+
+type PublicationEvidence = {
+  goalBracketCount: number;
+  gymQr: {
+    activeAssignedGymCount: number;
+    activeCredentialCount: number;
+    credentialExpiresAt: string[];
+  };
+  legal: {
+    bundleSha256: string | null;
+    configured: boolean;
+    documents: Array<{
+      contentSha256: string;
+      documentKey: string;
+      version: string;
+    }>;
+  };
+  region: {
+    boundaryVersion: string;
+    competitionEnabled: boolean;
+    policyVersion: string;
+    validFrom: string;
+    validTo: string | null;
+  } | null;
+  rewards: {
+    inventoryTotal: number;
+    publishedCount: number;
+  };
+  rules: { requireGymQr: boolean };
+  schedule: {
+    endsAt: string;
+    registrationClosesAt: string;
+    registrationOpensAt: string;
+    startsAt: string;
+  };
+  status: CompetitionStatus;
+};
 
 const partnerCompetitionRules = parseAdminCompetitionRules({
   categoryPodiumMultipliers: { 1: 3, 2: 2, 3: 1.5 },
@@ -71,10 +111,68 @@ const partnerCompetitionRules = parseAdminCompetitionRules({
 export class AdminCompetitionConfigurationService {
   constructor(
     private readonly authorization: AdminAuthorizationService,
+    private readonly database: DatabaseService,
     private readonly idempotency: IdempotencyService,
     private readonly legalDocuments: LegalDocumentsService,
     private readonly notifications: NotificationsService,
   ) {}
+
+  getPublicationPreflight(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+  ): Promise<AdminCompetitionPublicationPreflightDto> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        await this.authorization.requireAdmin(principal, transaction);
+        const competition = await transaction
+          .selectFrom('competitions')
+          .selectAll()
+          .where('id', '=', competitionId)
+          .where('deleted_at', 'is', null)
+          .executeTakeFirst();
+        if (!competition) {
+          throw new NotFoundException({
+            code: 'COMPETITION_NOT_FOUND',
+            message: 'The competition was not found.',
+          });
+        }
+        const evaluatedAt = new Date();
+        const evidence = await this.getPublicationEvidence(
+          transaction,
+          competition,
+        );
+        let blockingIssue: { code: string; message: string } | null = null;
+        try {
+          await this.assertPublishable(transaction, competition, evaluatedAt);
+        } catch (error) {
+          if (!(error instanceof HttpException)) throw error;
+          const response = error.getResponse();
+          const body =
+            typeof response === 'object' && response !== null
+              ? (response as { code?: unknown; message?: unknown })
+              : null;
+          blockingIssue = {
+            code:
+              typeof body?.code === 'string'
+                ? body.code
+                : 'COMPETITION_PUBLICATION_BLOCKED',
+            message:
+              typeof body?.message === 'string'
+                ? body.message
+                : 'Competition publication prerequisites are not satisfied.',
+          };
+        }
+        return {
+          checks: this.publicationChecks(evidence, blockingIssue, evaluatedAt),
+          competitionId,
+          evaluatedAt: evaluatedAt.toISOString(),
+          evidence,
+          ready: blockingIssue === null,
+          version: competition.configuration_version,
+        };
+      });
+  }
 
   create(
     principal: AuthenticatedPrincipal,
@@ -736,6 +834,217 @@ export class AdminCompetitionConfigurationService {
     }
   }
 
+  private async getPublicationEvidence(
+    transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
+    competition: {
+      ends_at: Date;
+      id: string;
+      region_policy_id: string;
+      registration_closes_at: Date;
+      registration_opens_at: Date;
+      rules: JsonValue;
+      starts_at: Date;
+      status: CompetitionStatus;
+    },
+  ): Promise<PublicationEvidence> {
+    const rules = parseAdminCompetitionRules(competition.rules);
+    const region = await transaction
+      .selectFrom('region_policies')
+      .select([
+        'boundary_version',
+        'competition_enabled',
+        'country_code',
+        'policy_version',
+        'subdivision_code',
+        'valid_from',
+        'valid_to',
+      ])
+      .where('id', '=', competition.region_policy_id)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst();
+    const jurisdictionCode = region
+      ? `${region.country_code}-${region.subdivision_code}`
+      : null;
+    const [goalBrackets, rewards, credentials, legalBundle] = await Promise.all(
+      [
+        transaction
+          .selectFrom('competition_goal_brackets')
+          .select('goal_days')
+          .where('competition_id', '=', competition.id)
+          .execute(),
+        transaction
+          .selectFrom('reward_catalog_items')
+          .select(['id', 'inventory_total'])
+          .where('competition_id', '=', competition.id)
+          .where('status', '=', 'published')
+          .where('deleted_at', 'is', null)
+          .execute(),
+        transaction
+          .selectFrom('competition_gym_locations as assignment')
+          .innerJoin(
+            'gym_locations as gym',
+            'gym.id',
+            'assignment.gym_location_id',
+          )
+          .innerJoin('gym_qr_credentials as credential', (join) =>
+            join
+              .onRef(
+                'credential.competition_id',
+                '=',
+                'assignment.competition_id',
+              )
+              .onRef(
+                'credential.gym_location_id',
+                '=',
+                'assignment.gym_location_id',
+              ),
+          )
+          .select([
+            'credential.expires_at',
+            'credential.id',
+            'gym.id as gym_id',
+          ])
+          .where('assignment.competition_id', '=', competition.id)
+          .where('gym.active', '=', true)
+          .where('gym.deleted_at', 'is', null)
+          .where('gym.region_policy_id', '=', competition.region_policy_id)
+          .where('credential.status', '=', 'active')
+          .where('credential.expires_at', '>=', competition.ends_at)
+          .execute(),
+        jurisdictionCode
+          ? this.legalDocuments.resolveCurrentBundle(
+              transaction,
+              jurisdictionCode,
+              'en',
+            )
+          : Promise.resolve(null),
+      ],
+    );
+    return {
+      goalBracketCount: goalBrackets.length,
+      gymQr: {
+        activeAssignedGymCount: new Set(
+          credentials.map((credential) => credential.gym_id),
+        ).size,
+        activeCredentialCount: credentials.length,
+        credentialExpiresAt: credentials.map((credential) =>
+          credential.expires_at.toISOString(),
+        ),
+      },
+      legal: {
+        bundleSha256: legalBundle?.bundleSha256 ?? null,
+        configured: legalBundle?.configured ?? false,
+        documents: (legalBundle?.documents ?? []).map((document) => ({
+          contentSha256: document.contentSha256,
+          documentKey: document.documentKey,
+          version: document.version,
+        })),
+      },
+      region: region
+        ? {
+            boundaryVersion: region.boundary_version,
+            competitionEnabled: region.competition_enabled,
+            policyVersion: region.policy_version,
+            validFrom: region.valid_from.toISOString(),
+            validTo: region.valid_to?.toISOString() ?? null,
+          }
+        : null,
+      rewards: {
+        inventoryTotal: rewards.reduce(
+          (total, reward) => total + reward.inventory_total,
+          0,
+        ),
+        publishedCount: rewards.length,
+      },
+      rules: { requireGymQr: rules.requireGymQr },
+      schedule: {
+        endsAt: competition.ends_at.toISOString(),
+        registrationClosesAt: competition.registration_closes_at.toISOString(),
+        registrationOpensAt: competition.registration_opens_at.toISOString(),
+        startsAt: competition.starts_at.toISOString(),
+      },
+      status: competition.status,
+    };
+  }
+
+  private publicationChecks(
+    evidence: PublicationEvidence,
+    blockingIssue: { code: string; message: string } | null,
+    evaluatedAt: Date,
+  ): AdminCompetitionPublicationPreflightDto['checks'] {
+    const now = evaluatedAt.getTime();
+    const regionCoversSchedule = Boolean(
+      evidence.region &&
+      new Date(evidence.region.validFrom).getTime() <=
+        new Date(evidence.schedule.registrationOpensAt).getTime() &&
+      (evidence.region.validTo === null ||
+        new Date(evidence.region.validTo).getTime() >=
+          new Date(evidence.schedule.endsAt).getTime()),
+    );
+    const hasOfficialRules = evidence.legal.documents.some(
+      (document) => document.documentKey === 'official_contest_rules',
+    );
+    const checks: AdminCompetitionPublicationPreflightDto['checks'] = [
+      {
+        detail: 'The Contest is still an editable draft.',
+        key: 'draft_status',
+        satisfied: evidence.status === 'draft',
+      },
+      {
+        detail:
+          'Registration is open and its close, start, and end remain in the future.',
+        key: 'schedule',
+        satisfied:
+          new Date(evidence.schedule.registrationOpensAt).getTime() <= now &&
+          new Date(evidence.schedule.registrationClosesAt).getTime() > now &&
+          new Date(evidence.schedule.startsAt).getTime() > now &&
+          new Date(evidence.schedule.endsAt).getTime() > now,
+      },
+      {
+        detail:
+          'The exact region policy is enabled and covers the full Contest lifecycle.',
+        key: 'region_policy',
+        satisfied: Boolean(
+          evidence.region?.competitionEnabled && regionCoversSchedule,
+        ),
+      },
+      {
+        detail: `${evidence.goalBracketCount} goal bracket(s) are stored.`,
+        key: 'goal_brackets',
+        satisfied: evidence.goalBracketCount > 0,
+      },
+      {
+        detail: `${evidence.rewards.publishedCount} published reward(s) with ${evidence.rewards.inventoryTotal} total slot(s) are stored.`,
+        key: 'rewards',
+        satisfied:
+          evidence.rewards.publishedCount > 0 &&
+          evidence.rewards.inventoryTotal > 0,
+      },
+      {
+        detail:
+          'The current owner-approved Privacy, Terms, and Official Contest Rules evidence resolves.',
+        key: 'legal',
+        satisfied: evidence.legal.configured && hasOfficialRules,
+      },
+      {
+        detail: `${evidence.gymQr.activeAssignedGymCount} active assigned gym(s) and ${evidence.gymQr.activeCredentialCount} full-window QR credential(s) are stored.`,
+        key: 'gym_qr',
+        satisfied:
+          evidence.rules.requireGymQr &&
+          evidence.gymQr.activeAssignedGymCount > 0 &&
+          evidence.gymQr.activeCredentialCount > 0,
+      },
+    ];
+    if (blockingIssue) {
+      checks.push({
+        detail: blockingIssue.message,
+        key: blockingIssue.code,
+        satisfied: false,
+      });
+    }
+    return checks;
+  }
+
   private async assertPublishable(
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
     competition: {
@@ -750,6 +1059,7 @@ export class AdminCompetitionConfigurationService {
       starts_at: Date;
       status: CompetitionStatus;
     },
+    now = new Date(),
   ): Promise<'registration'> {
     if (competition.status !== 'draft') {
       throw new ConflictException({
@@ -757,7 +1067,6 @@ export class AdminCompetitionConfigurationService {
         message: 'Only a draft competition can be published.',
       });
     }
-    const now = new Date();
     if (competition.ends_at <= now) {
       throw new ConflictException({
         code: 'COMPETITION_PUBLISH_WINDOW_CLOSED',
@@ -800,6 +1109,7 @@ export class AdminCompetitionConfigurationService {
         'valid_to',
       ])
       .where('id', '=', competition.region_policy_id)
+      .where('deleted_at', 'is', null)
       .executeTakeFirst();
     if (!region) {
       throw new NotFoundException({
@@ -875,7 +1185,9 @@ export class AdminCompetitionConfigurationService {
             .where('competition_gym.competition_id', '=', competition.id)
             .where('gym.active', '=', true)
             .where('gym.deleted_at', 'is', null)
+            .where('gym.region_policy_id', '=', competition.region_policy_id)
             .where('credential.status', '=', 'active')
+            .where('credential.expires_at', '>=', competition.ends_at)
             .executeTakeFirst()
         : Promise.resolve({ id: 'not-required' }),
       this.legalDocuments.resolveCurrentBundle(

@@ -18,7 +18,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `5886931dea855f4a60ddbac94d0c2d38e18ba9d6` after PR #105 on 2026-08-15.
+  `3398b47621096805cc044682a613975c3cc53df9` after PR #108 on 2026-08-20.
 - Active feature task: `GoGymGo Feature GGG-021 — Administrative configuration`
   on `agent/ggg-021-administrative-configuration`; creation follows this ledger
   merge.
@@ -995,20 +995,21 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   weaken Firebase, API route, deep-link, permission, or demo-isolation controls.
 - External providers / feature flag: npm/Expo compatibility metadata; existing
   locked dependencies only; no feature flag.
-- Current implementation / missing behavior: eleven SDK 57 package declarations
-  and their patch-level lockfile chain are aligned through supported Expo
-  tooling. Clean locked installs pass `expo install --check`; all-platform and
-  preview artifacts remain unchanged in behavior. No repository duty is missing.
+- Current implementation / missing behavior: two supported SDK 57 patch
+  alignments have merged through PRs #97 and #108. The current eleven Expo
+  declarations and patch-only lockfile chain match Expo's 2026-08-20 metadata;
+  clean locked installs pass `expo install --check`, all-platform and preview
+  exports remain behaviorally unchanged, and no repository duty is missing.
 - Required tests / operations / cloud dependency: exact declared package/lockfile
   alignment, dependency/governance audit, member type/lint/tests, Expo install
   check, iOS/Android/web exports, production/preview bundle and source audits,
   full repository check, exact-head PR and restored main-push checks. No cloud
   dependency.
 - Delivery: priority `P0` CI restoration; task `GoGymGo Feature GGG-031 — Expo
-  SDK patch compatibility`; branch `agent/ggg-031-expo-sdk-patch-compatibility`
-  deleted; PR #97; exact tested head
-  `7793c28aca7a8ff2c73280c90d3057ea21737bd1`; merge
-  `815ae80b1a27fd5dd70a7368bf01fbb2cf767fb4`; status `COMPLETE`.
+  SDK patch compatibility`; latest branch
+  `agent/ggg-031-expo-sdk-patch-compatibility-2` (deleted after merge); PR #108;
+  exact tested head `403475b911416b390125d9e13c07a98b97139d62`; merge
+  `3398b47621096805cc044682a613975c3cc53df9`; status `COMPLETE`.
 - Residual risks / blocker: Expo compatibility metadata can advance again; the
   deterministic CI gate must remain enabled. This task did not migrate SDK
   major/minor versions or alter permissions, plugins, native identifiers, source,
@@ -1121,6 +1122,18 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-20 — Recompleted `GGG-031` after Expo's external SDK 57 compatibility
+  metadata advanced again. Exact tested head
+  `403475b911416b390125d9e13c07a98b97139d62` changed only the member package
+  declaration and root lockfile, was squash-merged through PR #108 as
+  `3398b47621096805cc044682a613975c3cc53df9`, and restored the previously failing
+  Expo check. All seven PR checks and all six exact-main workflows passed; the
+  remote branch was deleted. Serial validation included a clean locked install,
+  244 member tests and audits, iOS/Android/web and preview exports, governance,
+  dependency audit, non-database journeys, and the full non-Docker repository
+  check. No local Docker, cloud access, deployment, SDK major/minor migration,
+  source/configuration, permission, plugin, or native-identifier change occurred.
+  `GGG-021` remains the next launch-critical P0 feature.
 - 2026-08-15 — Completed `GGG-024` through PR #105. Exact tested head
   `c5bfb50c6fc0fff8f998dd0d80296bafbe2553b9` was squash-merged as
   `5886931dea855f4a60ddbac94d0c2d38e18ba9d6`; all seven PR checks and all six

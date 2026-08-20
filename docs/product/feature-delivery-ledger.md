@@ -18,10 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `b81b4326ef550b7e87a4cd5e24968828e78f7463` after PR #109 on 2026-08-20.
-- Active feature task: `GoGymGo Feature GGG-021 — Administrative configuration`
-  on `agent/ggg-021-administrative-configuration`; creation follows this ledger
-  merge.
+  `197c6ea489215a6746123a857882df85b485e906` after PR #110 on 2026-08-20.
+- Active feature task: `GoGymGo Feature GGG-019 — Privacy operations and local
+  reset` on `agent/ggg-019-privacy-operations-local-reset`; creation follows this
+  ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -34,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 41 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 42 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -736,16 +736,28 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   optimistic version, idempotency key, reason, deletion policy, append-only audit.
 - External providers / feature flag: creator controls follow shared creator flag;
   database/PostGIS required.
-- Current implementation / missing behavior: one-page Contest publication journey
-  and supporting panels are implemented with direct tests. Missing real
-  configuration/UAT and a full mutation-by-mutation feature audit.
-- Required tests / operations / cloud dependency: validation, publish
-  prerequisites, DST schedule, version conflict, idempotency, deletion state,
-  role denial, audit before/after, worker transition; database/worker.
+- Current implementation / missing behavior: every production configuration
+  panel is reachable, including first-gym creation, and consumes authoritative
+  runtime-validated reads/mutations. Contest publication uses a server preflight;
+  region/gym/legal lifecycles use database versions and body-bound idempotency;
+  gym activation/deletion enforces dependencies and QR cleanup; immutable legal
+  documents use append-only versioned owner-gated events; Creator capability is
+  server-owned; and minimized audit projections preserve real before/after
+  evidence. Honest loading/error/conflict/disabled states and regenerated
+  contracts cover the full mutation surface. No known repository behavior
+  remains missing for this duty.
+- Required tests / operations / cloud dependency: validation, exact publication
+  prerequisites, version/body mismatch, rollback, deletion/dependency policy,
+  role/scope denial, minimized audit before/after, creator gating and rendered
+  reachability; full migrated PostGIS suite and release-environment worker/UAT.
 - Delivery: priority `P0`; task `GoGymGo Feature GGG-021 — Administrative
-  configuration`; branch/PR/merge `unassigned`; status `AUDITED`.
-- Residual risks / blocker: broad surface can hide unreachable drill-ins; browser
-  testing must prove every advertised action is reachable and authoritative.
+  configuration`; branch `agent/ggg-021-administrative-configuration` (deleted
+  after merge); PR `#110`; merge
+  `197c6ea489215a6746123a857882df85b485e906`; status `COMPLETE`.
+- Residual risks / blocker: migration/runtime rollout, real owner-approved legal,
+  reward, region and gym assets/configuration, provider approvals, intentional
+  flag enablement and staging operator/worker rehearsal remain external release
+  gates. Nothing was invented, enabled, deployed or accessed in cloud.
 
 ### GGG-022 — Human review queues, audit history, and operational health
 
@@ -1124,6 +1136,21 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-20 — Completed `GGG-021` through PR #110. Exact tested head
+  `fc6636956ce4eebb17401af50c44f65f2874cae4` was squash-merged as
+  `197c6ea489215a6746123a857882df85b485e906`; all seven PR checks and all six
+  exact-main workflows passed and the remote branch was deleted. Delivery added
+  authoritative Contest publication preflight, versioned/body-idempotent region
+  and gym lifecycles, append-only versioned owner-gated legal events, server
+  Creator capability, truthful audit projections and reachable/honest admin
+  configuration panels. Serial validation included 249 member tests, 309 API
+  unit tests, 28 API E2E tests, 37 admin tests, 15 landing tests, full workspace
+  gates/builds and dependency/governance/contracts/artifact audits. Authorized
+  focused PostGIS proof passed 10/10 and full integration passed 11 suites/73;
+  Docker cleaned to zero running containers. No cloud access or deployment.
+  Dependency ordering assigns launch-critical P0 `GGG-019` next because privacy
+  export/deletion/local reset is the remaining member/operator data-rights duty;
+  S3/provider/deployment behavior must remain fail closed without authorization.
 - 2026-08-20 — Completed the deterministic `GGG-031` repair through PR #109.
   Exact tested head `110bd70ba3ee7a5d8ed005e17a37bb498b644040`
   was squash-merged as `b81b4326ef550b7e87a4cd5e24968828e78f7463`;

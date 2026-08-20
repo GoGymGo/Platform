@@ -3137,6 +3137,55 @@
         "tags": ["privacy requests"]
       }
     },
+    "/v1/me/privacy-requests/capabilities": {
+      "get": {
+        "operationId": "capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyCapabilitiesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Return privacy operation availability",
+        "tags": ["privacy requests"]
+      }
+    },
+    "/v1/me/privacy-requests/{privacyRequestId}": {
+      "get": {
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "privacyRequestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestDetailResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Read one owned privacy request and its history",
+        "tags": ["privacy requests"]
+      }
+    },
     "/v1/me/privacy-requests/{privacyRequestId}/download-action": {
       "post": {
         "operationId": "downloadAction",
@@ -5480,6 +5529,10 @@
             ]
           },
           "status": { "type": "string" },
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "failureCode": { "type": "string" },
+          "nextAttemptAt": { "type": "string", "format": "date-time" },
+          "version": { "type": "number", "minimum": 1 },
           "createdAt": { "type": "string", "format": "date-time" },
           "regionCode": { "type": "string", "example": "CA-BC" },
           "verificationMethod": {
@@ -5800,9 +5853,10 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "decision": { "type": "string", "enum": ["processing", "rejected"] }
+          "decision": { "type": "string", "enum": ["processing", "rejected"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason", "decision"]
+        "required": ["reason", "decision", "expectedVersion"]
       },
       "ProfileMediaReviewActionDto": {
         "type": "object",
@@ -7577,15 +7631,24 @@
         "type": "object",
         "properties": {
           "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "confirmation": {
+            "type": "string",
+            "enum": ["DELETE_MY_ACCOUNT", "EXPORT_MY_DATA"]
+          },
           "reason": { "type": "string", "maxLength": 1000 }
         },
-        "required": ["requestType"]
+        "required": ["requestType", "confirmation"]
       },
       "PrivacyRequestResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "enum": ["completed", "processing", "rejected", "requested"]
@@ -7602,17 +7665,103 @@
             "format": "date-time",
             "nullable": true
           },
-          "failureCode": { "type": "string", "nullable": true }
+          "failureCode": { "type": "string", "nullable": true },
+          "nextAttemptAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
           "requestType",
+          "confirmedAt",
           "status",
           "requestedAt",
           "completedAt",
           "downloadAvailable",
           "exportExpiresAt",
-          "failureCode"
+          "failureCode",
+          "nextAttemptAt",
+          "version"
+        ]
+      },
+      "PrivacyCapabilitiesResponseDto": {
+        "type": "object",
+        "properties": {
+          "requestCreationAvailable": { "type": "boolean" },
+          "status": { "type": "string", "enum": ["disabled", "enabled"] }
+        },
+        "required": ["requestCreationAvailable", "status"]
+      },
+      "PrivacyRequestEventDto": {
+        "type": "object",
+        "properties": {
+          "createdAt": { "type": "string", "format": "date-time" },
+          "previousStatus": {
+            "type": "string",
+            "enum": ["completed", "processing", "rejected", "requested"],
+            "nullable": true
+          },
+          "nextStatus": {
+            "type": "string",
+            "enum": ["completed", "processing", "rejected", "requested"]
+          }
+        },
+        "required": ["createdAt", "previousStatus", "nextStatus"]
+      },
+      "PrivacyRequestDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["completed", "processing", "rejected", "requested"]
+          },
+          "requestedAt": { "type": "string", "format": "date-time" },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "downloadAvailable": { "type": "boolean" },
+          "exportExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureCode": { "type": "string", "nullable": true },
+          "nextAttemptAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": { "type": "number", "minimum": 1 },
+          "events": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PrivacyRequestEventDto" }
+          }
+        },
+        "required": [
+          "id",
+          "requestType",
+          "confirmedAt",
+          "status",
+          "requestedAt",
+          "completedAt",
+          "downloadAvailable",
+          "exportExpiresAt",
+          "failureCode",
+          "nextAttemptAt",
+          "version",
+          "events"
         ]
       },
       "PrivacyDownloadActionDto": {

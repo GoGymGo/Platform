@@ -142,6 +142,33 @@ describe('IdempotencyService', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('rejects a reused key whose body does not match the completed request', async () => {
+    const { service } = createService({
+      existing: {
+        request_hash: requestHash(request),
+        response_body: { id: 'request-1', status: 'accepted' },
+        state: 'completed',
+      },
+    });
+    const handler = jest.fn(() =>
+      Promise.resolve({ id: 'request-1', status: 'rejected' }),
+    );
+
+    await expect(
+      service.execute(
+        {
+          ...baseOptions,
+          request: { awardId: 'award-1', reason: 'different decision body' },
+          storeResponseBody: true,
+        },
+        handler,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it('authorizes inside the transaction before returning a stored response', async () => {
     const storedResponse = { id: 'request-1', status: 'accepted' };
     const { service, transaction } = createService({

@@ -173,7 +173,7 @@ export function createAppTourDataSource(): AppDataSource {
       cashCurrency: null,
       claimedAt: null,
       fulfilledAt: null,
-      id: "app-tour-award",
+      id: 'app-tour-award',
       imageUrl: null,
       rewardType: 'coupon',
       sponsorName: 'Northline Wellness',
@@ -250,21 +250,21 @@ export function createAppTourDataSource(): AppDataSource {
           awardRank: 1,
           cashAmountCents: null,
           cashCurrency: null,
-          rewardTitle: "Recovery Pack",
-          rewardType: "coupon",
-          sponsorName: "Northline Wellness",
-          streaks: fixedStreaks,
+          rewardTitle: 'Recovery Pack',
+          rewardType: 'coupon',
+          sponsorName: 'Northline Wellness',
+          streaks: fixedStreaks
         },
         {
           alias: 'MOVE_MORE',
           awardRank: 2,
           cashAmountCents: null,
           cashCurrency: null,
-          rewardTitle: "Training Credit",
-          rewardType: "coupon",
-          sponsorName: "Northline Wellness",
-          streaks: { ...fixedStreaks, daily: 3 },
-        },
+          rewardTitle: 'Training Credit',
+          rewardType: 'coupon',
+          sponsorName: 'Northline Wellness',
+          streaks: { ...fixedStreaks, daily: 3 }
+        }
       ],
       settledAt: nowIso()
     }),
@@ -454,18 +454,25 @@ export function createAppTourAccountSettingsRepository(): AccountSettingsReposit
   return {
     createPrivacyRequest: async (requestType) => ({
       completedAt: nowIso(),
+      confirmedAt: nowIso(),
       downloadAvailable: requestType === 'export',
       exportExpiresAt: requestType === 'export' ? nowIso() : null,
       failureCode: null,
       id: `app-tour-${requestType}`,
+      nextAttemptAt: null,
       requestedAt: nowIso(),
       requestType,
-      status: 'completed'
+      status: 'completed',
+      version: 3
     }),
     disablePushDevice: async () => undefined,
     getAvatar: async () => ({ active: avatar, latest: avatar }),
     getDevicePresenceConsent: async () => consent(),
     getProfile: async () => accountProfile,
+    getPrivacyCapabilities: async () => ({
+      requestCreationAvailable: true,
+      status: 'enabled'
+    }),
     getPrivacyDownload: async () => ({
       expiresAt: nowIso(),
       url: 'data:text/plain,GoGymGo%20App%20Tour%20export'

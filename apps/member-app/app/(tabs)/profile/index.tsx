@@ -186,7 +186,7 @@ export default function ProfileScreen() {
       router.replace('/');
     } catch {
       setAccountActionMessage(
-        'RESET FAILED. CLOSE THE APP AND TRY AGAIN.'
+        'LOCAL RESET DID NOT COMPLETE. SOME GOGYMGO DEVICE DATA MAY REMAIN; NO SERVER DATA WAS DELETED. TRY AGAIN.'
       );
       setResettingApp(false);
     }
@@ -319,10 +319,19 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           {profileStats.map((stat) => (
             <HUDBorderBox key={stat.label} style={styles.statCard} tone="muted">
-              <TerminalText glow style={styles.statValue} tone={stat.accent} variant="value">
+              <TerminalText
+                glow
+                style={styles.statValue}
+                tone={stat.accent}
+                variant="value"
+              >
                 {stat.value}
               </TerminalText>
-              <TerminalText style={styles.statLabel} tone="muted" variant="micro">
+              <TerminalText
+                style={styles.statLabel}
+                tone="muted"
+                variant="micro"
+              >
                 {stat.label}
               </TerminalText>
             </HUDBorderBox>
@@ -351,37 +360,48 @@ export default function ProfileScreen() {
         {showCompetitionSettings ? (
           <>
             {mobileGymVerificationAvailable ? (
-            <HUDBorderBox style={styles.regionCard} tone="cyan">
-              <View style={styles.regionCopy}>
-                <TerminalText tone="dim" variant="label">
-                  CONTEST REGION
-                </TerminalText>
-                <TerminalText glow tone="cyan" variant="body">
-                  {competitionRegion.label}
-                </TerminalText>
-                <TerminalText
-                  tone={regionVerification?.status === 'verified' ? 'green' : 'amber'}
-                  variant="caption"
-                >
-                  {regionVerification
-                    ? regionVerification.status === 'verified'
-                      ? 'VERIFIED BY DEVICE LOCATION'
-                      : 'LOCATION RECHECK REQUIRED'
-                    : 'LOCATION VERIFICATION REQUIRED'}
-                </TerminalText>
-              </View>
-              <CyberButtonOutline
-                label="CHANGE"
-                onPress={() => router.push('/region?source=profile' as Href)}
-                style={styles.regionButton}
-              />
-            </HUDBorderBox>
+              <HUDBorderBox style={styles.regionCard} tone="cyan">
+                <View style={styles.regionCopy}>
+                  <TerminalText tone="dim" variant="label">
+                    CONTEST REGION
+                  </TerminalText>
+                  <TerminalText glow tone="cyan" variant="body">
+                    {competitionRegion.label}
+                  </TerminalText>
+                  <TerminalText
+                    tone={
+                      regionVerification?.status === 'verified'
+                        ? 'green'
+                        : 'amber'
+                    }
+                    variant="caption"
+                  >
+                    {regionVerification
+                      ? regionVerification.status === 'verified'
+                        ? 'VERIFIED BY DEVICE LOCATION'
+                        : 'LOCATION RECHECK REQUIRED'
+                      : 'LOCATION VERIFICATION REQUIRED'}
+                  </TerminalText>
+                </View>
+                <CyberButtonOutline
+                  label="CHANGE"
+                  onPress={() => router.push('/region?source=profile' as Href)}
+                  style={styles.regionButton}
+                />
+              </HUDBorderBox>
             ) : null}
 
-            <TerminalText style={styles.sectionLabel} tone="dim" variant="label">
+            <TerminalText
+              style={styles.sectionLabel}
+              tone="dim"
+              variant="label"
+            >
               WORKOUT PREFERENCE
             </TerminalText>
-            <HUDBorderBox style={[styles.settingsCard, styles.settingsGroup]} tone="muted">
+            <HUDBorderBox
+              style={[styles.settingsCard, styles.settingsGroup]}
+              tone="muted"
+            >
               {settingsGroups.preferences.map((row) => (
                 <SettingsItem key={row.title} row={row} />
               ))}
@@ -417,7 +437,10 @@ export default function ProfileScreen() {
                   <TerminalText tone="muted" variant="caption">
                     WEEKLY GOAL, WEEKLY CHALLENGE AND BONUS DAY ALERTS
                   </TerminalText>
-                  <TerminalText tone={remindersEnabled ? 'green' : 'dim'} variant="micro">
+                  <TerminalText
+                    tone={remindersEnabled ? 'green' : 'dim'}
+                    variant="micro"
+                  >
                     {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
                   </TerminalText>
                 </View>
@@ -452,7 +475,10 @@ export default function ProfileScreen() {
           onPress={() => setShowLegal((current) => !current)}
         />
         {showLegal ? (
-          <HUDBorderBox style={[styles.settingsCard, styles.legalCard]} tone="muted">
+          <HUDBorderBox
+            style={[styles.settingsCard, styles.legalCard]}
+            tone="muted"
+          >
             {settingsGroups.legal.map((row) => (
               <SettingsItem key={row.title} row={row} />
             ))}
@@ -474,8 +500,8 @@ export default function ProfileScreen() {
               COULD NOT CHECK CONTEST ENROLLMENT
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Withdrawal controls are unavailable until your authoritative Contest entry can be
-              checked.
+              Withdrawal controls are unavailable until your authoritative
+              Contest entry can be checked.
             </TerminalText>
             <CyberButtonOutline
               disabled={currentEnrollment.isFetching}
@@ -490,8 +516,8 @@ export default function ProfileScreen() {
               WITHDRAW FROM CONTEST
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Ends workouts, ranking and prize eligibility. You can&apos;t re-enter; your Contest
-              record remains.
+              Ends workouts, ranking and prize eligibility. You can&apos;t
+              re-enter; your Contest record remains.
             </TerminalText>
             {confirmWithdrawal ? (
               <View style={styles.confirmActions}>
@@ -528,7 +554,10 @@ export default function ProfileScreen() {
             RESET APP ON THIS DEVICE
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
-            Signs out and clears this device. Your account and Contest history stay saved.
+            Clears only GoGymGo session, cache, and recovery data on this
+            device. It never requests account deletion: your server account and
+            Contest history stay saved, and unrelated app or browser data is
+            preserved.
           </TerminalText>
           {confirmReset ? (
             <View style={styles.confirmActions}>
@@ -540,7 +569,9 @@ export default function ProfileScreen() {
               />
               <CyberButtonOutline
                 disabled={resettingApp}
-                label={resettingApp ? 'RESETTING...' : 'CONFIRM RESET & SIGN OUT'}
+                label={
+                  resettingApp ? 'RESETTING...' : 'CONFIRM RESET & SIGN OUT'
+                }
                 onPress={() => void performAppReset()}
                 style={styles.confirmButton}
                 tone="red"
@@ -558,11 +589,18 @@ export default function ProfileScreen() {
         {accountActionMessage ? (
           <AuthStatusNotice
             message={accountActionMessage}
-            tone={accountActionMessage.includes('COULD NOT') ? 'red' : 'green'}
+            tone={
+              accountActionMessage.includes('COULD NOT') ||
+              accountActionMessage.includes('DID NOT')
+                ? 'red'
+                : 'green'
+            }
           />
         ) : null}
 
-        {signOutError ? <AuthStatusNotice message={signOutError} tone="red" /> : null}
+        {signOutError ? (
+          <AuthStatusNotice message={signOutError} tone="red" />
+        ) : null}
         <CyberButtonOutline
           disabled={signingOut}
           label={signingOut ? 'SIGNING OUT...' : 'SIGN OUT'}
@@ -606,7 +644,10 @@ function SettingsItem({ row }: { row: SettingsRow }) {
           router.push(row.route);
         }
       }}
-      style={({ pressed }) => [styles.settingsRow, pressed && isPressable ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.settingsRow,
+        pressed && isPressable ? styles.pressed : null
+      ]}
     >
       <View style={styles.settingsCopy}>
         <TerminalText style={styles.settingsTitle} tone="text" variant="body">
@@ -618,7 +659,11 @@ function SettingsItem({ row }: { row: SettingsRow }) {
       </View>
       {row.status ? (
         <HUDBorderBox style={styles.statusBadge} tone={statusTone}>
-          <TerminalText glow={row.tone !== 'muted'} tone={statusTone} variant="micro">
+          <TerminalText
+            glow={row.tone !== 'muted'}
+            tone={statusTone}
+            variant="micro"
+          >
             {row.status}
           </TerminalText>
         </HUDBorderBox>

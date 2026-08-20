@@ -6,6 +6,7 @@ import { PrivateObjectStorageError } from '../storage/private-object-storage';
 import type { PrivacyExportBuilder } from './privacy-export.builder';
 import type { PrivacyOperationsRepository } from './privacy-operations.repository';
 import { PrivacyOperationsService } from './privacy-operations.service';
+import { PrivacyOperationError } from './privacy-operations.types';
 import type { ClaimedPrivacyJob } from './privacy-operations.types';
 
 describe('PrivacyOperationsService', () => {
@@ -47,6 +48,7 @@ describe('PrivacyOperationsService', () => {
     const listExpiredExportObjects = jest.fn().mockResolvedValue([]);
     const markExportObjectDeleted = jest.fn().mockResolvedValue(true);
     const recordFailure = jest.fn();
+    const renewLease = jest.fn();
     const repository = {
       claimNext,
       completeDeletion,
@@ -55,6 +57,7 @@ describe('PrivacyOperationsService', () => {
       listExpiredExportObjects,
       markExportObjectDeleted,
       recordFailure,
+      renewLease,
     } as unknown as jest.Mocked<PrivacyOperationsRepository>;
     const deleteAccount = jest.fn();
     const identityAdmin: jest.Mocked<AccountIdentityAdmin> = {
@@ -90,6 +93,7 @@ describe('PrivacyOperationsService', () => {
         markExportObjectDeleted,
         putJsonIfAbsent,
         recordFailure,
+        renewLease,
       },
       exportBuilder,
       identityAdmin,
@@ -120,6 +124,13 @@ describe('PrivacyOperationsService', () => {
       `privacy-exports/${exportJob.userId}/${exportJob.id}.json`,
       'a'.repeat(64),
       expect.any(Date),
+    );
+    expect(calls.renewLease).toHaveBeenCalledTimes(2);
+    expect(calls.renewLease).toHaveBeenNthCalledWith(
+      1,
+      exportJob,
+      expect.any(Date),
+      600,
     );
   });
 
@@ -166,6 +177,7 @@ describe('PrivacyOperationsService', () => {
     expect(calls.deleteObject.mock.invocationCallOrder[1]).toBeLessThan(
       calls.deleteAccount.mock.invocationCallOrder[0],
     );
+    expect(calls.renewLease).toHaveBeenCalledTimes(9);
   });
 
   it('does not remove access while a reward still requires the winner', async () => {
@@ -238,6 +250,25 @@ describe('PrivacyOperationsService', () => {
     expect(calls.recordFailure).toHaveBeenCalledWith(
       exportJob,
       'OBJECT_WRITE_FAILED',
+    );
+  });
+
+  it('stops before writing when the worker no longer owns the lease', async () => {
+    const { calls, service } = setup();
+    calls.renewLease.mockRejectedValueOnce(
+      new PrivacyOperationError('PRIVACY_JOB_LEASE_LOST'),
+    );
+
+    await expect(service.processPending()).resolves.toEqual({
+      completed: 0,
+      expiredExportsDeleted: 0,
+      failed: 1,
+    });
+    expect(calls.putJsonIfAbsent).not.toHaveBeenCalled();
+    expect(calls.completeExport).not.toHaveBeenCalled();
+    expect(calls.recordFailure).toHaveBeenCalledWith(
+      exportJob,
+      'PRIVACY_JOB_LEASE_LOST',
     );
   });
 

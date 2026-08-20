@@ -101,6 +101,17 @@ but preserves pseudonymous contest, reward, fraud, ledger, legal-receipt, and
 operator-audit records required for integrity or approved retention. Coupon
 ciphertext and codes not assigned to the user are excluded from privacy exports.
 
+`PRIVACY_OPERATIONS_ENABLED` defaults to `false`. Before changing it, prove in
+the target environment that the dedicated export bucket is private and has its
+seven-day lifecycle, signed reads expire within five minutes, worker lease
+renewal/takeover alerts are visible, Firebase deletion and avatar/export object
+deletion return authoritative results, the pseudonymization key is present only
+in the worker, and backup/restore plus crashed-job reconciliation have been
+rehearsed. Run one staging v12 export minimization review and one deletion/FK/
+retained-integrity review using disposable approved fixtures. Missing or
+ambiguous evidence is a release blocker; do not enable the flag or describe the
+path as live.
+
 ## Backup and rollback
 
 - Verify a backup and recovery window before every migration.

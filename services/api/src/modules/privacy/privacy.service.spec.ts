@@ -1,4 +1,9 @@
-import { ConflictException, GoneException } from '@nestjs/common';
+import {
+  ConflictException,
+  GoneException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { Environment } from '../../config/environment';
@@ -6,6 +11,7 @@ import type { DatabaseService } from '../../database/database.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import type { ProfilesService } from '../profiles/profiles.service';
 import type { PrivateObjectStorage } from '../storage/private-object-storage';
+import { PrivacyRequestConfirmationDto } from './dto/privacy-request.dto';
 import { PrivacyService } from './privacy.service';
 
 describe('PrivacyService download actions', () => {
@@ -146,5 +152,136 @@ describe('PrivacyService download actions', () => {
       ),
     ).rejects.toBeInstanceOf(GoneException);
     expect(createSignedReadUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrivacyService request confirmation', () => {
+  const principal: AuthenticatedPrincipal = {
+    emailVerified: true,
+    firebaseUid: 'firebase-user',
+    roles: ['user'],
+    signInProvider: 'password',
+    tokenIssuedAt: 1,
+  };
+
+  function setup(enabled: boolean) {
+    const execute = jest.fn().mockResolvedValue({
+      completedAt: null,
+      confirmedAt: '2026-08-20T12:00:00.000Z',
+      downloadAvailable: false,
+      exportExpiresAt: null,
+      failureCode: null,
+      id: '10000000-0000-4000-8000-000000000001',
+      nextAttemptAt: null,
+      requestedAt: '2026-08-20T12:00:00.000Z',
+      requestType: 'export',
+      status: 'requested',
+      version: 1,
+    });
+    const config = {
+      get: jest.fn((key: string) =>
+        key === 'PRIVACY_OPERATIONS_ENABLED' ? enabled : undefined,
+      ),
+    } as unknown as ConfigService<Environment, true>;
+    const service = new PrivacyService(
+      {} as DatabaseService,
+      { execute } as unknown as IdempotencyService,
+      {} as ProfilesService,
+      config,
+      {} as PrivateObjectStorage,
+    );
+    return { execute, service };
+  }
+
+  it('fails closed without recording an idempotent request when disabled', () => {
+    const { execute, service } = setup(false);
+
+    expect(() =>
+      service.createRequest(principal, 'request-key', {
+        confirmation: PrivacyRequestConfirmationDto.EXPORT_MY_DATA,
+        requestType: 'export',
+      }),
+    ).toThrow(ServiceUnavailableException);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('requires the confirmation that matches the selected operation', () => {
+    const { execute, service } = setup(true);
+
+    expect(() =>
+      service.createRequest(principal, 'request-key', {
+        confirmation: PrivacyRequestConfirmationDto.EXPORT_MY_DATA,
+        requestType: 'delete',
+      }),
+    ).toThrow(ConflictException);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('binds the exact confirmation, operation, and reason to idempotency', async () => {
+    const { execute, service } = setup(true);
+
+    await expect(
+      service.createRequest(principal, 'request-key', {
+        confirmation: PrivacyRequestConfirmationDto.EXPORT_MY_DATA,
+        reason: '  portable copy  ',
+        requestType: 'export',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ status: 'requested' }));
+    expect(execute).toHaveBeenCalledWith(
+      {
+        actorKey: 'firebase:firebase-user',
+        key: 'request-key',
+        request: {
+          confirmation: 'EXPORT_MY_DATA',
+          reason: 'portable copy',
+          requestType: 'export',
+        },
+        responseCode: 201,
+        scope: 'privacy-requests:create',
+      },
+      expect.any(Function),
+    );
+  });
+
+  it('hides another account request behind the owned lookup', async () => {
+    const query = {
+      executeTakeFirst: jest.fn().mockResolvedValue(undefined),
+      select: jest.fn(),
+      where: jest.fn(),
+    };
+    query.select.mockReturnValue(query);
+    query.where.mockReturnValue(query);
+    const transaction = { selectFrom: jest.fn(() => query) };
+    const database = {
+      connection: {
+        transaction: jest.fn(() => ({
+          execute: (callback: (value: typeof transaction) => unknown) =>
+            callback(transaction),
+        })),
+      },
+    } as unknown as DatabaseService;
+    const profiles = {
+      ensureUser: jest.fn().mockResolvedValue({ id: 'internal-user' }),
+    } as unknown as ProfilesService;
+    const config = {
+      get: jest.fn(),
+    } as unknown as ConfigService<Environment, true>;
+    const service = new PrivacyService(
+      database,
+      {} as IdempotencyService,
+      profiles,
+      config,
+      {} as PrivateObjectStorage,
+    );
+
+    await expect(
+      service.getRequest(principal, '10000000-0000-4000-8000-000000000099'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(query.where).toHaveBeenCalledWith(
+      'id',
+      '=',
+      '10000000-0000-4000-8000-000000000099',
+    );
+    expect(query.where).toHaveBeenCalledWith('user_id', '=', 'internal-user');
   });
 });

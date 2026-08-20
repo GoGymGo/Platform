@@ -192,11 +192,15 @@ export type OperatorPortalAccess = {
 
 export type WorkQueueItem = {
   createdAt: string;
+  failureCode?: string;
   id: string;
   kind: string;
+  nextAttemptAt?: string;
   regionCode?: string;
+  requestType?: "delete" | "export";
   status: string;
   verificationMethod?: string;
+  version?: number;
 };
 
 export type SystemHealth = {

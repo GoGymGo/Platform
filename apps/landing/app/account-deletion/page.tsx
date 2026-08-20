@@ -29,7 +29,10 @@ export default function AccountDeletionPage() {
             <ol>
               <li>Open Account Data in the GoGymGo browser app.</li>
               <li>Sign in to the account you want deleted.</li>
-              <li>Select the account-deletion request and confirm it.</li>
+              <li>
+                Select account deletion and explicitly confirm
+                DELETE_MY_ACCOUNT.
+              </li>
               <li>Return to Account Data to review the request status.</li>
             </ol>
             <AppLink
@@ -38,6 +41,25 @@ export default function AccountDeletionPage() {
             >
               OPEN ACCOUNT DATA →
             </AppLink>
+          </section>
+
+          <section>
+            <h2>Local reset is not account deletion</h2>
+            <p>
+              “Sign out and clear local data” removes only GoGymGo-owned state
+              from that device, including the local session and cached recovery
+              data. It does not submit a deletion request or erase server-side
+              account, contest, workout, reward, or legal records.
+            </p>
+          </section>
+
+          <section>
+            <h2>If request processing is unavailable</h2>
+            <p>
+              Account Data will say when privacy operations are disabled or
+              unavailable. In that state no request has been submitted; retry
+              later after the service reports that request creation is enabled.
+            </p>
           </section>
 
           <section>
@@ -84,12 +106,15 @@ export default function AccountDeletionPage() {
             </AppLink>
           </section>
 
-          <p className="fine-print">Last updated August 6, 2026.</p>
+          <p className="fine-print">Last updated August 20, 2026.</p>
           <p className="fine-print">
             Never send a password, authentication code, precise workout
             location, or reward code through a public contact channel. For a
             public-site accessibility problem, use the{" "}
-            <Link href={siteLinks.publicSiteHelp}>public-site feedback form</Link>.
+            <Link href={siteLinks.publicSiteHelp}>
+              public-site feedback form
+            </Link>
+            .
           </p>
         </div>
       </div>

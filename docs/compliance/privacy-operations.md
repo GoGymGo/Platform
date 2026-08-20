@@ -6,23 +6,42 @@ This document describes the technical policy. Launch counsel must approve jurisd
 
 ## Export workflow
 
-1. `POST /v1/me/privacy-requests` creates a `requested` export with an idempotency key.
-2. Operations validates the request and changes it to `processing`.
-3. The worker reads a repeatable PostgreSQL snapshot and builds a versioned JSON file. Security credentials, other users' identifiers, provider tokens, and internal case material are excluded explicitly.
-4. The worker atomically creates one object at `privacy-exports/{userId}/{requestId}.json`, records its SHA-256 digest, and marks the request complete.
-5. The authenticated owner may call `POST /v1/me/privacy-requests/{id}/download-action`. The API returns a V4 read URL lasting no longer than five minutes or the export's remaining lifetime.
+1. `GET /v1/me/privacy-requests/capabilities` must report request creation
+   enabled. `POST /v1/me/privacy-requests` then creates a `requested` export
+   with an idempotency key and exact `EXPORT_MY_DATA` confirmation. A disabled
+   deployment returns an unavailable error and stores no request.
+2. Operations validates the request and changes it to `processing` with a
+   reason, the current `expectedVersion`, and a body-bound idempotency key.
+3. The worker reads a repeatable PostgreSQL snapshot and builds deterministic
+   portable JSON schema version 12. The exhaustive table-disposition map covers
+   every current authoritative table. It includes the member's account,
+   consent/legal, region, Contest/workout/ledger/reward, social, Creator,
+   Partner, notification/media, and privacy lifecycle data while excluding
+   provider/bearer secrets, raw or hashed device/QR credentials, push tokens,
+   coupon inventory, object keys, other-user identifiers, and internal case or
+   operator material.
+4. The worker atomically creates one S3 object at `privacy-exports/{userId}/{requestId}.json` with `If-None-Match: *`, records its SHA-256 digest, and marks the request complete.
+5. The authenticated owner may call `POST /v1/me/privacy-requests/{id}/download-action`. The API returns a presigned S3 read URL lasting no longer than five minutes or the export's remaining lifetime.
 6. After seven days, the worker deletes the object and records the deletion time. The bucket lifecycle is a defense-in-depth cleanup if application processing is delayed. The export bucket is private, has public access prevention and uniform bucket-level access, and must not be reused for public media.
 
 ## Deletion workflow
 
 External deletion happens before the local database transaction. Each external action is idempotent, so a database failure can be retried safely.
 
+Deletion creation requires exact `DELETE_MY_ACCOUNT` confirmation. An operator
+cannot decide it from client role claims: the API re-resolves the exact verified,
+password-authenticated, unscoped database role and current request version.
+
 The worker:
 
 - defers deletion while an active competition or open reward claim still requires the account, leaving access intact for operator review;
-- deletes the Firebase account, treating an already-absent user as success;
+- deletes the Firebase account, treating only an authoritative already-absent
+  response as success; unavailable or failed identity cleanup leaves the job
+  retryable and does not claim account erasure;
 - enumerates and deletes every active, pending, rejected, superseded, removed, or expired profile-media object that has not already been deleted, plus every previous privacy-export object;
 - removes push tokens and queued/sent notification records;
+- removes owned Challenge memberships/check-ins/content, friendship/block rows,
+  private Creator plans/submissions, and Partner gym assignments;
 - removes idempotency records keyed by the former Firebase UID;
 - removes public profile identity and replaces Firebase UID and callsign with namespace-separated HMAC pseudonyms;
 - removes precise region evidence detail and free-text decision reasons while preserving the eligibility decision and policy version;
@@ -30,21 +49,49 @@ The worker:
 - clears privacy-request reasons and marks the account `deleted`;
 - records an immutable completion event without personal information.
 
-The database retains pseudonymized account legal receipt bundles, competition enrollments, rules acceptance facts, workout evidence, entry ledgers, draws, reward awards, fraud evidence, and operator audit events. Assigned coupon ciphertext is excluded from the user's export, and unassigned codes are never linked to user identity. A September cash fulfillment retains only the exact Award, immutable value/currency, responsible authorized operator, server timestamp, bounded operational reason and append-only audit evidence; it contains no bank, payee, card, wallet, tax, balance, provider or transfer data. The user's export describes the settled reward snapshot and fulfillment time but excludes the private operator reason and operator identity. Legal receipts identify the exact document version, content digest, jurisdiction, locale, required action, and server acceptance time; they do not retain IP addresses or device fingerprints. These records protect contest integrity and meet fraud, dispute, and legal-hold obligations. Retention schedules and any future fulfillment subprocessors require legal approval; the deletion endpoint must not claim that legally retained records were erased.
+The database retains pseudonymized account legal receipt and verification-consent
+evidence, competition enrollment/rules/workout/ledger/scoring/settlement facts,
+immutable draw and published Alias/streak result snapshots, reward awards,
+fraud evidence, and operator audit events. These are the approved unlinkable or
+pseudonymous contest-integrity, dispute, legal-receipt, and hold records; no
+direct profile/Firebase identity or private content remains. Assigned coupon
+ciphertext is excluded from the user's export, and unassigned codes are never
+linked to user identity. A September cash fulfillment retains only the exact
+Award, immutable value/currency, responsible authorized operator, server
+timestamp, bounded operational reason and append-only audit evidence; it
+contains no bank, payee, card, wallet, tax, balance, provider or transfer data.
+The user's export describes the settled reward snapshot and fulfillment time
+but excludes the private operator reason and operator identity. Legal receipts
+identify the exact document version, content digest, jurisdiction, locale,
+required action, and server acceptance time; they do not retain IP addresses or
+device fingerprints. Retention schedules and any future fulfillment
+subprocessors require legal approval; deletion must not claim that approved
+retained facts were erased.
 
 ## Failure and incident behavior
 
-- A lease token prevents a stale worker from finalizing work claimed by another worker.
+- A bounded lease token prevents a stale worker from finalizing work claimed by
+  another worker. The owner renews it after export construction and before and
+  after every object/identity call; expiry permits takeover, while every
+  completion/failure write requires the same still-live token.
 - Failed attempts store only a bounded failure code and the next retry time. Exception messages and payloads are never persisted.
 - Retry delay grows exponentially to six hours. Repeated failures remain visible in the operator queue.
-- Object creation uses `ifGenerationMatch=0`; a retry accepts only an existing object carrying a valid SHA-256 metadata value.
+- Object creation uses `If-None-Match: *`; a retry accepts only an existing
+  object carrying a valid SHA-256 metadata value.
 - Object deletion treats `404` as success.
 - The pseudonymization key must never be logged, exposed to Expo, or committed. Loss of the key does not restore deleted identifiers; compromise of the key requires incident response and rotation planning.
 
-Cloud Storage references:
+## Local-device reset
 
-- <https://docs.cloud.google.com/storage/docs/access-control/signed-urls>
-- <https://docs.cloud.google.com/storage/docs/access-control/signing-urls-with-helpers>
-- <https://docs.cloud.google.com/storage/docs/uniform-bucket-level-access>
-- <https://docs.cloud.google.com/storage/docs/public-access-prevention>
-- <https://docs.cloud.google.com/storage/docs/lifecycle>
+Local reset is not this server workflow. The member app signs out, clears its
+query cache and only GoGymGo/Firebase app storage namespaces, recovery keys,
+owned cookies, and owned caches. It preserves unrelated app/browser data,
+creates no privacy request, and explicitly says that the server account and
+history remain. A failed reset says local data may remain and offers retry; it
+never implies server deletion.
+
+The implementation depends on S3 presigned-request expiry, conditional writes,
+private bucket/public-access blocking, object metadata, idempotent deletes, KMS
+encryption, and lifecycle expiry. Repository validation cannot prove the target
+account's bucket policy, IAM, KMS key, or lifecycle; those remain deployment
+gates.

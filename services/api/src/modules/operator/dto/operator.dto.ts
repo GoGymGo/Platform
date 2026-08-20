@@ -3,11 +3,13 @@ import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -235,6 +237,11 @@ export class DecidePrivacyRequestDto extends OperatorReasonDto {
   @ApiProperty({ enum: PrivacyDecisionDto, type: String })
   @IsEnum(PrivacyDecisionDto)
   decision!: 'processing' | 'rejected';
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export enum ProfileMediaDecisionDto {
@@ -299,6 +306,18 @@ export class OperatorWorkQueueItemDto {
 
   @ApiProperty({ type: String })
   status!: string;
+
+  @ApiPropertyOptional({ enum: ['delete', 'export'], type: String })
+  requestType?: 'delete' | 'export';
+
+  @ApiPropertyOptional({ type: String })
+  failureCode?: string;
+
+  @ApiPropertyOptional({ format: 'date-time', type: String })
+  nextAttemptAt?: string;
+
+  @ApiPropertyOptional({ minimum: 1, type: Number })
+  version?: number;
 
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;

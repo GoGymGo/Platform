@@ -314,6 +314,8 @@ describeWithDatabase('critical private profile-media workflow', () => {
     await database.connection
       .insertInto('privacy_requests')
       .values({
+        confirmation_code: 'DELETE_MY_ACCOUNT',
+        confirmed_at: new Date(),
         request_type: 'delete',
         status: 'requested',
         user_id: user.id,

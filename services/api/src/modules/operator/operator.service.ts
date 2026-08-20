@@ -229,7 +229,15 @@ export class OperatorService {
               .execute(),
             transaction
               .selectFrom('privacy_requests')
-              .select(['id', 'requested_at', 'status'])
+              .select([
+                'failure_code',
+                'id',
+                'next_attempt_at',
+                'request_type',
+                'requested_at',
+                'status',
+                'version',
+              ])
               .where('status', 'in', ['requested', 'processing'])
               .orderBy('requested_at')
               .limit(100)
@@ -255,9 +263,17 @@ export class OperatorService {
           ),
           ...privacy.map((item) => ({
             createdAt: item.requested_at.toISOString(),
+            ...(item.failure_code
+              ? {
+                  failureCode: item.failure_code,
+                  nextAttemptAt: item.next_attempt_at.toISOString(),
+                }
+              : {}),
             id: item.id,
             kind: 'privacy_request' as const,
-            status: item.status,
+            requestType: item.request_type,
+            status: item.failure_code ? 'failed' : item.status,
+            version: item.version,
           })),
           ...profileMedia.map((item) => this.queueItem(item, 'profile_media')),
         ].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -528,15 +544,95 @@ export class OperatorService {
     requestId: string,
     input: DecidePrivacyRequestDto,
   ): Promise<OperatorActionResponseDto> {
-    return this.decideSimpleStatus(principal, {
-      action: 'privacy_request.decided',
-      entityId: privacyRequestId,
-      entityType: 'privacy_requests',
-      nextStatus: input.decision,
-      reason: input.reason,
-      requestId,
-      table: 'privacy_requests',
-    });
+    return this.idempotency.execute<OperatorActionJson, string>(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: requestId,
+        request: {
+          decision: input.decision,
+          expectedVersion: input.expectedVersion,
+          privacyRequestId,
+          reason: input.reason,
+        },
+        scope: 'operator:privacy-request:decision',
+      },
+      async (transaction, operatorUserId) => {
+        const current = await transaction
+          .selectFrom('privacy_requests')
+          .select(['id', 'status', 'version'])
+          .where('id', '=', privacyRequestId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!current) {
+          throw this.notFound('privacy_requests');
+        }
+        if (current.version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'PRIVACY_REQUEST_VERSION_CONFLICT',
+            message: 'The privacy request changed. Refresh it before deciding.',
+          });
+        }
+        if (current.status !== 'requested') {
+          throw new ConflictException({
+            code: 'PRIVACY_REQUEST_ALREADY_DECIDED',
+            message: 'The privacy request is no longer awaiting a decision.',
+          });
+        }
+        const now = new Date();
+        const nextVersion = current.version + 1;
+        const updated = await transaction
+          .updateTable('privacy_requests')
+          .set({
+            completed_at: input.decision === 'rejected' ? now : null,
+            failure_code: null,
+            lease_expires_at: null,
+            lease_token: null,
+            next_attempt_at: now,
+            processing_started_at: input.decision === 'processing' ? now : null,
+            status: input.decision,
+            updated_at: now,
+            version: nextVersion,
+          })
+          .where('id', '=', current.id)
+          .where('status', '=', 'requested')
+          .where('version', '=', input.expectedVersion)
+          .returning('id')
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'PRIVACY_REQUEST_VERSION_CONFLICT',
+            message: 'The privacy request changed. Refresh it before deciding.',
+          });
+        }
+        await transaction
+          .insertInto('privacy_request_events')
+          .values({
+            metadata: { reasonRecordedInOperatorAudit: true },
+            next_status: input.decision,
+            previous_status: current.status,
+            privacy_request_id: current.id,
+            source: 'operator_decision',
+            source_event_id: requestId,
+          })
+          .executeTakeFirstOrThrow();
+        await this.audit(transaction, {
+          action: 'privacy_request.decided',
+          actorUserId: operatorUserId,
+          entityId: current.id,
+          entityType: 'privacy_requests',
+          nextState: { status: input.decision, version: nextVersion },
+          previousState: {
+            status: current.status,
+            version: current.version,
+          },
+          reason: input.reason,
+          requestId,
+        });
+        return { id: current.id, status: input.decision };
+      },
+      async (transaction) =>
+        (await this.requireOperator(principal, transaction)).id,
+    );
   }
 
   async getProfileMediaReviewAction(
@@ -600,100 +696,40 @@ export class OperatorService {
 
   private async decideSimpleStatus(
     principal: AuthenticatedPrincipal,
-    input:
-      | {
-          action: string;
-          entityId: string;
-          entityType: string;
-          nextStatus: 'approved' | 'in_review' | 'rejected';
-          reason: string;
-          requestId: string;
-          table: 'partner_applications';
-        }
-      | {
-          action: string;
-          entityId: string;
-          entityType: string;
-          nextStatus: 'processing' | 'rejected';
-          reason: string;
-          requestId: string;
-          table: 'privacy_requests';
-        },
+    input: {
+      action: string;
+      entityId: string;
+      entityType: string;
+      nextStatus: 'approved' | 'in_review' | 'rejected';
+      reason: string;
+      requestId: string;
+      table: 'partner_applications';
+    },
   ): Promise<OperatorActionResponseDto> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const operator = await this.requireOperator(principal, transaction);
-        if (input.table === 'partner_applications') {
-          const current = await transaction
-            .selectFrom('partner_applications')
-            .select(['id', 'status'])
-            .where('id', '=', input.entityId)
-            .forUpdate()
-            .executeTakeFirst();
-          if (!current) {
-            throw this.notFound(input.entityType);
-          }
-          await transaction
-            .updateTable('partner_applications')
-            .set({ status: input.nextStatus, updated_at: new Date() })
-            .where('id', '=', current.id)
-            .executeTakeFirstOrThrow();
-          await this.auditDecision(
-            transaction,
-            operator.id,
-            current.status,
-            input,
-          );
-        } else {
-          const current = await transaction
-            .selectFrom('privacy_requests')
-            .select(['id', 'status'])
-            .where('id', '=', input.entityId)
-            .forUpdate()
-            .executeTakeFirst();
-          if (!current) {
-            throw this.notFound(input.entityType);
-          }
-          if (current.status !== 'requested') {
-            throw new ConflictException({
-              code: 'PRIVACY_REQUEST_ALREADY_DECIDED',
-              message: 'The privacy request is no longer awaiting a decision.',
-            });
-          }
-          await transaction
-            .updateTable('privacy_requests')
-            .set({
-              completed_at: input.nextStatus === 'rejected' ? new Date() : null,
-              failure_code: null,
-              lease_expires_at: null,
-              lease_token: null,
-              next_attempt_at: new Date(),
-              processing_started_at:
-                input.nextStatus === 'processing' ? new Date() : null,
-              status: input.nextStatus,
-              updated_at: new Date(),
-            })
-            .where('id', '=', current.id)
-            .executeTakeFirstOrThrow();
-          await transaction
-            .insertInto('privacy_request_events')
-            .values({
-              metadata: { reasonRecordedInOperatorAudit: true },
-              next_status: input.nextStatus,
-              previous_status: current.status,
-              privacy_request_id: current.id,
-              source: 'operator_decision',
-              source_event_id: input.requestId,
-            })
-            .executeTakeFirstOrThrow();
-          await this.auditDecision(
-            transaction,
-            operator.id,
-            current.status,
-            input,
-          );
+        const current = await transaction
+          .selectFrom('partner_applications')
+          .select(['id', 'status'])
+          .where('id', '=', input.entityId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!current) {
+          throw this.notFound(input.entityType);
         }
+        await transaction
+          .updateTable('partner_applications')
+          .set({ status: input.nextStatus, updated_at: new Date() })
+          .where('id', '=', current.id)
+          .executeTakeFirstOrThrow();
+        await this.auditDecision(
+          transaction,
+          operator.id,
+          current.status,
+          input,
+        );
         return { id: input.entityId, status: input.nextStatus };
       });
   }

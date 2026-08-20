@@ -403,6 +403,8 @@ describeWithDatabase('critical account legal receipt workflow', () => {
     const privacyRequest = await database.connection
       .insertInto('privacy_requests')
       .values({
+        confirmation_code: 'EXPORT_MY_DATA',
+        confirmed_at: new Date(),
         lease_expires_at: new Date(Date.now() + 60_000),
         lease_token: leaseToken,
         next_attempt_at: new Date(),
@@ -433,7 +435,7 @@ describeWithDatabase('critical account legal receipt workflow', () => {
             receipt_action: 'acknowledge',
           }),
         ]),
-        schemaVersion: 11,
+        schemaVersion: 12,
         socialData: expect.objectContaining({
           blocks: [],
           challengeContactInvitations: [],

@@ -18,7 +18,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest completed delivery: `origin/main` at
-  `3398b47621096805cc044682a613975c3cc53df9` after PR #108 on 2026-08-20.
+  `b81b4326ef550b7e87a4cd5e24968828e78f7463` after PR #109 on 2026-08-20.
 - Active feature task: `GoGymGo Feature GGG-021 — Administrative configuration`
   on `agent/ggg-021-administrative-configuration`; creation follows this ledger
   merge.
@@ -995,11 +995,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   weaken Firebase, API route, deep-link, permission, or demo-isolation controls.
 - External providers / feature flag: npm/Expo compatibility metadata; existing
   locked dependencies only; no feature flag.
-- Current implementation / missing behavior: two supported SDK 57 patch
-  alignments have merged through PRs #97 and #108. The current eleven Expo
-  declarations and patch-only lockfile chain match Expo's 2026-08-20 metadata;
-  clean locked installs pass `expo install --check`, all-platform and preview
-  exports remain behaviorally unchanged, and no repository duty is missing.
+- Current implementation / missing behavior: the current SDK 57 patch set is
+  aligned through supported Expo tooling. Required PR/main CI now runs the
+  strict locked compatibility check with `EXPO_OFFLINE=1`, binding it to the
+  installed Expo SDK metadata and exact lock while still rejecting tampered
+  packages. A separate weekly/manual online advisory fails visibly when Expo
+  recommends newer compatible patches and never mutates dependencies. Unchanged
+  locked releases are deterministic and no repository duty remains missing.
 - Required tests / operations / cloud dependency: exact declared package/lockfile
   alignment, dependency/governance audit, member type/lint/tests, Expo install
   check, iOS/Android/web exports, production/preview bundle and source audits,
@@ -1007,9 +1009,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   dependency.
 - Delivery: priority `P0` CI restoration; task `GoGymGo Feature GGG-031 — Expo
   SDK patch compatibility`; latest branch
-  `agent/ggg-031-expo-sdk-patch-compatibility-2` (deleted after merge); PR #108;
-  exact tested head `403475b911416b390125d9e13c07a98b97139d62`; merge
-  `3398b47621096805cc044682a613975c3cc53df9`; status `COMPLETE`.
+  `agent/ggg-031-expo-sdk-deterministic-check-3` (deleted after merge); PR #109;
+  exact tested head `110bd70ba3ee7a5d8ed005e17a37bb498b644040`;
+  merge `b81b4326ef550b7e87a4cd5e24968828e78f7463`; status `COMPLETE`.
 - Residual risks / blocker: Expo compatibility metadata can advance again; the
   deterministic CI gate must remain enabled. This task did not migrate SDK
   major/minor versions or alter permissions, plugins, native identifiers, source,
@@ -1122,6 +1124,20 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-20 — Completed the deterministic `GGG-031` repair through PR #109.
+  Exact tested head `110bd70ba3ee7a5d8ed005e17a37bb498b644040`
+  was squash-merged as `b81b4326ef550b7e87a4cd5e24968828e78f7463`;
+  all seven PR checks and all six exact-main workflows passed and the remote
+  branch was deleted. Required CI now strictly validates the exact locked SDK
+  against installed Expo metadata offline, with a tampered-package regression;
+  a separate weekly/manual online advisory reports future compatible patches
+  without blocking unrelated releases or mutating dependencies. The bounded
+  five-file change also aligned the current eleven SDK 57 patches. Serial proof
+  included clean install, 249 member tests/audits, iOS/Android/web and preview
+  exports, governance, dependency audit, non-database journeys, and the full
+  repository check. No local Docker, cloud access, deployment, SDK major/minor,
+  product source/configuration, permission, plugin, or native-ID change occurred.
+  `GGG-021` remains the next launch-critical P0 feature.
 - 2026-08-20 — Recompleted `GGG-031` after Expo's external SDK 57 compatibility
   metadata advanced again. Exact tested head
   `403475b911416b390125d9e13c07a98b97139d62` changed only the member package

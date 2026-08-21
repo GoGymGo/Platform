@@ -35,6 +35,12 @@ test("checks out and attests the exact authorized source before cloud access", (
   assert.ok(credentialsIndex > createIndex);
   assert.ok(verifyIndex > credentialsIndex);
   assert.match(memberWorkflow, /persist-credentials: false/);
+  assert.doesNotMatch(memberWorkflow, /\$\{\{ runner\.temp \}\}/);
+  assert.equal(
+    memberWorkflow.match(/\$RUNNER_TEMP\/member-web-release-attestation\.json/g)
+      ?.length,
+    2,
+  );
 });
 
 test("publishes assets before the entrypoint and preserves automatic rollback", () => {

@@ -105,7 +105,6 @@ jobs:
       GOGYMGO_PLAY_STORE_URL: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_PLAY_STORE_URL || '' }}
       GOGYMGO_PRIVACY_POLICY_URL: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_PRIVACY_POLICY_URL || '' }}
       GOGYMGO_RELEASE_MODE: ${{ inputs.release_mode }}
-      MEMBER_WEB_ATTESTATION: ${{ runner.temp }}/member-web-release-attestation.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -180,7 +179,7 @@ jobs:
           node ../../tooling/static-export-attestation.mjs \
             create \
             dist \
-            "$MEMBER_WEB_ATTESTATION" \
+            "$RUNNER_TEMP/member-web-release-attestation.json" \
             "${{ inputs.source_commit }}" \
             "$GOGYMGO_RELEASE_MODE" \
             "$API_URL"
@@ -203,7 +202,7 @@ jobs:
           node tooling/static-export-attestation.mjs \
             verify \
             apps/member-app/dist \
-            "$MEMBER_WEB_ATTESTATION" \
+            "$RUNNER_TEMP/member-web-release-attestation.json" \
             "${{ inputs.source_commit }}" \
             "$GOGYMGO_RELEASE_MODE" \
             "$API_URL"

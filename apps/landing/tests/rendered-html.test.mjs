@@ -196,36 +196,47 @@ test("the homepage sends eligibility decisions to the app", async () => {
 });
 
 test("landing conversion measurement is anonymous, allowlisted, empty by default, and owner-exportable", async () => {
-  const [events, analytics, route, exportRoute, schema, migration, accessibilityPage] =
+  const [events, analytics, handler, route, storage, exportRoute, schema, migration, accessibilityPage] =
     await Promise.all([
       read("app/public-site-events.ts"),
       read("app/components/PublicSiteAnalytics.tsx"),
+      read("app/api/public-site-events/handler.ts"),
       read("app/api/public-site-events/route.ts"),
+      read("app/api/public-site-storage.ts"),
       read("app/api/internal/export-public-site-events/route.ts"),
       read("db/schema.ts"),
-      read("drizzle/0002_funny_expediter.sql"),
+      read("drizzle/0003_spooky_whiplash.sql"),
       read("app/accessibility/page.tsx"),
     ]);
 
-  assert.equal((events.match(/^  "[a-z_]+",$/gm) ?? []).length, 9);
-  assert.match(events, /JSON\.stringify\(\{ eventName, path: window\.location\.pathname \}\)/);
-  assert.doesNotMatch(events + analytics, /localStorage|sessionStorage|document\.cookie|userAgent|email/);
+  assert.equal((events.match(/^  [a-z_]+: \{ canonicalPath:/gm) ?? []).length, 8);
+  assert.match(events, /JSON\.stringify\(\{ eventName \}\)/);
+  assert.match(events, /credentials: "omit"/);
+  assert.match(events, /referrerPolicy: "no-referrer"/);
+  assert.doesNotMatch(events, /window\.location|pathname|properties|query|userAgent/);
+  assert.doesNotMatch(events + analytics, /localStorage|sessionStorage|document\.cookie|email/);
   assert.match(analytics, /new WeakSet<HTMLFormElement>/);
   assert.match(analytics, /faq_open/);
-  assert.match(route, /publicSiteEventNames\.includes\(eventName\)/);
-  assert.match(route, /Invalid public path/);
-  assert.match(route, /\.insert\(publicSiteEvents\)/);
+  assert.match(handler, /Object\.hasOwn\(publicSiteEventDefinitions, eventName\)/);
+  assert.match(handler, /readSameOriginJsonObject/);
+  assert.match(handler, /hasExactKeys/);
+  assert.match(route, /readPublicSiteRetentionPolicy/);
+  assert.match(storage, /publicSiteEventDefinitions\[eventName\]\.canonicalPath/);
+  assert.match(storage, /INSERT INTO public_site_events/);
+  assert.match(storage, /\.bind\(/);
+  assert.doesNotMatch(storage, /cf-connecting-ip|user-agent|referer|cookie/i);
   assert.match(schema, /public_site_events/);
   assert.match(schema, /idx_public_site_events_created/);
-  assert.match(migration, /CREATE TABLE `public_site_events`/);
+  assert.match(migration, /CREATE TABLE `public_site_rate_buckets`/);
+  assert.match(migration, /CREATE TABLE `public_site_operations_audit`/);
   assert.doesNotMatch(migration, /\bINSERT\b/i);
-  assert.match(exportRoute, /LANDING_D1_EXPORT_ENABLED !== "yes"/);
-  assert.match(exportRoute, /LANDING_D1_EXPORT_OWNER_EMAIL/);
+  assert.match(exportRoute, /LANDING_D1_EXPORT_ENABLED/);
   assert.match(exportRoute, /getChatGPTUser/);
-  assert.match(exportRoute, /\.select\(\)/);
-  assert.doesNotMatch(exportRoute, /\.(?:insert|update|delete)\(/);
+  assert.match(exportRoute, /readEventExportPage/);
+  assert.match(exportRoute, /exportPublicSiteEvents/);
   assert.match(accessibilityPage, /fixed list/);
   assert.match(accessibilityPage, /do not store cookies/);
+  assert.match(accessibilityPage, /never kept longer than[\s\S]*90 days/);
 });
 
 test("regional updates are intentionally short and separate from registration", async () => {
@@ -292,15 +303,17 @@ test("brand inquiry remains detailed and isolated from the regional list", async
 });
 
 test("public-site feedback is accessible, validated, stored and owner-exportable", async () => {
-  const [contact, accessibilityPage, form, route, exportRoute, schema, migration] =
+  const [contact, accessibilityPage, form, handler, route, storage, exportRoute, schema, migration] =
     await Promise.all([
       read("app/contact/page.tsx"),
       read("app/accessibility/page.tsx"),
       read("app/components/PublicSiteFeedbackForm.tsx"),
+      read("app/api/public-site-feedback/handler.ts"),
       read("app/api/public-site-feedback/route.ts"),
+      read("app/api/public-site-storage.ts"),
       read("app/api/internal/export-public-site-feedback/route.ts"),
       read("db/schema.ts"),
-      read("drizzle/0001_brown_pestilence.sql"),
+      read("drizzle/0003_spooky_whiplash.sql"),
     ]);
 
   assert.match(contact, /id="public-site-help"/);
@@ -308,19 +321,26 @@ test("public-site feedback is accessible, validated, stored and owner-exportable
   assert.match(accessibilityPage, /REPORT AN ACCESSIBILITY BARRIER/);
   assert.match(form, /Accessibility barrier/);
   assert.match(form, /minLength=\{20\}/);
+  assert.match(form, /YOUR EMAIL \(OPTIONAL\)/);
+  assert.match(form, /submissionIdRef/);
+  assert.match(form, /TRY AGAIN/);
+  assert.match(form, /never kept longer than 180 days/);
   assert.match(form, /Do not include passwords/);
   assert.match(form, /role="alert"/);
-  assert.match(route, /publicSiteFeedback/);
-  assert.match(route, /contactFax/);
-  assert.match(route, /\.insert\(publicSiteFeedback\)/);
+  assert.match(handler, /contactFax/);
+  assert.match(handler, /hasExactKeys/);
+  assert.match(handler, /submissionIdPattern/);
+  assert.match(route, /readPublicSiteRetentionPolicy/);
+  assert.match(storage, /INSERT OR IGNORE INTO public_site_feedback/);
+  assert.match(storage, /public_site_rate_buckets/);
   assert.match(schema, /public_site_feedback/);
+  assert.match(schema, /idx_public_site_feedback_created/);
   assert.match(schema, /idx_public_site_feedback_status_created/);
-  assert.match(migration, /CREATE TABLE `public_site_feedback`/);
-  assert.match(exportRoute, /LANDING_D1_EXPORT_ENABLED !== "yes"/);
-  assert.match(exportRoute, /LANDING_D1_EXPORT_OWNER_EMAIL/);
+  assert.match(migration, /idx_public_site_feedback_created/);
+  assert.match(exportRoute, /LANDING_D1_EXPORT_ENABLED/);
   assert.match(exportRoute, /getChatGPTUser/);
-  assert.match(exportRoute, /\.select\(\)/);
-  assert.doesNotMatch(exportRoute, /\.(?:insert|update|delete)\(/);
+  assert.match(exportRoute, /readFeedbackExportPage/);
+  assert.match(exportRoute, /exportPublicSiteFeedback/);
 });
 
 test("FAQ, contact and public information pages are scannable and discoverable", async () => {

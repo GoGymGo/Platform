@@ -111,8 +111,10 @@ export default function ContactPage() {
             <h2 id="public-site-help-title">Tell us what blocked you.</h2>
             <p>
               Use this form for the public website only. Include the affected
-              page and enough detail to reproduce the issue. Account,
-              contest, and workout support remains inside the member app.
+              page and enough detail to reproduce the issue. An email is
+              optional and is used only for report follow-up with your explicit
+              permission. Account, contest, and workout support remains inside
+              the member app.
             </p>
           </div>
           <PublicSiteFeedbackForm />

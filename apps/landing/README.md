@@ -20,7 +20,15 @@ landing application is not a source of truth.
 The legacy D1 binding remains attached only until its historical submissions
 are exported, idempotently imported into PostgreSQL, and count-verified. Follow
 [`docs/operations/landing-data-migration.md`](../../docs/operations/landing-data-migration.md)
-before removing that binding. Do not write new submissions to D1.
+before removing that binding. Do not write new regional-update or partnership
+submissions to D1. The separate public-site feedback and anonymous event tables
+remain landing-owned until GGG-027 makes an explicit, independently reviewed
+cutover decision.
+
+Public feedback and anonymous conversion measurement fail closed unless the D1
+binding and approved bounded retention values are present. Their payload,
+same-origin, rate-abuse, export, retention, audit, and recovery rules are in
+[`docs/operations/public-feedback-measurement.md`](../../docs/operations/public-feedback-measurement.md).
 
 User journeys belong to the canonical member application:
 

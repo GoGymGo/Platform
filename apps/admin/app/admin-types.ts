@@ -284,6 +284,7 @@ export type SystemHealth = {
     notificationsLeased: number;
     notificationsPending: number;
     notificationsRetryScheduled: number;
+    notificationsStaleLeases: number;
     privacyOperationsLeased: number;
     privacyOperationsPending: number;
     privacyOperationsRetryScheduled: number;

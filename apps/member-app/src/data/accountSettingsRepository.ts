@@ -3,10 +3,12 @@ import type {
   AvatarState,
   AvatarCapabilities,
   AvatarUploadResult,
+  DevicePushRegistration,
   DevicePresenceConsent,
   PrivacyDownloadAction,
   PrivacyCapabilities,
   PrivacyRequest,
+  PushCapabilities,
   PushDevice
 } from '@/domain/accountSettings'
 import type {
@@ -28,11 +30,9 @@ export type AccountSettingsRepository = {
     privacyRequestId: string
   ) => Promise<PrivacyDownloadAction>
   getPrivacyCapabilities: () => Promise<PrivacyCapabilities>
+  getPushCapabilities: () => Promise<PushCapabilities>
   listPrivacyRequests: () => Promise<readonly PrivacyRequest[]>
-  registerPushDevice: (
-    platform: 'android' | 'ios',
-    pushToken: string
-  ) => Promise<PushDevice>
+  registerPushDevice: (registration: DevicePushRegistration) => Promise<PushDevice>
   setDevicePresenceConsent: (
     accepted: boolean,
     consentVersion: string
@@ -70,10 +70,10 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
         .then(parsePrivacyRequest),
     disablePushDevice: (deviceId) =>
       api
-        .request<null>(`/v1/me/push-devices/${encodeURIComponent(deviceId)}`, {
+        .request<unknown>(`/v1/me/push-devices/${encodeURIComponent(deviceId)}`, {
           method: 'DELETE'
         })
-        .then(() => undefined),
+        .then(parsePushDisable),
     getDevicePresenceConsent: () =>
       api.request<DevicePresenceConsent>(
         '/v1/me/verification-consents/device-presence'
@@ -90,6 +90,10 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
       api
         .request<unknown>('/v1/me/privacy-requests/capabilities')
         .then(parsePrivacyCapabilities),
+    getPushCapabilities: () =>
+      api
+        .request<unknown>('/v1/me/push-devices/capabilities')
+        .then(parsePushCapabilities),
     listPrivacyRequests: () =>
       api
         .request<unknown>('/v1/me/privacy-requests')
@@ -106,15 +110,15 @@ function createApiRepository(api: ApiClient): AccountSettingsRepository {
           method: 'DELETE'
         })
         .then(parseRemoveAvatar),
-    registerPushDevice: (platform, pushToken) =>
+    registerPushDevice: (registration) =>
       api.request<
-        PushDevice,
-        { platform: 'android' | 'ios'; pushToken: string }
+        unknown,
+        DevicePushRegistration
       >('/v1/me/push-devices', {
-        body: { platform, pushToken },
+        body: registration,
         idempotencyKey: createIdempotencyKey('push-device'),
         method: 'POST'
-      }),
+      }).then(parsePushDevice),
     setDevicePresenceConsent: (accepted, consentVersion) =>
       api.request<
         DevicePresenceConsent,
@@ -147,6 +151,11 @@ function createUnavailableRepository(): AccountSettingsRepository {
     getPrivacyCapabilities: async () => ({
       requestCreationAvailable: false,
       status: 'disabled'
+    }),
+    getPushCapabilities: async () => ({
+      deliveryStatus: 'disabled',
+      maximumDevices: 5,
+      registrationAvailable: false
     }),
     getAvatar: async () => ({ active: null, latest: null }),
     getAvatarCapabilities: async () => ({
@@ -513,6 +522,46 @@ function isNullableIsoDate(value: unknown): value is string | null {
 
 function privacyContractError() {
   return new Error('The privacy service returned an invalid response.')
+}
+
+function parsePushCapabilities(value: unknown): PushCapabilities {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      'deliveryStatus',
+      'maximumDevices',
+      'registrationAvailable'
+    ]) ||
+    !['available', 'disabled'].includes(String(value.deliveryStatus)) ||
+    value.maximumDevices !== 5 ||
+    typeof value.registrationAvailable !== 'boolean' ||
+    value.registrationAvailable !== (value.deliveryStatus === 'available')
+  ) {
+    throw pushContractError()
+  }
+  return value as unknown as PushCapabilities
+}
+
+function parsePushDevice(value: unknown): PushDevice {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['enabled', 'id', 'platform', 'provider']) ||
+    value.enabled !== true ||
+    !isUuid(value.id) ||
+    !['android', 'ios'].includes(String(value.platform)) ||
+    value.provider !== 'expo'
+  ) {
+    throw pushContractError()
+  }
+  return value as unknown as PushDevice
+}
+
+function parsePushDisable(value: unknown): void {
+  if (value !== null) throw pushContractError()
+}
+
+function pushContractError() {
+  return new Error('The push registration service returned an invalid response.')
 }
 
 async function uploadAvatar(

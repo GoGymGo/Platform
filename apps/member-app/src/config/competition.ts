@@ -1,6 +1,7 @@
 export const competitionConfig = {
   activeWorkoutStorageKey: '@gogymgo/active-workout-session',
   reminderPreferenceStorageKey: '@gogymgo/competition-reminders-enabled',
+  pushInstallationIdStorageKey: '@gogymgo/push-installation-id',
   pushDeviceIdStorageKey: '@gogymgo/push-device-id',
   registrationCompetitionMonthStorageKey: '@gogymgo/competition-registration-month',
   registrationDateStorageKey: '@gogymgo/competition-registration-date',

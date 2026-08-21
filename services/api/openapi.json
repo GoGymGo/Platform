@@ -1,6 +1,27 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/v1/me/push-devices/capabilities": {
+      "get": {
+        "operationId": "capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushCapabilitiesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Read push registration availability",
+        "tags": ["push devices"]
+      }
+    },
     "/v1/me/push-devices": {
       "post": {
         "operationId": "register",
@@ -4930,13 +4951,35 @@
       }
     },
     "schemas": {
+      "PushCapabilitiesResponseDto": {
+        "type": "object",
+        "properties": {
+          "deliveryStatus": {
+            "type": "string",
+            "enum": ["available", "disabled"]
+          },
+          "maximumDevices": { "type": "number", "enum": [5] },
+          "registrationAvailable": { "type": "boolean" }
+        },
+        "required": [
+          "deliveryStatus",
+          "maximumDevices",
+          "registrationAvailable"
+        ]
+      },
       "RegisterPushDeviceDto": {
         "type": "object",
         "properties": {
+          "installationId": { "type": "string", "format": "uuid" },
           "platform": { "type": "string", "enum": ["android", "ios"] },
-          "pushToken": { "type": "string", "maxLength": 512, "minLength": 16 }
+          "pushToken": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 16,
+            "writeOnly": true
+          }
         },
-        "required": ["platform", "pushToken"]
+        "required": ["installationId", "platform", "pushToken"]
       },
       "PushDeviceResponseDto": {
         "type": "object",
@@ -6209,6 +6252,7 @@
           "notificationsExhausted": { "type": "number", "minimum": 0 },
           "notificationsLeased": { "type": "number", "minimum": 0 },
           "notificationsRetryScheduled": { "type": "number", "minimum": 0 },
+          "notificationsStaleLeases": { "type": "number", "minimum": 0 },
           "privacyOperationsLeased": { "type": "number", "minimum": 0 },
           "privacyOperationsRetryScheduled": { "type": "number", "minimum": 0 },
           "privacyOperationsStaleLeases": { "type": "number", "minimum": 0 },
@@ -6229,6 +6273,7 @@
           "notificationsExhausted",
           "notificationsLeased",
           "notificationsRetryScheduled",
+          "notificationsStaleLeases",
           "privacyOperationsLeased",
           "privacyOperationsRetryScheduled",
           "privacyOperationsStaleLeases",

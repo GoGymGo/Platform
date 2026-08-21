@@ -481,12 +481,17 @@ export function createAppTourAccountSettingsRepository(): AccountSettingsReposit
       requestCreationAvailable: true,
       status: 'enabled'
     }),
+    getPushCapabilities: async () => ({
+      deliveryStatus: 'disabled',
+      maximumDevices: 5,
+      registrationAvailable: false
+    }),
     getPrivacyDownload: async () => ({
       expiresAt: nowIso(),
       url: 'data:text/plain,GoGymGo%20App%20Tour%20export'
     }),
     listPrivacyRequests: async () => [],
-    registerPushDevice: async (platform) => ({
+    registerPushDevice: async ({ platform }) => ({
       enabled: true,
       id: 'app-tour-push-device',
       platform,

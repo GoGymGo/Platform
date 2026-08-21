@@ -185,6 +185,18 @@ const profileMediaIntegrityMigration = await readFile(
   join(root, 'migrations/1787965200000_profile_media_integrity.ts'),
   'utf8',
 );
+const notificationsService = await readFile(
+  join(root, 'src/modules/notifications/notifications.service.ts'),
+  'utf8',
+);
+const notificationLifecycleMigration = await readFile(
+  join(root, 'migrations/1788051600000_notification_lifecycle_integrity.ts'),
+  'utf8',
+);
+const privacyExportBuilder = await readFile(
+  join(root, 'src/modules/privacy/privacy-export.builder.ts'),
+  'utf8',
+);
 const dockerfile = await readFile(join(root, 'Dockerfile'), 'utf8');
 const compose = await readFile(
   join(platformRoot, 'infrastructure/local/compose.yml'),
@@ -411,6 +423,57 @@ for (const marker of [
       `profile media migration is missing integrity marker ${marker}`,
     );
   }
+}
+for (const marker of [
+  "scope: 'push-devices:register'",
+  'this.profiles.ensureUser(principal, transaction)',
+  "where('user_id', '=', userId)",
+  "where('lease_token', '=', delivery.lease_token)",
+  'completed_device_ids',
+  'notificationId: delivery.id',
+]) {
+  if (!notificationsService.includes(marker)) {
+    violations.push(
+      `notification lifecycle is missing ownership/fencing marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'push_devices_enabled_token_state',
+  'push_devices_user_installation_unique',
+  'notification_deliveries_attempt_bounded',
+  'notification_deliveries_device_progress_valid',
+  'notification_deliveries_user_dedupe_unique',
+]) {
+  if (!notificationLifecycleMigration.includes(marker)) {
+    violations.push(
+      `notification lifecycle migration is missing integrity marker ${marker}`,
+    );
+  }
+}
+const exportedPushDeviceSelection = privacyExportBuilder.match(
+  /selectFrom\('push_devices'\)[\s\S]{0,800}?\.execute\(\)/,
+)?.[0];
+const exportedNotificationSelection = privacyExportBuilder.match(
+  /selectFrom\('notification_deliveries'\)[\s\S]{0,800}?\.execute\(\)/,
+)?.[0];
+if (
+  !exportedPushDeviceSelection ||
+  /push_token|installation_id/.test(exportedPushDeviceSelection)
+) {
+  violations.push(
+    'privacy export must omit push tokens and private installation identifiers',
+  );
+}
+if (
+  !exportedNotificationSelection ||
+  /last_error|completed_device_ids|target_device_ids/.test(
+    exportedNotificationSelection,
+  )
+) {
+  violations.push(
+    'privacy export must omit provider errors and internal delivery device state',
+  );
 }
 if (
   dockerfile.includes('rm -f /usr/local/bin/npm') &&

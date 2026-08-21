@@ -32,8 +32,15 @@ export type PushDevice = {
 }
 
 export type DevicePushRegistration = {
+  installationId: string
   platform: 'android' | 'ios'
   pushToken: string
+}
+
+export type PushCapabilities = {
+  deliveryStatus: 'available' | 'disabled'
+  maximumDevices: number
+  registrationAvailable: boolean
 }
 
 export type DevicePresenceConsent = {

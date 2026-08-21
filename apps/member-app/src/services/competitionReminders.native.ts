@@ -1,34 +1,36 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import type { CompetitionReminder } from '@/domain/competitionReminders';
+import {
+  toCompetitionReminderDate,
+  type CompetitionReminder,
+  type CompetitionReminderPermission
+} from '@/domain/competitionReminders';
 
 const channelId = 'competition-reminders';
 const reminderOwner = 'gogymgo-competition';
+let notificationHandlerConfigured = false;
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true
-  })
-});
+export async function getCompetitionReminderPermission(): Promise<CompetitionReminderPermission> {
+  ensureNotificationHandler();
+  return normalizePermission(await Notifications.getPermissionsAsync());
+}
 
-export async function requestCompetitionReminderPermission() {
+export async function requestCompetitionReminderPermission(): Promise<CompetitionReminderPermission> {
+  ensureNotificationHandler();
   const existing = await Notifications.getPermissionsAsync();
-
-  if (existing.granted) {
-    return true;
+  const current = normalizePermission(existing);
+  if (current === 'granted' || current === 'provisional') {
+    return current;
   }
-
-  const requested = await Notifications.requestPermissionsAsync();
-  return requested.granted;
+  return normalizePermission(await Notifications.requestPermissionsAsync());
 }
 
 export async function syncCompetitionReminders(
-  reminders: readonly CompetitionReminder[]
+  reminders: readonly CompetitionReminder[],
+  timeZone: string
 ) {
+  ensureNotificationHandler();
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(channelId, {
       importance: Notifications.AndroidImportance.DEFAULT,
@@ -46,37 +48,62 @@ export async function syncCompetitionReminders(
       )
   );
 
-  const now = new Date();
+  const now = Date.now();
+  let scheduledCount = 0;
 
-  await Promise.all(
-    reminders.map(async (reminder) => {
-      const triggerDate = toLocalReminderTime(reminder.dateKey);
+  for (const reminder of reminders) {
+    const triggerDate = toCompetitionReminderDate(reminder, timeZone);
 
-      if (triggerDate <= now) {
-        return;
-      }
+    if (triggerDate.getTime() <= now) {
+      continue;
+    }
 
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          body: reminder.body,
-          data: {
-            dateKey: reminder.dateKey,
-            kind: reminder.kind,
-            owner: reminderOwner
-          },
-          title: reminder.title
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        body: reminder.body,
+        data: {
+          dateKey: reminder.dateKey,
+          kind: reminder.kind,
+          owner: reminderOwner,
+          timeZone
         },
-        trigger: {
-          channelId,
-          date: triggerDate,
-          type: Notifications.SchedulableTriggerInputTypes.DATE
-        }
-      });
-    })
-  );
+        title: reminder.title
+      },
+      trigger: {
+        channelId,
+        date: triggerDate,
+        type: Notifications.SchedulableTriggerInputTypes.DATE
+      }
+    });
+    scheduledCount += 1;
+  }
+
+  return scheduledCount;
 }
 
-function toLocalReminderTime(dateKey: string) {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day, 18, 0, 0, 0);
+function ensureNotificationHandler() {
+  if (notificationHandlerConfigured) return;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true
+    })
+  });
+  notificationHandlerConfigured = true;
+}
+
+function normalizePermission(
+  permission: Notifications.NotificationPermissionsStatus
+): CompetitionReminderPermission {
+  if (
+    permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
+    permission.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL
+  ) {
+    return 'provisional';
+  }
+  if (permission.granted) return 'granted';
+  if (permission.status === Notifications.PermissionStatus.UNDETERMINED) return 'undetermined';
+  return 'denied';
 }

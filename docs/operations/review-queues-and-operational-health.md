@@ -95,7 +95,7 @@ successful response contains:
 - human-review depths for all seven domains;
 - durable notification, privacy, profile-media-cleanup, competition, session,
   and social work counts, including applicable active leases, scheduled retries,
-  exhausted work, and expired/stale leases;
+  exhausted work, and separately counted expired/stale leases;
 - the durable worker heartbeat state: `starting`, `healthy`, `stale`, or
   `degraded`, plus bounded last-completion/failure evidence; and
 - notification, privacy, profile-media, and observability provider state.

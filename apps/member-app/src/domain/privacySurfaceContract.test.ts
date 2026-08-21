@@ -35,5 +35,6 @@ test('device reset is explicit, local-only, retryable, and separately reachable'
   assert.match(profile, /It never requests account deletion/);
   assert.match(profile, /unrelated app or browser data is\s+preserved/);
   assert.match(profile, /NO SERVER DATA WAS DELETED\. TRY AGAIN/);
+  assert.match(profile, /prepareCompetitionReminderSignOut\(\)/);
   assert.match(profile, /queryClient\.clear\(\)/);
 });

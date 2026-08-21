@@ -14,17 +14,45 @@ export interface ExpoPushMessage {
 }
 
 export interface ExpoPushClient {
-  send(messages: readonly ExpoPushMessage[]): Promise<void>;
+  send(
+    messages: readonly ExpoPushMessage[],
+  ): Promise<readonly PushSendResult[]>;
 }
 
-const responseSchema = z.object({
-  data: z.array(
-    z.object({
-      message: z.string().optional(),
-      status: z.enum(['error', 'ok']),
-    }),
-  ),
-});
+export type PushSendResult = {
+  status: 'accepted' | 'invalid-token' | 'retryable-failure';
+};
+
+export class PushProviderError extends Error {
+  readonly code = 'PUSH_PROVIDER_UNAVAILABLE';
+
+  constructor() {
+    super('The push notification provider is unavailable.');
+    this.name = 'PushProviderError';
+  }
+}
+
+const responseSchema = z
+  .object({
+    data: z.array(
+      z.discriminatedUnion('status', [
+        z
+          .object({ id: z.string().min(1).max(512), status: z.literal('ok') })
+          .strict(),
+        z
+          .object({
+            details: z
+              .object({ error: z.string().min(1).max(120) })
+              .strict()
+              .optional(),
+            message: z.string().min(1).max(1_024),
+            status: z.literal('error'),
+          })
+          .strict(),
+      ]),
+    ),
+  })
+  .strict();
 
 @Injectable()
 export class ExpoHttpPushClient implements ExpoPushClient {
@@ -39,7 +67,12 @@ export class ExpoHttpPushClient implements ExpoPushClient {
     this.apiUrl = config.get('EXPO_PUSH_API_URL', { infer: true });
   }
 
-  async send(messages: readonly ExpoPushMessage[]): Promise<void> {
+  async send(
+    messages: readonly ExpoPushMessage[],
+  ): Promise<readonly PushSendResult[]> {
+    if (messages.length < 1 || messages.length > 100) {
+      throw new PushProviderError();
+    }
     let response: Response;
     try {
       response = await this.fetcher(this.apiUrl, {
@@ -55,33 +88,35 @@ export class ExpoHttpPushClient implements ExpoPushClient {
         signal: AbortSignal.timeout(10_000),
       });
     } catch {
-      throw this.unavailable();
+      throw new PushProviderError();
     }
     if (!response.ok) {
-      throw this.unavailable();
+      throw new PushProviderError();
     }
 
     try {
       const result = responseSchema.parse(await response.json());
-      if (result.data.some((ticket) => ticket.status === 'error')) {
-        throw this.unavailable();
+      if (result.data.length !== messages.length) {
+        throw new PushProviderError();
       }
+      return result.data.map((ticket): PushSendResult => {
+        if (ticket.status === 'ok') return { status: 'accepted' };
+        return {
+          status:
+            ticket.details?.error === 'DeviceNotRegistered'
+              ? 'invalid-token'
+              : 'retryable-failure',
+        };
+      });
     } catch {
-      throw this.unavailable();
+      throw new PushProviderError();
     }
-  }
-
-  private unavailable(): ServiceUnavailableException {
-    return new ServiceUnavailableException({
-      code: 'PUSH_PROVIDER_UNAVAILABLE',
-      message: 'The push notification provider is unavailable.',
-    });
   }
 }
 
 @Injectable()
 export class DisabledExpoPushClient implements ExpoPushClient {
-  send(): Promise<void> {
+  send(): Promise<readonly PushSendResult[]> {
     return Promise.reject(
       new ServiceUnavailableException({
         code: 'PUSH_PROVIDER_UNAVAILABLE',

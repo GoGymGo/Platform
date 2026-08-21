@@ -58,6 +58,7 @@ function health() {
         "notificationsLeased",
         "notificationsPending",
         "notificationsRetryScheduled",
+        "notificationsStaleLeases",
         "privacyOperationsLeased",
         "privacyOperationsPending",
         "privacyOperationsRetryScheduled",

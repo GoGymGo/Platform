@@ -477,6 +477,9 @@ export class OperatorQueueDepthsDto {
   notificationsRetryScheduled!: number;
 
   @ApiProperty({ minimum: 0, type: Number })
+  notificationsStaleLeases!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
   privacyOperationsLeased!: number;
 
   @ApiProperty({ minimum: 0, type: Number })

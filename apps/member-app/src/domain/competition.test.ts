@@ -15,7 +15,10 @@ import {
   type CompetitionMatch,
   type CompetitionPeriodIndex
 } from './competition';
-import { buildCompetitionReminders } from './competitionReminders';
+import {
+  buildCompetitionReminders,
+  toCompetitionReminderDate
+} from './competitionReminders';
 
 describe('monthly competition scoring', () => {
   it('formats the exact location-check opening time in the Contest region', () => {
@@ -293,12 +296,30 @@ describe('monthly competition scoring', () => {
     assert.deepEqual(
       reminders.map((reminder) => [reminder.dateKey, reminder.kind]),
       [
-        ['2026-07-27', 'period-progress'],
-        ['2026-07-28', 'period-progress'],
+        ['2026-07-27', 'weekly-goal'],
+        ['2026-07-28', 'weekly-goal'],
+        ['2026-07-28', 'weekly-challenge'],
         ['2026-07-29', 'bonus-day'],
         ['2026-07-30', 'bonus-day'],
         ['2026-07-31', 'bonus-day']
       ]
+    );
+  });
+
+  it('resolves the declared Contest timezone across daylight-saving changes', () => {
+    assert.equal(
+      toCompetitionReminderDate(
+        { dateKey: '2026-07-27', localTime: '18:00' },
+        'America/Toronto'
+      ).toISOString(),
+      '2026-07-27T22:00:00.000Z'
+    );
+    assert.equal(
+      toCompetitionReminderDate(
+        { dateKey: '2026-11-27', localTime: '18:00' },
+        'America/Toronto'
+      ).toISOString(),
+      '2026-11-27T23:00:00.000Z'
     );
   });
 });

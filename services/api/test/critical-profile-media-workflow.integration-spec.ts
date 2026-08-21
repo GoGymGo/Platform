@@ -198,6 +198,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
 
     const approved = await moderation.decide({
       decision: 'approved',
+      expectedVersion: 1,
       mediaId: first.id,
       operatorUserId,
       reason: 'Approved after avatar moderation review.',
@@ -206,6 +207,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
     await expect(
       moderation.decide({
         decision: 'approved',
+        expectedVersion: 1,
         mediaId: first.id,
         operatorUserId,
         reason: 'Approved after avatar moderation review.',
@@ -230,6 +232,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
     await profileMedia.completeUpload(userPrincipal, second.id);
     await moderation.decide({
       decision: 'rejected',
+      expectedVersion: 1,
       mediaId: second.id,
       operatorUserId,
       reason: 'Rejected because the submitted avatar violates policy.',

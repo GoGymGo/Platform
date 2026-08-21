@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -19,6 +20,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
   DecidePartnerApplicationDto,
+  DecideCreatorSubmissionDto,
   DecideProfileMediaDto,
   DecidePrivacyRequestDto,
   DecideRegionVerificationDto,
@@ -28,7 +30,9 @@ import {
   ProfileMediaReviewActionDto,
   SessionEvidenceReviewResponseDto,
   OperatorSystemHealthResponseDto,
-  OperatorWorkQueueItemDto,
+  OperatorWorkQueueDetailDto,
+  OperatorWorkQueuePageDto,
+  ListOperatorWorkQueueQueryDto,
   RejectSessionDto,
   SettleDrawDto,
   VerifySessionDto,
@@ -42,12 +46,24 @@ export class OperatorController {
   constructor(private readonly operator: OperatorService) {}
 
   @Get('work-queue')
-  @ApiOperation({ summary: 'List review work without sensitive evidence data' })
-  @ApiOkResponse({ isArray: true, type: OperatorWorkQueueItemDto })
+  @ApiOperation({ summary: 'List globally ordered authoritative review work' })
+  @ApiOkResponse({ type: OperatorWorkQueuePageDto })
   listWorkQueue(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-  ): Promise<OperatorWorkQueueItemDto[]> {
-    return this.operator.listWorkQueue(principal);
+    @Query() query: ListOperatorWorkQueueQueryDto,
+  ): Promise<OperatorWorkQueuePageDto> {
+    return this.operator.listWorkQueue(principal, query);
+  }
+
+  @Get('work-queue/:kind/:itemId')
+  @ApiOperation({ summary: 'Get one minimized authoritative review detail' })
+  @ApiOkResponse({ type: OperatorWorkQueueDetailDto })
+  getWorkQueueDetail(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('kind') kind: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+  ): Promise<OperatorWorkQueueDetailDto> {
+    return this.operator.getWorkQueueDetail(principal, kind, itemId);
   }
 
   @Get('system-health')
@@ -172,6 +188,24 @@ export class OperatorController {
     return this.operator.decidePartnerApplication(
       principal,
       applicationId,
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
+  }
+
+  @Post('creator-submissions/:submissionId/decision')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Review a Creator video submission' })
+  @ApiOkResponse({ type: OperatorActionResponseDto })
+  decideCreatorSubmission(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: DecideCreatorSubmissionDto,
+  ): Promise<OperatorActionResponseDto> {
+    return this.operator.decideCreatorSubmission(
+      principal,
+      submissionId,
       requireIdempotencyKey(idempotencyKey),
       input,
     );

@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -31,7 +32,7 @@ import {
   GymScanResultDto,
   InterestSubmissionResponseDto,
   OperatorInterestSubmissionDto,
-  OperatorAuditHistoryDto,
+  OperatorAuditHistoryPageDto,
   OperatorGymSessionDto,
   RegionWaitlistEntryDto,
   RegionWaitlistReceiptDto,
@@ -47,6 +48,7 @@ import {
   OperatorReasonDto,
   RegionWaitlistRequestDto,
   UpdateRegionWaitlistStatusDto,
+  ListOperatorAuditHistoryQueryDto,
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import { GymsService } from './gyms.service';
@@ -346,10 +348,11 @@ export class GymOperatorController {
 
   @Get('audit-history')
   @ApiOperation({ summary: 'List recent immutable operator audit history' })
-  @ApiOkResponse({ isArray: true, type: OperatorAuditHistoryDto })
+  @ApiOkResponse({ type: OperatorAuditHistoryPageDto })
   listAuditHistory(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-  ): Promise<OperatorAuditHistoryDto[]> {
-    return this.gyms.listAuditHistory(principal);
+    @Query() query: ListOperatorAuditHistoryQueryDto,
+  ): Promise<OperatorAuditHistoryPageDto> {
+    return this.gyms.listAuditHistory(principal, query);
   }
 }

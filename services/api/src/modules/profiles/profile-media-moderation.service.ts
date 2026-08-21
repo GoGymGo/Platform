@@ -1,16 +1,17 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { sql } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import type { Environment } from '../../config/environment';
 import { DatabaseService } from '../../database/database.service';
-import type { JsonObject } from '../../database/database.types';
+import type { Database, JsonObject } from '../../database/database.types';
 import {
   PRIVATE_OBJECT_STORAGE,
   type PrivateObjectStorage,
@@ -27,6 +28,7 @@ export interface ProfileMediaReviewAction {
   contentType: string;
   expiresAt: string;
   id: string;
+  reviewVersion: number;
   submittedAt: string;
   url: string;
 }
@@ -76,6 +78,7 @@ export class ProfileMediaModerationService {
         contentType: media.content_type,
         expiresAt: expiresAt.toISOString(),
         id: media.id,
+        reviewVersion: media.review_version,
         submittedAt: media.completed_at.toISOString(),
         url,
       };
@@ -85,25 +88,29 @@ export class ProfileMediaModerationService {
   }
 
   decide(input: {
+    authorize?: (transaction: Transaction<Database>) => Promise<string>;
     decision: 'approved' | 'rejected';
+    expectedVersion: number;
     mediaId: string;
     operatorUserId: string;
     reason: string;
     requestId: string;
   }): Promise<MediaDecisionJson> {
     this.requireBucket();
-    return this.idempotency.execute<MediaDecisionJson>(
+    return this.idempotency.execute<MediaDecisionJson, string | undefined>(
       {
         actorKey: `operator:${input.operatorUserId}`,
         key: input.requestId,
         request: {
           decision: input.decision,
+          expectedVersion: input.expectedVersion,
           mediaId: input.mediaId,
           reason: input.reason.trim(),
         },
         scope: 'profile-media:decision',
       },
-      async (transaction) => {
+      async (transaction, authorizedOperatorId) => {
+        const operatorUserId = authorizedOperatorId ?? input.operatorUserId;
         const media = await transaction
           .selectFrom('profile_media')
           .selectAll()
@@ -112,6 +119,18 @@ export class ProfileMediaModerationService {
           .executeTakeFirst();
         if (!media) {
           throw this.mediaNotFound();
+        }
+        if (media.review_version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'AVATAR_MEDIA_VERSION_CONFLICT',
+            message: 'The avatar review changed. Refresh it before deciding.',
+          });
+        }
+        if (media.user_id === operatorUserId) {
+          throw new ForbiddenException({
+            code: 'AVATAR_MEDIA_SELF_REVIEW_FORBIDDEN',
+            message: 'Operators cannot review their own profile media.',
+          });
         }
         if (media.status !== 'pending_review') {
           throw new ConflictException({
@@ -147,33 +166,50 @@ export class ProfileMediaModerationService {
             .where('user_id', '=', media.user_id)
             .executeTakeFirstOrThrow();
         }
-        await transaction
+        const updated = await transaction
           .updateTable('profile_media')
           .set({
             decision_reason: input.reason.trim(),
+            review_version: sql<number>`review_version + 1`,
             reviewed_at: now,
-            reviewed_by_user_id: input.operatorUserId,
+            reviewed_by_user_id: operatorUserId,
             status: input.decision,
             updated_at: now,
           })
           .where('id', '=', media.id)
-          .executeTakeFirstOrThrow();
+          .where('status', '=', 'pending_review')
+          .where('review_version', '=', input.expectedVersion)
+          .returning('id')
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'AVATAR_MEDIA_VERSION_CONFLICT',
+            message: 'The avatar review changed. Refresh it before deciding.',
+          });
+        }
         await transaction
           .insertInto('operator_audit_events')
           .values({
             action: 'profile_media.decided',
-            actor_user_id: input.operatorUserId,
+            actor_user_id: operatorUserId,
             created_at: now,
             entity_id: media.id,
             entity_type: 'profile_media',
-            next_state: { status: input.decision },
-            previous_state: { status: media.status },
+            next_state: {
+              status: input.decision,
+              version: input.expectedVersion + 1,
+            },
+            previous_state: {
+              status: media.status,
+              version: input.expectedVersion,
+            },
             reason: input.reason.trim(),
             request_id: input.requestId,
           })
           .executeTakeFirstOrThrow();
         return { id: media.id, status: input.decision };
       },
+      input.authorize,
     );
   }
 

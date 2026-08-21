@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { Transaction } from 'kysely';
 import type { IdempotencyService } from '../../common/idempotency/idempotency.service';
@@ -39,10 +39,15 @@ describe('OperatorService privacy decisions', () => {
     tokenIssuedAt: 1,
   };
 
-  function setup(currentVersion = 4) {
+  function setup(
+    currentVersion = 4,
+    subjectUserId = 'subject-user',
+    status = 'requested',
+  ) {
     const selection = queryBuilder({
       id: '10000000-0000-4000-8000-000000000001',
-      status: 'requested',
+      status,
+      user_id: subjectUserId,
       version: currentVersion,
     });
     const update = queryBuilder({
@@ -166,6 +171,48 @@ describe('OperatorService privacy decisions', () => {
           decision: 'rejected',
           expectedVersion: 4,
           reason: 'Request could not be verified.',
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(update.set).not.toHaveBeenCalled();
+    expect(privacyEvent.values).not.toHaveBeenCalled();
+  });
+
+  it('rejects self-review before writing a transition', async () => {
+    const { privacyEvent, service, update } = setup(4, 'operator-user');
+
+    await expect(
+      service.decidePrivacyRequest(
+        principal,
+        '10000000-0000-4000-8000-000000000001',
+        'decision-key',
+        {
+          decision: 'rejected',
+          expectedVersion: 4,
+          reason: 'Request could not be verified.',
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(update.set).not.toHaveBeenCalled();
+    expect(privacyEvent.values).not.toHaveBeenCalled();
+  });
+
+  it('rejects an already-started request before writing another transition', async () => {
+    const { privacyEvent, service, update } = setup(
+      4,
+      'subject-user',
+      'processing',
+    );
+
+    await expect(
+      service.decidePrivacyRequest(
+        principal,
+        '10000000-0000-4000-8000-000000000001',
+        'decision-key',
+        {
+          decision: 'rejected',
+          expectedVersion: 4,
+          reason: 'Request is no longer awaiting a decision.',
         },
       ),
     ).rejects.toBeInstanceOf(ConflictException);

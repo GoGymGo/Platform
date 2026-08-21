@@ -1,10 +1,11 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { normalizeDateKey } from '../../database/date-key';
 import type {
   Database,
@@ -74,8 +75,14 @@ interface CompletionJson extends SessionJson {
   violations: string[];
 }
 
+interface SessionReviewDecisionJson extends JsonObject {
+  changed: boolean;
+}
+
 export interface SessionReviewDecisionInput {
+  authorize?: (transaction: Transaction<Database>) => Promise<string>;
   evidenceSnapshotSha256: string;
+  expectedVersion: number;
   findings: SessionEvidenceFindings;
   operatorUserId: string;
   reason: string;
@@ -509,9 +516,26 @@ export class SessionsService {
   }
 
   async verifySession(input: SessionReviewDecisionInput): Promise<boolean> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    const result = await this.idempotency.execute<
+      SessionReviewDecisionJson,
+      string | undefined
+    >(
+      {
+        actorKey: `operator:${input.operatorUserId}`,
+        key: input.requestId,
+        request: {
+          evidenceSnapshotSha256: input.evidenceSnapshotSha256.toLowerCase(),
+          expectedVersion: input.expectedVersion,
+          findings: input.findings,
+          reason: input.reason.trim(),
+          sessionId: input.sessionId,
+        },
+        scope: `operator:sessions:${input.sessionId}:verify`,
+      },
+      async (transaction, authorizedOperatorId) => {
+        const decisionInput = authorizedOperatorId
+          ? { ...input, operatorUserId: authorizedOperatorId }
+          : input;
         const session = await transaction
           .selectFrom('workout_sessions as session')
           .innerJoin(
@@ -542,6 +566,7 @@ export class SessionsService {
             'session.enrollment_id',
             'session.id',
             'session.policy_version',
+            'session.review_version',
             'session.started_at',
             'session.status',
             'session.user_id',
@@ -555,8 +580,17 @@ export class SessionsService {
             message: 'The session was not found.',
           });
         }
-        if (session.status === 'verified') {
-          return false;
+        if (session.user_id === decisionInput.operatorUserId) {
+          throw new ForbiddenException({
+            code: 'SESSION_SELF_REVIEW_FORBIDDEN',
+            message: 'Operators cannot review their own workout session.',
+          });
+        }
+        if (session.review_version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'SESSION_REVIEW_VERSION_CONFLICT',
+            message: 'The session changed. Refresh its review before deciding.',
+          });
         }
         if (session.status !== 'pending_review') {
           throw new ConflictException({
@@ -614,11 +648,12 @@ export class SessionsService {
         }
 
         const now = new Date();
-        await transaction
+        const updated = await transaction
           .updateTable('workout_sessions')
           .set({
             status: 'verified',
             updated_at: now,
+            review_version: sql<number>`review_version + 1`,
             verification_summary: this.buildDecisionSummary(
               evidenceReview,
               input,
@@ -628,7 +663,15 @@ export class SessionsService {
           })
           .where('id', '=', session.id)
           .where('status', '=', 'pending_review')
-          .executeTakeFirstOrThrow();
+          .where('review_version', '=', input.expectedVersion)
+          .returning('id')
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'SESSION_REVIEW_VERSION_CONFLICT',
+            message: 'The session changed. Refresh its review before deciding.',
+          });
+        }
         const rules = parseCompetitionRules(session.rules);
         const eligibleDate = normalizeDateKey(session.eligible_date);
         await this.ledger.append(transaction, {
@@ -648,18 +691,37 @@ export class SessionsService {
         });
         await this.appendSessionDecisionAudit(
           transaction,
-          input,
-          session.user_id,
+          decisionInput,
           'verified',
         );
-        return true;
-      });
+        return { changed: true };
+      },
+      input.authorize,
+    );
+    return result.changed;
   }
 
   async rejectSession(input: SessionReviewDecisionInput): Promise<boolean> {
-    return this.database.connection
-      .transaction()
-      .execute(async (transaction) => {
+    const result = await this.idempotency.execute<
+      SessionReviewDecisionJson,
+      string | undefined
+    >(
+      {
+        actorKey: `operator:${input.operatorUserId}`,
+        key: input.requestId,
+        request: {
+          evidenceSnapshotSha256: input.evidenceSnapshotSha256.toLowerCase(),
+          expectedVersion: input.expectedVersion,
+          findings: input.findings,
+          reason: input.reason.trim(),
+          sessionId: input.sessionId,
+        },
+        scope: `operator:sessions:${input.sessionId}:reject`,
+      },
+      async (transaction, authorizedOperatorId) => {
+        const decisionInput = authorizedOperatorId
+          ? { ...input, operatorUserId: authorizedOperatorId }
+          : input;
         const session = await transaction
           .selectFrom('workout_sessions as session')
           .innerJoin(
@@ -674,6 +736,7 @@ export class SessionsService {
             'session.eligible_date',
             'session.id',
             'session.policy_version',
+            'session.review_version',
             'session.started_at',
             'session.status',
             'session.user_id',
@@ -687,8 +750,17 @@ export class SessionsService {
             message: 'The session was not found.',
           });
         }
-        if (session.status === 'rejected') {
-          return false;
+        if (session.user_id === decisionInput.operatorUserId) {
+          throw new ForbiddenException({
+            code: 'SESSION_SELF_REVIEW_FORBIDDEN',
+            message: 'Operators cannot review their own workout session.',
+          });
+        }
+        if (session.review_version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'SESSION_REVIEW_VERSION_CONFLICT',
+            message: 'The session changed. Refresh its review before deciding.',
+          });
         }
         if (session.status !== 'pending_review') {
           throw new ConflictException({
@@ -711,11 +783,12 @@ export class SessionsService {
         }
 
         const now = new Date();
-        await transaction
+        const updated = await transaction
           .updateTable('workout_sessions')
           .set({
             status: 'rejected',
             updated_at: now,
+            review_version: sql<number>`review_version + 1`,
             verification_summary: this.buildDecisionSummary(
               evidenceReview,
               input,
@@ -725,15 +798,25 @@ export class SessionsService {
           })
           .where('id', '=', session.id)
           .where('status', '=', 'pending_review')
-          .executeTakeFirstOrThrow();
+          .where('review_version', '=', input.expectedVersion)
+          .returning('id')
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'SESSION_REVIEW_VERSION_CONFLICT',
+            message: 'The session changed. Refresh its review before deciding.',
+          });
+        }
         await this.appendSessionDecisionAudit(
           transaction,
-          input,
-          session.user_id,
+          decisionInput,
           'rejected',
         );
-        return true;
-      });
+        return { changed: true };
+      },
+      input.authorize,
+    );
+    return result.changed;
   }
 
   async getEvidenceReview(sessionId: string): Promise<SessionEvidenceReview> {
@@ -856,7 +939,6 @@ export class SessionsService {
   private appendSessionDecisionAudit(
     transaction: Transaction<Database>,
     input: SessionReviewDecisionInput,
-    subjectUserId: string,
     outcome: 'rejected' | 'verified',
   ): Promise<unknown> {
     return transaction
@@ -871,9 +953,12 @@ export class SessionsService {
           evidenceSnapshotSha256: input.evidenceSnapshotSha256.toLowerCase(),
           findings: input.findings,
           status: outcome,
-          subjectUserId,
+          version: input.expectedVersion + 1,
         },
-        previous_state: { status: 'pending_review' },
+        previous_state: {
+          status: 'pending_review',
+          version: input.expectedVersion,
+        },
         reason: input.reason,
         request_id: input.requestId,
       })

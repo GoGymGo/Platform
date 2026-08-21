@@ -1030,7 +1030,11 @@ function WaitlistReviewControl({
           return;
         }
         setError("");
-        void onUpdate(entry.id, { reason, status });
+        void onUpdate(entry.id, {
+          expectedVersion: entry.version,
+          reason,
+          status,
+        });
       }}
     >
       <select

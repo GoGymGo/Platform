@@ -1,7 +1,17 @@
 "use client";
 
 import type { User } from "firebase/auth";
-import type { AuditEvent, Competition, WorkQueueItem } from "./admin-types";
+import {
+  workQueueKinds,
+  type AuditEvent,
+  type AuditPage,
+  type Competition,
+  type ProfileMediaReviewAction,
+  type SystemHealth,
+  type WorkQueueDetail,
+  type WorkQueueItem,
+  type WorkQueuePage,
+} from "./admin-types";
 import {
   FirebaseTokenUnavailableError,
   sendWithFirebaseTokenRecovery,
@@ -18,23 +28,377 @@ export function isRewardConfigurableCompetition(competition: Competition) {
 }
 
 export function getQueueUrgency(item: WorkQueueItem) {
-  const ageHours = Math.max(
-    0,
-    (Date.now() - new Date(item.createdAt).getTime()) / 3_600_000,
-  );
   const normalized = `${item.kind} ${item.status}`.toLowerCase();
   if (
-    ageHours >= 24 ||
     normalized.includes("failed") ||
-    normalized.includes("rejected") ||
-    normalized.includes("privacy")
+    normalized.includes("retry") ||
+    normalized.includes("stale")
   ) {
-    return { label: "URGENT", tone: "urgent" } as const;
+    return { label: "ATTENTION", tone: "urgent" } as const;
   }
-  if (ageHours >= 8 || normalized.includes("pending_review")) {
-    return { label: "DUE SOON", tone: "warning" } as const;
+  if (!item.decisionAllowed || normalized.includes("stuck")) {
+    return { label: "BLOCKED", tone: "warning" } as const;
   }
-  return { label: "ROUTINE", tone: "routine" } as const;
+  return { label: "WAITING", tone: "routine" } as const;
+}
+
+export function decodeWorkQueuePage(value: unknown): WorkQueuePage {
+  const page = requireRecord(value, "work queue page");
+  if (!Array.isArray(page.items) || !isNullableString(page.nextCursor)) {
+    throw invalidAdminResponse("work queue page");
+  }
+  return {
+    items: page.items.map((item) => decodeWorkQueueItem(item)),
+    nextCursor: page.nextCursor,
+  };
+}
+
+export function decodeWorkQueueDetail(value: unknown): WorkQueueDetail {
+  const detail = requireRecord(value, "work queue detail");
+  const item = decodeWorkQueueItem(detail);
+  const allowedDecisionValues = allowedReviewDecisions[item.kind];
+  if (
+    !Array.isArray(detail.allowedDecisions) ||
+    !detail.allowedDecisions.every(
+      (decision) =>
+        isString(decision) && allowedDecisionValues.includes(decision),
+    ) ||
+    new Set(detail.allowedDecisions).size !== detail.allowedDecisions.length ||
+    (!item.decisionAllowed && detail.allowedDecisions.length > 0) ||
+    !Array.isArray(detail.facts)
+  ) {
+    throw invalidAdminResponse("work queue detail");
+  }
+  const facts = detail.facts.map((fact) => {
+    const entry = requireRecord(fact, "review fact");
+    if (!isString(entry.label) || !isString(entry.value)) {
+      throw invalidAdminResponse("review fact");
+    }
+    return { label: entry.label, value: entry.value };
+  });
+  const allowedLabels = allowedReviewFactLabels[item.kind];
+  if (
+    facts.length > allowedLabels.length ||
+    facts.some((fact) => !allowedLabels.includes(fact.label))
+  ) {
+    throw invalidAdminResponse("review facts");
+  }
+  const sessionEvidence =
+    detail.sessionEvidence === undefined
+      ? undefined
+      : decodeSessionEvidence(detail.sessionEvidence);
+  if ((item.kind === "workout_session") !== Boolean(sessionEvidence)) {
+    throw invalidAdminResponse("session evidence boundary");
+  }
+  return {
+    ...item,
+    allowedDecisions: detail.allowedDecisions,
+    facts,
+    ...(sessionEvidence ? { sessionEvidence } : {}),
+  };
+}
+
+function decodeSessionEvidence(
+  value: unknown,
+): NonNullable<WorkQueueDetail["sessionEvidence"]> {
+  const review = requireRecord(value, "session evidence");
+  const evidence = requireRecord(review.evidence, "session evidence groups");
+  const evidenceKeys = [
+    "deviceAttestation",
+    "gymQr",
+    "heartRate",
+    "presenceCheck",
+  ] as const;
+  if (
+    !evidenceKeys.every((key) => {
+      const group = evidence[key];
+      return (
+        isRecord(group) &&
+        isNonnegativeNumber(group.count) &&
+        isNonnegativeNumber(group.minimumRequiredCount) &&
+        typeof group.required === "boolean"
+      );
+    }) ||
+    ![
+      review.competitionId,
+      review.eligibleDate,
+      review.policyVersion,
+      review.sessionId,
+      review.status,
+    ].every(isString) ||
+    ![review.completedAt, review.startedAt].every(isIsoDate) ||
+    !isNonnegativeNumber(review.durationMinutes) ||
+    !isNonnegativeNumber(review.minimumDurationMinutes) ||
+    !isString(review.evidenceSnapshotSha256) ||
+    !/^[a-f0-9]{64}$/i.test(review.evidenceSnapshotSha256) ||
+    !Array.isArray(review.limitations) ||
+    !review.limitations.every(isString)
+  ) {
+    throw invalidAdminResponse("session evidence");
+  }
+  return review as NonNullable<WorkQueueDetail["sessionEvidence"]>;
+}
+
+export function decodeAuditPage(value: unknown): AuditPage {
+  const page = requireRecord(value, "audit page");
+  if (!Array.isArray(page.items) || !isNullableString(page.nextCursor)) {
+    throw invalidAdminResponse("audit page");
+  }
+  return {
+    items: page.items.map((item) => {
+      const event = requireRecord(item, "audit event");
+      if (
+        ![
+          event.action,
+          event.createdAt,
+          event.entityId,
+          event.entityType,
+          event.id,
+          event.reason,
+        ].every(isString) ||
+        !isNullableString(event.actorEmail) ||
+        !isSafeAuditState(event.before) ||
+        !isSafeAuditState(event.after)
+      ) {
+        throw invalidAdminResponse("audit event");
+      }
+      return event as AuditEvent;
+    }),
+    nextCursor: page.nextCursor,
+  };
+}
+
+export function decodeSystemHealth(value: unknown): SystemHealth {
+  const health = requireRecord(value, "system health");
+  const queues = requireRecord(health.queues, "system health queues");
+  const reviewQueues = requireRecord(
+    health.reviewQueues,
+    "review queue depths",
+  );
+  const worker = requireRecord(health.worker, "worker health");
+  const providers = requireRecord(health.providers, "provider health");
+  const queueKeys = [
+    "competitionStartsDue",
+    "incompleteSessionsDue",
+    "notificationsExhausted",
+    "notificationsLeased",
+    "notificationsPending",
+    "notificationsRetryScheduled",
+    "privacyOperationsLeased",
+    "privacyOperationsPending",
+    "privacyOperationsRetryScheduled",
+    "privacyOperationsStaleLeases",
+    "profileMediaCleanupLeased",
+    "profileMediaCleanupPending",
+    "profileMediaCleanupRetryScheduled",
+    "profileMediaCleanupStaleLeases",
+    "socialInvitationsDue",
+  ];
+  const reviewKeys = [
+    "creatorSubmissions",
+    "partnerApplications",
+    "privacyRequests",
+    "profileMedia",
+    "regionVerifications",
+    "regionWaitlist",
+    "workoutSessions",
+  ];
+  const providerKeys = [
+    "notifications",
+    "observability",
+    "privacy",
+    "profileMedia",
+  ];
+  const providersValid = providerKeys.every((key) => {
+    const provider = providers[key];
+    return (
+      isRecord(provider) &&
+      isString(provider.evidence) &&
+      ["configured", "disabled", "unavailable", "unconfigured"].includes(
+        String(provider.status),
+      )
+    );
+  });
+  if (
+    health.database !== "ok" ||
+    !isIsoDate(health.checkedAt) ||
+    !queueKeys.every((key) => isNonnegativeNumber(queues[key])) ||
+    !reviewKeys.every((key) => isNonnegativeNumber(reviewQueues[key])) ||
+    !providersValid ||
+    !["degraded", "healthy", "stale", "starting"].includes(
+      String(worker.status),
+    ) ||
+    !isNullableNumber(worker.heartbeatAgeSeconds) ||
+    ![worker.lastCompletedAt, worker.lastFailedAt].every(isNullableIsoDate) ||
+    !isNullableString(worker.lastFailureCode)
+  ) {
+    throw invalidAdminResponse("system health");
+  }
+  return health as SystemHealth;
+}
+
+export function decodeProfileMediaReviewAction(
+  value: unknown,
+): ProfileMediaReviewAction {
+  const action = requireRecord(value, "profile media review action");
+  if (
+    !isString(action.id) ||
+    !isString(action.contentType) ||
+    !isNonnegativeNumber(action.contentLength) ||
+    !isIsoDate(action.submittedAt) ||
+    !isIsoDate(action.expiresAt) ||
+    !isString(action.url) ||
+    !/^https?:\/\//.test(action.url) ||
+    !isPositiveInteger(action.reviewVersion)
+  ) {
+    throw invalidAdminResponse("profile media review action");
+  }
+  return action as ProfileMediaReviewAction;
+}
+
+function decodeWorkQueueItem(value: unknown): WorkQueueItem {
+  const item = requireRecord(value, "work queue item");
+  if (
+    !isString(item.id) ||
+    !workQueueKinds.includes(item.kind as WorkQueueItem["kind"]) ||
+    !isString(item.status) ||
+    !isIsoDate(item.createdAt) ||
+    typeof item.decisionAllowed !== "boolean" ||
+    !isPositiveInteger(item.reviewVersion) ||
+    !isOptionalString(item.failureCode) ||
+    !isOptionalIsoDate(item.nextAttemptAt) ||
+    !isOptionalString(item.regionCode) ||
+    !isOptionalString(item.verificationMethod) ||
+    (item.requestType !== undefined &&
+      !["delete", "export"].includes(String(item.requestType))) ||
+    (item.decisionRestrictionCode !== undefined &&
+      !["self_review", "stale_policy", "unsupported_method"].includes(
+        String(item.decisionRestrictionCode),
+      ))
+  ) {
+    throw invalidAdminResponse("work queue item");
+  }
+  return item as WorkQueueItem;
+}
+
+const allowedReviewFactLabels: Record<WorkQueueItem["kind"], string[]> = {
+  creator_submission: [
+    "Duration",
+    "Workout style",
+    "Region",
+    "Rights version",
+    "Rights accepted",
+    "Synthetic media disclosed",
+  ],
+  partner_application: ["Application type", "Region", "Contact email"],
+  privacy_request: [
+    "Request type",
+    "Attempts",
+    "Processing started",
+    "Lease expires",
+    "Next attempt",
+  ],
+  profile_media: ["Content type", "Content length", "Submitted"],
+  region_verification: ["Region", "Method", "Policy", "Boundary"],
+  region_waitlist: [
+    "Email",
+    "Requested region",
+    "Source",
+    "Country",
+    "Subdivision",
+    "Consented",
+    "Consent notice",
+  ],
+  workout_session: ["Competition", "Eligible date", "Duration", "Policy"],
+};
+
+const allowedReviewDecisions: Record<WorkQueueItem["kind"], string[]> = {
+  creator_submission: ["approved", "in_review", "rejected"],
+  partner_application: ["approved", "in_review", "rejected"],
+  privacy_request: ["processing", "rejected"],
+  profile_media: ["approved", "rejected"],
+  region_verification: ["approved", "rejected"],
+  region_waitlist: ["contacted", "launched", "closed"],
+  workout_session: ["verified", "rejected"],
+};
+
+function isSafeAuditState(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (Array.isArray(value)) {
+    return value.length <= 20 && value.every(isSafeAuditValue);
+  }
+  if (!isRecord(value) || Object.keys(value).length > 16) return false;
+  const sensitiveKey =
+    /user.?id|email|token|secret|password|credential|payload|content|metadata|object|url|address|coordinates?|latitude|longitude|notes?|message/i;
+  return Object.entries(value).every(
+    ([key, entry]) => !sensitiveKey.test(key) && isSafeAuditValue(entry),
+  );
+}
+
+function isSafeAuditValue(value: unknown): boolean {
+  if (value === undefined) return false;
+  return (
+    value === null ||
+    (typeof value === "string" && value.length <= 256) ||
+    (typeof value === "number" && Number.isFinite(value)) ||
+    typeof value === "boolean" ||
+    isSafeAuditState(value)
+  );
+}
+
+function invalidAdminResponse(label: string): AdminUserFacingError {
+  return new AdminUserFacingError(
+    `The server returned an invalid ${label}. Refresh before taking action.`,
+  );
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!isRecord(value)) throw invalidAdminResponse(label);
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || isString(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || isString(value);
+}
+
+function isOptionalIsoDate(value: unknown): boolean {
+  return value === undefined || isIsoDate(value);
+}
+
+function isNullableIsoDate(value: unknown): boolean {
+  return value === null || isIsoDate(value);
+}
+
+function isNullableNumber(value: unknown): value is number | null {
+  return value === null || isNonnegativeNumber(value);
+}
+
+function isNonnegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isIsoDate(value: unknown): value is string {
+  return (
+    isString(value) &&
+    !Number.isNaN(new Date(value).getTime()) &&
+    new Date(value).toISOString() === value
+  );
 }
 
 export function formatQueueAge(value: string) {

@@ -88,6 +88,10 @@ snapshot-bound, retry-safe, audited once, and awards no ledger value.
 
 Administrative region, competition, and creator-workout configuration is documented in [the admin operations runbook](../../docs/operations/admin-configuration.md). It includes the audited first-administrator bootstrap procedure; there is intentionally no public privilege-grant endpoint.
 
+The globally paginated human-review inventory, minimized audit search, factual
+worker/queue/provider health semantics, and lease recovery procedure are
+documented in [review queues and operational health](../../docs/operations/review-queues-and-operational-health.md).
+
 The private avatar upload, moderation, cleanup, and privacy lifecycle is documented in [profile-media operations](../../docs/architecture/profile-media.md).
 
 Server-authoritative Terms and Privacy publication, receipt, withdrawal, and enrollment controls are documented in [account legal documents](../../docs/compliance/legal-documents.md).

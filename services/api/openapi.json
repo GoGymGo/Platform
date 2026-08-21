@@ -714,24 +714,90 @@
     "/v1/operator/work-queue": {
       "get": {
         "operationId": "listWorkQueue",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "maxLength": 500, "type": "string" }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "creator_submission",
+                "partner_application",
+                "privacy_request",
+                "profile_media",
+                "region_verification",
+                "region_waitlist",
+                "workout_session"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OperatorWorkQueueItemDto"
-                  }
+                  "$ref": "#/components/schemas/OperatorWorkQueuePageDto"
                 }
               }
             }
           }
         },
         "security": [{ "firebase": [] }],
-        "summary": "List review work without sensitive evidence data",
+        "summary": "List globally ordered authoritative review work",
+        "tags": ["operator"]
+      }
+    },
+    "/v1/operator/work-queue/{kind}/{itemId}": {
+      "get": {
+        "operationId": "getWorkQueueDetail",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWorkQueueDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Get one minimized authoritative review detail",
         "tags": ["operator"]
       }
     },
@@ -1029,6 +1095,50 @@
         },
         "security": [{ "firebase": [] }],
         "summary": "Review a partner application",
+        "tags": ["operator"]
+      }
+    },
+    "/v1/operator/creator-submissions/{submissionId}/decision": {
+      "post": {
+        "operationId": "decideCreatorSubmission",
+        "parameters": [
+          {
+            "name": "submissionId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideCreatorSubmissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Review a Creator video submission",
         "tags": ["operator"]
       }
     },
@@ -2933,17 +3043,50 @@
     "/v1/operator/audit-history": {
       "get": {
         "operationId": "listAuditHistory",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": { "maxLength": 100, "type": "string" }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": { "maxLength": 100, "type": "string" }
+          },
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "schema": { "maxLength": 100, "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OperatorAuditHistoryDto"
-                  }
+                  "$ref": "#/components/schemas/OperatorAuditHistoryPageDto"
                 }
               }
             }
@@ -5521,18 +5664,25 @@
           "kind": {
             "type": "string",
             "enum": [
+              "creator_submission",
               "partner_application",
               "privacy_request",
               "profile_media",
               "region_verification",
+              "region_waitlist",
               "workout_session"
             ]
           },
           "status": { "type": "string" },
+          "decisionAllowed": { "type": "boolean" },
+          "decisionRestrictionCode": {
+            "type": "string",
+            "enum": ["self_review", "stale_policy", "unsupported_method"]
+          },
           "requestType": { "type": "string", "enum": ["delete", "export"] },
           "failureCode": { "type": "string" },
           "nextAttemptAt": { "type": "string", "format": "date-time" },
-          "version": { "type": "number", "minimum": 1 },
+          "reviewVersion": { "type": "number", "minimum": 1 },
           "createdAt": { "type": "string", "format": "date-time" },
           "regionCode": { "type": "string", "example": "CA-BC" },
           "verificationMethod": {
@@ -5540,54 +5690,26 @@
             "enum": ["device_location", "manual_review", "postal_code"]
           }
         },
-        "required": ["id", "kind", "status", "createdAt"]
+        "required": ["id", "kind", "status", "decisionAllowed", "createdAt"]
       },
-      "OperatorQueueDepthsDto": {
+      "OperatorWorkQueuePageDto": {
         "type": "object",
         "properties": {
-          "competitionStartsDue": { "type": "number", "minimum": 0 },
-          "notificationsPending": { "type": "number", "minimum": 0 },
-          "privacyOperationsPending": { "type": "number", "minimum": 0 },
-          "profileMediaCleanupPending": { "type": "number", "minimum": 0 }
-        },
-        "required": [
-          "competitionStartsDue",
-          "notificationsPending",
-          "privacyOperationsPending",
-          "profileMediaCleanupPending"
-        ]
-      },
-      "OperatorWorkerHealthDto": {
-        "type": "object",
-        "properties": {
-          "heartbeatAgeSeconds": { "type": "number", "nullable": true },
-          "lastCompletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OperatorWorkQueueItemDto" }
           },
-          "lastFailedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "lastFailureCode": { "type": "string", "nullable": true },
-          "status": {
-            "type": "string",
-            "enum": ["degraded", "healthy", "stale", "starting"]
-          }
+          "nextCursor": { "type": "string", "nullable": true }
         },
-        "required": ["heartbeatAgeSeconds", "status"]
+        "required": ["items"]
       },
-      "OperatorSystemHealthResponseDto": {
+      "OperatorReviewFactDto": {
         "type": "object",
         "properties": {
-          "checkedAt": { "type": "string", "format": "date-time" },
-          "database": { "type": "string", "enum": ["ok"] },
-          "queues": { "$ref": "#/components/schemas/OperatorQueueDepthsDto" },
-          "worker": { "$ref": "#/components/schemas/OperatorWorkerHealthDto" }
+          "label": { "type": "string" },
+          "value": { "type": "string" }
         },
-        "required": ["checkedAt", "database", "queues", "worker"]
+        "required": ["label", "value"]
       },
       "DeviceAttestationReviewDto": {
         "type": "object",
@@ -5705,6 +5827,200 @@
           "status"
         ]
       },
+      "OperatorWorkQueueDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "creator_submission",
+              "partner_application",
+              "privacy_request",
+              "profile_media",
+              "region_verification",
+              "region_waitlist",
+              "workout_session"
+            ]
+          },
+          "status": { "type": "string" },
+          "decisionAllowed": { "type": "boolean" },
+          "decisionRestrictionCode": {
+            "type": "string",
+            "enum": ["self_review", "stale_policy", "unsupported_method"]
+          },
+          "requestType": { "type": "string", "enum": ["delete", "export"] },
+          "failureCode": { "type": "string" },
+          "nextAttemptAt": { "type": "string", "format": "date-time" },
+          "reviewVersion": { "type": "number", "minimum": 1 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "regionCode": { "type": "string", "example": "CA-BC" },
+          "verificationMethod": {
+            "type": "string",
+            "enum": ["device_location", "manual_review", "postal_code"]
+          },
+          "allowedDecisions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "facts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OperatorReviewFactDto" }
+          },
+          "sessionEvidence": {
+            "$ref": "#/components/schemas/SessionEvidenceReviewResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "decisionAllowed",
+          "createdAt",
+          "allowedDecisions",
+          "facts"
+        ]
+      },
+      "OperatorProviderHealthDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["configured", "disabled", "unavailable", "unconfigured"]
+          },
+          "evidence": { "type": "string" }
+        },
+        "required": ["status", "evidence"]
+      },
+      "OperatorProviderHealthSetDto": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "$ref": "#/components/schemas/OperatorProviderHealthDto"
+          },
+          "observability": {
+            "$ref": "#/components/schemas/OperatorProviderHealthDto"
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/OperatorProviderHealthDto"
+          },
+          "profileMedia": {
+            "$ref": "#/components/schemas/OperatorProviderHealthDto"
+          }
+        },
+        "required": [
+          "notifications",
+          "observability",
+          "privacy",
+          "profileMedia"
+        ]
+      },
+      "OperatorQueueDepthsDto": {
+        "type": "object",
+        "properties": {
+          "competitionStartsDue": { "type": "number", "minimum": 0 },
+          "notificationsPending": { "type": "number", "minimum": 0 },
+          "privacyOperationsPending": { "type": "number", "minimum": 0 },
+          "profileMediaCleanupPending": { "type": "number", "minimum": 0 },
+          "incompleteSessionsDue": { "type": "number", "minimum": 0 },
+          "notificationsExhausted": { "type": "number", "minimum": 0 },
+          "notificationsLeased": { "type": "number", "minimum": 0 },
+          "notificationsRetryScheduled": { "type": "number", "minimum": 0 },
+          "privacyOperationsLeased": { "type": "number", "minimum": 0 },
+          "privacyOperationsRetryScheduled": { "type": "number", "minimum": 0 },
+          "privacyOperationsStaleLeases": { "type": "number", "minimum": 0 },
+          "profileMediaCleanupLeased": { "type": "number", "minimum": 0 },
+          "profileMediaCleanupRetryScheduled": {
+            "type": "number",
+            "minimum": 0
+          },
+          "profileMediaCleanupStaleLeases": { "type": "number", "minimum": 0 },
+          "socialInvitationsDue": { "type": "number", "minimum": 0 }
+        },
+        "required": [
+          "competitionStartsDue",
+          "notificationsPending",
+          "privacyOperationsPending",
+          "profileMediaCleanupPending",
+          "incompleteSessionsDue",
+          "notificationsExhausted",
+          "notificationsLeased",
+          "notificationsRetryScheduled",
+          "privacyOperationsLeased",
+          "privacyOperationsRetryScheduled",
+          "privacyOperationsStaleLeases",
+          "profileMediaCleanupLeased",
+          "profileMediaCleanupRetryScheduled",
+          "profileMediaCleanupStaleLeases",
+          "socialInvitationsDue"
+        ]
+      },
+      "OperatorReviewQueueDepthsDto": {
+        "type": "object",
+        "properties": {
+          "creatorSubmissions": { "type": "number", "minimum": 0 },
+          "partnerApplications": { "type": "number", "minimum": 0 },
+          "privacyRequests": { "type": "number", "minimum": 0 },
+          "profileMedia": { "type": "number", "minimum": 0 },
+          "regionVerifications": { "type": "number", "minimum": 0 },
+          "regionWaitlist": { "type": "number", "minimum": 0 },
+          "workoutSessions": { "type": "number", "minimum": 0 }
+        },
+        "required": [
+          "creatorSubmissions",
+          "partnerApplications",
+          "privacyRequests",
+          "profileMedia",
+          "regionVerifications",
+          "regionWaitlist",
+          "workoutSessions"
+        ]
+      },
+      "OperatorWorkerHealthDto": {
+        "type": "object",
+        "properties": {
+          "heartbeatAgeSeconds": { "type": "number", "nullable": true },
+          "lastCompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastFailedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastFailureCode": { "type": "string", "nullable": true },
+          "status": {
+            "type": "string",
+            "enum": ["degraded", "healthy", "stale", "starting"]
+          }
+        },
+        "required": ["heartbeatAgeSeconds", "status"]
+      },
+      "OperatorSystemHealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "checkedAt": { "type": "string", "format": "date-time" },
+          "database": { "type": "string", "enum": ["ok"] },
+          "providers": {
+            "$ref": "#/components/schemas/OperatorProviderHealthSetDto"
+          },
+          "queues": { "$ref": "#/components/schemas/OperatorQueueDepthsDto" },
+          "reviewQueues": {
+            "$ref": "#/components/schemas/OperatorReviewQueueDepthsDto"
+          },
+          "worker": { "$ref": "#/components/schemas/OperatorWorkerHealthDto" }
+        },
+        "required": [
+          "checkedAt",
+          "database",
+          "providers",
+          "queues",
+          "reviewQueues",
+          "worker"
+        ]
+      },
       "SessionEvidenceFindingsDto": {
         "type": "object",
         "properties": {
@@ -5731,6 +6047,7 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "expectedVersion": { "type": "number", "minimum": 1 },
           "evidenceSnapshotSha256": {
             "type": "string",
             "maxLength": 64,
@@ -5740,7 +6057,12 @@
             "$ref": "#/components/schemas/SessionEvidenceFindingsDto"
           }
         },
-        "required": ["reason", "evidenceSnapshotSha256", "findings"]
+        "required": [
+          "reason",
+          "expectedVersion",
+          "evidenceSnapshotSha256",
+          "findings"
+        ]
       },
       "OperatorActionResponseDto": {
         "type": "object",
@@ -5754,6 +6076,7 @@
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "expectedVersion": { "type": "number", "minimum": 1 },
           "evidenceSnapshotSha256": {
             "type": "string",
             "maxLength": 64,
@@ -5763,7 +6086,12 @@
             "$ref": "#/components/schemas/SessionEvidenceFindingsDto"
           }
         },
-        "required": ["reason", "evidenceSnapshotSha256", "findings"]
+        "required": [
+          "reason",
+          "expectedVersion",
+          "evidenceSnapshotSha256",
+          "findings"
+        ]
       },
       "LockDrawDto": {
         "type": "object",
@@ -5834,9 +6162,10 @@
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
           "decision": { "type": "string", "enum": ["approved", "rejected"] },
+          "expectedVersion": { "type": "number", "minimum": 1 },
           "expiresAt": { "type": "string", "format": "date-time" }
         },
-        "required": ["reason", "decision"]
+        "required": ["reason", "decision", "expectedVersion"]
       },
       "DecidePartnerApplicationDto": {
         "type": "object",
@@ -5845,9 +6174,22 @@
           "decision": {
             "type": "string",
             "enum": ["approved", "in_review", "rejected"]
-          }
+          },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason", "decision"]
+        "required": ["reason", "decision", "expectedVersion"]
+      },
+      "DecideCreatorSubmissionDto": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
+          "decision": {
+            "type": "string",
+            "enum": ["approved", "in_review", "rejected"]
+          },
+          "expectedVersion": { "type": "number", "minimum": 1 }
+        },
+        "required": ["reason", "decision", "expectedVersion"]
       },
       "DecidePrivacyRequestDto": {
         "type": "object",
@@ -5866,7 +6208,8 @@
           "contentLength": { "type": "number" },
           "submittedAt": { "type": "string", "format": "date-time" },
           "expiresAt": { "type": "string", "format": "date-time" },
-          "url": { "type": "string", "format": "uri" }
+          "url": { "type": "string", "format": "uri" },
+          "reviewVersion": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
@@ -5874,16 +6217,18 @@
           "contentLength",
           "submittedAt",
           "expiresAt",
-          "url"
+          "url",
+          "reviewVersion"
         ]
       },
       "DecideProfileMediaDto": {
         "type": "object",
         "properties": {
           "reason": { "type": "string", "maxLength": 500, "minLength": 8 },
-          "decision": { "type": "string", "enum": ["approved", "rejected"] }
+          "decision": { "type": "string", "enum": ["approved", "rejected"] },
+          "expectedVersion": { "type": "number", "minimum": 1 }
         },
-        "required": ["reason", "decision"]
+        "required": ["reason", "decision", "expectedVersion"]
       },
       "OperatorPortalAssignmentDto": {
         "type": "object",
@@ -7361,7 +7706,8 @@
             "format": "date-time",
             "nullable": true
           },
-          "consentNoticeVersion": { "type": "string", "nullable": true }
+          "consentNoticeVersion": { "type": "string", "nullable": true },
+          "version": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
@@ -7369,19 +7715,21 @@
           "requestedRegion",
           "status",
           "source",
-          "createdAt"
+          "createdAt",
+          "version"
         ]
       },
       "UpdateRegionWaitlistStatusDto": {
         "type": "object",
         "properties": {
           "reason": { "type": "string", "minLength": 8, "maxLength": 500 },
+          "expectedVersion": { "type": "number", "minimum": 1 },
           "status": {
             "type": "string",
             "enum": ["contacted", "launched", "closed"]
           }
         },
-        "required": ["reason", "status"]
+        "required": ["reason", "expectedVersion", "status"]
       },
       "OperatorInterestSubmissionDto": {
         "type": "object",
@@ -7461,6 +7809,13 @@
           "entityType": { "type": "string" },
           "entityId": { "type": "string", "format": "uuid" },
           "reason": { "type": "string" },
+          "actorEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "before": { "type": "object", "nullable": true },
+          "after": { "type": "object", "nullable": true },
           "createdAt": { "type": "string", "format": "date-time" }
         },
         "required": [
@@ -7469,8 +7824,22 @@
           "entityType",
           "entityId",
           "reason",
+          "actorEmail",
+          "before",
+          "after",
           "createdAt"
         ]
+      },
+      "OperatorAuditHistoryPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OperatorAuditHistoryDto" }
+          },
+          "nextCursor": { "type": "string", "nullable": true }
+        },
+        "required": ["items"]
       },
       "GymScanRequestDto": {
         "type": "object",

@@ -5,6 +5,7 @@ import type {
   CreateGymLocationDto,
   GymScanRequestDto,
   InterestSubmissionDto,
+  ListOperatorAuditHistoryQueryDto,
   MemberRegionWaitlistRequestDto,
   OperatorReasonDto,
   RegionWaitlistRequestDto,
@@ -28,6 +29,7 @@ const principal: AuthenticatedPrincipal = {
   tokenIssuedAt: 1,
 };
 const idempotencyKey = 'operator-request-0001';
+const auditQuery = { limit: 50 } satisfies ListOperatorAuditHistoryQueryDto;
 
 describe('gym controllers', () => {
   const mocks = {
@@ -144,6 +146,7 @@ describe('gym controllers', () => {
       rewardAwardId: '10000000-0000-4000-8000-000000000003',
     } satisfies CashFulfillmentRequestDto;
     const waitlistUpdate = {
+      expectedVersion: 1,
       reason: 'Regional update email was sent.',
       status: 'contacted',
     } satisfies UpdateRegionWaitlistStatusDto;
@@ -183,7 +186,7 @@ describe('gym controllers', () => {
     );
     await controller.listInterest(principal);
     await controller.recordCashFulfillment(principal, idempotencyKey, cash);
-    await controller.listAuditHistory(principal);
+    await controller.listAuditHistory(principal, auditQuery);
 
     expect(mocks.listGymLocations).toHaveBeenCalledWith(principal);
     expect(mocks.createGymLocation).toHaveBeenCalledWith(
@@ -237,6 +240,6 @@ describe('gym controllers', () => {
       idempotencyKey,
       cash,
     );
-    expect(mocks.listAuditHistory).toHaveBeenCalledWith(principal);
+    expect(mocks.listAuditHistory).toHaveBeenCalledWith(principal, auditQuery);
   });
 });

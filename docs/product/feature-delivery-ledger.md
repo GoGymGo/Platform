@@ -18,10 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `382a8d951ece5d61af63b8541afedf83bd5ea4a7` after PR #122 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-026 — Public feedback and measurement`
-  on `agent/ggg-026-public-feedback-measurement`; creation follows this ledger
-  merge.
+  `605c35274a377c54a6240a53f13cbe247501751c` after PR #124 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-027 — Landing data cutover` on
+  `agent/ggg-027-landing-data-cutover`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -34,7 +33,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 47 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 47 API forward migrations and 4 landing D1 migrations;
+  generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -943,17 +943,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   export is disabled by default and owner-restricted.
 - External providers / feature flag: Cloudflare D1 binding; export enable variables
   default off.
-- Current implementation / missing behavior: tests cover allowlists, validation,
-  accessibility, empty defaults, and export gate. Missing production retention,
-  owner export rehearsal, and decision whether data migrates to PostgreSQL.
+- Current implementation / missing behavior: repository behavior is complete:
+  strict same-origin bounded requests, exact event allowlist/canonical mapping,
+  optional minimized contact, replay-safe feedback, aggregate non-identifying rate
+  buckets, bounded cleanup/retention, exact owner authorization, paginated minimized
+  exports and privacy-safe audit evidence. Production D1 operations remain disabled
+  and unproven.
 - Required tests / operations / cloud dependency: event allowlist/no PII,
   validation/spam/rate limits, owner denial, disabled export, retention/deletion,
   analytics failure isolation; Cloudflare D1/Sites.
 - Delivery: priority `P2`; task `GoGymGo Feature GGG-026 — Public feedback and
-  measurement`; branch `agent/ggg-026-public-feedback-measurement`; PR/merge
-  `unassigned`; status `IN_PROGRESS`.
-- Residual risks / blocker: no cloud inspection or export is authorized in this
-  program task.
+  measurement`; branch `agent/ggg-026-public-feedback-measurement` (deleted after
+  merge); PR `#124`; merge `605c35274a377c54a6240a53f13cbe247501751c`;
+  status `BLOCKED`.
+- Residual risks / blocker: D1 migration/binding, approved retention values, hosted
+  abuse controls, exact-owner credentials/export rehearsal, deployment and hosted
+  UAT require separate Cloudflare/provider authority. No cloud inspection, export
+  or real data access occurred.
 
 ### GGG-027 — Landing submission migration and authoritative intake cutover
 
@@ -975,7 +981,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   idempotent import, duplicate mapping, count/hash verification, rollback, export
   disablement; Cloudflare and database access.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-027 — Landing data cutover`;
-  branch/PR/merge `unassigned`; status `READY`.
+  branch `agent/ggg-027-landing-data-cutover`; PR/merge `unassigned`; status
+  `IN_PROGRESS`.
 - Residual risks / blocker: requires unavailable/unauthorized cloud access and must
   not be attempted from a normal feature task.
 
@@ -1195,6 +1202,24 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed the repository delivery for `GGG-026` through PR #124.
+  Exact tested head `51e3de9f00be5304ffcbc700544b9e41595f36b8` was
+  squash-merged as `605c35274a377c54a6240a53f13cbe247501751c`; all PR
+  checks and applicable exact-main workflows passed and the feature branch was
+  deleted. Delivery added strict same-origin/content/size/exact-key requests,
+  canonical name-only event mapping, optional minimized contact, UUID replay safety,
+  aggregate no-IP/no-cookie/no-UA rate buckets, bounded retention cleanup, exact
+  owner authorization, paginated minimized export, audit evidence and a forward D1
+  migration. Proof included landing 29/29, direct unavailable-D1/retry/accessibility/
+  navigation browser checks, build/artifact audit, and governance/dependency/
+  contract/source/scope/secret/diff gates. The installed Miniflare alpha could not
+  provide reliable in-memory D1 proof and that limitation is documented rather than
+  hidden. No cloud/provider/credential/real-data/Docker/PostgreSQL/deploy action
+  occurred. Status remains `BLOCKED` pending real D1 migration/binding, approved
+  retention, hosted abuse controls, owner credential/export rehearsal, deployment
+  and hosted UAT. Dependency ordering assigns `GGG-027` next for repository audit
+  and fail-closed cutover readiness only; actual historical export/import remains
+  prohibited without separate cloud/data authority.
 - 2026-08-21 — Completed the repository delivery for `GGG-025` through PR #122.
   Exact tested head `4db9f3260a46cc26738c519f5c2e10eacc38db24` was
   squash-merged as `382a8d951ece5d61af63b8541afedf83bd5ea4a7`; all seven

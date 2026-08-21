@@ -165,6 +165,26 @@ const sessionsService = await readFile(
   join(root, 'src/modules/sessions/sessions.service.ts'),
   'utf8',
 );
+const profileMediaImage = await readFile(
+  join(root, 'src/modules/profiles/profile-media-image.ts'),
+  'utf8',
+);
+const profileMediaService = await readFile(
+  join(root, 'src/modules/profiles/profile-media.service.ts'),
+  'utf8',
+);
+const profileMediaModeration = await readFile(
+  join(root, 'src/modules/profiles/profile-media-moderation.service.ts'),
+  'utf8',
+);
+const privateObjectStorage = await readFile(
+  join(root, 'src/modules/storage/aws-s3-private-object-storage.ts'),
+  'utf8',
+);
+const profileMediaIntegrityMigration = await readFile(
+  join(root, 'migrations/1787965200000_profile_media_integrity.ts'),
+  'utf8',
+);
 const dockerfile = await readFile(join(root, 'Dockerfile'), 'utf8');
 const compose = await readFile(
   join(platformRoot, 'infrastructure/local/compose.yml'),
@@ -328,6 +348,67 @@ for (const marker of [
   if (!sessionsService.includes(marker)) {
     violations.push(
       `session creation is missing authoritative requirement marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  "profileMediaInspectionVersion = 'avatar-image-v1'",
+  "failOn: 'warning'",
+  'limitInputPixels: profileMediaMaximumPixels',
+  ".digest('hex')",
+]) {
+  if (!profileMediaImage.includes(marker)) {
+    violations.push(
+      `profile image inspection is missing bounded-decode marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'this.objectStorage.readObject(',
+  '{ etag: metadata.etag, versionId: metadata.versionId }',
+  'content_sha256: inspection.sha256',
+  'inspection_version: inspection.inspectionVersion',
+  "where('inspection_version', '=', profileMediaInspectionVersion)",
+]) {
+  if (!profileMediaService.includes(marker)) {
+    violations.push(
+      `profile media completion/presentation is missing marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'metadata.etag !== media.storage_generation',
+  'metadata.versionId !== media.storage_version_id',
+  'expectedVersion: input.expectedVersion',
+  'input.authorize',
+]) {
+  if (!profileMediaModeration.includes(marker)) {
+    violations.push(
+      `profile media moderation is missing authorization/version marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  "IfNoneMatch: '*'",
+  'IfMatch: identity.etag',
+  'VersionId: identity.versionId',
+  'VersionId: resolvedVersionId',
+]) {
+  if (!privateObjectStorage.includes(marker)) {
+    violations.push(
+      `private object storage is missing immutable-object marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'profile_media_object_owned',
+  'profile_media_review_state_inspected',
+  'profile_media_one_live_candidate_per_user',
+  "where: \"status IN ('pending_upload', 'pending_review')\"",
+]) {
+  if (!profileMediaIntegrityMigration.includes(marker)) {
+    violations.push(
+      `profile media migration is missing integrity marker ${marker}`,
     );
   }
 }

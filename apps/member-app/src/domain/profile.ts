@@ -1,54 +1,59 @@
-export type IdentityMode = 'private' | 'alias' | 'real_name';
+export type IdentityMode = 'private' | 'alias' | 'real_name'
 
 export type PublicIdentity = {
-  callsign: string;
-  displayName: string;
-  mode: IdentityMode;
-};
+  callsign: string
+  displayName: string
+  mode: IdentityMode
+}
 
 export type AccountProfile = {
-  callsign: string;
-  publicIdentityMode: IdentityMode;
-  publicName: string | null;
-  screenName: string;
-};
+  callsign: string
+  publicIdentityMode: IdentityMode
+  publicName: string | null
+  screenName: string
+  version: number
+}
 
 export type UpdateAccountProfileInput = {
-  publicIdentityMode: IdentityMode;
-  publicName: string | null;
-  screenName?: string;
-};
+  publicIdentityMode: IdentityMode
+  publicName: string | null
+  screenName?: string
+}
 
-export function createPrivateIdentity(userId: string | null | undefined): PublicIdentity {
+export function createPrivateIdentity(
+  userId: string | null | undefined
+): PublicIdentity {
   const suffix = (userId ?? '')
     .replace(/[^a-z0-9]/gi, '')
     .slice(-6)
-    .toUpperCase();
-  const callsign = suffix ? `PLAYER_${suffix}` : 'GOGYMGO_PLAYER';
+    .toUpperCase()
+  const callsign = suffix ? `PLAYER_${suffix}` : 'GOGYMGO_PLAYER'
 
   return {
     callsign,
     displayName: '',
     mode: 'private'
-  };
+  }
 }
 
-export function normalizePublicIdentity(identity: PublicIdentity): PublicIdentity {
+export function normalizePublicIdentity(
+  identity: PublicIdentity
+): PublicIdentity {
   return {
     callsign: identity.callsign.trim(),
     displayName: identity.displayName.trim(),
     mode: identity.mode
-  };
+  }
 }
 
 export function resolvePublicName(identity: PublicIdentity) {
-  const normalized = normalizePublicIdentity(identity);
+  const normalized = normalizePublicIdentity(identity)
 
   if (normalized.mode !== 'private' && normalized.displayName) {
-    return normalized.displayName;
+    return normalized.displayName
   }
 
-  return normalized.callsign || 'IDENTITY NOT SET';
+  return normalized.callsign || 'IDENTITY NOT SET'
 }
 
 export function publicIdentityFromAccountProfile(
@@ -57,53 +62,55 @@ export function publicIdentityFromAccountProfile(
   return normalizePublicIdentity({
     callsign: profile.callsign,
     displayName:
-      profile.publicIdentityMode === 'private'
-        ? ''
-        : profile.publicName ?? profile.screenName,
+      profile.publicIdentityMode === 'real_name'
+        ? (profile.publicName ?? profile.screenName)
+        : profile.screenName,
     mode: profile.publicIdentityMode
-  });
+  })
 }
 
 export function getPublicInitials(publicName: string) {
   const parts = publicName
     .trim()
     .split(/[\s_-]+/)
-    .filter(Boolean);
+    .filter(Boolean)
 
   if (parts.length >= 2) {
-    return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+    return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
   }
 
-  return (parts[0] ?? 'GG').slice(0, 2).toUpperCase();
+  return (parts[0] ?? 'GG').slice(0, 2).toUpperCase()
 }
 
-export function parseStoredPublicIdentity(rawValue: string | null): PublicIdentity | null {
+export function parseStoredPublicIdentity(
+  rawValue: string | null
+): PublicIdentity | null {
   if (!rawValue) {
-    return null;
+    return null
   }
 
   try {
-    const parsed: unknown = JSON.parse(rawValue);
+    const parsed: unknown = JSON.parse(rawValue)
 
     if (!isRecord(parsed)) {
-      return null;
+      return null
     }
 
-    const { callsign, displayName, mode } = parsed;
+    const { callsign, displayName, mode } = parsed
     if (
       typeof callsign !== 'string' ||
       typeof displayName !== 'string' ||
       (mode !== 'private' && mode !== 'alias' && mode !== 'real_name')
     ) {
-      return null;
+      return null
     }
 
-    return normalizePublicIdentity({ callsign, displayName, mode });
+    return normalizePublicIdentity({ callsign, displayName, mode })
   } catch {
-    return null;
+    return null
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null
 }

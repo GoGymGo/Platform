@@ -160,13 +160,17 @@ export class PrivacyOperationsService {
     ) {
       throw new PrivacyOperationError('PROFILE_MEDIA_UPLOAD_ACTION_ACTIVE');
     }
-    if (context.avatarObjectKeys.length > 0) {
+    if (context.avatarObjects.length > 0) {
       if (!this.contentBucket) {
         throw new PrivacyOperationError('USER_CONTENT_BUCKET_REQUIRED');
       }
-      for (const objectKey of context.avatarObjectKeys) {
+      for (const object of context.avatarObjects) {
         await this.renewLease(job);
-        await this.objectStorage.deleteObject(this.contentBucket, objectKey);
+        await this.objectStorage.deleteObject(
+          this.contentBucket,
+          object.objectKey,
+          object.versionId,
+        );
         await this.renewLease(job);
       }
     }

@@ -596,14 +596,38 @@ export function decodeProfileMediaReviewAction(
 ): ProfileMediaReviewAction {
   const action = requireRecord(value, "profile media review action");
   if (
-    !isString(action.id) ||
-    !isString(action.contentType) ||
-    !isNonnegativeNumber(action.contentLength) ||
+    !hasExactKeys(action, [
+      "contentLength",
+      "contentType",
+      "expiresAt",
+      "height",
+      "id",
+      "reviewVersion",
+      "sha256",
+      "submittedAt",
+      "url",
+      "width",
+    ]) ||
+    !isUuid(action.id) ||
+    !["image/jpeg", "image/png", "image/webp"].includes(
+      String(action.contentType),
+    ) ||
+    !isPositiveInteger(action.contentLength) ||
+    action.contentLength < 12 ||
+    action.contentLength > 5 * 1_024 * 1_024 ||
     !isIsoDate(action.submittedAt) ||
-    !isIsoDate(action.expiresAt) ||
-    !isString(action.url) ||
-    !/^https?:\/\//.test(action.url) ||
-    !isPositiveInteger(action.reviewVersion)
+    !isShortLivedActionExpiry(action.expiresAt) ||
+    !isPrivateActionUrl(action.url) ||
+    !isPositiveInteger(action.reviewVersion) ||
+    !isPositiveInteger(action.height) ||
+    !isPositiveInteger(action.width) ||
+    action.height < 64 ||
+    action.height > 2048 ||
+    action.width < 64 ||
+    action.width > 2048 ||
+    action.height * action.width > 4_194_304 ||
+    !isString(action.sha256) ||
+    !/^[a-f0-9]{64}$/.test(action.sha256)
   ) {
     throw invalidAdminResponse("profile media review action");
   }
@@ -652,7 +676,13 @@ const allowedReviewFactLabels: Record<WorkQueueItem["kind"], string[]> = {
     "Lease expires",
     "Next attempt",
   ],
-  profile_media: ["Content type", "Content length", "Submitted"],
+  profile_media: [
+    "Content type",
+    "Content length",
+    "Dimensions",
+    "SHA-256",
+    "Submitted",
+  ],
   region_verification: ["Region", "Method", "Policy", "Boundary"],
   region_waitlist: [
     "Email",
@@ -711,6 +741,18 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
   return value;
 }
 
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index])
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -764,6 +806,38 @@ function isIsoDate(value: unknown): value is string {
     isString(value) &&
     !Number.isNaN(new Date(value).getTime()) &&
     new Date(value).toISOString() === value
+  );
+}
+
+function isShortLivedActionExpiry(value: unknown): value is string {
+  if (!isIsoDate(value)) return false;
+  const expiry = Date.parse(value);
+  const now = Date.now();
+  return expiry > now && expiry <= now + 15 * 60 * 1_000 + 5_000;
+}
+
+function isPrivateActionUrl(value: unknown): value is string {
+  if (!isString(value)) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !url.hash &&
+      url.search.length > 1
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isUuid(value: unknown): value is string {
+  return (
+    isString(value) &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
   );
 }
 

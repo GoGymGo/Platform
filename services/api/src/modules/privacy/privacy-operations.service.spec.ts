@@ -73,7 +73,7 @@ describe('PrivacyOperationsService', () => {
       deleteObject,
       getObjectMetadata: jest.fn(),
       putJsonIfAbsent,
-      readObjectPrefix: jest.fn(),
+      readObject: jest.fn(),
     };
     const service = new PrivacyOperationsService(
       config,
@@ -142,7 +142,10 @@ describe('PrivacyOperationsService', () => {
     });
     repository.getDeletionContext.mockResolvedValue({
       activeMediaUploadExpiresAt: null,
-      avatarObjectKeys: ['avatars/me.jpg', 'avatars/me-pending.jpg'],
+      avatarObjects: [
+        { objectKey: 'avatars/me.jpg', versionId: 'version-approved' },
+        { objectKey: 'avatars/me-pending.jpg', versionId: null },
+      ],
       exportObjectKeys: ['privacy-exports/me/old.json'],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
@@ -160,10 +163,12 @@ describe('PrivacyOperationsService', () => {
     expect(calls.deleteObject).toHaveBeenCalledWith(
       'user-content',
       'avatars/me.jpg',
+      'version-approved',
     );
     expect(calls.deleteObject).toHaveBeenCalledWith(
       'user-content',
       'avatars/me-pending.jpg',
+      null,
     );
     expect(calls.deleteObject).toHaveBeenCalledWith(
       'private-exports',
@@ -185,7 +190,7 @@ describe('PrivacyOperationsService', () => {
     const { calls, repository, service } = setup({ job: deletionJob });
     repository.getDeletionContext.mockResolvedValue({
       activeMediaUploadExpiresAt: null,
-      avatarObjectKeys: [],
+      avatarObjects: [],
       exportObjectKeys: [],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,
@@ -214,7 +219,7 @@ describe('PrivacyOperationsService', () => {
     });
     repository.getDeletionContext.mockResolvedValue({
       activeMediaUploadExpiresAt: new Date(Date.now() + 60_000),
-      avatarObjectKeys: ['avatars/pending.jpg'],
+      avatarObjects: [{ objectKey: 'avatars/pending.jpg', versionId: null }],
       exportObjectKeys: [],
       firebaseUid: 'firebase-user',
       hasOpenCompetition: false,

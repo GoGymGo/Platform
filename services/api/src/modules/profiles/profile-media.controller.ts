@@ -21,6 +21,7 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
   AvatarStateResponseDto,
+  AvatarCapabilitiesResponseDto,
   AvatarUploadCompletionResponseDto,
   CreateAvatarUploadDto,
   CreateAvatarUploadResponseDto,
@@ -50,6 +51,13 @@ export class ProfileMediaController {
       requireIdempotencyKey(idempotencyKey),
       input,
     );
+  }
+
+  @Get('avatar/capabilities')
+  @ApiOperation({ summary: 'Get authoritative avatar upload availability' })
+  @ApiOkResponse({ type: AvatarCapabilitiesResponseDto })
+  getCapabilities(): AvatarCapabilitiesResponseDto {
+    return this.profileMedia.getCapabilities();
   }
 
   @Post('avatar-upload/:mediaId/complete')

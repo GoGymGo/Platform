@@ -1,58 +1,58 @@
-import type { GymScanResultDto } from '@gogymgo/contracts';
+import type { GymScanResultDto } from '@gogymgo/contracts'
 
-import type { AccountReadinessRepository } from '@/data/accountReadinessRepository';
-import type { AccountSettingsRepository } from '@/data/accountSettingsRepository';
-import type { AppDataSource } from '@/data/appData';
-import type { SocialRepository } from '@/data/socialRepository';
-import type { WorkoutSessionRepository } from '@/data/sessionRepository';
+import type { AccountReadinessRepository } from '@/data/accountReadinessRepository'
+import type { AccountSettingsRepository } from '@/data/accountSettingsRepository'
+import type { AppDataSource } from '@/data/appData'
+import type { SocialRepository } from '@/data/socialRepository'
+import type { WorkoutSessionRepository } from '@/data/sessionRepository'
 import type {
   CompetitionEnrollment,
   CurrentCompetition,
   CurrentLegalDocuments,
   LegalReceiptStatus,
   RegionVerification
-} from '@/domain/accountReadiness';
+} from '@/domain/accountReadiness'
 import type {
   AvatarMedia,
   DevicePresenceConsent
-} from '@/domain/accountSettings';
-import type { GoalCategory } from '@/domain/campaignEconomics';
+} from '@/domain/accountSettings'
+import type { GoalCategory } from '@/domain/campaignEconomics'
 import type {
   CompetitionMatch,
   CompetitionPeriodIndex,
   WeeklyChallengeRequest
-} from '@/domain/competition';
+} from '@/domain/competition'
 import type {
   CreatorVideoSubmission,
   CreatorWorkoutPlan
-} from '@/domain/creatorWorkouts';
-import type { CategoryLeaderboard } from '@/domain/leaderboard';
-import type { RewardAward } from '@/domain/rewards';
+} from '@/domain/creatorWorkouts'
+import type { CategoryLeaderboard } from '@/domain/leaderboard'
+import type { RewardAward } from '@/domain/rewards'
 import type {
   AuthoritativeWorkoutSession,
   CompetitionProgress,
   StartedWorkoutSession
-} from '@/domain/session';
+} from '@/domain/session'
 import type {
   CreateSocialChallengeInput,
   FriendRequest,
   SocialChallenge,
   SocialProfile
-} from '@/domain/social';
-import type { AccountProfile, PublicIdentity } from '@/domain/profile';
-import type { PersistedActiveWorkoutSession } from '@/domain/workoutProgress';
-import type { PendingGymScan } from '@/services/pendingGymScan';
-import type { AuthenticatedUser } from '@/state/auth';
-import type { AppTourScenario } from '@/state/appTour';
+} from '@/domain/social'
+import type { AccountProfile, PublicIdentity } from '@/domain/profile'
+import type { PersistedActiveWorkoutSession } from '@/domain/workoutProgress'
+import type { PendingGymScan } from '@/services/pendingGymScan'
+import type { AuthenticatedUser } from '@/state/auth'
+import type { AppTourScenario } from '@/state/appTour'
 
-const appTourCompetitionId = '10000000-0000-4000-8000-000000000001';
-const appTourEnrollmentId = '10000000-0000-4000-8000-000000000002';
-const appTourRegionPolicyId = '10000000-0000-4000-8000-000000000003';
-const appTourRegionVerificationId = '10000000-0000-4000-8000-000000000004';
-const appTourLegalBundleId = '10000000-0000-4000-8000-000000000005';
-const appTourUserId = 'app-tour-player';
-export const appTourAuthToken = 'app-tour-token';
-const appTourCompetitionMonthKey = '2026-09';
+const appTourCompetitionId = '10000000-0000-4000-8000-000000000001'
+const appTourEnrollmentId = '10000000-0000-4000-8000-000000000002'
+const appTourRegionPolicyId = '10000000-0000-4000-8000-000000000003'
+const appTourRegionVerificationId = '10000000-0000-4000-8000-000000000004'
+const appTourLegalBundleId = '10000000-0000-4000-8000-000000000005'
+const appTourUserId = 'app-tour-player'
+export const appTourAuthToken = 'app-tour-token'
+const appTourCompetitionMonthKey = '2026-09'
 export const appTourCompetitionRegistrationEvidence = {
   gymPresence: {
     accuracyMeters: 5,
@@ -62,22 +62,22 @@ export const appTourCompetitionRegistrationEvidence = {
   },
   legalReceiptBundleId: 'app-tour-legal-receipt',
   regionVerificationId: 'app-tour-region-verification'
-} as const;
+} as const
 export const appTourPresenceConfirmationMessage =
-  'Presence confirmed in the browser preview.';
+  'Presence confirmed in the browser preview.'
 export const appTourPublicIdentity: PublicIdentity = {
   callsign: 'PULSE_RIDER',
   displayName: 'PULSE_RIDER',
   mode: 'alias'
-};
-export const appTourSimulatedHeartRateBpm = 118;
+}
+export const appTourSimulatedHeartRateBpm = 118
 const fixedStreaks = {
   daily: 4,
   monthly: 2,
   projectionVersion: 'streaks-v1',
   weekly: 3,
   yearly: 1
-} as const;
+} as const
 
 export const appTourUser: AuthenticatedUser = {
   displayName: 'Preview Player',
@@ -86,12 +86,12 @@ export const appTourUser: AuthenticatedUser = {
   photoUrl: null,
   providerIds: ['password'],
   uid: appTourUserId
-};
+}
 
-export type AppTourQrMode = 'entry' | 'exit';
+export type AppTourQrMode = 'entry' | 'exit'
 
 export function createAppTourGymQrPayload(mode: AppTourQrMode) {
-  return `app-tour-gym-${mode}-credential-000000000001`;
+  return `app-tour-gym-${mode}-credential-000000000001`
 }
 
 export function createAppTourPendingGymScan(
@@ -99,9 +99,9 @@ export function createAppTourPendingGymScan(
   now = Date.now()
 ): PendingGymScan {
   const workoutActive =
-    scenario === 'active-workout' || scenario === 'presence-check';
-  const elapsedSeconds = scenario === 'presence-check' ? 31 * 60 : 8 * 60;
-  const startedAt = now - elapsedSeconds * 1000;
+    scenario === 'active-workout' || scenario === 'presence-check'
+  const elapsedSeconds = scenario === 'presence-check' ? 31 * 60 : 8 * 60
+  const startedAt = now - elapsedSeconds * 1000
 
   return {
     activeSession: workoutActive
@@ -119,13 +119,13 @@ export function createAppTourPendingGymScan(
       now + 30 * 24 * 60 * 60 * 1000
     ).toISOString(),
     createdAt: now
-  };
+  }
 }
 
 export function createAppTourVerifiedGymLocationResult(
   now = Date.now()
 ): GymScanResultDto {
-  const startedAt = now - 31 * 60 * 1000;
+  const startedAt = now - 31 * 60 * 1000
 
   return {
     credentialVersion: 1,
@@ -139,7 +139,7 @@ export function createAppTourVerifiedGymLocationResult(
     serverTimestamp: new Date(now).toISOString(),
     sessionId: 'app-tour-gym-session',
     startedAt: new Date(startedAt).toISOString()
-  };
+  }
 }
 
 export function createAppTourStartedGymLocationResult(
@@ -157,11 +157,11 @@ export function createAppTourStartedGymLocationResult(
     serverTimestamp: new Date(now).toISOString(),
     sessionId: 'app-tour-gym-session',
     startedAt: new Date(now).toISOString()
-  };
+  }
 }
 
 export function isAppTourGymQrPayload(payload: string, mode: AppTourQrMode) {
-  return payload === createAppTourGymQrPayload(mode);
+  return payload === createAppTourGymQrPayload(mode)
 }
 
 export function createAppTourDataSource(): AppDataSource {
@@ -180,11 +180,11 @@ export function createAppTourDataSource(): AppDataSource {
       status: 'awarded',
       title: 'Recovery Pack'
     }
-  ];
+  ]
 
   return {
     claimReward: async (awardId) => {
-      const award = awards.find(({ id }) => id === awardId) ?? awards[0];
+      const award = awards.find(({ id }) => id === awardId) ?? awards[0]
       const claimed = {
         ...award,
         claimedAt: nowIso(),
@@ -192,9 +192,9 @@ export function createAppTourDataSource(): AppDataSource {
         couponCode: 'RECOVER20',
         fulfillmentInstructions: null,
         status: 'claimed' as const
-      };
-      awards.splice(0, awards.length, claimed);
-      return claimed;
+      }
+      awards.splice(0, awards.length, claimed)
+      return claimed
     },
     getCategoryLeaderboard: async (goal) => createLeaderboard(goal),
     getCompetitionMatches: async (monthKey, _weeklyGoal, region) =>
@@ -336,13 +336,13 @@ export function createAppTourDataSource(): AppDataSource {
         videoUrl: input.videoUrl
       }) satisfies CreatorVideoSubmission,
     mode: 'tour'
-  };
+  }
 }
 
 export function createAppTourAccountReadinessRepository(
   scenario: AppTourScenario = 'ready'
 ): AccountReadinessRepository {
-  const newPlayer = scenario === 'new-player';
+  const newPlayer = scenario === 'new-player'
   let enrollment: CompetitionEnrollment | null = newPlayer
     ? null
     : {
@@ -354,18 +354,18 @@ export function createAppTourAccountReadinessRepository(
         gymName: 'SKYGATE',
         id: appTourEnrollmentId,
         status: 'active'
-      };
+      }
   let legalReceipt = newPlayer
     ? createUnacceptedLegalReceipt()
-    : createLegalReceipt();
+    : createLegalReceipt()
   let regionVerification: RegionVerification | null = newPlayer
     ? null
-    : createRegionVerification();
+    : createRegionVerification()
 
   return {
     createRegionVerification: async () => {
-      regionVerification = createRegionVerification();
-      return regionVerification;
+      regionVerification = createRegionVerification()
+      return regionVerification
     },
     enrollInCompetition: async (competitionId, input) => {
       enrollment = {
@@ -377,8 +377,8 @@ export function createAppTourAccountReadinessRepository(
         gymName: 'SKYGATE',
         id: appTourEnrollmentId,
         status: 'active'
-      };
-      return enrollment;
+      }
+      return enrollment
     },
     getCurrentCompetition: async (expectedMonthKey) =>
       createCurrentCompetition(
@@ -405,8 +405,8 @@ export function createAppTourAccountReadinessRepository(
         acceptedAt: nowIso(),
         complete: true,
         receiptBundleId: appTourLegalBundleId
-      };
-      return legalReceipt;
+      }
+      return legalReceipt
     },
     resolveCompetitionByGymQr: async () =>
       createCurrentCompetition(
@@ -425,22 +425,23 @@ export function createAppTourAccountReadinessRepository(
           id: appTourEnrollmentId
         }),
         status: 'withdrawn' as const
-      };
-      enrollment = null;
-      return withdrawn;
+      }
+      enrollment = null
+      return withdrawn
     }
-  };
+  }
 }
 
 export function createAppTourAccountSettingsRepository(): AccountSettingsRepository {
-  let accepted = true;
-  let avatar: AvatarMedia | null = null;
+  let accepted = true
+  let avatar: AvatarMedia | null = null
   let accountProfile: AccountProfile = {
     callsign: appTourPublicIdentity.callsign,
     publicIdentityMode: appTourPublicIdentity.mode,
     publicName: appTourPublicIdentity.displayName,
-    screenName: appTourPublicIdentity.displayName
-  };
+    screenName: appTourPublicIdentity.displayName,
+    version: 1
+  }
 
   const consent = (): DevicePresenceConsent => ({
     accepted,
@@ -449,7 +450,7 @@ export function createAppTourAccountSettingsRepository(): AccountSettingsReposit
     consentVersion: 'app-tour',
     updatedAt: nowIso(),
     withdrawnAt: accepted ? null : nowIso()
-  });
+  })
 
   return {
     createPrivacyRequest: async (requestType) => ({
@@ -467,6 +468,13 @@ export function createAppTourAccountSettingsRepository(): AccountSettingsReposit
     }),
     disablePushDevice: async () => undefined,
     getAvatar: async () => ({ active: avatar, latest: avatar }),
+    getAvatarCapabilities: async () => ({
+      maxBytes: 2 * 1_024 * 1_024,
+      maxDimension: 2048,
+      minDimension: 64,
+      status: 'configured',
+      uploadAvailable: true
+    }),
     getDevicePresenceConsent: async () => consent(),
     getProfile: async () => accountProfile,
     getPrivacyCapabilities: async () => ({
@@ -485,65 +493,69 @@ export function createAppTourAccountSettingsRepository(): AccountSettingsReposit
       provider: 'expo'
     }),
     removeAvatar: async () => {
-      avatar = null;
+      avatar = null
     },
     setDevicePresenceConsent: async (nextAccepted, consentVersion) => {
-      accepted = nextAccepted;
-      return { ...consent(), consentVersion };
+      accepted = nextAccepted
+      return { ...consent(), consentVersion }
     },
     updateProfile: async (input) => {
       accountProfile = {
         ...accountProfile,
-        ...input
-      };
-      return accountProfile;
+        ...input,
+        version: accountProfile.version + 1
+      }
+      return accountProfile
     },
     uploadAvatar: async (uri) => {
       avatar = {
         contentType: 'image/jpeg',
         createdAt: nowIso(),
+        height: 640,
         id: 'app-tour-avatar',
         readUrl: uri,
         readUrlExpiresAt: null,
-        status: 'approved'
-      };
+        status: 'approved',
+        version: 2,
+        width: 640
+      }
       return {
         state: { active: avatar, latest: avatar },
         status: 'approved'
-      };
+      }
     }
-  };
+  }
 }
 
 export function createAppTourWorkoutSessionRepository(): WorkoutSessionRepository {
-  const sessions = new Map<string, AuthoritativeWorkoutSession>();
+  const sessions = new Map<string, AuthoritativeWorkoutSession>()
 
   return {
     appendGymQrScan: async () => undefined,
     appendHeartRateSample: async () => undefined,
     appendPresenceCheck: async () => undefined,
     cancelSession: async (sessionId) => {
-      const session = getOrCreateSession(sessions, sessionId);
-      const cancelled = { ...session, status: 'cancelled' as const };
-      sessions.set(sessionId, cancelled);
-      return cancelled;
+      const session = getOrCreateSession(sessions, sessionId)
+      const cancelled = { ...session, status: 'cancelled' as const }
+      sessions.set(sessionId, cancelled)
+      return cancelled
     },
     completeSession: async (sessionId) => {
-      const session = getOrCreateSession(sessions, sessionId);
+      const session = getOrCreateSession(sessions, sessionId)
       const completed = {
         ...session,
         completedAt: nowIso(),
         eligibleForReview: true,
         status: 'verified' as const,
         violations: []
-      };
-      sessions.set(sessionId, completed);
-      return completed;
+      }
+      sessions.set(sessionId, completed)
+      return completed
     },
     createSession: async () => {
-      const id = `app-tour-session-${sessions.size + 1}`;
-      const session = createAuthoritativeSession(id);
-      sessions.set(id, session);
+      const id = `app-tour-session-${sessions.size + 1}`
+      const session = createAuthoritativeSession(id)
+      sessions.set(id, session)
       return {
         ...session,
         requirements: {
@@ -553,10 +565,10 @@ export function createAppTourWorkoutSessionRepository(): WorkoutSessionRepositor
           requireGymQr: false,
           requirePresenceCheck: true
         }
-      } satisfies StartedWorkoutSession;
+      } satisfies StartedWorkoutSession
     },
     getCompetitionProgress: async () => createCompetitionProgress()
-  };
+  }
 }
 
 export function createAppTourSocialRepository(): SocialRepository {
@@ -564,20 +576,20 @@ export function createAppTourSocialRepository(): SocialRepository {
     screenName: 'PULSE_RIDER',
     streaks: fixedStreaks,
     userId: appTourUserId
-  };
+  }
   const friend = {
     friendsSince: '2026-01-15T00:00:00.000Z',
     screenName: 'MOVE_MORE',
     streaks: { ...fixedStreaks, daily: 3 },
     userId: 'app-tour-friend'
-  };
-  let challenges = [createSocialChallenge()];
-  let blocks: (typeof friend & { blockedAt: string })[] = [];
+  }
+  let challenges = [createSocialChallenge()]
+  let blocks: (typeof friend & { blockedAt: string })[] = []
 
   return {
     blockMember: async (memberUserId) => {
-      blocks = [{ ...friend, blockedAt: nowIso(), userId: memberUserId }];
-      return { action: 'blocked', requestId: null, userId: memberUserId };
+      blocks = [{ ...friend, blockedAt: nowIso(), userId: memberUserId }]
+      return { action: 'blocked', requestId: null, userId: memberUserId }
     },
     cancelFriendRequest: async (requestId) => ({
       action: 'cancelled',
@@ -595,13 +607,13 @@ export function createAppTourSocialRepository(): SocialRepository {
         challenge.id === challengeId
           ? { ...challenge, canCancel: false, state: 'cancelled' }
           : challenge
-      );
-      return { challengeId, state: 'cancelled' };
+      )
+      return { challengeId, state: 'cancelled' }
     },
     createChallenge: async (input) => {
-      const challenge = createSocialChallenge(input);
-      challenges = [challenge, ...challenges];
-      return challenge;
+      const challenge = createSocialChallenge(input)
+      challenges = [challenge, ...challenges]
+      return challenge
     },
     discoverRegionalChallenges: async () => challenges,
     getMyProfile: async () => profile,
@@ -674,20 +686,20 @@ export function createAppTourSocialRepository(): SocialRepository {
       user: { ...friend, userId: recipientUserId }
     }),
     updateScreenName: async (screenName) => {
-      profile = { ...profile, screenName };
-      return profile;
+      profile = { ...profile, screenName }
+      return profile
     },
     unblockMember: async (blockedUserId) => {
-      blocks = blocks.filter((block) => block.userId !== blockedUserId);
-      return { action: 'unblocked', requestId: null, userId: blockedUserId };
+      blocks = blocks.filter((block) => block.userId !== blockedUserId)
+      return { action: 'unblocked', requestId: null, userId: blockedUserId }
     },
     withdrawFromChallenge: async (challengeId) => {
       challenges = challenges.filter(
         (challenge) => challenge.id !== challengeId
-      );
-      return { challengeId, status: 'withdrawn' };
+      )
+      return { challengeId, status: 'withdrawn' }
     }
-  };
+  }
 }
 
 export function createAppTourActiveSession(
@@ -695,18 +707,18 @@ export function createAppTourActiveSession(
   verificationMethod: PersistedActiveWorkoutSession['verificationMethod'] = 'heartRate'
 ): PersistedActiveWorkoutSession | null {
   if (scenario === 'new-player' || scenario === 'ready') {
-    return null;
+    return null
   }
 
-  const presenceCheck = scenario === 'presence-check';
-  const completionReady = scenario === 'workout-complete';
+  const presenceCheck = scenario === 'presence-check'
+  const completionReady = scenario === 'workout-complete'
   const elapsedSeconds = completionReady
     ? 31 * 60
     : presenceCheck
       ? 15 * 60
-      : 8 * 60;
-  const heartRateObservedSeconds = completionReady ? 30 * 60 : elapsedSeconds;
-  const averageHeartRateBpm = 118;
+      : 8 * 60
+  const heartRateObservedSeconds = completionReady ? 30 * 60 : elapsedSeconds
+  const averageHeartRateBpm = 118
 
   return {
     averageHeartRateBpm,
@@ -729,20 +741,20 @@ export function createAppTourActiveSession(
     serverManaged: true,
     startedAt: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
     verificationMethod
-  };
+  }
 }
 
 export function createAppTourReadyWorkoutSession(
   verificationMethod: PersistedActiveWorkoutSession['verificationMethod']
 ) {
-  return createAppTourActiveSession('workout-complete', verificationMethod);
+  return createAppTourActiveSession('workout-complete', verificationMethod)
 }
 
 function createCurrentCompetition(
   monthKey: string,
   regionName: string
 ): CurrentCompetition {
-  const { end, start } = monthWindow(monthKey);
+  const { end, start } = monthWindow(monthKey)
 
   return {
     endsAt: end,
@@ -774,7 +786,7 @@ function createCurrentCompetition(
     serverTime: nowIso(),
     startsAt: start,
     status: 'active'
-  };
+  }
 }
 
 function createRegionVerification(): RegionVerification {
@@ -791,7 +803,7 @@ function createRegionVerification(): RegionVerification {
     reviewedAt: nowIso(),
     status: 'approved',
     timezone: 'America/Vancouver'
-  };
+  }
 }
 
 function createLegalBundle(
@@ -845,7 +857,7 @@ function createLegalBundle(
     ],
     jurisdictionCode,
     locale
-  };
+  }
 }
 
 function createLegalReceipt(): LegalReceiptStatus {
@@ -854,7 +866,7 @@ function createLegalReceipt(): LegalReceiptStatus {
     acceptedAt: nowIso(),
     complete: true,
     receiptBundleId: appTourLegalBundleId
-  };
+  }
 }
 
 function createUnacceptedLegalReceipt(): LegalReceiptStatus {
@@ -863,21 +875,19 @@ function createUnacceptedLegalReceipt(): LegalReceiptStatus {
     acceptedAt: null,
     complete: false,
     receiptBundleId: null
-  };
+  }
 }
 
 function createCompetitionProgress(): CompetitionProgress {
-  const monthKey = currentMonthKey();
-  const verifiedDateKeys = ['02', '05', '09'].map(
-    (day) => `${monthKey}-${day}`
-  );
+  const monthKey = currentMonthKey()
+  const verifiedDateKeys = ['02', '05', '09'].map((day) => `${monthKey}-${day}`)
   const sessions = verifiedDateKeys.map((dateKey, index) => ({
     completedAt: `${dateKey}T13:30:00.000Z`,
     eligibleDate: dateKey,
     id: `app-tour-verified-${index + 1}`,
     startedAt: `${dateKey}T13:00:00.000Z`,
     status: 'verified' as const
-  }));
+  }))
 
   return {
     bankedPrizeDrawEntries: 4,
@@ -898,7 +908,7 @@ function createCompetitionProgress(): CompetitionProgress {
     updatedAt: nowIso(),
     verifiedDateKeys,
     verifiedDays: verifiedDateKeys.length
-  };
+  }
 }
 
 function createAuthoritativeSession(id: string): AuthoritativeWorkoutSession {
@@ -910,21 +920,21 @@ function createAuthoritativeSession(id: string): AuthoritativeWorkoutSession {
     policyVersion: 'app-tour',
     startedAt: nowIso(),
     status: 'active'
-  };
+  }
 }
 
 function getOrCreateSession(
   sessions: Map<string, AuthoritativeWorkoutSession>,
   id: string
 ) {
-  const existing = sessions.get(id);
+  const existing = sessions.get(id)
   if (existing) {
-    return existing;
+    return existing
   }
 
-  const session = createAuthoritativeSession(id);
-  sessions.set(id, session);
-  return session;
+  const session = createAuthoritativeSession(id)
+  sessions.set(id, session)
+  return session
 }
 
 function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
@@ -961,7 +971,7 @@ function createLeaderboard(goal: GoalCategory): CategoryLeaderboard {
     scoringStatus: 'provisional',
     serverTime: nowIso(),
     settledPeriodCount: 2
-  };
+  }
 }
 
 function createCompetitionMatches(
@@ -981,7 +991,7 @@ function createCompetitionMatches(
     periodIndex,
     region,
     scoringStatus: 'projected'
-  }));
+  }))
 }
 
 function createWeeklyChallengeRequest(
@@ -997,22 +1007,22 @@ function createWeeklyChallengeRequest(
     partnerStreaks: fixedStreaks,
     periodIndex: normalizePeriodIndex(periodIndex),
     status: 'pending'
-  };
+  }
 }
 
 function normalizePeriodIndex(value: number): CompetitionPeriodIndex {
   if (value === 2 || value === 3 || value === 4) {
-    return value;
+    return value
   }
-  return 1;
+  return 1
 }
 
 function createSocialChallenge(
   input?: CreateSocialChallengeInput
 ): SocialChallenge {
-  const month = monthWindow(currentMonthKey());
-  const challengeId = `app-tour-challenge-${Date.now()}`;
-  const targetCount = input?.targetCount ?? 4;
+  const month = monthWindow(currentMonthKey())
+  const challengeId = `app-tour-challenge-${Date.now()}`
+  const targetCount = input?.targetCount ?? 4
 
   return {
     activity: input?.activity ?? 'gym',
@@ -1077,31 +1087,31 @@ function createSocialChallenge(
     targetCount,
     targetPeriod: input?.targetPeriod ?? 'weekly',
     timezone: 'America/Vancouver'
-  };
+  }
 }
 
 function monthWindow(monthKey: string) {
-  const [year, month] = monthKey.split('-').map(Number);
-  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
-  const start = new Date(Date.UTC(year, month - 1, 1)).toISOString();
-  return { end, start };
+  const [year, month] = monthKey.split('-').map(Number)
+  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString()
+  const start = new Date(Date.UTC(year, month - 1, 1)).toISOString()
+  return { end, start }
 }
 
 function currentMonthKey() {
-  return todayKey().slice(0, 7);
+  return todayKey().slice(0, 7)
 }
 
 function previousMonthKey() {
-  const date = new Date();
-  date.setUTCDate(1);
-  date.setUTCMonth(date.getUTCMonth() - 1);
-  return date.toISOString().slice(0, 7);
+  const date = new Date()
+  date.setUTCDate(1)
+  date.setUTCMonth(date.getUTCMonth() - 1)
+  return date.toISOString().slice(0, 7)
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10)
 }
 
 function nowIso() {
-  return new Date().toISOString();
+  return new Date().toISOString()
 }

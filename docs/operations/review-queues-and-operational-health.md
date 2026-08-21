@@ -51,9 +51,12 @@ invent operator actions for them.
 1. Refresh the queue and fetch its detail. Confirm the kind, ID, current status,
    `reviewVersion`, `decisionAllowed`, and `allowedDecisions` from that response.
 2. Review only the minimized detail. Profile media requires the explicit
-   short-lived review action; never copy that URL into a ticket, reason, log, or
-   audit note. Session review requires the returned evidence digest and typed
-   findings rather than raw location or device evidence.
+   short-lived review action for the current review version. Confirm its
+   server-verified MIME, byte count, dimensions, digest, and expiry before
+   opening the private preview; approval stays disabled until that action is
+   loaded. Never copy its URL into a ticket, reason, log, or audit note. Session
+   review requires the returned evidence digest and typed findings rather than
+   raw location or device evidence.
 3. Submit a permitted transition with an operational reason, the returned
    `expectedVersion`, and a new idempotency key. The key is bound to the complete
    decision body, including evidence fields. A different body with the same key

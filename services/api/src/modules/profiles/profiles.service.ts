@@ -53,7 +53,7 @@ export class ProfilesService {
         .execute(async (transaction) => {
           const user = await this.ensureUser(principal, transaction);
           const current = await this.ensureProfile(user.id, transaction);
-          const screenName =
+          let screenName =
             update.screenName === undefined
               ? current.screen_name
               : requireValidPublicAlias(update.screenName);
@@ -64,7 +64,10 @@ export class ProfilesService {
               ? current.public_name
               : update.publicName?.trim() || null;
 
-          if (publicIdentityMode === 'alias') {
+          if (publicIdentityMode === 'private') {
+            publicName = null;
+          } else if (publicIdentityMode === 'alias') {
+            screenName = requireValidPublicAlias(screenName);
             publicName = screenName;
           }
 

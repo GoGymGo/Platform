@@ -92,6 +92,16 @@ record.
   operator/partner portal. Mutation retries reuse the browser's pending
   idempotency key, and every successful issue or revocation writes audit
   evidence. The credential-history response intentionally omits the QR payload.
+- The current credential row's `qr_payload` is sensitive and is the single
+  authoritative active recoverability source. It is never duplicated in
+  idempotency storage, logs, audit history, credential history or privacy
+  exports, and is cleared by revocation, supersession, gym closure, proposal
+  archival or Contest cancellation. An authorized exact-body replay may rebuild
+  the prior poster from that row; it must not mint a replacement when the value
+  is unavailable.
+- GoGymGo administrators may prepare a pre-publication poster for controlled
+  preflight. A Partner administrator can issue or recover only after GoGymGo has
+  published that gym's submitted proposal. Partner staff remain history-only.
 - Revocation is immediate. Replace every displayed physical copy when a poster
   is revoked or reissued; do not delete credential, enrollment, scan, session,
   idempotency, or audit history.

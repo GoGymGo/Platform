@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import type { OperatorWorkQueueKind } from './dto/operator.dto';
 import { operatorWorkQueueKinds } from './dto/operator.dto';
+import type { PartnerVisitStatus } from './dto/operator-portal.dto';
+import { partnerVisitStatuses } from './dto/operator-portal.dto';
 
 export interface OperatorQueueCursor {
   createdAt: Date;
@@ -11,6 +13,23 @@ export interface OperatorQueueCursor {
 export interface OperatorAuditCursor {
   createdAt: Date;
   id: string;
+}
+
+export interface PartnerCompetitionCursor {
+  gymLocationId: string;
+  id: string;
+  startsAt: Date;
+}
+
+export interface PartnerVisitCursor {
+  gymLocationId: string;
+  gymName: string;
+  status: PartnerVisitStatus;
+}
+
+export interface GymQrCredentialCursor {
+  id: string;
+  version: number;
 }
 
 export function compareOperatorQueueTuple(
@@ -59,6 +78,69 @@ export function decodeOperatorAuditCursor(
     createdAt: readDate(cursor.createdAt),
     id: readString(cursor.id, 64),
   };
+}
+
+export function encodePartnerCompetitionCursor(
+  cursor: PartnerCompetitionCursor,
+): string {
+  return encode({
+    gymLocationId: cursor.gymLocationId,
+    id: cursor.id,
+    startsAt: cursor.startsAt.toISOString(),
+  });
+}
+
+export function decodePartnerCompetitionCursor(
+  value?: string,
+): PartnerCompetitionCursor | null {
+  if (!value) return null;
+  const cursor = decode(value);
+  return {
+    gymLocationId: readString(cursor.gymLocationId, 64),
+    id: readString(cursor.id, 64),
+    startsAt: readDate(cursor.startsAt),
+  };
+}
+
+export function encodePartnerVisitCursor(cursor: PartnerVisitCursor): string {
+  return encode({
+    gymLocationId: cursor.gymLocationId,
+    gymName: cursor.gymName,
+    status: cursor.status,
+  });
+}
+
+export function decodePartnerVisitCursor(
+  value?: string,
+): PartnerVisitCursor | null {
+  if (!value) return null;
+  const cursor = decode(value);
+  const status = readString(cursor.status, 32);
+  if (!partnerVisitStatuses.includes(status as PartnerVisitStatus)) {
+    throw invalidCursor();
+  }
+  return {
+    gymLocationId: readString(cursor.gymLocationId, 64),
+    gymName: readString(cursor.gymName, 160),
+    status: status as PartnerVisitStatus,
+  };
+}
+
+export function encodeGymQrCredentialCursor(
+  cursor: GymQrCredentialCursor,
+): string {
+  return encode({ id: cursor.id, version: String(cursor.version) });
+}
+
+export function decodeGymQrCredentialCursor(
+  value?: string,
+): GymQrCredentialCursor | null {
+  if (!value) return null;
+  const cursor = decode(value);
+  const versionText = readString(cursor.version, 16);
+  const version = Number(versionText);
+  if (!Number.isSafeInteger(version) || version < 1) throw invalidCursor();
+  return { id: readString(cursor.id, 64), version };
 }
 
 function encode(value: Record<string, string>): string {

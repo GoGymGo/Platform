@@ -171,7 +171,7 @@ describe('AdminAuthorizationService', () => {
     const partner = {
       email: 'partner@example.com',
       id: 'partner-1',
-      roles: ['gym_partner_admin'],
+      roles: ['gym_partner_admin', 'gym_partner_staff'],
     };
     const profiles = {
       ensureUser: jest.fn().mockResolvedValue(partner),
@@ -197,7 +197,7 @@ describe('AdminAuthorizationService', () => {
     });
   });
 
-  it('denies partner roles that have no active gym assignment', async () => {
+  it('denies a partner role that has no matching active gym assignment', async () => {
     const profiles = {
       ensureUser: jest.fn().mockResolvedValue({
         id: 'partner-1',
@@ -210,7 +210,7 @@ describe('AdminAuthorizationService', () => {
     await expect(
       service.resolvePortalAccess(principal, transactionWithAssignments([])),
     ).rejects.toMatchObject({
-      response: { code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED' },
+      response: { code: 'PARTNER_ACCESS_STATE_CONFLICT' },
     });
   });
 

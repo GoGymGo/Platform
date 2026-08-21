@@ -125,7 +125,18 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /SIGNING OUT/);
   assert.match(dashboard, /error \|\|/);
   assert.match(dashboard, /Your gyms, without the platform-wide controls/);
-  assert.match(dashboard, /AWAITING GOGYMGO REVIEW/);
+  assert.match(dashboard, /SUBMIT FOR GOGYMGO REVIEW/);
+  assert.match(dashboard, /operator\/partner-proposals/);
+  assert.match(dashboard, /operator\/partner-competitions\?limit=25/);
+  assert.match(dashboard, /operator\/partner-visits\?limit=25/);
+  assert.match(dashboard, /VIEW SECRET-FREE HISTORY/);
+  assert.match(dashboard, /expectedCredentialVersion/);
+  assert.match(dashboard, /disabled=\{submitting \|\| !canManagePoster\}/);
+  assert.match(
+    dashboard,
+    /proposal is submitted, published by GoGymGo, and the\s+Contest is open/,
+  );
+  assert.doesNotMatch(dashboard, /snapshot\.sessions/);
   assert.doesNotMatch(
     dashboard,
     /GoogleAuthProvider|OAuthProvider|signInWithPopup|CONNECTED ACCOUNT/,
@@ -239,7 +250,11 @@ test("keeps authorization and mutation safeguards in the implementation", async 
     contestSetupWorkspace,
     /Create a new gym here|newGymName|newGymLatitude|newGymLongitude/,
   );
-  assert.match(dashboard, /gym\.active && gym\.accessLevel === "admin"/);
+  assert.match(dashboard, /gym\.accessLevel === "admin"/);
+  assert.doesNotMatch(
+    dashboard,
+    /snapshot\.gyms\.filter\(\s*\(gym\) => gym\.active/,
+  );
   assert.doesNotMatch(contestSetupWorkspace, /onNavigate/);
   assert.match(dashboard, /getQueueUrgency/);
   assert.match(dashboard, /RELATED AUDIT EVIDENCE/);

@@ -68,6 +68,17 @@ export class AdminAuthorizationService {
         message: 'A GoGymGo or gym-partner role is required for this portal.',
       });
     }
+    const unexpectedRoles = user.roles.filter(
+      (role) =>
+        !['user', 'gym_partner_admin', 'gym_partner_staff'].includes(role),
+    );
+    if (unexpectedRoles.length > 0) {
+      throw new ForbiddenException({
+        code: 'OPERATOR_ROLE_CONFLICT',
+        message:
+          'Platform operations and gym-partner access cannot be combined.',
+      });
+    }
 
     const assignments = await transaction
       .selectFrom('gym_partner_assignments as assignment')
@@ -78,18 +89,35 @@ export class AdminAuthorizationService {
       .where('gym.active', '=', true)
       .where('gym.deleted_at', 'is', null)
       .orderBy('assignment.gym_location_id')
+      .limit(101)
       .execute();
-    const authorizedAssignments = assignments
-      .filter(
-        (assignment) =>
-          (assignment.access_level === 'admin' && partnerAdmin) ||
-          (assignment.access_level === 'staff' &&
-            (partnerAdmin || partnerStaff)),
-      )
-      .map((assignment) => ({
-        accessLevel: assignment.access_level,
-        gymLocationId: assignment.gym_location_id,
-      }));
+    if (assignments.length > 100) {
+      throw new ForbiddenException({
+        code: 'PARTNER_ASSIGNMENT_LIMIT_EXCEEDED',
+        message:
+          'This partner account has too many active gym assignments. Contact GoGymGo support.',
+      });
+    }
+    const assignmentHasAdmin = assignments.some(
+      (assignment) => assignment.access_level === 'admin',
+    );
+    const assignmentHasStaff = assignments.some(
+      (assignment) => assignment.access_level === 'staff',
+    );
+    if (
+      partnerAdmin !== assignmentHasAdmin ||
+      partnerStaff !== assignmentHasStaff
+    ) {
+      throw new ForbiddenException({
+        code: 'PARTNER_ACCESS_STATE_CONFLICT',
+        message:
+          'This partner account has inconsistent role and gym-assignment state. Contact GoGymGo support.',
+      });
+    }
+    const authorizedAssignments = assignments.map((assignment) => ({
+      accessLevel: assignment.access_level,
+      gymLocationId: assignment.gym_location_id,
+    }));
     if (authorizedAssignments.length === 0) {
       throw new ForbiddenException({
         code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED',

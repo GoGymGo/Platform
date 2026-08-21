@@ -274,11 +274,54 @@ export class GymQrCredentialHistoryDto {
   revokedAt!: string | null;
 }
 
+export class GymQrCredentialHistoryPageDto {
+  @ApiProperty({ isArray: true, type: () => GymQrCredentialHistoryDto })
+  items!: GymQrCredentialHistoryDto[];
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  nextCursor!: string | null;
+}
+
+export class ListGymQrCredentialHistoryQueryDto {
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  cursor?: string;
+
+  @ApiPropertyOptional({ default: 25, maximum: 100, minimum: 1, type: Number })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Max(100)
+  @Min(1)
+  limit = 25;
+}
+
 export class OperatorReasonDto {
   @ApiProperty({ minLength: 8, maxLength: 500, type: String })
   @IsString()
   @Length(8, 500)
   reason!: string;
+}
+
+export class IssueGymQrCredentialDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, nullable: true, type: Number })
+  @ValidateIf(
+    (_input: IssueGymQrCredentialDto, value: unknown) => value !== null,
+  )
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedCredentialVersion!: number | null;
+}
+
+export class RevokeGymQrCredentialDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedCredentialVersion!: number;
 }
 
 export class DeleteGymLocationDto extends OperatorReasonDto {

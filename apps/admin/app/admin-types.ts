@@ -58,6 +58,8 @@ export type Competition = {
   monthKey: string;
   name: string;
   publishedRewardCount: number;
+  proposalStatus: PartnerProposalStatus | null;
+  proposalVersion: number | null;
   regionCode: string;
   regionName: string;
   regionPolicyId: string;
@@ -185,9 +187,7 @@ export type OperatorPortalAccess = {
     gymLocationId: string;
   }[];
   email: string;
-  id: string;
   portal: "gogymgo" | "partner";
-  roles: string[];
 };
 
 export type WorkQueueItem = {
@@ -343,21 +343,104 @@ export type PartnerApplication = OperatorPartnerApplicationDto;
 export type PilotAuditEvent = OperatorAuditHistoryDto;
 export type RegionWaitlistEntry = RegionWaitlistEntryDto;
 
-export type PartnerGym = GymLocation & {
+export type PartnerGym = {
   accessLevel: "admin" | "staff";
+  activeQrCredentials: GymLocation["activeQrCredentials"];
+  address: string;
+  id: string;
+  name: string;
+  radiusMeters: number;
+  regionCode: string;
+  regionPolicyId: string;
 };
 
-export type PartnerCompetition = Competition & {
+export type PartnerProposalStatus =
+  "archived" | "draft" | "published" | "submitted" | "withdrawn";
+
+export type PartnerCompetition = {
+  competitionStatus: string;
+  configurationVersion: number;
+  endsAt: string;
+  enrollmentCount: number;
+  entrantCap: number | null;
+  goalBrackets: GoalBracket[];
   gymLocationId: string;
   gymName: string;
-  proposedByUserId: string | null;
+  id: string;
+  monthKey: string;
+  name: string;
+  proposalStatus: PartnerProposalStatus | null;
+  proposalVersion: number | null;
+  regionCode: string;
+  regionName: string;
+  regionPolicyId: string;
+  registrationClosesAt: string;
+  registrationOpensAt: string;
+  startsAt: string;
+};
+
+export type PartnerCompetitionPage = {
+  items: PartnerCompetition[];
+  nextCursor: string | null;
+};
+
+export type PartnerVisitStatus =
+  "completed" | "in_progress" | "incomplete" | "pending_review";
+
+export type PartnerVisitSummary = {
+  count: number;
+  gymLocationId: string;
+  gymName: string;
+  status: PartnerVisitStatus;
+};
+
+export type PartnerVisitPage = {
+  items: PartnerVisitSummary[];
+  nextCursor: string | null;
+};
+
+export type PartnerRegion = {
+  code: string;
+  competitionEnabled: boolean;
+  id: string;
+  name: string;
+  timezone: string;
+};
+
+export type GymQrCredentialHistory = {
+  competitionId: string;
+  competitionName: string;
+  credentialVersion: number;
+  expiresAt: string;
+  gymLocationId: string;
+  id: string;
+  issuedAt: string;
+  revokedAt: string | null;
+  status: "active" | "expired" | "revoked";
+};
+
+export type GymQrCredentialHistoryPage = {
+  items: GymQrCredentialHistory[];
+  nextCursor: string | null;
+};
+
+export type PartnerProposalActionResponse = {
+  id: string;
+  status: PartnerProposalStatus;
+  version: number;
 };
 
 export type PartnerDashboardSnapshot = {
-  competitions: PartnerCompetition[];
+  competitions: PartnerCompetitionPage;
   generatedAt: string;
   gyms: PartnerGym[];
-  operator: DashboardSnapshot["admin"];
-  regions: RegionPolicy[];
-  sessions: GymSession[];
+  operator: { email: string };
+  overview: {
+    activeVisitCount: number;
+    assignedGymCount: number;
+    draftProposalCount: number;
+    submittedProposalCount: number;
+  };
+  regions: PartnerRegion[];
+  visits: PartnerVisitPage;
 };

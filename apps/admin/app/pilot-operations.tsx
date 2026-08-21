@@ -4,7 +4,6 @@ import type {
   AssignCompetitionGymDto,
   CashFulfillmentRequestDto,
   CreateGymLocationDto,
-  OperatorReasonDto,
   UpdateRegionWaitlistStatusDto,
   UpdateGymLocationDto,
 } from "@gogymgo/contracts";
@@ -38,6 +37,8 @@ import type {
   RewardAward,
 } from "./admin-types";
 
+type OperatorReason = Pick<AssignCompetitionGymDto, "reason">;
+
 export type PilotData = {
   auditEvents: PilotAuditEvent[];
   gyms: GymLocation[];
@@ -59,7 +60,7 @@ type PilotOperationsProps = PilotData & {
   onIssueQr: (
     competitionId: string,
     gymId: string,
-    input: OperatorReasonDto,
+    input: OperatorReason & { expectedCredentialVersion: number | null },
   ) => Promise<GymQrCredential>;
   onLoadActiveQr: (
     competitionId: string,
@@ -69,7 +70,7 @@ type PilotOperationsProps = PilotData & {
   onRevokeQr: (
     competitionId: string,
     gymId: string,
-    input: OperatorReasonDto,
+    input: OperatorReason & { expectedCredentialVersion: number },
   ) => Promise<void>;
   onUpdateGym: (gymId: string, input: UpdateGymLocationDto) => Promise<void>;
   onUpdateWaitlist: (
@@ -270,12 +271,19 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
     }
   }
 
-  async function issueQrForGym(gym: GymLocation, input: OperatorReasonDto) {
+  async function issueQrForGym(gym: GymLocation, input: OperatorReason) {
     setPosterRecoveryMessage("");
     const issuedCredential = await props.onIssueQr(
       props.selectedCompetition.id,
       gym.id,
-      input,
+      {
+        ...input,
+        expectedCredentialVersion:
+          (gym.activeQrCredentials ?? []).find(
+            (credential) =>
+              credential.competitionId === props.selectedCompetition.id,
+          )?.credentialVersion ?? null,
+      },
     );
     const credential = assertGymQrCredentialScope(
       issuedCredential,
@@ -1111,8 +1119,10 @@ function GymCard({
   activeCredentialVersion: number | null;
   gym: GymLocation;
   onDelete: () => void;
-  onIssue: (input: OperatorReasonDto) => Promise<void>;
-  onRevoke: (input: OperatorReasonDto) => Promise<void>;
+  onIssue: (input: OperatorReason) => Promise<void>;
+  onRevoke: (
+    input: OperatorReason & { expectedCredentialVersion: number },
+  ) => Promise<void>;
   onUpdate: (input: UpdateGymLocationDto) => Promise<void>;
   onViewPoster: () => void;
   posterLoading: boolean;
@@ -1142,7 +1152,15 @@ function GymCard({
     setQrError("");
     setQrSuccess("");
     try {
-      await onRevoke({ reason: "Revoke the current QR poster." });
+      if (!activeCredentialVersion) {
+        throw new AdminUserFacingError(
+          "Reload the active credential version before revoking this poster.",
+        );
+      }
+      await onRevoke({
+        expectedCredentialVersion: activeCredentialVersion,
+        reason: "Revoke the current QR poster.",
+      });
       setQrSuccess(`${selectedContestName} poster revoked.`);
     } catch (error) {
       setQrError(formErrorMessage(error));

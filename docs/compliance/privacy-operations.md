@@ -15,7 +15,7 @@ This document describes the technical policy. Launch counsel must approve jurisd
    The deciding administrator is reauthorized from the database before an
    idempotent replay and cannot decide a request owned by the same account.
 3. The worker reads a repeatable PostgreSQL snapshot and builds deterministic
-   portable JSON schema version 12. The exhaustive table-disposition map covers
+   portable JSON schema version 13. The exhaustive table-disposition map covers
    every current authoritative table. It includes the member's account,
    consent/legal, region, Contest/workout/ledger/reward, social, Creator,
    Partner, notification/media, and privacy lifecycle data while excluding
@@ -44,6 +44,8 @@ The worker:
 - removes push tokens and queued/sent notification records;
 - removes owned Challenge memberships/check-ins/content, friendship/block rows,
   private Creator plans/submissions, and Partner gym assignments;
+- preserves gym-owned Contest proposal provenance against the pseudonymized
+  account while exporting only its minimized lifecycle, version and timestamps;
 - removes idempotency records keyed by the former Firebase UID;
 - removes public profile identity and replaces Firebase UID and callsign with namespace-separated HMAC pseudonyms;
 - removes precise region evidence detail and free-text decision reasons while preserving the eligibility decision and policy version;
@@ -62,6 +64,12 @@ linked to user identity. A September cash fulfillment retains only the exact
 Award, immutable value/currency, responsible authorized operator, server
 timestamp, bounded operational reason and append-only audit evidence; it
 contains no bank, payee, card, wallet, tax, balance, provider or transfer data.
+Gym-owned Contest proposals remain attributable only to the retained
+pseudonymized account row: deletion does not erase, reassign or replace their
+immutable proposer, gym or creation provenance. The export omits proposer and
+reviewer identifiers, but schema version 13 includes status, lifecycle version,
+submission, withdrawal, archival and publication timestamps for proposals made
+by the requesting account.
 The user's export describes the settled reward snapshot and fulfillment time
 but excludes the private operator reason and operator identity. Legal receipts
 identify the exact document version, content digest, jurisdiction, locale,

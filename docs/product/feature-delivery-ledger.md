@@ -18,10 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `5ab7216fe43d92db07b34d74f8d55dfb6341165a` after PR #126 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-028 — Member release and native
-  links` on `agent/ggg-028-member-release-native-links`; creation follows this
-  ledger merge.
+  `6c7d7d63cc8c1689b2150edf0a54b2e67e82a4e8` after PR #129 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-014 — Partner intake and review` on
+  `agent/ggg-014-partner-intake-review`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -530,7 +529,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   limits, deduplication/idempotency, role decision, privacy retention/export,
   landing-to-API failure; deployed API/database.
 - Delivery: priority `P2`; task `GoGymGo Feature GGG-014 — Partner intake and
-  review`; branch/PR/merge `unassigned`; status `AUDITED`.
+  review`; branch `agent/ggg-014-partner-intake-review`; PR/merge `unassigned`;
+  status `IN_PROGRESS`.
 - Residual risks / blocker: contractual onboarding remains a human process, not
   an application success state.
 
@@ -1006,17 +1006,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   PR; protected environments and Firebase rules apply.
 - External providers / feature flag: Firebase Hosting, EAS/Apple/Google app links;
   browser pilot audit requires native association files omitted and preview off.
-- Current implementation / missing behavior: browser-only protected workflow and
-  audits are merged. Native release lacks final bundle/package/team/signing IDs,
-  EAS project, store URLs, and physical app-link validation.
+- Current implementation / missing behavior: exact browser/native release modes,
+  fail-closed identifier policy, association generation/audits, artifact
+  attestation, exact CloudFront well-known handling, atomic publish/rollback, and
+  strict QR/native-link parsing are repository-complete. Native release lacks
+  final bundle/package/team/signing IDs, EAS project, store URLs, provider release
+  configuration, and physical app-link validation.
 - Required tests / operations / cloud dependency: source authorization, exact
   export audit, demo exclusion, association generation, signed iOS/Android link
   test, rollback; Firebase/EAS/Apple/Google and domains.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-028 — Member release and
-  native links`; branch `agent/ggg-028-member-release-native-links`; PR/merge
-  `unassigned`; status `IN_PROGRESS`.
-- Residual risks / blocker: deployment is not authorized and placeholder native
-  identifiers are forbidden.
+  native links`; branches deleted after merge; PRs `#128` and `#129`; latest merge
+  `6c7d7d63cc8c1689b2150edf0a54b2e67e82a4e8`; status `BLOCKED`.
+- Residual risks / blocker: authoritative Apple Team/bundle IDs, Android package/
+  signing fingerprints, EAS owner/project, store URLs, Firebase release config,
+  explicit approval, deployment/DNS, signed builds, store submission, and
+  physical-device UAT require separate authority; placeholder values are
+  forbidden.
 
 ### GGG-029 — Contracts, critical journeys, architecture, and dependency governance
 
@@ -1210,6 +1216,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed the repository delivery for `GGG-028` through PRs #128
+  and #129. Exact corrected feature head
+  `7b16a9cdf4d9b208b82a02f5206c8a6789a1c5b5` was guarded-squash merged as
+  `071a9e412ad6e1cfe136b519daf3ebeb4af59a93`; a main-push workflow-validation
+  failure then exposed an invalid job-level `runner.temp` context before any job
+  or deployment ran. The narrow exact head
+  `6a39e4e67854a271dac43fbab1cbd6196707de56` moved that reference into runner
+  steps and was guarded-squash merged as
+  `6c7d7d63cc8c1689b2150edf0a54b2e67e82a4e8`. Both PRs and all applicable
+  exact-main workflows passed; branches were deleted. Delivery added exact release
+  modes and source policy, fail-closed native identifiers, association generation/
+  audits, strict canonical QR and `/scan` parsing, deterministic artifact
+  attestation, CloudFront well-known bypass, assets-first/index-last publication
+  with verification/restoration, and honest browser-only copy. Proof included the
+  full repository check (member 270, API 408 unit plus 29 E2E, admin 44, landing
+  34), release/governance/dependency/source/artifact audits, a deterministic 26-file
+  browser artifact digest, and direct browser validation of welcome/demo/malformed
+  and canonical QR states. Database suites were correctly skipped because no data
+  path changed; no local Docker, cloud/provider/credential/deploy/native/signing/
+  store/DNS action occurred. Status remains `BLOCKED` pending authoritative native
+  IDs/configuration, explicit release approval, signed builds, provider deployment,
+  store submission, and physical-device UAT. Before any AWS reconciliation, the
+  coordinator returns to non-terminal `GGG-014` for its distinct end-to-end partner
+  intake/review verification; this may reuse later foundations but must not be
+  declared complete by inference.
 - 2026-08-21 — Completed the repository delivery for `GGG-027` through PR #126.
   Corrected exact head `2fc7610cc01e2543247d413ecf48f603ac7e15d9` was
   squash-merged with an exact-head guard as

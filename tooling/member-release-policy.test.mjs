@@ -58,8 +58,10 @@ test("requires canonical production origins and rejects decorated origins", () =
     GOGYMGO_RELEASE_MODE: "browser-pilot",
     MEMBER_WEB_URL: "https://staging.gogymgo.com",
   });
-  assert.ok(issues.some((issue) => issue.includes("https://api.gogymgo.com")));
-  assert.ok(issues.some((issue) => issue.includes("https://app.gogymgo.com")));
+  assert.deepEqual(issues, [
+    "production releases must use https://api.gogymgo.com",
+    "production releases must use https://app.gogymgo.com",
+  ]);
 });
 
 test("keeps native publication fail-closed behind exact approved inputs", () => {
@@ -99,8 +101,10 @@ test("accepts native association publication only at the canonical production ta
     GOGYMGO_RELEASE_MODE: "native-links",
     MEMBER_WEB_URL: "https://staging.gogymgo.com",
   });
-  assert.ok(stagingIssues.some((issue) => issue.includes("only to")));
-  assert.ok(stagingIssues.some((issue) => issue.includes("app.gogymgo.com")));
+  assert.deepEqual(stagingIssues, [
+    "native links may be published only to the protected production environment",
+    "native links must be published at https://app.gogymgo.com",
+  ]);
 });
 
 test("generates associations for only the canonical /scan handoff", () => {

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Headers,
   Param,
@@ -9,7 +10,9 @@ import {
   Post,
   Put,
   Query,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -21,6 +24,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key';
+import type { Environment } from '../../config/environment';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import { Public } from '../auth/public.decorator';
@@ -54,6 +58,10 @@ import {
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import { GymsService } from './gyms.service';
+import {
+  isAuthorizedLandingForwarder,
+  readLandingIntakePolicy,
+} from './landing-intake-policy';
 
 @ApiTags('gym location checks')
 @ApiBearerAuth('firebase')
@@ -84,28 +92,78 @@ export class GymScansController {
 @ApiTags('pilot submissions')
 @Controller()
 export class PilotSubmissionsController {
-  constructor(private readonly gyms: GymsService) {}
+  constructor(
+    private readonly gyms: GymsService,
+    private readonly config: ConfigService<Environment, true>,
+  ) {}
 
   @Post('region-waitlist')
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-GoGymGo-Landing-Key', required: true })
   @ApiOperation({ summary: 'Join the unsupported-region launch waitlist' })
   @ApiCreatedResponse({ type: RegionWaitlistReceiptDto })
   submitWaitlist(
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Headers('x-gogymgo-landing-key') forwardingKey: string | undefined,
     @Body() input: RegionWaitlistRequestDto,
   ): Promise<RegionWaitlistReceiptDto> {
-    return this.gyms.submitPublicWaitlist(input);
+    const retentionDays = this.requireLandingForwarder(forwardingKey);
+    return this.gyms.submitPublicWaitlist(
+      requireIdempotencyKey(idempotencyKey),
+      retentionDays,
+      input,
+    );
   }
 
   @Post('interest-submissions')
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-GoGymGo-Landing-Key', required: true })
   @ApiOperation({ summary: 'Submit landing-page member or brand interest' })
   @ApiCreatedResponse({ type: InterestSubmissionResponseDto })
   submitInterest(
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Headers('x-gogymgo-landing-key') forwardingKey: string | undefined,
     @Body() input: InterestSubmissionDto,
   ): Promise<InterestSubmissionResponseDto> {
-    return this.gyms.submitInterest(input);
+    const retentionDays = this.requireLandingForwarder(forwardingKey);
+    return this.gyms.submitInterest(
+      requireIdempotencyKey(idempotencyKey),
+      retentionDays,
+      input,
+    );
+  }
+
+  private requireLandingForwarder(forwardingKey: string | undefined): number {
+    const policy = readLandingIntakePolicy({
+      LANDING_INTAKE_ENABLED: this.config.get('LANDING_INTAKE_ENABLED', {
+        infer: true,
+      }),
+      LANDING_INTAKE_FORWARDING_SECRET: this.config.get(
+        'LANDING_INTAKE_FORWARDING_SECRET',
+        { infer: true },
+      ),
+      LANDING_INTAKE_RETENTION_DAYS: this.config.get(
+        'LANDING_INTAKE_RETENTION_DAYS',
+        { infer: true },
+      ),
+    });
+    if (!policy) {
+      throw new ServiceUnavailableException({
+        code: 'LANDING_INTAKE_UNAVAILABLE',
+        message: 'Public landing intake is unavailable.',
+      });
+    }
+    if (!isAuthorizedLandingForwarder(forwardingKey, policy.forwardingSecret)) {
+      throw new ForbiddenException({
+        code: 'LANDING_INTAKE_FORWARDER_INVALID',
+        message: 'Public landing intake forwarding is not authorized.',
+      });
+    }
+    return policy.retentionDays;
   }
 }
 

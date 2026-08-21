@@ -3427,7 +3427,20 @@
     "/v1/region-waitlist": {
       "post": {
         "operationId": "submitWaitlist",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-GoGymGo-Landing-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3457,7 +3470,20 @@
     "/v1/interest-submissions": {
       "post": {
         "operationId": "submitInterest",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-GoGymGo-Landing-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -8123,6 +8149,11 @@
           "requestedRegion": { "type": "string" },
           "status": { "type": "string" },
           "source": { "type": "string" },
+          "retentionExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "createdAt": { "type": "string", "format": "date-time" },
           "consentedAt": {
             "type": "string",
@@ -8138,6 +8169,7 @@
           "requestedRegion",
           "status",
           "source",
+          "retentionExpiresAt",
           "createdAt",
           "version"
         ]
@@ -8163,6 +8195,12 @@
           "fullName": { "type": "string" },
           "companyName": { "type": "string", "nullable": true },
           "region": { "type": "string" },
+          "source": { "type": "string" },
+          "retentionExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "goalDays": { "type": "number", "nullable": true },
           "workoutStyle": { "type": "string", "nullable": true },
           "partnershipInterest": { "type": "string", "nullable": true },
@@ -8174,6 +8212,8 @@
           "email",
           "fullName",
           "region",
+          "source",
+          "retentionExpiresAt",
           "submittedAt"
         ]
       },
@@ -8399,7 +8439,7 @@
           "email": { "type": "string", "format": "email", "maxLength": 320 },
           "fullName": { "type": "string", "maxLength": 100, "minLength": 2 },
           "region": { "type": "string", "maxLength": 160, "minLength": 2 },
-          "consent": { "type": "boolean" },
+          "consent": { "type": "boolean", "enum": [true] },
           "companyName": { "type": "string", "maxLength": 140 },
           "website": { "type": "string", "maxLength": 300 },
           "goalDays": { "type": "number", "maximum": 7, "minimum": 1 },

@@ -108,10 +108,43 @@ export class PrivacyExportBuilder {
             'status',
             'consent_notice_version',
             'consented_at',
+            'retention_expires_at',
             'created_at',
             'updated_at',
           ])
-          .where('user_id', '=', job.userId)
+          .where((expression) =>
+            expression.or([
+              expression('user_id', '=', job.userId),
+              expression.and([
+                expression('user_id', 'is', null),
+                expression('email', '=', account.email),
+              ]),
+            ]),
+          )
+          .orderBy('created_at')
+          .execute();
+
+        const landingInterestSubmissions = await transaction
+          .selectFrom('interest_submissions')
+          .select([
+            'id',
+            'audience',
+            'full_name',
+            'company_name',
+            'website',
+            'region',
+            'goal_days',
+            'workout_style',
+            'partnership_interest',
+            'discovery_source',
+            'message',
+            'consent',
+            'source',
+            'retention_expires_at',
+            'created_at',
+            'updated_at',
+          ])
+          .where('email', '=', account.email)
           .orderBy('created_at')
           .execute();
 
@@ -883,6 +916,7 @@ export class PrivacyExportBuilder {
           },
           privacyRequests,
           profileMedia,
+          landingInterestSubmissions,
           regionalUpdateRequests,
           regionVerifications,
           request: {

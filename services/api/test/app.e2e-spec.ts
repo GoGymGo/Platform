@@ -132,6 +132,42 @@ describe('platform foundation (e2e)', () => {
       .expect(401);
   });
 
+  it('keeps public landing intake disabled and method-exact by default', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/region-waitlist')
+      .set('Idempotency-Key', '10000000-0000-4000-8000-000000000027')
+      .set('X-GoGymGo-Landing-Key', 'not-an-enabled-forwarding-key')
+      .send({
+        consent: true,
+        consentNoticeVersion: 'regional-updates-2026-08-13-v1',
+        email: 'player@example.com',
+        requestedRegion: 'Victoria, BC',
+      })
+      .expect(503)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({
+            code: 'LANDING_INTAKE_UNAVAILABLE',
+          }),
+        });
+      });
+    await request(app.getHttpServer())
+      .post('/v1/interest-submissions')
+      .set('Idempotency-Key', '20000000-0000-4000-8000-000000000027')
+      .set('X-GoGymGo-Landing-Key', 'not-an-enabled-forwarding-key')
+      .send({
+        audience: 'brand',
+        companyName: 'Example Co',
+        consent: true,
+        email: 'partner@example.com',
+        fullName: 'Partner Person',
+        partnershipInterest: 'regional-sponsor',
+        region: 'Victoria, BC',
+      })
+      .expect(503);
+    await request(app.getHttpServer()).get('/v1/region-waitlist').expect(404);
+  });
+
   it('requires authentication across friend and challenge routes', async () => {
     await request(app.getHttpServer())
       .get('/v1/social/users?screenName=GHOST')

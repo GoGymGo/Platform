@@ -12,6 +12,8 @@ function workerResult() {
     competitionsActivated: 0,
     competitionsCancelled: 0,
     incompleteGymSessionsExpired: 0,
+    landingInterestDeleted: 0,
+    landingWaitlistDeleted: 0,
     notificationsSent: 0,
     privacyExportsDeleted: 0,
     privacyOperationsCompleted: 0,

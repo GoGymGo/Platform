@@ -11,6 +11,8 @@ const WORKER_RESULT_KEYS = [
   'competitionsActivated',
   'competitionsCancelled',
   'competitionPeriodsSettled',
+  'landingInterestDeleted',
+  'landingWaitlistDeleted',
   'notificationsSent',
   'profileMediaCleanupFailed',
   'profileMediaDeleted',

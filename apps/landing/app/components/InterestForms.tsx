@@ -36,11 +36,12 @@ async function submitInterest(
   );
   const response = await fetch("/api/interest", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       ...payload,
       audience: "brand",
       consent: formData.get("consent") === "on",
+      submissionId: crypto.randomUUID(),
     }),
   });
 
@@ -63,13 +64,14 @@ async function submitRegionalUpdates(
   const formData = new FormData(form);
   const response = await fetch("/api/regional-updates", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       contactFax: formData.get("contactFax"),
       consent: formData.get("consent") === "on",
       consentNoticeVersion: regionalUpdatesConsentNoticeVersion,
       email: formData.get("email"),
       requestedRegion: formData.get("region"),
+      submissionId: crypto.randomUUID(),
     }),
   });
 

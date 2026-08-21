@@ -106,7 +106,7 @@ export interface components {
     HealthResponseDto: { service: string; status: "ok"; timestamp: string; uptimeSeconds: number };
     HeartRateReviewDto: { averageBpm: number | null; count: number; maximumBpm: number | null; minimumBpm: number | null; minimumRequiredCount: number; required: boolean; trustStates: Array<string> };
     InspectChallengeContactInvitationDto: { token: string };
-    InterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string; consent: boolean; discoverySource?: string; email: string; fullName: string; goalDays?: number; message?: string; partnershipInterest?: string; region: string; website?: string; workoutStyle?: string };
+    InterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string; consent: true; discoverySource?: string; email: string; fullName: string; goalDays?: number; message?: string; partnershipInterest?: string; region: string; website?: string; workoutStyle?: string };
     InterestSubmissionResponseDto: { audience: "gym_goer" | "brand"; id: string; submittedAt: string };
     InviteChallengeContactDto: { channel: "email" | "phone"; destination: string };
     InviteChallengeFriendDto: { friendUserId: string };
@@ -123,7 +123,7 @@ export interface components {
     OperatorAuditHistoryDto: { action: string; actorEmail: string | null; after: Record<string, unknown> | null; before: Record<string, unknown> | null; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
     OperatorAuditHistoryPageDto: { items: Array<components['schemas']["OperatorAuditHistoryDto"]>; nextCursor?: string | null };
     OperatorGymSessionDto: { completedAt: string | null; gymLocationId: string; gymName: string; id: string; incomplete: boolean; startedAt: string; status: string };
-    OperatorInterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string | null; email: string; fullName: string; goalDays?: number | null; id: string; partnershipInterest?: string | null; region: string; submittedAt: string; workoutStyle?: string | null };
+    OperatorInterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string | null; email: string; fullName: string; goalDays?: number | null; id: string; partnershipInterest?: string | null; region: string; retentionExpiresAt: string | null; source: string; submittedAt: string; workoutStyle?: string | null };
     OperatorPartnerApplicationDto: { applicationType: "creator" | "gym" | "sponsor"; contactEmail?: string | null; id: string; payload: Record<string, unknown>; region: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
     OperatorPortalAccessDto: { assignments: Array<components['schemas']["OperatorPortalAssignmentDto"]>; email: string; portal: "gogymgo" | "partner" };
     OperatorPortalAssignmentDto: { accessLevel: "admin" | "staff"; gymLocationId: string };
@@ -167,7 +167,7 @@ export interface components {
     RegionPolicyResponseDto: { boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: string; id: string; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; subdivisionCode: string; timezone: string; validFrom: string; validTo: string | null };
     RegionPolicyStatusActionDto: { action: "disable" | "enable"; expectedVersion: number; reason: string };
     RegionVerificationResponseDto: { createdAt: string; expiresAt: string; id: string; jurisdictionCode: string; method: "device_location"; policyVersion: string; regionCode: string; regionName: string; regionPolicyId: string; reviewedAt: string; status: "approved"; timezone: string };
-    RegionWaitlistEntryDto: { consentedAt?: string | null; consentNoticeVersion?: string | null; createdAt: string; email: string; id: string; requestedRegion: string; source: string; status: string; version: number };
+    RegionWaitlistEntryDto: { consentedAt?: string | null; consentNoticeVersion?: string | null; createdAt: string; email: string; id: string; requestedRegion: string; retentionExpiresAt: string | null; source: string; status: string; version: number };
     RegionWaitlistReceiptDto: { status: "received" };
     RegionWaitlistRequestDto: { consent: true; consentNoticeVersion: "regional-updates-2026-08-13-v1"; countryCode?: string; email: string; requestedRegion: string; subdivisionCode?: string };
     RegisterPushDeviceDto: { installationId: string; platform: "android" | "ios"; pushToken: string };
@@ -1287,7 +1287,7 @@ export interface operations {
   submitInterest: {
     method: "POST";
     path: "/v1/interest-submissions";
-    parameters: Record<string, never>;
+    parameters: { header: { "Idempotency-Key": string; "X-GoGymGo-Landing-Key": string } };
     requestBody: components['schemas']["InterestSubmissionDto"];
     responses: {
       "201": components['schemas']["InterestSubmissionResponseDto"];
@@ -1314,7 +1314,7 @@ export interface operations {
   submitWaitlist_post_v1_region_waitlist: {
     method: "POST";
     path: "/v1/region-waitlist";
-    parameters: Record<string, never>;
+    parameters: { header: { "Idempotency-Key": string; "X-GoGymGo-Landing-Key": string } };
     requestBody: components['schemas']["RegionWaitlistRequestDto"];
     responses: {
       "201": components['schemas']["RegionWaitlistReceiptDto"];

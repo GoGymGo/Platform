@@ -270,7 +270,7 @@ export class PrivacyOperationsRepository {
 
         const user = await transaction
           .selectFrom('users')
-          .select('firebase_uid')
+          .select(['email', 'firebase_uid'])
           .where('id', '=', request.user_id)
           .forUpdate()
           .executeTakeFirstOrThrow();
@@ -342,7 +342,19 @@ export class PrivacyOperationsRepository {
           .execute();
         await transaction
           .deleteFrom('region_waitlist_entries')
-          .where('user_id', '=', request.user_id)
+          .where((expression) =>
+            expression.or([
+              expression('user_id', '=', request.user_id),
+              expression.and([
+                expression('user_id', 'is', null),
+                expression('email', '=', user.email),
+              ]),
+            ]),
+          )
+          .execute();
+        await transaction
+          .deleteFrom('interest_submissions')
+          .where('email', '=', user.email)
           .execute();
         await transaction
           .deleteFrom('idempotency_keys')

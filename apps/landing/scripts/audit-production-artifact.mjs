@@ -25,6 +25,8 @@ for (const marker of [
   "browser-test-preview",
   "codex-preview",
   "gogymgo-admin-control.wilson-1212.chatgpt.site",
+  "GOGYMGO_LANDING_FORWARDING_SECRET",
+  "LANDING_D1_EXPORT_OWNER_USER_ID",
   "Northline Wellness",
   "preview.player@example.com",
   "trycloudflare.com",
@@ -87,6 +89,9 @@ if (fs.existsSync(serverEntry)) {
   const serverSource = fs.readFileSync(serverEntry, "utf8");
   for (const required of [
     "Content-Security-Policy",
+    "GOGYMGO_LANDING_FORWARDING_SECRET",
+    "Idempotency-Key",
+    "LANDING_D1_EXPORT_CUTOFF_EXCLUSIVE",
     "LANDING_D1_EXPORT_OWNER_USER_ID",
     "Permissions-Policy",
     "PUBLIC_SITE_EVENT_RETENTION_DAYS",
@@ -94,6 +99,7 @@ if (fs.existsSync(serverEntry)) {
     "camera=(), geolocation=(), microphone=()",
     "public_site_operations_audit",
     "public_site_rate_buckets",
+    "gogymgo.landing-interest-export-page",
     "Strict-Transport-Security",
     "X-Content-Type-Options",
   ]) {

@@ -246,6 +246,27 @@ const cashFulfillmentMigration = await readFile(
   join(root, 'migrations/1787533200000_september_pilot_cash_fulfillment.ts'),
   'utf8',
 );
+const landingIntakeController = await readFile(
+  join(root, 'src/modules/gyms/gyms.controller.ts'),
+  'utf8',
+);
+const landingIntakePolicy = await readFile(
+  join(root, 'src/modules/gyms/landing-intake-policy.ts'),
+  'utf8',
+);
+const landingIntakeImport = await readFile(
+  join(root, 'src/modules/gyms/landing-intake-import.ts'),
+  'utf8',
+);
+const landingIntakeMigration = await readFile(
+  join(root, 'migrations/1788138000000_landing_intake_provenance.ts'),
+  'utf8',
+);
+const landingImportScript = await readFile(
+  join(root, 'scripts/import-landing-d1.ts'),
+  'utf8',
+);
+const appModuleSource = await readFile(join(root, 'src/app.module.ts'), 'utf8');
 const legalDocumentPolicy = await readFile(
   join(root, 'src/modules/legal/legal-document.ts'),
   'utf8',
@@ -605,6 +626,83 @@ for (const marker of [
   if (!cashFulfillmentMigration.includes(marker)) {
     violations.push(
       `manual cash fulfillment migration is missing invariant marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  "@Headers('x-gogymgo-landing-key')",
+  'requireIdempotencyKey(idempotencyKey)',
+  'readLandingIntakePolicy',
+  '@Throttle({ default: { limit: 5, ttl: 60_000 } })',
+]) {
+  if (!landingIntakeController.includes(marker)) {
+    violations.push(
+      `landing intake controller is missing fail-closed marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'timingSafeEqual',
+  "landingPublicSourceSystem = 'landing-public-v1'",
+  'LANDING_INTAKE_ENABLED !== true',
+]) {
+  if (!landingIntakePolicy.includes(marker)) {
+    violations.push(`landing intake policy is missing marker ${marker}`);
+  }
+}
+for (const marker of [
+  "scope: 'landing-intake:region-waitlist'",
+  "scope: 'landing-intake:interest-submission'",
+  "insertInto('landing_intake_source_records')",
+  'purgeExpiredLandingIntake',
+]) {
+  if (!cashFulfillmentService.includes(marker)) {
+    violations.push(
+      `landing intake service is missing authority/provenance marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'landing_intake_source_records_source_unique',
+  'landing_intake_source_records_destination_exactly_one',
+  'landing_intake_source_records_source_hash',
+  'retention_expires_at IS NOT NULL AND user_id IS NULL',
+]) {
+  if (!landingIntakeMigration.includes(marker)) {
+    violations.push(
+      `landing intake migration is missing integrity marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
+  'deterministicLandingDestinationId',
+  "'matched_source_duplicate'",
+  'assertExistingMapping',
+  'reconciliationSha256',
+]) {
+  if (!landingIntakeImport.includes(marker)) {
+    violations.push(`landing import is missing rerun marker ${marker}`);
+  }
+}
+for (const marker of [
+  'CONFIRM_LANDING_D1_IMPORT_SHA256',
+  'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE',
+  "client.query('ROLLBACK')",
+  "mode === 'validate-only'",
+]) {
+  if (!landingImportScript.includes(marker)) {
+    violations.push(`landing import script is missing safety marker ${marker}`);
+  }
+}
+for (const marker of [
+  'req.headers["idempotency-key"]',
+  'req.headers["x-gogymgo-landing-key"]',
+  'req.body.email',
+  'req.body.requestedRegion',
+]) {
+  if (!appModuleSource.includes(marker)) {
+    violations.push(
+      `API logging is missing landing redaction marker ${marker}`,
     );
   }
 }

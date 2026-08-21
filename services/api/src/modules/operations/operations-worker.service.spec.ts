@@ -11,6 +11,7 @@ function createWorker(overrides?: {
   competitionLifecycle?: jest.Mock;
   competitionScoring?: jest.Mock;
   gyms?: jest.Mock;
+  landingIntake?: jest.Mock;
   notifications?: jest.Mock;
   privacy?: jest.Mock;
   profileMedia?: jest.Mock;
@@ -20,6 +21,7 @@ function createWorker(overrides?: {
     competitionLifecycle: jest.Mock;
     competitionScoring: jest.Mock;
     gyms: jest.Mock;
+    landingIntake: jest.Mock;
     notifications: jest.Mock;
     privacy: jest.Mock;
     profileMedia: jest.Mock;
@@ -34,6 +36,9 @@ function createWorker(overrides?: {
     competitionScoring:
       overrides?.competitionScoring ?? jest.fn().mockResolvedValue(3),
     gyms: overrides?.gyms ?? jest.fn().mockResolvedValue(10),
+    landingIntake:
+      overrides?.landingIntake ??
+      jest.fn().mockResolvedValue({ interestDeleted: 13, waitlistDeleted: 14 }),
     notifications: overrides?.notifications ?? jest.fn().mockResolvedValue(4),
     privacy:
       overrides?.privacy ??
@@ -61,6 +66,7 @@ function createWorker(overrides?: {
       } as unknown as CompetitionScoringService,
       {
         expireIncompleteSessions: calls.gyms,
+        purgeExpiredLandingIntake: calls.landingIntake,
       } as unknown as GymsService,
       {
         processPending: calls.notifications,
@@ -83,6 +89,8 @@ describe('OperationsWorkerService', () => {
       competitionsCancelled: 1,
       competitionPeriodsSettled: 3,
       incompleteGymSessionsExpired: 10,
+      landingInterestDeleted: 13,
+      landingWaitlistDeleted: 14,
       notificationsSent: 4,
       privacyExportsDeleted: 6,
       privacyOperationsCompleted: 5,
@@ -104,6 +112,7 @@ describe('OperationsWorkerService', () => {
     expect(calls.competitionScoring).toHaveBeenCalledTimes(1);
     expect(calls.profileMedia).toHaveBeenCalledTimes(1);
     expect(calls.gyms).toHaveBeenCalledTimes(1);
+    expect(calls.landingIntake).toHaveBeenCalledTimes(1);
     expect(calls.privacy).toHaveBeenCalledTimes(1);
     expect(calls.notifications).toHaveBeenCalledTimes(1);
     expect(calls.socialInvitations).toHaveBeenCalledTimes(1);

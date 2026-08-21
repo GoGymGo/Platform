@@ -206,7 +206,7 @@ describeWithDatabase('authoritative region verification', () => {
 
   it('normalizes waitlist retries, preserves review status, and links member privacy ownership', async () => {
     await expect(
-      gyms.submitPublicWaitlist({
+      gyms.submitPublicWaitlist('10000000-0000-4000-8000-000000000101', 90, {
         consent: true,
         consentNoticeVersion: 'regional-updates-2026-08-13-v1',
         email: principal.email!,
@@ -216,12 +216,16 @@ describeWithDatabase('authoritative region verification', () => {
       response: { code: 'REGION_WAITLIST_REGION_INVALID' },
     });
 
-    const publicReceipt = await gyms.submitPublicWaitlist({
-      consent: true,
-      consentNoticeVersion: 'regional-updates-2026-08-13-v1',
-      email: principal.email!,
-      requestedRegion: '  North   Island  ',
-    });
+    const publicReceipt = await gyms.submitPublicWaitlist(
+      '10000000-0000-4000-8000-000000000102',
+      90,
+      {
+        consent: true,
+        consentNoticeVersion: 'regional-updates-2026-08-13-v1',
+        email: principal.email!,
+        requestedRegion: '  North   Island  ',
+      },
+    );
     expect(publicReceipt).toEqual({ status: 'received' });
     const initial = await database.connection
       .selectFrom('region_waitlist_entries')
@@ -234,12 +238,16 @@ describeWithDatabase('authoritative region verification', () => {
       .where('id', '=', initial.id)
       .execute();
 
-    await gyms.submitPublicWaitlist({
-      consent: true,
-      consentNoticeVersion: 'regional-updates-2026-08-13-v1',
-      email: principal.email!.toUpperCase(),
-      requestedRegion: 'north island',
-    });
+    await gyms.submitPublicWaitlist(
+      '10000000-0000-4000-8000-000000000103',
+      90,
+      {
+        consent: true,
+        consentNoticeVersion: 'regional-updates-2026-08-13-v1',
+        email: principal.email!.toUpperCase(),
+        requestedRegion: 'north island',
+      },
+    );
     await gyms.submitMemberWaitlist(principal, {
       consent: true,
       consentNoticeVersion: 'regional-updates-2026-08-13-v1',

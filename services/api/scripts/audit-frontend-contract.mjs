@@ -71,6 +71,8 @@ const requiredOperations = [
   ['post', '/v1/partner-applications/creators'],
   ['post', '/v1/partner-applications/gyms'],
   ['post', '/v1/partner-applications/sponsors'],
+  ['post', '/v1/interest-submissions'],
+  ['post', '/v1/region-waitlist'],
 
   // Push-device registration used by competition reminders.
   ['post', '/v1/me/push-devices'],
@@ -89,6 +91,8 @@ const requiredResponseSchemas = [
     'AvatarUploadCompletionResponseDto',
   ],
   ['delete', '/v1/me/avatar', 'RemoveAvatarResponseDto'],
+  ['post', '/v1/interest-submissions', 'InterestSubmissionResponseDto'],
+  ['post', '/v1/region-waitlist', 'RegionWaitlistReceiptDto'],
   ['get', '/v1/legal-documents/current', 'CurrentLegalDocumentsResponseDto'],
   ['get', '/v1/me/legal-receipts/status', 'LegalReceiptStatusResponseDto'],
   ['post', '/v1/me/legal-receipts', 'LegalReceiptStatusResponseDto'],
@@ -167,6 +171,26 @@ const requiredSchemaProperties = {
     'upload',
   ],
   RemoveAvatarResponseDto: ['status'],
+  OperatorInterestSubmissionDto: [
+    'audience',
+    'email',
+    'fullName',
+    'id',
+    'region',
+    'retentionExpiresAt',
+    'source',
+    'submittedAt',
+  ],
+  RegionWaitlistEntryDto: [
+    'createdAt',
+    'email',
+    'id',
+    'requestedRegion',
+    'retentionExpiresAt',
+    'source',
+    'status',
+    'version',
+  ],
   CategoryPodiumMultipliersResponseDto: ['1', '2', '3'],
   CategoryLeaderboardDto: ['goal', 'rows'],
   ClaimRewardResponseDto: [
@@ -453,6 +477,28 @@ const missing = requiredOperations.filter(
 const contractErrors = missing.map(
   ([method, path]) => `missing operation ${method.toUpperCase()} ${path}`,
 );
+
+for (const path of ['/v1/interest-submissions', '/v1/region-waitlist']) {
+  const parameters = contract.paths?.[path]?.post?.parameters ?? [];
+  for (const name of ['Idempotency-Key', 'X-GoGymGo-Landing-Key']) {
+    const header = parameters.find(
+      (parameter) => parameter?.in === 'header' && parameter?.name === name,
+    );
+    if (header?.required !== true) {
+      contractErrors.push(`${path} is missing required ${name} header`);
+    }
+  }
+}
+
+const landingConsent =
+  contract.components?.schemas?.InterestSubmissionDto?.properties?.consent;
+if (
+  !Array.isArray(landingConsent?.enum) ||
+  landingConsent.enum.length !== 1 ||
+  landingConsent.enum[0] !== true
+) {
+  contractErrors.push('InterestSubmissionDto.consent must be locked to true');
+}
 
 for (const [method, path, schemaName] of requiredResponseSchemas) {
   const responseSchema = getJsonResponseSchema(

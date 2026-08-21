@@ -34,6 +34,12 @@ const optionalSecret = z.preprocess(
   z.string().min(32).optional(),
 );
 
+const optionalIntakeRetentionDays = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.coerce.number().int().min(30).max(730).optional(),
+);
+
 const awsRegion = z.preprocess(
   (value) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -145,6 +151,9 @@ export const environmentSchema = z
       .max(3_600)
       .default(600),
     PRIVACY_PSEUDONYMIZATION_KEY: optionalSecret,
+    LANDING_INTAKE_ENABLED: booleanString.default(false),
+    LANDING_INTAKE_FORWARDING_SECRET: optionalSecret,
+    LANDING_INTAKE_RETENTION_DAYS: optionalIntakeRetentionDays,
     PUSH_NOTIFICATIONS_ENABLED: booleanString.default(false),
     EXPO_PUSH_API_URL: z
       .string()
@@ -322,6 +331,21 @@ export const environmentSchema = z
             'PRIVACY_PSEUDONYMIZATION_KEY is required by the worker when PRIVACY_OPERATIONS_ENABLED is true.',
           path: ['PRIVACY_PSEUDONYMIZATION_KEY'],
         });
+      }
+    }
+
+    if (environment.LANDING_INTAKE_ENABLED) {
+      for (const key of [
+        'LANDING_INTAKE_FORWARDING_SECRET',
+        'LANDING_INTAKE_RETENTION_DAYS',
+      ] as const) {
+        if (!environment[key]) {
+          context.addIssue({
+            code: 'custom',
+            message: `${key} is required when LANDING_INTAKE_ENABLED is true.`,
+            path: [key],
+          });
+        }
       }
     }
 

@@ -76,6 +76,11 @@ import {
   isWithinGymGeofence,
   resolveActiveSessionScan,
 } from './gym-scan-policy';
+import {
+  landingIntakeRetentionExpiry,
+  landingIntakeSourceHash,
+  landingPublicSourceSystem,
+} from './landing-intake-policy';
 
 interface GymScanJson extends JsonObject {
   credentialVersion: number | null;
@@ -105,6 +110,16 @@ interface GymPresenceContext {
 interface DeletedGymJson extends JsonObject {
   id: string;
   status: 'deleted';
+}
+
+interface InterestSubmissionJson extends JsonObject {
+  audience: 'brand' | 'gym_goer';
+  id: string;
+  submittedAt: string;
+}
+
+interface WaitlistReceiptJson extends JsonObject {
+  status: 'received';
 }
 
 interface GymQrCredentialJson extends JsonObject {
@@ -140,6 +155,7 @@ interface WaitlistEntryJson extends JsonObject {
   email: string;
   id: string;
   requestedRegion: string;
+  retentionExpiresAt: string | null;
   source: string;
   status: string;
   version: number;
@@ -1390,18 +1406,47 @@ export class GymsService {
   }
 
   async submitPublicWaitlist(
+    idempotencyKey: string,
+    retentionDays: number,
     input: RegionWaitlistRequestDto,
   ): Promise<RegionWaitlistReceiptDto> {
     this.assertWaitlistConsent(input);
-    await this.database.connection.transaction().execute((transaction) =>
-      this.upsertWaitlist(transaction, {
-        ...input,
-        email: input.email,
-        source: 'landing',
-        userId: null,
-      }),
+    const normalizedInput = {
+      consent: true as const,
+      consentNoticeVersion: input.consentNoticeVersion,
+      countryCode: input.countryCode?.trim().toUpperCase() ?? null,
+      email: input.email.trim().toLowerCase(),
+      requestedRegion: input.requestedRegion.trim().replace(/\s+/g, ' '),
+      subdivisionCode: input.subdivisionCode?.trim().toUpperCase() ?? null,
+    };
+    return this.idempotency.execute<WaitlistReceiptJson>(
+      {
+        actorKey: landingPublicSourceSystem,
+        key: idempotencyKey,
+        request: normalizedInput,
+        responseCode: 201,
+        scope: 'landing-intake:region-waitlist',
+      },
+      async (transaction) => {
+        const now = new Date();
+        const entry = await this.upsertWaitlist(transaction, {
+          ...normalizedInput,
+          email: normalizedInput.email,
+          retentionExpiresAt: landingIntakeRetentionExpiry(now, retentionDays),
+          source: 'landing',
+          userId: null,
+        });
+        await this.recordLandingSource(transaction, {
+          disposition: entry.inserted ? 'inserted' : 'matched_existing',
+          interestSubmissionId: null,
+          regionWaitlistEntryId: entry.id,
+          sourceCreatedAt: now,
+          sourceRecordId: idempotencyKey,
+          sourceRecordSha256: landingIntakeSourceHash(normalizedInput),
+        });
+        return { status: 'received' };
+      },
     );
-    return { status: 'received' };
   }
 
   async submitMemberWaitlist(
@@ -1417,6 +1462,7 @@ export class GymsService {
         await this.upsertWaitlist(transaction, {
           ...input,
           email: user.email,
+          retentionExpiresAt: null,
           source: 'member_onboarding',
           userId: user.id,
         });
@@ -1426,12 +1472,18 @@ export class GymsService {
 
   private async upsertWaitlist(
     transaction: Transaction<Database>,
-    input: MemberRegionWaitlistRequestDto & {
+    input: {
+      consent: true;
+      consentNoticeVersion: string;
+      countryCode?: string | null;
       email: string;
+      requestedRegion: string;
+      retentionExpiresAt: Date | null;
       source: 'landing' | 'member_onboarding';
+      subdivisionCode?: string | null;
       userId: string | null;
     },
-  ): Promise<void> {
+  ): Promise<{ id: string; inserted: boolean }> {
     const now = new Date();
     const requestedRegion = input.requestedRegion.trim().replace(/\s+/g, ' ');
     if (requestedRegion.length < 2) {
@@ -1441,7 +1493,7 @@ export class GymsService {
       });
     }
     const requestedRegionKey = requestedRegion.toLocaleLowerCase('en-CA');
-    await transaction
+    const entry = await transaction
       .insertInto('region_waitlist_entries')
       .values({
         consent_notice_version: input.consentNoticeVersion,
@@ -1451,6 +1503,7 @@ export class GymsService {
         email: input.email.trim().toLowerCase(),
         requested_region: requestedRegion,
         requested_region_key: requestedRegionKey,
+        retention_expires_at: input.retentionExpiresAt,
         source: input.source,
         status: 'waiting',
         subdivision_code: input.subdivisionCode?.trim().toUpperCase() ?? null,
@@ -1463,13 +1516,20 @@ export class GymsService {
           consented_at: now,
           country_code: input.countryCode?.trim().toUpperCase() ?? null,
           requested_region: requestedRegion,
+          retention_expires_at: sql<Date | null>`CASE
+            WHEN region_waitlist_entries.user_id IS NULL
+              THEN excluded.retention_expires_at
+            ELSE NULL
+          END`,
           review_version: sql<number>`region_waitlist_entries.review_version + 1`,
           subdivision_code: input.subdivisionCode?.trim().toUpperCase() ?? null,
           updated_at: now,
           user_id: sql`COALESCE(region_waitlist_entries.user_id, excluded.user_id)`,
         }),
       )
+      .returning(['id', sql<boolean>`xmax = 0`.as('inserted')])
       .executeTakeFirstOrThrow();
+    return entry;
   }
 
   private assertWaitlistConsent(input: {
@@ -1487,7 +1547,64 @@ export class GymsService {
     }
   }
 
+  private async recordLandingSource(
+    transaction: Transaction<Database>,
+    input: {
+      disposition: 'inserted' | 'matched_existing';
+      interestSubmissionId: string | null;
+      regionWaitlistEntryId: string | null;
+      sourceCreatedAt: Date;
+      sourceRecordId: string;
+      sourceRecordSha256: string;
+    },
+  ): Promise<void> {
+    const inserted = await transaction
+      .insertInto('landing_intake_source_records')
+      .values({
+        artifact_sha256: null,
+        interest_submission_id: input.interestSubmissionId,
+        mapping_disposition: input.disposition,
+        region_waitlist_entry_id: input.regionWaitlistEntryId,
+        source_created_at: input.sourceCreatedAt,
+        source_record_id: input.sourceRecordId,
+        source_record_sha256: input.sourceRecordSha256,
+        source_system: landingPublicSourceSystem,
+      })
+      .onConflict((conflict) =>
+        conflict.columns(['source_system', 'source_record_id']).doNothing(),
+      )
+      .returning('id')
+      .executeTakeFirst();
+    if (inserted) {
+      return;
+    }
+
+    const existing = await transaction
+      .selectFrom('landing_intake_source_records')
+      .select([
+        'interest_submission_id',
+        'region_waitlist_entry_id',
+        'source_record_sha256',
+      ])
+      .where('source_system', '=', landingPublicSourceSystem)
+      .where('source_record_id', '=', input.sourceRecordId)
+      .executeTakeFirstOrThrow();
+    if (
+      existing.source_record_sha256 !== input.sourceRecordSha256 ||
+      existing.interest_submission_id !== input.interestSubmissionId ||
+      existing.region_waitlist_entry_id !== input.regionWaitlistEntryId
+    ) {
+      throw new ConflictException({
+        code: 'LANDING_SOURCE_RECORD_CONFLICT',
+        message:
+          'The landing submission replay did not match its source record.',
+      });
+    }
+  }
+
   async submitInterest(
+    idempotencyKey: string,
+    retentionDays: number,
     input: InterestSubmissionDto,
   ): Promise<InterestSubmissionResponseDto> {
     if (!input.consent) {
@@ -1514,49 +1631,95 @@ export class GymsService {
         message: 'Company and partnership interest are required.',
       });
     }
-    const now = new Date();
-    const submission = await this.database.connection
-      .insertInto('interest_submissions')
-      .values({
-        audience: input.audience,
-        company_name: input.companyName?.trim() ?? null,
-        consent: true,
-        created_at: now,
-        discovery_source: input.discoverySource?.trim() ?? null,
-        email: input.email.trim().toLowerCase(),
-        full_name: input.fullName.trim(),
-        goal_days: input.goalDays ?? null,
-        message: input.message?.trim() ?? null,
-        partnership_interest: input.partnershipInterest?.trim() ?? null,
-        region: input.region.trim(),
-        source: 'gogymgo.com',
-        updated_at: now,
-        website: input.website?.trim() ?? null,
-        workout_style: input.workoutStyle?.trim() ?? null,
-      })
-      .onConflict((conflict) =>
-        conflict.columns(['audience', 'email']).doUpdateSet({
-          company_name: input.companyName?.trim() ?? null,
-          consent: true,
-          discovery_source: input.discoverySource?.trim() ?? null,
-          full_name: input.fullName.trim(),
-          goal_days: input.goalDays ?? null,
-          message: input.message?.trim() ?? null,
-          partnership_interest: input.partnershipInterest?.trim() ?? null,
-          region: input.region.trim(),
-          source: 'gogymgo.com',
-          updated_at: now,
-          website: input.website?.trim() ?? null,
-          workout_style: input.workoutStyle?.trim() ?? null,
-        }),
-      )
-      .returning(['audience', 'created_at', 'id'])
-      .executeTakeFirstOrThrow();
-    return {
-      audience: submission.audience,
-      id: submission.id,
-      submittedAt: submission.created_at.toISOString(),
+    const normalizedInput = {
+      audience: input.audience,
+      companyName: input.companyName?.trim() ?? null,
+      consent: true,
+      discoverySource: input.discoverySource?.trim() ?? null,
+      email: input.email.trim().toLowerCase(),
+      fullName: input.fullName.trim(),
+      goalDays: input.goalDays ?? null,
+      message: input.message?.trim() ?? null,
+      partnershipInterest: input.partnershipInterest?.trim() ?? null,
+      region: input.region.trim(),
+      website: input.website?.trim() ?? null,
+      workoutStyle: input.workoutStyle?.trim() ?? null,
     };
+    return this.idempotency.execute<InterestSubmissionJson>(
+      {
+        actorKey: landingPublicSourceSystem,
+        key: idempotencyKey,
+        request: normalizedInput,
+        responseCode: 201,
+        scope: 'landing-intake:interest-submission',
+      },
+      async (transaction) => {
+        const now = new Date();
+        const submission = await transaction
+          .insertInto('interest_submissions')
+          .values({
+            audience: normalizedInput.audience,
+            company_name: normalizedInput.companyName,
+            consent: true,
+            created_at: now,
+            discovery_source: normalizedInput.discoverySource,
+            email: normalizedInput.email,
+            full_name: normalizedInput.fullName,
+            goal_days: normalizedInput.goalDays,
+            message: normalizedInput.message,
+            partnership_interest: normalizedInput.partnershipInterest,
+            region: normalizedInput.region,
+            retention_expires_at: landingIntakeRetentionExpiry(
+              now,
+              retentionDays,
+            ),
+            source: landingPublicSourceSystem,
+            updated_at: now,
+            website: normalizedInput.website,
+            workout_style: normalizedInput.workoutStyle,
+          })
+          .onConflict((conflict) =>
+            conflict.columns(['audience', 'email']).doUpdateSet({
+              company_name: normalizedInput.companyName,
+              consent: true,
+              discovery_source: normalizedInput.discoverySource,
+              full_name: normalizedInput.fullName,
+              goal_days: normalizedInput.goalDays,
+              message: normalizedInput.message,
+              partnership_interest: normalizedInput.partnershipInterest,
+              region: normalizedInput.region,
+              retention_expires_at: landingIntakeRetentionExpiry(
+                now,
+                retentionDays,
+              ),
+              source: landingPublicSourceSystem,
+              updated_at: now,
+              website: normalizedInput.website,
+              workout_style: normalizedInput.workoutStyle,
+            }),
+          )
+          .returning([
+            'audience',
+            'created_at',
+            'id',
+            sql<boolean>`xmax = 0`.as('inserted'),
+          ])
+          .executeTakeFirstOrThrow();
+        await this.recordLandingSource(transaction, {
+          disposition: submission.inserted ? 'inserted' : 'matched_existing',
+          interestSubmissionId: submission.id,
+          regionWaitlistEntryId: null,
+          sourceCreatedAt: now,
+          sourceRecordId: idempotencyKey,
+          sourceRecordSha256: landingIntakeSourceHash(normalizedInput),
+        });
+        return {
+          audience: submission.audience,
+          id: submission.id,
+          submittedAt: submission.created_at.toISOString(),
+        };
+      },
+    );
   }
 
   listWaitlist(
@@ -1707,6 +1870,9 @@ export class GymsService {
           id: submission.id,
           partnershipInterest: submission.partnership_interest,
           region: submission.region,
+          retentionExpiresAt:
+            submission.retention_expires_at?.toISOString() ?? null,
+          source: submission.source,
           submittedAt: submission.created_at.toISOString(),
           workoutStyle: submission.workout_style,
         }));
@@ -2085,6 +2251,52 @@ export class GymsService {
       .returning('id')
       .execute();
     return expired.length;
+  }
+
+  purgeExpiredLandingIntake(
+    limit = 100,
+    now = new Date(),
+  ): Promise<{ interestDeleted: number; waitlistDeleted: number }> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+      throw new RangeError('Landing intake retention limit is invalid.');
+    }
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const interest = await transaction
+          .deleteFrom('interest_submissions')
+          .where('id', 'in', (query) =>
+            query
+              .selectFrom('interest_submissions')
+              .select('id')
+              .where('retention_expires_at', 'is not', null)
+              .where('retention_expires_at', '<=', now)
+              .orderBy('retention_expires_at')
+              .orderBy('id')
+              .limit(limit),
+          )
+          .returning('id')
+          .execute();
+        const waitlist = await transaction
+          .deleteFrom('region_waitlist_entries')
+          .where('id', 'in', (query) =>
+            query
+              .selectFrom('region_waitlist_entries')
+              .select('id')
+              .where('user_id', 'is', null)
+              .where('retention_expires_at', 'is not', null)
+              .where('retention_expires_at', '<=', now)
+              .orderBy('retention_expires_at')
+              .orderBy('id')
+              .limit(limit),
+          )
+          .returning('id')
+          .execute();
+        return {
+          interestDeleted: interest.length,
+          waitlistDeleted: waitlist.length,
+        };
+      });
   }
 
   private async resolveQrGymPresence(
@@ -2569,6 +2781,7 @@ export class GymsService {
     email: string;
     id: string;
     requested_region: string;
+    retention_expires_at: Date | null;
     review_version: number;
     source: string;
     status: string;
@@ -2580,6 +2793,7 @@ export class GymsService {
       email: entry.email,
       id: entry.id,
       requestedRegion: entry.requested_region,
+      retentionExpiresAt: entry.retention_expires_at?.toISOString() ?? null,
       source: entry.source,
       status: entry.status,
       version: entry.review_version,

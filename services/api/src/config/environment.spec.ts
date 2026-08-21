@@ -25,6 +25,7 @@ describe('environment validation', () => {
     expect(environment.PRETTY_LOGS_ENABLED).toBe(true);
     expect(environment.DATABASE_URL).toContain('localhost:5432');
     expect(environment.PRIVACY_OPERATIONS_ENABLED).toBe(false);
+    expect(environment.LANDING_INTAKE_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
     expect(environment.CREATOR_FEATURES_ENABLED).toBe(false);
     expect(environment.PRIVATE_OBJECT_STORAGE_PROVIDER).toBe('aws-s3');
@@ -37,6 +38,31 @@ describe('environment validation', () => {
     expect(
       validateEnvironment({ AWS_REGION: '', NODE_ENV: 'test' }).AWS_REGION,
     ).toBe('ca-central-1');
+  });
+
+  it('requires the forwarding secret and retention when landing intake is enabled', () => {
+    expect(() =>
+      validateEnvironment({
+        LANDING_INTAKE_ENABLED: 'true',
+        NODE_ENV: 'test',
+      }),
+    ).toThrow(/LANDING_INTAKE_FORWARDING_SECRET is required/i);
+    expect(() =>
+      validateEnvironment({
+        LANDING_INTAKE_ENABLED: 'true',
+        LANDING_INTAKE_FORWARDING_SECRET: 's'.repeat(32),
+        NODE_ENV: 'test',
+      }),
+    ).toThrow(/LANDING_INTAKE_RETENTION_DAYS is required/i);
+
+    const environment = validateEnvironment({
+      LANDING_INTAKE_ENABLED: 'true',
+      LANDING_INTAKE_FORWARDING_SECRET: 's'.repeat(32),
+      LANDING_INTAKE_RETENTION_DAYS: '90',
+      NODE_ENV: 'test',
+    });
+    expect(environment.LANDING_INTAKE_ENABLED).toBe(true);
+    expect(environment.LANDING_INTAKE_RETENTION_DAYS).toBe(90);
   });
 
   it('requires an OTLP endpoint and service name when telemetry is enabled', () => {

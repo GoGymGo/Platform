@@ -796,7 +796,9 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           headings={[
             "Email",
             "Requested region",
+            "Source",
             "Consent",
+            "Retention",
             "Status",
             "Submitted",
             "Review",
@@ -804,9 +806,15 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
           rows={props.waitlist.map((entry) => [
             entry.email,
             entry.requestedRegion,
+            entry.source,
             entry.consentedAt && entry.consentNoticeVersion
               ? "recorded"
               : "legacy / not recorded",
+            entry.retentionExpiresAt
+              ? formatDateTime(entry.retentionExpiresAt)
+              : entry.source === "member_onboarding"
+                ? "Account-linked / no public expiry"
+                : "Legacy / no scheduled expiry",
             entry.status,
             formatDateTime(entry.createdAt),
             <WaitlistReviewControl
@@ -821,11 +829,22 @@ export function PilotOperationsPanel(props: PilotOperationsProps) {
         <PilotTable
           empty="No landing submissions."
           eyebrow="LANDING INTAKE"
-          headings={["Contact", "Audience", "Region", "Submitted"]}
+          headings={[
+            "Contact",
+            "Audience",
+            "Region",
+            "Source",
+            "Retention",
+            "Submitted",
+          ]}
           rows={props.interestSubmissions.map((entry) => [
             `${entry.fullName} · ${entry.email}`,
             entry.audience,
             entry.region,
+            entry.source,
+            entry.retentionExpiresAt
+              ? formatDateTime(entry.retentionExpiresAt)
+              : "Legacy / no scheduled expiry",
             formatDateTime(entry.submittedAt),
           ])}
           title="Waitlist + interest"

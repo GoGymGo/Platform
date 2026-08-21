@@ -67,7 +67,7 @@ describe('PrivacyService download actions', () => {
       deleteObject: jest.fn(),
       getObjectMetadata: jest.fn(),
       putJsonIfAbsent: jest.fn(),
-      readObjectPrefix: jest.fn(),
+      readObject: jest.fn(),
     };
     const service = new PrivacyService(
       database,

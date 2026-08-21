@@ -25,6 +25,7 @@ interface ClaimedProfileMediaCleanup {
   leaseToken: string;
   objectKey: string;
   status: ProfileMediaStatus;
+  storageVersionId: string | null;
 }
 
 @Injectable()
@@ -57,7 +58,11 @@ export class ProfileMediaCleanupService {
       const candidate = await this.claimNext(new Date());
       if (!candidate) break;
       try {
-        await this.objectStorage.deleteObject(bucket, candidate.objectKey);
+        await this.objectStorage.deleteObject(
+          bucket,
+          candidate.objectKey,
+          candidate.storageVersionId,
+        );
         const deletedAt = new Date();
         const updated = await this.database.connection
           .updateTable('profile_media')
@@ -103,7 +108,7 @@ export class ProfileMediaCleanupService {
       .execute(async (transaction) => {
         const candidate = await transaction
           .selectFrom('profile_media')
-          .select(['id', 'object_key', 'status'])
+          .select(['id', 'object_key', 'status', 'storage_version_id'])
           .where('object_deleted_at', 'is', null)
           .where('expires_at', '<=', now)
           .where('cleanup_next_attempt_at', '<=', now)
@@ -147,6 +152,7 @@ export class ProfileMediaCleanupService {
           leaseToken,
           objectKey: candidate.object_key,
           status: candidate.status,
+          storageVersionId: candidate.storage_version_id,
         };
       });
   }

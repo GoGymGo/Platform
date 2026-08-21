@@ -100,11 +100,14 @@ test("accepts the exact bounded queue, health, and private-action contracts", ()
     decoders.decodeProfileMediaReviewAction({
       contentLength: 2048,
       contentType: "image/jpeg",
-      expiresAt: "2026-08-20T12:05:00.000Z",
+      expiresAt: new Date(Date.now() + 5 * 60 * 1_000).toISOString(),
+      height: 640,
       id: queueItem.id,
       reviewVersion: 2,
+      sha256: "a".repeat(64),
       submittedAt: queueItem.createdAt,
-      url: "https://private.example/review",
+      url: "https://private.example/review?signature=one",
+      width: 640,
     }).reviewVersion,
     2,
   );
@@ -119,10 +122,38 @@ test("rejects undeclared actions, private facts, and malformed retry dates", () 
     }),
   );
   assert.throws(() =>
+    decoders.decodeProfileMediaReviewAction({
+      contentLength: 2048,
+      contentType: "image/jpeg",
+      expiresAt: new Date(Date.now() + 5 * 60 * 1_000).toISOString(),
+      height: 640,
+      id: queueItem.id,
+      reviewVersion: 2,
+      sha256: "a".repeat(64),
+      submittedAt: queueItem.createdAt,
+      url: "http://public.example/permanent.jpg",
+      width: 640,
+    }),
+  );
+  assert.throws(() =>
     decoders.decodeWorkQueueDetail({
       ...queueItem,
       allowedDecisions: ["approved"],
       facts: [{ label: "Object key", value: "avatars/private.jpg" }],
+    }),
+  );
+  assert.throws(() =>
+    decoders.decodeProfileMediaReviewAction({
+      contentLength: 2048,
+      contentType: "image/jpeg",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1_000).toISOString(),
+      height: 640,
+      id: queueItem.id,
+      reviewVersion: 2,
+      sha256: "a".repeat(64),
+      submittedAt: queueItem.createdAt,
+      url: "https://private.example/review?signature=one",
+      width: 640,
     }),
   );
   assert.throws(() =>

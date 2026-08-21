@@ -127,7 +127,7 @@ export class PrivacyOperationsRepository {
       .execute();
     const profileMedia = await this.database.connection
       .selectFrom('profile_media')
-      .select(['expires_at', 'object_key'])
+      .select(['expires_at', 'object_key', 'storage_version_id'])
       .where('user_id', '=', job.userId)
       .where('object_deleted_at', 'is', null)
       .execute();
@@ -161,11 +161,30 @@ export class PrivacyOperationsRepository {
         profileMedia
           .map((item) => item.expires_at)
           .sort((left, right) => right.getTime() - left.getTime())[0] ?? null,
-      avatarObjectKeys: [
-        ...new Set([
-          ...profileMedia.map((item) => item.object_key),
-          ...(user.avatar_object_key ? [user.avatar_object_key] : []),
-        ]),
+      avatarObjects: [
+        ...new Map([
+          ...profileMedia.map(
+            (item) =>
+              [
+                item.object_key,
+                {
+                  objectKey: item.object_key,
+                  versionId: item.storage_version_id,
+                },
+              ] as const,
+          ),
+          ...(user.avatar_object_key &&
+          !profileMedia.some(
+            (item) => item.object_key === user.avatar_object_key,
+          )
+            ? [
+                [
+                  user.avatar_object_key,
+                  { objectKey: user.avatar_object_key, versionId: null },
+                ] as const,
+              ]
+            : []),
+        ]).values(),
       ],
       exportObjectKeys: exports.flatMap((item) =>
         item.result_object_key ? [item.result_object_key] : [],

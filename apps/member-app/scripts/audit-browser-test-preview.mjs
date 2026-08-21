@@ -13,7 +13,12 @@ const requiredMarkers = [
   'COMPLETE NEW-PLAYER FLOW',
   'PULSE_RIDER',
   'Northline Wellness',
-  'BROWSER PREVIEW QR'
+  'BROWSER PREVIEW QR',
+  'USE PRIVATE PLAYER ID',
+  'ACCOUNT DATA & DELETION',
+  'RESET APP ON THIS DEVICE',
+  'Your private player ID works immediately.',
+  'New pictures stay private and pending until moderation.'
 ];
 const forbiddenMarkers = [
   'DEVELOPMENT ONLY // LOCAL TESTING',

@@ -5356,15 +5356,22 @@ function QueueDecisionControl({
             LOAD PRIVATE MEDIA REVIEW ACTION
           </button>
           {mediaAction ? (
-            <a
-              className="primary-button full"
-              href={mediaAction.url}
-              rel="noreferrer"
-              target="_blank"
-            >
-              OPEN PRIVATE PREVIEW (EXPIRES{" "}
-              {formatDateTime(mediaAction.expiresAt)})
-            </a>
+            <>
+              <p className="queue-review-note" role="status">
+                Verified {mediaAction.contentType} · {mediaAction.width} ×{" "}
+                {mediaAction.height} px · {mediaAction.contentLength} bytes ·
+                SHA-256 {mediaAction.sha256.slice(0, 12)}…
+              </p>
+              <a
+                className="primary-button full"
+                href={mediaAction.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                OPEN PRIVATE PREVIEW (EXPIRES{" "}
+                {formatDateTime(mediaAction.expiresAt)})
+              </a>
+            </>
           ) : null}
         </div>
       ) : null}
@@ -5376,6 +5383,16 @@ function QueueDecisionControl({
           const validationError = formValidationError(event.currentTarget);
           if (validationError) {
             setError(validationError);
+            return;
+          }
+          if (
+            item.kind === "profile_media" &&
+            decision === "approved" &&
+            !mediaAction
+          ) {
+            setError(
+              "Load and inspect the current private media action before approval.",
+            );
             return;
           }
           setSubmitting(true);

@@ -251,7 +251,12 @@ export interface ProfileMediaTable {
   content_type: string;
   expected_size_bytes: number;
   actual_size_bytes: number | null;
+  content_sha256: string | null;
+  image_height: number | null;
+  image_width: number | null;
+  inspection_version: string | null;
   storage_generation: string | null;
+  storage_version_id: string | null;
   status: ProfileMediaStatus;
   expires_at: Timestamp;
   completed_at: NullableTimestamp;

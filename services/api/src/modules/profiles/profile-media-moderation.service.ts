@@ -15,7 +15,9 @@ import type { Database, JsonObject } from '../../database/database.types';
 import {
   PRIVATE_OBJECT_STORAGE,
   type PrivateObjectStorage,
+  PrivateObjectStorageError,
 } from '../storage/private-object-storage';
+import { profileMediaInspectionVersion } from './profile-media-image';
 import { ProfilesService } from './profiles.service';
 
 interface MediaDecisionJson extends JsonObject {
@@ -27,10 +29,13 @@ export interface ProfileMediaReviewAction {
   contentLength: number;
   contentType: string;
   expiresAt: string;
+  height: number;
   id: string;
   reviewVersion: number;
+  sha256: string;
   submittedAt: string;
   url: string;
+  width: number;
 }
 
 @Injectable()
@@ -62,27 +67,66 @@ export class ProfileMediaModerationService {
       .where('id', '=', mediaId)
       .where('status', '=', 'pending_review')
       .where('object_deleted_at', 'is', null)
+      .where('inspection_version', '=', profileMediaInspectionVersion)
       .executeTakeFirst();
-    if (!media || media.actual_size_bytes === null || !media.completed_at) {
+    if (
+      !media ||
+      media.actual_size_bytes === null ||
+      !media.completed_at ||
+      !media.content_sha256 ||
+      media.image_height === null ||
+      media.image_width === null ||
+      !media.storage_generation
+    ) {
       throw this.mediaNotFound();
     }
     const expiresAt = new Date(Date.now() + this.readTtlSeconds * 1_000);
     try {
+      const metadata = await this.objectStorage.getObjectMetadata(
+        bucket,
+        media.object_key,
+      );
+      if (
+        metadata.contentEncoding !== null ||
+        metadata.contentLength !== media.actual_size_bytes ||
+        metadata.contentType !== media.content_type ||
+        metadata.etag !== media.storage_generation ||
+        metadata.mediaId !== media.id ||
+        metadata.versionId !== media.storage_version_id
+      ) {
+        throw new PrivateObjectStorageError('OBJECT_IDENTITY_MISMATCH');
+      }
       const url = await this.objectStorage.createSignedReadUrl(
         bucket,
         media.object_key,
         expiresAt,
+        {
+          etag: media.storage_generation,
+          versionId: media.storage_version_id,
+        },
       );
       return {
         contentLength: media.actual_size_bytes,
         contentType: media.content_type,
         expiresAt: expiresAt.toISOString(),
+        height: media.image_height,
         id: media.id,
         reviewVersion: media.review_version,
+        sha256: media.content_sha256,
         submittedAt: media.completed_at.toISOString(),
         url,
+        width: media.image_width,
       };
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof PrivateObjectStorageError &&
+        error.code === 'OBJECT_IDENTITY_MISMATCH'
+      ) {
+        throw new ConflictException({
+          code: 'AVATAR_OBJECT_CHANGED',
+          message: 'The avatar object changed after verification.',
+        });
+      }
       throw this.storageUnavailable();
     }
   }
@@ -111,15 +155,28 @@ export class ProfileMediaModerationService {
       },
       async (transaction, authorizedOperatorId) => {
         const operatorUserId = authorizedOperatorId ?? input.operatorUserId;
+        const mediaOwner = await transaction
+          .selectFrom('profile_media')
+          .select('user_id')
+          .where('id', '=', input.mediaId)
+          .executeTakeFirst();
+        if (!mediaOwner) {
+          throw this.mediaNotFound();
+        }
+        await this.profiles.ensureProfile(mediaOwner.user_id, transaction);
+        const profile = await transaction
+          .selectFrom('profiles')
+          .selectAll()
+          .where('user_id', '=', mediaOwner.user_id)
+          .forUpdate()
+          .executeTakeFirstOrThrow();
         const media = await transaction
           .selectFrom('profile_media')
           .selectAll()
           .where('id', '=', input.mediaId)
           .forUpdate()
           .executeTakeFirst();
-        if (!media) {
-          throw this.mediaNotFound();
-        }
+        if (!media) throw this.mediaNotFound();
         if (media.review_version !== input.expectedVersion) {
           throw new ConflictException({
             code: 'AVATAR_MEDIA_VERSION_CONFLICT',
@@ -138,19 +195,31 @@ export class ProfileMediaModerationService {
             message: 'Only pending avatar media can be decided.',
           });
         }
+        if (
+          media.inspection_version !== profileMediaInspectionVersion ||
+          !media.content_sha256 ||
+          media.image_height === null ||
+          media.image_width === null ||
+          !media.storage_generation
+        ) {
+          throw new ConflictException({
+            code: 'AVATAR_MEDIA_NOT_VERIFIED',
+            message: 'This avatar is not eligible for moderation.',
+          });
+        }
         const now = new Date();
         if (input.decision === 'approved') {
-          const profile = await this.profiles.ensureProfile(
-            media.user_id,
-            transaction,
-          );
           if (
             profile.avatar_object_key &&
             profile.avatar_object_key !== media.object_key
           ) {
             await transaction
               .updateTable('profile_media')
-              .set({ status: 'superseded', updated_at: now })
+              .set({
+                review_version: sql<number>`review_version + 1`,
+                status: 'superseded',
+                updated_at: now,
+              })
               .where('user_id', '=', media.user_id)
               .where('object_key', '=', profile.avatar_object_key)
               .where('status', '=', 'approved')

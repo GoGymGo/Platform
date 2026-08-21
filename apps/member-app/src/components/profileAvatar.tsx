@@ -4,34 +4,37 @@ import {
   View,
   type StyleProp,
   type ViewStyle
-} from 'react-native';
+} from 'react-native'
 
-import { TerminalText } from '@/components/cyber';
-import { colors, fontFamilies } from '@/constants/theme';
+import { TerminalText } from '@/components/cyber'
+import { colors, fontFamilies } from '@/constants/theme'
 
 type ProfileAvatarProps = {
-  imageUri: string | null;
-  initials?: string;
-  showStatus?: boolean;
-  size?: number;
-  style?: StyleProp<ViewStyle>;
-};
+  imageUri: string | null
+  initials?: string
+  showStatus?: boolean
+  size?: number
+  style?: StyleProp<ViewStyle>
+  version?: string | null
+}
 
 export function ProfileAvatar({
   imageUri,
   initials = 'GG',
   showStatus = false,
   size = 84,
-  style
+  style,
+  version
 }: ProfileAvatarProps) {
-  const borderRadius = Math.round(size * 0.28);
+  const borderRadius = Math.round(size * 0.28)
 
   return (
     <View style={[styles.wrapper, { height: size, width: size }, style]}>
       <View style={[styles.avatar, { borderRadius }]}>
         {imageUri ? (
           <Image
-            accessibilityLabel="Profile image"
+            accessibilityLabel="Approved profile image"
+            key={version ?? imageUri}
             resizeMode="cover"
             source={{ uri: imageUri }}
             style={styles.image}
@@ -44,7 +47,7 @@ export function ProfileAvatar({
       </View>
       {showStatus ? <View style={styles.statusDot} /> : null}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -78,4 +81,4 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: colors.green
   }
-});
+})

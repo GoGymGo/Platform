@@ -86,9 +86,16 @@ describe('AwsS3PrivateObjectStorage', () => {
         'private-content',
         'avatars/user/avatar.jpg',
         expiresAt,
+        { etag: '"etag-1"', versionId: 'version-1' },
       ),
     ).resolves.toBe('https://s3.example/signed');
     expect(presign.mock.calls[0][1]).toBeInstanceOf(GetObjectCommand);
+    expect(presign.mock.calls[0][1].input).toEqual(
+      expect.objectContaining({
+        IfMatch: '"etag-1"',
+        VersionId: 'version-1',
+      }),
+    );
 
     await expect(
       client.createSignedUploadUrl({
@@ -128,6 +135,7 @@ describe('AwsS3PrivateObjectStorage', () => {
         ContentType: 'image/png',
         ETag: '"etag-1"',
         Metadata: { 'media-id': 'media-1' },
+        VersionId: 'version-1',
       })
       .mockResolvedValueOnce({
         Body: {
@@ -142,29 +150,58 @@ describe('AwsS3PrivateObjectStorage', () => {
       contentEncoding: null,
       contentLength: 12,
       contentType: 'image/png',
-      generation: '"etag-1"',
+      etag: '"etag-1"',
       mediaId: 'media-1',
+      versionId: 'version-1',
     });
     await expect(
-      client.readObjectPrefix('private-content', 'avatars/user/avatar.png', 12),
+      client.readObject('private-content', 'avatars/user/avatar.png', 12, {
+        etag: '"etag-1"',
+        versionId: 'version-1',
+      }),
     ).resolves.toEqual(Buffer.from('0123456789ab'));
-    const rangedRead = send.mock.calls[1][0] as GetObjectCommand;
-    expect(rangedRead).toBeInstanceOf(GetObjectCommand);
-    expect(rangedRead.input.Range).toBe('bytes=0-11');
+    const boundedRead = send.mock.calls[1][0] as GetObjectCommand;
+    expect(boundedRead.input).toEqual(
+      expect.objectContaining({
+        IfMatch: '"etag-1"',
+        Range: 'bytes=0-11',
+        VersionId: 'version-1',
+      }),
+    );
   });
 
   it('makes deletion idempotent and rejects unsafe object keys', async () => {
     const { client, send } = setup();
     send.mockResolvedValue({});
     await expect(
-      client.deleteObject('private-content', 'avatars/user/avatar.png'),
+      client.deleteObject(
+        'private-content',
+        'avatars/user/avatar.png',
+        'version-1',
+      ),
     ).resolves.toBeUndefined();
-    expect(send.mock.calls[0][0] as DeleteObjectCommand).toBeInstanceOf(
-      DeleteObjectCommand,
+    expect((send.mock.calls[0][0] as DeleteObjectCommand).input).toEqual(
+      expect.objectContaining({ VersionId: 'version-1' }),
     );
 
     await expect(
       client.deleteObject('private-content', '../unsafe'),
     ).rejects.toMatchObject({ code: 'OBJECT_LOCATION_INVALID' });
+  });
+
+  it('discovers and deletes the exact live version for uncaptured uploads', async () => {
+    const { client, send } = setup();
+    send
+      .mockResolvedValueOnce({ VersionId: 'discovered-version' })
+      .mockResolvedValueOnce({});
+
+    await expect(
+      client.deleteObject('private-content', 'avatars/user/abandoned.png'),
+    ).resolves.toBeUndefined();
+
+    expect(send.mock.calls[0][0]).toBeInstanceOf(HeadObjectCommand);
+    expect((send.mock.calls[1][0] as DeleteObjectCommand).input).toEqual(
+      expect.objectContaining({ VersionId: 'discovered-version' }),
+    );
   });
 });

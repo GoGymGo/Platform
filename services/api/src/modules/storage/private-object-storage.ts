@@ -21,8 +21,14 @@ export interface PrivateObjectMetadata {
   contentEncoding: string | null;
   contentLength: number;
   contentType: string;
-  generation: string;
+  etag: string;
   mediaId: string | null;
+  versionId: string | null;
+}
+
+export interface PrivateObjectIdentity {
+  etag: string;
+  versionId: string | null;
 }
 
 export interface SignedUploadAction {
@@ -35,20 +41,26 @@ export interface PrivateObjectStorage {
     bucket: string,
     objectKey: string,
     expiresAt: Date,
+    identity?: PrivateObjectIdentity,
   ): Promise<string>;
   createSignedUploadUrl(
     input: CreateSignedUploadUrlInput,
   ): Promise<SignedUploadAction>;
-  deleteObject(bucket: string, objectKey: string): Promise<void>;
+  deleteObject(
+    bucket: string,
+    objectKey: string,
+    versionId?: string | null,
+  ): Promise<void>;
   getObjectMetadata(
     bucket: string,
     objectKey: string,
   ): Promise<PrivateObjectMetadata>;
   putJsonIfAbsent(input: PutPrivateJsonInput): Promise<{ sha256: string }>;
-  readObjectPrefix(
+  readObject(
     bucket: string,
     objectKey: string,
-    length: number,
+    expectedLength: number,
+    identity: PrivateObjectIdentity,
   ): Promise<Buffer>;
 }
 

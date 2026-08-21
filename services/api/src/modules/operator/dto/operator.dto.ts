@@ -311,11 +311,20 @@ export class ProfileMediaReviewActionDto {
   @ApiProperty({ format: 'date-time', type: String })
   expiresAt!: string;
 
+  @ApiProperty({ minimum: 64, type: Number })
+  height!: number;
+
   @ApiProperty({ format: 'uri', type: String })
   url!: string;
 
   @ApiProperty({ minimum: 1, type: Number })
   reviewVersion!: number;
+
+  @ApiProperty({ pattern: '^[a-f0-9]{64}$', type: String })
+  sha256!: string;
+
+  @ApiProperty({ minimum: 64, type: Number })
+  width!: number;
 }
 
 export class OperatorActionResponseDto {

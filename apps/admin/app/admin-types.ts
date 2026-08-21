@@ -255,10 +255,13 @@ export type ProfileMediaReviewAction = {
   contentLength: number;
   contentType: string;
   expiresAt: string;
+  height: number;
   id: string;
   reviewVersion: number;
+  sha256: string;
   submittedAt: string;
   url: string;
+  width: number;
 };
 
 export type AuditPage = {

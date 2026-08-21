@@ -28,7 +28,8 @@ export interface components {
     AdminRewardResponseDto: { id: string; status: "archived" | "draft" | "published"; version: number };
     AppendSessionEventDto: { deviceEvidenceToken?: string; eventId: string; eventType: "device_attestation" | "gym_qr_scan" | "heart_rate_sample" | "presence_check"; heartRateBpm?: number; occurredAt: string; qrPayload?: string };
     AssignCompetitionGymDto: { reason: string };
-    AvatarMediaDto: { contentType: string; createdAt: string; id: string; readUrl: string | null; readUrlExpiresAt: string | null; status: string };
+    AvatarCapabilitiesResponseDto: { maxBytes: number; maxDimension: number; minDimension: number; status: "configured" | "disabled" | "unconfigured"; uploadAvailable: boolean };
+    AvatarMediaDto: { contentType: string; createdAt: string; height: number | null; id: string; readUrl: string | null; readUrlExpiresAt: string | null; status: string; version: number; width: number | null };
     AvatarStateResponseDto: { active: components['schemas']["AvatarMediaDto"] | null; latest: components['schemas']["AvatarMediaDto"] | null };
     AvatarUploadActionDto: { headers: { [key: string]: string }; method: "PUT"; url: string };
     AvatarUploadCompletionResponseDto: { id: string; status: "approved" | "pending_review" };
@@ -155,7 +156,7 @@ export interface components {
     PrivacyRequestEventDto: { createdAt: string; nextStatus: "completed" | "processing" | "rejected" | "requested"; previousStatus: "completed" | "processing" | "rejected" | "requested" | null };
     PrivacyRequestResponseDto: { completedAt: string | null; confirmedAt: string | null; downloadAvailable: boolean; exportExpiresAt: string | null; failureCode: string | null; id: string; nextAttemptAt: string | null; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested"; version: number };
     PrivacySettingsDto: { showRegion: boolean; showStats: boolean };
-    ProfileMediaReviewActionDto: { contentLength: number; contentType: string; expiresAt: string; id: string; reviewVersion: number; submittedAt: string; url: string };
+    ProfileMediaReviewActionDto: { contentLength: number; contentType: string; expiresAt: string; height: number; id: string; reviewVersion: number; sha256: string; submittedAt: string; url: string; width: number };
     PublishLegalDocumentDto: { content: components['schemas']["LegalDocumentContentDto"]; documentKey: string; effectiveAt: string; jurisdictionCode: string; locale: string; ownerApprovalConfirmed: boolean; reason: string; receiptRequirement: "accept" | "acknowledge" | "none"; title: string; version: string };
     PushDeviceResponseDto: { enabled: boolean; id: string; platform: "android" | "ios"; provider: "expo" };
     ReadinessDependenciesDto: { database: "ok"; worker: "healthy" | "starting" };
@@ -649,6 +650,14 @@ export interface operations {
     parameters: Record<string, never>;
     responses: {
       "200": components['schemas']["AvatarStateResponseDto"];
+    };
+  };
+  getCapabilities: {
+    method: "GET";
+    path: "/v1/me/avatar/capabilities";
+    parameters: Record<string, never>;
+    responses: {
+      "200": components['schemas']["AvatarCapabilitiesResponseDto"];
     };
   };
   getCatalog: {
@@ -1489,6 +1498,9 @@ export interface paths {
   "/v1/me/avatar-upload/{mediaId}/complete": {
     post: operations["completeUpload"];
   };
+  "/v1/me/avatar/capabilities": {
+    get: operations["getCapabilities"];
+  };
   "/v1/me/legal-receipts": {
     post: operations["record"];
   };
@@ -1825,6 +1837,7 @@ export type AdminRewardAwardResponseDto = components['schemas']["AdminRewardAwar
 export type AdminRewardResponseDto = components['schemas']["AdminRewardResponseDto"];
 export type AppendSessionEventDto = components['schemas']["AppendSessionEventDto"];
 export type AssignCompetitionGymDto = components['schemas']["AssignCompetitionGymDto"];
+export type AvatarCapabilitiesResponseDto = components['schemas']["AvatarCapabilitiesResponseDto"];
 export type AvatarMediaDto = components['schemas']["AvatarMediaDto"];
 export type AvatarStateResponseDto = components['schemas']["AvatarStateResponseDto"];
 export type AvatarUploadActionDto = components['schemas']["AvatarUploadActionDto"];

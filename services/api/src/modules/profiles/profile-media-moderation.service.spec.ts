@@ -14,6 +14,7 @@ function queryBuilder(result?: unknown) {
   for (const method of [
     'forUpdate',
     'returning',
+    'select',
     'selectAll',
     'set',
     'values',
@@ -29,9 +30,14 @@ function queryBuilder(result?: unknown) {
 function setup(overrides: Record<string, unknown> = {}) {
   const media = {
     id: 'media-id',
+    content_sha256: 'a'.repeat(64),
+    image_height: 640,
+    image_width: 640,
+    inspection_version: 'avatar-image-v1',
     object_key: 'avatars/member/media.jpg',
     review_version: 3,
     status: 'pending_review',
+    storage_generation: '"etag-1"',
     user_id: 'member-user',
     ...overrides,
   };
@@ -69,7 +75,12 @@ function setup(overrides: Record<string, unknown> = {}) {
     config,
     {} as DatabaseService,
     { execute } as unknown as IdempotencyService,
-    {} as ProfilesService,
+    {
+      ensureProfile: jest.fn().mockResolvedValue({
+        avatar_object_key: null,
+        user_id: 'member-user',
+      }),
+    } as unknown as ProfilesService,
     {} as PrivateObjectStorage,
   );
   return { audit, execute, service, update };

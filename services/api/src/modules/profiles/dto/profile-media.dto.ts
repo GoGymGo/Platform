@@ -51,6 +51,23 @@ export class CreateAvatarUploadResponseDto {
   upload!: AvatarUploadActionDto;
 }
 
+export class AvatarCapabilitiesResponseDto {
+  @ApiProperty({ type: Number })
+  maxBytes!: number;
+
+  @ApiProperty({ type: Number })
+  maxDimension!: number;
+
+  @ApiProperty({ type: Number })
+  minDimension!: number;
+
+  @ApiProperty({ enum: ['configured', 'disabled', 'unconfigured'] })
+  status!: 'configured' | 'disabled' | 'unconfigured';
+
+  @ApiProperty({ type: Boolean })
+  uploadAvailable!: boolean;
+}
+
 export class AvatarUploadCompletionResponseDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
@@ -77,6 +94,15 @@ export class AvatarMediaDto {
 
   @ApiProperty({ type: String })
   status!: ProfileMediaStatus;
+
+  @ApiProperty({ nullable: true, type: Number })
+  height!: number | null;
+
+  @ApiProperty({ nullable: true, type: Number })
+  width!: number | null;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }
 
 export class AvatarStateResponseDto {

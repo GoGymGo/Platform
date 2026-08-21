@@ -17,9 +17,11 @@ import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import {
   PRIVATE_OBJECT_STORAGE,
   type PrivateObjectStorage,
+  type PrivateObjectMetadata,
   PrivateObjectStorageError,
 } from '../storage/private-object-storage';
 import type {
+  AvatarCapabilitiesResponseDto,
   AvatarMediaDto,
   AvatarStateResponseDto,
   AvatarUploadCompletionResponseDto,
@@ -27,7 +29,13 @@ import type {
   CreateAvatarUploadResponseDto,
   RemoveAvatarResponseDto,
 } from './dto/profile-media.dto';
-import { isExpectedProfileImageSignature } from './profile-media-signature';
+import {
+  inspectProfileImage,
+  ProfileImageInspectionError,
+  profileMediaInspectionVersion,
+  profileMediaMaximumDimension,
+  profileMediaMinimumDimension,
+} from './profile-media-image';
 import { ProfilesService } from './profiles.service';
 
 @Injectable()
@@ -56,6 +64,21 @@ export class ProfileMediaService {
     });
   }
 
+  getCapabilities(): AvatarCapabilitiesResponseDto {
+    const status = !this.enabled
+      ? 'disabled'
+      : this.bucket
+        ? 'configured'
+        : 'unconfigured';
+    return {
+      maxBytes: this.maxBytes,
+      maxDimension: profileMediaMaximumDimension,
+      minDimension: profileMediaMinimumDimension,
+      status,
+      uploadAvailable: status === 'configured',
+    };
+  }
+
   async createUpload(
     principal: AuthenticatedPrincipal,
     requestKey: string,
@@ -74,6 +97,12 @@ export class ProfileMediaService {
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
         await this.profiles.ensureProfile(user.id, transaction);
+        await transaction
+          .selectFrom('profiles')
+          .select('user_id')
+          .where('user_id', '=', user.id)
+          .forUpdate()
+          .executeTakeFirstOrThrow();
         const deletionRequest = await transaction
           .selectFrom('privacy_requests')
           .select('id')
@@ -121,20 +150,16 @@ export class ProfileMediaService {
           return existing;
         }
 
-        const pending = await transaction
-          .selectFrom('profile_media')
-          .select((expression) => expression.fn.countAll<number>().as('count'))
+        await transaction
+          .updateTable('profile_media')
+          .set({
+            review_version: sql<number>`review_version + 1`,
+            status: 'superseded',
+            updated_at: now,
+          })
           .where('user_id', '=', user.id)
-          .where('status', '=', 'pending_upload')
-          .where('expires_at', '>', now)
-          .executeTakeFirstOrThrow();
-        if (Number(pending.count) >= 3) {
-          throw new ConflictException({
-            code: 'AVATAR_UPLOAD_LIMIT_REACHED',
-            message:
-              'Complete or wait for an existing avatar upload to expire.',
-          });
-        }
+          .where('status', 'in', ['pending_upload', 'pending_review'])
+          .execute();
 
         const id = randomUUID();
         const expiresAt = new Date(
@@ -206,13 +231,19 @@ export class ProfileMediaService {
       return { id: media.id, status: media.status };
     }
 
-    let metadata;
-    let prefix;
+    let metadata: PrivateObjectMetadata;
+    let object: Buffer;
     try {
-      [metadata, prefix] = await Promise.all([
-        this.objectStorage.getObjectMetadata(bucket, media.object_key),
-        this.objectStorage.readObjectPrefix(bucket, media.object_key, 12),
-      ]);
+      metadata = await this.objectStorage.getObjectMetadata(
+        bucket,
+        media.object_key,
+      );
+      object = await this.objectStorage.readObject(
+        bucket,
+        media.object_key,
+        media.expected_size_bytes,
+        { etag: metadata.etag, versionId: metadata.versionId },
+      );
     } catch (error) {
       if (
         error instanceof PrivateObjectStorageError &&
@@ -223,6 +254,15 @@ export class ProfileMediaService {
           message: 'Upload the avatar object before completing this action.',
         });
       }
+      if (
+        error instanceof PrivateObjectStorageError &&
+        error.code === 'OBJECT_IDENTITY_MISMATCH'
+      ) {
+        throw new ConflictException({
+          code: 'AVATAR_OBJECT_CHANGED',
+          message: 'The uploaded avatar changed before it could be verified.',
+        });
+      }
       throw this.storageUnavailable();
     }
     if (
@@ -230,8 +270,7 @@ export class ProfileMediaService {
       (metadata.contentEncoding !== null &&
         metadata.contentEncoding !== 'identity') ||
       metadata.contentType !== media.content_type ||
-      metadata.mediaId !== media.id ||
-      !isExpectedProfileImageSignature(prefix, media.content_type)
+      metadata.mediaId !== media.id
     ) {
       throw new UnprocessableEntityException({
         code: 'AVATAR_UPLOAD_METADATA_MISMATCH',
@@ -239,10 +278,31 @@ export class ProfileMediaService {
       });
     }
 
+    let inspection;
+    try {
+      inspection = await inspectProfileImage(object, media.content_type);
+    } catch (error) {
+      if (error instanceof ProfileImageInspectionError) {
+        throw new UnprocessableEntityException({
+          code: 'AVATAR_IMAGE_INVALID',
+          message:
+            'The avatar must be a metadata-free JPEG, PNG, or WebP image between 64 and 2048 pixels per side.',
+        });
+      }
+      throw error;
+    }
+
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
+        await this.profiles.ensureProfile(user.id, transaction);
+        await transaction
+          .selectFrom('profiles')
+          .select('user_id')
+          .where('user_id', '=', user.id)
+          .forUpdate()
+          .executeTakeFirstOrThrow();
         const current = await transaction
           .selectFrom('profile_media')
           .selectAll()
@@ -266,8 +326,13 @@ export class ProfileMediaService {
           .set({
             actual_size_bytes: metadata.contentLength,
             completed_at: completedAt,
+            content_sha256: inspection.sha256,
+            image_height: inspection.height,
+            image_width: inspection.width,
+            inspection_version: inspection.inspectionVersion,
             status: 'pending_review',
-            storage_generation: metadata.generation,
+            storage_generation: metadata.etag,
+            storage_version_id: metadata.versionId,
             updated_at: completedAt,
           })
           .where('id', '=', current.id)
@@ -279,7 +344,7 @@ export class ProfileMediaService {
   async getAvatar(
     principal: AuthenticatedPrincipal,
   ): Promise<AvatarStateResponseDto> {
-    const bucket = this.requireBucket();
+    const bucket = this.enabled ? this.bucket : undefined;
     const state = await this.database.connection
       .transaction()
       .execute(async (transaction) => {
@@ -294,6 +359,7 @@ export class ProfileMediaService {
                 .where('object_key', '=', profile.avatar_object_key)
                 .where('status', '=', 'approved')
                 .where('object_deleted_at', 'is', null)
+                .where('inspection_version', '=', profileMediaInspectionVersion)
                 .executeTakeFirst()
             : Promise.resolve(undefined),
           transaction
@@ -308,7 +374,12 @@ export class ProfileMediaService {
 
     const expiresAt = new Date(Date.now() + this.readTtlSeconds * 1_000);
     const active = state.active
-      ? await this.mediaResponse(bucket, state.active, expiresAt, true)
+      ? await this.mediaResponse(
+          bucket,
+          state.active,
+          expiresAt,
+          Boolean(bucket),
+        )
       : null;
     const latest =
       state.latest?.id === state.active?.id
@@ -318,7 +389,9 @@ export class ProfileMediaService {
               bucket,
               state.latest,
               expiresAt,
-              state.latest.status === 'pending_review',
+              state.latest.status === 'pending_review' &&
+                state.latest.inspection_version ===
+                  profileMediaInspectionVersion,
             )
           : null;
     return { active, latest };
@@ -331,11 +404,21 @@ export class ProfileMediaService {
       .transaction()
       .execute(async (transaction) => {
         const user = await this.profiles.ensureUser(principal, transaction);
-        const profile = await this.profiles.ensureProfile(user.id, transaction);
+        await this.profiles.ensureProfile(user.id, transaction);
+        const profile = await transaction
+          .selectFrom('profiles')
+          .selectAll()
+          .where('user_id', '=', user.id)
+          .forUpdate()
+          .executeTakeFirstOrThrow();
         const now = new Date();
         const removed = await transaction
           .updateTable('profile_media')
-          .set({ status: 'removed', updated_at: now })
+          .set({
+            review_version: sql<number>`review_version + 1`,
+            status: 'removed',
+            updated_at: now,
+          })
           .where('user_id', '=', user.id)
           .where('status', 'in', [
             'approved',
@@ -379,12 +462,12 @@ export class ProfileMediaService {
   }
 
   private async mediaResponse(
-    bucket: string,
+    bucket: string | undefined,
     media: Selectable<ProfileMediaTable>,
     expiresAt: Date,
     includeReadUrl: boolean,
   ): Promise<AvatarMediaDto> {
-    if (!includeReadUrl) {
+    if (!includeReadUrl || !bucket) {
       return {
         contentType: media.content_type,
         createdAt: media.created_at.toISOString(),
@@ -392,13 +475,21 @@ export class ProfileMediaService {
         readUrl: null,
         readUrlExpiresAt: null,
         status: media.status,
+        height: media.image_height,
+        version: media.review_version,
+        width: media.image_width,
       };
     }
+    if (!media.storage_generation) throw this.storageUnavailable();
     try {
       const readUrl = await this.objectStorage.createSignedReadUrl(
         bucket,
         media.object_key,
         expiresAt,
+        {
+          etag: media.storage_generation,
+          versionId: media.storage_version_id,
+        },
       );
       return {
         contentType: media.content_type,
@@ -407,6 +498,9 @@ export class ProfileMediaService {
         readUrl,
         readUrlExpiresAt: expiresAt.toISOString(),
         status: media.status,
+        height: media.image_height,
+        version: media.review_version,
+        width: media.image_width,
       };
     } catch {
       throw this.storageUnavailable();

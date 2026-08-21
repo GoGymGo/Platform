@@ -90,6 +90,27 @@
         "tags": ["profiles"]
       }
     },
+    "/v1/me/avatar/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarCapabilitiesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "firebase": [] }],
+        "summary": "Get authoritative avatar upload availability",
+        "tags": ["profiles"]
+      }
+    },
     "/v1/me/avatar-upload/{mediaId}/complete": {
       "post": {
         "operationId": "completeUpload",
@@ -4973,6 +4994,26 @@
           "upload"
         ]
       },
+      "AvatarCapabilitiesResponseDto": {
+        "type": "object",
+        "properties": {
+          "maxBytes": { "type": "number" },
+          "maxDimension": { "type": "number" },
+          "minDimension": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": ["configured", "disabled", "unconfigured"]
+          },
+          "uploadAvailable": { "type": "boolean" }
+        },
+        "required": [
+          "maxBytes",
+          "maxDimension",
+          "minDimension",
+          "status",
+          "uploadAvailable"
+        ]
+      },
       "AvatarUploadCompletionResponseDto": {
         "type": "object",
         "properties": {
@@ -4993,7 +5034,10 @@
             "format": "date-time",
             "nullable": true
           },
-          "status": { "type": "string" }
+          "status": { "type": "string" },
+          "height": { "type": "number", "nullable": true },
+          "width": { "type": "number", "nullable": true },
+          "version": { "type": "number", "minimum": 1 }
         },
         "required": [
           "id",
@@ -5001,7 +5045,10 @@
           "createdAt",
           "readUrl",
           "readUrlExpiresAt",
-          "status"
+          "status",
+          "height",
+          "width",
+          "version"
         ]
       },
       "AvatarStateResponseDto": {
@@ -6444,8 +6491,11 @@
           "contentLength": { "type": "number" },
           "submittedAt": { "type": "string", "format": "date-time" },
           "expiresAt": { "type": "string", "format": "date-time" },
+          "height": { "type": "number", "minimum": 64 },
           "url": { "type": "string", "format": "uri" },
-          "reviewVersion": { "type": "number", "minimum": 1 }
+          "reviewVersion": { "type": "number", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "width": { "type": "number", "minimum": 64 }
         },
         "required": [
           "id",
@@ -6453,8 +6503,11 @@
           "contentLength",
           "submittedAt",
           "expiresAt",
+          "height",
           "url",
-          "reviewVersion"
+          "reviewVersion",
+          "sha256",
+          "width"
         ]
       },
       "DecideProfileMediaDto": {

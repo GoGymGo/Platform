@@ -15,7 +15,7 @@ This document describes the technical policy. Launch counsel must approve jurisd
    The deciding administrator is reauthorized from the database before an
    idempotent replay and cannot decide a request owned by the same account.
 3. The worker reads a repeatable PostgreSQL snapshot and builds deterministic
-   portable JSON schema version 13. The exhaustive table-disposition map covers
+   portable JSON schema version 14. The exhaustive table-disposition map covers
    every current authoritative table. It includes the member's account,
    consent/legal, region, Contest/workout/ledger/reward, social, Creator,
    Partner, notification/media, and privacy lifecycle data while excluding
@@ -40,7 +40,11 @@ The worker:
 - deletes the Firebase account, treating only an authoritative already-absent
   response as success; unavailable or failed identity cleanup leaves the job
   retryable and does not claim account erasure;
-- enumerates and deletes every active, pending, rejected, superseded, removed, or expired profile-media object that has not already been deleted, plus every previous privacy-export object;
+- enumerates and deletes every active, pending, rejected, superseded, removed,
+  or expired profile-media object that has not already been deleted, using the
+  captured exact storage version when one exists and resolving the exact live
+  version first for an upload that never completed, plus every previous
+  privacy-export object;
 - removes push tokens and queued/sent notification records;
 - removes owned Challenge memberships/check-ins/content, friendship/block rows,
   private Creator plans/submissions, and Partner gym assignments;
@@ -67,7 +71,7 @@ contains no bank, payee, card, wallet, tax, balance, provider or transfer data.
 Gym-owned Contest proposals remain attributable only to the retained
 pseudonymized account row: deletion does not erase, reassign or replace their
 immutable proposer, gym or creation provenance. The export omits proposer and
-reviewer identifiers, but schema version 13 includes status, lifecycle version,
+reviewer identifiers, but schema version 14 includes status, lifecycle version,
 submission, withdrawal, archival and publication timestamps for proposals made
 by the requesting account.
 The user's export describes the settled reward snapshot and fulfillment time

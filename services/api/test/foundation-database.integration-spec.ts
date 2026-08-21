@@ -632,9 +632,9 @@ describeWithDatabase('database migrations', () => {
     await expect(
       pool.query(
         `INSERT INTO profile_media
-           (user_id, request_key, object_key, content_type,
+         (user_id, request_key, object_key, content_type,
             expected_size_bytes, status, expires_at)
-         VALUES ($1, 'too-large', 'avatars/too-large.jpg', 'image/jpeg',
+         VALUES ($1, 'too-large', 'avatars/' || $1::uuid::text || '/too-large.jpg', 'image/jpeg',
                  5242881, 'pending_upload', current_timestamp + interval '5 minutes')`,
         [user.rows[0].id],
       ),
@@ -645,7 +645,7 @@ describeWithDatabase('database migrations', () => {
            (user_id, request_key, object_key, content_type,
             expected_size_bytes, status, expires_at, reviewed_at,
             reviewed_by_user_id, decision_reason)
-         VALUES ($1, 'invalid-approval', 'avatars/invalid-approval.jpg', 'image/jpeg',
+         VALUES ($1, 'invalid-approval', 'avatars/' || $1::uuid::text || '/invalid-approval.jpg', 'image/jpeg',
                  512, 'approved', current_timestamp + interval '5 minutes',
                  current_timestamp, $1, 'constraint test decision')`,
         [user.rows[0].id],
@@ -657,10 +657,26 @@ describeWithDatabase('database migrations', () => {
         `INSERT INTO profile_media
            (user_id, request_key, object_key, content_type,
             expected_size_bytes, actual_size_bytes, storage_generation,
+            status, expires_at, completed_at)
+         VALUES ($1, 'uninspected-review',
+                 'avatars/' || $1::uuid::text || '/uninspected-review.jpg', 'image/jpeg',
+                 512, 512, 'generation-uninspected', 'pending_review',
+                 current_timestamp + interval '5 minutes', current_timestamp)`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/profile_media_review_state_inspected/i);
+
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, actual_size_bytes, storage_generation,
+            content_sha256, image_height, image_width, inspection_version,
             status, expires_at, completed_at, reviewed_at,
             reviewed_by_user_id, decision_reason)
-         VALUES ($1, 'approved-one', 'avatars/approved-one.jpg', 'image/jpeg',
-                 512, 512, 'generation-one', 'approved',
+         VALUES ($1, 'approved-one', 'avatars/' || $1::uuid::text || '/approved-one.jpg', 'image/jpeg',
+                 512, 512, 'generation-one', repeat('a', 64), 640, 640,
+                 'avatar-image-v1', 'approved',
                  current_timestamp + interval '5 minutes', current_timestamp,
                  current_timestamp, $1, 'constraint test approval')`,
         [user.rows[0].id],
@@ -671,14 +687,39 @@ describeWithDatabase('database migrations', () => {
         `INSERT INTO profile_media
            (user_id, request_key, object_key, content_type,
             expected_size_bytes, actual_size_bytes, storage_generation,
+            content_sha256, image_height, image_width, inspection_version,
             status, expires_at, completed_at, reviewed_at,
             reviewed_by_user_id, decision_reason)
-         VALUES ($1, 'approved-two', 'avatars/approved-two.jpg', 'image/jpeg',
-                 512, 512, 'generation-two', 'approved',
+         VALUES ($1, 'approved-two', 'avatars/' || $1::uuid::text || '/approved-two.jpg', 'image/jpeg',
+                 512, 512, 'generation-two', repeat('b', 64), 640, 640,
+                 'avatar-image-v1', 'approved',
                  current_timestamp + interval '5 minutes', current_timestamp,
                  current_timestamp, $1, 'constraint test approval')`,
         [user.rows[0].id],
       ),
     ).rejects.toThrow(/profile_media_one_approved_per_user/i);
+
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, status, expires_at)
+         VALUES ($1, 'pending-one', 'avatars/' || $1::uuid::text || '/pending-one.jpg',
+                 'image/jpeg', 512, 'pending_upload',
+                 current_timestamp + interval '5 minutes')`,
+        [user.rows[0].id],
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      pool.query(
+        `INSERT INTO profile_media
+           (user_id, request_key, object_key, content_type,
+            expected_size_bytes, status, expires_at)
+         VALUES ($1, 'pending-two', 'avatars/' || $1::uuid::text || '/pending-two.jpg',
+                 'image/jpeg', 512, 'pending_upload',
+                 current_timestamp + interval '5 minutes')`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/profile_media_one_live_candidate_per_user/i);
   });
 });

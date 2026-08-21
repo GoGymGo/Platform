@@ -7,6 +7,7 @@ const requiredOperations = [
   ['patch', '/v1/me'],
   ['get', '/v1/me/progress'],
   ['get', '/v1/me/avatar'],
+  ['get', '/v1/me/avatar/capabilities'],
   ['post', '/v1/me/avatar-upload'],
   ['post', '/v1/me/avatar-upload/{mediaId}/complete'],
   ['delete', '/v1/me/avatar'],
@@ -80,12 +81,14 @@ const requiredResponseSchemas = [
   ['get', '/v1/me', 'MeResponseDto'],
   ['get', '/v1/me/progress', 'CompetitionProgressResponseDto'],
   ['get', '/v1/me/avatar', 'AvatarStateResponseDto'],
+  ['get', '/v1/me/avatar/capabilities', 'AvatarCapabilitiesResponseDto'],
   ['post', '/v1/me/avatar-upload', 'CreateAvatarUploadResponseDto'],
   [
     'post',
     '/v1/me/avatar-upload/{mediaId}/complete',
     'AvatarUploadCompletionResponseDto',
   ],
+  ['delete', '/v1/me/avatar', 'RemoveAvatarResponseDto'],
   ['get', '/v1/legal-documents/current', 'CurrentLegalDocumentsResponseDto'],
   ['get', '/v1/me/legal-receipts/status', 'LegalReceiptStatusResponseDto'],
   ['post', '/v1/me/legal-receipts', 'LegalReceiptStatusResponseDto'],
@@ -135,7 +138,35 @@ const requiredResponseSchemas = [
 ];
 
 const requiredSchemaProperties = {
+  AvatarCapabilitiesResponseDto: [
+    'maxBytes',
+    'maxDimension',
+    'minDimension',
+    'status',
+    'uploadAvailable',
+  ],
+  AvatarMediaDto: [
+    'contentType',
+    'createdAt',
+    'height',
+    'id',
+    'readUrl',
+    'readUrlExpiresAt',
+    'status',
+    'version',
+    'width',
+  ],
   AvatarStateResponseDto: ['active', 'latest'],
+  AvatarUploadActionDto: ['headers', 'method', 'url'],
+  CreateAvatarUploadResponseDto: [
+    'contentLength',
+    'contentType',
+    'expiresAt',
+    'id',
+    'status',
+    'upload',
+  ],
+  RemoveAvatarResponseDto: ['status'],
   CategoryPodiumMultipliersResponseDto: ['1', '2', '3'],
   CategoryLeaderboardDto: ['goal', 'rows'],
   ClaimRewardResponseDto: [

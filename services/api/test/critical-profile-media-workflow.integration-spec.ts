@@ -1,4 +1,5 @@
 import { sql } from 'kysely';
+import sharp from 'sharp';
 import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
@@ -49,8 +50,28 @@ describeWithDatabase('critical private profile-media workflow', () => {
   let profiles: ProfilesService;
   let storage: jest.Mocked<PrivateObjectStorage>;
   const uploadActions = new Map<string, CreateSignedUploadUrlInput>();
+  const imageBytes = new Map<string, Buffer>();
 
   beforeAll(async () => {
+    for (const [contentType, format] of [
+      ['image/jpeg', 'jpeg'],
+      ['image/png', 'png'],
+      ['image/webp', 'webp'],
+    ] as const) {
+      imageBytes.set(
+        contentType,
+        await sharp({
+          create: {
+            background: { b: 90, g: 60, r: 30 },
+            channels: 3,
+            height: 128,
+            width: 128,
+          },
+        })
+          [format]({ quality: 80 })
+          .toBuffer(),
+      );
+    }
     migrated = await startMigratedPostgisTestDatabase();
     const config = createTestConfig(migrated.databaseUrl, {
       PRIVATE_CONTENT_BUCKET: 'private-content',
@@ -89,27 +110,27 @@ describeWithDatabase('critical private profile-media workflow', () => {
           contentEncoding: null,
           contentLength: upload.contentLength,
           contentType: upload.contentType,
-          generation: `generation-${upload.mediaId}`,
+          etag: `"etag-${upload.mediaId}"`,
           mediaId: upload.mediaId,
+          versionId: `version-${upload.mediaId}`,
         });
       }),
       putJsonIfAbsent: jest.fn(),
-      readObjectPrefix: jest.fn((_bucket, objectKey, length) => {
+      readObject: jest.fn((_bucket, objectKey, expectedLength, identity) => {
         const upload = [...uploadActions.values()].find(
           (item) => item.objectKey === objectKey,
         );
-        if (!upload) {
-          throw new Error('Missing fake upload action.');
+        const data = upload ? imageBytes.get(upload.contentType) : undefined;
+        if (
+          !upload ||
+          !data ||
+          data.length !== expectedLength ||
+          identity.etag !== `"etag-${upload.mediaId}"` ||
+          identity.versionId !== `version-${upload.mediaId}`
+        ) {
+          throw new Error('Missing fake uploaded object.');
         }
-        const signature =
-          upload.contentType === 'image/jpeg'
-            ? Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])
-            : upload.contentType === 'image/png'
-              ? Buffer.from([
-                  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0,
-                ])
-              : Buffer.from('RIFF0000WEBP');
-        return Promise.resolve(signature.subarray(0, length));
+        return Promise.resolve(data);
       }),
     };
     profileMedia = new ProfileMediaService(config, database, profiles, storage);
@@ -142,16 +163,19 @@ describeWithDatabase('critical private profile-media workflow', () => {
     const first = await profileMedia.createUpload(
       userPrincipal,
       'profile-media-first-upload',
-      { contentLength: 512, contentType: 'image/jpeg' },
+      {
+        contentLength: imageBytes.get('image/jpeg')!.length,
+        contentType: 'image/jpeg',
+      },
     );
     expect(first).toEqual(
       expect.objectContaining({
-        contentLength: 512,
+        contentLength: imageBytes.get('image/jpeg')!.length,
         contentType: 'image/jpeg',
         status: 'pending_upload',
         upload: expect.objectContaining({
           headers: expect.objectContaining({
-            'x-goog-content-length-range': '512,512',
+            'x-goog-content-length-range': `${imageBytes.get('image/jpeg')!.length},${imageBytes.get('image/jpeg')!.length}`,
             'x-goog-if-generation-match': '0',
           }),
           method: 'PUT',
@@ -160,13 +184,13 @@ describeWithDatabase('critical private profile-media workflow', () => {
     );
     await expect(
       profileMedia.createUpload(userPrincipal, 'profile-media-first-upload', {
-        contentLength: 512,
+        contentLength: imageBytes.get('image/jpeg')!.length,
         contentType: 'image/jpeg',
       }),
     ).resolves.toMatchObject({ id: first.id });
     await expect(
       profileMedia.createUpload(userPrincipal, 'profile-media-first-upload', {
-        contentLength: 513,
+        contentLength: imageBytes.get('image/jpeg')!.length + 1,
         contentType: 'image/jpeg',
       }),
     ).rejects.toMatchObject({
@@ -190,7 +214,7 @@ describeWithDatabase('critical private profile-media workflow', () => {
     await expect(
       moderation.createReviewAction(first.id),
     ).resolves.toMatchObject({
-      contentLength: 512,
+      contentLength: imageBytes.get('image/jpeg')!.length,
       contentType: 'image/jpeg',
       id: first.id,
       url: expect.stringContaining('/read/'),
@@ -227,7 +251,10 @@ describeWithDatabase('critical private profile-media workflow', () => {
     const second = await profileMedia.createUpload(
       userPrincipal,
       'profile-media-rejected-upload',
-      { contentLength: 640, contentType: 'image/png' },
+      {
+        contentLength: imageBytes.get('image/png')!.length,
+        contentType: 'image/png',
+      },
     );
     await profileMedia.completeUpload(userPrincipal, second.id);
     await moderation.decide({
@@ -249,7 +276,10 @@ describeWithDatabase('critical private profile-media workflow', () => {
     const expired = await profileMedia.createUpload(
       userPrincipal,
       'profile-media-expired-upload',
-      { contentLength: 400, contentType: 'image/webp' },
+      {
+        contentLength: imageBytes.get('image/webp')!.length,
+        contentType: 'image/webp',
+      },
     );
     await database.connection
       .updateTable('profile_media')
@@ -328,7 +358,10 @@ describeWithDatabase('critical private profile-media workflow', () => {
       profileMedia.createUpload(
         userPrincipal,
         'profile-media-after-deletion-request',
-        { contentLength: 512, contentType: 'image/jpeg' },
+        {
+          contentLength: imageBytes.get('image/jpeg')!.length,
+          contentType: 'image/jpeg',
+        },
       ),
     ).rejects.toMatchObject({
       response: expect.objectContaining({

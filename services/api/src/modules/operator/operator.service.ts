@@ -234,9 +234,16 @@ export class OperatorService {
             'in_review',
           ]),
           this.countReviewQueue(transaction, 'privacy_requests', ['requested']),
-          this.countReviewQueue(transaction, 'profile_media', [
-            'pending_review',
-          ]),
+          transaction
+            .selectFrom('profile_media')
+            .select((expression) =>
+              expression.fn.countAll<number>().as('count'),
+            )
+            .where('status', '=', 'pending_review')
+            .where('object_deleted_at', 'is', null)
+            .where('inspection_version', '=', 'avatar-image-v1')
+            .executeTakeFirstOrThrow()
+            .then((item) => Number(item.count)),
           this.countReviewQueue(transaction, 'creator_video_submissions', [
             'submitted',
             'in_review',
@@ -523,6 +530,8 @@ export class OperatorService {
             .selectFrom('profile_media')
             .select(['created_at', 'id', 'review_version', 'status', 'user_id'])
             .where('status', '=', 'pending_review')
+            .where('object_deleted_at', 'is', null)
+            .where('inspection_version', '=', 'avatar-image-v1')
             .where(this.queueAfter('created_at', 'profile_media', cursor))
             .orderBy('created_at')
             .orderBy('id')
@@ -781,14 +790,20 @@ export class OperatorService {
             .select([
               'actual_size_bytes',
               'completed_at',
+              'content_sha256',
               'content_type',
               'created_at',
               'id',
+              'image_height',
+              'image_width',
+              'inspection_version',
               'review_version',
               'status',
               'user_id',
             ])
             .where('id', '=', itemId)
+            .where('object_deleted_at', 'is', null)
+            .where('inspection_version', '=', 'avatar-image-v1')
             .executeTakeFirst();
           this.assertExists(item, kind);
           if (item.status !== 'pending_review' || !item.completed_at) {
@@ -806,6 +821,11 @@ export class OperatorService {
                 label: 'Content length',
                 value: String(item.actual_size_bytes ?? 0),
               },
+              {
+                label: 'Dimensions',
+                value: `${item.image_width ?? 0} × ${item.image_height ?? 0}`,
+              },
+              { label: 'SHA-256', value: item.content_sha256 ?? '' },
               { label: 'Submitted', value: item.completed_at.toISOString() },
             ],
           };

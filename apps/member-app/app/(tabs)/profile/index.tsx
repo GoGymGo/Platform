@@ -1,53 +1,53 @@
-import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { type Href, useRouter } from 'expo-router'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native'
 
-import { AuthStatusNotice } from '@/components/auth';
+import { AuthStatusNotice } from '@/components/auth'
 import {
   ScreenScrollView,
   CyberButtonOutline,
   HUDBorderBox,
   ScreenContainer,
   TerminalText
-} from '@/components/cyber';
-import { CompactTextButton } from '@/components/onboarding';
-import { ProfileAvatar } from '@/components/profileAvatar';
-import { StreakRewards, UserAlias } from '@/components/streakRewards';
-import { colors, fontFamilies, spacing } from '@/constants/theme';
-import { useMyStreaks } from '@/data/appDataHooks';
+} from '@/components/cyber'
+import { CompactTextButton } from '@/components/onboarding'
+import { ProfileAvatar } from '@/components/profileAvatar'
+import { StreakRewards, UserAlias } from '@/components/streakRewards'
+import { colors, fontFamilies, spacing } from '@/constants/theme'
+import { useMyStreaks } from '@/data/appDataHooks'
 import {
   useCurrentEnrollment,
   useWithdrawFromCompetition
-} from '@/data/accountReadinessHooks';
-import { getPublicInitials } from '@/domain/profile';
-import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
-import { useProfileImagePicker } from '@/hooks/useProfileImagePicker';
-import { useAuth } from '@/state/auth';
-import { useProfile } from '@/state/profile';
-import { useCompetitionRegion } from '@/state/competitionRegion';
-import { useWorkoutProgress } from '@/state/workoutProgress';
-import { clearLocalAppData } from '@/services/localAppReset';
-import { clearPendingGymScan } from '@/services/pendingGymScan';
+} from '@/data/accountReadinessHooks'
+import { getPublicInitials } from '@/domain/profile'
+import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification'
+import { useProfileImagePicker } from '@/hooks/useProfileImagePicker'
+import { useAuth } from '@/state/auth'
+import { useProfile } from '@/state/profile'
+import { useCompetitionRegion } from '@/state/competitionRegion'
+import { useWorkoutProgress } from '@/state/workoutProgress'
+import { clearLocalAppData } from '@/services/localAppReset'
+import { clearPendingGymScan } from '@/services/pendingGymScan'
 
 type ProfileStat = {
-  accent: 'cyan' | 'green' | 'pink';
-  label: string;
-  value: string;
-};
+  accent: 'cyan' | 'green' | 'pink'
+  label: string
+  value: string
+}
 
 type SettingsRow = {
-  route?: Href;
-  status?: string;
-  subtitle: string;
-  title: string;
-  tone: 'cyan' | 'green' | 'muted';
-};
+  route?: Href
+  status?: string
+  subtitle: string
+  title: string
+  tone: 'cyan' | 'green' | 'muted'
+}
 
 type SettingsGroups = {
-  preferences: readonly SettingsRow[];
-  legal: readonly SettingsRow[];
-};
+  preferences: readonly SettingsRow[]
+  legal: readonly SettingsRow[]
+}
 
 function getSettingsRows(): SettingsGroups {
   return {
@@ -85,47 +85,53 @@ function getSettingsRows(): SettingsGroups {
         route: '/account-data' as Href
       }
     ]
-  };
+  }
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
+  const router = useRouter()
+  const queryClient = useQueryClient()
   const mobileGymVerificationAvailable =
-    Platform.OS !== 'web' || isMobileWebGymVerificationDevice();
-  const { signOutUser, user } = useAuth();
-  const { publicName } = useProfile();
-  const streaksQuery = useMyStreaks();
-  const streakSummary = streaksQuery.data ?? null;
-  const currentEnrollment = useCurrentEnrollment();
-  const withdrawFromCompetition = useWithdrawFromCompetition();
-  const { competitionRegion, regionVerification } = useCompetitionRegion();
-  const publicInitials = getPublicInitials(publicName);
+    Platform.OS !== 'web' || isMobileWebGymVerificationDevice()
+  const { signOutUser, user } = useAuth()
+  const { identityMode, publicName, setIdentityMode } = useProfile()
+  const streaksQuery = useMyStreaks()
+  const streakSummary = streaksQuery.data ?? null
+  const currentEnrollment = useCurrentEnrollment()
+  const withdrawFromCompetition = useWithdrawFromCompetition()
+  const { competitionRegion, regionVerification } = useCompetitionRegion()
+  const publicInitials = getPublicInitials(publicName)
   const {
     remindersEnabled,
     setCompetitionRemindersEnabled,
     totalEntries,
     verifiedSessionCount
-  } = useWorkoutProgress();
-  const [signingOut, setSigningOut] = useState(false);
-  const [signOutError, setSignOutError] = useState<string>();
-  const [accountActionMessage, setAccountActionMessage] = useState<string>();
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmWithdrawal, setConfirmWithdrawal] = useState(false);
-  const [resettingApp, setResettingApp] = useState(false);
-  const [showProfileEditor, setShowProfileEditor] = useState(false);
-  const [showCompetitionSettings, setShowCompetitionSettings] = useState(false);
-  const [showLegal, setShowLegal] = useState(false);
-  const [notificationBusy, setNotificationBusy] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState<string>();
+  } = useWorkoutProgress()
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState<string>()
+  const [accountActionMessage, setAccountActionMessage] = useState<string>()
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmWithdrawal, setConfirmWithdrawal] = useState(false)
+  const [resettingApp, setResettingApp] = useState(false)
+  const [showProfileEditor, setShowProfileEditor] = useState(false)
+  const [showCompetitionSettings, setShowCompetitionSettings] = useState(false)
+  const [showLegal, setShowLegal] = useState(false)
+  const [notificationBusy, setNotificationBusy] = useState(false)
+  const [notificationMessage, setNotificationMessage] = useState<string>()
+  const [identityBusy, setIdentityBusy] = useState(false)
+  const [identityMessage, setIdentityMessage] = useState<string>()
   const {
     chooseProfileImage,
     clearProfileImage,
     isPickingImage,
+    isRemovingImage,
+    profileImageAvailability,
     profileImageMessage,
     profileImageStatus,
-    profileImageUri
-  } = useProfileImagePicker();
+    profileImageUri,
+    profileImageVersion,
+    retryProfileImage
+  } = useProfileImagePicker()
   const profileStats: readonly ProfileStat[] = [
     {
       value:
@@ -141,72 +147,89 @@ export default function ProfileScreen() {
       label: 'BANKED DRAW ENTRIES',
       accent: 'pink'
     }
-  ];
-  const settingsGroups = getSettingsRows();
-  const providerLabel = formatProviderLabel(user?.providerIds ?? []);
+  ]
+  const settingsGroups = getSettingsRows()
+  const providerLabel = formatProviderLabel(user?.providerIds ?? [])
 
   async function performSignOut() {
-    setSigningOut(true);
-    setSignOutError(undefined);
+    setSigningOut(true)
+    setSignOutError(undefined)
     try {
-      await signOutUser();
-      router.replace('/');
+      await signOutUser()
+      router.replace('/')
     } catch {
-      setSignOutError('SIGN-OUT COULD NOT BE COMPLETED. TRY AGAIN.');
+      setSignOutError('SIGN-OUT COULD NOT BE COMPLETED. TRY AGAIN.')
     } finally {
-      setSigningOut(false);
+      setSigningOut(false)
     }
   }
 
   async function performWithdrawal() {
-    const enrollment = currentEnrollment.data;
-    if (!enrollment) return;
+    const enrollment = currentEnrollment.data
+    if (!enrollment) return
 
-    setAccountActionMessage(undefined);
+    setAccountActionMessage(undefined)
     try {
-      await withdrawFromCompetition.mutateAsync(enrollment.competitionId);
-      await clearPendingGymScan();
-      setConfirmWithdrawal(false);
+      await withdrawFromCompetition.mutateAsync(enrollment.competitionId)
+      await clearPendingGymScan()
+      setConfirmWithdrawal(false)
       setAccountActionMessage(
         'WITHDRAWAL COMPLETE. CONTEST ACCESS AND PRIZE ELIGIBILITY ARE CLOSED.'
-      );
+      )
     } catch {
-      setAccountActionMessage('WITHDRAWAL COULD NOT BE COMPLETED. TRY AGAIN.');
+      setAccountActionMessage('WITHDRAWAL COULD NOT BE COMPLETED. TRY AGAIN.')
     }
   }
 
   async function performAppReset() {
-    setResettingApp(true);
-    setAccountActionMessage(undefined);
+    setResettingApp(true)
+    setAccountActionMessage(undefined)
     try {
-      await signOutUser();
-      await clearPendingGymScan();
-      await clearLocalAppData();
-      queryClient.clear();
-      router.replace('/');
+      await signOutUser()
+      await clearPendingGymScan()
+      await clearLocalAppData()
+      queryClient.clear()
+      router.replace('/')
     } catch {
       setAccountActionMessage(
         'LOCAL RESET DID NOT COMPLETE. SOME GOGYMGO DEVICE DATA MAY REMAIN; NO SERVER DATA WAS DELETED. TRY AGAIN.'
-      );
-      setResettingApp(false);
+      )
+      setResettingApp(false)
     }
   }
 
   async function updateNotifications(enabled: boolean) {
-    setNotificationBusy(true);
-    setNotificationMessage(undefined);
+    setNotificationBusy(true)
+    setNotificationMessage(undefined)
     try {
-      const updated = await setCompetitionRemindersEnabled(enabled);
+      const updated = await setCompetitionRemindersEnabled(enabled)
 
       if (!updated) {
         setNotificationMessage(
           enabled
             ? 'NOTIFICATION PERMISSION IS OFF. ENABLE IT IN YOUR DEVICE SETTINGS, THEN TRY AGAIN.'
             : 'REMINDERS COULD NOT BE UPDATED. TRY AGAIN.'
-        );
+        )
       }
     } finally {
-      setNotificationBusy(false);
+      setNotificationBusy(false)
+    }
+  }
+
+  async function switchToPrivateIdentity() {
+    setIdentityBusy(true)
+    setIdentityMessage(undefined)
+    try {
+      await setIdentityMode('private')
+      setIdentityMessage(
+        'PRIVATE PLAYER ID ACTIVE. YOUR ALIAS IS SAVED BUT NOT PRESENTED.'
+      )
+    } catch {
+      setIdentityMessage(
+        'PUBLIC IDENTITY COULD NOT BE UPDATED. CHECK YOUR CONNECTION AND TRY AGAIN.'
+      )
+    } finally {
+      setIdentityBusy(false)
     }
   }
 
@@ -231,6 +254,7 @@ export default function ProfileScreen() {
               imageUri={profileImageUri}
               initials={publicInitials}
               showStatus={Boolean(user?.emailVerified)}
+              version={profileImageVersion}
             />
           </View>
           <CyberButtonOutline
@@ -241,12 +265,27 @@ export default function ProfileScreen() {
           {showProfileEditor ? (
             <View style={styles.profileEditor}>
               <CompactTextButton
-                label="EDIT ALIAS"
+                disabled={identityBusy}
+                label={
+                  identityMode === 'alias' ? 'EDIT ALIAS' : 'USE PUBLIC ALIAS'
+                }
                 onPress={() => router.push('/identity?source=profile' as Href)}
               />
+              {identityMode !== 'private' ? (
+                <CompactTextButton
+                  disabled={identityBusy}
+                  label={identityBusy ? 'UPDATING...' : 'USE PRIVATE PLAYER ID'}
+                  onPress={() => void switchToPrivateIdentity()}
+                  tone="muted"
+                />
+              ) : null}
               <View style={styles.profileImageActions}>
                 <CyberButtonOutline
-                  disabled={isPickingImage}
+                  disabled={
+                    isPickingImage ||
+                    isRemovingImage ||
+                    profileImageAvailability !== 'configured'
+                  }
                   label={
                     isPickingImage
                       ? 'PREPARING...'
@@ -257,16 +296,42 @@ export default function ProfileScreen() {
                   onPress={chooseProfileImage}
                   style={styles.profileImageButton}
                 />
-                {profileImageUri ? (
+                {profileImageUri || profileImageStatus ? (
                   <CyberButtonOutline
-                    label="REMOVE"
+                    disabled={isPickingImage || isRemovingImage}
+                    label={isRemovingImage ? 'REMOVING...' : 'REMOVE'}
                     onPress={clearProfileImage}
                     style={styles.profileImageButton}
                     tone="red"
                   />
                 ) : null}
               </View>
+              {profileImageAvailability === 'loading' ? (
+                <TerminalText live="polite" tone="dim" variant="caption">
+                  CHECKING PROFILE PICTURE AVAILABILITY...
+                </TerminalText>
+              ) : profileImageAvailability === 'unavailable' ? (
+                <CyberButtonOutline
+                  label="RETRY PICTURE SERVICE"
+                  onPress={() => void retryProfileImage()}
+                  tone="red"
+                />
+              ) : profileImageAvailability !== 'configured' ? (
+                <TerminalText live="polite" tone="amber" variant="caption">
+                  PROFILE PICTURE UPLOADS ARE NOT ENABLED IN THIS DEPLOYMENT.
+                </TerminalText>
+              ) : null}
             </View>
+          ) : null}
+          {showProfileEditor && identityMessage ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone={identityMessage.includes('COULD NOT') ? 'red' : 'green'}
+              variant="caption"
+            >
+              {identityMessage}
+            </TerminalText>
           ) : null}
           {showProfileEditor && profileImageMessage ? (
             <TerminalText
@@ -286,6 +351,56 @@ export default function ProfileScreen() {
               variant="caption"
             >
               PICTURE PENDING MODERATION
+            </TerminalText>
+          ) : showProfileEditor && profileImageStatus === 'rejected' ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="red"
+              variant="caption"
+            >
+              PICTURE WAS NOT APPROVED. YOUR PREVIOUS APPROVED PICTURE OR
+              INITIALS REMAIN ACTIVE.
+            </TerminalText>
+          ) : showProfileEditor && profileImageStatus === 'pending_upload' ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="amber"
+              variant="caption"
+            >
+              PICTURE UPLOAD IS INCOMPLETE. SUBMIT A NEW PICTURE OR REMOVE IT.
+            </TerminalText>
+          ) : showProfileEditor && profileImageStatus === 'approved' ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="green"
+              variant="caption"
+            >
+              APPROVED PICTURE ACTIVE.
+            </TerminalText>
+          ) : showProfileEditor && profileImageStatus === null ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="dim"
+              variant="caption"
+            >
+              INITIALS AVATAR ACTIVE. NO PICTURE IS PRESENTED.
+            </TerminalText>
+          ) : showProfileEditor &&
+            profileImageStatus &&
+            ['expired', 'removed', 'superseded'].includes(
+              profileImageStatus
+            ) ? (
+            <TerminalText
+              live="polite"
+              style={styles.profileImageMessage}
+              tone="dim"
+              variant="caption"
+            >
+              THAT PICTURE IS NOT PRESENTED. PRIVATE CLEANUP IS SCHEDULED.
             </TerminalText>
           ) : null}
         </View>
@@ -610,30 +725,30 @@ export default function ProfileScreen() {
         />
       </ScreenScrollView>
     </ScreenContainer>
-  );
+  )
 }
 
 function formatProviderLabel(providerIds: readonly string[]) {
   const labels = providerIds.map((providerId) => {
     if (providerId === 'password') {
-      return 'EMAIL';
+      return 'EMAIL'
     }
     if (providerId === 'google.com') {
-      return 'GOOGLE';
+      return 'GOOGLE'
     }
     if (providerId === 'apple.com') {
-      return 'APPLE';
+      return 'APPLE'
     }
-    return providerId.toUpperCase();
-  });
+    return providerId.toUpperCase()
+  })
 
-  return labels.length > 0 ? labels.join(' + ') : 'FIREBASE';
+  return labels.length > 0 ? labels.join(' + ') : 'FIREBASE'
 }
 
 function SettingsItem({ row }: { row: SettingsRow }) {
-  const router = useRouter();
-  const isPressable = Boolean(row.route);
-  const statusTone = row.tone;
+  const router = useRouter()
+  const isPressable = Boolean(row.route)
+  const statusTone = row.tone
 
   return (
     <Pressable
@@ -641,7 +756,7 @@ function SettingsItem({ row }: { row: SettingsRow }) {
       disabled={!isPressable}
       onPress={() => {
         if (row.route) {
-          router.push(row.route);
+          router.push(row.route)
         }
       }}
       style={({ pressed }) => [
@@ -673,7 +788,7 @@ function SettingsItem({ row }: { row: SettingsRow }) {
         </TerminalText>
       )}
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -863,4 +978,4 @@ const styles = StyleSheet.create({
     opacity: 0.74,
     transform: [{ scale: 0.99 }]
   }
-});
+})

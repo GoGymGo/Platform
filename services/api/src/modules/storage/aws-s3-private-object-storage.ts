@@ -8,6 +8,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type {
   CreateSignedUploadUrlInput,
+  PrivateObjectIdentity,
   PrivateObjectStorage,
   PutPrivateJsonInput,
   SignedUploadAction,
@@ -82,13 +83,19 @@ export class AwsS3PrivateObjectStorage implements PrivateObjectStorage {
     bucket: string,
     objectKey: string,
     expiresAt: Date,
+    identity?: PrivateObjectIdentity,
   ): Promise<string> {
     this.assertLocation(bucket, objectKey);
     const expiresIn = this.expiresInSeconds(expiresAt);
     try {
       return await this.presign(
         this.s3,
-        new GetObjectCommand({ Bucket: bucket, Key: objectKey }),
+        new GetObjectCommand({
+          Bucket: bucket,
+          ...(identity ? { IfMatch: identity.etag } : {}),
+          Key: objectKey,
+          ...(identity?.versionId ? { VersionId: identity.versionId } : {}),
+        }),
         { expiresIn },
       );
     } catch {
@@ -143,15 +150,15 @@ export class AwsS3PrivateObjectStorage implements PrivateObjectStorage {
       );
       const contentLength = metadata.ContentLength;
       const contentType = metadata.ContentType;
-      const generation = metadata.VersionId ?? metadata.ETag;
+      const etag = metadata.ETag;
       if (
         typeof contentLength !== 'number' ||
         !Number.isSafeInteger(contentLength) ||
         contentLength < 1 ||
         typeof contentType !== 'string' ||
         !contentType.trim() ||
-        typeof generation !== 'string' ||
-        !generation.trim()
+        typeof etag !== 'string' ||
+        !etag.trim()
       ) {
         throw new PrivateObjectStorageError('OBJECT_METADATA_INVALID');
       }
@@ -160,8 +167,12 @@ export class AwsS3PrivateObjectStorage implements PrivateObjectStorage {
         contentEncoding: metadata.ContentEncoding ?? null,
         contentLength,
         contentType,
-        generation,
+        etag,
         mediaId: typeof mediaId === 'string' ? mediaId : null,
+        versionId:
+          typeof metadata.VersionId === 'string' && metadata.VersionId.trim()
+            ? metadata.VersionId
+            : null,
       };
     } catch (error) {
       if (error instanceof PrivateObjectStorageError) throw error;
@@ -172,45 +183,74 @@ export class AwsS3PrivateObjectStorage implements PrivateObjectStorage {
     }
   }
 
-  async readObjectPrefix(
+  async readObject(
     bucket: string,
     objectKey: string,
-    length: number,
+    expectedLength: number,
+    identity: PrivateObjectIdentity,
   ): Promise<Buffer> {
     this.assertLocation(bucket, objectKey);
-    if (!Number.isSafeInteger(length) || length < 1 || length > 64) {
-      throw new PrivateObjectStorageError('OBJECT_PREFIX_LENGTH_INVALID');
+    if (
+      !Number.isSafeInteger(expectedLength) ||
+      expectedLength < 1 ||
+      expectedLength > 5 * 1_024 * 1_024 ||
+      !identity.etag.trim()
+    ) {
+      throw new PrivateObjectStorageError('OBJECT_READ_INPUT_INVALID');
     }
     try {
       const response = await this.s3.send(
         new GetObjectCommand({
           Bucket: bucket,
+          IfMatch: identity.etag,
           Key: objectKey,
-          Range: `bytes=0-${length - 1}`,
+          Range: `bytes=0-${expectedLength - 1}`,
+          ...(identity.versionId ? { VersionId: identity.versionId } : {}),
         }),
       );
       if (!response.Body) {
-        throw new PrivateObjectStorageError('OBJECT_PREFIX_INVALID');
+        throw new PrivateObjectStorageError('OBJECT_READ_INVALID');
       }
       const data = Buffer.from(await response.Body.transformToByteArray());
-      if (data.length < length) {
-        throw new PrivateObjectStorageError('OBJECT_PREFIX_INVALID');
+      if (data.length !== expectedLength) {
+        throw new PrivateObjectStorageError('OBJECT_READ_INVALID');
       }
-      return data.subarray(0, length);
+      return data;
     } catch (error) {
       if (error instanceof PrivateObjectStorageError) throw error;
       if (this.isNotFound(error)) {
         throw new PrivateObjectStorageError('OBJECT_NOT_FOUND');
       }
-      throw new PrivateObjectStorageError('OBJECT_PREFIX_READ_FAILED');
+      if (this.hasStatus(error, 412)) {
+        throw new PrivateObjectStorageError('OBJECT_IDENTITY_MISMATCH');
+      }
+      throw new PrivateObjectStorageError('OBJECT_READ_FAILED');
     }
   }
 
-  async deleteObject(bucket: string, objectKey: string): Promise<void> {
+  async deleteObject(
+    bucket: string,
+    objectKey: string,
+    versionId?: string | null,
+  ): Promise<void> {
     this.assertLocation(bucket, objectKey);
     try {
+      let resolvedVersionId = versionId;
+      if (!resolvedVersionId) {
+        const metadata = await this.s3.send(
+          new HeadObjectCommand({ Bucket: bucket, Key: objectKey }),
+        );
+        resolvedVersionId =
+          typeof metadata.VersionId === 'string' && metadata.VersionId.trim()
+            ? metadata.VersionId
+            : null;
+      }
       await this.s3.send(
-        new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }),
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: objectKey,
+          ...(resolvedVersionId ? { VersionId: resolvedVersionId } : {}),
+        }),
       );
     } catch (error) {
       if (!this.isNotFound(error)) {

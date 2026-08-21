@@ -174,6 +174,12 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboardUtils, /apiError\?\.message\?\.trim\(\)/);
   assert.match(dashboard, /adminRequestStatus\(error\) === 409/);
   assert.match(dashboard, /REFRESH \+ REVIEW/);
+  assert.match(
+    dashboard,
+    /Load and inspect the current private media action before approval/,
+  );
+  assert.match(dashboard, /action\.reviewVersion !== item\.reviewVersion/);
+  assert.match(dashboard, /SHA-256/);
   assert.match(dashboard, /aria-current=\{section === item\.id \? "page"/);
   assert.match(dashboard, /className="page-context"/);
   assert.match(dashboard, /aria-labelledby=\{titleId\}/);

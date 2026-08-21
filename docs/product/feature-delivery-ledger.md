@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `d845263734b41b9b8a9c0f5d254c569d1c6d7802` after PR #116 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-017 — Profile and moderated avatar`
-  on `agent/ggg-017-profile-moderated-avatar`; creation follows this ledger merge.
+  `98bc63b04c40e92718af1f0772335150b4c078e6` after PR #118 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-018 — Competition reminders and push`
+  on `agent/ggg-018-competition-reminders-push`; creation follows this ledger
+  merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 45 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 46 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -621,16 +622,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   fields are server-enforced.
 - External providers / feature flag: private Amazon S3; `PROFILE_MEDIA_ENABLED`
   defaults false.
-- Current implementation / missing behavior: Alias and lifecycle code exist;
-  avatar duty needs storage enablement, CORS, moderation, cleanup, and real upload
-  UAT before it performs in a release.
+- Current implementation / missing behavior: repository behavior is complete:
+  canonical Alias/private-profile boundaries, fail-closed media capability,
+  strict full-image validation, private version/ETag-bound storage actions,
+  single-candidate replacement, versioned moderation, durable cleanup, privacy
+  handling, and exact member/admin runtime contracts. Production storage remains
+  deliberately disabled and unproven.
 - Required tests / operations / cloud dependency: Alias validation/uniqueness,
   upload size/type/signature, pending/approve/reject/remove, ownership, cleanup,
   privacy deletion, local reset semantics; S3/CORS and worker.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-017 — Profile and moderated
-  avatar`; branch/PR/merge `unassigned`; status `READY`.
-- Residual risks / blocker: cloud storage is disabled by default and may not be
-  inspected or enabled without separate authority.
+  avatar`; branch `agent/ggg-017-profile-moderated-avatar` (deleted after merge);
+  PR `#118`; merge `98bc63b04c40e92718af1f0772335150b4c078e6`;
+  status `BLOCKED`.
+- Residual risks / blocker: `PROFILE_MEDIA_ENABLED=false`; real S3/IAM/CORS/KMS/
+  lifecycle and provider-health configuration, hosted upload validation, and
+  physical-device release UAT require separate cloud/deployment authority. The
+  repository fails closed until those external gates are satisfied.
 
 ### GGG-018 — Competition reminders and push-device lifecycle
 
@@ -652,7 +660,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   disable coupling, token rotation, duplicate delivery, lease recovery, provider
   failure, background notifications; Expo/Firebase project and worker.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-018 — Competition reminders
-  and push`; branch/PR/merge `unassigned`; status `READY`.
+  and push`; branch `agent/ggg-018-competition-reminders-push`; PR/merge
+  `unassigned`; status `IN_PROGRESS`.
 - Residual risks / blocker: no UI may claim push delivery while the provider is
   disabled or unavailable.
 
@@ -1172,6 +1181,24 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed the repository delivery for `GGG-017` through PR #118.
+  Exact tested head `3bd0cfb699ff8487473782246b5023ce6e682076` was
+  squash-merged as `98bc63b04c40e92718af1f0772335150b4c078e6`; all PR
+  checks and all six exact-main workflows passed, the feature branch was deleted,
+  and Docker returned exactly to its original stopped-container baseline with zero
+  running containers. Delivery added canonical Alias/private-profile controls,
+  fail-closed moderated-avatar capability, strict bounded container/full-raster/
+  dimension/digest validation, version/ETag-bound private storage and replacement,
+  stale/self-review/idempotency protections, durable cleanup, privacy handling,
+  exact member/admin runtime decoders, honest accessible UI states, migration,
+  contracts and runbooks. Serial proof included 386 API unit tests, 28 API E2E
+  tests, 74 PostGIS integration tests, 259 member tests, 43 admin tests, direct
+  browser inspection, and all governance/dependency/source/build/artifact/secret
+  gates. No cloud access or deployment occurred. Status remains `BLOCKED` because
+  `PROFILE_MEDIA_ENABLED=false` and real S3/IAM/CORS/KMS/lifecycle/provider setup,
+  hosted-upload validation and device release UAT are external. Dependency ordering
+  assigns `GGG-018` next because reminder controls consume the completed Profile,
+  privacy and operational-health boundaries.
 - 2026-08-21 — Completed `GGG-023` through PR #116. Exact tested head
   `838a45a4db2dcdc1d43405e56711c3a46a19ffb4` was squash-merged as
   `d845263734b41b9b8a9c0f5d254c569d1c6d7802`; all seven PR checks and all six

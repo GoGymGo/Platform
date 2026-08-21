@@ -35,10 +35,28 @@ export const septemberCampaign = {
   weeklyGoalRange: "1–7 days",
 } as const;
 
-export function getSeptemberCampaignState(now = new Date()) {
+export function isSeptemberPilotPublished(
+  value = process.env.NEXT_PUBLIC_SEPTEMBER_PILOT_PUBLISHED,
+): boolean {
+  return value === "yes";
+}
+
+export function getSeptemberCampaignState(
+  now = new Date(),
+  published = isSeptemberPilotPublished(),
+) {
   const currentTime = now.getTime();
   const startTime = Date.parse(septemberCampaign.competitionStartAt);
   const endTime = Date.parse(septemberCampaign.competitionEndAt);
+
+  if (!published) {
+    return {
+      phase: "unpublished" as const,
+      primaryAction: "regionalUpdates" as const,
+      primaryLabel: "GET REGIONAL UPDATES",
+      statusLabel: "PILOT NOT YET PUBLISHED",
+    };
+  }
 
   if (currentTime >= endTime) {
     return {

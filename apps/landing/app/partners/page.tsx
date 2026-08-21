@@ -47,7 +47,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
         <div className="audience-copy">
           <p className="eyebrow eyebrow-pink">
             <span className="status-dot" />
-            FOUNDING PARTNER PROGRAM
+            PARTNERSHIP INQUIRIES
           </p>
           <h1>
             Build a partnership around real gym <span>visits.</span>
@@ -107,12 +107,12 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
           id="partner-form"
         >
           <div className="form-card-header">
-            <span>FOUNDING PARTNER INTAKE // OPEN</span>
+            <span>PARTNERSHIP REVIEW // SUBJECT TO AVAILABILITY</span>
             <h2 id="partner-form-title">Tell us how you want to partner</h2>
             <p>
               Share your organization, region, locations, operating needs, or
-              campaign idea. We review inquiries weekly and aim to respond
-              within five business days.
+              campaign idea. A submission receipt confirms only that the request
+              was received; it is not approval or a response-time promise.
             </p>
             <small>Fields marked * are required.</small>
           </div>

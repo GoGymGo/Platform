@@ -36,6 +36,7 @@ for (const required of [
   'THE REAL APP UI // READ-ONLY SHOWCASE',
   'SCREEN DIRECTORY',
   'SAFE SHOWCASE MODE',
+  'LEAVE DEMO + REVIEW JOIN OPTIONS',
   'buildAppTourHref(route, \'demo\')',
   'publicDemoRoutes'
 ]) {

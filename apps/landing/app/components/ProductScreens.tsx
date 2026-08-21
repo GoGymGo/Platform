@@ -3,26 +3,26 @@ import { AppLink } from "./AppLink";
 
 const productScreens = [
   {
-    alt: "GoGymGo active workout screen showing elapsed server time and live verification status",
-    height: 1600,
-    proof: "LIVE VERIFICATION",
+    alt: "GoGymGo member join screen showing the gym QR account path, existing-account sign-in, and Partner options",
+    height: 899,
+    proof: "CANONICAL JOIN",
     proofCopy:
-      "Server-timed progress with live heart-rate verification and automatic session saving.",
-    src: "/app/active-workout.webp",
-    step: "01 // VERIFY",
-    title: "Follow the authoritative workout timer",
-    width: 960,
+      "Players, existing members, sponsors, and Partner gyms enter through the member experience or reviewed public intake—never a landing-owned account store.",
+    src: "/app/join-selection.jpg",
+    step: "01 // CHOOSE A PATH",
+    title: "Start from one canonical join screen",
+    width: 430,
   },
   {
-    alt: "GoGymGo Winners Circle screen showing published contest results",
-    height: 1600,
-    proof: "PUBLISHED ONLY",
+    alt: "GoGymGo public demo directory labeled as a read-only showcase with isolated sample data",
+    height: 899,
+    proof: "FAKE DATA ONLY",
     proofCopy:
-      "Final standings appear only after submitted activity is reviewed.",
-    src: "/app/winners-circle.webp",
-    step: "02 // RESULTS",
-    title: "Review published contest results",
-    width: 960,
+      "The public demo disables Firebase, API, camera, and location access and keeps the exit to real join options separate.",
+    src: "/app/public-demo.jpg",
+    step: "02 // EXPLORE SAFELY",
+    title: "Tour the interface with live services off",
+    width: 430,
   },
 ] as const;
 
@@ -33,19 +33,20 @@ export function ProductScreens() {
         <div className="section-heading product-showcase-heading">
           <div>
             <p className="eyebrow">INSIDE THE MEMBER APP</p>
-            <h2>From Verified workout to published result.</h2>
+            <h2>One join path. One isolated product demo.</h2>
           </div>
           <p>
-            The app keeps live verification separate from final contest
-            results, so pending activity is never presented as approved credit.
+            Registration belongs to the member app. The public demo reuses its
+            interface with fake data while live services stay disabled.
           </p>
         </div>
         <div className="product-demo-entry">
           <div>
             <strong>DEMO MODE // ISOLATED SAMPLE DATA</strong>
             <p>
-              Explore the real browser, iPhone, and Android interface without
-              creating an account or contacting live GoGymGo services.
+              Explore the shared member interface without creating an account,
+              requesting device permissions, or contacting live GoGymGo
+              services.
             </p>
           </div>
           <AppLink
@@ -56,9 +57,9 @@ export function ProductScreens() {
             OPEN THE INTERACTIVE DEMO
           </AppLink>
         </div>
-        <p className="product-swipe-hint">SWIPE TO PREVIEW BOTH APP SCREENS →</p>
+        <p className="product-swipe-hint">SWIPE TO PREVIEW BOTH ROUTES →</p>
         <div
-          aria-label="Member app screen previews"
+          aria-label="Canonical member join and isolated demo previews"
           className="product-screen-grid"
           tabIndex={0}
         >

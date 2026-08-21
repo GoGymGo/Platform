@@ -1,35 +1,30 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
 import { AppLink } from "./components/AppLink";
 import { DesktopNavigation } from "./components/DesktopNavigation";
 import { MobileNavigation } from "./components/MobileNavigation";
 import { PublicSiteAnalytics } from "./components/PublicSiteAnalytics";
-import { siteLinks } from "./site-links";
+import { publicSiteOrigin, siteLinks } from "./site-links";
 import "./globals.css";
 import "./experience.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host =
-    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol =
-    requestHeaders.get("x-forwarded-proto") ??
-    (host?.includes("localhost") ? "http" : "https");
-  const metadataBase = host ? new URL(`${protocol}://${host}`) : undefined;
-  const socialImage = metadataBase
-    ? new URL("/og.png", metadataBase).toString()
-    : undefined;
+  const metadataBase = new URL(publicSiteOrigin);
+  const socialImage = new URL("/og.png", metadataBase).toString();
   const campaignState = getSeptemberCampaignState();
   const description =
     campaignState.phase === "ended"
       ? `Review the September 2026 GoGymGo beta and request updates about future availability on ${septemberCampaign.regionName}.`
-      : `Join the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`;
+      : campaignState.phase === "unpublished"
+        ? `Review the planned September 2026 GoGymGo pilot for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}. Registration and the planned reward remain unavailable until publication.`
+        : `Check current availability for the free September 2026 GoGymGo beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`;
   const socialDescription =
     campaignState.phase === "ended"
       ? "The September 2026 beta has ended. Review the pilot and request future Regional updates."
-      : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. Planned ${septemberCampaign.reward} Reward; check the app and rules for availability.`;
+      : campaignState.phase === "unpublished"
+        ? `Planned September pilot. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. Registration and the ${septemberCampaign.reward} reward remain unavailable until publication.`
+        : `Free September beta. ${septemberCampaign.minimumAge}+. ${septemberCampaign.minimumSessionMinutes}+ minute Verified workouts at a Partner gym. Check the app and rules for current reward availability.`;
 
   return {
     metadataBase,
@@ -49,24 +44,24 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "GoGymGo — Make consistency count",
       description: socialDescription,
+      locale: "en_CA",
       type: "website",
       siteName: "GoGymGo",
-      images: socialImage
-        ? [
-            {
-              url: socialImage,
-              width: 1200,
-              height: 630,
-              alt: "GoGymGo September 2026 beta — Make consistency count.",
-            },
-          ]
-        : undefined,
+      url: "/",
+      images: [
+        {
+          url: socialImage,
+          width: 1200,
+          height: 630,
+          alt: "GoGymGo September 2026 pilot — Make consistency count.",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: "GoGymGo — Make consistency count",
       description: socialDescription,
-      images: socialImage ? [socialImage] : undefined,
+      images: [socialImage],
     },
     alternates: {
       canonical: "/",
@@ -90,7 +85,7 @@ export default function RootLayout({
 }>) {
   const campaignState = getSeptemberCampaignState();
   const memberRegistrationAvailable =
-    campaignState.primaryAction === "memberApp";
+    campaignState.primaryAction === "memberApp" && siteLinks.memberApp !== null;
 
   return (
     <html lang="en">
@@ -171,6 +166,7 @@ export default function RootLayout({
               <AppLink analyticsEvent="demo_click" href={siteLinks.demo}>
                 App demo
               </AppLink>
+              <Link href={siteLinks.partners}>Gym and brand partnerships</Link>
               <Link
                 data-analytics-event="brand_partnership_click"
                 href={siteLinks.brands}
@@ -189,12 +185,6 @@ export default function RootLayout({
                 Official Contest Rules
               </AppLink>
               <Link href={siteLinks.accessibility}>Accessibility</Link>
-              <AppLink
-                destinationLabel="opens the GoGymGo admin dashboard"
-                href={siteLinks.adminDashboard}
-              >
-                Admin dashboard
-              </AppLink>
             </div>
           </div>
           <div className="shell footer-bottom">

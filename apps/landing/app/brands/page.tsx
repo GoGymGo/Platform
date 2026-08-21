@@ -31,7 +31,7 @@ export default function BrandsPage() {
         <div className="audience-copy">
           <p className="eyebrow eyebrow-pink">
             <span className="status-dot" />
-            FOUNDING PARTNER PROGRAM
+            PARTNERSHIP INQUIRIES
           </p>
           <h1>
             Reach verified gym communities at moments that <span>matter.</span>
@@ -59,12 +59,12 @@ export default function BrandsPage() {
           id="brand-form"
         >
           <div className="form-card-header">
-            <span>FOUNDING PARTNER INTAKE // OPEN</span>
+            <span>PARTNERSHIP REVIEW // SUBJECT TO AVAILABILITY</span>
             <h2 id="brand-form-title">Explore a future campaign</h2>
             <p>
               Tell us the region, timing, inventory, and outcome you are
-              considering. We review inquiries weekly and aim to respond within
-              five business days.
+              considering. A submission receipt confirms only that the request
+              was received; it is not approval or a response-time promise.
             </p>
             <small>Fields marked * are required.</small>
           </div>

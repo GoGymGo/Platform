@@ -9,7 +9,7 @@ export default function NotFound() {
         <h1>That page is not part of GoGymGo.</h1>
         <p>
           The link may be old or incomplete. Return to the public site, check
-          the September beta details, or find Regional updates.
+          the September pilot details, or find Regional updates.
         </p>
         <div className="not-found-page__actions">
           <Link className="button button-primary" href={siteLinks.home}>

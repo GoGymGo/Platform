@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { publicSiteOrigin } from "./site-links";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -7,6 +8,6 @@ export default function robots(): MetadataRoute.Robots {
       disallow: ["/api/", "/demo"],
       userAgent: "*",
     },
-    sitemap: "https://gogymgo.com/sitemap.xml",
+    sitemap: `${publicSiteOrigin}/sitemap.xml`,
   };
 }

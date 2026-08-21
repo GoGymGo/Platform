@@ -29,4 +29,13 @@ User journeys belong to the canonical member application:
 
 Do not add a second demo implementation or account database to this app.
 For local cross-application testing, set `NEXT_PUBLIC_MEMBER_APP_ORIGIN` to the
-local member-app origin. Production falls back to `https://app.gogymgo.com`.
+local loopback member-app origin. A production build accepts only
+`https://app.gogymgo.com`; a missing, malformed, non-HTTPS, private, preview, or
+unapproved origin renders every member-app control unavailable.
+
+`NEXT_PUBLIC_SEPTEMBER_PILOT_PUBLISHED=yes` is a release assertion, not a
+calendar switch. Set it only for the exact landing build created after the
+September Contest, current legal documents, and sole GoGymGo-sponsored $100 CAD
+manual-handoff reward are approved and published. Missing or different values
+keep registration and reward claims visibly closed. See
+[`docs/operations/public-conversion-release.md`](../../docs/operations/public-conversion-release.md).

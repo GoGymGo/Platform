@@ -48,7 +48,7 @@ const universalForbiddenMarkers = [
 const publicDemoRequiredMarkers = [
   'THE REAL APP UI // READ-ONLY SHOWCASE',
   'SAFE SHOWCASE MODE',
-  'LEAVE DEMO + JOIN BETA'
+  'LEAVE DEMO + REVIEW JOIN OPTIONS'
 ];
 
 if (!fs.existsSync(exportRoot) || !fs.statSync(exportRoot).isDirectory()) {

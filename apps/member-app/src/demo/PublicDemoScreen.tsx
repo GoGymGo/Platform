@@ -55,9 +55,9 @@ export default function PublicDemoScreen() {
             EXPLORE GOGYMGO
           </TerminalText>
           <TerminalText style={styles.body} tone="muted" uppercase={false} variant="body">
-            Tour ten core product screens built from the same components used by
-            the browser, iPhone and Android apps. Demo actions use isolated sample
-            data and never create an account or contact live GoGymGo services.
+            Tour the core product screens built from the shared member
+            interface. Demo actions use isolated sample data and never create an
+            account or contact live GoGymGo services.
           </TerminalText>
         </View>
 
@@ -137,7 +137,7 @@ export default function PublicDemoScreen() {
         </HUDBorderBox>
 
         <CyberButtonOutline
-          label="LEAVE DEMO + JOIN BETA ->"
+          label="LEAVE DEMO + REVIEW JOIN OPTIONS ->"
           onPress={joinBeta}
           tone="pink"
         />

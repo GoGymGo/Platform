@@ -22,7 +22,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@gogymgo/contracts/feature-capabilities": [
+        "../../packages/contracts/src/feature-capabilities.ts"
+      ],
+      "@gogymgo/contracts": ["../../packages/contracts/src/index.ts"]
     }
   },
   "include": [

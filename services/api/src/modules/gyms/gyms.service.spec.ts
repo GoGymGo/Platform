@@ -71,6 +71,7 @@ interface GymsServiceInternals {
     email: string;
     id: string;
     requested_region: string;
+    retention_expires_at: Date | null;
     source: string;
     status: string;
   }): RegionWaitlistEntryDto;
@@ -231,6 +232,7 @@ describe('gym service privacy-safe presentation helpers', () => {
         email: 'player@example.com',
         id: 'waitlist-1',
         requested_region: 'Victoria, BC',
+        retention_expires_at: null,
         source: 'member_onboarding',
         status: 'waiting',
       }),
@@ -241,6 +243,7 @@ describe('gym service privacy-safe presentation helpers', () => {
       email: 'player@example.com',
       id: 'waitlist-1',
       requestedRegion: 'Victoria, BC',
+      retentionExpiresAt: null,
       source: 'member_onboarding',
       status: 'waiting',
     });

@@ -73,7 +73,8 @@ export const privacyTableDisposition = {
   },
   gym_scan_events: { deletion: 'retain_integrity', export: 'minimize' },
   idempotency_keys: { deletion: 'delete', export: 'exclude' },
-  interest_submissions: { deletion: 'shared', export: 'exclude' },
+  interest_submissions: { deletion: 'delete', export: 'include' },
+  landing_intake_source_records: { deletion: 'delete', export: 'exclude' },
   legal_document_events: { deletion: 'shared', export: 'exclude' },
   legal_documents: { deletion: 'shared', export: 'minimize' },
   notification_deliveries: { deletion: 'delete', export: 'minimize' },
@@ -122,4 +123,4 @@ export const privacyTableDisposition = {
   workout_sessions: { deletion: 'retain_integrity', export: 'include' },
 } satisfies Record<keyof Database, PrivacyDisposition>;
 
-export const privacyExportSchemaVersion = 14;
+export const privacyExportSchemaVersion = 15;

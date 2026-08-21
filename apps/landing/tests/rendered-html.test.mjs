@@ -240,11 +240,12 @@ test("landing conversion measurement is anonymous, allowlisted, empty by default
 });
 
 test("regional updates are intentionally short and separate from registration", async () => {
-  const [gymPage, forms, regionalRoute, interestRoute] = await Promise.all([
+  const [gymPage, forms, regionalRoute, interestRoute, intakeHandler] = await Promise.all([
     read("app/gym-goers/page.tsx"),
     read("app/components/InterestForms.tsx"),
     read("app/api/regional-updates/route.ts"),
     read("app/api/interest/route.ts"),
+    read("app/api/landing-intake-request.ts"),
   ]);
   const gymForm = forms.slice(
     forms.indexOf("export function GymGoerForm"),
@@ -261,13 +262,18 @@ test("regional updates are intentionally short and separate from registration", 
   assert.match(forms, /regional availability emails/);
   assert.match(forms, /regional-updates-2026-08-13-v1/);
   assert.match(forms, /consent: formData\.get\("consent"\) === "on"/);
-  assert.match(regionalRoute, /\/v1\/region-waitlist/);
-  assert.match(regionalRoute, /payload\.consent !== true/);
-  assert.match(regionalRoute, /consentNoticeVersion: regionalUpdatesConsentNoticeVersion/);
-  assert.doesNotMatch(regionalRoute, /getDb|env\.DB/);
-  assert.match(interestRoute, /\/v1\/interest-submissions/);
-  assert.match(interestRoute, /Partnership requests are temporarily unavailable/);
-  assert.match(interestRoute, /partnershipInterests\.has/);
+  assert.match(regionalRoute, /handleRegionalUpdates/);
+  assert.match(interestRoute, /handlePartnershipInterest/);
+  assert.match(intakeHandler, /\/v1\/region-waitlist/);
+  assert.match(intakeHandler, /parsed\.value\.consent !== true/);
+  assert.match(intakeHandler, /consentNoticeVersion: regionalUpdatesConsentNoticeVersion/);
+  assert.match(intakeHandler, /\/v1\/interest-submissions/);
+  assert.match(intakeHandler, /Partnership requests/);
+  assert.match(intakeHandler, /partnershipInterests\.includes/);
+  assert.match(intakeHandler, /Idempotency-Key/);
+  assert.match(intakeHandler, /GOGYMGO_LANDING_FORWARDING_SECRET/);
+  assert.match(intakeHandler, /AbortSignal\.timeout\(5_000\)/);
+  assert.doesNotMatch(intakeHandler, /getD1|getDb|env\.DB/);
   assert.doesNotMatch(interestRoute, /return new Response\(body/);
   assert.doesNotMatch(regionalRoute, /return new Response\(body/);
   assert.doesNotMatch(interestRoute, /env\.DB|ensureInterestTable/);
@@ -501,13 +507,23 @@ test("the retired landing demo redirects only when the canonical member demo is 
 });
 
 test("historical interest export remains disabled, owner-restricted and read-only", async () => {
-  const route = await read("app/api/internal/export-interest-submissions/route.ts");
+  const [route, owner, exporter] = await Promise.all([
+    read("app/api/internal/export-interest-submissions/route.ts"),
+    read("app/api/internal/public-site-owner.ts"),
+    read("app/api/landing-intake-export.ts"),
+  ]);
 
-  assert.match(route, /LANDING_D1_EXPORT_ENABLED !== "yes"/);
-  assert.match(route, /LANDING_D1_EXPORT_OWNER_EMAIL/);
+  assert.match(route, /readPublicSiteOwnerConfig/);
+  assert.match(route, /readLandingInterestExportConfig/);
   assert.match(route, /getChatGPTUser/);
-  assert.match(route, /Content-Disposition/);
-  assert.match(route, /Cache-Control.*no-store/);
-  assert.match(route, /\.select\(\)/);
-  assert.doesNotMatch(route, /\.(?:insert|update|delete)\(/);
+  assert.match(route, /exportHeaders/);
+  assert.match(owner, /values\[enableVariable\] !== "yes"/);
+  assert.match(owner, /LANDING_D1_EXPORT_OWNER_EMAIL/);
+  assert.match(owner, /LANDING_D1_EXPORT_OWNER_USER_ID/);
+  assert.match(exporter, /LANDING_D1_EXPORT_CUTOFF_EXCLUSIVE/);
+  assert.match(exporter, /LANDING_D1_EXPORT_ID/);
+  assert.match(exporter, /source_record_sha256/);
+  assert.match(exporter, /content_sha256/);
+  assert.match(exporter, /LIMIT \?4|LIMIT \?2/);
+  assert.doesNotMatch(exporter, /\b(?:INSERT|UPDATE|DELETE)\b/i);
 });

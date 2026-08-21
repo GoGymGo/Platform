@@ -809,6 +809,7 @@ export interface RegionWaitlistEntriesTable {
   consent_notice_version: string | null;
   consented_at: Timestamp | null;
   review_version: Generated<number>;
+  retention_expires_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -828,8 +829,23 @@ export interface InterestSubmissionsTable {
   message: string | null;
   consent: boolean;
   source: string;
+  retention_expires_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+export interface LandingIntakeSourceRecordsTable {
+  id: Generated<string>;
+  source_system: string;
+  source_record_id: string;
+  source_record_sha256: string;
+  artifact_sha256: string | null;
+  interest_submission_id: string | null;
+  region_waitlist_entry_id: string | null;
+  mapping_disposition:
+    'inserted' | 'matched_existing' | 'matched_source_duplicate';
+  source_created_at: Timestamp;
+  created_at: Timestamp;
 }
 
 export interface CashFulfillmentsTable {
@@ -1016,6 +1032,7 @@ export interface Database {
   creator_workout_plans: CreatorWorkoutPlansTable;
   idempotency_keys: IdempotencyKeysTable;
   interest_submissions: InterestSubmissionsTable;
+  landing_intake_source_records: LandingIntakeSourceRecordsTable;
   legal_document_events: LegalDocumentEventsTable;
   legal_documents: LegalDocumentsTable;
   operator_audit_events: OperatorAuditEventsTable;

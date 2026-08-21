@@ -455,6 +455,9 @@ export class RegionWaitlistEntryDto {
   @ApiProperty({ type: String })
   source!: string;
 
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  retentionExpiresAt!: string | null;
+
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
 
@@ -488,9 +491,9 @@ export class InterestSubmissionDto {
   @Length(2, 160)
   region!: string;
 
-  @ApiProperty({ type: Boolean })
-  @IsBoolean()
-  consent!: boolean;
+  @ApiProperty({ enum: [true], type: Boolean })
+  @Equals(true)
+  consent!: true;
 
   @ApiPropertyOptional({ maxLength: 140, type: String })
   @IsOptional()
@@ -521,6 +524,13 @@ export class InterestSubmissionDto {
   @ApiPropertyOptional({ maxLength: 80, type: String })
   @IsOptional()
   @IsString()
+  @IsIn([
+    'regional-sponsor',
+    'brand-rewards',
+    'creator-campaign',
+    'gym-partnership',
+    'explore',
+  ])
   @MaxLength(80)
   partnershipInterest?: string;
 
@@ -566,6 +576,12 @@ export class OperatorInterestSubmissionDto {
 
   @ApiProperty({ type: String })
   region!: string;
+
+  @ApiProperty({ type: String })
+  source!: string;
+
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  retentionExpiresAt!: string | null;
 
   @ApiPropertyOptional({ nullable: true, type: Number })
   goalDays!: number | null;

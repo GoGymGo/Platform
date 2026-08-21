@@ -1,4 +1,6 @@
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import type { ConfigService } from '@nestjs/config';
+import type { Environment } from '../../config/environment';
 import type {
   AssignCompetitionGymDto,
   CashFulfillmentRequestDto,
@@ -32,6 +34,7 @@ const principal: AuthenticatedPrincipal = {
 };
 const idempotencyKey = 'operator-request-0001';
 const auditQuery = { limit: 50 } satisfies ListOperatorAuditHistoryQueryDto;
+const forwardingSecret = 'f'.repeat(32);
 
 describe('gym controllers', () => {
   const mocks = {
@@ -59,6 +62,14 @@ describe('gym controllers', () => {
     updateGymLocation: jest.fn().mockResolvedValue({ id: 'gym-1' }),
   };
   const gyms = mocks as unknown as GymsService;
+  const landingConfig: Partial<Environment> = {
+    LANDING_INTAKE_ENABLED: true,
+    LANDING_INTAKE_FORWARDING_SECRET: forwardingSecret,
+    LANDING_INTAKE_RETENTION_DAYS: 90,
+  };
+  const config = {
+    get: (key: keyof Environment) => landingConfig[key],
+  } as unknown as ConfigService<Environment, true>;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -79,7 +90,7 @@ describe('gym controllers', () => {
   });
 
   it('forwards public regional and landing submissions', async () => {
-    const controller = new PilotSubmissionsController(gyms);
+    const controller = new PilotSubmissionsController(gyms, config);
     const waitlist = {
       consent: true,
       consentNoticeVersion: 'regional-updates-2026-08-13-v1',
@@ -96,14 +107,22 @@ describe('gym controllers', () => {
       workoutStyle: 'Strength',
     } satisfies InterestSubmissionDto;
 
-    await expect(controller.submitWaitlist(waitlist)).resolves.toEqual({
-      status: 'received',
-    });
-    await expect(controller.submitInterest(interest)).resolves.toEqual({
-      id: 'interest-1',
-    });
-    expect(mocks.submitPublicWaitlist).toHaveBeenCalledWith(waitlist);
-    expect(mocks.submitInterest).toHaveBeenCalledWith(interest);
+    await expect(
+      controller.submitWaitlist(idempotencyKey, forwardingSecret, waitlist),
+    ).resolves.toEqual({ status: 'received' });
+    await expect(
+      controller.submitInterest(idempotencyKey, forwardingSecret, interest),
+    ).resolves.toEqual({ id: 'interest-1' });
+    expect(mocks.submitPublicWaitlist).toHaveBeenCalledWith(
+      idempotencyKey,
+      90,
+      waitlist,
+    );
+    expect(mocks.submitInterest).toHaveBeenCalledWith(
+      idempotencyKey,
+      90,
+      interest,
+    );
 
     const memberController = new MemberRegionWaitlistController(gyms);
     const memberInput = {
@@ -118,6 +137,28 @@ describe('gym controllers', () => {
       principal,
       memberInput,
     );
+  });
+
+  it('fails public landing intake closed for disabled or invalid forwarding policy', () => {
+    const disabled = new PilotSubmissionsController(gyms, {
+      get: () => undefined,
+    } as unknown as ConfigService<Environment, true>);
+    const waitlist = {
+      consent: true,
+      consentNoticeVersion: 'regional-updates-2026-08-13-v1',
+      email: 'player@example.com',
+      requestedRegion: 'Victoria, BC',
+    } satisfies RegionWaitlistRequestDto;
+
+    expect(() =>
+      disabled.submitWaitlist(idempotencyKey, forwardingSecret, waitlist),
+    ).toThrow('Public landing intake is unavailable.');
+
+    const enabled = new PilotSubmissionsController(gyms, config);
+    expect(() =>
+      enabled.submitWaitlist(idempotencyKey, 'wrong-secret', waitlist),
+    ).toThrow('Public landing intake forwarding is not authorized.');
+    expect(mocks.submitPublicWaitlist).not.toHaveBeenCalled();
   });
 
   it('forwards every operator gym and pilot command', async () => {

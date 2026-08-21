@@ -12,6 +12,8 @@ export interface WorkerRunResult {
   competitionsCancelled: number;
   competitionPeriodsSettled: number;
   incompleteGymSessionsExpired: number;
+  landingInterestDeleted: number;
+  landingWaitlistDeleted: number;
   notificationsSent: number;
   profileMediaCleanupFailed: number;
   profileMediaDeleted: number;
@@ -60,6 +62,10 @@ export class OperationsWorkerService {
       () => this.gyms.expireIncompleteSessions(),
       0,
     );
+    const landingIntake = await attempt(
+      () => this.gyms.purgeExpiredLandingIntake(),
+      { interestDeleted: 0, waitlistDeleted: 0 },
+    );
     const profileMedia = await attempt(() => this.profileMedia.process(), {
       deleted: 0,
       failed: 0,
@@ -90,6 +96,8 @@ export class OperationsWorkerService {
       competitionsCancelled: competitions.cancelled,
       competitionPeriodsSettled,
       incompleteGymSessionsExpired,
+      landingInterestDeleted: landingIntake.interestDeleted,
+      landingWaitlistDeleted: landingIntake.waitlistDeleted,
       notificationsSent,
       profileMediaCleanupFailed: profileMedia.failed,
       profileMediaDeleted: profileMedia.deleted,

@@ -4,6 +4,7 @@ import {
   CashFulfillmentRequestDto,
   DeleteGymLocationDto,
   GymScanRequestDto,
+  InterestSubmissionDto,
   UpdateGymLocationDto,
 } from './gym.dto';
 
@@ -38,6 +39,40 @@ describe('GymScanRequestDto', () => {
       'competitionId',
       'credential',
     ]);
+  });
+});
+
+describe('InterestSubmissionDto', () => {
+  const validPartner = {
+    audience: 'brand',
+    companyName: 'Example Co',
+    consent: true,
+    email: 'partner@example.com',
+    fullName: 'Partner Person',
+    partnershipInterest: 'regional-sponsor',
+    region: 'Victoria, BC',
+  };
+
+  it('requires affirmative consent and an allowlisted partnership kind', async () => {
+    await expect(
+      validate(plainToInstance(InterestSubmissionDto, validPartner)),
+    ).resolves.toHaveLength(0);
+    await expect(
+      validate(
+        plainToInstance(InterestSubmissionDto, {
+          ...validPartner,
+          consent: false,
+        }),
+      ),
+    ).resolves.not.toHaveLength(0);
+    await expect(
+      validate(
+        plainToInstance(InterestSubmissionDto, {
+          ...validPartner,
+          partnershipInterest: 'unlisted-partnership',
+        }),
+      ),
+    ).resolves.not.toHaveLength(0);
   });
 });
 

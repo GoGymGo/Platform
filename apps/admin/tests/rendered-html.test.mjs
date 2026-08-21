@@ -312,6 +312,11 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(pilot, /STATIC QR PILOT/);
   assert.match(pilot, /onUpdateWaitlist/);
   assert.match(pilot, /legacy \/ not recorded/);
+  assert.match(pilot, /entry\.source/);
+  assert.match(pilot, /entry\.retentionExpiresAt/);
+  assert.match(pilot, /Account-linked \/ no public expiry/);
+  assert.match(pilot, /Legacy \/ no scheduled expiry/);
+  assert.doesNotMatch(pilot, /source_record_sha256|artifact_sha256|forwarding-secret/i);
   assert.match(pilot, /Compass coordinates/);
   assert.match(pilot, /USE MY PHONE LOCATION/);
   assert.match(pilot, /navigator\.geolocation\.getCurrentPosition/);

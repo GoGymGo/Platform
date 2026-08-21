@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `6019ac5fddacec9ba4ee22f9a6bb037f9bf35d6d` after PR #120 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-025 — Public conversion journeys` on
-  `agent/ggg-025-public-conversion-journeys`; creation follows this ledger merge.
+  `382a8d951ece5d61af63b8541afedf83bd5ea4a7` after PR #122 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-026 — Public feedback and measurement`
+  on `agent/ggg-026-public-feedback-measurement`; creation follows this ledger
+  merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -911,17 +912,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   location and never creates authoritative value.
 - External providers / feature flag: configured member-app origin; browser test
   preview is separate and forbidden in production.
-- Current implementation / missing behavior: responsive copy/navigation and real
-  app screenshots are directly tested. Missing production-domain crawl, link,
-  analytics, and accessibility UAT after final legal/reward copy.
+- Current implementation / missing behavior: repository behavior is complete:
+  release-authoritative fail-closed claims, allowlisted configured origins,
+  canonical join/demo/legal/partner navigation, current product captures,
+  isolated fake-only demo, metadata/robots/sitemap/headers, responsive keyboard
+  states, custom not-found handling, and production/preview artifact isolation.
+  Final hosted-domain and released-capability proof remains external.
 - Required tests / operations / cloud dependency: canonical links, demo isolation,
   no misleading registration/reward claims, SEO/robots/sitemap, responsive and
   keyboard behavior, production artifact audit; Sites/Firebase hosting domains.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-025 — Public conversion
-  journeys`; branch `agent/ggg-025-public-conversion-journeys`; PR/merge
-  `unassigned`; status `IN_PROGRESS`.
-- Residual risks / blocker: landing claims must track release capability and the
-  approved pilot reward exactly.
+  journeys`; branch `agent/ggg-025-public-conversion-journeys` (deleted after
+  merge); PR `#122`; merge `382a8d951ece5d61af63b8541afedf83bd5ea4a7`;
+  status `BLOCKED`.
+- Residual risks / blocker: final hosting/TLS mappings, released member-web
+  dependencies, approved live legal/reward publication, and hosted crawl/link/
+  accessibility UAT require separate deployment/provider authority. Landing claims
+  remain fail closed and must continue to track release capability exactly.
 
 ### GGG-026 — Public-site feedback and privacy-safe conversion measurement
 
@@ -943,7 +950,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   validation/spam/rate limits, owner denial, disabled export, retention/deletion,
   analytics failure isolation; Cloudflare D1/Sites.
 - Delivery: priority `P2`; task `GoGymGo Feature GGG-026 — Public feedback and
-  measurement`; branch/PR/merge `unassigned`; status `AUDITED`.
+  measurement`; branch `agent/ggg-026-public-feedback-measurement`; PR/merge
+  `unassigned`; status `IN_PROGRESS`.
 - Residual risks / blocker: no cloud inspection or export is authorized in this
   program task.
 
@@ -1187,6 +1195,24 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed the repository delivery for `GGG-025` through PR #122.
+  Exact tested head `4db9f3260a46cc26738c519f5c2e10eacc38db24` was
+  squash-merged as `382a8d951ece5d61af63b8541afedf83bd5ea4a7`; all seven
+  PR checks and all applicable exact-main workflows passed and the feature branch/
+  worktree were deleted. Delivery removed calendar-inferred registration claims,
+  enforced allowlisted configured origins, replaced retired/fake product captures,
+  kept join and fake-only demo boundaries canonical, and hardened public copy,
+  partner presets, accessibility/responsive states, metadata, robots/sitemap,
+  headers, not-found behavior and production/preview artifact isolation. Proof
+  included landing 18/18, member 268/268, production and preview exports/audits,
+  direct 430x900 and 1440x900 keyboard/browser QA, plus governance/contracts/
+  dependency/source/security/secret/diff gates. No API/schema/persistence changed,
+  so Docker/database proof was neither relevant nor run. No cloud/provider/deploy
+  action occurred. Status remains `BLOCKED` pending final hosting/TLS, released
+  member-web dependencies, approved live legal/reward publication and hosted crawl/
+  link/accessibility UAT. Dependency ordering assigns `GGG-026` next because its
+  public feedback and measurement duty consumes the now-truthful conversion routes
+  without broadening the member or demo systems.
 - 2026-08-21 — Completed the repository delivery for `GGG-018` through PR #120.
   Exact tested head `4b7af48c5db40723ac56ad7548f2b1ed71e7de35` was
   squash-merged as `6019ac5fddacec9ba4ee22f9a6bb037f9bf35d6d`; all PR

@@ -18,10 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `b1b3e7b741467ae7eb16e60f269ca9a2fe8d4068` after PR #112 on 2026-08-20.
-- Active feature task: `GoGymGo Feature GGG-022 — Review queues and operational
-  health` on `agent/ggg-022-review-queues-operational-health`; creation follows
-  this ledger merge.
+  `263ca6e45beb3e688d0ac9a12c2d03aa120a78b9` after PR #114 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-023 — Gym partner portal` on
+  `agent/ggg-023-gym-partner-portal`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -34,7 +33,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 43 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 44 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -788,16 +787,28 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   idempotency; sensitive review data is not public.
 - External providers / feature flag: optional OTLP, database, worker; feature-
   specific providers may be disabled.
-- Current implementation / missing behavior: queue, heartbeat, observability,
-  decision endpoints, and UI exist. Missing deployed alerting/SLO ownership,
-  stuck-job rehearsal, and feature-specific review browser tests.
+- Current implementation / missing behavior: repository behavior is complete.
+  One stable globally paginated queue, minimized detail contract, and
+  server-declared decision surface cover Creator submissions, partner
+  applications, privacy requests, profile media, region verification, region
+  waitlist, and workout sessions. Decisions reauthorize database roles on replay,
+  deny self-review, enforce valid transitions and optimistic versions, and bind
+  idempotency to the full body. Audit search is bounded, cursor-paginated and
+  recursively redacted. Worker/database/queue/lease/provider health is durable
+  and honest without probing disabled providers, and the admin client validates
+  every response/action fail closed. Deployed alert ownership/destinations and
+  production rehearsal remain external.
 - Required tests / operations / cloud dependency: stale/degraded worker, queue
   counts, lease recovery, every decision authorization/state conflict, audit
   search/redaction, OTLP failure safety; deployed worker/monitoring.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-022 — Review queues and
-  operational health`; branch/PR/merge `unassigned`; status `READY`.
+  operational health`; branch `agent/ggg-022-review-queues-operational-health`
+  (deleted after merge); PR `#114`; merge
+  `263ca6e45beb3e688d0ac9a12c2d03aa120a78b9`; status `COMPLETE`.
 - Residual risks / blocker: observability is measurable in code but production
-  alerts cannot be verified without authorized environment access.
+  alerts, provider credentials/configuration, alert ownership/destinations and
+  staging operational UAT cannot be verified without authorized environment
+  access. No production health claim or external probe was invented.
 
 ### GGG-023 — Gym partner portal and QR poster operations
 
@@ -818,7 +829,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   revoke, cross-gym denial, draft ownership/state, poster issue/revoke, visit
   privacy, admin publication; Firebase/database/Cloudflare Access.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-023 — Gym partner portal`;
-  branch/PR/merge `unassigned`; status `AUDITED`.
+  branch/PR/merge `unassigned`; status `READY`.
 - Residual risks / blocker: operator credential issuance remains a controlled
   human process and must not become public signup.
 
@@ -1150,6 +1161,24 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed `GGG-022` through PR #114. Exact tested head
+  `2b99a1d40883322e56cb0d1ee4e18e379867f4a8` was squash-merged as
+  `263ca6e45beb3e688d0ac9a12c2d03aa120a78b9`; all seven PR checks and all six
+  exact-main workflows passed, the remote branch was deleted, and Docker cleaned
+  to zero running containers. Delivery added a globally paginated seven-domain
+  review queue, minimized details and server-declared decisions; body-bound
+  idempotency, replay reauthorization, self-review denial and optimistic versions;
+  bounded recursively redacted audit search; durable cleanup leases/fencing; and
+  truthful database/worker/queue/lease/provider health with fail-closed admin
+  contracts. Serial proof included 374 API unit tests, 28 API E2E tests, 253
+  member tests, 41 admin tests, 15 landing tests, focused regressions 59/59,
+  full PostGIS integration 74/74 and database journeys 38/38, plus all contracts,
+  governance, dependency, source, build, artifact, diff and secret gates. No
+  cloud access or deployment occurred. External alert destinations/ownership,
+  provider configuration and production operational rehearsal remain release
+  gates. Dependency ordering assigns `GGG-023` next because the partner portal
+  consumes the completed role-scoped admin, gym/QR configuration, review and
+  audit boundaries.
 - 2026-08-20 — Merged the complete repository implementation for `GGG-019`
   through PR #112. Exact tested head
   `f2d6402dcacc32358f2f072c65881a23659a03de` was squash-merged as

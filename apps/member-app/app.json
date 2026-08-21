@@ -142,7 +142,7 @@
             {
               "scheme": "https",
               "host": "app.gogymgo.com",
-              "pathPrefix": "/scan"
+              "path": "/scan"
             }
           ],
           "category": [

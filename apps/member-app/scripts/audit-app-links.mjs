@@ -21,11 +21,13 @@ const scanIntent = (expo.android?.intentFilters ?? []).find(
       (entry) =>
         entry.scheme === 'https' &&
         entry.host === 'app.gogymgo.com' &&
-        entry.pathPrefix === '/scan'
+        entry.path === '/scan' &&
+        entry.pathPrefix === undefined &&
+        entry.pathPattern === undefined
     )
 );
 if (!scanIntent) {
-  issues.push('Android verified App Link for https://app.gogymgo.com/scan is missing');
+  issues.push('Android exact verified App Link for https://app.gogymgo.com/scan is missing');
 }
 
 if (!packageJson.scripts?.build?.includes('write-app-link-associations.mjs')) {

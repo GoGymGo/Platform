@@ -9,6 +9,8 @@ export default function configureApp({ config }: ConfigContext): ExpoConfig {
   const androidGoogleServicesPath = resolve(process.cwd(), 'google-services.json');
   const googleServicesReady =
     existsSync(iosGoogleServicesPath) && existsSync(androidGoogleServicesPath);
+  const easOwner = process.env.GOGYMGO_EAS_OWNER?.trim();
+  const easProjectId = process.env.GOGYMGO_EAS_PROJECT_ID?.trim();
   const plugins = [...(config.plugins ?? [])];
   const releaseBuild =
     process.env.GOGYMGO_RELEASE_BUILD === 'true' ||
@@ -32,7 +34,19 @@ export default function configureApp({ config }: ConfigContext): ExpoConfig {
   return {
     ...config,
     name: config.name ?? 'GoGymGo',
+    ...(easOwner ? { owner: easOwner } : {}),
     slug: config.slug ?? 'gogymgo-mobile',
+    extra: {
+      ...config.extra,
+      ...(easProjectId
+        ? {
+            eas: {
+              ...(typeof config.extra?.eas === 'object' ? config.extra.eas : {}),
+              projectId: easProjectId
+            }
+          }
+        : {})
+    },
     plugins,
     ios: {
       ...config.ios,

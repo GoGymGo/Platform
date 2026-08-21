@@ -2,20 +2,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 
 import { ScreenLoadingState } from '@/components/cyber';
-import { extractGymScanCredential } from '@/domain/gymScan';
+import { extractGymScanRouteCredential } from '@/domain/gymScan';
 import { gymScanAuthNext, gymScanWorkoutRoute } from '@/navigation/gymScanFlow';
 import { rememberGymScanCredential } from '@/services/pendingGymScan';
 import { useAuth } from '@/state/auth';
 
 export default function StaticQrDeepLinkRoute() {
   const router = useRouter();
-  const { credential: credentialParameter } = useLocalSearchParams<{
-    credential?: string;
-  }>();
+  const parameters = useLocalSearchParams<Record<string, string | string[]>>();
   const { loading, user } = useAuth();
   const routed = useRef(false);
   const [intentReady, setIntentReady] = useState(false);
-  const credential = extractGymScanCredential(credentialParameter ?? '');
+  const credential = extractGymScanRouteCredential(parameters);
 
   useEffect(() => {
     let active = true;

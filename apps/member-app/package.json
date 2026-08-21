@@ -19,6 +19,7 @@
     "audit:app-links": "node scripts/audit-app-links.mjs",
     "audit:browser-pilot-release": "node scripts/audit-browser-pilot-release.mjs",
     "audit:demo-isolation": "node scripts/audit-demo-isolation.mjs",
+    "audit:native-link-release": "node scripts/audit-native-link-release.mjs",
     "audit:dependencies": "node ../../tooling/audit-dependencies.mjs",
     "audit:production-bundle": "node scripts/audit-production-bundle.mjs",
     "audit:web-test-preview": "node scripts/audit-browser-test-preview.mjs dist",

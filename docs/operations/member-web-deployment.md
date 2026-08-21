@@ -36,6 +36,13 @@ but the team must not claim that scanning opens an installed native app. Native
 handoff becomes a separate release milestone governed by
 [`member-app-native-links.md`](member-app-native-links.md).
 
+The protected release has two explicit modes. `member-web` is the browser-only
+pilot and rejects every native identifier or approval value. The separately
+approved `member-native-links` scope is production-only, requires every final
+native identifier and public listing/legal URL, and publishes the two exact
+association documents for `/scan`. Neither mode builds, signs, submits, or
+deploys a native binary.
+
 ## Free connected preview
 
 From the repository root:
@@ -88,7 +95,7 @@ Function sends extensionless Expo Router paths such as `/sign-up` and `/join` to
 the SPA entrypoint. Do not promote a bundle containing a Quick Tunnel or local
 API URL.
 
-For a permanent release:
+For a permanent browser-pilot release:
 
 1. provision the production database and API runtime;
 2. run migrations and the API readiness check;
@@ -104,24 +111,40 @@ For a permanent release:
 Before assuming the AWS deployment role, the workflow verifies that the commit
 is on `main`, is the merge commit of a merged pull request into `main`, and
 passed every check currently required by branch protection. It then builds the
-exact source commit and runs `audit:browser-pilot-release`. The audit requires
+exact source commit and runs `audit:browser-pilot-release`. The release-policy
+gate requires the exact staging or production API origin and, for production,
+the canonical `https://app.gogymgo.com` member origin. The artifact audit requires
 the permanent HTTPS API origin, rejects browser-test and tunnel markers,
 verifies QR plus foreground-location pilot capabilities, and rejects native
-association files when signing identifiers are absent. The S3 publish step also
-removes and verifies the absence of stale association files.
+association files and native inputs. The S3 publish step removes both association
+objects and verifies that the public URLs return 403 or 404 rather than SPA HTML.
 
 This browser deployment does not authorize or imply an iOS App Store, Google
 Play or native QR-link release.
 
-The protected workflow forces a clean Expo export, rejects public sample data and
-production markers, verifies the compiled API origin, assumes a separate
-least-privilege AWS OIDC role, synchronizes the private S3 origin, invalidates
-CloudFront and checks both public routes. The staging environment must define:
+The protected workflow forces a clean Expo export, rejects public sample data
+and production markers, verifies the compiled API origin, and writes a
+deterministic manifest of every exported path, size, and SHA-256 digest. After it
+assumes the separate least-privilege AWS OIDC role and verifies the account, it
+recomputes that manifest before any remote write. Assets are uploaded without
+deleting the previous hashed release; native associations are published or
+removed according to the explicit mode; and `index.html` changes last. Following
+CloudFront invalidation, every public SPA route must byte-match the exact local
+entrypoint. A failure restores the captured prior entrypoint and association
+state and invalidates again.
+
+The staging environment must define:
 
 - `MEMBER_WEB_BUCKET`, `MEMBER_WEB_DISTRIBUTION_ID`,
   `MEMBER_WEB_DEPLOY_ROLE_ARN`, and `MEMBER_WEB_URL` from Terraform output;
 - `API_URL`, `AWS_ACCOUNT_ID`, and `AWS_REGION`;
 - the public `EXPO_PUBLIC_FIREBASE_*` browser configuration.
+
+Production native-link publication additionally requires every authoritative
+value and the guarded sequence in
+[`member-app-native-links.md`](member-app-native-links.md). Repository readiness
+does not establish those provider-owned values and does not imply that native
+handoff is live.
 
 Device permissions, notification registrations, unfinished form drafts and
 active hardware evidence collection remain device-specific by design. Their

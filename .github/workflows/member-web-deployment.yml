@@ -14,6 +14,14 @@ on:
         description: Merged main commit SHA to build and deploy
         required: true
         type: string
+      release_mode:
+        description: Browser pilot or approved native-link association release
+        required: true
+        default: browser-pilot
+        type: choice
+        options:
+          - browser-pilot
+          - native-links
   workflow_call:
     inputs:
       environment:
@@ -23,6 +31,11 @@ on:
       source_commit:
         description: Merged main commit SHA to build and deploy
         required: true
+        type: string
+      release_mode:
+        description: Browser pilot or approved native-link association release
+        required: false
+        default: browser-pilot
         type: string
 
 permissions: {}
@@ -78,8 +91,27 @@ jobs:
       EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW: "false"
       EXPO_PUBLIC_ENABLE_CREATOR_FEATURES: ${{ vars.EXPO_PUBLIC_ENABLE_CREATOR_FEATURES || 'false' }}
       EXPO_PUBLIC_ENABLE_GOOGLE_AUTH: "false"
-      GOGYMGO_BROWSER_ONLY_PILOT: "true"
+      GOGYMGO_ACCOUNT_DELETION_URL: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_ACCOUNT_DELETION_URL || '' }}
+      GOGYMGO_ANDROID_CERT_SHA256: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_ANDROID_CERT_SHA256 || '' }}
+      GOGYMGO_ANDROID_PACKAGE: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_ANDROID_PACKAGE || '' }}
+      GOGYMGO_APP_STORE_URL: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_APP_STORE_URL || '' }}
+      GOGYMGO_BROWSER_ONLY_PILOT: ${{ inputs.release_mode == 'browser-pilot' && 'true' || 'false' }}
+      GOGYMGO_DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+      GOGYMGO_EAS_OWNER: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_EAS_OWNER || '' }}
+      GOGYMGO_EAS_PROJECT_ID: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_EAS_PROJECT_ID || '' }}
+      GOGYMGO_IOS_BUNDLE_ID: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_IOS_BUNDLE_ID || '' }}
+      GOGYMGO_IOS_TEAM_ID: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_IOS_TEAM_ID || '' }}
+      GOGYMGO_NATIVE_LINKS_APPROVED: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_NATIVE_LINKS_APPROVED || 'no' }}
+      GOGYMGO_PLAY_STORE_URL: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_PLAY_STORE_URL || '' }}
+      GOGYMGO_PRIVACY_POLICY_URL: ${{ inputs.release_mode == 'native-links' && vars.GOGYMGO_PRIVACY_POLICY_URL || '' }}
+      GOGYMGO_RELEASE_MODE: ${{ inputs.release_mode }}
+      MEMBER_WEB_ATTESTATION: ${{ runner.temp }}/member-web-release-attestation.json
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_commit }}
+
       - name: Validate protected environment configuration
         shell: bash
         run: |
@@ -107,18 +139,16 @@ jobs:
             echo "GoGymGo releases are restricted to ca-central-1." >&2
             exit 1
           fi
-          if [[ "$API_URL" != "https://api-staging.gogymgo.com" && "${{ inputs.environment }}" == "staging" ]]; then
-            echo "The staging web build must use the isolated staging API." >&2
-            exit 1
-          fi
           if [[ ! "${{ inputs.source_commit }}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "source_commit must be a full lowercase Git commit SHA." >&2
             exit 1
           fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ inputs.source_commit }}
+          actual_commit="$(git rev-parse HEAD)"
+          if [[ "$actual_commit" != "${{ inputs.source_commit }}" ]]; then
+            echo "Checkout resolved ${actual_commit}; expected ${{ inputs.source_commit }}." >&2
+            exit 1
+          fi
+          node apps/member-app/scripts/member-release-policy.mjs
 
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -128,7 +158,7 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
-      - name: Build and audit the browser member app
+      - name: Build and attest the member web release
         working-directory: apps/member-app
         env:
           CI: "1"
@@ -136,10 +166,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "$GOGYMGO_RELEASE_MODE" == "native-links" ]]; then
+            npm run audit:release
+          fi
           npm run build
           npm run audit:production-bundle -- dist
           npm run audit:demo-isolation
-          npm run audit:browser-pilot-release -- dist
+          if [[ "$GOGYMGO_RELEASE_MODE" == "native-links" ]]; then
+            npm run audit:native-link-release -- dist
+          else
+            npm run audit:browser-pilot-release -- dist
+          fi
+          node ../../tooling/static-export-attestation.mjs \
+            create \
+            dist \
+            "$MEMBER_WEB_ATTESTATION" \
+            "${{ inputs.source_commit }}" \
+            "$GOGYMGO_RELEASE_MODE" \
+            "$API_URL"
 
       - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
@@ -156,50 +200,178 @@ jobs:
             echo "OIDC assumed account ${actual_account}; expected ${AWS_ACCOUNT_ID}." >&2
             exit 1
           fi
+          node tooling/static-export-attestation.mjs \
+            verify \
+            apps/member-app/dist \
+            "$MEMBER_WEB_ATTESTATION" \
+            "${{ inputs.source_commit }}" \
+            "$GOGYMGO_RELEASE_MODE" \
+            "$API_URL"
 
-      - name: Publish immutable assets and the no-cache entrypoint
+      - name: Publish, verify, and roll back on failure
         shell: bash
         run: |
           set -euo pipefail
+          previous_root="$RUNNER_TEMP/member-web-previous"
+          mkdir -p "$previous_root"
+          remote_mutated=false
+
+          capture_object() {
+            local key="$1"
+            local file="$2"
+            local head_error
+            if head_error="$(aws s3api head-object \
+                --bucket "$MEMBER_WEB_BUCKET" \
+                --key "$key" 2>&1 > /dev/null)"; then
+              aws s3 cp "s3://${MEMBER_WEB_BUCKET}/${key}" "$file" --only-show-errors
+              printf 'present' > "${file}.state"
+            elif grep -Eq '\((404|NoSuchKey|NotFound)\)|Not Found' <<<"$head_error"; then
+              printf 'absent' > "${file}.state"
+            else
+              echo "Could not capture s3://${MEMBER_WEB_BUCKET}/${key}: ${head_error}" >&2
+              return 1
+            fi
+          }
+
+          restore_object() {
+            local key="$1"
+            local file="$2"
+            local content_type="$3"
+            local cache_control="$4"
+            if [[ "$(cat "${file}.state")" == "present" ]]; then
+              aws s3 cp "$file" "s3://${MEMBER_WEB_BUCKET}/${key}" \
+                --cache-control "$cache_control" \
+                --content-type "$content_type" \
+                --only-show-errors
+            else
+              aws s3api delete-object \
+                --bucket "$MEMBER_WEB_BUCKET" \
+                --key "$key" > /dev/null
+            fi
+          }
+
+          invalidate_all() {
+            local invalidation_id
+            invalidation_id="$(aws cloudfront create-invalidation \
+              --distribution-id "$MEMBER_WEB_DISTRIBUTION_ID" \
+              --paths '/*' \
+              --query Invalidation.Id \
+              --output text)"
+            aws cloudfront wait invalidation-completed \
+              --distribution-id "$MEMBER_WEB_DISTRIBUTION_ID" \
+              --id "$invalidation_id"
+          }
+
+          rollback() {
+            local status="$?"
+            local recovery_status=0
+            trap - ERR
+            set +e
+            if [[ "$remote_mutated" == "true" ]]; then
+              echo "Release verification failed; restoring the previous entrypoint and association state." >&2
+              restore_object index.html "$previous_root/index.html" 'text/html; charset=utf-8' 'no-store,max-age=0' || recovery_status=1
+              restore_object \
+                .well-known/apple-app-site-association \
+                "$previous_root/apple-app-site-association" \
+                'application/json' \
+                'public,max-age=3600' || recovery_status=1
+              restore_object \
+                .well-known/assetlinks.json \
+                "$previous_root/assetlinks.json" \
+                'application/json' \
+                'public,max-age=3600' || recovery_status=1
+              invalidate_all || recovery_status=1
+              if [[ "$recovery_status" != "0" ]]; then
+                echo "Automatic recovery was incomplete; follow the documented manual recovery procedure." >&2
+              fi
+            fi
+            exit "$status"
+          }
+          trap rollback ERR
+
+          capture_object index.html "$previous_root/index.html"
+          capture_object \
+            .well-known/apple-app-site-association \
+            "$previous_root/apple-app-site-association"
+          capture_object \
+            .well-known/assetlinks.json \
+            "$previous_root/assetlinks.json"
+
+          remote_mutated=true
           aws s3 sync apps/member-app/dist "s3://${MEMBER_WEB_BUCKET}" \
-            --delete \
             --exclude index.html \
+            --exclude '.well-known/*' \
             --cache-control 'public,max-age=3600'
-          aws s3 cp apps/member-app/dist/index.html "s3://${MEMBER_WEB_BUCKET}/index.html" \
-            --cache-control 'no-store,max-age=0' \
-            --content-type 'text/html; charset=utf-8'
           if [[ -d apps/member-app/dist/_expo/static ]]; then
             aws s3 cp apps/member-app/dist/_expo/static "s3://${MEMBER_WEB_BUCKET}/_expo/static" \
               --recursive \
               --cache-control 'public,max-age=31536000,immutable'
           fi
-          for key in \
-            .well-known/apple-app-site-association \
-            .well-known/assetlinks.json; do
-            if aws s3api head-object \
+          if [[ "$GOGYMGO_RELEASE_MODE" == "native-links" ]]; then
+            for key in apple-app-site-association assetlinks.json; do
+              aws s3 cp \
+                "apps/member-app/dist/.well-known/${key}" \
+                "s3://${MEMBER_WEB_BUCKET}/.well-known/${key}" \
+                --cache-control 'public,max-age=3600' \
+                --content-type 'application/json' \
+                --only-show-errors
+            done
+          else
+            aws s3api delete-object \
               --bucket "$MEMBER_WEB_BUCKET" \
-              --key "$key" > /dev/null 2>&1; then
-              echo "Browser-only pilot must not publish ${key}." >&2
-              exit 1
-            fi
-          done
+              --key .well-known/apple-app-site-association > /dev/null
+            aws s3api delete-object \
+              --bucket "$MEMBER_WEB_BUCKET" \
+              --key .well-known/assetlinks.json > /dev/null
+          fi
+          aws s3 cp apps/member-app/dist/index.html "s3://${MEMBER_WEB_BUCKET}/index.html" \
+            --cache-control 'no-store,max-age=0' \
+            --content-type 'text/html; charset=utf-8' \
+            --only-show-errors
 
-      - name: Invalidate and verify browser routes
-        shell: bash
-        run: |
-          set -euo pipefail
-          invalidation_id="$(aws cloudfront create-invalidation \
-            --distribution-id "$MEMBER_WEB_DISTRIBUTION_ID" \
-            --paths '/*' \
-            --query Invalidation.Id \
-            --output text)"
-          aws cloudfront wait invalidation-completed \
-            --distribution-id "$MEMBER_WEB_DISTRIBUTION_ID" \
-            --id "$invalidation_id"
+          invalidate_all
+          expected_index_sha="$(sha256sum apps/member-app/dist/index.html | awk '{print $1}')"
           for route in sign-up join demo scan profile winners-circle; do
+            route_file="$RUNNER_TEMP/member-web-${route}.html"
             curl --fail --show-error --silent \
+              --proto '=https' \
               --retry 12 \
               --retry-all-errors \
               --retry-delay 5 \
-              "${MEMBER_WEB_URL}/${route}" > /dev/null
+              --output "$route_file" \
+              "${MEMBER_WEB_URL}/${route}"
+            actual_index_sha="$(sha256sum "$route_file" | awk '{print $1}')"
+            if [[ "$actual_index_sha" != "$expected_index_sha" ]]; then
+              echo "${MEMBER_WEB_URL}/${route} did not return the exact released entrypoint." >&2
+              exit 1
+            fi
           done
+          for key in apple-app-site-association assetlinks.json; do
+            public_url="${MEMBER_WEB_URL}/.well-known/${key}"
+            if [[ "$GOGYMGO_RELEASE_MODE" == "native-links" ]]; then
+              public_file="$RUNNER_TEMP/member-web-${key}"
+              headers_file="${public_file}.headers"
+              curl --fail --show-error --silent \
+                --proto '=https' \
+                --dump-header "$headers_file" \
+                --output "$public_file" \
+                "$public_url"
+              if ! grep -Eiq '^content-type:[[:space:]]*application/json([;[:space:]]|$)' "$headers_file"; then
+                echo "${public_url} was not served as application/json." >&2
+                exit 1
+              fi
+              if ! cmp --silent "apps/member-app/dist/.well-known/${key}" "$public_file"; then
+                echo "${public_url} did not return the exact released association." >&2
+                exit 1
+              fi
+            else
+              status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+                --proto '=https' \
+                "$public_url")"
+              if [[ "$status" != "403" && "$status" != "404" ]]; then
+                echo "Browser-only pilot must not serve ${public_url}; received HTTP ${status}." >&2
+                exit 1
+              fi
+            fi
+          done
+          trap - ERR

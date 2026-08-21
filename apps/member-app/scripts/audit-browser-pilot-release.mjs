@@ -2,6 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  nativeReleaseEnvironmentNames,
+  parseExactPublicHttpsOrigin
+} from './member-release-policy.mjs';
+
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const exportRoot = path.resolve(projectRoot, process.argv[2] ?? 'dist');
 const issues = [];
@@ -12,8 +17,10 @@ if (environment.GOGYMGO_BROWSER_ONLY_PILOT !== 'true') {
   issues.push('GOGYMGO_BROWSER_ONLY_PILOT must be true for this release audit');
 }
 
-if (!isPublicHttpsUrl(apiUrl)) {
-  issues.push('EXPO_PUBLIC_API_URL must be a permanent public HTTPS origin');
+if (!parseExactPublicHttpsOrigin(apiUrl)) {
+  issues.push(
+    'EXPO_PUBLIC_API_URL must be an exact public HTTPS origin without credentials, a port, path, query, or fragment'
+  );
 }
 
 for (const name of [
@@ -26,18 +33,21 @@ for (const name of [
   }
 }
 
-for (const name of [
-  'GOGYMGO_IOS_TEAM_ID',
-  'GOGYMGO_IOS_BUNDLE_ID',
-  'GOGYMGO_ANDROID_PACKAGE',
-  'GOGYMGO_ANDROID_CERT_SHA256'
-]) {
+for (const name of nativeReleaseEnvironmentNames) {
   if (environment[name]?.trim()) {
     issues.push(`${name} must be omitted from a browser-only pilot build`);
   }
 }
+const nativeApproval = environment.GOGYMGO_NATIVE_LINKS_APPROVED?.trim() ?? '';
+if (nativeApproval && nativeApproval !== 'no') {
+  issues.push('GOGYMGO_NATIVE_LINKS_APPROVED must be omitted or exactly no for a browser-only pilot build');
+}
 
-if (!fs.existsSync(exportRoot) || !fs.statSync(exportRoot).isDirectory()) {
+if (
+  !fs.existsSync(exportRoot) ||
+  fs.lstatSync(exportRoot).isSymbolicLink() ||
+  !fs.lstatSync(exportRoot).isDirectory()
+) {
   issues.push(`the browser export does not exist: ${exportRoot}`);
 } else {
   auditExport();
@@ -61,6 +71,9 @@ function auditExport() {
   const indexPath = path.join(exportRoot, 'index.html');
   if (!fs.existsSync(indexPath)) {
     issues.push('the browser export is missing index.html');
+  }
+  if (fs.existsSync(path.join(exportRoot, 'browser-test-preview-build.json'))) {
+    issues.push('the browser export contains the standalone test-preview manifest');
   }
 
   for (const associationPath of [
@@ -128,17 +141,17 @@ function auditPilotCapabilities() {
   }
 }
 
-function isPublicHttpsUrl(value) {
-  if (!/^https:\/\//i.test(value)) {
-    return false;
-  }
-  return !/(?:localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\.local(?:[/:]|$)|trycloudflare\.com)/i.test(value);
-}
-
 function collectFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
-    return entry.isDirectory() ? collectFiles(entryPath) : [entryPath];
+    if (entry.isSymbolicLink()) {
+      issues.push(`the browser export contains a symbolic link: ${path.relative(exportRoot, entryPath)}`);
+      return [];
+    }
+    if (entry.isDirectory()) return collectFiles(entryPath);
+    if (entry.isFile()) return [entryPath];
+    issues.push(`the browser export contains a non-regular file: ${path.relative(exportRoot, entryPath)}`);
+    return [];
   });
 }
 

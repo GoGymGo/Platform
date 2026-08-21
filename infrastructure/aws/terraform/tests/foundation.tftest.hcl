@@ -57,6 +57,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = strcontains(aws_cloudfront_function.member_web_spa.code, "request.uri.startsWith('/.well-known/')") && strcontains(aws_cloudfront_function.member_web_spa.code, "!associationFile")
+    error_message = "CloudFront must serve native association files directly instead of rewriting them to the SPA entrypoint."
+  }
+
+  assert {
     condition     = aws_iam_role.github_member_web_deploy.name == "gogymgo-staging-github-member-web"
     error_message = "Member-app publishing must use a separate environment-scoped GitHub role."
   }

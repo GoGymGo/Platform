@@ -1,4 +1,7 @@
-export function extractGymScanCredential(payload: string) {
+export function extractGymScanCredential(payload: unknown) {
+  if (typeof payload !== 'string') {
+    return null;
+  }
   const trimmed = payload.trim();
   if (isGymScanCredential(trimmed) && !trimmed.includes('://')) {
     return trimmed;
@@ -6,6 +9,12 @@ export function extractGymScanCredential(payload: string) {
 
   try {
     const url = new URL(trimmed);
+    const hasExactCredentialQuery =
+      [...url.searchParams.keys()].length === 1 &&
+      url.searchParams.getAll('credential').length === 1;
+    const hasUnsafeUrlParts = Boolean(
+      url.username || url.password || url.hash || url.port
+    );
     const isProductionWebLink =
       url.protocol === 'https:' &&
       url.hostname === 'app.gogymgo.com' &&
@@ -15,19 +24,42 @@ export function extractGymScanCredential(payload: string) {
       ((url.hostname === 'scan' && (url.pathname === '' || url.pathname === '/')) ||
         (url.hostname === '' && url.pathname === '/scan'));
 
-    if (!isProductionWebLink && !isNativeSchemeLink) {
+    if (
+      hasUnsafeUrlParts ||
+      !hasExactCredentialQuery ||
+      (!isProductionWebLink && !isNativeSchemeLink)
+    ) {
       return null;
     }
 
     const credential = url.searchParams.get('credential')?.trim() ?? '';
-    return isGymScanCredential(credential) ? credential : null;
+    if (!isGymScanCredential(credential)) {
+      return null;
+    }
+    const canonicalPayloads = isProductionWebLink
+      ? [`https://app.gogymgo.com/scan?credential=${credential}`]
+      : [
+          `gogymgo://scan?credential=${credential}`,
+          `gogymgo:///scan?credential=${credential}`
+        ];
+    return canonicalPayloads.includes(trimmed) ? credential : null;
   } catch {
     return null;
   }
 }
 
 export function isGymScanCredential(value: string) {
-  return value.length >= 32 && value.length <= 256;
+  return /^[A-Za-z0-9_-]{32,256}$/.test(value);
+}
+
+export function extractGymScanRouteCredential(
+  parameters: Record<string, string | string[] | undefined>
+) {
+  const keys = Object.keys(parameters);
+  if (keys.length !== 1 || keys[0] !== 'credential') {
+    return null;
+  }
+  return extractGymScanCredential(parameters.credential);
 }
 
 export function normalizeGymScanAccuracyMeters(accuracyMeters: number | null) {

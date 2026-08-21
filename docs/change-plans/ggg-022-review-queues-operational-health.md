@@ -83,7 +83,7 @@ external provider or claiming a production service is healthy.
   production-artifact audits run serially. Docker/Testcontainers/database-backed
   validation requires fresh user authorization before any command is run.
 
-## Rollout and recovery
+## Rollout
 
 Deploy migration, worker, API and admin from the same reviewed artifact. Keep
 privacy, profile-media and notification providers disabled until their existing
@@ -92,6 +92,8 @@ replacement-worker takeover, provider failure, changed-body retry, stale review
 decision and audit lookup in an authorized staging environment before enabling
 production workflows. Configure alert ownership and destinations outside the
 repository; their absence remains an explicit release blocker.
+
+## Recovery
 
 The migration is additive and stays applied during an application rollback.
 Expired leases are recovered forward; append-only audit and decision history is

@@ -325,3 +325,30 @@ test("rejects invalid partner lifecycle, visit, and secret-bearing history shape
     }),
   );
 });
+
+test("accepts only an exact canonical QR poster handoff", () => {
+  const credential = "a".repeat(43);
+  const value = {
+    competitionId: "contest-1",
+    competitionName: "September Contest",
+    credentialVersion: 1,
+    expiresAt: "2026-10-01T07:00:00.000Z",
+    gymLocationId: "gym-1",
+    id: "credential-1",
+    issuedAt: "2026-08-20T12:00:00.000Z",
+    printablePosterSvg: "<svg></svg>",
+    qrPayload: `https://app.gogymgo.com/scan?credential=${credential}`,
+  };
+
+  assert.equal(decoders.decodeGymQrCredential(value).qrPayload, value.qrPayload);
+  for (const qrPayload of [
+    `https://app.gogymgo.com/scanner?credential=${credential}`,
+    `https://app.gogymgo.com/scan?credential=${credential}&next=/profile`,
+    `https://app.gogymgo.com/scan?credential=${credential}#fragment`,
+    "https://app.gogymgo.com/scan?credential=too-short",
+  ]) {
+    assert.throws(() =>
+      decoders.decodeGymQrCredential({ ...value, qrPayload }),
+    );
+  }
+});

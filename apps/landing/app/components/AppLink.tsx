@@ -13,7 +13,7 @@ export function AppLink({
   analyticsEvent,
   children,
   className,
-  destinationLabel = "opens the GoGymGo app",
+  destinationLabel = "opens the GoGymGo browser member experience",
   href,
   unavailableLabel = "Member app link unavailable",
 }: AppLinkProps) {

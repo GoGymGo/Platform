@@ -22,6 +22,7 @@ on:
         options:
           - platform
           - member-web
+          - member-native-links
           - pilot-configuration
 
 permissions: {}
@@ -427,6 +428,21 @@ jobs:
     uses: ./.github/workflows/member-web-deployment.yml
     with:
       environment: ${{ inputs.environment }}
+      release_mode: browser-pilot
+      source_commit: ${{ inputs.source_commit }}
+
+  member-native-links:
+    needs: authorize_source
+    if: needs.authorize_source.result == 'success' && inputs.scope == 'member-native-links'
+    permissions:
+      checks: read
+      contents: read
+      id-token: write
+      pull-requests: read
+    uses: ./.github/workflows/member-web-deployment.yml
+    with:
+      environment: ${{ inputs.environment }}
+      release_mode: native-links
       source_commit: ${{ inputs.source_commit }}
 
   pilot-configuration:

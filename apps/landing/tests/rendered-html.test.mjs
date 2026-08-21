@@ -189,7 +189,7 @@ test("the homepage sends eligibility decisions to the app", async () => {
   assert.doesNotMatch(page, /<EligibilityCheck \/>/);
   assert.match(page, /analyticsEvent="member_app_click"/);
   assert.match(page, /href=\{siteLinks\.memberApp\}/);
-  assert.match(appLink, /opens the GoGymGo app/);
+  assert.match(appLink, /opens the GoGymGo browser member experience/);
   assert.match(appLink, /data-destination-unavailable="member-app"/);
   assert.match(appLink, /rel="external noopener noreferrer"/);
   assert.match(appLink, /aria-hidden="true" className="app-link-cue">\s+↗/);

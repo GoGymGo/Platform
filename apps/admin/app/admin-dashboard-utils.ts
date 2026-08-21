@@ -234,9 +234,7 @@ export function decodeGymQrCredential(value: unknown): GymQrCredential | null {
     ].every(isString) ||
     !isPositiveInteger(credential.credentialVersion) ||
     ![credential.expiresAt, credential.issuedAt].every(isIsoDate) ||
-    !(credential.qrPayload as string).startsWith(
-      "https://app.gogymgo.com/scan?credential=",
-    ) ||
+    !isCanonicalGymQrPayload(credential.qrPayload as string) ||
     !(credential.printablePosterSvg as string).startsWith("<svg")
   ) {
     throw invalidAdminResponse("gym QR credential");
@@ -252,6 +250,27 @@ export function decodeGymQrCredential(value: unknown): GymQrCredential | null {
     printablePosterSvg: credential.printablePosterSvg,
     qrPayload: credential.qrPayload,
   } as GymQrCredential;
+}
+
+function isCanonicalGymQrPayload(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const token = url.searchParams.get("credential") ?? "";
+    return (
+      url.origin === "https://app.gogymgo.com" &&
+      url.pathname === "/scan" &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      !url.hash &&
+      [...url.searchParams.keys()].length === 1 &&
+      url.searchParams.getAll("credential").length === 1 &&
+      /^[A-Za-z0-9_-]{32,256}$/.test(token) &&
+      value === `https://app.gogymgo.com/scan?credential=${token}`
+    );
+  } catch {
+    return false;
+  }
 }
 
 function decodePartnerGym(value: unknown): PartnerGym {

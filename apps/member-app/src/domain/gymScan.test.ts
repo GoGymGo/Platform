@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   extractGymScanCredential,
+  extractGymScanRouteCredential,
   getGymScanRemainingSeconds,
   isGymLocationAccuracyValidationMessage,
   isGymScanCompletionReady,
@@ -42,6 +43,30 @@ describe('gym scan credentials', () => {
       extractGymScanCredential(`gogymgo://profile?credential=${credential}`),
       null
     );
+  });
+
+  it('rejects ambiguous, decorated, and non-base64url handoff values', () => {
+    for (const payload of [
+      `https://app.gogymgo.com/scan?credential=${credential}&next=/profile`,
+      `https://app.gogymgo.com/scan?credential=${credential}#fragment`,
+      `https://user@app.gogymgo.com/scan?credential=${credential}`,
+      `https://app.gogymgo.com:443/scan?credential=${credential}`,
+      `https://app.gogymgo.com/scanner?credential=${credential}`,
+      `gogymgo://scan?credential=${credential}&credential=${'b'.repeat(32)}`,
+      `${'a'.repeat(31)}!`
+    ]) {
+      assert.equal(extractGymScanCredential(payload), null, payload);
+    }
+  });
+
+  it('accepts only one credential parameter at the /scan route boundary', () => {
+    assert.equal(extractGymScanRouteCredential({ credential }), credential);
+    assert.equal(extractGymScanRouteCredential({ credential: [credential] }), null);
+    assert.equal(
+      extractGymScanRouteCredential({ credential, next: '/profile' }),
+      null
+    );
+    assert.equal(extractGymScanRouteCredential({}), null);
   });
 });
 

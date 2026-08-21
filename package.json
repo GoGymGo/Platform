@@ -39,7 +39,7 @@
     "audit:dependencies": "node tooling/audit-dependencies.mjs",
     "check": "npm run check:governance && npm run contracts:check && npm run check --workspace @gogymgo/brand && npm run check --workspace @gogymgo/member-app && npm run check --workspace @gogymgo/api && npm run check --workspace @gogymgo/admin && npm run check --workspace @gogymgo/landing",
     "check:architecture": "node tooling/architecture-policy.mjs && node --test tooling/architecture-policy.test.mjs tooling/change-scope-policy.test.mjs",
-    "check:governance": "npm run check:architecture && node --test tooling/dependency-risk-policy.test.mjs",
+    "check:governance": "npm run check:architecture && node --test tooling/dependency-risk-policy.test.mjs tooling/deployment-source-policy.test.mjs tooling/member-release-policy.test.mjs tooling/member-release-workflow.test.mjs tooling/static-export-attestation.test.mjs",
     "contracts:check": "npm run check --workspace @gogymgo/contracts",
     "contracts:generate": "npm run generate --workspace @gogymgo/contracts",
     "start:member": "npm run web --workspace @gogymgo/member-app",

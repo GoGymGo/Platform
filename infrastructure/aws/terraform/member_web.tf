@@ -79,8 +79,9 @@ resource "aws_cloudfront_function" "member_web_spa" {
     function handler(event) {
       var request = event.request;
       var lastSegment = request.uri.split('/').pop();
+      var associationFile = request.uri.startsWith('/.well-known/');
 
-      if (request.uri.endsWith('/') || !lastSegment.includes('.')) {
+      if (!associationFile && (request.uri.endsWith('/') || !lastSegment.includes('.'))) {
         request.uri = '/index.html';
       }
 

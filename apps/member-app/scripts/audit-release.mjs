@@ -2,6 +2,12 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
+import {
+  parseExactPublicHttpsOrigin,
+  productionApiOrigin,
+  validateNativeReleaseValues
+} from './member-release-policy.mjs';
+
 const projectRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const issues = [];
@@ -10,13 +16,8 @@ const easJson = readJson('eas.json');
 const expo = appJson.expo ?? {};
 const environment = loadEnvironment(['.env', '.env.local']);
 
-requireValue('GOGYMGO_IOS_BUNDLE_ID');
-requireValue('GOGYMGO_ANDROID_PACKAGE');
-requireValue('GOGYMGO_IOS_TEAM_ID');
-requireValue('GOGYMGO_ANDROID_CERT_SHA256');
 requireValue('EXPO_PUBLIC_API_URL');
-requirePublicHttpsUrl('GOGYMGO_PRIVACY_POLICY_URL');
-requirePublicHttpsUrl('GOGYMGO_ACCOUNT_DELETION_URL');
+issues.push(...validateNativeReleaseValues(environment));
 for (const name of [
   'EXPO_PUBLIC_FIREBASE_API_KEY',
   'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN',
@@ -28,15 +29,6 @@ for (const name of [
   requireValue(name);
 }
 
-const iosBundleId = environment.GOGYMGO_IOS_BUNDLE_ID ?? '';
-const androidPackage = environment.GOGYMGO_ANDROID_PACKAGE ?? '';
-const iosTeamId = environment.GOGYMGO_IOS_TEAM_ID ?? '';
-const androidCertificateFingerprints = (
-  environment.GOGYMGO_ANDROID_CERT_SHA256 ?? ''
-)
-  .split(',')
-  .map((value) => value.trim().toUpperCase())
-  .filter(Boolean);
 const apiUrl = environment.EXPO_PUBLIC_API_URL ?? '';
 const browserTestPreviewEnabled =
   environment.EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW === 'true';
@@ -45,28 +37,8 @@ const workoutVerificationSource = readText('src/config/workoutVerification.ts');
 const devicePresenceEnabled = capabilityEnabled('devicePresence');
 const heartRateEnabled = capabilityEnabled('heartRate');
 
-if (iosBundleId && !isProductionAppId(iosBundleId)) {
-  issues.push('GOGYMGO_IOS_BUNDLE_ID must be a final reverse-domain identifier without dev/test markers');
-}
-if (androidPackage && !isProductionAppId(androidPackage)) {
-  issues.push('GOGYMGO_ANDROID_PACKAGE must be a final reverse-domain identifier without dev/test markers');
-}
-if (iosTeamId && !/^[A-Z0-9]{10}$/.test(iosTeamId)) {
-  issues.push('GOGYMGO_IOS_TEAM_ID must be the 10-character Apple Developer Team ID');
-}
-if (
-  androidCertificateFingerprints.length > 0 &&
-  androidCertificateFingerprints.some(
-    (value) => !/^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(value)
-  )
-) {
-  issues.push('GOGYMGO_ANDROID_CERT_SHA256 must contain colon-delimited SHA-256 fingerprints');
-}
-if (apiUrl && !/^https:\/\//i.test(apiUrl)) {
-  issues.push('EXPO_PUBLIC_API_URL must use HTTPS for a store release');
-}
-if (apiUrl && /(?:localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)/i.test(apiUrl)) {
-  issues.push('EXPO_PUBLIC_API_URL must not point to a local development host');
+if (apiUrl && parseExactPublicHttpsOrigin(apiUrl) !== productionApiOrigin) {
+  issues.push(`EXPO_PUBLIC_API_URL must be the exact production origin ${productionApiOrigin}`);
 }
 if (browserTestPreviewEnabled) {
   issues.push('EXPO_PUBLIC_ENABLE_BROWSER_TEST_PREVIEW must be false for store releases');
@@ -79,14 +51,6 @@ for (const marker of [
   if (legalSource.includes(marker)) {
     issues.push(`src/constants/legal.ts must replace release-blocking legal placeholder: ${marker}`);
   }
-}
-
-const easProjectId = expo.extra?.eas?.projectId;
-if (typeof easProjectId !== 'string' || !isUuid(easProjectId)) {
-  issues.push('app.json must contain the EAS project link at expo.extra.eas.projectId');
-}
-if (typeof expo.owner !== 'string' || expo.owner.trim().length === 0) {
-  issues.push('app.json must declare the EAS account owner');
 }
 
 if (easJson.build?.production?.autoIncrement !== true) {
@@ -118,11 +82,13 @@ const gymScanIntentFilter = (expo.android?.intentFilters ?? []).find(
       (entry) =>
         entry.scheme === 'https' &&
         entry.host === 'app.gogymgo.com' &&
-        entry.pathPrefix === '/scan'
+        entry.path === '/scan' &&
+        entry.pathPrefix === undefined &&
+        entry.pathPattern === undefined
     )
 );
 if (!gymScanIntentFilter) {
-  issues.push('Android must register a verified App Link for https://app.gogymgo.com/scan');
+  issues.push('Android must register an exact verified App Link for https://app.gogymgo.com/scan');
 }
 
 const plugins = new Map(
@@ -232,6 +198,16 @@ for (const category of [
 }
 const releaseConfig = readText('app.config.ts');
 const releasePermissionPlugin = readText('plugins/withReleaseIosPermissions.js');
+for (const marker of [
+  'GOGYMGO_EAS_OWNER',
+  'GOGYMGO_EAS_PROJECT_ID',
+  'GOGYMGO_IOS_BUNDLE_ID',
+  'GOGYMGO_ANDROID_PACKAGE'
+]) {
+  if (!releaseConfig.includes(marker)) {
+    issues.push(`app.config.ts must inject the approved ${marker} value`);
+  }
+}
 if (
   !releaseConfig.includes('./plugins/withReleaseIosPermissions') ||
   !releasePermissionPlugin.includes('withFinalizedMod')
@@ -321,31 +297,6 @@ function requireValue(name) {
   if (!environment[name]?.trim()) {
     issues.push(`${name} is required in the release environment`);
   }
-}
-
-function requirePublicHttpsUrl(name) {
-  const value = environment[name]?.trim() ?? '';
-  if (!value) {
-    issues.push(`${name} is required in the release environment`);
-    return;
-  }
-  if (
-    !/^https:\/\//i.test(value) ||
-    /(?:localhost|127\.0\.0\.1|example\.(?:com|invalid))/i.test(value)
-  ) {
-    issues.push(`${name} must be a final public HTTPS URL`);
-  }
-}
-
-function isProductionAppId(value) {
-  return (
-    /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*){2,}$/i.test(value) &&
-    !/(?:^|\.)(?:dev|development|local|preview|staging|test)(?:\.|$)/i.test(value)
-  );
-}
-
-function isUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function auditPng(relativePath, width, height, alphaRequired, label) {

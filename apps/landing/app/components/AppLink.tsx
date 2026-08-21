@@ -1,30 +1,46 @@
-import type { ComponentProps } from "react";
-import Link from "next/link";
+import type { ReactNode } from "react";
 
-type AppLinkProps = Omit<ComponentProps<typeof Link>, "href"> & {
+type AppLinkProps = {
   analyticsEvent?: string;
+  children: ReactNode;
+  className?: string;
   destinationLabel?: string;
-  href: string;
+  href: string | null;
+  unavailableLabel?: string;
 };
 
 export function AppLink({
   analyticsEvent,
   children,
+  className,
   destinationLabel = "opens the GoGymGo app",
   href,
-  ...props
+  unavailableLabel = "Member app link unavailable",
 }: AppLinkProps) {
+  if (!href) {
+    return (
+      <span
+        aria-label={`${unavailableLabel}. The canonical member-app origin is not configured.`}
+        className={[className, "app-link--unavailable"].filter(Boolean).join(" ")}
+        data-destination-unavailable="member-app"
+      >
+        {unavailableLabel}
+      </span>
+    );
+  }
+
   return (
-    <Link
-      {...props}
+    <a
+      className={className}
       data-analytics-event={analyticsEvent}
       href={href}
+      rel="external noopener noreferrer"
     >
       {children}
       <span aria-hidden="true" className="app-link-cue">
         ↗
       </span>
       <span className="visually-hidden"> ({destinationLabel})</span>
-    </Link>
+    </a>
   );
 }

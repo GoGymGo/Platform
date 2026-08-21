@@ -1,9 +1,11 @@
 import type { MetadataRoute } from "next";
+import { publicSiteOrigin } from "./site-links";
 
 const routes = [
   "",
   "/gym-goers",
   "/brands",
+  "/partners",
   "/faq",
   "/contact",
   "/accessibility",
@@ -17,6 +19,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: route ? "monthly" : "weekly",
     lastModified,
     priority: route ? 0.7 : 1,
-    url: `https://gogymgo.com${route}`,
+    url: `${publicSiteOrigin}${route}`,
   }));
 }

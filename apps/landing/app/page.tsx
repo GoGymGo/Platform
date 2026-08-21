@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getSeptemberCampaignState, septemberCampaign } from "./campaign";
 import { AppLink } from "./components/AppLink";
 import { ProductScreens } from "./components/ProductScreens";
-import { siteLinks } from "./site-links";
+import { publicSiteOrigin, siteLinks } from "./site-links";
 
 const journeySteps = [
   {
@@ -56,35 +56,25 @@ const transparencyFacts = [
   },
 ] as const;
 
-const structuredData = [
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    logo: "https://gogymgo.com/mark.svg",
-    name: "GoGymGo",
-    url: "https://gogymgo.com",
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    description:
-      "Free September 2026 beta for eligible gym-goers age 19+ on Vancouver Island and the supported Gulf Islands.",
-    name: "GoGymGo",
-    url: "https://gogymgo.com",
-  },
-];
-
-function SeptemberCompetitionPanel() {
+function SeptemberCompetitionPanel({
+  published,
+}: {
+  published: boolean;
+}) {
   return (
     <aside
-      aria-label="September 2026 beta contest details"
+      aria-label="September 2026 pilot details"
       className="pilot-console"
     >
       <div className="pilot-console__header">
         <span>CONTEST SNAPSHOT</span>
       </div>
       <div className="pilot-console__reward">
-        <span>PLANNED REWARD — CHECK APP</span>
+        <span>
+          {published
+            ? "PUBLISHED REWARD — CHECK APP"
+            : "PLANNED REWARD — NOT YET PUBLISHED"}
+        </span>
         <strong>{septemberCampaign.reward}</strong>
         <p>Sponsored by {septemberCampaign.rewardSponsor}</p>
         <p>{septemberCampaign.rewardAvailabilityNote}</p>
@@ -123,7 +113,26 @@ function SeptemberCompetitionPanel() {
 export default function Home() {
   const campaignState = getSeptemberCampaignState();
   const memberRegistrationAvailable =
-    campaignState.primaryAction === "memberApp";
+    campaignState.primaryAction === "memberApp" && siteLinks.memberApp !== null;
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      logo: `${publicSiteOrigin}/mark.svg`,
+      name: "GoGymGo",
+      url: publicSiteOrigin,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      description:
+        campaignState.phase === "unpublished"
+          ? "Planned September 2026 GoGymGo pilot for eligible gym-goers on Vancouver Island and the supported Gulf Islands. Registration and the planned reward remain unavailable until publication."
+          : "September 2026 GoGymGo beta information for eligible gym-goers on Vancouver Island and the supported Gulf Islands.",
+      name: "GoGymGo",
+      url: publicSiteOrigin,
+    },
+  ];
 
   return (
     <main className="landing-page">
@@ -151,6 +160,12 @@ export default function Home() {
               <>
                 Build verified contest progress from weekly workouts. The
                 September 2026 beta has ended, but Regional updates remain open.
+              </>
+            ) : campaignState.phase === "unpublished" ? (
+              <>
+                The September pilot is planned, but registration and its reward
+                remain unavailable until the Contest, legal documents, and
+                exact reward are published. Regional updates remain open.
               </>
             ) : (
               <>
@@ -193,7 +208,9 @@ export default function Home() {
             )}
           </div>
         </div>
-            <SeptemberCompetitionPanel />
+        <SeptemberCompetitionPanel
+          published={campaignState.phase !== "unpublished"}
+        />
       </section>
 
       <section className="section shell" id="joining-and-verification">
@@ -249,12 +266,13 @@ export default function Home() {
         <div className="shell">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">PILOT TRANSPARENCY // PUBLISHED FACTS</p>
+              <p className="eyebrow">PILOT TRANSPARENCY // CURRENT FACTS</p>
               <h2>Clear rules without crowding the experience.</h2>
             </div>
             <p>
-              Review the published pilot facts when you need them. The member
-              app remains authoritative for live availability and eligibility.
+              Review the current pilot policy when you need it. The member app
+              and published Official Contest Rules remain authoritative for
+              live availability and eligibility.
             </p>
           </div>
           <details className="campaign-details">
@@ -289,11 +307,12 @@ export default function Home() {
         <div className="shell conversion-grid">
           <div className="conversion-primary">
             <div>
-              <p className="eyebrow">YOUR NEXT WORKOUT CAN COUNT</p>
+              <p className="eyebrow">PLAN YOUR NEXT STEP</p>
               <h2>Ready to turn consistency into verified progress?</h2>
               <p>
-                Join in the member app, or get Regional updates if the current
-                pilot is not available where you train.
+                {memberRegistrationAvailable
+                  ? "Check current registration in the member app, or get Regional updates if the pilot is not available where you train."
+                  : "Registration is not currently available from this site. Get Regional updates while publication and member-app release gates are incomplete."}
               </p>
             </div>
             <div className="final-actions">
@@ -332,7 +351,7 @@ export default function Home() {
               data-analytics-event="brand_partnership_click"
               href={siteLinks.brands}
             >
-              EXPLORE A FOUNDING PARTNERSHIP <span aria-hidden="true">→</span>
+              REQUEST A PARTNERSHIP REVIEW <span aria-hidden="true">→</span>
             </Link>
           </aside>
         </div>

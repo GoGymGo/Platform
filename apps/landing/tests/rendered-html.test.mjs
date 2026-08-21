@@ -8,14 +8,24 @@ async function read(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-function readVp8Dimensions(image) {
-  assert.equal(image.subarray(12, 16).toString("ascii"), "VP8 ");
-  assert.deepEqual([...image.subarray(23, 26)], [157, 1, 42]);
+function readJpegDimensions(image) {
+  assert.deepEqual([...image.subarray(0, 2)], [255, 216]);
+  let offset = 2;
 
-  return {
-    height: image.readUInt16LE(28) & 0x3fff,
-    width: image.readUInt16LE(26) & 0x3fff,
-  };
+  while (offset + 9 < image.length) {
+    assert.equal(image[offset], 255);
+    const marker = image[offset + 1];
+    const length = image.readUInt16BE(offset + 2);
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: image.readUInt16BE(offset + 5),
+        width: image.readUInt16BE(offset + 7),
+      };
+    }
+    offset += 2 + length;
+  }
+
+  assert.fail("JPEG dimensions were not found");
 }
 
 test("campaign facts have one landing-owned source of truth", async () => {
@@ -37,6 +47,10 @@ test("campaign facts have one landing-owned source of truth", async () => {
   assert.match(campaign, /competitionEndAt: "2026-10-01T07:00:00\.000Z"/);
   assert.match(campaign, /currentTime >= endTime/);
   assert.match(campaign, /currentTime >= startTime/);
+  assert.match(campaign, /NEXT_PUBLIC_SEPTEMBER_PILOT_PUBLISHED/);
+  assert.match(campaign, /value === "yes"/);
+  assert.match(campaign, /phase: "unpublished"/);
+  assert.match(campaign, /statusLabel: "PILOT NOT YET PUBLISHED"/);
   assert.match(campaign, /primaryLabel: "CHECK CURRENT AVAILABILITY"/);
   assert.match(campaign, /primaryLabel: "GET REGIONAL UPDATES"/);
   assert.match(page, /getSeptemberCampaignState\(\)/);
@@ -51,7 +65,8 @@ test("campaign facts have one landing-owned source of truth", async () => {
     faq,
     /does\s+not initiate a bank, card, wallet, or provider transfer/,
   );
-  assert.match(page, /PLANNED REWARD — CHECK APP/);
+  assert.match(page, /PLANNED REWARD — NOT YET PUBLISHED/);
+  assert.match(page, /registration and its reward[\s\S]*?remain unavailable until/);
   assert.doesNotMatch(page, /ONE PUBLISHED REWARD/);
 });
 
@@ -86,29 +101,30 @@ test("home offers direct next steps without repeating long feature sections", as
   assert.doesNotMatch(page, />30:00</);
   assert.doesNotMatch(page, /BUILT FOR CLARITY/);
   assert.doesNotMatch(page, /brand-console|landing-feature-grid/);
-  assert.match(productScreens, /active-workout\.webp/);
-  assert.match(productScreens, /winners-circle\.webp/);
-  assert.equal((productScreens.match(/height: 1600/g) ?? []).length, 2);
-  assert.equal((productScreens.match(/width: 960/g) ?? []).length, 2);
-  assert.match(productScreens, /LIVE VERIFICATION/);
-  assert.match(productScreens, /PUBLISHED ONLY/);
+  assert.match(productScreens, /join-selection\.jpg/);
+  assert.match(productScreens, /public-demo\.jpg/);
+  assert.equal((productScreens.match(/height: 899/g) ?? []).length, 2);
+  assert.equal((productScreens.match(/width: 430/g) ?? []).length, 2);
+  assert.match(productScreens, /CANONICAL JOIN/);
+  assert.match(productScreens, /FAKE DATA ONLY/);
   assert.match(productScreens, /product-screen-callout/);
-  assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS/);
+  assert.match(productScreens, /SWIPE TO PREVIEW BOTH ROUTES/);
   assert.match(productScreens, /DEMO MODE \/\/ ISOLATED SAMPLE DATA/);
   assert.match(productScreens, /analyticsEvent="demo_click"/);
   assert.match(productScreens, /href=\{siteLinks\.demo\}/);
-  assert.match(productScreens, /SWIPE TO PREVIEW BOTH APP SCREENS →/);
+  assert.match(productScreens, /SWIPE TO PREVIEW BOTH ROUTES →/);
   assert.doesNotMatch(productScreens, /â†’/);
   assert.match(productScreens, /tabIndex=\{0\}/);
   assert.equal((productScreens.match(/src: "\/app\//g) ?? []).length, 2);
   assert.match(links, /regionalUpdates: "\/gym-goers#gym-form"/);
   assert.match(links, /NEXT_PUBLIC_MEMBER_APP_ORIGIN/);
-  assert.match(links, /memberApp: `\$\{memberAppOrigin\}\/join`/);
-  assert.match(links, /NEXT_PUBLIC_ADMIN_DASHBOARD_ORIGIN/);
-  assert.match(links, /adminDashboard: adminDashboardOrigin/);
+  assert.match(links, /approvedMemberAppOrigins/);
+  assert.match(links, /memberApp: memberAppPath\("\/join"\)/);
+  assert.match(links, /return null/);
+  assert.doesNotMatch(links, /ADMIN_DASHBOARD|chatgpt\.site/);
   assert.match(layout, /href=\{siteLinks\.regionalUpdates\}[\s\S]*?Regional launch updates/);
-  assert.match(layout, /href=\{siteLinks\.adminDashboard\}[\s\S]*?Admin dashboard/);
-  assert.match(layout, /destinationLabel="opens the GoGymGo admin dashboard"/);
+  assert.match(layout, /href=\{siteLinks\.partners\}>Gym and brand partnerships/);
+  assert.doesNotMatch(layout, /Admin dashboard|siteLinks\.adminDashboard/);
   assert.match(layout, /width: 1200/);
   assert.match(layout, /height: 630/);
   assert.doesNotMatch(layout, /Administrator sign-in/);
@@ -156,7 +172,8 @@ test("mobile navigation uses native modal semantics and current-page state", asy
     primaryNavigation,
     /currentPath: "\/",\s+href: "\/#how-it-works"/,
   );
-  assert.doesNotMatch(primaryNavigation, /siteLinks\.demo|label: "DEMO"/);
+  assert.match(primaryNavigation, /siteLinks\.partners[\s\S]*?label: "PARTNERS"/);
+  assert.doesNotMatch(primaryNavigation, /siteLinks\.demo|label: "DEMO"|FITNESS BRANDS/);
   assert.match(layout, /<AppLink analyticsEvent="demo_click" href=\{siteLinks\.demo\}>/);
   assert.match(layout, /href=\{siteLinks\.demo\}/);
   assert.match(layout, /App demo\s+<\/AppLink>/);
@@ -173,6 +190,8 @@ test("the homepage sends eligibility decisions to the app", async () => {
   assert.match(page, /analyticsEvent="member_app_click"/);
   assert.match(page, /href=\{siteLinks\.memberApp\}/);
   assert.match(appLink, /opens the GoGymGo app/);
+  assert.match(appLink, /data-destination-unavailable="member-app"/);
+  assert.match(appLink, /rel="external noopener noreferrer"/);
   assert.match(appLink, /aria-hidden="true" className="app-link-cue">\s+↗/);
 });
 
@@ -257,6 +276,9 @@ test("brand inquiry remains detailed and isolated from the regional list", async
     brandPage,
     /September pilot Contest is approved and published,[\s\S]*sole planned[\s\S]*cash reward is sponsored by GoGymGo/,
   );
+  assert.match(brandPage, /PARTNERSHIP REVIEW \/\/ SUBJECT TO AVAILABILITY/);
+  assert.match(brandPage, /not approval or a response-time promise/);
+  assert.doesNotMatch(brandPage, /five business days|INTAKE \/\/ OPEN/);
   assert.match(forms, /fetch\("\/api\/interest"/);
   assert.match(forms, /name="partnershipInterest"/);
   assert.match(forms, /name="companyName"/);
@@ -342,9 +364,10 @@ test("FAQ, contact and public information pages are scannable and discoverable",
   assert.match(deletionPage, /It does not submit a deletion request/);
   assert.match(deletionPage, /no request has been submitted/);
   assert.match(layout, /href=\{siteLinks\.accountDeletion\}>Account deletion/);
-  assert.match(robots, /sitemap: "https:\/\/gogymgo\.com\/sitemap\.xml"/);
+  assert.match(robots, /sitemap: `\$\{publicSiteOrigin\}\/sitemap\.xml`/);
   assert.match(sitemap, /"\/accessibility"/);
   assert.match(sitemap, /"\/account-deletion"/);
+  assert.match(sitemap, /"\/partners"/);
   assert.match(manifest, /theme_color: "#080b0e"/);
 });
 
@@ -403,29 +426,29 @@ test("campaign metadata describes the public September experience precisely", as
     assert.doesNotMatch(source, /social challenges/i);
   }
 
-  assert.match(layout, /Free September beta/);
+  assert.match(layout, /Planned September pilot/);
+  assert.match(layout, /remain unavailable until publication/);
   assert.match(layout, /septemberCampaign\.minimumAge/);
   assert.match(layout, /septemberCampaign\.regionName/);
-  assert.match(manifest, /Free September 2026 beta/);
+  assert.match(manifest, /Planned September 2026 pilot details/);
   assert.match(manifest, /septemberCampaign\.minimumAge/);
   assert.match(manifest, /septemberCampaign\.regionName/);
 });
 
-test("optimized product images and wide social preview are valid assets", async () => {
-  const [activeWorkout, winnersCircle, socialImage, socialStat, mark] =
+test("current route captures and wide social preview are valid, documented assets", async () => {
+  const [joinSelection, publicDemo, socialImage, socialStat, mark, provenance] =
     await Promise.all([
-      readFile(new URL("public/app/active-workout.webp", root)),
-      readFile(new URL("public/app/winners-circle.webp", root)),
+      readFile(new URL("public/app/join-selection.jpg", root)),
+      readFile(new URL("public/app/public-demo.jpg", root)),
       readFile(new URL("public/og.png", root)),
       stat(new URL("public/og.png", root)),
       read("public/mark.svg"),
+      read("docs/asset-provenance.md"),
     ]);
 
-  for (const image of [activeWorkout, winnersCircle]) {
-    assert.equal(image.subarray(0, 4).toString("ascii"), "RIFF");
-    assert.equal(image.subarray(8, 12).toString("ascii"), "WEBP");
-    assert.deepEqual(readVp8Dimensions(image), { height: 1600, width: 960 });
-    assert.ok(image.length > 50_000);
+  for (const image of [joinSelection, publicDemo]) {
+    assert.deepEqual(readJpegDimensions(image), { height: 899, width: 430 });
+    assert.ok(image.length > 20_000);
     assert.ok(image.length < 150_000);
   }
 
@@ -434,21 +457,27 @@ test("optimized product images and wide social preview are valid assets", async 
   assert.equal(socialImage.readUInt32BE(20), 630);
   assert.ok(socialStat.size < 600_000);
   assert.match(mark, /viewBox="0 0 100 100"/);
+  assert.match(provenance, /August 21, 2026/);
+  assert.match(provenance, /contain no user data/);
+  assert.match(provenance, /illustrate navigation and demo isolation only/);
 
   for (const removed of [
     "public/fonts/Rajdhani-Medium.ttf",
     "public/fonts/Rajdhani-SemiBold.ttf",
     "public/app/active-workout.png",
     "public/app/winners-circle.png",
+    "public/app/active-workout.webp",
+    "public/app/winners-circle.webp",
   ]) {
     await assert.rejects(access(new URL(removed, root)));
   }
 });
 
-test("the retired landing demo still redirects to the canonical member demo", async () => {
+test("the retired landing demo redirects only when the canonical member demo is configured", async () => {
   const demoPage = await read("app/demo/page.tsx");
 
-  assert.match(demoPage, /redirect\(siteLinks\.demo\)/);
+  assert.match(demoPage, /if \(siteLinks\.demo\)[\s\S]*?redirect\(siteLinks\.demo\)/);
+  assert.match(demoPage, /will not guess or open a preview destination/);
 });
 
 test("historical interest export remains disabled, owner-restricted and read-only", async () => {

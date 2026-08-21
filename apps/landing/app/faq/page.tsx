@@ -160,7 +160,7 @@ const faqGroups = [
 export default function FaqPage() {
   const campaignState = getSeptemberCampaignState();
   const memberRegistrationAvailable =
-    campaignState.primaryAction === "memberApp";
+    campaignState.primaryAction === "memberApp" && siteLinks.memberApp !== null;
 
   return (
     <main className="info-page">

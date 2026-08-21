@@ -11,7 +11,25 @@ export const metadata: Metadata = {
   title: "Contact",
 };
 
-const contactPaths = [
+type ContactPath =
+  | {
+      analyticsEvent?: string;
+      appBound?: false;
+      copy: string;
+      href: string;
+      label: string;
+      title: string;
+    }
+  | {
+      analyticsEvent: string;
+      appBound: true;
+      copy: string;
+      href: string | null;
+      label: string;
+      title: string;
+    };
+
+const contactPaths: readonly ContactPath[] = [
   {
     analyticsEvent: "regional_updates_click",
     copy: "Join the free regional update list for launch and availability news. This does not register you for a contest.",
@@ -60,7 +78,7 @@ export default function ContactPage() {
             <article className="contact-card" key={path.title}>
               <h2>{path.title}</h2>
               <p>{path.copy}</p>
-              {"appBound" in path && path.appBound ? (
+              {path.appBound ? (
                 <AppLink
                   analyticsEvent={path.analyticsEvent}
                   className="text-link"

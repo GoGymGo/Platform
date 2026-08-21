@@ -8,8 +8,8 @@ import { siteLinks } from "../site-links";
 export const metadata: Metadata = {
   alternates: { canonical: "/gym-goers" },
   description:
-    "Register for the eligible September GoGymGo beta or request Regional updates about future Verified workout Contests.",
-  title: "Gym-goer registration and Regional updates",
+    "Review September GoGymGo pilot eligibility and current availability, or request Regional updates about future Verified workout Contests.",
+  title: "Gym-goer pilot details and Regional updates",
 };
 
 const points = [
@@ -34,7 +34,7 @@ const points = [
 export default function GymGoersPage() {
   const campaignState = getSeptemberCampaignState();
   const memberRegistrationAvailable =
-    campaignState.primaryAction === "memberApp";
+    campaignState.primaryAction === "memberApp" && siteLinks.memberApp !== null;
 
   return (
     <main className="audience-page">
@@ -59,6 +59,14 @@ export default function GymGoersPage() {
                 details and join the free regional update list for future
                 availability.
               </>
+            ) : campaignState.phase === "unpublished" ? (
+              <>
+                The September 2026 pilot is planned for eligible gym-goers age{" "}
+                {septemberCampaign.minimumAge}+ on {septemberCampaign.regionName},
+                but registration and the reward remain unavailable until the
+                Contest, legal documents, and exact reward are published. Join
+                the free regional update list below.
+              </>
             ) : (
               <>
                 The September 2026 beta is limited to eligible gym-goers age{" "}
@@ -75,7 +83,11 @@ export default function GymGoersPage() {
             </div>
             <div>
               <dt>REGISTRATION STATUS</dt>
-              <dd>The app confirms current availability</dd>
+              <dd>
+                {campaignState.phase === "unpublished"
+                  ? "Not yet published"
+                  : "The app confirms current availability"}
+              </dd>
             </div>
           </dl>
           <div className="audience-actions">

@@ -9,7 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       campaignState.phase === "ended"
         ? `September 2026 beta details and future Regional updates for ${septemberCampaign.regionName}.`
-        : `Free September 2026 beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`,
+        : campaignState.phase === "unpublished"
+          ? `Planned September 2026 pilot details and Regional updates for ${septemberCampaign.regionName}.`
+          : `Check current availability for the free September 2026 beta for eligible gym-goers age ${septemberCampaign.minimumAge}+ on ${septemberCampaign.regionName}.`,
     display: "standalone",
     icons: [
       {

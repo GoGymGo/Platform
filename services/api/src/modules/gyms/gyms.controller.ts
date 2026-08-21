@@ -27,7 +27,7 @@ import { Public } from '../auth/public.decorator';
 import {
   CashFulfillmentRecordDto,
   GymLocationResponseDto,
-  GymQrCredentialHistoryDto,
+  GymQrCredentialHistoryPageDto,
   GymQrCredentialResponseDto,
   GymScanResultDto,
   InterestSubmissionResponseDto,
@@ -43,12 +43,14 @@ import {
   CreateGymLocationDto,
   DeleteGymLocationDto,
   GymScanRequestDto,
+  IssueGymQrCredentialDto,
   InterestSubmissionDto,
   MemberRegionWaitlistRequestDto,
-  OperatorReasonDto,
   RegionWaitlistRequestDto,
   UpdateRegionWaitlistStatusDto,
   ListOperatorAuditHistoryQueryDto,
+  ListGymQrCredentialHistoryQueryDto,
+  RevokeGymQrCredentialDto,
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import { GymsService } from './gyms.service';
@@ -203,14 +205,14 @@ export class GymOperatorController {
     @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() input: OperatorReasonDto,
+    @Body() input: IssueGymQrCredentialDto,
   ): Promise<GymQrCredentialResponseDto> {
     return this.gyms.issueCredential(
       principal,
       competitionId,
       gymId,
       requireIdempotencyKey(idempotencyKey),
-      input.reason,
+      input,
     );
   }
 
@@ -232,13 +234,19 @@ export class GymOperatorController {
 
   @Get('competitions/:competitionId/gym-locations/:gymId/qr-credentials')
   @ApiOperation({ summary: 'List scoped gym QR credential history' })
-  @ApiOkResponse({ isArray: true, type: GymQrCredentialHistoryDto })
+  @ApiOkResponse({ type: GymQrCredentialHistoryPageDto })
   listCredentialHistory(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
-  ): Promise<GymQrCredentialHistoryDto[]> {
-    return this.gyms.listCredentialHistory(principal, competitionId, gymId);
+    @Query() query: ListGymQrCredentialHistoryQueryDto,
+  ): Promise<GymQrCredentialHistoryPageDto> {
+    return this.gyms.listCredentialHistory(
+      principal,
+      competitionId,
+      gymId,
+      query,
+    );
   }
 
   @Post(
@@ -252,14 +260,14 @@ export class GymOperatorController {
     @Param('competitionId', ParseUUIDPipe) competitionId: string,
     @Param('gymId', ParseUUIDPipe) gymId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() input: OperatorReasonDto,
+    @Body() input: RevokeGymQrCredentialDto,
   ): Promise<{ id: string; status: 'revoked' }> {
     return this.gyms.revokeCredential(
       principal,
       competitionId,
       gymId,
       requireIdempotencyKey(idempotencyKey),
-      input.reason,
+      input,
     );
   }
 

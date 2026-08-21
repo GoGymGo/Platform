@@ -31,10 +31,12 @@ import type {
   DashboardSnapshot,
   FirebaseClientConfig,
   GymQrCredential,
+  GymQrCredentialHistoryPage,
   LegalDocument,
   OperatorPortalAccess,
   PartnerCompetition,
   PartnerDashboardSnapshot,
+  PartnerProposalActionResponse,
   ProfileMediaReviewAction,
   RegionPolicy,
   Reward,
@@ -52,6 +54,13 @@ import {
   authErrorMessage,
   clearAdminRequestSession,
   compactObject,
+  decodeGymQrCredential,
+  decodeDashboardProposalVisibility,
+  decodeGymQrCredentialHistoryPage,
+  decodeOperatorPortalAccess,
+  decodePartnerCompetitionPage,
+  decodePartnerDashboardSnapshot,
+  decodePartnerVisitPage,
   decodeAuditPage,
   decodeProfileMediaReviewAction,
   decodeSystemHealth,
@@ -544,16 +553,17 @@ export function AdminDashboard({
       setBusy(true);
       setLoadError("");
       try {
-        const access = await adminRequest<OperatorPortalAccess>(
-          activeUser,
-          "operator/access",
+        const access = decodeOperatorPortalAccess(
+          await adminRequest<unknown>(activeUser, "operator/access"),
         );
         if (authEpoch.current !== refreshEpoch) return;
         setPortalAccess(access);
         if (access.portal === "partner") {
-          const partnerResult = await adminRequest<PartnerDashboardSnapshot>(
-            activeUser,
-            "operator/partner-dashboard",
+          const partnerResult = decodePartnerDashboardSnapshot(
+            await adminRequest<unknown>(
+              activeUser,
+              "operator/partner-dashboard",
+            ),
           );
           if (authEpoch.current !== refreshEpoch) return;
           setPartnerSnapshot(partnerResult);
@@ -578,10 +588,7 @@ export function AdminDashboard({
           interestSubmissions,
           partnerApplications,
         ] = await Promise.all([
-          adminRequest<DashboardSnapshot>(
-            activeUser,
-            "operator/configuration/dashboard",
-          ),
+          adminRequest<unknown>(activeUser, "operator/configuration/dashboard"),
           adminRequest<PilotData["gyms"]>(activeUser, "operator/gym-locations"),
           adminRequest<PilotData["sessions"]>(
             activeUser,
@@ -601,7 +608,7 @@ export function AdminDashboard({
           ),
         ]);
         if (authEpoch.current !== refreshEpoch) return;
-        setSnapshot(dashboardResult);
+        setSnapshot(decodeDashboardProposalVisibility(dashboardResult));
         setPartnerSnapshot(null);
         const [healthResult, queueResult, auditResult] =
           await Promise.allSettled([
@@ -992,8 +999,10 @@ export function AdminDashboard({
       <PartnerWorkspace
         busy={busy}
         error={loadError}
+        key={`${user?.uid ?? "partner"}:${partnerSnapshot.generatedAt}`}
         onDismissError={() => setLoadError("")}
         onMutate={mutate}
+        onRequest={request}
         onRefresh={() => {
           if (user) void refresh(user);
         }}
@@ -1389,6 +1398,7 @@ export function AdminDashboard({
           `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
           {
             body: {
+              expectedCredentialVersion: null,
               reason:
                 "Issue the contest-specific Partner gym poster during launch.",
             },
@@ -2316,6 +2326,7 @@ function PartnerWorkspace({
   onDismissError,
   onMutate,
   onRefresh,
+  onRequest,
   onSignOut,
   snapshot,
   submitting,
@@ -2330,6 +2341,10 @@ function PartnerWorkspace({
     method: HttpMethod,
     body: unknown,
   ) => Promise<T>;
+  onRequest: <T = unknown>(
+    path: string,
+    options?: { body?: unknown; method?: HttpMethod },
+  ) => Promise<T>;
   onRefresh: () => void;
   onSignOut: () => Promise<void>;
   snapshot: PartnerDashboardSnapshot;
@@ -2340,24 +2355,70 @@ function PartnerWorkspace({
   const [competitionEditor, setCompetitionEditor] = useState<
     PartnerCompetition | "new" | null
   >(null);
+  const [competitionPage, setCompetitionPage] = useState(snapshot.competitions);
+  const [visitPage, setVisitPage] = useState(snapshot.visits);
+  const [pageError, setPageError] = useState("");
+  const [loadingMore, setLoadingMore] = useState<
+    "competitions" | "visits" | null
+  >(null);
+  const [qrError, setQrError] = useState("");
+  const [credentialHistory, setCredentialHistory] = useState<
+    Record<string, GymQrCredentialHistoryPage>
+  >({});
   const activeNavigation =
     partnerNavigation.find((item) => item.id === section) ??
     partnerNavigation[0];
-  const adminGyms = snapshot.gyms.filter(
-    (gym) => gym.active && gym.accessLevel === "admin",
-  );
-  const activeVisits = snapshot.sessions.filter(
-    (session) => session.status === "active",
-  ).length;
-  const proposalsAwaitingReview = snapshot.competitions.filter(
-    (competition) => competition.status === "draft",
-  ).length;
+  const adminGyms = snapshot.gyms.filter((gym) => gym.accessLevel === "admin");
+  const proposalsAwaitingReview = snapshot.overview.submittedProposalCount;
+
+  async function loadMoreCompetitions() {
+    if (!competitionPage.nextCursor) return;
+    setLoadingMore("competitions");
+    setPageError("");
+    try {
+      const page = decodePartnerCompetitionPage(
+        await onRequest<unknown>(
+          `operator/partner-competitions?limit=25&cursor=${encodeURIComponent(competitionPage.nextCursor)}`,
+        ),
+      );
+      setCompetitionPage((current) => ({
+        items: [...current.items, ...page.items],
+        nextCursor: page.nextCursor,
+      }));
+    } catch (error) {
+      setPageError(errorMessage(error));
+    } finally {
+      setLoadingMore(null);
+    }
+  }
+
+  async function loadMoreVisits() {
+    if (!visitPage.nextCursor) return;
+    setLoadingMore("visits");
+    setPageError("");
+    try {
+      const page = decodePartnerVisitPage(
+        await onRequest<unknown>(
+          `operator/partner-visits?limit=25&cursor=${encodeURIComponent(visitPage.nextCursor)}`,
+        ),
+      );
+      setVisitPage((current) => ({
+        items: [...current.items, ...page.items],
+        nextCursor: page.nextCursor,
+      }));
+    } catch (error) {
+      setPageError(errorMessage(error));
+    } finally {
+      setLoadingMore(null);
+    }
+  }
 
   async function issueQr(
     competitionId: string,
     competitionName: string,
     gymId: string,
     gymName: string,
+    expectedCredentialVersion: number | null,
   ) {
     if (
       !window.confirm(
@@ -2366,16 +2427,28 @@ function PartnerWorkspace({
     ) {
       return;
     }
-    const credential = await onMutate<{ printablePosterSvg: string }>(
-      "New QR poster issued.",
-      `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
-      "POST",
-      { reason: "Issue a gym QR poster from the scoped partner workspace." },
-    );
-    await downloadPosterJpeg(
-      credential.printablePosterSvg,
-      `${competitionName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-poster.jpg`,
-    );
+    setQrError("");
+    try {
+      const credential = decodeGymQrCredential(
+        await onMutate<unknown>(
+          "New QR poster issued.",
+          `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials`,
+          "POST",
+          {
+            expectedCredentialVersion,
+            reason: "Issue a gym QR poster from the scoped partner workspace.",
+          },
+        ),
+      );
+      if (!credential)
+        throw new AdminUserFacingError("No poster was returned.");
+      await downloadPosterJpeg(
+        credential.printablePosterSvg,
+        `${competitionName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-poster.jpg`,
+      );
+    } catch (error) {
+      setQrError(errorMessage(error));
+    }
   }
 
   async function revokeQr(
@@ -2383,6 +2456,7 @@ function PartnerWorkspace({
     competitionName: string,
     gymId: string,
     gymName: string,
+    expectedCredentialVersion: number,
   ) {
     if (
       !window.confirm(
@@ -2391,12 +2465,97 @@ function PartnerWorkspace({
     ) {
       return;
     }
-    await onMutate(
-      "QR poster revoked.",
-      `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/revoke`,
-      "POST",
-      { reason: "Revoke the gym QR poster from the scoped partner workspace." },
-    );
+    setQrError("");
+    try {
+      await onMutate(
+        "QR poster revoked.",
+        `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/revoke`,
+        "POST",
+        {
+          expectedCredentialVersion,
+          reason: "Revoke the gym QR poster from the scoped partner workspace.",
+        },
+      );
+    } catch (error) {
+      setQrError(errorMessage(error));
+    }
+  }
+
+  async function recoverQr(
+    competitionId: string,
+    competitionName: string,
+    gymId: string,
+    gymName: string,
+  ) {
+    setQrError("");
+    try {
+      const credential = decodeGymQrCredential(
+        await onRequest<unknown>(
+          `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials/active`,
+        ),
+      );
+      if (!credential) {
+        throw new AdminUserFacingError(
+          "No active poster is available. Reload the Contest before retrying.",
+        );
+      }
+      await downloadPosterJpeg(
+        credential.printablePosterSvg,
+        `${competitionName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${gymName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-poster.jpg`,
+      );
+    } catch (error) {
+      setQrError(errorMessage(error));
+    }
+  }
+
+  async function loadCredentialHistory(
+    competitionId: string,
+    gymId: string,
+    cursor?: string,
+  ) {
+    setQrError("");
+    try {
+      const query = new URLSearchParams({ limit: "25" });
+      if (cursor) query.set("cursor", cursor);
+      const page = decodeGymQrCredentialHistoryPage(
+        await onRequest<unknown>(
+          `operator/competitions/${competitionId}/gym-locations/${gymId}/qr-credentials?${query.toString()}`,
+        ),
+      );
+      setCredentialHistory((current) => ({
+        ...current,
+        [competitionId]: {
+          items: cursor
+            ? [...(current[competitionId]?.items ?? []), ...page.items]
+            : page.items,
+          nextCursor: page.nextCursor,
+        },
+      }));
+    } catch (error) {
+      setQrError(errorMessage(error));
+    }
+  }
+
+  async function changeProposalStatus(
+    competition: PartnerCompetition,
+    action: "archive" | "submit" | "withdraw",
+  ) {
+    if (competition.proposalVersion === null) return;
+    setPageError("");
+    try {
+      await onMutate<PartnerProposalActionResponse>(
+        `Proposal ${action === "submit" ? "submitted for review" : action === "withdraw" ? "withdrawn" : "archived"}.`,
+        `operator/partner-proposals/${competition.id}/status-action`,
+        "POST",
+        {
+          action,
+          expectedVersion: competition.proposalVersion,
+          reason: `${action} the gym-owned Contest proposal from the Partner workspace.`,
+        },
+      );
+    } catch (error) {
+      setPageError(errorMessage(error));
+    }
   }
 
   return (
@@ -2525,8 +2684,8 @@ function PartnerWorkspace({
                   type="button"
                 >
                   <span>DRAFT PROPOSALS</span>
-                  <strong>{proposalsAwaitingReview}</strong>
-                  <small>Awaiting GoGymGo publication</small>
+                  <strong>{snapshot.overview.draftProposalCount}</strong>
+                  <small>Editable gym-owned drafts</small>
                 </button>
                 <button
                   className="metric"
@@ -2534,8 +2693,8 @@ function PartnerWorkspace({
                   type="button"
                 >
                   <span>ACTIVE VISITS</span>
-                  <strong>{activeVisits}</strong>
-                  <small>QR sessions in progress</small>
+                  <strong>{snapshot.overview.activeVisitCount}</strong>
+                  <small>Aggregate sessions in progress</small>
                 </button>
                 <div className="metric static">
                   <span>ACCESS</span>
@@ -2560,10 +2719,8 @@ function PartnerWorkspace({
                   <article className="competition-card" key={gym.id}>
                     <div className="card-title-row">
                       <div>
-                        <span
-                          className={`status-tag ${gym.active ? "active" : "cancelled"}`}
-                        >
-                          {gym.active ? "ACTIVE" : "INACTIVE"}
+                        <span className="status-tag active">
+                          ACTIVE ASSIGNMENT
                         </span>
                         <h3>{gym.name}</h3>
                         <p>{gym.address}</p>
@@ -2584,7 +2741,9 @@ function PartnerWorkspace({
                       </span>
                     </div>
                     <p className="action-guidance compact">
-                      Issue and manage posters from the contest they belong to.
+                      {gym.accessLevel === "admin"
+                        ? "Published gym-owned Contest posters can be managed from Contests."
+                        : "Staff access is read-only. Poster and proposal changes require a gym admin assignment."}
                     </p>
                   </article>
                 ))}
@@ -2613,14 +2772,14 @@ function PartnerWorkspace({
                   </button>
                 ) : null}
               </div>
-              {snapshot.competitions.length === 0 ? (
+              {competitionPage.items.length === 0 ? (
                 <EmptyState
                   body="Gym administrators can submit the first local contest proposal for GoGymGo review."
                   title="No contest proposals yet"
                 />
               ) : (
                 <div className="card-list">
-                  {snapshot.competitions.map((competition) => {
+                  {competitionPage.items.map((competition) => {
                     const competitionGym = snapshot.gyms.find(
                       (gym) => gym.id === competition.gymLocationId,
                     );
@@ -2630,10 +2789,20 @@ function PartnerWorkspace({
                           credential.competitionId === competition.id,
                       )?.credentialVersion ?? null;
                     const canEdit =
-                      competition.status === "draft" &&
+                      competition.competitionStatus === "draft" &&
+                      ["draft", "withdrawn"].includes(
+                        competition.proposalStatus ?? "",
+                      ) &&
                       adminGyms.some(
                         (gym) => gym.id === competition.gymLocationId,
                       );
+                    const canManagePoster =
+                      competition.proposalStatus === "published" &&
+                      ["registration", "active"].includes(
+                        competition.competitionStatus,
+                      ) &&
+                      competitionGym?.accessLevel === "admin";
+                    const history = credentialHistory[competition.id];
                     return (
                       <article
                         className="competition-card"
@@ -2642,11 +2811,11 @@ function PartnerWorkspace({
                         <div className="card-title-row">
                           <div>
                             <span
-                              className={`status-tag ${competition.status}`}
+                              className={`status-tag ${competition.proposalStatus ?? competition.competitionStatus}`}
                             >
-                              {competition.status === "draft"
-                                ? "AWAITING GOGYMGO REVIEW"
-                                : competition.status}
+                              {competition.proposalStatus
+                                ? `PROPOSAL ${competition.proposalStatus}`
+                                : competition.competitionStatus}
                             </span>
                             <h3>{competition.name}</h3>
                             <p>
@@ -2681,19 +2850,73 @@ function PartnerWorkspace({
                                 EDIT PROPOSAL
                               </button>
                             ) : null}
+                            {competitionGym?.accessLevel === "admin" &&
+                            ["draft", "withdrawn"].includes(
+                              competition.proposalStatus ?? "",
+                            ) ? (
+                              <>
+                                <button
+                                  className="primary-button"
+                                  disabled={submitting}
+                                  onClick={() =>
+                                    void changeProposalStatus(
+                                      competition,
+                                      "submit",
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  SUBMIT FOR GOGYMGO REVIEW
+                                </button>
+                                <button
+                                  className="danger-button"
+                                  disabled={submitting}
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        `Archive ${competition.name}? This preserves its GoGymGo review provenance and cannot be undone by the Partner portal.`,
+                                      )
+                                    ) {
+                                      void changeProposalStatus(
+                                        competition,
+                                        "archive",
+                                      );
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  ARCHIVE PROPOSAL
+                                </button>
+                              </>
+                            ) : null}
+                            {competitionGym?.accessLevel === "admin" &&
+                            competition.proposalStatus === "submitted" ? (
+                              <button
+                                className="secondary-button"
+                                disabled={submitting}
+                                onClick={() =>
+                                  void changeProposalStatus(
+                                    competition,
+                                    "withdraw",
+                                  )
+                                }
+                                type="button"
+                              >
+                                WITHDRAW FROM REVIEW
+                              </button>
+                            ) : null}
                             {competitionGym?.accessLevel === "admin" ? (
                               <>
                                 <button
                                   className="primary-button"
-                                  disabled={
-                                    submitting || !competitionGym.active
-                                  }
+                                  disabled={submitting || !canManagePoster}
                                   onClick={() =>
                                     void issueQr(
                                       competition.id,
                                       competition.name,
                                       competitionGym.id,
                                       competitionGym.name,
+                                      activeCredentialVersion,
                                     )
                                   }
                                   type="button"
@@ -2705,9 +2928,27 @@ function PartnerWorkspace({
                                 {activeCredentialVersion ? (
                                   <button
                                     className="danger-button"
-                                    disabled={submitting}
+                                    disabled={submitting || !canManagePoster}
                                     onClick={() =>
                                       void revokeQr(
+                                        competition.id,
+                                        competition.name,
+                                        competitionGym.id,
+                                        competitionGym.name,
+                                        activeCredentialVersion,
+                                      )
+                                    }
+                                    type="button"
+                                  >
+                                    REVOKE THIS CONTEST QR
+                                  </button>
+                                ) : null}
+                                {activeCredentialVersion ? (
+                                  <button
+                                    className="secondary-button"
+                                    disabled={submitting || !canManagePoster}
+                                    onClick={() =>
+                                      void recoverQr(
                                         competition.id,
                                         competition.name,
                                         competitionGym.id,
@@ -2716,10 +2957,73 @@ function PartnerWorkspace({
                                     }
                                     type="button"
                                   >
-                                    REVOKE THIS CONTEST QR
+                                    RECOVER / DOWNLOAD ACTIVE POSTER
                                   </button>
                                 ) : null}
+                                <button
+                                  className="text-button"
+                                  onClick={() =>
+                                    void loadCredentialHistory(
+                                      competition.id,
+                                      competitionGym.id,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  VIEW SECRET-FREE HISTORY
+                                </button>
                               </>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {competitionGym?.accessLevel === "staff" ? (
+                          <div className="card-actions">
+                            <button
+                              className="text-button"
+                              onClick={() =>
+                                void loadCredentialHistory(
+                                  competition.id,
+                                  competitionGym.id,
+                                )
+                              }
+                              type="button"
+                            >
+                              VIEW SECRET-FREE HISTORY
+                            </button>
+                          </div>
+                        ) : null}
+                        {!canManagePoster ? (
+                          <p className="action-guidance compact">
+                            Partner poster actions remain unavailable until the
+                            proposal is submitted, published by GoGymGo, and the
+                            Contest is open.
+                          </p>
+                        ) : null}
+                        {history ? (
+                          <div className="action-guidance compact">
+                            {history.items.length === 0
+                              ? "No credential history."
+                              : history.items.map((credential) => (
+                                  <span key={credential.id}>
+                                    V{credential.credentialVersion} ·{" "}
+                                    {credential.status.toUpperCase()} · issued{" "}
+                                    {formatDateTime(credential.issuedAt)}
+                                  </span>
+                                ))}
+                            {history.nextCursor && competitionGym ? (
+                              <button
+                                className="text-button"
+                                onClick={() =>
+                                  void loadCredentialHistory(
+                                    competition.id,
+                                    competitionGym.id,
+                                    history.nextCursor ?? undefined,
+                                  )
+                                }
+                                type="button"
+                              >
+                                LOAD MORE HISTORY
+                              </button>
                             ) : null}
                           </div>
                         ) : null}
@@ -2728,6 +3032,33 @@ function PartnerWorkspace({
                   })}
                 </div>
               )}
+              {competitionPage.nextCursor ? (
+                <button
+                  className="secondary-button"
+                  disabled={loadingMore === "competitions"}
+                  onClick={() => void loadMoreCompetitions()}
+                  type="button"
+                >
+                  {loadingMore === "competitions"
+                    ? "LOADING…"
+                    : "LOAD MORE CONTESTS"}
+                </button>
+              ) : null}
+              {qrError || pageError ? (
+                <div className="alert error" role="alert">
+                  <span>!</span>
+                  <p>{qrError || pageError}</p>
+                  <button
+                    onClick={() => {
+                      setQrError("");
+                      setPageError("");
+                    }}
+                    type="button"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -2743,7 +3074,7 @@ function PartnerWorkspace({
                   </p>
                 </div>
               </div>
-              {snapshot.sessions.length === 0 ? (
+              {visitPage.items.length === 0 ? (
                 <EmptyState
                   body="Gym visits will appear after members complete a start location check."
                   title="No gym visits yet"
@@ -2754,36 +3085,38 @@ function PartnerWorkspace({
                     <thead>
                       <tr>
                         <th>Gym</th>
-                        <th>Started</th>
-                        <th>Completed</th>
                         <th>Status</th>
+                        <th>Visits</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {snapshot.sessions.map((session) => (
-                        <tr key={session.id}>
-                          <td>{session.gymName}</td>
-                          <td>{formatDateTime(session.startedAt)}</td>
+                      {visitPage.items.map((visit) => (
+                        <tr key={`${visit.gymLocationId}:${visit.status}`}>
+                          <td>{visit.gymName}</td>
                           <td>
-                            {session.completedAt
-                              ? formatDateTime(session.completedAt)
-                              : "—"}
-                          </td>
-                          <td>
-                            <span
-                              className={`status-tag ${session.incomplete ? "rejected" : session.status}`}
-                            >
-                              {session.incomplete
-                                ? "INCOMPLETE"
-                                : session.status}
+                            <span className={`status-tag ${visit.status}`}>
+                              {visit.status.replaceAll("_", " ")}
                             </span>
                           </td>
+                          <td>{visit.count}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+              {visitPage.nextCursor ? (
+                <button
+                  className="secondary-button"
+                  disabled={loadingMore === "visits"}
+                  onClick={() => void loadMoreVisits()}
+                  type="button"
+                >
+                  {loadingMore === "visits"
+                    ? "LOADING…"
+                    : "LOAD MORE VISIT GROUPS"}
+                </button>
+              ) : null}
             </section>
           ) : null}
         </div>
@@ -2805,10 +3138,10 @@ function PartnerWorkspace({
             await onMutate(
               editing
                 ? "Contest proposal updated."
-                : "Contest proposal submitted.",
+                : "Contest proposal draft created.",
               editing
-                ? `operator/configuration/competitions/${editing.id}`
-                : "operator/configuration/competitions",
+                ? `operator/partner-proposals/${editing.id}`
+                : "operator/partner-proposals",
               editing ? "PUT" : "POST",
               body,
             );
@@ -2860,7 +3193,7 @@ function Overview({
   onIssueQr: (
     competitionId: string,
     gymId: string,
-    body: { reason: string },
+    body: { expectedCredentialVersion: number | null; reason: string },
   ) => Promise<GymQrCredential>;
   onLoadActiveQr: (
     competitionId: string,
@@ -2994,6 +3327,10 @@ function Overview({
     setPosterActionMessage(null);
     try {
       const issued = await onIssueQr(competition.id, gym.id, {
+        expectedCredentialVersion:
+          (gym.activeQrCredentials ?? []).find(
+            (credential) => credential.competitionId === competition.id,
+          )?.credentialVersion ?? null,
         reason: `Issue the ${competition.name} contest-specific QR poster.`,
       });
       const credential = assertGymQrCredentialScope(
@@ -5356,15 +5693,20 @@ function CompetitionForm({
   regions,
   submitting,
 }: {
-  competition?: Competition;
+  competition?: PartnerCompetition;
   gymLocationId?: string;
   gyms: { id: string; name: string; regionPolicyId: string }[];
   onClose: () => void;
   onSubmit: (
     body: Record<string, unknown>,
-    editing?: Competition,
+    editing?: PartnerCompetition,
   ) => Promise<void>;
-  regions: RegionPolicy[];
+  regions: {
+    id: string;
+    name?: string;
+    metroName?: string;
+    timezone: string;
+  }[];
   submitting: boolean;
 }) {
   const [formError, setFormError] = useState("");
@@ -5452,10 +5794,12 @@ function CompetitionForm({
         regionPolicyId,
         registrationClosesAt: parsedSchedule.registrationClosesAt,
         registrationOpensAt: parsedSchedule.registrationOpensAt,
-        rules: competition?.rules ?? defaultCompetitionRules,
-        rulesVersion: competition?.rulesVersion ?? "partner-proposal-v1",
+        rules: defaultCompetitionRules,
+        rulesVersion: "partner-proposal-v1",
         startsAt: parsedSchedule.startsAt,
-        ...(competition ? { expectedVersion: competition.version } : {}),
+        ...(competition
+          ? { expectedVersion: competition.configurationVersion }
+          : {}),
       };
       await onSubmit(body, competition);
     } catch (error) {
@@ -5504,7 +5848,7 @@ function CompetitionForm({
               <option value="">Select a region</option>
               {selectableRegions.map((region) => (
                 <option key={region.id} value={region.id}>
-                  {region.metroName}
+                  {region.metroName ?? region.name}
                 </option>
               ))}
             </select>

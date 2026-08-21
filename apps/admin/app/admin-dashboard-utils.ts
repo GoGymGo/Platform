@@ -6,6 +6,17 @@ import {
   type AuditEvent,
   type AuditPage,
   type Competition,
+  type DashboardSnapshot,
+  type GymQrCredentialHistoryPage,
+  type GymQrCredential,
+  type OperatorPortalAccess,
+  type PartnerCompetition,
+  type PartnerCompetitionPage,
+  type PartnerDashboardSnapshot,
+  type PartnerGym,
+  type PartnerRegion,
+  type PartnerVisitPage,
+  type PartnerVisitSummary,
   type ProfileMediaReviewAction,
   type SystemHealth,
   type WorkQueueDetail,
@@ -18,6 +29,349 @@ import {
 } from "./admin-auth-request.mjs";
 
 export type HttpMethod = "DELETE" | "POST" | "PUT";
+
+const partnerProposalStatuses = [
+  "archived",
+  "draft",
+  "published",
+  "submitted",
+  "withdrawn",
+] as const;
+const partnerVisitStatuses = [
+  "completed",
+  "in_progress",
+  "incomplete",
+  "pending_review",
+] as const;
+
+export function decodeOperatorPortalAccess(
+  value: unknown,
+): OperatorPortalAccess {
+  const access = requireRecord(value, "operator portal access");
+  if (
+    !isString(access.email) ||
+    !["gogymgo", "partner"].includes(String(access.portal)) ||
+    !Array.isArray(access.assignments)
+  ) {
+    throw invalidAdminResponse("operator portal access");
+  }
+  const assignments = access.assignments.map((value) => {
+    const assignment = requireRecord(value, "operator gym assignment");
+    if (
+      !isString(assignment.gymLocationId) ||
+      !["admin", "staff"].includes(String(assignment.accessLevel))
+    ) {
+      throw invalidAdminResponse("operator gym assignment");
+    }
+    return {
+      accessLevel: assignment.accessLevel as "admin" | "staff",
+      gymLocationId: assignment.gymLocationId,
+    };
+  });
+  return {
+    assignments,
+    email: access.email,
+    portal: access.portal as "gogymgo" | "partner",
+  };
+}
+
+export function decodeDashboardProposalVisibility(
+  value: unknown,
+): DashboardSnapshot {
+  const snapshot = requireRecord(value, "admin dashboard");
+  if (!Array.isArray(snapshot.competitions)) {
+    throw invalidAdminResponse("admin dashboard Contests");
+  }
+  for (const value of snapshot.competitions) {
+    const competition = requireRecord(value, "admin dashboard Contest");
+    const proposalStatus = competition.proposalStatus;
+    const proposalVersion = competition.proposalVersion;
+    if (
+      (proposalStatus !== null &&
+        !partnerProposalStatuses.includes(
+          proposalStatus as (typeof partnerProposalStatuses)[number],
+        )) ||
+      !isNullablePositiveInteger(proposalVersion) ||
+      (proposalStatus === null) !== (proposalVersion === null)
+    ) {
+      throw invalidAdminResponse("admin proposal visibility");
+    }
+  }
+  return snapshot as DashboardSnapshot;
+}
+
+export function decodePartnerDashboardSnapshot(
+  value: unknown,
+): PartnerDashboardSnapshot {
+  const snapshot = requireRecord(value, "partner dashboard");
+  const operator = requireRecord(snapshot.operator, "partner identity");
+  const overview = requireRecord(snapshot.overview, "partner overview");
+  if (
+    !isString(operator.email) ||
+    !Array.isArray(snapshot.gyms) ||
+    !Array.isArray(snapshot.regions) ||
+    !isIsoDate(snapshot.generatedAt) ||
+    ![
+      overview.activeVisitCount,
+      overview.assignedGymCount,
+      overview.draftProposalCount,
+      overview.submittedProposalCount,
+    ].every(isNonnegativeInteger)
+  ) {
+    throw invalidAdminResponse("partner dashboard");
+  }
+  return {
+    competitions: decodePartnerCompetitionPage(snapshot.competitions),
+    generatedAt: snapshot.generatedAt,
+    gyms: snapshot.gyms.map(decodePartnerGym),
+    operator: { email: operator.email },
+    overview: {
+      activeVisitCount: overview.activeVisitCount as number,
+      assignedGymCount: overview.assignedGymCount as number,
+      draftProposalCount: overview.draftProposalCount as number,
+      submittedProposalCount: overview.submittedProposalCount as number,
+    },
+    regions: snapshot.regions.map(decodePartnerRegion),
+    visits: decodePartnerVisitPage(snapshot.visits),
+  };
+}
+
+export function decodePartnerCompetitionPage(
+  value: unknown,
+): PartnerCompetitionPage {
+  const page = requireRecord(value, "partner Contest page");
+  if (!Array.isArray(page.items) || !isNullableString(page.nextCursor)) {
+    throw invalidAdminResponse("partner Contest page");
+  }
+  return {
+    items: page.items.map(decodePartnerCompetition),
+    nextCursor: page.nextCursor,
+  };
+}
+
+export function decodePartnerVisitPage(value: unknown): PartnerVisitPage {
+  const page = requireRecord(value, "partner visit page");
+  if (!Array.isArray(page.items) || !isNullableString(page.nextCursor)) {
+    throw invalidAdminResponse("partner visit page");
+  }
+  return {
+    items: page.items.map((item) => {
+      const visit = requireRecord(item, "partner visit summary");
+      if (
+        !isString(visit.gymLocationId) ||
+        !isString(visit.gymName) ||
+        !partnerVisitStatuses.includes(
+          visit.status as (typeof partnerVisitStatuses)[number],
+        ) ||
+        !isPositiveInteger(visit.count)
+      ) {
+        throw invalidAdminResponse("partner visit summary");
+      }
+      return {
+        count: visit.count,
+        gymLocationId: visit.gymLocationId,
+        gymName: visit.gymName,
+        status: visit.status,
+      } as PartnerVisitSummary;
+    }),
+    nextCursor: page.nextCursor,
+  };
+}
+
+export function decodeGymQrCredentialHistoryPage(
+  value: unknown,
+): GymQrCredentialHistoryPage {
+  const page = requireRecord(value, "gym QR history page");
+  if (!Array.isArray(page.items) || !isNullableString(page.nextCursor)) {
+    throw invalidAdminResponse("gym QR history page");
+  }
+  return {
+    items: page.items.map((item) => {
+      const credential = requireRecord(item, "gym QR history item");
+      if (
+        "qrPayload" in credential ||
+        "printablePosterSvg" in credential ||
+        ![
+          credential.competitionId,
+          credential.competitionName,
+          credential.gymLocationId,
+          credential.id,
+        ].every(isString) ||
+        !isPositiveInteger(credential.credentialVersion) ||
+        ![credential.expiresAt, credential.issuedAt].every(isIsoDate) ||
+        !isNullableIsoDate(credential.revokedAt) ||
+        !["active", "expired", "revoked"].includes(String(credential.status))
+      ) {
+        throw invalidAdminResponse("gym QR history item");
+      }
+      return {
+        competitionId: credential.competitionId,
+        competitionName: credential.competitionName,
+        credentialVersion: credential.credentialVersion,
+        expiresAt: credential.expiresAt,
+        gymLocationId: credential.gymLocationId,
+        id: credential.id,
+        issuedAt: credential.issuedAt,
+        revokedAt: credential.revokedAt,
+        status: credential.status,
+      } as GymQrCredentialHistoryPage["items"][number];
+    }),
+    nextCursor: page.nextCursor,
+  };
+}
+
+export function decodeGymQrCredential(value: unknown): GymQrCredential | null {
+  if (value === null) return null;
+  const credential = requireRecord(value, "gym QR credential");
+  if (
+    ![
+      credential.competitionId,
+      credential.competitionName,
+      credential.gymLocationId,
+      credential.id,
+      credential.printablePosterSvg,
+      credential.qrPayload,
+    ].every(isString) ||
+    !isPositiveInteger(credential.credentialVersion) ||
+    ![credential.expiresAt, credential.issuedAt].every(isIsoDate) ||
+    !(credential.qrPayload as string).startsWith(
+      "https://app.gogymgo.com/scan?credential=",
+    ) ||
+    !(credential.printablePosterSvg as string).startsWith("<svg")
+  ) {
+    throw invalidAdminResponse("gym QR credential");
+  }
+  return {
+    competitionId: credential.competitionId,
+    competitionName: credential.competitionName,
+    credentialVersion: credential.credentialVersion,
+    expiresAt: credential.expiresAt,
+    gymLocationId: credential.gymLocationId,
+    id: credential.id,
+    issuedAt: credential.issuedAt,
+    printablePosterSvg: credential.printablePosterSvg,
+    qrPayload: credential.qrPayload,
+  } as GymQrCredential;
+}
+
+function decodePartnerGym(value: unknown): PartnerGym {
+  const gym = requireRecord(value, "partner gym");
+  if (
+    ![gym.address, gym.id, gym.name, gym.regionCode, gym.regionPolicyId].every(
+      isString,
+    ) ||
+    !["admin", "staff"].includes(String(gym.accessLevel)) ||
+    !isPositiveInteger(gym.radiusMeters) ||
+    !Array.isArray(gym.activeQrCredentials)
+  ) {
+    throw invalidAdminResponse("partner gym");
+  }
+  return {
+    accessLevel: gym.accessLevel as "admin" | "staff",
+    activeQrCredentials: gym.activeQrCredentials.map((value) => {
+      const credential = requireRecord(value, "active gym QR credential");
+      if (
+        !isString(credential.competitionId) ||
+        !isPositiveInteger(credential.credentialVersion) ||
+        !isIsoDate(credential.expiresAt)
+      ) {
+        throw invalidAdminResponse("active gym QR credential");
+      }
+      return {
+        competitionId: credential.competitionId,
+        credentialVersion: credential.credentialVersion,
+        expiresAt: credential.expiresAt,
+      };
+    }),
+    address: gym.address as string,
+    id: gym.id as string,
+    name: gym.name as string,
+    radiusMeters: gym.radiusMeters,
+    regionCode: gym.regionCode as string,
+    regionPolicyId: gym.regionPolicyId as string,
+  };
+}
+
+function decodePartnerRegion(value: unknown): PartnerRegion {
+  const region = requireRecord(value, "partner region");
+  if (
+    ![region.code, region.id, region.name, region.timezone].every(isString) ||
+    typeof region.competitionEnabled !== "boolean"
+  ) {
+    throw invalidAdminResponse("partner region");
+  }
+  return {
+    code: region.code as string,
+    competitionEnabled: region.competitionEnabled,
+    id: region.id as string,
+    name: region.name as string,
+    timezone: region.timezone as string,
+  };
+}
+
+function decodePartnerCompetition(value: unknown): PartnerCompetition {
+  const competition = requireRecord(value, "partner Contest");
+  if (
+    ![
+      competition.competitionStatus,
+      competition.gymLocationId,
+      competition.gymName,
+      competition.id,
+      competition.monthKey,
+      competition.name,
+      competition.regionCode,
+      competition.regionName,
+      competition.regionPolicyId,
+    ].every(isString) ||
+    ![
+      competition.endsAt,
+      competition.registrationClosesAt,
+      competition.registrationOpensAt,
+      competition.startsAt,
+    ].every(isIsoDate) ||
+    !isPositiveInteger(competition.configurationVersion) ||
+    !isNullablePositiveInteger(competition.proposalVersion) ||
+    !isNullableNonnegativeNumber(competition.entrantCap) ||
+    !isNonnegativeInteger(competition.enrollmentCount) ||
+    !Array.isArray(competition.goalBrackets) ||
+    !competition.goalBrackets.every((value) => {
+      const bracket = isRecord(value) ? value : null;
+      return (
+        bracket !== null &&
+        isPositiveInteger(bracket.goalDays) &&
+        isString(bracket.label)
+      );
+    }) ||
+    (competition.proposalStatus !== null &&
+      !partnerProposalStatuses.includes(
+        competition.proposalStatus as (typeof partnerProposalStatuses)[number],
+      ))
+  ) {
+    throw invalidAdminResponse("partner Contest");
+  }
+  return {
+    competitionStatus: competition.competitionStatus,
+    configurationVersion: competition.configurationVersion,
+    endsAt: competition.endsAt,
+    enrollmentCount: competition.enrollmentCount,
+    entrantCap: competition.entrantCap,
+    goalBrackets:
+      competition.goalBrackets as PartnerCompetition["goalBrackets"],
+    gymLocationId: competition.gymLocationId,
+    gymName: competition.gymName,
+    id: competition.id,
+    monthKey: competition.monthKey,
+    name: competition.name,
+    proposalStatus: competition.proposalStatus,
+    proposalVersion: competition.proposalVersion,
+    regionCode: competition.regionCode,
+    regionName: competition.regionName,
+    regionPolicyId: competition.regionPolicyId,
+    registrationClosesAt: competition.registrationClosesAt,
+    registrationOpensAt: competition.registrationOpensAt,
+    startsAt: competition.startsAt,
+  } as PartnerCompetition;
+}
 
 export function isOperationalCompetition(competition: Competition) {
   return ["draft", "registration", "active"].includes(competition.status);
@@ -387,6 +741,18 @@ function isNullableNumber(value: unknown): value is number | null {
 
 function isNonnegativeNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isNonnegativeInteger(value: unknown): value is number {
+  return isNonnegativeNumber(value) && Number.isInteger(value);
+}
+
+function isNullableNonnegativeNumber(value: unknown): value is number | null {
+  return value === null || isNonnegativeNumber(value);
+}
+
+function isNullablePositiveInteger(value: unknown): value is number | null {
+  return value === null || isPositiveInteger(value);
 }
 
 function isPositiveInteger(value: unknown): value is number {

@@ -114,10 +114,7 @@ function couponCodes(value: FormDataEntryValue | null): string[] {
   ];
 }
 
-function optionalZonedIso(
-  value: FormDataEntryValue | null,
-  timeZone: string,
-) {
+function optionalZonedIso(value: FormDataEntryValue | null, timeZone: string) {
   const normalized = optionalString(value);
   if (!normalized) return undefined;
   try {
@@ -166,9 +163,7 @@ function locationError(error: GeolocationPositionError) {
 function nativeSectionErrors(form: HTMLFormElement) {
   const errors: Partial<Record<SetupSection, string>> = {};
   const invalid: (
-    | HTMLInputElement
-    | HTMLSelectElement
-    | HTMLTextAreaElement
+    HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
   )[] = [];
   form
     .querySelectorAll("input:invalid, select:invalid, textarea:invalid")
@@ -183,9 +178,9 @@ function nativeSectionErrors(form: HTMLFormElement) {
       }
     });
 
-  form.querySelectorAll("[aria-invalid='true']").forEach((control) =>
-    control.removeAttribute("aria-invalid"),
-  );
+  form
+    .querySelectorAll("[aria-invalid='true']")
+    .forEach((control) => control.removeAttribute("aria-invalid"));
   invalid.forEach((control) => {
     control.setAttribute("aria-invalid", "true");
     const section =
@@ -193,7 +188,8 @@ function nativeSectionErrors(form: HTMLFormElement) {
         .closest("[data-setup-section]")
         ?.getAttribute("data-setup-section") as SetupSection | null) ??
       "contest";
-    errors[section] ??= `Complete the highlighted ${sectionLabels[section].toLowerCase()} fields.`;
+    errors[section] ??=
+      `Complete the highlighted ${sectionLabels[section].toLowerCase()} fields.`;
   });
   return { errors, firstInvalid: invalid[0] };
 }
@@ -254,6 +250,9 @@ export function ContestSetupWorkspace({
 }: ContestSetupWorkspaceProps) {
   const contestRewards = rewards.filter(
     (reward) => reward.competitionId === competition?.id,
+  );
+  const proposalSubmissionBlocked = Boolean(
+    competition?.proposalStatus && competition.proposalStatus !== "submitted",
   );
   const publishedReward = contestRewards.find(
     (reward) => reward.status === "published",
@@ -324,9 +323,9 @@ export function ContestSetupWorkspace({
     schedule.endsAt,
     selectedTimeZone,
   );
-  const regionGyms = gyms.filter(
-    (gym) => gym.active && gym.regionPolicyId === selectedRegionId,
-  ).sort((left, right) => left.name.localeCompare(right.name));
+  const regionGyms = gyms
+    .filter((gym) => gym.active && gym.regionPolicyId === selectedRegionId)
+    .sort((left, right) => left.name.localeCompare(right.name));
   const selectedGym = regionGyms.find((gym) => gym.id === selectedGymId);
 
   function updateSchedule(field: keyof ScheduleInputs, value: string) {
@@ -348,9 +347,10 @@ export function ContestSetupWorkspace({
         const latitude = position.coords.latitude;
         const longitude = position.coords.longitude;
         const nearestGym = [...gyms]
-          .filter((gym) =>
-            gym.active &&
-            enabledRegions.some((region) => region.id === gym.regionPolicyId),
+          .filter(
+            (gym) =>
+              gym.active &&
+              enabledRegions.some((region) => region.id === gym.regionPolicyId),
           )
           .sort(
             (left, right) =>
@@ -589,7 +589,9 @@ export function ContestSetupWorkspace({
       <div className="one-page-setup-intro">
         <div>
           <p className="eyebrow">ONE-PAGE CONTEST SETUP</p>
-          <h2>{competition ? `Finish ${competition.name}` : "Create a contest"}</h2>
+          <h2>
+            {competition ? `Finish ${competition.name}` : "Create a contest"}
+          </h2>
           <p>
             Fill in each section once. The final button saves everything,
             publishes the reward, creates the QR poster and opens the contest.
@@ -650,7 +652,9 @@ export function ContestSetupWorkspace({
                 <p className="eyebrow">CONTEST DETAILS</p>
                 <h3>What players are joining</h3>
               </div>
-              <span className={competition ? "setup-ready-tag" : "setup-draft-tag"}>
+              <span
+                className={competition ? "setup-ready-tag" : "setup-draft-tag"}
+              >
                 {competition ? "DRAFT LOADED" : "NEW"}
               </span>
             </header>
@@ -731,13 +735,17 @@ export function ContestSetupWorkspace({
                 <small className="field-help">
                   {workoutCutoffs ? (
                     <>
-                      Workouts must start before {formatContestDateTime(
+                      Workouts must start before{" "}
+                      {formatContestDateTime(
                         workoutCutoffs.startBefore,
                         selectedTimeZone,
-                      )} and in-progress workouts must finish before {formatContestDateTime(
+                      )}{" "}
+                      and in-progress workouts must finish before{" "}
+                      {formatContestDateTime(
                         workoutCutoffs.completionDeadline,
                         selectedTimeZone,
-                      )}.
+                      )}
+                      .
                     </>
                   ) : (
                     "Enter the contest end time to see the workout cutoffs."
@@ -745,8 +753,8 @@ export function ContestSetupWorkspace({
                 </small>
               </SetupField>
               <p className="setup-time-zone-note">
-                Schedule times use <strong>{selectedTimeZone}</strong>, the selected
-                region&apos;s timezone.
+                Schedule times use <strong>{selectedTimeZone}</strong>, the
+                selected region&apos;s timezone.
               </p>
               <SetupField label="ENTRANT CAP (OPTIONAL)">
                 <input
@@ -805,9 +813,15 @@ export function ContestSetupWorkspace({
                 <h3>Create it once; publishing is automatic</h3>
               </div>
               <span
-                className={publishedReward ? "setup-ready-tag" : "setup-draft-tag"}
+                className={
+                  publishedReward ? "setup-ready-tag" : "setup-draft-tag"
+                }
               >
-                {publishedReward ? "PUBLISHED" : editableReward ? "DRAFT LOADED" : "NEW"}
+                {publishedReward
+                  ? "PUBLISHED"
+                  : editableReward
+                    ? "DRAFT LOADED"
+                    : "NEW"}
               </span>
             </header>
             <SectionError message={sectionErrors.reward} />
@@ -817,8 +831,9 @@ export function ContestSetupWorkspace({
                 <div>
                   <strong>{publishedReward.title}</strong>
                   <p>
-                    {publishedReward.sponsorName} · {publishedReward.inventoryTotal}{" "}
-                    available. It will stay attached to this contest.
+                    {publishedReward.sponsorName} ·{" "}
+                    {publishedReward.inventoryTotal} available. It will stay
+                    attached to this contest.
                   </p>
                 </div>
               </div>
@@ -890,7 +905,10 @@ export function ContestSetupWorkspace({
                 ) : (
                   <fieldset className="reward-fulfillment setup-reward-fulfillment">
                     <legend>FULFILLMENT</legend>
-                    <p>Choose exactly one way for a winner to receive this reward.</p>
+                    <p>
+                      Choose exactly one way for a winner to receive this
+                      reward.
+                    </p>
                     <div className="reward-fulfillment-fields">
                       <SetupField label="SECURE CLAIM URL">
                         <input
@@ -1128,7 +1146,9 @@ export function ContestSetupWorkspace({
               </div>
               <div>
                 <small>REWARD</small>
-                <strong>{publishedReward?.title || rewardTitle || "Not complete"}</strong>
+                <strong>
+                  {publishedReward?.title || rewardTitle || "Not complete"}
+                </strong>
               </div>
               <div>
                 <small>REGION</small>
@@ -1144,7 +1164,8 @@ export function ContestSetupWorkspace({
                   {formattedScheduleInput(
                     schedule.registrationOpensAt,
                     selectedTimeZone,
-                  )} {" → "}
+                  )}{" "}
+                  {" → "}
                   {formattedScheduleInput(
                     schedule.registrationClosesAt,
                     selectedTimeZone,
@@ -1192,6 +1213,15 @@ export function ContestSetupWorkspace({
                 {flowError}
               </p>
             ) : null}
+            {proposalSubmissionBlocked ? (
+              <p className="setup-publish-error" role="status">
+                <span>PARTNER SUBMISSION REQUIRED</span>
+                This gym-owned proposal is {competition?.proposalStatus}. The
+                assigned gym administrator must submit it before GoGymGo can
+                publish; platform review controls do not impersonate that
+                Partner action.
+              </p>
+            ) : null}
             {progress ? (
               <p aria-live="polite" className="setup-publish-progress">
                 <span aria-hidden="true" />
@@ -1208,10 +1238,12 @@ export function ContestSetupWorkspace({
               </div>
               <button
                 className="primary-button setup-publish-button"
-                disabled={submitting}
+                disabled={submitting || proposalSubmissionBlocked}
                 type="submit"
               >
-                {submitting ? "PUBLISHING COMPLETE SETUP..." : "PUBLISH CONTEST"}
+                {submitting
+                  ? "PUBLISHING COMPLETE SETUP..."
+                  : "PUBLISH CONTEST"}
               </button>
             </div>
           </div>

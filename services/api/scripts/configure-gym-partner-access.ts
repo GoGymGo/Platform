@@ -169,9 +169,14 @@ async function main(): Promise<void> {
     const activeLevels = await client.query<{
       access_level: 'admin' | 'staff';
     }>(
-      `SELECT DISTINCT access_level
-       FROM gym_partner_assignments
-       WHERE user_id = $1 AND active = true`,
+      `SELECT DISTINCT assignment.access_level
+       FROM gym_partner_assignments AS assignment
+       INNER JOIN gym_locations AS gym
+         ON gym.id = assignment.gym_location_id
+       WHERE assignment.user_id = $1
+         AND assignment.active = true
+         AND gym.active = true
+         AND gym.deleted_at IS NULL`,
       [user.id],
     );
     const nextRoles = rolesForActivePartnerAssignments(

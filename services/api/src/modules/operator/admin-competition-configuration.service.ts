@@ -13,6 +13,7 @@ import type {
   CompetitionStatus,
   JsonObject,
   JsonValue,
+  PartnerCompetitionProposalStatus,
 } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { closeCompetitionParticipation } from '../competitions/competition-participation';
@@ -43,6 +44,11 @@ import {
   type DeleteVersionedAdminEntityDto,
   type UpdateCompetitionDraftDto,
 } from './dto/admin-configuration.dto';
+import {
+  PartnerProposalAction,
+  type PartnerProposalActionResponseDto,
+  type PartnerProposalStatusActionDto,
+} from './dto/operator-portal.dto';
 
 interface AdminEntityJson extends JsonObject {
   id: string;
@@ -53,6 +59,12 @@ interface AdminEntityJson extends JsonObject {
 interface DeletedEntityJson extends JsonObject {
   id: string;
   status: 'deleted';
+}
+
+interface PartnerProposalActionJson extends JsonObject {
+  id: string;
+  status: PartnerCompetitionProposalStatus;
+  version: number;
 }
 
 type PublicationEvidence = {
@@ -179,22 +191,42 @@ export class AdminCompetitionConfigurationService {
     idempotencyKey: string,
     input: CreateCompetitionDraftDto,
   ): Promise<AdminEntityResponseDto> {
+    return this.createDraft(principal, idempotencyKey, input, 'platform');
+  }
+
+  createProposal(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    input: CreateCompetitionDraftDto,
+  ): Promise<AdminEntityResponseDto> {
+    return this.createDraft(principal, idempotencyKey, input, 'partner');
+  }
+
+  private createDraft(
+    principal: AuthenticatedPrincipal,
+    idempotencyKey: string,
+    input: CreateCompetitionDraftDto,
+    mode: 'partner' | 'platform',
+  ): Promise<AdminEntityResponseDto> {
     const validated = this.validateDraft(input);
 
-    return this.idempotency.execute<AdminEntityJson>(
+    return this.idempotency.execute<
+      AdminEntityJson,
+      Awaited<
+        ReturnType<AdminCompetitionConfigurationService['resolveCreateActor']>
+      >
+    >(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
         request: input as unknown as JsonObject,
         responseCode: 201,
-        scope: 'admin-competitions:create',
+        scope:
+          mode === 'partner'
+            ? 'partner-competition-proposals:create'
+            : 'admin-competitions:create',
       },
-      async (transaction) => {
-        const actor = await this.resolveCreateActor(
-          principal,
-          transaction,
-          input,
-        );
+      async (transaction, actor) => {
         this.assertPartnerLimits(input, actor.proposalGymId);
         await this.lockCompetitionSlot(
           transaction,
@@ -262,6 +294,8 @@ export class AdminCompetitionConfigurationService {
               gym_location_id: actor.proposalGymId,
               month_key: input.monthKey,
               proposed_by_user_id: actor.user.id,
+              status: 'draft',
+              status_changed_by_user_id: actor.user.id,
               updated_at: now,
             })
             .executeTakeFirstOrThrow();
@@ -290,6 +324,8 @@ export class AdminCompetitionConfigurationService {
           version: competition.configuration_version,
         };
       },
+      (transaction) =>
+        this.resolveCreateActor(principal, transaction, input, mode),
     );
   }
 
@@ -299,16 +335,55 @@ export class AdminCompetitionConfigurationService {
     idempotencyKey: string,
     input: UpdateCompetitionDraftDto,
   ): Promise<AdminEntityResponseDto> {
+    return this.updateDraft(
+      principal,
+      competitionId,
+      idempotencyKey,
+      input,
+      'platform',
+    );
+  }
+
+  updateProposal(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    idempotencyKey: string,
+    input: UpdateCompetitionDraftDto,
+  ): Promise<AdminEntityResponseDto> {
+    return this.updateDraft(
+      principal,
+      competitionId,
+      idempotencyKey,
+      input,
+      'partner',
+    );
+  }
+
+  private updateDraft(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    idempotencyKey: string,
+    input: UpdateCompetitionDraftDto,
+    mode: 'partner' | 'platform',
+  ): Promise<AdminEntityResponseDto> {
     const validated = this.validateDraft(input);
 
-    return this.idempotency.execute<AdminEntityJson>(
+    return this.idempotency.execute<
+      AdminEntityJson,
+      Awaited<
+        ReturnType<AdminCompetitionConfigurationService['resolveUpdateActor']>
+      >
+    >(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
         request: { ...input, competitionId } as unknown as JsonObject,
-        scope: `admin-competitions:${competitionId}:update`,
+        scope:
+          mode === 'partner'
+            ? `partner-competition-proposals:${competitionId}:update`
+            : `admin-competitions:${competitionId}:update`,
       },
-      async (transaction) => {
+      async (transaction, actor) => {
         const current = await transaction
           .selectFrom('competitions')
           .selectAll()
@@ -328,12 +403,28 @@ export class AdminCompetitionConfigurationService {
             message: 'Only draft competitions can be reconfigured.',
           });
         }
-        const actor = await this.resolveUpdateActor(
-          principal,
-          transaction,
-          competitionId,
-          input,
-        );
+        const currentProposalStatus = actor.proposalGymId
+          ? (
+              await transaction
+                .selectFrom('partner_competition_proposals')
+                .select('status')
+                .where('competition_id', '=', competitionId)
+                .where('gym_location_id', '=', actor.proposalGymId)
+                .forUpdate()
+                .executeTakeFirstOrThrow()
+            ).status
+          : null;
+        if (
+          mode === 'partner' &&
+          currentProposalStatus !== 'draft' &&
+          currentProposalStatus !== 'withdrawn'
+        ) {
+          throw new ConflictException({
+            code: 'PARTNER_PROPOSAL_NOT_EDITABLE',
+            message:
+              'Withdraw a submitted proposal before editing it. Published or archived proposals cannot be edited.',
+          });
+        }
         this.assertPartnerLimits(input, actor.proposalGymId);
         this.assertExpectedVersion(
           current.configuration_version,
@@ -433,6 +524,14 @@ export class AdminCompetitionConfigurationService {
           version: updated.configuration_version,
         };
       },
+      (transaction) =>
+        this.resolveUpdateActor(
+          principal,
+          transaction,
+          competitionId,
+          input,
+          mode,
+        ),
     );
   }
 
@@ -442,18 +541,17 @@ export class AdminCompetitionConfigurationService {
     idempotencyKey: string,
     input: CompetitionStatusActionDto,
   ): Promise<AdminEntityResponseDto> {
-    return this.idempotency.execute<AdminEntityJson>(
+    return this.idempotency.execute<
+      AdminEntityJson,
+      Awaited<ReturnType<AdminAuthorizationService['requireAdmin']>>
+    >(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
         request: { ...input, competitionId },
         scope: `admin-competitions:${competitionId}:status`,
       },
-      async (transaction) => {
-        const admin = await this.authorization.requireAdmin(
-          principal,
-          transaction,
-        );
+      async (transaction, admin) => {
         const competition = await transaction
           .selectFrom('competitions')
           .selectAll()
@@ -492,6 +590,46 @@ export class AdminCompetitionConfigurationService {
           throw this.versionConflict();
         }
 
+        const proposal = await transaction
+          .selectFrom('partner_competition_proposals')
+          .select(['lifecycle_version', 'status'])
+          .where('competition_id', '=', competitionId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (proposal && nextStatus === 'registration') {
+          await transaction
+            .updateTable('partner_competition_proposals')
+            .set({
+              lifecycle_version: sql<number>`lifecycle_version + 1`,
+              published_at: changedAt,
+              status: 'published',
+              status_changed_by_user_id: admin.id,
+              updated_at: changedAt,
+            })
+            .where('competition_id', '=', competitionId)
+            .where('lifecycle_version', '=', proposal.lifecycle_version)
+            .where('status', '=', 'submitted')
+            .executeTakeFirstOrThrow();
+        } else if (
+          proposal &&
+          nextStatus === 'cancelled' &&
+          proposal.status !== 'published' &&
+          proposal.status !== 'archived'
+        ) {
+          await transaction
+            .updateTable('partner_competition_proposals')
+            .set({
+              archived_at: changedAt,
+              lifecycle_version: sql<number>`lifecycle_version + 1`,
+              status: 'archived',
+              status_changed_by_user_id: admin.id,
+              updated_at: changedAt,
+            })
+            .where('competition_id', '=', competitionId)
+            .where('lifecycle_version', '=', proposal.lifecycle_version)
+            .executeTakeFirstOrThrow();
+        }
+
         if (nextStatus === 'cancelled' && competition.status !== 'draft') {
           const enrollments = await closeCompetitionParticipation(
             transaction,
@@ -506,6 +644,20 @@ export class AdminCompetitionConfigurationService {
               { competitionId },
             );
           }
+        }
+        if (nextStatus === 'cancelled') {
+          await transaction
+            .updateTable('gym_qr_credentials')
+            .set({
+              qr_payload: null,
+              revoked_at: changedAt,
+              revoked_by_user_id: admin.id,
+              revocation_reason: input.reason,
+              status: 'revoked',
+            })
+            .where('competition_id', '=', competitionId)
+            .where('status', '=', 'active')
+            .execute();
         }
 
         await this.authorization.audit(transaction, {
@@ -530,6 +682,160 @@ export class AdminCompetitionConfigurationService {
           version: updated.configuration_version,
         };
       },
+      (transaction) => this.authorization.requireAdmin(principal, transaction),
+    );
+  }
+
+  changeProposalStatus(
+    principal: AuthenticatedPrincipal,
+    competitionId: string,
+    idempotencyKey: string,
+    input: PartnerProposalStatusActionDto,
+  ): Promise<PartnerProposalActionResponseDto> {
+    return this.idempotency.execute<
+      PartnerProposalActionJson,
+      Awaited<
+        ReturnType<
+          AdminCompetitionConfigurationService['requireProposalGymAdmin']
+        >
+      >
+    >(
+      {
+        actorKey: `firebase:${principal.firebaseUid}`,
+        key: idempotencyKey,
+        request: { ...input, competitionId },
+        scope: `partner-competition-proposals:${competitionId}:status`,
+      },
+      async (transaction, actor) => {
+        const proposal = await transaction
+          .selectFrom('partner_competition_proposals')
+          .innerJoin(
+            'competitions',
+            'competitions.id',
+            'partner_competition_proposals.competition_id',
+          )
+          .select([
+            'competitions.configuration_version',
+            'competitions.deleted_at',
+            'competitions.status as competition_status',
+            'partner_competition_proposals.archived_at',
+            'partner_competition_proposals.lifecycle_version',
+            'partner_competition_proposals.published_at',
+            'partner_competition_proposals.status',
+            'partner_competition_proposals.submitted_at',
+            'partner_competition_proposals.withdrawn_at',
+          ])
+          .where(
+            'partner_competition_proposals.competition_id',
+            '=',
+            competitionId,
+          )
+          .where(
+            'partner_competition_proposals.gym_location_id',
+            '=',
+            actor.gymLocationId,
+          )
+          .forUpdate()
+          .executeTakeFirst();
+        if (!proposal) {
+          throw new NotFoundException({
+            code: 'PARTNER_PROPOSAL_NOT_FOUND',
+            message: 'The gym-owned Contest proposal was not found.',
+          });
+        }
+        if (proposal.lifecycle_version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'PARTNER_PROPOSAL_VERSION_CONFLICT',
+            message: 'The proposal changed; reload it before retrying.',
+          });
+        }
+        if (
+          proposal.deleted_at !== null ||
+          proposal.competition_status !== 'draft'
+        ) {
+          throw new ConflictException({
+            code: 'PARTNER_PROPOSAL_CONFIGURATION_LOCKED',
+            message:
+              'Only an unpublished Contest draft can change proposal state.',
+          });
+        }
+
+        const now = new Date();
+        const next = this.proposalTransition(proposal.status, input.action);
+        const updated = await transaction
+          .updateTable('partner_competition_proposals')
+          .set({
+            archived_at: next === 'archived' ? now : proposal.archived_at,
+            lifecycle_version: sql<number>`lifecycle_version + 1`,
+            status: next,
+            status_changed_by_user_id: actor.user.id,
+            submitted_at: next === 'submitted' ? now : proposal.submitted_at,
+            updated_at: now,
+            withdrawn_at:
+              next === 'submitted'
+                ? null
+                : next === 'withdrawn'
+                  ? now
+                  : proposal.withdrawn_at,
+          })
+          .where('competition_id', '=', competitionId)
+          .where('lifecycle_version', '=', input.expectedVersion)
+          .returning(['competition_id', 'lifecycle_version', 'status'])
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'PARTNER_PROPOSAL_VERSION_CONFLICT',
+            message: 'The proposal changed; reload it before retrying.',
+          });
+        }
+
+        if (next === 'archived') {
+          await transaction
+            .updateTable('competitions')
+            .set({
+              configuration_version: sql<number>`configuration_version + 1`,
+              deleted_at: now,
+              updated_at: now,
+            })
+            .where('id', '=', competitionId)
+            .where('configuration_version', '=', proposal.configuration_version)
+            .where('deleted_at', 'is', null)
+            .executeTakeFirstOrThrow();
+          await transaction
+            .updateTable('gym_qr_credentials')
+            .set({
+              qr_payload: null,
+              revoked_at: now,
+              revoked_by_user_id: actor.user.id,
+              revocation_reason: input.reason,
+              status: 'revoked',
+            })
+            .where('competition_id', '=', competitionId)
+            .where('status', '=', 'active')
+            .execute();
+        }
+
+        await this.authorization.audit(transaction, {
+          action: `competition.partner_proposal_${next}`,
+          actorUserId: actor.user.id,
+          entityId: competitionId,
+          entityType: 'partner_competition_proposals',
+          nextState: { status: next, version: updated.lifecycle_version },
+          previousState: {
+            status: proposal.status,
+            version: proposal.lifecycle_version,
+          },
+          reason: input.reason,
+          requestId: idempotencyKey,
+        });
+        return {
+          id: updated.competition_id,
+          status: updated.status,
+          version: updated.lifecycle_version,
+        };
+      },
+      (transaction) =>
+        this.requireProposalGymAdmin(principal, transaction, competitionId),
     );
   }
 
@@ -539,18 +845,17 @@ export class AdminCompetitionConfigurationService {
     idempotencyKey: string,
     input: DeleteVersionedAdminEntityDto,
   ): Promise<AdminDeletedEntityResponseDto> {
-    return this.idempotency.execute<DeletedEntityJson>(
+    return this.idempotency.execute<
+      DeletedEntityJson,
+      Awaited<ReturnType<AdminAuthorizationService['requireAdmin']>>
+    >(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
         request: { ...input, competitionId },
         scope: `admin-competitions:${competitionId}:delete`,
       },
-      async (transaction) => {
-        const admin = await this.authorization.requireAdmin(
-          principal,
-          transaction,
-        );
+      async (transaction, admin) => {
         const competition = await transaction
           .selectFrom('competitions')
           .selectAll()
@@ -575,6 +880,18 @@ export class AdminCompetitionConfigurationService {
               'Only draft, cancelled, or settled competitions can be deleted from the dashboard.',
           });
         }
+        const proposal = await transaction
+          .selectFrom('partner_competition_proposals')
+          .select('competition_id')
+          .where('competition_id', '=', competitionId)
+          .executeTakeFirst();
+        if (proposal) {
+          throw new ConflictException({
+            code: 'PARTNER_PROPOSAL_DELETE_FORBIDDEN',
+            message:
+              'Gym-owned Contest proposal provenance cannot be deleted. Archive the proposal instead.',
+          });
+        }
 
         const deletedAt = new Date();
         const deleted = await transaction
@@ -590,10 +907,6 @@ export class AdminCompetitionConfigurationService {
           .returning('id')
           .executeTakeFirst();
         if (!deleted) throw this.versionConflict();
-        await transaction
-          .deleteFrom('partner_competition_proposals')
-          .where('competition_id', '=', competitionId)
-          .execute();
         await this.authorization.audit(transaction, {
           action: 'competition.deleted',
           actorUserId: admin.id,
@@ -614,6 +927,7 @@ export class AdminCompetitionConfigurationService {
         });
         return { id: deleted.id, status: 'deleted' };
       },
+      (transaction) => this.authorization.requireAdmin(principal, transaction),
     );
   }
 
@@ -644,14 +958,19 @@ export class AdminCompetitionConfigurationService {
     principal: AuthenticatedPrincipal,
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
     input: CreateCompetitionDraftDto,
+    mode: 'partner' | 'platform',
   ) {
-    const access = await this.authorization.resolvePortalAccess(
+    if (mode === 'platform') {
+      const user = await this.authorization.requireAdmin(
+        principal,
+        transaction,
+      );
+      return { proposalGymId: null, proposalStatus: null, user };
+    }
+    const access = await this.authorization.requirePartnerPortal(
       principal,
       transaction,
     );
-    if (access.kind === 'platform_admin') {
-      return { proposalGymId: null, user: access.user };
-    }
     if (!input.gymLocationId) {
       throw new BadRequestException({
         code: 'PARTNER_COMPETITION_GYM_REQUIRED',
@@ -673,7 +992,11 @@ export class AdminCompetitionConfigurationService {
       input.gymLocationId,
       input.regionPolicyId,
     );
-    return { proposalGymId: input.gymLocationId, user: access.user };
+    return {
+      proposalGymId: input.gymLocationId,
+      proposalStatus: 'draft' as const,
+      user: access.user,
+    };
   }
 
   private assertPartnerLimits(
@@ -702,16 +1025,22 @@ export class AdminCompetitionConfigurationService {
     transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
     competitionId: string,
     input: UpdateCompetitionDraftDto,
+    mode: 'partner' | 'platform',
   ) {
-    const [access, proposal] = await Promise.all([
-      this.authorization.resolvePortalAccess(principal, transaction),
+    const [userOrAccess, proposal] = await Promise.all([
+      mode === 'platform'
+        ? this.authorization.requireAdmin(principal, transaction)
+        : this.authorization.requirePartnerPortal(principal, transaction),
       transaction
         .selectFrom('partner_competition_proposals')
-        .select('gym_location_id')
+        .select(['gym_location_id', 'status'])
         .where('competition_id', '=', competitionId)
         .executeTakeFirst(),
     ]);
-    if (access.kind === 'gym_partner') {
+    if (mode === 'partner') {
+      const access = userOrAccess as Awaited<
+        ReturnType<AdminAuthorizationService['requirePartnerPortal']>
+      >;
       if (!proposal) {
         throw new ForbiddenException({
           code: 'PARTNER_COMPETITION_SCOPE_FORBIDDEN',
@@ -749,8 +1078,79 @@ export class AdminCompetitionConfigurationService {
     }
     return {
       proposalGymId: proposal?.gym_location_id ?? null,
+      proposalStatus: proposal?.status ?? null,
+      user:
+        mode === 'partner'
+          ? (
+              userOrAccess as Awaited<
+                ReturnType<AdminAuthorizationService['requirePartnerPortal']>
+              >
+            ).user
+          : (userOrAccess as Awaited<
+              ReturnType<AdminAuthorizationService['requireAdmin']>
+            >),
+    };
+  }
+
+  private async requireProposalGymAdmin(
+    principal: AuthenticatedPrincipal,
+    transaction: Parameters<AdminAuthorizationService['requireAdmin']>[1],
+    competitionId: string,
+  ) {
+    const access = await this.authorization.requirePartnerPortal(
+      principal,
+      transaction,
+    );
+    const proposal = await transaction
+      .selectFrom('partner_competition_proposals')
+      .select('gym_location_id')
+      .where('competition_id', '=', competitionId)
+      .executeTakeFirst();
+    if (!proposal) {
+      throw new NotFoundException({
+        code: 'PARTNER_PROPOSAL_NOT_FOUND',
+        message: 'The gym-owned Contest proposal was not found.',
+      });
+    }
+    const assignment = access.assignments.find(
+      (candidate) => candidate.gymLocationId === proposal.gym_location_id,
+    );
+    if (!assignment || assignment.accessLevel !== 'admin') {
+      throw new ForbiddenException({
+        code: 'PARTNER_COMPETITION_ADMIN_REQUIRED',
+        message:
+          'Gym administrator access is required to change this proposal.',
+      });
+    }
+    return {
+      gymLocationId: proposal.gym_location_id,
       user: access.user,
     };
+  }
+
+  private proposalTransition(
+    current: PartnerCompetitionProposalStatus,
+    action: PartnerProposalAction,
+  ): PartnerCompetitionProposalStatus {
+    if (
+      action === PartnerProposalAction.SUBMIT &&
+      (current === 'draft' || current === 'withdrawn')
+    ) {
+      return 'submitted';
+    }
+    if (action === PartnerProposalAction.WITHDRAW && current === 'submitted') {
+      return 'withdrawn';
+    }
+    if (
+      action === PartnerProposalAction.ARCHIVE &&
+      (current === 'draft' || current === 'withdrawn')
+    ) {
+      return 'archived';
+    }
+    throw new ConflictException({
+      code: 'PARTNER_PROPOSAL_TRANSITION_INVALID',
+      message: `A ${current} proposal cannot perform the ${action} action.`,
+    });
   }
 
   private async assertPartnerGymRegion(
@@ -763,6 +1163,7 @@ export class AdminCompetitionConfigurationService {
       .select(['id', 'region_policy_id'])
       .where('id', '=', gymLocationId)
       .where('active', '=', true)
+      .where('deleted_at', 'is', null)
       .executeTakeFirst();
     if (!gym) {
       throw new NotFoundException({
@@ -822,6 +1223,7 @@ export class AdminCompetitionConfigurationService {
       .select('competition_id')
       .where('gym_location_id', '=', proposalGymId!)
       .where('month_key', '=', monthKey)
+      .where('status', '!=', 'archived')
       .$if(Boolean(excludingCompetitionId), (query) =>
         query.where('competition_id', '!=', excludingCompetitionId!),
       )
@@ -1096,6 +1498,18 @@ export class AdminCompetitionConfigurationService {
         code: 'COMPETITION_VERIFICATION_METHOD_UNSUPPORTED',
         message:
           'Contest publication currently requires Partner gym QR verification.',
+      });
+    }
+    const proposal = await transaction
+      .selectFrom('partner_competition_proposals')
+      .select('status')
+      .where('competition_id', '=', competition.id)
+      .executeTakeFirst();
+    if (proposal && proposal.status !== 'submitted') {
+      throw new ConflictException({
+        code: 'PARTNER_PROPOSAL_SUBMISSION_REQUIRED',
+        message:
+          'The gym administrator must submit this proposal before GoGymGo can publish it.',
       });
     }
     const region = await transaction

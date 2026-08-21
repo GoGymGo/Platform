@@ -83,6 +83,11 @@ export class AdminDashboardService {
               'draw.competition_id',
               'competition.id',
             )
+            .leftJoin(
+              'partner_competition_proposals as proposal',
+              'proposal.competition_id',
+              'competition.id',
+            )
             .select([
               'competition.id',
               'competition.configuration_version',
@@ -112,6 +117,8 @@ export class AdminDashboardService {
               'draw.total_entries as draw_total_entries',
               'region.code as region_code',
               'region.metro_name as region_name',
+              'proposal.lifecycle_version as proposal_version',
+              'proposal.status as proposal_status',
             ])
             .where('competition.deleted_at', 'is', null)
             .orderBy('competition.starts_at', 'desc')
@@ -513,6 +520,9 @@ export class AdminDashboardService {
       rules_version: string;
       starts_at: Date;
       status: string;
+      proposal_status:
+        'archived' | 'draft' | 'published' | 'submitted' | 'withdrawn' | null;
+      proposal_version: number | null;
     },
     goalsByCompetition: Map<string, { goalDays: number; label: string }[]>,
     enrollmentsByCompetition: Map<string, number>,
@@ -560,6 +570,8 @@ export class AdminDashboardService {
       monthKey: competition.month_key,
       name: competition.name,
       publishedRewardCount: rewardCount?.published ?? 0,
+      proposalStatus: competition.proposal_status,
+      proposalVersion: competition.proposal_version,
       regionCode: competition.region_code,
       regionName: competition.region_name,
       regionPolicyId: competition.region_policy_id,

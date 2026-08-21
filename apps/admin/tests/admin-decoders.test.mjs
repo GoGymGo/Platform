@@ -167,3 +167,129 @@ test("rejects fabricated queue counts, provider states, and heartbeat dates", ()
   invalidHeartbeat.worker.lastCompletedAt = "recently";
   assert.throws(() => decoders.decodeSystemHealth(invalidHeartbeat));
 });
+
+test("decodes only minimized paginated partner projections", () => {
+  const decoded = decoders.decodePartnerDashboardSnapshot({
+    competitions: {
+      items: [
+        {
+          competitionStatus: "draft",
+          configurationVersion: 2,
+          endsAt: "2026-10-01T07:00:00.000Z",
+          enrollmentCount: 0,
+          entrantCap: 500,
+          goalBrackets: [{ goalDays: 3, label: "3 DAYS / WEEK" }],
+          gymLocationId: "gym-1",
+          gymName: "Harbour Gym",
+          id: "contest-1",
+          monthKey: "2026-09",
+          name: "Harbour Challenge",
+          proposalStatus: "submitted",
+          proposalVersion: 3,
+          proposedByUserId: "must-not-cross-client-boundary",
+          regionCode: "ca-bc-victoria",
+          regionName: "Victoria",
+          regionPolicyId: "region-1",
+          registrationClosesAt: "2026-09-01T07:00:00.000Z",
+          registrationOpensAt: "2026-08-25T07:00:00.000Z",
+          startsAt: "2026-09-02T07:00:00.000Z",
+        },
+      ],
+      nextCursor: "opaque-next",
+    },
+    generatedAt: "2026-08-20T12:00:00.000Z",
+    gyms: [
+      {
+        accessLevel: "admin",
+        activeQrCredentials: [],
+        address: "Approved gym display address",
+        id: "gym-1",
+        latitude: 48.4,
+        name: "Harbour Gym",
+        radiusMeters: 75,
+        regionCode: "ca-bc-victoria",
+        regionPolicyId: "region-1",
+      },
+    ],
+    operator: {
+      email: "partner@example.com",
+      id: "must-not-cross-client-boundary",
+      roles: ["gym_partner_admin"],
+    },
+    overview: {
+      activeVisitCount: 2,
+      assignedGymCount: 1,
+      draftProposalCount: 0,
+      submittedProposalCount: 1,
+    },
+    regions: [
+      {
+        code: "ca-bc-victoria",
+        competitionEnabled: true,
+        id: "region-1",
+        name: "Victoria",
+        timezone: "America/Vancouver",
+      },
+    ],
+    visits: {
+      items: [
+        {
+          count: 2,
+          gymLocationId: "gym-1",
+          gymName: "Harbour Gym",
+          sessionId: "must-not-cross-client-boundary",
+          startedAt: "2026-08-19T12:00:00.000Z",
+          status: "in_progress",
+        },
+      ],
+      nextCursor: null,
+    },
+  });
+
+  assert.deepEqual(decoded.operator, { email: "partner@example.com" });
+  assert.equal(decoded.competitions.items[0].proposedByUserId, undefined);
+  assert.equal(decoded.gyms[0].latitude, undefined);
+  assert.equal(decoded.visits.items[0].sessionId, undefined);
+  assert.equal(decoded.visits.items[0].startedAt, undefined);
+});
+
+test("rejects invalid partner lifecycle, visit, and secret-bearing history shapes", () => {
+  assert.throws(() =>
+    decoders.decodePartnerCompetitionPage({
+      items: [{ proposalStatus: "platform_published" }],
+      nextCursor: null,
+    }),
+  );
+  assert.throws(() =>
+    decoders.decodePartnerVisitPage({
+      items: [
+        {
+          count: 0,
+          gymLocationId: "gym-1",
+          gymName: "Gym",
+          status: "completed",
+        },
+      ],
+      nextCursor: null,
+    }),
+  );
+  assert.throws(() =>
+    decoders.decodeGymQrCredentialHistoryPage({
+      items: [
+        {
+          competitionId: "contest-1",
+          competitionName: "Contest",
+          credentialVersion: 1,
+          expiresAt: "2026-10-01T07:00:00.000Z",
+          gymLocationId: "gym-1",
+          id: "credential-1",
+          issuedAt: "2026-08-20T12:00:00.000Z",
+          qrPayload: "https://app.gogymgo.com/scan?credential=secret",
+          revokedAt: null,
+          status: "active",
+        },
+      ],
+      nextCursor: null,
+    }),
+  );
+});

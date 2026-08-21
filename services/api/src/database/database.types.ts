@@ -555,11 +555,21 @@ export interface GymPartnerAssignmentsTable {
   updated_at: Timestamp;
 }
 
+export type PartnerCompetitionProposalStatus =
+  'archived' | 'draft' | 'published' | 'submitted' | 'withdrawn';
+
 export interface PartnerCompetitionProposalsTable {
   competition_id: string;
   gym_location_id: string;
   month_key: string;
   proposed_by_user_id: string;
+  status: PartnerCompetitionProposalStatus;
+  lifecycle_version: Generated<number>;
+  submitted_at: NullableTimestamp;
+  withdrawn_at: NullableTimestamp;
+  archived_at: NullableTimestamp;
+  published_at: NullableTimestamp;
+  status_changed_by_user_id: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

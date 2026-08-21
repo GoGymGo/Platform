@@ -54,7 +54,9 @@ Only approved gym owners and GoGymGo regional directors receive admin-console
 credentials. Accounts are created directly by GoGymGo as Firebase
 email/password users; the console exposes no self-registration or social-login
 path. Keep the Cloudflare allow policy synchronized with the private operator
-access register whenever an account is issued or revoked.
+access register whenever an account is issued or revoked. Follow the
+[gym partner portal runbook](gym-partner-portal.md) for exact assignment,
+proposal, poster, relationship-closure and privacy checks.
 
 ## Administrative command defense
 

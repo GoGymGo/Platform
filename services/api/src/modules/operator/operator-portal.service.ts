@@ -1,12 +1,29 @@
 import { Injectable } from '@nestjs/common';
-import { sql } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { DatabaseService } from '../../database/database.service';
+import type { Database } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { AdminAuthorizationService } from './admin-authorization.service';
 import type {
+  ListPartnerPortalPageQueryDto,
   OperatorPortalAccessDto,
+  PartnerCompetitionDto,
+  PartnerCompetitionPageDto,
   PartnerDashboardSnapshotDto,
+  PartnerVisitPageDto,
+  PartnerVisitStatus,
+  PartnerVisitSummaryDto,
 } from './dto/operator-portal.dto';
+import {
+  decodePartnerCompetitionCursor,
+  decodePartnerVisitCursor,
+  encodePartnerCompetitionCursor,
+  encodePartnerVisitCursor,
+} from './operator-pagination';
+
+type PartnerAccess = Awaited<
+  ReturnType<AdminAuthorizationService['requirePartnerPortal']>
+>;
 
 @Injectable()
 export class OperatorPortalService {
@@ -28,9 +45,7 @@ export class OperatorPortalService {
         return {
           assignments: access.assignments,
           email: access.user.email ?? principal.email ?? '',
-          id: access.user.id,
           portal: access.kind === 'platform_admin' ? 'gogymgo' : 'partner',
-          roles: access.user.roles,
         };
       });
   }
@@ -54,8 +69,14 @@ export class OperatorPortalService {
             assignment.accessLevel,
           ]),
         );
-        const now = new Date();
-        const [gyms, sessions, competitions] = await Promise.all([
+        const [
+          gyms,
+          regions,
+          proposalCounts,
+          activeVisits,
+          competitions,
+          visits,
+        ] = await Promise.all([
           transaction
             .selectFrom('gym_locations as gym')
             .innerJoin(
@@ -64,23 +85,12 @@ export class OperatorPortalService {
               'gym.region_policy_id',
             )
             .select([
-              'gym.active',
               'gym.address',
-              'gym.configuration_version',
-              'gym.created_at',
               'gym.id',
               'gym.name',
               'gym.radius_meters',
               'gym.region_policy_id',
-              'gym.updated_at',
               'region.code as region_code',
-              sql<number | null>`(
-                SELECT MAX(credential.credential_version)::integer
-                FROM gym_qr_credentials AS credential
-                WHERE credential.gym_location_id = gym.id
-                  AND credential.status = 'active'
-                  AND credential.expires_at > CURRENT_TIMESTAMP
-              )`.as('active_credential_version'),
               sql<
                 Array<{
                   competitionId: string;
@@ -88,248 +98,349 @@ export class OperatorPortalService {
                   expiresAt: string;
                 }>
               >`COALESCE((
-                SELECT json_agg(
-                  json_build_object(
-                    'competitionId', credential.competition_id,
-                    'credentialVersion', credential.credential_version,
-                    'expiresAt', credential.expires_at
+                  SELECT json_agg(
+                    json_build_object(
+                      'competitionId', credential.competition_id,
+                      'credentialVersion', credential.credential_version,
+                      'expiresAt', credential.expires_at
+                    )
+                    ORDER BY credential.credential_version DESC
                   )
-                  ORDER BY credential.credential_version DESC
-                )
-                FROM gym_qr_credentials AS credential
-                WHERE credential.gym_location_id = gym.id
-                  AND credential.status = 'active'
-                  AND credential.competition_id IS NOT NULL
-                  AND credential.expires_at > CURRENT_TIMESTAMP
-              ), '[]'::json)`.as('active_qr_credentials'),
-              sql<number>`ST_Y(gym.coordinates::geometry)`.as('latitude'),
-              sql<number>`ST_X(gym.coordinates::geometry)`.as('longitude'),
+                  FROM gym_qr_credentials AS credential
+                  WHERE credential.gym_location_id = gym.id
+                    AND credential.status = 'active'
+                    AND credential.competition_id IS NOT NULL
+                    AND credential.expires_at > CURRENT_TIMESTAMP
+                ), '[]'::json)`.as('active_qr_credentials'),
             ])
             .where('gym.id', 'in', gymIds)
+            .where('gym.active', '=', true)
             .where('gym.deleted_at', 'is', null)
             .orderBy('gym.name')
+            .orderBy('gym.id')
+            .execute(),
+          transaction
+            .selectFrom('region_policies as region')
+            .select([
+              'region.code',
+              'region.competition_enabled',
+              'region.id',
+              'region.metro_name',
+              'region.timezone',
+            ])
+            .where(
+              'region.id',
+              'in',
+              transaction
+                .selectFrom('gym_locations')
+                .select('region_policy_id')
+                .where('id', 'in', gymIds),
+            )
+            .where('region.deleted_at', 'is', null)
+            .orderBy('region.code')
+            .execute(),
+          transaction
+            .selectFrom('partner_competition_proposals as proposal')
+            .select([
+              'proposal.status',
+              sql<number>`count(*)::integer`.as('count'),
+            ])
+            .where('proposal.gym_location_id', 'in', gymIds)
+            .where('proposal.status', 'in', ['draft', 'submitted'])
+            .groupBy('proposal.status')
             .execute(),
           transaction
             .selectFrom('workout_sessions as session')
-            .innerJoin(
-              'gym_locations as gym',
-              'gym.id',
-              'session.gym_location_id',
-            )
-            .select([
-              'gym.id as gym_id',
-              'gym.name as gym_name',
-              'session.completed_at',
-              'session.expires_at',
-              'session.id',
-              'session.started_at',
-              'session.status',
-            ])
+            .select(sql<number>`count(*)::integer`.as('count'))
+            .where('session.gym_location_id', 'in', gymIds)
             .where('session.verification_mode', '=', 'static_qr')
-            .where('gym.id', 'in', gymIds)
-            .orderBy('session.started_at', 'desc')
-            .limit(500)
-            .execute(),
-          transaction
-            .selectFrom('competition_gym_locations as assignment')
-            .innerJoin(
-              'competitions as competition',
-              'competition.id',
-              'assignment.competition_id',
+            .where('session.status', '=', 'active')
+            .where((expression) =>
+              expression.or([
+                expression('session.expires_at', 'is', null),
+                expression('session.expires_at', '>', new Date()),
+              ]),
             )
-            .innerJoin(
-              'gym_locations as gym',
-              'gym.id',
-              'assignment.gym_location_id',
-            )
-            .leftJoin('partner_competition_proposals as proposal', (join) =>
-              join
-                .onRef('proposal.competition_id', '=', 'competition.id')
-                .onRef('proposal.gym_location_id', '=', 'gym.id'),
-            )
-            .innerJoin(
-              'region_policies as region',
-              'region.id',
-              'competition.region_policy_id',
-            )
-            .select([
-              'competition.id',
-              'competition.configuration_version',
-              'competition.ends_at',
-              'competition.entrant_cap',
-              'competition.minimum_entrants',
-              'competition.month_key',
-              'competition.name',
-              'competition.region_policy_id',
-              'competition.registration_closes_at',
-              'competition.registration_opens_at',
-              'competition.rules',
-              'competition.rules_version',
-              'competition.starts_at',
-              'competition.status',
-              'gym.id as gym_id',
-              'gym.name as gym_name',
-              'proposal.proposed_by_user_id',
-              'region.code as region_code',
-              'region.metro_name as region_name',
-            ])
-            .where('assignment.gym_location_id', 'in', gymIds)
-            .where('competition.deleted_at', 'is', null)
-            .where('gym.deleted_at', 'is', null)
-            .orderBy('competition.starts_at', 'desc')
-            .execute(),
+            .executeTakeFirstOrThrow(),
+          this.listCompetitionsInTransaction(transaction, access, {
+            limit: 25,
+          }),
+          this.listVisitsInTransaction(transaction, access, { limit: 25 }),
         ]);
 
-        const competitionIds = competitions.map(
-          (competition) => competition.id,
+        const proposalCountByStatus = new Map(
+          proposalCounts.map((row) => [row.status, row.count]),
         );
-        const [goalBrackets, enrollmentCounts] =
-          competitionIds.length === 0
-            ? [[], []]
-            : await Promise.all([
-                transaction
-                  .selectFrom('competition_goal_brackets')
-                  .select(['competition_id', 'goal_days', 'label'])
-                  .where('competition_id', 'in', competitionIds)
-                  .orderBy('goal_days')
-                  .execute(),
-                transaction
-                  .selectFrom('competition_enrollments')
-                  .select([
-                    'competition_id',
-                    sql<number>`count(*)::integer`.as('count'),
-                  ])
-                  .where('competition_id', 'in', competitionIds)
-                  .where('status', '=', 'active')
-                  .groupBy('competition_id')
-                  .execute(),
-              ]);
-        const goalsByCompetition = new Map<
-          string,
-          { goalDays: number; label: string }[]
-        >();
-        for (const bracket of goalBrackets) {
-          const current = goalsByCompetition.get(bracket.competition_id) ?? [];
-          current.push({
-            goalDays: bracket.goal_days,
-            label: bracket.label,
-          });
-          goalsByCompetition.set(bracket.competition_id, current);
-        }
-        const enrollmentByCompetition = new Map(
-          enrollmentCounts.map((row) => [row.competition_id, row.count]),
-        );
-        const regionIds = [...new Set(gyms.map((gym) => gym.region_policy_id))];
-        const regions =
-          regionIds.length === 0
-            ? []
-            : await transaction
-                .selectFrom('region_policies')
-                .select([
-                  'id',
-                  'boundary_version',
-                  'code',
-                  'competition_enabled',
-                  'configuration_version',
-                  'country_code',
-                  'currency',
-                  'language_codes',
-                  'metro_name',
-                  'minimum_age',
-                  'policy_version',
-                  'subdivision_code',
-                  'timezone',
-                  'valid_from',
-                  'valid_to',
-                ])
-                .where('id', 'in', regionIds)
-                .where('deleted_at', 'is', null)
-                .execute();
-
         return {
-          competitions: competitions.map((competition) => ({
-            assignedGymIds: [competition.gym_id],
-            draw: null,
-            endsAt: competition.ends_at.toISOString(),
-            enrollmentCount: enrollmentByCompetition.get(competition.id) ?? 0,
-            entrantCap: competition.entrant_cap,
-            goalBrackets: goalsByCompetition.get(competition.id) ?? [],
-            gymLocationId: competition.gym_id,
-            gymName: competition.gym_name,
-            id: competition.id,
-            minimumEntrants: competition.minimum_entrants,
-            monthKey: competition.month_key,
-            name: competition.name,
-            proposedByUserId: competition.proposed_by_user_id,
-            publishedRewardCount: 0,
-            regionCode: competition.region_code,
-            regionName: competition.region_name,
-            regionPolicyId: competition.region_policy_id,
-            registrationClosesAt:
-              competition.registration_closes_at.toISOString(),
-            registrationOpensAt:
-              competition.registration_opens_at.toISOString(),
-            rewardCount: 0,
-            rules: competition.rules as Record<string, unknown>,
-            rulesVersion: competition.rules_version,
-            startsAt: competition.starts_at.toISOString(),
-            status: competition.status,
-            version: competition.configuration_version,
-          })),
-          generatedAt: now.toISOString(),
+          competitions,
+          generatedAt: new Date().toISOString(),
           gyms: gyms.map((gym) => ({
             accessLevel: assignmentByGym.get(gym.id) ?? 'staff',
-            active: gym.active,
-            activeCredentialVersion: gym.active_credential_version,
             activeQrCredentials: gym.active_qr_credentials,
             address: gym.address,
-            createdAt: gym.created_at.toISOString(),
             id: gym.id,
-            latitude: Number(gym.latitude),
-            longitude: Number(gym.longitude),
             name: gym.name,
             radiusMeters: gym.radius_meters,
             regionCode: gym.region_code,
             regionPolicyId: gym.region_policy_id,
-            updatedAt: gym.updated_at.toISOString(),
-            version: gym.configuration_version,
           })),
-          operator: {
-            email: access.user.email ?? principal.email ?? '',
-            id: access.user.id,
-            roles: access.user.roles,
+          operator: { email: access.user.email ?? principal.email ?? '' },
+          overview: {
+            activeVisitCount: activeVisits.count,
+            assignedGymCount: gyms.length,
+            draftProposalCount: proposalCountByStatus.get('draft') ?? 0,
+            submittedProposalCount: proposalCountByStatus.get('submitted') ?? 0,
           },
           regions: regions.map((region) => ({
-            boundaryVersion: region.boundary_version,
             code: region.code,
             competitionEnabled: region.competition_enabled,
-            countryCode: region.country_code,
-            currency: region.currency,
             id: region.id,
-            languageCodes: region.language_codes,
-            metroName: region.metro_name,
-            minimumAge: region.minimum_age,
-            policyVersion: region.policy_version,
-            subdivisionCode: region.subdivision_code,
+            name: region.metro_name,
             timezone: region.timezone,
-            validFrom: region.valid_from.toISOString(),
-            validTo: region.valid_to?.toISOString() ?? null,
-            version: region.configuration_version,
           })),
-          sessions: sessions.map((session) => ({
-            completedAt: session.completed_at?.toISOString() ?? null,
-            gymLocationId: session.gym_id,
-            gymName: session.gym_name,
-            id: session.id,
-            incomplete:
-              session.status === 'cancelled' ||
-              (session.status === 'active' &&
-                session.expires_at !== null &&
-                session.expires_at <= now),
-            startedAt: session.started_at.toISOString(),
-            status: session.status,
-          })),
+          visits,
         };
       });
   }
+
+  listPartnerCompetitions(
+    principal: AuthenticatedPrincipal,
+    query: ListPartnerPortalPageQueryDto,
+  ): Promise<PartnerCompetitionPageDto> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const access = await this.authorization.requirePartnerPortal(
+          principal,
+          transaction,
+        );
+        return this.listCompetitionsInTransaction(transaction, access, query);
+      });
+  }
+
+  listPartnerVisits(
+    principal: AuthenticatedPrincipal,
+    query: ListPartnerPortalPageQueryDto,
+  ): Promise<PartnerVisitPageDto> {
+    return this.database.connection
+      .transaction()
+      .execute(async (transaction) => {
+        const access = await this.authorization.requirePartnerPortal(
+          principal,
+          transaction,
+        );
+        return this.listVisitsInTransaction(transaction, access, query);
+      });
+  }
+
+  private async listCompetitionsInTransaction(
+    transaction: Transaction<Database>,
+    access: PartnerAccess,
+    query: ListPartnerPortalPageQueryDto,
+  ): Promise<PartnerCompetitionPageDto> {
+    const gymIds = access.assignments.map(
+      (assignment) => assignment.gymLocationId,
+    );
+    const cursor = decodePartnerCompetitionCursor(query.cursor);
+    let builder = transaction
+      .selectFrom('competition_gym_locations as assignment')
+      .innerJoin(
+        'competitions as competition',
+        'competition.id',
+        'assignment.competition_id',
+      )
+      .innerJoin('gym_locations as gym', 'gym.id', 'assignment.gym_location_id')
+      .innerJoin(
+        'region_policies as region',
+        'region.id',
+        'competition.region_policy_id',
+      )
+      .leftJoin('partner_competition_proposals as proposal', (join) =>
+        join
+          .onRef('proposal.competition_id', '=', 'competition.id')
+          .onRef('proposal.gym_location_id', '=', 'gym.id'),
+      )
+      .select([
+        'assignment.gym_location_id',
+        'competition.configuration_version',
+        'competition.ends_at',
+        'competition.entrant_cap',
+        'competition.id',
+        'competition.month_key',
+        'competition.name',
+        'competition.region_policy_id',
+        'competition.registration_closes_at',
+        'competition.registration_opens_at',
+        'competition.starts_at',
+        'competition.status as competition_status',
+        'gym.name as gym_name',
+        'proposal.lifecycle_version as proposal_version',
+        'proposal.status as proposal_status',
+        'region.code as region_code',
+        'region.metro_name as region_name',
+      ])
+      .where('assignment.gym_location_id', 'in', gymIds)
+      .where('gym.active', '=', true)
+      .where('gym.deleted_at', 'is', null)
+      .where('region.deleted_at', 'is', null)
+      .where((expression) =>
+        expression.or([
+          expression('competition.deleted_at', 'is', null),
+          expression('proposal.status', '=', 'archived'),
+        ]),
+      );
+    if (cursor) {
+      builder = builder.where((expression) =>
+        expression.or([
+          expression('competition.starts_at', '<', cursor.startsAt),
+          expression.and([
+            expression('competition.starts_at', '=', cursor.startsAt),
+            expression('competition.id', '<', cursor.id),
+          ]),
+          expression.and([
+            expression('competition.starts_at', '=', cursor.startsAt),
+            expression('competition.id', '=', cursor.id),
+            expression('assignment.gym_location_id', '<', cursor.gymLocationId),
+          ]),
+        ]),
+      );
+    }
+    const rows = await builder
+      .orderBy('competition.starts_at', 'desc')
+      .orderBy('competition.id', 'desc')
+      .orderBy('assignment.gym_location_id', 'desc')
+      .limit(query.limit + 1)
+      .execute();
+    const pageRows = rows.slice(0, query.limit);
+    const competitionIds = [...new Set(pageRows.map((row) => row.id))];
+    const [goalBrackets, enrollmentCounts] =
+      competitionIds.length === 0
+        ? [[], []]
+        : await Promise.all([
+            transaction
+              .selectFrom('competition_goal_brackets')
+              .select(['competition_id', 'goal_days', 'label'])
+              .where('competition_id', 'in', competitionIds)
+              .orderBy('goal_days')
+              .execute(),
+            transaction
+              .selectFrom('competition_enrollments')
+              .select([
+                'competition_id',
+                sql<number>`count(*)::integer`.as('count'),
+              ])
+              .where('competition_id', 'in', competitionIds)
+              .where('status', '=', 'active')
+              .groupBy('competition_id')
+              .execute(),
+          ]);
+    const goalsByCompetition = new Map<
+      string,
+      { goalDays: number; label: string }[]
+    >();
+    for (const goal of goalBrackets) {
+      const goals = goalsByCompetition.get(goal.competition_id) ?? [];
+      goals.push({ goalDays: goal.goal_days, label: goal.label });
+      goalsByCompetition.set(goal.competition_id, goals);
+    }
+    const enrollmentsByCompetition = new Map(
+      enrollmentCounts.map((row) => [row.competition_id, row.count]),
+    );
+    const items: PartnerCompetitionDto[] = pageRows.map((row) => ({
+      competitionStatus: row.competition_status,
+      configurationVersion: row.configuration_version,
+      endsAt: row.ends_at.toISOString(),
+      enrollmentCount: enrollmentsByCompetition.get(row.id) ?? 0,
+      entrantCap: row.entrant_cap,
+      goalBrackets: goalsByCompetition.get(row.id) ?? [],
+      gymLocationId: row.gym_location_id,
+      gymName: row.gym_name,
+      id: row.id,
+      monthKey: row.month_key,
+      name: row.name,
+      proposalStatus: row.proposal_status,
+      proposalVersion: row.proposal_version,
+      regionCode: row.region_code,
+      regionName: row.region_name,
+      regionPolicyId: row.region_policy_id,
+      registrationClosesAt: row.registration_closes_at.toISOString(),
+      registrationOpensAt: row.registration_opens_at.toISOString(),
+      startsAt: row.starts_at.toISOString(),
+    }));
+    const last = pageRows.at(-1);
+    return {
+      items,
+      nextCursor:
+        rows.length > query.limit && last
+          ? encodePartnerCompetitionCursor({
+              gymLocationId: last.gym_location_id,
+              id: last.id,
+              startsAt: last.starts_at,
+            })
+          : null,
+    };
+  }
+
+  private async listVisitsInTransaction(
+    transaction: Transaction<Database>,
+    access: PartnerAccess,
+    query: ListPartnerPortalPageQueryDto,
+  ): Promise<PartnerVisitPageDto> {
+    const gymIds = access.assignments.map(
+      (assignment) => assignment.gymLocationId,
+    );
+    const statusExpression = sql<PartnerVisitStatus>`CASE
+      WHEN session.status = 'verified' THEN 'completed'
+      WHEN session.status = 'pending_review' THEN 'pending_review'
+      WHEN session.status = 'active'
+        AND (session.expires_at IS NULL OR session.expires_at > CURRENT_TIMESTAMP)
+        THEN 'in_progress'
+      ELSE 'incomplete'
+    END`;
+    const visitRows = await transaction
+      .selectFrom('workout_sessions as session')
+      .innerJoin('gym_locations as gym', 'gym.id', 'session.gym_location_id')
+      .select([
+        'gym.id as gym_location_id',
+        'gym.name as gym_name',
+        statusExpression.as('visit_status'),
+        sql<number>`count(*)::integer`.as('count'),
+      ])
+      .where('session.verification_mode', '=', 'static_qr')
+      .where('gym.id', 'in', gymIds)
+      .where('gym.active', '=', true)
+      .where('gym.deleted_at', 'is', null)
+      .groupBy(['gym.id', 'gym.name', statusExpression])
+      .execute();
+    const cursor = decodePartnerVisitCursor(query.cursor);
+    const ordered: PartnerVisitSummaryDto[] = visitRows
+      .map((row) => ({
+        count: row.count,
+        gymLocationId: row.gym_location_id,
+        gymName: row.gym_name,
+        status: row.visit_status,
+      }))
+      .sort(comparePartnerVisits)
+      .filter((row) => !cursor || comparePartnerVisits(row, cursor) > 0);
+    const items = ordered.slice(0, query.limit);
+    const last = items.at(-1);
+    return {
+      items,
+      nextCursor:
+        ordered.length > query.limit && last
+          ? encodePartnerVisitCursor(last)
+          : null,
+    };
+  }
+}
+
+function comparePartnerVisits(
+  left: Pick<PartnerVisitSummaryDto, 'gymLocationId' | 'gymName' | 'status'>,
+  right: Pick<PartnerVisitSummaryDto, 'gymLocationId' | 'gymName' | 'status'>,
+): number {
+  return (
+    left.gymName.localeCompare(right.gymName) ||
+    left.gymLocationId.localeCompare(right.gymLocationId) ||
+    left.status.localeCompare(right.status)
+  );
 }

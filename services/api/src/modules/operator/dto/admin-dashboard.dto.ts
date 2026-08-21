@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AdminDashboardIdentityDto {
   @ApiProperty({ format: 'uuid', type: String })
@@ -136,6 +136,17 @@ export class AdminDashboardCompetitionDto {
 
   @ApiProperty({ type: String })
   status!: string;
+
+  @ApiPropertyOptional({
+    enum: ['archived', 'draft', 'published', 'submitted', 'withdrawn'],
+    nullable: true,
+    type: String,
+  })
+  proposalStatus!:
+    'archived' | 'draft' | 'published' | 'submitted' | 'withdrawn' | null;
+
+  @ApiPropertyOptional({ minimum: 1, nullable: true, type: Number })
+  proposalVersion!: number | null;
 
   @ApiProperty({ minimum: 1, type: Number })
   version!: number;

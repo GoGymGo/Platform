@@ -5,9 +5,11 @@ import type {
   CreateGymLocationDto,
   GymScanRequestDto,
   InterestSubmissionDto,
+  IssueGymQrCredentialDto,
   ListOperatorAuditHistoryQueryDto,
   MemberRegionWaitlistRequestDto,
   OperatorReasonDto,
+  RevokeGymQrCredentialDto,
   RegionWaitlistRequestDto,
   UpdateRegionWaitlistStatusDto,
   UpdateGymLocationDto,
@@ -138,6 +140,14 @@ describe('gym controllers', () => {
       reason: 'Configure the approved pilot gym.',
     } satisfies OperatorReasonDto;
     const assignment = reason satisfies AssignCompetitionGymDto;
+    const issue = {
+      expectedCredentialVersion: null,
+      ...reason,
+    } satisfies IssueGymQrCredentialDto;
+    const revoke = {
+      expectedCredentialVersion: 1,
+      ...reason,
+    } satisfies RevokeGymQrCredentialDto;
     const cash = {
       amountCents: 10_000,
       currency: 'CAD',
@@ -159,7 +169,7 @@ describe('gym controllers', () => {
       'competition-1',
       'gym-1',
       idempotencyKey,
-      reason,
+      issue,
     );
     await controller.getActiveCredential(principal, 'competition-1', 'gym-1');
     await controller.revokeCredential(
@@ -167,7 +177,7 @@ describe('gym controllers', () => {
       'competition-1',
       'gym-1',
       idempotencyKey,
-      reason,
+      revoke,
     );
     await controller.assignCompetitionGym(
       principal,
@@ -205,7 +215,7 @@ describe('gym controllers', () => {
       'competition-1',
       'gym-1',
       idempotencyKey,
-      reason.reason,
+      issue,
     );
     expect(mocks.getActiveCredential).toHaveBeenCalledWith(
       principal,
@@ -217,7 +227,7 @@ describe('gym controllers', () => {
       'competition-1',
       'gym-1',
       idempotencyKey,
-      reason.reason,
+      revoke,
     );
     expect(mocks.assignCompetitionGym).toHaveBeenCalledWith(
       principal,

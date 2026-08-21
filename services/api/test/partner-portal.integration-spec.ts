@@ -203,14 +203,13 @@ describeWithDatabase('gym partner operator portal', () => {
     await expect(portal.getAccess(adminPrincipal)).resolves.toMatchObject({
       assignments: [],
       portal: 'gogymgo',
-      roles: ['admin'],
     });
     await expect(
       portal.getPartnerDashboard(adminPrincipal),
     ).rejects.toMatchObject({
       response: { code: 'GYM_PARTNER_ACCESS_REQUIRED' },
     });
-    const proposal = await competitionConfiguration.create(
+    const proposal = await competitionConfiguration.createProposal(
       partnerPrincipal,
       'partner-proposal-create',
       competitionInput('Partner Proposal', true),
@@ -246,9 +245,9 @@ describeWithDatabase('gym partner operator portal', () => {
     });
     expect(assignment.gym_location_id).toBe(gymId);
     expect(dashboard.gyms.map((gym) => gym.id)).toEqual([gymId]);
-    expect(dashboard.competitions.map((competition) => competition.id)).toEqual(
-      [proposal.id],
-    );
+    expect(
+      dashboard.competitions.items.map((competition) => competition.id),
+    ).toEqual([proposal.id]);
 
     await expect(
       competitionConfiguration.create(
@@ -259,7 +258,9 @@ describeWithDatabase('gym partner operator portal', () => {
     ).resolves.toMatchObject({ status: 'draft' });
     await expect(
       portal.getPartnerDashboard(partnerPrincipal),
-    ).resolves.toMatchObject({ competitions: [{ id: proposal.id }] });
+    ).resolves.toMatchObject({
+      competitions: { items: [{ id: proposal.id }] },
+    });
     await expect(
       competitionConfiguration.changeStatus(
         partnerPrincipal,
@@ -281,7 +282,7 @@ describeWithDatabase('gym partner operator portal', () => {
       gyms: [{ accessLevel: 'staff', id: gymId }],
     });
     await expect(
-      competitionConfiguration.create(
+      competitionConfiguration.createProposal(
         staffPrincipal,
         'staff-proposal-attempt',
         { ...competitionInput('Staff Proposal', true), monthKey: '2027-10' },
@@ -391,7 +392,7 @@ describeWithDatabase('gym partner operator portal', () => {
       .where('id', '=', unassigned.id)
       .executeTakeFirstOrThrow();
     await expect(portal.getAccess(unassignedPrincipal)).rejects.toMatchObject({
-      response: { code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED' },
+      response: { code: 'PARTNER_ACCESS_STATE_CONFLICT' },
     });
 
     expect(member.roles).toEqual(['user']);
@@ -456,7 +457,7 @@ describeWithDatabase('gym partner operator portal', () => {
       ),
     ).rejects.toMatchObject({ response: { code: 'GYM_SCOPE_FORBIDDEN' } });
     await expect(
-      competitionConfiguration.create(
+      competitionConfiguration.createProposal(
         partnerPrincipal,
         'cross-gym-body-attempt',
         {
@@ -475,6 +476,14 @@ describeWithDatabase('gym partner operator portal', () => {
       .where('user_id', '=', mixed.id)
       .where('gym_location_id', '=', gymId)
       .executeTakeFirstOrThrow();
+    await expect(portal.getAccess(mixedPrincipal)).rejects.toMatchObject({
+      response: { code: 'PARTNER_ACCESS_STATE_CONFLICT' },
+    });
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['gym_partner_staff'] })
+      .where('id', '=', mixed.id)
+      .executeTakeFirstOrThrow();
     await expect(portal.getAccess(mixedPrincipal)).resolves.toMatchObject({
       assignments: [{ accessLevel: 'staff', gymLocationId: secondGym.id }],
     });
@@ -485,7 +494,7 @@ describeWithDatabase('gym partner operator portal', () => {
       .where('id', '=', secondGym.id)
       .executeTakeFirstOrThrow();
     await expect(portal.getAccess(mixedPrincipal)).rejects.toMatchObject({
-      response: { code: 'PARTNER_GYM_ASSIGNMENT_REQUIRED' },
+      response: { code: 'PARTNER_ACCESS_STATE_CONFLICT' },
     });
   });
 
@@ -689,6 +698,28 @@ describeWithDatabase('gym partner operator portal', () => {
         createInput,
       ),
     ).resolves.toEqual(created);
+    const adminUser = await database.connection
+      .selectFrom('users')
+      .select('id')
+      .where('firebase_uid', '=', adminPrincipal.firebaseUid)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['user'] })
+      .where('id', '=', adminUser.id)
+      .executeTakeFirstOrThrow();
+    await expect(
+      gyms.createGymLocation(
+        adminPrincipal,
+        'gym-lifecycle-create',
+        createInput,
+      ),
+    ).rejects.toMatchObject({ response: { code: 'ADMIN_REQUIRED' } });
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', adminUser.id)
+      .executeTakeFirstOrThrow();
     await expect(
       gyms.createGymLocation(adminPrincipal, 'gym-lifecycle-create', {
         ...createInput,
@@ -698,6 +729,26 @@ describeWithDatabase('gym partner operator portal', () => {
       response: { code: 'IDEMPOTENCY_KEY_REUSED' },
     });
     expect(created.version).toBe(1);
+
+    const closurePrincipal = testPrincipal('gym-closure-staff');
+    const closureUser = await profiles.ensureUser(
+      closurePrincipal,
+      database.connection,
+    );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['gym_partner_staff'] })
+      .where('id', '=', closureUser.id)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .insertInto('gym_partner_assignments')
+      .values({
+        access_level: 'staff',
+        active: true,
+        gym_location_id: created.id,
+        user_id: closureUser.id,
+      })
+      .executeTakeFirstOrThrow();
 
     const updateInput = {
       ...createInput,
@@ -734,20 +785,38 @@ describeWithDatabase('gym partner operator portal', () => {
       ),
     ).resolves.toEqual({ id: created.id, status: 'deleted' });
 
-    const [stored, audits] = await Promise.all([
-      database.connection
-        .selectFrom('gym_locations')
-        .select(['configuration_version', 'deleted_at'])
-        .where('id', '=', created.id)
-        .executeTakeFirstOrThrow(),
-      database.connection
-        .selectFrom('operator_audit_events')
-        .select(['action', 'next_state', 'previous_state'])
-        .where('entity_id', '=', created.id)
-        .orderBy('created_at')
-        .orderBy('id')
-        .execute(),
-    ]);
+    const [stored, audits, closedAssignment, closedUser, closureAudits] =
+      await Promise.all([
+        database.connection
+          .selectFrom('gym_locations')
+          .select(['configuration_version', 'deleted_at'])
+          .where('id', '=', created.id)
+          .executeTakeFirstOrThrow(),
+        database.connection
+          .selectFrom('operator_audit_events')
+          .select(['action', 'next_state', 'previous_state'])
+          .where('entity_id', '=', created.id)
+          .orderBy('created_at')
+          .orderBy('id')
+          .execute(),
+        database.connection
+          .selectFrom('gym_partner_assignments')
+          .select('active')
+          .where('gym_location_id', '=', created.id)
+          .where('user_id', '=', closureUser.id)
+          .executeTakeFirstOrThrow(),
+        database.connection
+          .selectFrom('users')
+          .select('roles')
+          .where('id', '=', closureUser.id)
+          .executeTakeFirstOrThrow(),
+        database.connection
+          .selectFrom('operator_audit_events')
+          .select(['action', 'next_state', 'previous_state'])
+          .where('entity_id', '=', closureUser.id)
+          .where('action', '=', 'gym_partner_assignment.closed_with_gym')
+          .execute(),
+      ]);
     expect(stored.configuration_version).toBe(3);
     expect(stored.deleted_at).toBeInstanceOf(Date);
     expect(audits.map((audit) => audit.action)).toEqual([
@@ -756,9 +825,29 @@ describeWithDatabase('gym partner operator portal', () => {
       'gym_location.deleted',
     ]);
     expect(audits[1]).toMatchObject({
-      next_state: expect.objectContaining({ active: false, version: 2 }),
+      next_state: expect.objectContaining({
+        active: false,
+        closedAssignments: 1,
+        version: 2,
+      }),
       previous_state: expect.objectContaining({ active: true, version: 1 }),
     });
+    expect(closedAssignment.active).toBe(false);
+    expect(closedUser.roles).toEqual([]);
+    expect(closureAudits).toEqual([
+      expect.objectContaining({
+        next_state: {
+          active: false,
+          gymLocationId: created.id,
+          roles: [],
+        },
+        previous_state: {
+          accessLevel: 'staff',
+          active: true,
+          gymLocationId: created.id,
+        },
+      }),
+    ]);
   });
 
   it('issues, recovers, lists, and immediately revokes one scoped contest poster idempotently', async () => {
@@ -767,20 +856,78 @@ describeWithDatabase('gym partner operator portal', () => {
       .select(['ends_at', 'id'])
       .where('name', '=', 'Partner Proposal')
       .executeTakeFirstOrThrow();
+    await expect(
+      gyms.issueCredential(
+        partnerPrincipal,
+        competition.id,
+        gymId,
+        'partner-unpublished-poster-issue',
+        {
+          expectedCredentialVersion: null,
+          reason: 'Partners must wait for platform publication.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'PARTNER_PROPOSAL_PUBLICATION_REQUIRED' },
+    });
+    await expect(
+      gyms.getActiveCredential(partnerPrincipal, competition.id, gymId),
+    ).rejects.toMatchObject({
+      response: { code: 'PARTNER_PROPOSAL_PUBLICATION_REQUIRED' },
+    });
     const first = await gyms.issueCredential(
-      partnerPrincipal,
+      adminPrincipal,
       competition.id,
       gymId,
       'partner-poster-issue',
-      'Issue the approved poster for the partner contest.',
+      {
+        expectedCredentialVersion: null,
+        reason: 'Issue the approved poster for the partner contest.',
+      },
     );
     const replay = await gyms.issueCredential(
-      partnerPrincipal,
+      adminPrincipal,
       competition.id,
       gymId,
       'partner-poster-issue',
-      'Issue the approved poster for the partner contest.',
+      {
+        expectedCredentialVersion: null,
+        reason: 'Issue the approved poster for the partner contest.',
+      },
     );
+    const adminUser = await database.connection
+      .selectFrom('users')
+      .select('id')
+      .where('firebase_uid', '=', adminPrincipal.firebaseUid)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['user'] })
+      .where('id', '=', adminUser.id)
+      .executeTakeFirstOrThrow();
+    const unauthorizedReplay = await gyms
+      .issueCredential(
+        adminPrincipal,
+        competition.id,
+        gymId,
+        'partner-poster-issue',
+        {
+          expectedCredentialVersion: null,
+          reason: 'Issue the approved poster for the partner contest.',
+        },
+      )
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    await database.connection
+      .updateTable('users')
+      .set({ roles: ['admin'] })
+      .where('id', '=', adminUser.id)
+      .executeTakeFirstOrThrow();
+    expect(unauthorizedReplay).toMatchObject({
+      response: { code: 'OPERATOR_PORTAL_ACCESS_REQUIRED' },
+    });
 
     expect(replay).toEqual(first);
     expect(first).toMatchObject({
@@ -795,16 +942,32 @@ describeWithDatabase('gym partner operator portal', () => {
     });
     expect(first.printablePosterSvg).toContain('Partner Proposal');
     expect(first.printablePosterSvg).not.toMatch(/demo|sample|placeholder/i);
+    const idempotencyRecord = await database.connection
+      .selectFrom('idempotency_keys')
+      .select(['response_body', 'state'])
+      .where(
+        'scope',
+        '=',
+        `gym-qr-credentials:${competition.id}:${gymId}:issue`,
+      )
+      .where('idempotency_key', '=', 'partner-poster-issue')
+      .executeTakeFirstOrThrow();
+    expect(idempotencyRecord).toEqual({
+      response_body: { redacted: true },
+      state: 'completed',
+    });
+    expect(JSON.stringify(idempotencyRecord)).not.toMatch(/credential=|<svg/i);
     await expect(
-      gyms.getActiveCredential(partnerPrincipal, competition.id, gymId),
+      gyms.getActiveCredential(adminPrincipal, competition.id, gymId),
     ).resolves.toEqual(first);
 
     const history = await gyms.listCredentialHistory(
       staffPrincipal,
       competition.id,
       gymId,
+      { limit: 25 },
     );
-    expect(history).toEqual([
+    expect(history.items).toEqual([
       expect.objectContaining({
         competitionId: competition.id,
         credentialVersion: first.credentialVersion,
@@ -816,11 +979,28 @@ describeWithDatabase('gym partner operator portal', () => {
     expect(JSON.stringify(history)).not.toContain('credential=');
     await expect(
       gyms.issueCredential(
+        adminPrincipal,
+        competition.id,
+        gymId,
+        'stale-poster-reissue',
+        {
+          expectedCredentialVersion: null,
+          reason: 'A stale browser must not replace the active poster.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_QR_CREDENTIAL_VERSION_CONFLICT' },
+    });
+    await expect(
+      gyms.issueCredential(
         staffPrincipal,
         competition.id,
         gymId,
         'staff-poster-issue',
-        'Staff must not issue a contest poster.',
+        {
+          expectedCredentialVersion: first.credentialVersion,
+          reason: 'Staff must not issue a contest poster.',
+        },
       ),
     ).rejects.toMatchObject({ response: { code: 'GYM_SCOPE_FORBIDDEN' } });
     await expect(
@@ -828,50 +1008,174 @@ describeWithDatabase('gym partner operator portal', () => {
         partnerPrincipal,
         competition.id,
         '00000000-0000-4000-8000-000000000099',
+        { limit: 25 },
       ),
     ).rejects.toMatchObject({ response: { code: 'GYM_SCOPE_FORBIDDEN' } });
 
+    await expect(
+      gyms.revokeCredential(
+        adminPrincipal,
+        competition.id,
+        gymId,
+        'stale-poster-revoke',
+        {
+          expectedCredentialVersion: first.credentialVersion + 1,
+          reason: 'A stale browser must not revoke another poster.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_QR_CREDENTIAL_VERSION_CONFLICT' },
+    });
+
     const revoked = await gyms.revokeCredential(
-      partnerPrincipal,
+      adminPrincipal,
       competition.id,
       gymId,
       'partner-poster-revoke',
-      'Retire the poster immediately after the test.',
+      {
+        expectedCredentialVersion: first.credentialVersion,
+        reason: 'Retire the poster immediately after the test.',
+      },
     );
     await expect(
       gyms.revokeCredential(
-        partnerPrincipal,
+        adminPrincipal,
         competition.id,
         gymId,
         'partner-poster-revoke',
-        'Retire the poster immediately after the test.',
+        {
+          expectedCredentialVersion: first.credentialVersion,
+          reason: 'Retire the poster immediately after the test.',
+        },
       ),
     ).resolves.toEqual(revoked);
     await expect(
-      gyms.getActiveCredential(partnerPrincipal, competition.id, gymId),
+      gyms.getActiveCredential(adminPrincipal, competition.id, gymId),
     ).resolves.toBeNull();
     await expect(
-      gyms.listCredentialHistory(partnerPrincipal, competition.id, gymId),
-    ).resolves.toEqual([
-      expect.objectContaining({ id: first.id, status: 'revoked' }),
-    ]);
+      gyms.listCredentialHistory(partnerPrincipal, competition.id, gymId, {
+        limit: 25,
+      }),
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ id: first.id, status: 'revoked' })],
+    });
 
     const evidence = await database.connection
       .selectFrom('operator_audit_events')
-      .select(['action', 'request_id'])
+      .select([
+        'action',
+        'next_state',
+        'previous_state',
+        'reason',
+        'request_id',
+      ])
       .where('entity_id', '=', first.id)
       .orderBy('action')
       .execute();
     expect(evidence).toEqual([
-      {
+      expect.objectContaining({
         action: 'gym_qr_credential.issued',
         request_id: 'partner-poster-issue',
-      },
-      {
+      }),
+      expect.objectContaining({
         action: 'gym_qr_credential.revoked',
         request_id: 'partner-poster-revoke',
-      },
+      }),
     ]);
+    expect(JSON.stringify(evidence)).not.toMatch(/credential=|<svg/i);
+    await expect(
+      gyms.issueCredential(
+        adminPrincipal,
+        competition.id,
+        gymId,
+        'partner-poster-issue',
+        {
+          expectedCredentialVersion: null,
+          reason: 'Issue the approved poster for the partner contest.',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'GYM_QR_REPLAY_SECRET_UNAVAILABLE' },
+    });
+    await expect(
+      database.connection
+        .selectFrom('gym_qr_credentials')
+        .select((expression) => expression.fn.countAll<number>().as('count'))
+        .where('competition_id', '=', competition.id)
+        .where('gym_location_id', '=', gymId)
+        .executeTakeFirstOrThrow(),
+    ).resolves.toMatchObject({ count: '1' });
+
+    const publishedAt = new Date();
+    await database.connection
+      .updateTable('partner_competition_proposals')
+      .set({
+        lifecycle_version: sql<number>`lifecycle_version + 1`,
+        published_at: publishedAt,
+        status: 'published',
+        status_changed_by_user_id: adminUser.id,
+        submitted_at: publishedAt,
+        updated_at: publishedAt,
+      })
+      .where('competition_id', '=', competition.id)
+      .executeTakeFirstOrThrow();
+    await database.connection
+      .updateTable('competitions')
+      .set({ status: 'registration', updated_at: publishedAt })
+      .where('id', '=', competition.id)
+      .executeTakeFirstOrThrow();
+    const partnerPoster = await gyms.issueCredential(
+      partnerPrincipal,
+      competition.id,
+      gymId,
+      'published-partner-poster-issue',
+      {
+        expectedCredentialVersion: null,
+        reason: 'Issue the platform-published Partner poster.',
+      },
+    );
+    expect(partnerPoster.credentialVersion).toBe(first.credentialVersion + 1);
+    await expect(
+      gyms.getActiveCredential(partnerPrincipal, competition.id, gymId),
+    ).resolves.toEqual(partnerPoster);
+
+    await database.connection
+      .updateTable('idempotency_keys')
+      .set({ expires_at: new Date(0) })
+      .where(
+        'scope',
+        '=',
+        `gym-qr-credentials:${competition.id}:${gymId}:issue`,
+      )
+      .where('actor_key', '=', `firebase:${partnerPrincipal.firebaseUid}`)
+      .where('idempotency_key', '=', 'published-partner-poster-issue')
+      .executeTakeFirstOrThrow();
+    const reusedExpiredKey = await gyms.issueCredential(
+      partnerPrincipal,
+      competition.id,
+      gymId,
+      'published-partner-poster-issue',
+      {
+        expectedCredentialVersion: partnerPoster.credentialVersion,
+        reason: 'Rotate the published Partner poster after retry expiry.',
+      },
+    );
+    expect(reusedExpiredKey).toMatchObject({
+      credentialVersion: partnerPoster.credentialVersion + 1,
+    });
+    expect(reusedExpiredKey.id).not.toBe(partnerPoster.id);
+    await expect(
+      gyms.issueCredential(
+        partnerPrincipal,
+        competition.id,
+        gymId,
+        'published-partner-poster-issue',
+        {
+          expectedCredentialVersion: partnerPoster.credentialVersion,
+          reason: 'Rotate the published Partner poster after retry expiry.',
+        },
+      ),
+    ).resolves.toEqual(reusedExpiredKey);
   });
 
   function competitionInput(

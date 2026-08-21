@@ -148,6 +148,9 @@ describe('AdminCompetitionConfigurationService publication', () => {
 
     const transaction = {
       selectFrom: jest.fn((table: string) => {
+        if (table === 'partner_competition_proposals') {
+          return query(undefined);
+        }
         if (table === 'region_policies') {
           return query({
             competition_enabled: true,

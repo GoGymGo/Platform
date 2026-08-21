@@ -131,8 +131,10 @@ describeWithDatabase('database migrations', () => {
          'competitions_region_month_unique',
          'gym_partner_assignments_access_level',
          'gym_partner_assignments_pk',
-         'partner_competition_proposals_gym_month_unique',
-         'partner_competition_proposals_month_key_format'
+         'partner_competition_proposals_lifecycle_complete',
+         'partner_competition_proposals_month_key_format',
+         'partner_competition_proposals_status',
+         'partner_competition_proposals_version_positive'
        )`,
     );
     const names = constraints.rows.map((row) => row.conname);
@@ -141,11 +143,39 @@ describeWithDatabase('database migrations', () => {
       expect.arrayContaining([
         'gym_partner_assignments_access_level',
         'gym_partner_assignments_pk',
-        'partner_competition_proposals_gym_month_unique',
+        'partner_competition_proposals_lifecycle_complete',
         'partner_competition_proposals_month_key_format',
+        'partner_competition_proposals_status',
+        'partner_competition_proposals_version_positive',
       ]),
     );
     expect(names).not.toContain('competitions_region_month_unique');
+
+    const indexes = await pool.query<{ indexname: string }>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE schemaname = 'public'
+         AND indexname IN (
+           'partner_competition_proposals_active_gym_month_unique',
+           'partner_competition_proposals_portal_page_idx'
+         )`,
+    );
+    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+      expect.arrayContaining([
+        'partner_competition_proposals_active_gym_month_unique',
+        'partner_competition_proposals_portal_page_idx',
+      ]),
+    );
+
+    const provenanceTrigger = await pool.query<{ tgname: string }>(
+      `SELECT tgname
+       FROM pg_trigger
+       WHERE tgname = 'partner_competition_proposals_provenance_immutable'
+         AND NOT tgisinternal`,
+    );
+    expect(provenanceTrigger.rows).toEqual([
+      { tgname: 'partner_competition_proposals_provenance_immutable' },
+    ]);
   });
 
   it('keeps obsolete demo and payment schema out of the release baseline', async () => {

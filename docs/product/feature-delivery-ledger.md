@@ -18,9 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `263ca6e45beb3e688d0ac9a12c2d03aa120a78b9` after PR #114 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-023 — Gym partner portal` on
-  `agent/ggg-023-gym-partner-portal`; creation follows this ledger merge.
+  `d845263734b41b9b8a9c0f5d254c569d1c6d7802` after PR #116 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-017 — Profile and moderated avatar`
+  on `agent/ggg-017-profile-moderated-avatar`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +33,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 44 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 45 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -822,16 +822,27 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Authentication and authorization: password-only verified operator, active
   assignment, per-gym scope; partner admin write, staff read-only; admin publishes.
 - External providers / feature flag: Firebase; no public flag.
-- Current implementation / missing behavior: portal, migrations, assignment CLI,
-  and database integration tests exist. Missing real partner login/revocation and
-  cross-gym browser UAT.
+- Current implementation / missing behavior: repository behavior is complete.
+  Password-verified database roles and active exact-gym assignments are
+  authoritative; partner admin writes and staff reads are strictly separated;
+  visits are cursor-paginated aggregate counts with no member/session/date/location
+  detail; proposals retain immutable gym/proposer provenance through versioned
+  draft/submitted/withdrawn/archived states and only submitted proposals may be
+  published by a platform admin. Partner QR issue/recovery requires a published
+  proposal while platform pre-publication capability remains separate; replay
+  reauthorizes current scope/version, and idempotency/audit/history never duplicate
+  QR payload/SVG. Gym closure reconciles assignments/roles and clears active QR
+  payloads. Admin clients validate all minimized responses fail closed.
 - Required tests / operations / cloud dependency: access-level matrix, assignment
   revoke, cross-gym denial, draft ownership/state, poster issue/revoke, visit
   privacy, admin publication; Firebase/database/Cloudflare Access.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-023 — Gym partner portal`;
-  branch/PR/merge `unassigned`; status `READY`.
-- Residual risks / blocker: operator credential issuance remains a controlled
-  human process and must not become public signup.
+  branch `agent/ggg-023-gym-partner-portal` (deleted after merge); PR `#116`;
+  merge `d845263734b41b9b8a9c0f5d254c569d1c6d7802`; status `COMPLETE`.
+- Residual risks / blocker: real Firebase/Cloudflare identity infrastructure,
+  hosted real-partner login/revocation and cross-gym UAT, plus physical poster/
+  print/device validation remain external release gates. Operator credential
+  issuance remains controlled and must not become public signup.
 
 ### GGG-024 — September pilot cash reward and manual fulfillment
 
@@ -1161,6 +1172,24 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed `GGG-023` through PR #116. Exact tested head
+  `838a45a4db2dcdc1d43405e56711c3a46a19ffb4` was squash-merged as
+  `d845263734b41b9b8a9c0f5d254c569d1c6d7802`; all seven PR checks and all six
+  exact-main workflows passed, the feature branch was deleted, and current-session
+  Testcontainers resources cleaned fully. Delivery added authoritative active
+  assignment/role/gym gates, staff-read/admin-write separation, aggregate-only
+  paginated visits, immutable versioned proposal provenance/lifecycle with
+  submitted-only platform publication, published-only partner poster eligibility,
+  versioned replay-reauthorized QR operations without secret duplication, gym
+  relationship closure, strict admin runtime contracts and minimized privacy
+  export. Serial proof included 374 API unit tests, 28 API E2E tests, 253 member
+  tests, 43 admin tests, 15 landing tests, focused API 50/50, focused PostGIS
+  30/30 and full integration 74/74, plus all repository/governance/dependency/
+  contracts/source/build/artifact/secret gates. No cloud access or deployment.
+  Real identity infrastructure, partner/browser UAT and physical poster/device
+  validation remain external. Dependency ordering assigns `GGG-017` next because
+  its moderated profile-media flow now consumes the completed review, privacy and
+  operational-health boundaries.
 - 2026-08-21 — Completed `GGG-022` through PR #114. Exact tested head
   `2b99a1d40883322e56cb0d1ee4e18e379867f4a8` was squash-merged as
   `263ca6e45beb3e688d0ac9a12c2d03aa120a78b9`; all seven PR checks and all six

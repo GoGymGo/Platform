@@ -4,11 +4,14 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -51,6 +54,11 @@ export class SessionEvidenceFindingsDto {
 }
 
 export class SessionReviewDecisionDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+
   @ApiProperty({ maxLength: 64, minLength: 64, type: String })
   @Matches(/^[a-f0-9]{64}$/i)
   evidenceSnapshotSha256!: string;
@@ -210,6 +218,11 @@ export class DecideRegionVerificationDto extends OperatorReasonDto {
   @IsEnum(RegionDecisionDto)
   decision!: 'approved' | 'rejected';
 
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+
   @ApiPropertyOptional({ format: 'date-time', type: String })
   @IsOptional()
   @IsDateString()
@@ -226,6 +239,11 @@ export class DecidePartnerApplicationDto extends OperatorReasonDto {
   @ApiProperty({ enum: PartnerDecisionDto, type: String })
   @IsEnum(PartnerDecisionDto)
   decision!: 'approved' | 'in_review' | 'rejected';
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export enum PrivacyDecisionDto {
@@ -253,6 +271,28 @@ export class DecideProfileMediaDto extends OperatorReasonDto {
   @ApiProperty({ enum: ProfileMediaDecisionDto, type: String })
   @IsEnum(ProfileMediaDecisionDto)
   decision!: 'approved' | 'rejected';
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
+
+export enum CreatorSubmissionDecisionDto {
+  APPROVED = 'approved',
+  IN_REVIEW = 'in_review',
+  REJECTED = 'rejected',
+}
+
+export class DecideCreatorSubmissionDto extends OperatorReasonDto {
+  @ApiProperty({ enum: CreatorSubmissionDecisionDto, type: String })
+  @IsEnum(CreatorSubmissionDecisionDto)
+  decision!: 'approved' | 'in_review' | 'rejected';
+
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 export class ProfileMediaReviewActionDto {
@@ -273,6 +313,9 @@ export class ProfileMediaReviewActionDto {
 
   @ApiProperty({ format: 'uri', type: String })
   url!: string;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  reviewVersion!: number;
 }
 
 export class OperatorActionResponseDto {
@@ -283,29 +326,69 @@ export class OperatorActionResponseDto {
   status!: string;
 }
 
+export const operatorWorkQueueKinds = [
+  'creator_submission',
+  'partner_application',
+  'privacy_request',
+  'profile_media',
+  'region_verification',
+  'region_waitlist',
+  'workout_session',
+] as const;
+
+export type OperatorWorkQueueKind = (typeof operatorWorkQueueKinds)[number];
+
+export class ListOperatorWorkQueueQueryDto {
+  @ApiPropertyOptional({ maxLength: 500, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  cursor?: string;
+
+  @ApiPropertyOptional({ enum: operatorWorkQueueKinds, type: String })
+  @IsOptional()
+  @IsIn(operatorWorkQueueKinds)
+  kind?: OperatorWorkQueueKind;
+
+  @ApiPropertyOptional({ default: 50, maximum: 100, minimum: 1, type: Number })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Max(100)
+  @Min(1)
+  limit = 50;
+}
+
 export class OperatorWorkQueueItemDto {
   @ApiProperty({ format: 'uuid', type: String })
   id!: string;
 
   @ApiProperty({
     enum: [
+      'creator_submission',
       'partner_application',
       'privacy_request',
       'profile_media',
       'region_verification',
+      'region_waitlist',
       'workout_session',
     ],
     type: String,
   })
-  kind!:
-    | 'partner_application'
-    | 'privacy_request'
-    | 'profile_media'
-    | 'region_verification'
-    | 'workout_session';
+  kind!: OperatorWorkQueueKind;
 
   @ApiProperty({ type: String })
   status!: string;
+
+  @ApiProperty({ type: Boolean })
+  decisionAllowed!: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['self_review', 'stale_policy', 'unsupported_method'],
+    type: String,
+  })
+  decisionRestrictionCode?:
+    'self_review' | 'stale_policy' | 'unsupported_method';
 
   @ApiPropertyOptional({ enum: ['delete', 'export'], type: String })
   requestType?: 'delete' | 'export';
@@ -317,7 +400,7 @@ export class OperatorWorkQueueItemDto {
   nextAttemptAt?: string;
 
   @ApiPropertyOptional({ minimum: 1, type: Number })
-  version?: number;
+  reviewVersion!: number;
 
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
@@ -332,6 +415,33 @@ export class OperatorWorkQueueItemDto {
   verificationMethod?: string;
 }
 
+export class OperatorWorkQueuePageDto {
+  @ApiProperty({ isArray: true, type: OperatorWorkQueueItemDto })
+  items!: OperatorWorkQueueItemDto[];
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  nextCursor!: string | null;
+}
+
+export class OperatorReviewFactDto {
+  @ApiProperty({ type: String })
+  label!: string;
+
+  @ApiProperty({ type: String })
+  value!: string;
+}
+
+export class OperatorWorkQueueDetailDto extends OperatorWorkQueueItemDto {
+  @ApiProperty({ isArray: true, type: String })
+  allowedDecisions!: string[];
+
+  @ApiProperty({ isArray: true, type: OperatorReviewFactDto })
+  facts!: OperatorReviewFactDto[];
+
+  @ApiPropertyOptional({ type: SessionEvidenceReviewResponseDto })
+  sessionEvidence?: SessionEvidenceReviewResponseDto;
+}
+
 export class OperatorQueueDepthsDto {
   @ApiProperty({ minimum: 0, type: Number })
   competitionStartsDue!: number;
@@ -344,6 +454,87 @@ export class OperatorQueueDepthsDto {
 
   @ApiProperty({ minimum: 0, type: Number })
   profileMediaCleanupPending!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  incompleteSessionsDue!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  notificationsExhausted!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  notificationsLeased!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  notificationsRetryScheduled!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  privacyOperationsLeased!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  privacyOperationsRetryScheduled!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  privacyOperationsStaleLeases!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  profileMediaCleanupLeased!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  profileMediaCleanupRetryScheduled!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  profileMediaCleanupStaleLeases!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  socialInvitationsDue!: number;
+}
+
+export class OperatorReviewQueueDepthsDto {
+  @ApiProperty({ minimum: 0, type: Number })
+  creatorSubmissions!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  partnerApplications!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  privacyRequests!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  profileMedia!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  regionVerifications!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  regionWaitlist!: number;
+
+  @ApiProperty({ minimum: 0, type: Number })
+  workoutSessions!: number;
+}
+
+export class OperatorProviderHealthDto {
+  @ApiProperty({
+    enum: ['configured', 'disabled', 'unavailable', 'unconfigured'],
+    type: String,
+  })
+  status!: 'configured' | 'disabled' | 'unavailable' | 'unconfigured';
+
+  @ApiProperty({ type: String })
+  evidence!: string;
+}
+
+export class OperatorProviderHealthSetDto {
+  @ApiProperty({ type: OperatorProviderHealthDto })
+  notifications!: OperatorProviderHealthDto;
+
+  @ApiProperty({ type: OperatorProviderHealthDto })
+  observability!: OperatorProviderHealthDto;
+
+  @ApiProperty({ type: OperatorProviderHealthDto })
+  privacy!: OperatorProviderHealthDto;
+
+  @ApiProperty({ type: OperatorProviderHealthDto })
+  profileMedia!: OperatorProviderHealthDto;
 }
 
 export class OperatorWorkerHealthDto {
@@ -373,8 +564,14 @@ export class OperatorSystemHealthResponseDto {
   @ApiProperty({ enum: ['ok'], type: String })
   database!: 'ok';
 
+  @ApiProperty({ type: OperatorProviderHealthSetDto })
+  providers!: OperatorProviderHealthSetDto;
+
   @ApiProperty({ type: OperatorQueueDepthsDto })
   queues!: OperatorQueueDepthsDto;
+
+  @ApiProperty({ type: OperatorReviewQueueDepthsDto })
+  reviewQueues!: OperatorReviewQueueDepthsDto;
 
   @ApiProperty({ type: OperatorWorkerHealthDto })
   worker!: OperatorWorkerHealthDto;

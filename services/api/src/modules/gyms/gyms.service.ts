@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,6 +17,14 @@ import { parseCompetitionRules } from '../competitions/competition-rules';
 import { LedgerService } from '../ledger/ledger.service';
 import { AdminAuthorizationService } from '../operator/admin-authorization.service';
 import { canDeleteGym } from '../operator/admin-deletion-policy';
+import {
+  minimizeOperatorAuditState,
+  redactOperatorAuditText,
+} from '../operator/operator-audit-redaction';
+import {
+  decodeOperatorAuditCursor,
+  encodeOperatorAuditCursor,
+} from '../operator/operator-pagination';
 import { ProfilesService } from '../profiles/profiles.service';
 import {
   isSeptemberPilotCompetition,
@@ -36,11 +45,13 @@ import type {
   MemberRegionWaitlistRequestDto,
   OperatorInterestSubmissionDto,
   OperatorAuditHistoryDto,
+  OperatorAuditHistoryPageDto,
   OperatorGymSessionDto,
   RegionWaitlistEntryDto,
   RegionWaitlistReceiptDto,
   RegionWaitlistRequestDto,
   UpdateRegionWaitlistStatusDto,
+  ListOperatorAuditHistoryQueryDto,
   UpdateGymLocationDto,
 } from './dto/gym.dto';
 import { regionalUpdatesConsentNoticeVersion } from './dto/gym.dto';
@@ -117,6 +128,7 @@ interface WaitlistEntryJson extends JsonObject {
   requestedRegion: string;
   source: string;
   status: string;
+  version: number;
 }
 
 interface CashFulfillmentJson extends JsonObject {
@@ -1351,6 +1363,7 @@ export class GymsService {
           consented_at: now,
           country_code: input.countryCode?.trim().toUpperCase() ?? null,
           requested_region: requestedRegion,
+          review_version: sql<number>`region_waitlist_entries.review_version + 1`,
           subdivision_code: input.subdivisionCode?.trim().toUpperCase() ?? null,
           updated_at: now,
           user_id: sql`COALESCE(region_waitlist_entries.user_id, excluded.user_id)`,
@@ -1469,19 +1482,20 @@ export class GymsService {
     idempotencyKey: string,
     input: UpdateRegionWaitlistStatusDto,
   ): Promise<RegionWaitlistEntryDto> {
-    return this.idempotency.execute<WaitlistEntryJson>(
+    return this.idempotency.execute<WaitlistEntryJson, string>(
       {
         actorKey: `firebase:${principal.firebaseUid}`,
         key: idempotencyKey,
-        request: { entryId, reason: input.reason, status: input.status },
+        request: {
+          entryId,
+          expectedVersion: input.expectedVersion,
+          reason: input.reason,
+          status: input.status,
+        },
         responseCode: 200,
         scope: 'operator:region-waitlist:update-status',
       },
-      async (transaction) => {
-        const admin = await this.adminAuthorization.requireAdmin(
-          principal,
-          transaction,
-        );
+      async (transaction, adminId) => {
         const entry = await transaction
           .selectFrom('region_waitlist_entries')
           .selectAll()
@@ -1492,6 +1506,18 @@ export class GymsService {
           throw new NotFoundException({
             code: 'REGION_WAITLIST_ENTRY_NOT_FOUND',
             message: 'The regional waitlist entry was not found.',
+          });
+        }
+        if (entry.user_id === adminId) {
+          throw new ForbiddenException({
+            code: 'REGION_WAITLIST_SELF_REVIEW_FORBIDDEN',
+            message: 'Operators cannot review their own waitlist entry.',
+          });
+        }
+        if (entry.review_version !== input.expectedVersion) {
+          throw new ConflictException({
+            code: 'REGION_WAITLIST_VERSION_CONFLICT',
+            message: 'The waitlist entry changed. Refresh it before deciding.',
           });
         }
         const transitions: Record<string, readonly string[]> = {
@@ -1520,22 +1546,42 @@ export class GymsService {
         }
         const updated = await transaction
           .updateTable('region_waitlist_entries')
-          .set({ status: input.status, updated_at: new Date() })
+          .set({
+            review_version: sql<number>`review_version + 1`,
+            status: input.status,
+            updated_at: new Date(),
+          })
           .where('id', '=', entryId)
+          .where('review_version', '=', input.expectedVersion)
+          .where('status', '=', entry.status)
           .returningAll()
-          .executeTakeFirstOrThrow();
+          .executeTakeFirst();
+        if (!updated) {
+          throw new ConflictException({
+            code: 'REGION_WAITLIST_VERSION_CONFLICT',
+            message: 'The waitlist entry changed. Refresh it before deciding.',
+          });
+        }
         await this.adminAuthorization.audit(transaction, {
           action: 'region_waitlist.status_updated',
-          actorUserId: admin.id,
+          actorUserId: adminId,
           entityId: entryId,
           entityType: 'region_waitlist_entries',
-          nextState: { status: input.status },
-          previousState: { status: entry.status },
+          nextState: {
+            status: input.status,
+            version: input.expectedVersion + 1,
+          },
+          previousState: {
+            status: entry.status,
+            version: input.expectedVersion,
+          },
           reason: input.reason,
           requestId: idempotencyKey,
         });
         return this.mapWaitlist(updated);
       },
+      async (transaction) =>
+        (await this.adminAuthorization.requireAdmin(principal, transaction)).id,
     );
   }
 
@@ -1820,32 +1866,83 @@ export class GymsService {
 
   listAuditHistory(
     principal: AuthenticatedPrincipal,
-  ): Promise<OperatorAuditHistoryDto[]> {
+    query: ListOperatorAuditHistoryQueryDto,
+  ): Promise<OperatorAuditHistoryPageDto> {
     return this.database.connection
       .transaction()
       .execute(async (transaction) => {
         await this.adminAuthorization.requireAdmin(principal, transaction);
-        const events = await transaction
-          .selectFrom('operator_audit_events')
+        const cursor = decodeOperatorAuditCursor(query.cursor);
+        const pageLimit = Math.min(100, Math.max(1, query.limit ?? 50));
+        let eventsQuery = transaction
+          .selectFrom('operator_audit_events as audit')
+          .leftJoin('users as actor', 'actor.id', 'audit.actor_user_id')
           .select([
-            'action',
-            'created_at',
-            'entity_id',
-            'entity_type',
-            'id',
-            'reason',
+            'audit.action',
+            'audit.created_at',
+            'audit.entity_id',
+            'audit.entity_type',
+            'audit.id',
+            'audit.next_state',
+            'audit.previous_state',
+            'audit.reason',
+            'actor.email as actor_email',
           ])
-          .orderBy('created_at', 'desc')
-          .limit(500)
+          .$if(Boolean(query.action), (builder) =>
+            builder.where('audit.action', '=', query.action!),
+          )
+          .$if(Boolean(query.entityType), (builder) =>
+            builder.where('audit.entity_type', '=', query.entityType!),
+          )
+          .$if(Boolean(query.search), (builder) => {
+            const pattern = `%${this.escapeLike(query.search!.trim())}%`;
+            return builder.where((expression) =>
+              expression.or([
+                expression('audit.action', 'ilike', pattern),
+                expression('audit.entity_type', 'ilike', pattern),
+                expression('audit.reason', 'ilike', pattern),
+                expression('actor.email', 'ilike', pattern),
+                sql<boolean>`audit.entity_id::text ilike ${pattern}`,
+              ]),
+            );
+          });
+        if (cursor) {
+          eventsQuery = eventsQuery.where(
+            sql<boolean>`(
+              audit.created_at < ${cursor.createdAt}
+              or (audit.created_at = ${cursor.createdAt} and audit.id < ${cursor.id})
+            )`,
+          );
+        }
+        const events = await eventsQuery
+          .orderBy('audit.created_at', 'desc')
+          .orderBy('audit.id', 'desc')
+          .limit(pageLimit + 1)
           .execute();
-        return events.map((event) => ({
-          action: event.action,
-          createdAt: event.created_at.toISOString(),
-          entityId: event.entity_id,
-          entityType: event.entity_type,
-          id: event.id,
-          reason: event.reason,
-        }));
+        const items: OperatorAuditHistoryDto[] = events
+          .slice(0, pageLimit)
+          .map((event) => ({
+            action: event.action,
+            actorEmail: event.actor_email,
+            after: minimizeOperatorAuditState(event.next_state),
+            before: minimizeOperatorAuditState(event.previous_state),
+            createdAt: event.created_at.toISOString(),
+            entityId: event.entity_id,
+            entityType: event.entity_type,
+            id: event.id,
+            reason: redactOperatorAuditText(event.reason),
+          }));
+        const last = events.slice(0, pageLimit).at(-1);
+        return {
+          items,
+          nextCursor:
+            events.length > pageLimit && last
+              ? encodeOperatorAuditCursor({
+                  createdAt: last.created_at,
+                  id: last.id,
+                })
+              : null,
+        };
       });
   }
 
@@ -2361,6 +2458,10 @@ export class GymsService {
     };
   }
 
+  private escapeLike(value: string): string {
+    return value.replace(/[\\%_]/g, '\\$&');
+  }
+
   private mapWaitlist(entry: {
     consent_notice_version: string | null;
     consented_at: Date | null;
@@ -2368,6 +2469,7 @@ export class GymsService {
     email: string;
     id: string;
     requested_region: string;
+    review_version: number;
     source: string;
     status: string;
   }): WaitlistEntryJson {
@@ -2380,6 +2482,7 @@ export class GymsService {
       requestedRegion: entry.requested_region,
       source: entry.source,
       status: entry.status,
+      version: entry.review_version,
     };
   }
 

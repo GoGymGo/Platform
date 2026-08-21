@@ -25,6 +25,13 @@ export function safeOperationalErrorCode(error: unknown): string {
     : 'UnknownError';
 }
 
+export class WorkerHeartbeatLeaseLostError extends Error {
+  constructor() {
+    super('The worker heartbeat belongs to a newer process instance.');
+    this.name = 'WorkerHeartbeatLeaseLostError';
+  }
+}
+
 @Injectable()
 export class WorkerObservabilityService {
   private readonly batchCounter = metrics
@@ -135,10 +142,9 @@ export class WorkerObservabilityService {
     result: WorkerRunResult,
   ): Promise<void> {
     const now = new Date();
-    await this.database.connection
+    const updated = await this.database.connection
       .updateTable('worker_heartbeats')
       .set({
-        instance_id: instanceId,
         last_completed_at: now,
         last_failure_code: null,
         last_result: result as unknown as JsonObject,
@@ -146,7 +152,10 @@ export class WorkerObservabilityService {
         updated_at: now,
       })
       .where('worker_name', '=', WORKER_NAME)
-      .executeTakeFirstOrThrow();
+      .where('instance_id', '=', instanceId)
+      .returning('worker_name')
+      .executeTakeFirst();
+    if (!updated) throw new WorkerHeartbeatLeaseLostError();
     this.lastSuccessfulHeartbeatAt = now.getTime();
   }
 
@@ -155,16 +164,18 @@ export class WorkerObservabilityService {
     errorCode: string,
   ): Promise<void> {
     const now = new Date();
-    await this.database.connection
+    const updated = await this.database.connection
       .updateTable('worker_heartbeats')
       .set({
-        instance_id: instanceId,
         last_failed_at: now,
         last_failure_code: errorCode,
         status: 'failed',
         updated_at: now,
       })
       .where('worker_name', '=', WORKER_NAME)
-      .executeTakeFirstOrThrow();
+      .where('instance_id', '=', instanceId)
+      .returning('worker_name')
+      .executeTakeFirst();
+    if (!updated) throw new WorkerHeartbeatLeaseLostError();
   }
 }

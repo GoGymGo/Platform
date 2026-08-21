@@ -269,9 +269,15 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /operator\/region-waitlist/);
   assert.match(
     dashboard,
-    /operator\/region-verifications\/\$\{verificationId\}\/decision/,
+    /operator\/region-verifications\/\$\{item\.id\}\/decision/,
   );
-  assert.match(dashboard, /Region verification decision recorded/);
+  assert.match(dashboard, /Review decision recorded/);
+  assert.match(dashboard, /item\.allowedDecisions\.map/);
+  assert.match(dashboard, /LOAD MORE AUTHORITATIVE ITEMS/);
+  assert.match(dashboard, /SEARCH SERVER/);
+  assert.match(dashboardUtils, /decodeWorkQueueDetail/);
+  assert.match(dashboardUtils, /allowedReviewFactLabels/);
+  assert.doesNotMatch(dashboardUtils, /ageHours >=/);
   assert.doesNotMatch(dashboard, /defaultChecked name="competitionEnabled"/);
   assert.match(dashboard, /operator\/interest-submissions/);
   assert.match(dashboard, /operator\/partner-applications/);
@@ -531,11 +537,11 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(formValidation, /invalidControls\[0\]\?\.focus\(\)/);
   assert.match(styles, /\.form-error \{[\s\S]*border:/);
   assert.match(styles, /input\[aria-invalid="true"\]/);
-  assert.match(dashboard, /RECORD PRIVACY DECISION/);
-  assert.match(dashboard, /expectedVersion: item\.version/);
+  assert.match(dashboard, /RECORD DECISION/);
+  assert.match(dashboard, /expectedVersion: item\.reviewVersion/);
   assert.match(
     dashboard,
-    /Refresh the queue to load the authoritative request version/,
+    /The server controls the permitted transitions shown below/,
   );
   assert.match(
     dashboard,

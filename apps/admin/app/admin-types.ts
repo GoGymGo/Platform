@@ -150,8 +150,8 @@ export type LegalDocument = {
 export type AuditEvent = {
   action: string;
   actorEmail: string | null;
-  after?: Record<string, unknown> | null;
-  before?: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  before: Record<string, unknown> | null;
   createdAt: string;
   entityId: string;
   entityType: string;
@@ -192,15 +192,83 @@ export type OperatorPortalAccess = {
 
 export type WorkQueueItem = {
   createdAt: string;
+  decisionAllowed: boolean;
+  decisionRestrictionCode?:
+    "self_review" | "stale_policy" | "unsupported_method";
   failureCode?: string;
   id: string;
-  kind: string;
+  kind: WorkQueueKind;
   nextAttemptAt?: string;
   regionCode?: string;
   requestType?: "delete" | "export";
+  reviewVersion: number;
   status: string;
   verificationMethod?: string;
-  version?: number;
+};
+
+export const workQueueKinds = [
+  "creator_submission",
+  "partner_application",
+  "privacy_request",
+  "profile_media",
+  "region_verification",
+  "region_waitlist",
+  "workout_session",
+] as const;
+
+export type WorkQueueKind = (typeof workQueueKinds)[number];
+
+export type WorkQueuePage = {
+  items: WorkQueueItem[];
+  nextCursor: string | null;
+};
+
+export type ReviewFact = { label: string; value: string };
+
+export type SessionEvidenceFinding = "approved" | "not_required" | "rejected";
+
+export type SessionEvidenceReview = {
+  competitionId: string;
+  completedAt: string;
+  durationMinutes: number;
+  eligibleDate: string;
+  evidence: Record<
+    "deviceAttestation" | "gymQr" | "heartRate" | "presenceCheck",
+    { count: number; minimumRequiredCount: number; required: boolean }
+  >;
+  evidenceSnapshotSha256: string;
+  limitations: string[];
+  minimumDurationMinutes: number;
+  policyVersion: string;
+  sessionId: string;
+  startedAt: string;
+  status: string;
+};
+
+export type WorkQueueDetail = WorkQueueItem & {
+  allowedDecisions: string[];
+  facts: ReviewFact[];
+  sessionEvidence?: SessionEvidenceReview;
+};
+
+export type ProfileMediaReviewAction = {
+  contentLength: number;
+  contentType: string;
+  expiresAt: string;
+  id: string;
+  reviewVersion: number;
+  submittedAt: string;
+  url: string;
+};
+
+export type AuditPage = {
+  items: AuditEvent[];
+  nextCursor: string | null;
+};
+
+export type ProviderHealth = {
+  evidence: string;
+  status: "configured" | "disabled" | "unavailable" | "unconfigured";
 };
 
 export type SystemHealth = {
@@ -208,10 +276,37 @@ export type SystemHealth = {
   database: "ok";
   queues: {
     competitionStartsDue: number;
+    incompleteSessionsDue: number;
+    notificationsExhausted: number;
+    notificationsLeased: number;
     notificationsPending: number;
+    notificationsRetryScheduled: number;
+    privacyOperationsLeased: number;
     privacyOperationsPending: number;
+    privacyOperationsRetryScheduled: number;
+    privacyOperationsStaleLeases: number;
+    profileMediaCleanupLeased: number;
     profileMediaCleanupPending: number;
+    profileMediaCleanupRetryScheduled: number;
+    profileMediaCleanupStaleLeases: number;
+    socialInvitationsDue: number;
   };
+  providers: {
+    notifications: ProviderHealth;
+    observability: ProviderHealth;
+    privacy: ProviderHealth;
+    profileMedia: ProviderHealth;
+  };
+  reviewQueues: Record<
+    | "creatorSubmissions"
+    | "partnerApplications"
+    | "privacyRequests"
+    | "profileMedia"
+    | "regionVerifications"
+    | "regionWaitlist"
+    | "workoutSessions",
+    number
+  >;
   worker: {
     heartbeatAgeSeconds: number | null;
     lastCompletedAt: string | null;

@@ -20,12 +20,12 @@ The upload-initiation idempotency key is stored with the media row rather than t
 
 - Pending media appears as `profile_media` in `GET /v1/operator/work-queue`.
 - An authorized operator requests `GET /v1/operator/profile-media/{mediaId}/review-action` for a short-lived private read URL.
-- `POST /v1/operator/profile-media/{mediaId}/decision` requires an idempotency key and a reason. Approval atomically activates the new object and supersedes the previous avatar. Rejection leaves any previous approved avatar active.
+- `POST /v1/operator/profile-media/{mediaId}/decision` requires an idempotency key, reason, and current `expectedVersion`. The database administrator is reauthorized before a replay, self-review is denied, and a changed body, state, or version fails closed. Approval atomically activates the new object and supersedes the previous avatar. Rejection leaves any previous approved avatar active.
 - Every decision writes the append-only operator audit ledger. Signed review URLs and image bytes are not written to PostgreSQL or logs.
 
 ## Cleanup and privacy
 
-The worker deletes rejected, superseded, removed, and expired-upload objects only after the corresponding upload action has expired. This prevents a still-valid create-only URL from recreating an object after deletion. Deletion is idempotent, so concurrent worker attempts cannot restore or duplicate content. Account erasure likewise waits for active upload actions to expire, then enumerates every undeleted profile-media object, deletes each object before identity pseudonymization, removes the media rows, and clears the profile pointer. Data exports include media status and timestamps but exclude storage object keys, signatures, and internal moderation reasons.
+The worker deletes rejected, superseded, removed, and expired-upload objects only after the corresponding upload action has expired. This prevents a still-valid create-only URL from recreating an object after deletion. Cleanup claims one row with `FOR UPDATE SKIP LOCKED`, a bounded lease token, durable attempt/failure code, and scheduled retry. Completion remains conditional on the current token, so an expired owner cannot overwrite a reclaiming worker. Deletion is idempotent, so concurrent worker attempts cannot restore or duplicate content. Account erasure likewise waits for active upload actions to expire, then enumerates every undeleted profile-media object, deletes each object before identity pseudonymization, removes the media rows, and clears the profile pointer. Data exports include media status and timestamps but exclude storage object keys, signatures, and internal moderation reasons.
 
 The API task role receives only the S3 object actions required to presign,
 verify, and read the bucket's `avatars/` prefix. It cannot delete content. The

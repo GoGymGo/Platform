@@ -259,6 +259,12 @@ export interface ProfileMediaTable {
   reviewed_by_user_id: string | null;
   decision_reason: string | null;
   object_deleted_at: NullableTimestamp;
+  cleanup_attempt_count: Generated<number>;
+  cleanup_failure_code: string | null;
+  cleanup_lease_expires_at: NullableTimestamp;
+  cleanup_lease_token: string | null;
+  cleanup_next_attempt_at: Timestamp;
+  review_version: Generated<number>;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -296,6 +302,7 @@ export interface RegionVerificationsTable {
   decision_reason: string | null;
   verified_at: NullableTimestamp;
   expires_at: NullableTimestamp;
+  review_version: Generated<number>;
   created_at: Timestamp;
 }
 
@@ -517,6 +524,7 @@ export interface WorkoutSessionsTable {
     JsonValue | null | undefined,
     JsonValue | null
   >;
+  review_version: Generated<number>;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -768,6 +776,7 @@ export interface PartnerApplicationsTable {
   payload: ColumnType<JsonValue, JsonValue, JsonValue>;
   dedupe_hash: string;
   status: PartnerApplicationStatus;
+  review_version: Generated<number>;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -784,6 +793,7 @@ export interface RegionWaitlistEntriesTable {
   status: RegionWaitlistStatus;
   consent_notice_version: string | null;
   consented_at: Timestamp | null;
+  review_version: Generated<number>;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -917,6 +927,7 @@ export interface CreatorVideoSubmissionsTable {
   rights_accepted_at: Timestamp;
   notes: string | null;
   status: CreatorVideoSubmissionStatus;
+  review_version: Generated<number>;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

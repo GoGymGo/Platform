@@ -118,6 +118,12 @@ export const environmentSchema = z
       .min(60)
       .max(900)
       .default(300),
+    PROFILE_MEDIA_CLEANUP_LEASE_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(3_600)
+      .default(600),
     PRIVACY_OPERATIONS_ENABLED: booleanString.default(false),
     PRIVACY_EXPORT_BUCKET: optionalTrimmedString,
     PRIVACY_EXPORT_RETENTION_DAYS: z.coerce

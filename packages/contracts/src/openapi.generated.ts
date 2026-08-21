@@ -76,10 +76,11 @@ export interface components {
     CreatorWorkoutStatusActionDto: { action: "publish" | "unpublish"; expectedVersion: number; reason: string };
     CurrentLegalDocumentsResponseDto: { bundleSha256: string; configured: boolean; documents: Array<components['schemas']["LegalDocumentResponseDto"]>; jurisdictionCode: string; locale: string };
     CurrentRegionVerificationResponseDto: { createdAt: string; expiresAt: string; id: string; jurisdictionCode: string; method: "device_location"; policyVersion: string; regionCode: string; regionName: string; regionPolicyId: string; reviewedAt: string; status: "approved"; timezone: string };
-    DecidePartnerApplicationDto: { decision: "approved" | "in_review" | "rejected"; reason: string };
+    DecideCreatorSubmissionDto: { decision: "approved" | "in_review" | "rejected"; expectedVersion: number; reason: string };
+    DecidePartnerApplicationDto: { decision: "approved" | "in_review" | "rejected"; expectedVersion: number; reason: string };
     DecidePrivacyRequestDto: { decision: "processing" | "rejected"; expectedVersion: number; reason: string };
-    DecideProfileMediaDto: { decision: "approved" | "rejected"; reason: string };
-    DecideRegionVerificationDto: { decision: "approved" | "rejected"; expiresAt?: string; reason: string };
+    DecideProfileMediaDto: { decision: "approved" | "rejected"; expectedVersion: number; reason: string };
+    DecideRegionVerificationDto: { decision: "approved" | "rejected"; expectedVersion: number; expiresAt?: string; reason: string };
     DeleteGymLocationDto: { expectedVersion: number; reason: string };
     DeleteVersionedAdminEntityDto: { expectedVersion: number; reason: string };
     DeviceAttestationReviewDto: { count: number; minimumRequiredCount: number; required: boolean; trustStates: Array<string>; uniqueTokenCount: number };
@@ -116,16 +117,23 @@ export interface components {
     MeResponseDto: { callsign: string; email: string | null; emailVerified: boolean; id: string; privacySettings: components['schemas']["PrivacySettingsDto"]; publicIdentityMode: "private" | "alias" | "real_name"; publicName: string | null; roles: Array<string>; screenName: string; status: "active" | "suspended" | "deleted"; version: number };
     MemberRegionWaitlistRequestDto: { consent: true; consentNoticeVersion: "regional-updates-2026-08-13-v1"; countryCode?: string; requestedRegion: string; subdivisionCode?: string };
     OperatorActionResponseDto: { id: string; status: string };
-    OperatorAuditHistoryDto: { action: string; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
+    OperatorAuditHistoryDto: { action: string; actorEmail: string | null; after: Record<string, unknown> | null; before: Record<string, unknown> | null; createdAt: string; entityId: string; entityType: string; id: string; reason: string };
+    OperatorAuditHistoryPageDto: { items: Array<components['schemas']["OperatorAuditHistoryDto"]>; nextCursor?: string | null };
     OperatorGymSessionDto: { completedAt: string | null; gymLocationId: string; gymName: string; id: string; incomplete: boolean; startedAt: string; status: string };
     OperatorInterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string | null; email: string; fullName: string; goalDays?: number | null; id: string; partnershipInterest?: string | null; region: string; submittedAt: string; workoutStyle?: string | null };
     OperatorPartnerApplicationDto: { applicationType: "creator" | "gym" | "sponsor"; contactEmail?: string | null; id: string; payload: Record<string, unknown>; region: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
     OperatorPortalAccessDto: { assignments: Array<components['schemas']["OperatorPortalAssignmentDto"]>; email: string; id: string; portal: "gogymgo" | "partner"; roles: Array<string> };
     OperatorPortalAssignmentDto: { accessLevel: "admin" | "staff"; gymLocationId: string };
-    OperatorQueueDepthsDto: { competitionStartsDue: number; notificationsPending: number; privacyOperationsPending: number; profileMediaCleanupPending: number };
+    OperatorProviderHealthDto: { evidence: string; status: "configured" | "disabled" | "unavailable" | "unconfigured" };
+    OperatorProviderHealthSetDto: { notifications: components['schemas']["OperatorProviderHealthDto"]; observability: components['schemas']["OperatorProviderHealthDto"]; privacy: components['schemas']["OperatorProviderHealthDto"]; profileMedia: components['schemas']["OperatorProviderHealthDto"] };
+    OperatorQueueDepthsDto: { competitionStartsDue: number; incompleteSessionsDue: number; notificationsExhausted: number; notificationsLeased: number; notificationsPending: number; notificationsRetryScheduled: number; privacyOperationsLeased: number; privacyOperationsPending: number; privacyOperationsRetryScheduled: number; privacyOperationsStaleLeases: number; profileMediaCleanupLeased: number; profileMediaCleanupPending: number; profileMediaCleanupRetryScheduled: number; profileMediaCleanupStaleLeases: number; socialInvitationsDue: number };
     OperatorReasonDto: { reason: string };
-    OperatorSystemHealthResponseDto: { checkedAt: string; database: "ok"; queues: components['schemas']["OperatorQueueDepthsDto"]; worker: components['schemas']["OperatorWorkerHealthDto"] };
-    OperatorWorkQueueItemDto: { createdAt: string; failureCode?: string; id: string; kind: "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "workout_session"; nextAttemptAt?: string; regionCode?: string; requestType?: "delete" | "export"; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code"; version?: number };
+    OperatorReviewFactDto: { label: string; value: string };
+    OperatorReviewQueueDepthsDto: { creatorSubmissions: number; partnerApplications: number; privacyRequests: number; profileMedia: number; regionVerifications: number; regionWaitlist: number; workoutSessions: number };
+    OperatorSystemHealthResponseDto: { checkedAt: string; database: "ok"; providers: components['schemas']["OperatorProviderHealthSetDto"]; queues: components['schemas']["OperatorQueueDepthsDto"]; reviewQueues: components['schemas']["OperatorReviewQueueDepthsDto"]; worker: components['schemas']["OperatorWorkerHealthDto"] };
+    OperatorWorkQueueDetailDto: { allowedDecisions: Array<string>; createdAt: string; decisionAllowed: boolean; decisionRestrictionCode?: "self_review" | "stale_policy" | "unsupported_method"; facts: Array<components['schemas']["OperatorReviewFactDto"]>; failureCode?: string; id: string; kind: "creator_submission" | "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "region_waitlist" | "workout_session"; nextAttemptAt?: string; regionCode?: string; requestType?: "delete" | "export"; reviewVersion?: number; sessionEvidence?: components['schemas']["SessionEvidenceReviewResponseDto"]; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code" };
+    OperatorWorkQueueItemDto: { createdAt: string; decisionAllowed: boolean; decisionRestrictionCode?: "self_review" | "stale_policy" | "unsupported_method"; failureCode?: string; id: string; kind: "creator_submission" | "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "region_waitlist" | "workout_session"; nextAttemptAt?: string; regionCode?: string; requestType?: "delete" | "export"; reviewVersion?: number; status: string; verificationMethod?: "device_location" | "manual_review" | "postal_code" };
+    OperatorWorkQueuePageDto: { items: Array<components['schemas']["OperatorWorkQueueItemDto"]>; nextCursor?: string | null };
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
     ParticipantCompetitionResultsResponseDto: { categoryLeaderboards: Array<components['schemas']["CategoryLeaderboardDto"]>; competitionId: string; competitionName: string; endedAt: string; monthKey: string; participantGoalDays: number; regionCode: string; regionName: string; resultsStatus: "pending" | "settled"; rewardCount: number; rewardWinners: Array<components['schemas']["RewardWinnerResponseDto"]>; settledAt: string | null };
     PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
@@ -138,7 +146,7 @@ export interface components {
     PrivacyRequestEventDto: { createdAt: string; nextStatus: "completed" | "processing" | "rejected" | "requested"; previousStatus: "completed" | "processing" | "rejected" | "requested" | null };
     PrivacyRequestResponseDto: { completedAt: string | null; confirmedAt: string | null; downloadAvailable: boolean; exportExpiresAt: string | null; failureCode: string | null; id: string; nextAttemptAt: string | null; requestedAt: string; requestType: "delete" | "export"; status: "completed" | "processing" | "rejected" | "requested"; version: number };
     PrivacySettingsDto: { showRegion: boolean; showStats: boolean };
-    ProfileMediaReviewActionDto: { contentLength: number; contentType: string; expiresAt: string; id: string; submittedAt: string; url: string };
+    ProfileMediaReviewActionDto: { contentLength: number; contentType: string; expiresAt: string; id: string; reviewVersion: number; submittedAt: string; url: string };
     PublishLegalDocumentDto: { content: components['schemas']["LegalDocumentContentDto"]; documentKey: string; effectiveAt: string; jurisdictionCode: string; locale: string; ownerApprovalConfirmed: boolean; reason: string; receiptRequirement: "accept" | "acknowledge" | "none"; title: string; version: string };
     PushDeviceResponseDto: { enabled: boolean; id: string; platform: "android" | "ios"; provider: "expo" };
     ReadinessDependenciesDto: { database: "ok"; worker: "healthy" | "starting" };
@@ -148,11 +156,11 @@ export interface components {
     RegionPolicyResponseDto: { boundaryVersion: string; code: string; competitionEnabled: boolean; countryCode: string; currency: string; id: string; languageCodes: Array<string>; metroName: string; minimumAge: number; policyVersion: string; subdivisionCode: string; timezone: string; validFrom: string; validTo: string | null };
     RegionPolicyStatusActionDto: { action: "disable" | "enable"; expectedVersion: number; reason: string };
     RegionVerificationResponseDto: { createdAt: string; expiresAt: string; id: string; jurisdictionCode: string; method: "device_location"; policyVersion: string; regionCode: string; regionName: string; regionPolicyId: string; reviewedAt: string; status: "approved"; timezone: string };
-    RegionWaitlistEntryDto: { consentedAt?: string | null; consentNoticeVersion?: string | null; createdAt: string; email: string; id: string; requestedRegion: string; source: string; status: string };
+    RegionWaitlistEntryDto: { consentedAt?: string | null; consentNoticeVersion?: string | null; createdAt: string; email: string; id: string; requestedRegion: string; source: string; status: string; version: number };
     RegionWaitlistReceiptDto: { status: "received" };
     RegionWaitlistRequestDto: { consent: true; consentNoticeVersion: "regional-updates-2026-08-13-v1"; countryCode?: string; email: string; requestedRegion: string; subdivisionCode?: string };
     RegisterPushDeviceDto: { platform: "android" | "ios"; pushToken: string };
-    RejectSessionDto: { evidenceSnapshotSha256: string; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
+    RejectSessionDto: { evidenceSnapshotSha256: string; expectedVersion: number; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
     RemoveAvatarResponseDto: { status: "removed" };
     ResolveGymQrCompetitionDto: { credential: string };
     RewardAwardResponseDto: { awardedAt: string; awardRank: number; cashAmountCents: number | null; cashCurrency: string | null; claimedAt: string | null; fulfilledAt: string | null; id: string; imageUrl: string | null; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; status: "awarded" | "cancelled" | "claimed" | "fulfilled" | "redeemed"; title: string };
@@ -186,11 +194,11 @@ export interface components {
     UpdateGymLocationDto: { active: boolean; address?: string; expectedVersion: number; latitude: number; longitude: number; name: string; radiusMeters: number; reason: string; regionPolicyId: string };
     UpdateMeDto: { privacySettings?: components['schemas']["UpdatePrivacySettingsDto"]; publicIdentityMode?: "private" | "alias" | "real_name"; publicName?: string | null; screenName?: string };
     UpdatePrivacySettingsDto: { showRegion?: boolean; showStats?: boolean };
-    UpdateRegionWaitlistStatusDto: { reason: string; status: "contacted" | "launched" | "closed" };
+    UpdateRegionWaitlistStatusDto: { expectedVersion: number; reason: string; status: "contacted" | "launched" | "closed" };
     UpdateRewardCatalogItemDto: { availableFrom?: string; availableUntil?: string; cashAmountCents?: number; cashCurrency?: string; claimUrl?: string; competitionId: string; description: string; displayOrder?: number; expectedVersion: number; fulfillmentInstructions?: string; imageUrl?: string; inventoryTotal: number; reason: string; rewardType: "cash" | "coupon" | "physical"; sponsorName: string; termsUrl?: string; title: string };
     UserSearchResultDto: { relationship: "none" | "friend" | "incoming_request" | "outgoing_request"; screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     VerificationConsentStatusResponseDto: { accepted: boolean; acceptedAt: string | null; consentKey: "device_presence_qr_camera"; consentVersion: string; updatedAt: string | null; withdrawnAt: string | null };
-    VerifySessionDto: { evidenceSnapshotSha256: string; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
+    VerifySessionDto: { evidenceSnapshotSha256: string; expectedVersion: number; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
     WeeklyChallengeRequestDecisionDto: { decision: "accepted" | "declined" };
     WeeklyChallengeRequestResponseDto: { createdAt: string; direction: "incoming" | "outgoing"; goalDays: number; id: string; partnerAlias: string; partnerStreaks: components['schemas']["StreakCountsDto"]; periodIndex: number; status: "accepted" | "cancelled" | "declined" | "pending" };
     WithdrawLegalDocumentDto: { expectedVersion: number; reason: string };
@@ -458,6 +466,15 @@ export interface operations {
     requestBody: components['schemas']["CreateCreatorWorkoutDto"];
     responses: {
       "201": components['schemas']["AdminEntityResponseDto"];
+    };
+  };
+  decideCreatorSubmission: {
+    method: "POST";
+    path: "/v1/operator/creator-submissions/{submissionId}/decision";
+    parameters: { header: { "Idempotency-Key": string }; path: { submissionId: string } };
+    requestBody: components['schemas']["DecideCreatorSubmissionDto"];
+    responses: {
+      "200": components['schemas']["OperatorActionResponseDto"];
     };
   };
   decidePartner: {
@@ -806,6 +823,14 @@ export interface operations {
       "200": components['schemas']["OperatorSystemHealthResponseDto"];
     };
   };
+  getWorkQueueDetail: {
+    method: "GET";
+    path: "/v1/operator/work-queue/{kind}/{itemId}";
+    parameters: { path: { itemId: string; kind: string } };
+    responses: {
+      "200": components['schemas']["OperatorWorkQueueDetailDto"];
+    };
+  };
   inspectContactInvitation: {
     method: "POST";
     path: "/v1/social/challenge-contact-invitations/inspect";
@@ -869,9 +894,9 @@ export interface operations {
   listAuditHistory: {
     method: "GET";
     path: "/v1/operator/audit-history";
-    parameters: Record<string, never>;
+    parameters: { query: { action?: string; cursor?: string; entityType?: string; limit?: number; search?: string } };
     responses: {
-      "200": Array<components['schemas']["OperatorAuditHistoryDto"]>;
+      "200": components['schemas']["OperatorAuditHistoryPageDto"];
     };
   };
   listBlocks: {
@@ -997,9 +1022,9 @@ export interface operations {
   listWorkQueue: {
     method: "GET";
     path: "/v1/operator/work-queue";
-    parameters: Record<string, never>;
+    parameters: { query: { cursor?: string; kind?: "creator_submission" | "partner_application" | "privacy_request" | "profile_media" | "region_verification" | "region_waitlist" | "workout_session"; limit?: number } };
     responses: {
-      "200": Array<components['schemas']["OperatorWorkQueueItemDto"]>;
+      "200": components['schemas']["OperatorWorkQueuePageDto"];
     };
   };
   lockDraw: {
@@ -1528,6 +1553,9 @@ export interface paths {
   "/v1/operator/configuration/rewards/{rewardId}/status-action": {
     post: operations["changeStatus_post_v1_operator_configuration_rewards_rewardId_status_action"];
   };
+  "/v1/operator/creator-submissions/{submissionId}/decision": {
+    post: operations["decideCreatorSubmission"];
+  };
   "/v1/operator/draws/lock": {
     post: operations["lockDraw"];
   };
@@ -1592,6 +1620,9 @@ export interface paths {
   };
   "/v1/operator/work-queue": {
     get: operations["listWorkQueue"];
+  };
+  "/v1/operator/work-queue/{kind}/{itemId}": {
+    get: operations["getWorkQueueDetail"];
   };
   "/v1/partner-applications/creators": {
     post: operations["submitCreator"];
@@ -1774,6 +1805,7 @@ export type CreatorWorkoutResponseDto = components['schemas']["CreatorWorkoutRes
 export type CreatorWorkoutStatusActionDto = components['schemas']["CreatorWorkoutStatusActionDto"];
 export type CurrentLegalDocumentsResponseDto = components['schemas']["CurrentLegalDocumentsResponseDto"];
 export type CurrentRegionVerificationResponseDto = components['schemas']["CurrentRegionVerificationResponseDto"];
+export type DecideCreatorSubmissionDto = components['schemas']["DecideCreatorSubmissionDto"];
 export type DecidePartnerApplicationDto = components['schemas']["DecidePartnerApplicationDto"];
 export type DecidePrivacyRequestDto = components['schemas']["DecidePrivacyRequestDto"];
 export type DecideProfileMediaDto = components['schemas']["DecideProfileMediaDto"];
@@ -1815,15 +1847,22 @@ export type MeResponseDto = components['schemas']["MeResponseDto"];
 export type MemberRegionWaitlistRequestDto = components['schemas']["MemberRegionWaitlistRequestDto"];
 export type OperatorActionResponseDto = components['schemas']["OperatorActionResponseDto"];
 export type OperatorAuditHistoryDto = components['schemas']["OperatorAuditHistoryDto"];
+export type OperatorAuditHistoryPageDto = components['schemas']["OperatorAuditHistoryPageDto"];
 export type OperatorGymSessionDto = components['schemas']["OperatorGymSessionDto"];
 export type OperatorInterestSubmissionDto = components['schemas']["OperatorInterestSubmissionDto"];
 export type OperatorPartnerApplicationDto = components['schemas']["OperatorPartnerApplicationDto"];
 export type OperatorPortalAccessDto = components['schemas']["OperatorPortalAccessDto"];
 export type OperatorPortalAssignmentDto = components['schemas']["OperatorPortalAssignmentDto"];
+export type OperatorProviderHealthDto = components['schemas']["OperatorProviderHealthDto"];
+export type OperatorProviderHealthSetDto = components['schemas']["OperatorProviderHealthSetDto"];
 export type OperatorQueueDepthsDto = components['schemas']["OperatorQueueDepthsDto"];
 export type OperatorReasonDto = components['schemas']["OperatorReasonDto"];
+export type OperatorReviewFactDto = components['schemas']["OperatorReviewFactDto"];
+export type OperatorReviewQueueDepthsDto = components['schemas']["OperatorReviewQueueDepthsDto"];
 export type OperatorSystemHealthResponseDto = components['schemas']["OperatorSystemHealthResponseDto"];
+export type OperatorWorkQueueDetailDto = components['schemas']["OperatorWorkQueueDetailDto"];
 export type OperatorWorkQueueItemDto = components['schemas']["OperatorWorkQueueItemDto"];
+export type OperatorWorkQueuePageDto = components['schemas']["OperatorWorkQueuePageDto"];
 export type OperatorWorkerHealthDto = components['schemas']["OperatorWorkerHealthDto"];
 export type ParticipantCompetitionResultsResponseDto = components['schemas']["ParticipantCompetitionResultsResponseDto"];
 export type PartnerApplicationResponseDto = components['schemas']["PartnerApplicationResponseDto"];

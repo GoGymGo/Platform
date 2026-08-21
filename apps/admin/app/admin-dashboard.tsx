@@ -1,11 +1,7 @@
 "use client";
 
 import { resolveFeatureCapabilities } from "@gogymgo/contracts/feature-capabilities";
-import type {
-  DecidePrivacyRequestDto,
-  DecideRegionVerificationDto,
-  UpdateRegionWaitlistStatusDto,
-} from "@gogymgo/contracts";
+import type { UpdateRegionWaitlistStatusDto } from "@gogymgo/contracts";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
@@ -28,6 +24,7 @@ import {
 } from "react";
 import type {
   AdminSection,
+  AuditPage,
   AuditEvent,
   Competition,
   CreatorWorkout,
@@ -38,12 +35,16 @@ import type {
   OperatorPortalAccess,
   PartnerCompetition,
   PartnerDashboardSnapshot,
+  ProfileMediaReviewAction,
   RegionPolicy,
   Reward,
   RewardAward,
   SystemHealth,
+  WorkQueueDetail,
   WorkQueueItem,
+  WorkQueueKind,
 } from "./admin-types";
+import { workQueueKinds } from "./admin-types";
 import {
   AdminUserFacingError,
   adminRequestStatus,
@@ -51,6 +52,11 @@ import {
   authErrorMessage,
   clearAdminRequestSession,
   compactObject,
+  decodeAuditPage,
+  decodeProfileMediaReviewAction,
+  decodeSystemHealth,
+  decodeWorkQueueDetail,
+  decodeWorkQueuePage,
   errorMessage,
   formatDate,
   formatDateTime,
@@ -121,6 +127,14 @@ type AdminEntityResult = {
   id: string;
   status: string;
   version: number;
+};
+
+type QueueDecisionBody = {
+  decision: string;
+  evidenceSnapshotSha256?: string;
+  expectedVersion: number;
+  findings?: Record<string, string>;
+  reason: string;
 };
 
 type CouponCodesResult = {
@@ -458,6 +472,14 @@ export function AdminDashboard({
     useState<PartnerDashboardSnapshot | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [queue, setQueue] = useState<WorkQueueItem[]>([]);
+  const [queueNextCursor, setQueueNextCursor] = useState<string | null>(null);
+  const [queueError, setQueueError] = useState("");
+  const [healthError, setHealthError] = useState("");
+  const [auditPage, setAuditPage] = useState<AuditPage>({
+    items: [],
+    nextCursor: null,
+  });
+  const [auditError, setAuditError] = useState("");
   const [pilotData, setPilotData] = useState<PilotData>(emptyPilotData);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [loadError, setLoadError] = useState(
@@ -538,6 +560,11 @@ export function AdminDashboard({
           setSnapshot(null);
           setHealth(null);
           setQueue([]);
+          setQueueNextCursor(null);
+          setQueueError("");
+          setHealthError("");
+          setAuditPage({ items: [], nextCursor: null });
+          setAuditError("");
           setPilotData(emptyPilotData);
           setLastRefreshedAt(new Date());
           setAuthStage("ready");
@@ -545,21 +572,16 @@ export function AdminDashboard({
         }
         const [
           dashboardResult,
-          healthResult,
-          queueResult,
           gyms,
           sessions,
           waitlist,
           interestSubmissions,
           partnerApplications,
-          auditEvents,
         ] = await Promise.all([
           adminRequest<DashboardSnapshot>(
             activeUser,
             "operator/configuration/dashboard",
           ),
-          adminRequest<SystemHealth>(activeUser, "operator/system-health"),
-          adminRequest<WorkQueueItem[]>(activeUser, "operator/work-queue"),
           adminRequest<PilotData["gyms"]>(activeUser, "operator/gym-locations"),
           adminRequest<PilotData["sessions"]>(
             activeUser,
@@ -577,16 +599,63 @@ export function AdminDashboard({
             activeUser,
             "operator/partner-applications",
           ),
-          adminRequest<PilotData["auditEvents"]>(
-            activeUser,
-            "operator/audit-history",
-          ),
         ]);
         if (authEpoch.current !== refreshEpoch) return;
         setSnapshot(dashboardResult);
         setPartnerSnapshot(null);
-        setHealth(healthResult);
-        setQueue(queueResult);
+        const [healthResult, queueResult, auditResult] =
+          await Promise.allSettled([
+            adminRequest<unknown>(activeUser, "operator/system-health"),
+            adminRequest<unknown>(activeUser, "operator/work-queue?limit=100"),
+            adminRequest<unknown>(
+              activeUser,
+              "operator/audit-history?limit=50",
+            ),
+          ]);
+        if (authEpoch.current !== refreshEpoch) return;
+        if (healthResult.status === "fulfilled") {
+          try {
+            setHealth(decodeSystemHealth(healthResult.value));
+            setHealthError("");
+          } catch (error) {
+            setHealth(null);
+            setHealthError(errorMessage(error));
+          }
+        } else {
+          setHealth(null);
+          setHealthError(errorMessage(healthResult.reason));
+        }
+        let auditEvents: AuditEvent[] = [];
+        if (queueResult.status === "fulfilled") {
+          try {
+            const page = decodeWorkQueuePage(queueResult.value);
+            setQueue(page.items);
+            setQueueNextCursor(page.nextCursor);
+            setQueueError("");
+          } catch (error) {
+            setQueue([]);
+            setQueueNextCursor(null);
+            setQueueError(errorMessage(error));
+          }
+        } else {
+          setQueue([]);
+          setQueueNextCursor(null);
+          setQueueError(errorMessage(queueResult.reason));
+        }
+        if (auditResult.status === "fulfilled") {
+          try {
+            const page = decodeAuditPage(auditResult.value);
+            auditEvents = page.items;
+            setAuditPage(page);
+            setAuditError("");
+          } catch (error) {
+            setAuditPage({ items: [], nextCursor: null });
+            setAuditError(errorMessage(error));
+          }
+        } else {
+          setAuditPage({ items: [], nextCursor: null });
+          setAuditError(errorMessage(auditResult.reason));
+        }
         setPilotData({
           auditEvents,
           gyms,
@@ -690,6 +759,106 @@ export function AdminDashboard({
     }
   }
 
+  async function loadQueuePage(
+    kind?: WorkQueueKind,
+    cursor?: string,
+    append = false,
+  ): Promise<void> {
+    setQueueError("");
+    try {
+      const parameters = new URLSearchParams({ limit: "100" });
+      if (kind) parameters.set("kind", kind);
+      if (cursor) parameters.set("cursor", cursor);
+      const page = decodeWorkQueuePage(
+        await request<unknown>(`operator/work-queue?${parameters.toString()}`),
+      );
+      setQueue((current) =>
+        append ? [...current, ...page.items] : page.items,
+      );
+      setQueueNextCursor(page.nextCursor);
+    } catch (error) {
+      setQueueError(errorMessage(error));
+      throw error;
+    }
+  }
+
+  async function loadAuditPage(
+    search?: string,
+    cursor?: string,
+    append = false,
+  ): Promise<void> {
+    setAuditError("");
+    try {
+      const parameters = new URLSearchParams({ limit: "50" });
+      if (search?.trim()) parameters.set("search", search.trim());
+      if (cursor) parameters.set("cursor", cursor);
+      const page = decodeAuditPage(
+        await request<unknown>(
+          `operator/audit-history?${parameters.toString()}`,
+        ),
+      );
+      setAuditPage((current) => ({
+        items: append ? [...current.items, ...page.items] : page.items,
+        nextCursor: page.nextCursor,
+      }));
+    } catch (error) {
+      setAuditError(errorMessage(error));
+      throw error;
+    }
+  }
+
+  async function loadQueueDetail(
+    item: WorkQueueItem,
+  ): Promise<WorkQueueDetail> {
+    return decodeWorkQueueDetail(
+      await request<unknown>(`operator/work-queue/${item.kind}/${item.id}`),
+    );
+  }
+
+  async function loadProfileMediaReviewAction(
+    mediaId: string,
+  ): Promise<ProfileMediaReviewAction> {
+    return decodeProfileMediaReviewAction(
+      await request<unknown>(`operator/profile-media/${mediaId}/review-action`),
+    );
+  }
+
+  async function decideQueueItem(
+    item: WorkQueueDetail,
+    body: QueueDecisionBody,
+  ): Promise<void> {
+    const route = (() => {
+      if (item.kind === "workout_session") {
+        return `operator/sessions/${item.id}/${body.decision === "verified" ? "verify" : "reject"}`;
+      }
+      if (item.kind === "region_verification") {
+        return `operator/region-verifications/${item.id}/decision`;
+      }
+      if (item.kind === "partner_application") {
+        return `operator/partner-applications/${item.id}/decision`;
+      }
+      if (item.kind === "privacy_request") {
+        return `operator/privacy-requests/${item.id}/decision`;
+      }
+      if (item.kind === "profile_media") {
+        return `operator/profile-media/${item.id}/decision`;
+      }
+      if (item.kind === "creator_submission") {
+        return `operator/creator-submissions/${item.id}/decision`;
+      }
+      return `operator/region-waitlist/${item.id}/status`;
+    })();
+    const requestBody =
+      item.kind === "region_waitlist"
+        ? {
+            expectedVersion: body.expectedVersion,
+            reason: body.reason,
+            status: body.decision,
+          }
+        : body;
+    await mutate("Review decision recorded.", route, "POST", requestBody);
+  }
+
   async function handleEmailSignIn(
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
@@ -740,6 +909,11 @@ export function AdminDashboard({
       setPartnerSnapshot(null);
       setHealth(null);
       setQueue([]);
+      setQueueNextCursor(null);
+      setQueueError("");
+      setHealthError("");
+      setAuditPage({ items: [], nextCursor: null });
+      setAuditError("");
       setPilotData(emptyPilotData);
       setLastRefreshedAt(null);
       setAuthStage("signed-out");
@@ -1760,30 +1934,27 @@ export function AdminDashboard({
           ) : null}
           {section === "operations" ? (
             <OperationsPanel
-              events={snapshot.auditEvents}
+              events={auditPage.items}
               health={health}
-              onDecidePrivacy={async (privacyRequestId, body) => {
-                await mutate(
-                  "Privacy request decision recorded.",
-                  `operator/privacy-requests/${privacyRequestId}/decision`,
-                  "POST",
-                  body,
-                );
+              healthError={healthError}
+              onDecide={decideQueueItem}
+              onLoadDetail={loadQueueDetail}
+              onLoadProfileMedia={loadProfileMediaReviewAction}
+              onLoadQueue={loadQueuePage}
+              onRetryHealth={() => {
+                if (user) void refresh(user);
               }}
-              onDecideRegion={async (verificationId, body) => {
-                await mutate(
-                  "Region verification decision recorded.",
-                  `operator/region-verifications/${verificationId}/decision`,
-                  "POST",
-                  body,
-                );
-              }}
-              onNavigate={navigateToSection}
               queue={queue}
+              queueError={queueError}
+              queueNextCursor={queueNextCursor}
             />
           ) : null}
           {section === "audit" ? (
-            <AuditPanel events={snapshot.auditEvents} />
+            <AuditPanel
+              error={auditError}
+              onLoad={loadAuditPage}
+              page={auditPage}
+            />
           ) : null}
         </div>
       </main>
@@ -2716,10 +2887,14 @@ function Overview({
   const draftRewards = snapshot.rewards.filter(
     (reward) => reward.status === "draft",
   ).length;
-  const healthNeedsAttention =
-    health?.database !== "ok" ||
-    (health?.worker.status !== "healthy" &&
-      health?.worker.status !== "starting");
+  const healthNeedsAttention = Boolean(
+    health &&
+    (health.worker.status === "degraded" ||
+      health.worker.status === "stale" ||
+      Object.values(health.providers).some((provider) =>
+        ["unavailable", "unconfigured"].includes(provider.status),
+      )),
+  );
   const attentionCount = queue.length + (healthNeedsAttention ? 1 : 0);
   const oldestQueueItem = [...queue].sort(
     (left, right) =>
@@ -2854,7 +3029,7 @@ function Overview({
           </p>
           <h2>
             {queue.length > 0
-              ? `${queue.length} review item${queue.length === 1 ? "" : "s"} need attention.`
+              ? `${queue.length} loaded review item${queue.length === 1 ? " is" : "s are"} waiting.`
               : healthNeedsAttention
                 ? "System health needs review."
                 : activeCompetitions.length > 0
@@ -2867,9 +3042,9 @@ function Overview({
           </h2>
           <p>
             {queue.length > 0
-              ? "Open the human review queue first, then return to launch and publication work."
+              ? "Open Operations to inspect the authoritative item detail and server-permitted actions."
               : healthNeedsAttention
-                ? "Check the worker heartbeat and queue health before making publication changes."
+                ? "Open Operations to inspect the worker, lease, queue, and provider evidence."
                 : activeCompetitions.length > 0
                   ? `${activeCompetitions.map((competition) => competition.name).join(" + ")} ${activeCompetitions.length === 1 ? "is" : "are"} public with ${activeCompetitions.reduce((total, competition) => total + competition.enrollmentCount, 0)} enrolled players.`
                   : publishReady.length > 0
@@ -4330,37 +4505,42 @@ function ContentPanel({
 function OperationsPanel({
   events,
   health,
-  onDecidePrivacy,
-  onDecideRegion,
-  onNavigate,
+  healthError,
+  onDecide,
+  onLoadDetail,
+  onLoadProfileMedia,
+  onLoadQueue,
+  onRetryHealth,
   queue,
+  queueError,
+  queueNextCursor,
 }: {
   events: AuditEvent[];
   health: SystemHealth | null;
-  onDecidePrivacy: (
-    privacyRequestId: string,
-    body: DecidePrivacyRequestDto,
+  healthError: string;
+  onDecide: (item: WorkQueueDetail, body: QueueDecisionBody) => Promise<void>;
+  onLoadDetail: (item: WorkQueueItem) => Promise<WorkQueueDetail>;
+  onLoadProfileMedia: (mediaId: string) => Promise<ProfileMediaReviewAction>;
+  onLoadQueue: (
+    kind?: WorkQueueKind,
+    cursor?: string,
+    append?: boolean,
   ) => Promise<void>;
-  onDecideRegion: (
-    verificationId: string,
-    body: DecideRegionVerificationDto,
-  ) => Promise<void>;
-  onNavigate: (section: AdminSection) => void;
+  onRetryHealth: () => void;
   queue: WorkQueueItem[];
+  queueError: string;
+  queueNextCursor: string | null;
 }) {
   const [kindFilter, setKindFilter] = useStoredPreference(
     "gogymgo.admin.operations.kind",
     "all",
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const kindOptions = Array.from(new Set(queue.map((item) => item.kind)));
-  const filteredQueue = queue.filter(
-    (item) => kindFilter === "all" || item.kind === kindFilter,
-  );
-  const selectedItem = queue.find((item) => item.id === selectedId) ?? null;
-  const selectedDestination = selectedItem
-    ? queueDestination(selectedItem.kind)
-    : null;
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [detail, setDetail] = useState<WorkQueueDetail | null>(null);
+  const [detailError, setDetailError] = useState("");
+  const [detailLoading, setDetailLoading] = useState(false);
+  const selectedItem =
+    queue.find((item) => `${item.kind}:${item.id}` === selectedKey) ?? null;
   const selectedUrgency = selectedItem ? getQueueUrgency(selectedItem) : null;
   const selectedHistory = selectedItem
     ? events
@@ -4377,14 +4557,51 @@ function OperationsPanel({
       : [
           {
             label: `Type: ${kindFilter.replaceAll("_", " ")}`,
-            onClear: () => setKindFilter("all"),
+            onClear: () => {
+              setKindFilter("all");
+              setSelectedKey(null);
+              setDetail(null);
+              setDetailError("");
+              setDetailLoading(false);
+              void onLoadQueue();
+            },
           },
         ];
+  useEffect(() => {
+    if (!selectedItem) {
+      return;
+    }
+    let active = true;
+    void onLoadDetail(selectedItem)
+      .then((loaded) => {
+        if (!active) return;
+        if (
+          loaded.id !== selectedItem.id ||
+          loaded.kind !== selectedItem.kind ||
+          loaded.reviewVersion !== selectedItem.reviewVersion
+        ) {
+          throw new AdminUserFacingError(
+            "The review detail no longer matches the queue. Refresh before deciding.",
+          );
+        }
+        setDetail(loaded);
+      })
+      .catch((error) => {
+        if (active) setDetailError(errorMessage(error));
+      })
+      .finally(() => {
+        if (active) setDetailLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [onLoadDetail, selectedItem]);
+
   return (
     <div className="section-stack">
       <section className="metric-grid">
         <MetricCard label="WORKER" value={health?.worker.status ?? "unknown"} />
-        <MetricCard label="QUEUE ITEMS" value={queue.length} />
+        <MetricCard label="QUEUE PAGE" value={queue.length} />
         <MetricCard
           label="NOTIFICATIONS"
           value={health?.queues.notificationsPending ?? "—"}
@@ -4394,6 +4611,72 @@ function OperationsPanel({
           value={health?.queues.privacyOperationsPending ?? "—"}
         />
       </section>
+      {healthError ? (
+        <div className="alert error" role="alert">
+          <span>!</span>
+          <p>{healthError} System health has not been inferred.</p>
+          <button onClick={onRetryHealth} type="button">
+            RETRY HEALTH
+          </button>
+        </div>
+      ) : null}
+      {health ? (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">DURABLE OPERATIONAL EVIDENCE</p>
+              <h2>Worker, leases and providers</h2>
+              <p>
+                Provider states are configuration and durable-failure evidence;
+                this screen does not contact providers.
+              </p>
+            </div>
+          </div>
+          <div className="health-detail">
+            <div>
+              <small>WORKER HEARTBEAT</small>
+              <strong>{health.worker.status}</strong>
+            </div>
+            <div>
+              <small>NOTIFICATION LEASED / RETRY / EXHAUSTED</small>
+              <strong>
+                {health.queues.notificationsLeased} /{" "}
+                {health.queues.notificationsRetryScheduled} /{" "}
+                {health.queues.notificationsExhausted}
+              </strong>
+            </div>
+            <div>
+              <small>PRIVACY LEASED / RETRY / STALE</small>
+              <strong>
+                {health.queues.privacyOperationsLeased} /{" "}
+                {health.queues.privacyOperationsRetryScheduled} /{" "}
+                {health.queues.privacyOperationsStaleLeases}
+              </strong>
+            </div>
+            <div>
+              <small>MEDIA LEASED / RETRY / STALE</small>
+              <strong>
+                {health.queues.profileMediaCleanupLeased} /{" "}
+                {health.queues.profileMediaCleanupRetryScheduled} /{" "}
+                {health.queues.profileMediaCleanupStaleLeases}
+              </strong>
+            </div>
+          </div>
+          <div className="compact-list">
+            {Object.entries(health.providers).map(([name, provider]) => (
+              <div className="compact-row" key={name}>
+                <div>
+                  <strong>{name.replaceAll("_", " ")}</strong>
+                  <small>{provider.evidence}</small>
+                </div>
+                <span className={`status-tag ${provider.status}`}>
+                  {provider.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <section className="panel">
         <div className="panel-heading">
           <div>
@@ -4411,11 +4694,21 @@ function OperationsPanel({
             <label className="filter-field compact">
               <span>ITEM TYPE</span>
               <select
-                onChange={(event) => setKindFilter(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setKindFilter(value);
+                  setSelectedKey(null);
+                  setDetail(null);
+                  setDetailError("");
+                  setDetailLoading(false);
+                  void onLoadQueue(
+                    value === "all" ? undefined : (value as WorkQueueKind),
+                  );
+                }}
                 value={kindFilter}
               >
                 <option value="all">All review types</option>
-                {kindOptions.map((kind) => (
+                {workQueueKinds.map((kind) => (
                   <option key={kind} value={kind}>
                     {kind.replaceAll("_", " ")}
                   </option>
@@ -4425,29 +4718,49 @@ function OperationsPanel({
           </div>
         ) : null}
         <FilterChips filters={activeFilters} />
-        {queue.length === 0 ? (
+        {queueError ? (
+          <div className="alert error" role="alert">
+            <span>!</span>
+            <p>{queueError}</p>
+            <button
+              onClick={() =>
+                void onLoadQueue(
+                  kindFilter === "all"
+                    ? undefined
+                    : (kindFilter as WorkQueueKind),
+                )
+              }
+              type="button"
+            >
+              RETRY QUEUE
+            </button>
+          </div>
+        ) : queue.length === 0 ? (
           <EmptyState
             body="Nothing is waiting for operator review."
             title="Queue clear"
           />
-        ) : filteredQueue.length === 0 ? (
-          <EmptyState
-            body="Choose another review type to see queued records."
-            title="No items match"
-          />
         ) : (
           <div className="queue-workspace">
             <div className="compact-list">
-              {filteredQueue.map((item) => (
+              {queue.map((item) => (
                 <button
-                  aria-pressed={selectedId === item.id}
+                  aria-pressed={selectedKey === `${item.kind}:${item.id}`}
                   className={
-                    selectedId === item.id
+                    selectedKey === `${item.kind}:${item.id}`
                       ? "compact-row queue-row selected"
                       : "compact-row queue-row"
                   }
                   key={`${item.kind}-${item.id}`}
-                  onClick={() => setSelectedId(item.id)}
+                  onClick={() => {
+                    setDetail(null);
+                    setDetailError("");
+                    setDetailLoading(true);
+                    setSelectedKey(null);
+                    queueMicrotask(() =>
+                      setSelectedKey(`${item.kind}:${item.id}`),
+                    );
+                  }}
                   type="button"
                 >
                   <div>
@@ -4475,6 +4788,23 @@ function OperationsPanel({
                   </span>
                 </button>
               ))}
+              {queueNextCursor ? (
+                <button
+                  className="secondary-button full"
+                  onClick={() =>
+                    void onLoadQueue(
+                      kindFilter === "all"
+                        ? undefined
+                        : (kindFilter as WorkQueueKind),
+                      queueNextCursor,
+                      true,
+                    )
+                  }
+                  type="button"
+                >
+                  LOAD MORE AUTHORITATIVE ITEMS
+                </button>
+              ) : null}
             </div>
             <aside aria-live="polite" className="queue-review-panel">
               {selectedItem ? (
@@ -4536,6 +4866,43 @@ function OperationsPanel({
                       <dd className="record-id">{selectedItem.id}</dd>
                     </div>
                   </dl>
+                  {detailLoading ? (
+                    <p className="queue-review-note" role="status">
+                      Loading authoritative review detail…
+                    </p>
+                  ) : null}
+                  {detailError ? (
+                    <div className="alert error compact" role="alert">
+                      <span>!</span>
+                      <p>{detailError}</p>
+                      <button
+                        onClick={() => {
+                          setDetail(null);
+                          setDetailError("");
+                          setDetailLoading(true);
+                          setSelectedKey(null);
+                          queueMicrotask(() =>
+                            setSelectedKey(
+                              `${selectedItem.kind}:${selectedItem.id}`,
+                            ),
+                          );
+                        }}
+                        type="button"
+                      >
+                        RETRY DETAIL
+                      </button>
+                    </div>
+                  ) : null}
+                  {detail ? (
+                    <dl>
+                      {detail.facts.map((fact) => (
+                        <div key={fact.label}>
+                          <dt>{fact.label.toUpperCase()}</dt>
+                          <dd>{fact.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
                   <details className="queue-review-history">
                     <summary>
                       RELATED AUDIT EVIDENCE
@@ -4559,36 +4926,19 @@ function OperationsPanel({
                       </p>
                     )}
                   </details>
-                  {selectedItem.kind === "region_verification" ? (
-                    <RegionVerificationDecisionControl
-                      item={selectedItem}
-                      onDecide={onDecideRegion}
+                  {detail ? (
+                    <QueueDecisionControl
+                      item={detail}
+                      key={`${detail.kind}:${detail.id}:${detail.reviewVersion}`}
+                      onDecide={onDecide}
+                      onLoadProfileMedia={onLoadProfileMedia}
                     />
-                  ) : null}
-                  {selectedItem.kind === "privacy_request" &&
-                  selectedItem.status === "requested" ? (
-                    <PrivacyRequestDecisionControl
-                      item={selectedItem}
-                      onDecide={onDecidePrivacy}
-                    />
-                  ) : null}
-                  {selectedDestination ? (
-                    <button
-                      className="primary-button full"
-                      onClick={() => onNavigate(selectedDestination)}
-                      type="button"
-                    >
-                      OPEN{" "}
-                      {navigation
-                        .find((item) => item.id === selectedDestination)
-                        ?.label.toUpperCase()}
-                    </button>
-                  ) : (
+                  ) : !detailLoading && !detailError ? (
                     <p className="queue-review-note">
-                      Keep this record ID visible while completing the
-                      authorized review action, then refresh the queue.
+                      A validated server detail is required before any decision
+                      can be shown.
                     </p>
-                  )}
+                  ) : null}
                 </>
               ) : (
                 <div className="queue-review-empty">
@@ -4607,176 +4957,183 @@ function OperationsPanel({
   );
 }
 
-function PrivacyRequestDecisionControl({
+function QueueDecisionControl({
   item,
   onDecide,
+  onLoadProfileMedia,
 }: {
-  item: WorkQueueItem;
-  onDecide: (
-    privacyRequestId: string,
-    body: DecidePrivacyRequestDto,
-  ) => Promise<void>;
+  item: WorkQueueDetail;
+  onDecide: (item: WorkQueueDetail, body: QueueDecisionBody) => Promise<void>;
+  onLoadProfileMedia: (mediaId: string) => Promise<ProfileMediaReviewAction>;
 }) {
-  const [decision, setDecision] =
-    useState<DecidePrivacyRequestDto["decision"]>("processing");
+  const [decision, setDecision] = useState(item.allowedDecisions[0] ?? "");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [mediaAction, setMediaAction] =
+    useState<ProfileMediaReviewAction | null>(null);
+  const [findings, setFindings] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(item.sessionEvidence?.evidence ?? {}).map(
+        ([key, evidence]) => [
+          key,
+          evidence.required ? "approved" : "not_required",
+        ],
+      ),
+    ),
+  );
 
-  return (
-    <form
-      className="queue-decision-form"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        const validationError = formValidationError(event.currentTarget);
-        if (validationError) {
-          setError(validationError);
-          return;
-        }
-        if (!item.version) {
-          setError(
-            "Refresh the queue to load the authoritative request version.",
-          );
-          return;
-        }
-        setSubmitting(true);
-        setError("");
-        void onDecide(item.id, {
-          decision,
-          expectedVersion: item.version,
-          reason,
-        })
-          .catch((cause) => setError(errorMessage(cause)))
-          .finally(() => setSubmitting(false));
-      }}
-    >
-      <p className="queue-review-note">
-        {item.requestType === "delete"
-          ? "Starting deletion authorizes the worker to revoke access and remove direct account data after external cleanup succeeds."
-          : "Starting export authorizes a minimized private JSON export with a short retention window."}
+  if (!item.decisionAllowed || item.allowedDecisions.length === 0) {
+    return (
+      <p className="queue-review-note" role="status">
+        No decision is permitted for this operator and current record state
+        {item.decisionRestrictionCode
+          ? ` (${item.decisionRestrictionCode.replaceAll("_", " ")})`
+          : ""}
+        .
       </p>
-      <label>
-        <span>DECISION</span>
-        <select
-          onChange={(event) =>
-            setDecision(
-              event.target.value as DecidePrivacyRequestDto["decision"],
-            )
-          }
-          value={decision}
-        >
-          <option value="processing">Approve and start processing</option>
-          <option value="rejected">Reject request</option>
-        </select>
-      </label>
-      <label>
-        <span>AUDIT REASON</span>
-        <textarea
-          maxLength={500}
-          minLength={8}
-          onChange={(event) => setReason(event.target.value)}
-          required
-          rows={3}
-          value={reason}
-        />
-      </label>
-      <button
-        className="primary-button full"
-        disabled={submitting}
-        type="submit"
-      >
-        {submitting ? "RECORDING..." : "RECORD PRIVACY DECISION"}
-      </button>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </form>
-  );
-}
-
-function RegionVerificationDecisionControl({
-  item,
-  onDecide,
-}: {
-  item: WorkQueueItem;
-  onDecide: (
-    verificationId: string,
-    body: DecideRegionVerificationDto,
-  ) => Promise<void>;
-}) {
-  const [decision, setDecision] =
-    useState<DecideRegionVerificationDto["decision"]>("rejected");
-  const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+    );
+  }
 
   return (
-    <form
-      className="queue-decision-form"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        const validationError = formValidationError(event.currentTarget);
-        if (validationError) {
-          setError(validationError);
-          return;
-        }
-        setSubmitting(true);
-        setError("");
-        void onDecide(item.id, { decision, reason })
-          .catch((cause) => setError(errorMessage(cause)))
-          .finally(() => setSubmitting(false));
-      }}
-    >
-      <label>
-        <span>DECISION</span>
-        <select
-          onChange={(event) =>
-            setDecision(
-              event.target.value as DecideRegionVerificationDto["decision"],
-            )
-          }
-          value={decision}
-        >
-          <option value="rejected">Reject</option>
-          <option value="approved">Approve within policy window</option>
-        </select>
-      </label>
-      <label>
-        <span>AUDIT REASON</span>
-        <textarea
-          maxLength={500}
-          minLength={8}
-          onChange={(event) => setReason(event.target.value)}
-          required
-          rows={3}
-          value={reason}
-        />
-      </label>
-      <button
-        className="primary-button full"
-        disabled={submitting}
-        type="submit"
-      >
-        {submitting ? "RECORDING..." : "RECORD DECISION"}
-      </button>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+    <>
+      {item.kind === "profile_media" ? (
+        <div className="queue-decision-form">
+          <button
+            className="secondary-button full"
+            onClick={() => {
+              setError("");
+              void onLoadProfileMedia(item.id)
+                .then((action) => {
+                  if (action.reviewVersion !== item.reviewVersion) {
+                    throw new AdminUserFacingError(
+                      "The private media action is for a different review version. Refresh before deciding.",
+                    );
+                  }
+                  setMediaAction(action);
+                })
+                .catch((cause) => setError(errorMessage(cause)));
+            }}
+            type="button"
+          >
+            LOAD PRIVATE MEDIA REVIEW ACTION
+          </button>
+          {mediaAction ? (
+            <a
+              className="primary-button full"
+              href={mediaAction.url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              OPEN PRIVATE PREVIEW (EXPIRES{" "}
+              {formatDateTime(mediaAction.expiresAt)})
+            </a>
+          ) : null}
+        </div>
       ) : null}
-    </form>
+      <form
+        className="queue-decision-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          const validationError = formValidationError(event.currentTarget);
+          if (validationError) {
+            setError(validationError);
+            return;
+          }
+          setSubmitting(true);
+          setError("");
+          void onDecide(item, {
+            decision,
+            ...(item.sessionEvidence
+              ? {
+                  evidenceSnapshotSha256:
+                    item.sessionEvidence.evidenceSnapshotSha256,
+                  findings,
+                }
+              : {}),
+            expectedVersion: item.reviewVersion,
+            reason,
+          })
+            .catch((cause) => setError(errorMessage(cause)))
+            .finally(() => setSubmitting(false));
+        }}
+      >
+        <p className="queue-review-note">
+          {item.kind === "privacy_request" && item.requestType === "delete"
+            ? "Starting deletion authorizes the worker to revoke access and remove direct account data after external cleanup succeeds."
+            : item.kind === "privacy_request"
+              ? "Starting export authorizes a minimized private JSON export with a short retention window."
+              : "The server controls the permitted transitions shown below. The reason and exact review version are recorded."}
+        </p>
+        <label>
+          <span>DECISION</span>
+          <select
+            onChange={(event) => setDecision(event.target.value)}
+            value={decision}
+          >
+            {item.allowedDecisions.map((allowed) => (
+              <option key={allowed} value={allowed}>
+                {allowed.replaceAll("_", " ")}
+              </option>
+            ))}
+          </select>
+        </label>
+        {item.sessionEvidence ? (
+          <fieldset>
+            <legend>EVIDENCE FINDINGS</legend>
+            {Object.entries(item.sessionEvidence.evidence).map(
+              ([category, evidence]) => (
+                <label key={category}>
+                  <span>
+                    {category.replace(/([a-z])([A-Z])/g, "$1 $2")} ·{" "}
+                    {evidence.count}
+                    {evidence.required ? " required" : " optional"}
+                  </span>
+                  <select
+                    onChange={(event) =>
+                      setFindings((current) => ({
+                        ...current,
+                        [category]: event.target.value,
+                      }))
+                    }
+                    value={findings[category]}
+                  >
+                    <option value="approved">approved</option>
+                    <option value="rejected">rejected</option>
+                    <option value="not_required">not required</option>
+                  </select>
+                </label>
+              ),
+            )}
+          </fieldset>
+        ) : null}
+        <label>
+          <span>AUDIT REASON</span>
+          <textarea
+            maxLength={500}
+            minLength={8}
+            onChange={(event) => setReason(event.target.value)}
+            required
+            rows={3}
+            value={reason}
+          />
+        </label>
+        <button
+          className="primary-button full"
+          disabled={submitting}
+          type="submit"
+        >
+          {submitting ? "RECORDING..." : "RECORD DECISION"}
+        </button>
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </form>
+    </>
   );
-}
-
-function queueDestination(kind: string): AdminSection | null {
-  if (kind === "workout_session" || kind === "partner_application") {
-    return "pilot";
-  }
-  return null;
 }
 
 function MetricCard({
@@ -4795,47 +5152,31 @@ function MetricCard({
   );
 }
 
-function AuditPanel({ events }: { events: AuditEvent[] }) {
+function AuditPanel({
+  error,
+  onLoad,
+  page,
+}: {
+  error: string;
+  onLoad: (search?: string, cursor?: string, append?: boolean) => Promise<void>;
+  page: AuditPage;
+}) {
   const [query, setQuery] = useStoredPreference(
     "gogymgo.admin.audit.query",
     "",
   );
-  const [actorFilter, setActorFilter] = useStoredPreference(
-    "gogymgo.admin.audit.actor",
-    "all",
-  );
-  const [page, setPage] = useState(1);
-  const normalizedQuery = query.trim().toLowerCase();
-  const actorOptions = Array.from(
-    new Set(events.map((event) => event.actorEmail || "SYSTEM")),
-  );
-  const filteredEvents = events.filter((event) => {
-    const actor = event.actorEmail || "SYSTEM";
-    const matchesActor = actorFilter === "all" || actor === actorFilter;
-    const matchesQuery =
-      !normalizedQuery ||
-      [event.action, event.reason, event.entityType, event.entityId, actor]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedQuery);
-    return matchesActor && matchesQuery;
-  });
-  const pageSize = 12;
-  const pageCount = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
-  const visiblePage = Math.min(page, pageCount);
-  const pagedEvents = filteredEvents.slice(
-    (visiblePage - 1) * pageSize,
-    visiblePage * pageSize,
-  );
+  const [loading, setLoading] = useState(false);
+  const events = page.items;
   const activeFilters: ActiveFilter[] = [
     ...(query
-      ? [{ label: `Search: ${query}`, onClear: () => setQuery("") }]
-      : []),
-    ...(actorFilter !== "all"
       ? [
           {
-            label: `Actor: ${actorFilter}`,
-            onClear: () => setActorFilter("all"),
+            label: `Search: ${query}`,
+            onClear: () => {
+              setQuery("");
+              setLoading(true);
+              void onLoad().finally(() => setLoading(false));
+            },
           },
         ]
       : []),
@@ -4847,57 +5188,67 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
           <p className="eyebrow">ADMINISTRATIVE RECORDS</p>
           <h2>Audit history</h2>
           <p>
-            The latest 100 administrative decisions, including who acted and
-            why.
+            Server-paginated, minimized administrative decisions, including who
+            acted and why.
           </p>
         </div>
       </div>
-      {events.length > 0 ? (
-        <div
-          aria-label="Filter audit history"
-          className="panel-toolbar"
-          role="search"
-        >
-          <label className="filter-field">
-            <span>SEARCH</span>
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Action, reason, entity or record ID"
-              type="search"
-              value={query}
-            />
-          </label>
-          <label className="filter-field compact">
-            <span>ACTOR</span>
-            <select
-              onChange={(event) => setActorFilter(event.target.value)}
-              value={actorFilter}
-            >
-              <option value="all">All actors</option>
-              {actorOptions.map((actor) => (
-                <option key={actor} value={actor}>
-                  {actor}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      ) : null}
+      <form
+        aria-label="Filter audit history"
+        className="panel-toolbar"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          const validationError = formValidationError(event.currentTarget);
+          if (validationError) {
+            return;
+          }
+          setLoading(true);
+          void onLoad(query).finally(() => setLoading(false));
+        }}
+        role="search"
+      >
+        <label className="filter-field">
+          <span>SEARCH</span>
+          <input
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Action, reason, entity or record ID"
+            type="search"
+            value={query}
+          />
+        </label>
+        <button className="secondary-button" disabled={loading} type="submit">
+          {loading ? "SEARCHING…" : "SEARCH SERVER"}
+        </button>
+      </form>
       <FilterChips filters={activeFilters} />
-      {events.length === 0 ? (
+      {error ? (
+        <div className="alert error" role="alert">
+          <span>!</span>
+          <p>{error}</p>
+          <button
+            onClick={() => {
+              setLoading(true);
+              void onLoad(query).finally(() => setLoading(false));
+            }}
+            type="button"
+          >
+            RETRY AUDIT SEARCH
+          </button>
+        </div>
+      ) : events.length === 0 ? (
         <EmptyState
-          body="Administrative decisions will appear here after the first recorded change."
-          title="No audit events recorded"
-        />
-      ) : filteredEvents.length === 0 ? (
-        <EmptyState
-          body="Try a different search term or actor filter."
-          title="No audit events match"
+          body={
+            query
+              ? "No authoritative audit event matches this server search."
+              : "Administrative decisions will appear here after the first recorded change."
+          }
+          title={query ? "No audit events match" : "No audit events recorded"}
         />
       ) : (
         <>
           <div className="timeline">
-            {pagedEvents.map((event) => (
+            {events.map((event) => (
               <article key={event.id}>
                 <div aria-hidden="true" className="timeline-node" />
                 <div>
@@ -4917,12 +5268,21 @@ function AuditPanel({ events }: { events: AuditEvent[] }) {
               </article>
             ))}
           </div>
-          <Pagination
-            onNext={() => setPage(Math.min(pageCount, visiblePage + 1))}
-            onPrevious={() => setPage(Math.max(1, visiblePage - 1))}
-            page={visiblePage}
-            pageCount={pageCount}
-          />
+          {page.nextCursor ? (
+            <button
+              className="secondary-button full"
+              disabled={loading}
+              onClick={() => {
+                setLoading(true);
+                void onLoad(query, page.nextCursor ?? undefined, true).finally(
+                  () => setLoading(false),
+                );
+              }}
+              type="button"
+            >
+              {loading ? "LOADING…" : "LOAD MORE AUDIT EVENTS"}
+            </button>
+          ) : null}
         </>
       )}
     </section>

@@ -12,6 +12,8 @@ This document describes the technical policy. Launch counsel must approve jurisd
    deployment returns an unavailable error and stores no request.
 2. Operations validates the request and changes it to `processing` with a
    reason, the current `expectedVersion`, and a body-bound idempotency key.
+   The deciding administrator is reauthorized from the database before an
+   idempotent replay and cannot decide a request owned by the same account.
 3. The worker reads a repeatable PostgreSQL snapshot and builds deterministic
    portable JSON schema version 12. The exhaustive table-disposition map covers
    every current authoritative table. It includes the member's account,
@@ -76,6 +78,10 @@ retained facts were erased.
   completion/failure write requires the same still-live token.
 - Failed attempts store only a bounded failure code and the next retry time. Exception messages and payloads are never persisted.
 - Retry delay grows exponentially to six hours. Repeated failures remain visible in the operator queue.
+- Operator queue detail includes lifecycle and bounded retry/lease facts, not
+  the export body, deletion payload, owner contact details, signed download
+  action, internal worker exception, or operator-only decision history. Audit
+  projections recursively remove those same private and credential fields.
 - Object creation uses `If-None-Match: *`; a retry accepts only an existing
   object carrying a valid SHA-256 metadata value.
 - Object deletion treats `404` as success.

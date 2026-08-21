@@ -3,9 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { sql } from 'kysely';
 import type { Environment } from '../../config/environment';
 import { DatabaseService } from '../../database/database.service';
-import type { JsonObject, JsonValue } from '../../database/database.types';
+import type { JsonObject } from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { AdminAuthorizationService } from './admin-authorization.service';
+import {
+  minimizeOperatorAuditState,
+  redactOperatorAuditText,
+} from './operator-audit-redaction';
 import type {
   AdminDashboardCompetitionDto,
   AdminDashboardSnapshotDto,
@@ -351,7 +355,7 @@ export class AdminDashboardService {
             entityId: event.entity_id,
             entityType: event.entity_type,
             id: event.id,
-            reason: event.reason,
+            reason: redactOperatorAuditText(event.reason),
           })),
           competitions: competitions.map((competition) =>
             this.toCompetition(
@@ -476,38 +480,7 @@ export class AdminDashboardService {
   }
 
   private minimizeAuditState(value: unknown): JsonObject | null {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return null;
-    }
-    const sensitiveKey =
-      /(?:actor|winner)?userId|email|firebase|password|secret|token|qrPayload|(?:coupon|reward|redemption)Code|codeFingerprint|encrypted|claimUrl|fulfillmentInstructions|seedReveal/i;
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => !sensitiveKey.test(key))
-        .slice(0, 16)
-        .map(([key, entry]) => [key, this.minimizeAuditValue(entry)]),
-    );
-  }
-
-  private minimizeAuditValue(value: unknown): JsonValue {
-    if (value === null) return null;
-    if (
-      typeof value === 'boolean' ||
-      typeof value === 'number' ||
-      typeof value === 'string'
-    ) {
-      return value;
-    }
-    if (Array.isArray(value)) {
-      return value
-        .slice(0, 20)
-        .filter(
-          (entry): entry is boolean | number | string | null =>
-            entry === null ||
-            ['boolean', 'number', 'string'].includes(typeof entry),
-        );
-    }
-    return this.minimizeAuditState(value);
+    return minimizeOperatorAuditState(value);
   }
 
   private toCompetition(

@@ -317,6 +317,7 @@ describeWithDatabase('authoritative region verification', () => {
       .executeTakeFirstOrThrow();
     const decision = {
       decision: 'rejected' as const,
+      expectedVersion: 1,
       reason: 'Device evidence requires rejection.',
     };
     await expect(
@@ -338,10 +339,11 @@ describeWithDatabase('authoritative region verification', () => {
 
     const waitlist = await database.connection
       .selectFrom('region_waitlist_entries')
-      .select('id')
+      .select(['id', 'review_version'])
       .where('email', '=', principal.email!)
       .executeTakeFirstOrThrow();
     const waitlistDecision = {
+      expectedVersion: waitlist.review_version,
       reason: 'Region is now approved for launch.',
       status: 'launched' as const,
     };

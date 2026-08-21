@@ -386,6 +386,11 @@ export class RegionWaitlistReceiptDto {
 }
 
 export class UpdateRegionWaitlistStatusDto extends OperatorReasonDto {
+  @ApiProperty({ minimum: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+
   @ApiProperty({ enum: ['contacted', 'launched', 'closed'], type: String })
   @IsIn(['contacted', 'launched', 'closed'])
   status!: 'contacted' | 'launched' | 'closed';
@@ -415,6 +420,9 @@ export class RegionWaitlistEntryDto {
 
   @ApiPropertyOptional({ nullable: true, type: String })
   consentNoticeVersion!: string | null;
+
+  @ApiProperty({ minimum: 1, type: Number })
+  version!: number;
 }
 
 export class InterestSubmissionDto {
@@ -622,6 +630,57 @@ export class OperatorAuditHistoryDto {
   @ApiProperty({ type: String })
   reason!: string;
 
+  @ApiProperty({ format: 'email', nullable: true, type: String })
+  actorEmail!: string | null;
+
+  @ApiProperty({ nullable: true, type: Object })
+  before!: Record<string, unknown> | null;
+
+  @ApiProperty({ nullable: true, type: Object })
+  after!: Record<string, unknown> | null;
+
   @ApiProperty({ format: 'date-time', type: String })
   createdAt!: string;
+}
+
+export class ListOperatorAuditHistoryQueryDto {
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1_024)
+  cursor?: string;
+
+  @ApiPropertyOptional({ default: 50, maximum: 100, minimum: 1, type: Number })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Max(100)
+  @Min(1)
+  limit = 50;
+
+  @ApiPropertyOptional({ maxLength: 100, type: String })
+  @IsOptional()
+  @IsString()
+  @Length(2, 100)
+  search?: string;
+
+  @ApiPropertyOptional({ maxLength: 100, type: String })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  action?: string;
+
+  @ApiPropertyOptional({ maxLength: 100, type: String })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  entityType?: string;
+}
+
+export class OperatorAuditHistoryPageDto {
+  @ApiProperty({ isArray: true, type: OperatorAuditHistoryDto })
+  items!: OperatorAuditHistoryDto[];
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  nextCursor!: string | null;
 }

@@ -2053,6 +2053,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await expect(
       sessions.verifySession({
         evidenceSnapshotSha256: evidenceReview.evidenceSnapshotSha256,
+        expectedVersion: 1,
         findings: {
           deviceAttestation: 'approved',
           gymQr: 'approved',
@@ -2074,10 +2075,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await expect(
       verifySession(
         created.id,
-        'verify-session-retry',
+        'verify-session',
         evidenceReview.evidenceSnapshotSha256,
       ),
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
 
     const progress = await migrated.pool.query<{
       category_score: number;
@@ -2141,6 +2142,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await expect(
       sessions.rejectSession({
         evidenceSnapshotSha256: duplicateReview.evidenceSnapshotSha256,
+        expectedVersion: 1,
         findings: {
           deviceAttestation: 'not_required',
           gymQr: 'not_required',
@@ -2166,9 +2168,9 @@ describeWithDatabase('critical session and ledger workflow', () => {
       rejectSession(
         duplicateDay.rows[0].id,
         duplicateReview.evidenceSnapshotSha256,
-        'reject-duplicate-day-retry',
+        'reject-duplicate-day',
       ),
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
     const rejection = await migrated.pool.query<{
       audit_count: number;
       outcome: string;
@@ -2470,6 +2472,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       (await sessions.getEvidenceReview(sessionId)).evidenceSnapshotSha256;
     return sessions.verifySession({
       evidenceSnapshotSha256: resolvedSnapshotSha256,
+      expectedVersion: 1,
       findings: {
         deviceAttestation: 'approved',
         gymQr: 'approved',
@@ -2490,6 +2493,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   ) {
     return sessions.rejectSession({
       evidenceSnapshotSha256,
+      expectedVersion: 1,
       findings: {
         deviceAttestation: 'not_required',
         gymQr: 'not_required',

@@ -4975,10 +4975,11 @@ function OperationsPanel({
               <strong>{health.worker.status}</strong>
             </div>
             <div>
-              <small>NOTIFICATION LEASED / RETRY / EXHAUSTED</small>
+              <small>NOTIFICATION LEASED / RETRY / STALE / EXHAUSTED</small>
               <strong>
                 {health.queues.notificationsLeased} /{" "}
                 {health.queues.notificationsRetryScheduled} /{" "}
+                {health.queues.notificationsStaleLeases} /{" "}
                 {health.queues.notificationsExhausted}
               </strong>
             </div>

@@ -342,6 +342,157 @@ describeWithDatabase('database migrations', () => {
     );
   });
 
+  it('installs notification device lifecycle and duplicate-suppression constraints', async () => {
+    const deviceColumns = await pool.query<{
+      column_name: string;
+      is_nullable: string;
+    }>(
+      `SELECT column_name, is_nullable
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'push_devices'
+         AND column_name IN (
+           'disabled_at', 'installation_id', 'last_registered_at', 'push_token'
+         )
+       ORDER BY column_name`,
+    );
+    const deliveryColumns = await pool.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'notification_deliveries'
+         AND column_name IN (
+           'completed_device_ids', 'dedupe_key', 'delivered_count',
+           'target_device_ids'
+         )
+       ORDER BY column_name`,
+    );
+    const constraints = await pool.query<{ conname: string }>(
+      `SELECT conname
+       FROM pg_constraint
+       WHERE conname IN (
+         'notification_deliveries_attempt_bounded',
+         'notification_deliveries_device_progress_valid',
+         'push_devices_enabled_token_state'
+       )`,
+    );
+    const indexes = await pool.query<{ indexname: string }>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE schemaname = 'public'
+         AND indexname IN (
+           'notification_deliveries_user_dedupe_unique',
+           'push_devices_active_token_unique',
+           'push_devices_user_installation_unique'
+         )`,
+    );
+
+    expect(deviceColumns.rows).toEqual([
+      { column_name: 'disabled_at', is_nullable: 'YES' },
+      { column_name: 'installation_id', is_nullable: 'NO' },
+      { column_name: 'last_registered_at', is_nullable: 'NO' },
+      { column_name: 'push_token', is_nullable: 'YES' },
+    ]);
+    expect(deliveryColumns.rows.map((row) => row.column_name)).toEqual([
+      'completed_device_ids',
+      'dedupe_key',
+      'delivered_count',
+      'target_device_ids',
+    ]);
+    expect(constraints.rows.map((row) => row.conname)).toEqual(
+      expect.arrayContaining([
+        'notification_deliveries_attempt_bounded',
+        'notification_deliveries_device_progress_valid',
+        'push_devices_enabled_token_state',
+      ]),
+    );
+    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+      expect.arrayContaining([
+        'notification_deliveries_user_dedupe_unique',
+        'push_devices_active_token_unique',
+        'push_devices_user_installation_unique',
+      ]),
+    );
+  });
+
+  it('enforces private device state and notification deduplication at the database boundary', async () => {
+    const user = await pool.query<{ id: string }>(
+      `INSERT INTO users (firebase_uid)
+       VALUES ('notification-lifecycle-user')
+       RETURNING id`,
+    );
+    const installationId = 'a0000000-0000-4000-8000-000000000001';
+    const pushToken = 'ExponentPushToken[integration-device-one]';
+    const device = await pool.query<{ id: string }>(
+      `INSERT INTO push_devices
+         (user_id, provider, platform, push_token, installation_id,
+          last_registered_at)
+       VALUES ($1, 'expo', 'ios', $2, $3, current_timestamp)
+       RETURNING id`,
+      [user.rows[0].id, pushToken, installationId],
+    );
+
+    await expect(
+      pool.query(
+        `INSERT INTO push_devices
+           (user_id, provider, platform, push_token, installation_id,
+            last_registered_at)
+         VALUES ($1, 'expo', 'ios', $2, $3, current_timestamp)`,
+        [
+          user.rows[0].id,
+          'ExponentPushToken[integration-device-two]',
+          installationId,
+        ],
+      ),
+    ).rejects.toThrow(/push_devices_user_installation_unique/i);
+    await expect(
+      pool.query(
+        `UPDATE push_devices
+         SET enabled = FALSE
+         WHERE id = $1`,
+        [device.rows[0].id],
+      ),
+    ).rejects.toThrow(/push_devices_enabled_token_state/i);
+    await pool.query(
+      `UPDATE push_devices
+       SET enabled = FALSE, push_token = NULL, disabled_at = current_timestamp
+       WHERE id = $1`,
+      [device.rows[0].id],
+    );
+
+    await pool.query(
+      `INSERT INTO notification_deliveries
+         (user_id, template, payload, dedupe_key, scheduled_at)
+       VALUES (
+         $1, 'competition_cancelled', '{}', 'competition:one:cancelled',
+         current_timestamp
+       )`,
+      [user.rows[0].id],
+    );
+    await expect(
+      pool.query(
+        `INSERT INTO notification_deliveries
+           (user_id, template, payload, dedupe_key, scheduled_at)
+         VALUES (
+           $1, 'competition_cancelled', '{}', 'competition:one:cancelled',
+           current_timestamp
+         )`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/notification_deliveries_user_dedupe_unique/i);
+    await expect(
+      pool.query(
+        `INSERT INTO notification_deliveries
+           (user_id, template, payload, dedupe_key, attempt_count, scheduled_at)
+         VALUES (
+           $1, 'competition_cancelled', '{}', 'competition:two:cancelled', 6,
+           current_timestamp
+         )`,
+        [user.rows[0].id],
+      ),
+    ).rejects.toThrow(/notification_deliveries_attempt_bounded/i);
+  });
+
   it('installs partial indexes for bounded worker queue scans', async () => {
     const indexes = await pool.query<{ indexname: string }>(
       `SELECT indexname

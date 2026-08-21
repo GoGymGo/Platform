@@ -129,7 +129,7 @@ export interface components {
     OperatorPortalAssignmentDto: { accessLevel: "admin" | "staff"; gymLocationId: string };
     OperatorProviderHealthDto: { evidence: string; status: "configured" | "disabled" | "unavailable" | "unconfigured" };
     OperatorProviderHealthSetDto: { notifications: components['schemas']["OperatorProviderHealthDto"]; observability: components['schemas']["OperatorProviderHealthDto"]; privacy: components['schemas']["OperatorProviderHealthDto"]; profileMedia: components['schemas']["OperatorProviderHealthDto"] };
-    OperatorQueueDepthsDto: { competitionStartsDue: number; incompleteSessionsDue: number; notificationsExhausted: number; notificationsLeased: number; notificationsPending: number; notificationsRetryScheduled: number; privacyOperationsLeased: number; privacyOperationsPending: number; privacyOperationsRetryScheduled: number; privacyOperationsStaleLeases: number; profileMediaCleanupLeased: number; profileMediaCleanupPending: number; profileMediaCleanupRetryScheduled: number; profileMediaCleanupStaleLeases: number; socialInvitationsDue: number };
+    OperatorQueueDepthsDto: { competitionStartsDue: number; incompleteSessionsDue: number; notificationsExhausted: number; notificationsLeased: number; notificationsPending: number; notificationsRetryScheduled: number; notificationsStaleLeases: number; privacyOperationsLeased: number; privacyOperationsPending: number; privacyOperationsRetryScheduled: number; privacyOperationsStaleLeases: number; profileMediaCleanupLeased: number; profileMediaCleanupPending: number; profileMediaCleanupRetryScheduled: number; profileMediaCleanupStaleLeases: number; socialInvitationsDue: number };
     OperatorReviewFactDto: { label: string; value: string };
     OperatorReviewQueueDepthsDto: { creatorSubmissions: number; partnerApplications: number; privacyRequests: number; profileMedia: number; regionVerifications: number; regionWaitlist: number; workoutSessions: number };
     OperatorSystemHealthResponseDto: { checkedAt: string; database: "ok"; providers: components['schemas']["OperatorProviderHealthSetDto"]; queues: components['schemas']["OperatorQueueDepthsDto"]; reviewQueues: components['schemas']["OperatorReviewQueueDepthsDto"]; worker: components['schemas']["OperatorWorkerHealthDto"] };
@@ -158,6 +158,7 @@ export interface components {
     PrivacySettingsDto: { showRegion: boolean; showStats: boolean };
     ProfileMediaReviewActionDto: { contentLength: number; contentType: string; expiresAt: string; height: number; id: string; reviewVersion: number; sha256: string; submittedAt: string; url: string; width: number };
     PublishLegalDocumentDto: { content: components['schemas']["LegalDocumentContentDto"]; documentKey: string; effectiveAt: string; jurisdictionCode: string; locale: string; ownerApprovalConfirmed: boolean; reason: string; receiptRequirement: "accept" | "acknowledge" | "none"; title: string; version: string };
+    PushCapabilitiesResponseDto: { deliveryStatus: "available" | "disabled"; maximumDevices: 5; registrationAvailable: boolean };
     PushDeviceResponseDto: { enabled: boolean; id: string; platform: "android" | "ios"; provider: "expo" };
     ReadinessDependenciesDto: { database: "ok"; worker: "healthy" | "starting" };
     ReadinessResponseDto: { dependencies: components['schemas']["ReadinessDependenciesDto"]; service: string; status: "ok"; timestamp: string; uptimeSeconds: number };
@@ -169,7 +170,7 @@ export interface components {
     RegionWaitlistEntryDto: { consentedAt?: string | null; consentNoticeVersion?: string | null; createdAt: string; email: string; id: string; requestedRegion: string; source: string; status: string; version: number };
     RegionWaitlistReceiptDto: { status: "received" };
     RegionWaitlistRequestDto: { consent: true; consentNoticeVersion: "regional-updates-2026-08-13-v1"; countryCode?: string; email: string; requestedRegion: string; subdivisionCode?: string };
-    RegisterPushDeviceDto: { platform: "android" | "ios"; pushToken: string };
+    RegisterPushDeviceDto: { installationId: string; platform: "android" | "ios"; pushToken: string };
     RejectSessionDto: { evidenceSnapshotSha256: string; expectedVersion: number; findings: components['schemas']["SessionEvidenceFindingsDto"]; reason: string };
     RemoveAvatarResponseDto: { status: "removed" };
     ResolveGymQrCompetitionDto: { credential: string };
@@ -285,12 +286,20 @@ export interface operations {
       "200": components['schemas']["WeeklyChallengeRequestResponseDto"];
     };
   };
-  capabilities: {
+  capabilities_get_v1_me_privacy_requests_capabilities: {
     method: "GET";
     path: "/v1/me/privacy-requests/capabilities";
     parameters: Record<string, never>;
     responses: {
       "200": components['schemas']["PrivacyCapabilitiesResponseDto"];
+    };
+  };
+  capabilities_get_v1_me_push_devices_capabilities: {
+    method: "GET";
+    path: "/v1/me/push-devices/capabilities";
+    parameters: Record<string, never>;
+    responses: {
+      "200": components['schemas']["PushCapabilitiesResponseDto"];
     };
   };
   changeCompetitionStatus: {
@@ -1512,7 +1521,7 @@ export interface paths {
     post: operations["create_post_v1_me_privacy_requests"];
   };
   "/v1/me/privacy-requests/capabilities": {
-    get: operations["capabilities"];
+    get: operations["capabilities_get_v1_me_privacy_requests_capabilities"];
   };
   "/v1/me/privacy-requests/{privacyRequestId}": {
     get: operations["get"];
@@ -1525,6 +1534,9 @@ export interface paths {
   };
   "/v1/me/push-devices": {
     post: operations["register"];
+  };
+  "/v1/me/push-devices/capabilities": {
+    get: operations["capabilities_get_v1_me_push_devices_capabilities"];
   };
   "/v1/me/push-devices/{deviceId}": {
     delete: operations["disable"];
@@ -1967,6 +1979,7 @@ export type PrivacyRequestResponseDto = components['schemas']["PrivacyRequestRes
 export type PrivacySettingsDto = components['schemas']["PrivacySettingsDto"];
 export type ProfileMediaReviewActionDto = components['schemas']["ProfileMediaReviewActionDto"];
 export type PublishLegalDocumentDto = components['schemas']["PublishLegalDocumentDto"];
+export type PushCapabilitiesResponseDto = components['schemas']["PushCapabilitiesResponseDto"];
 export type PushDeviceResponseDto = components['schemas']["PushDeviceResponseDto"];
 export type ReadinessDependenciesDto = components['schemas']["ReadinessDependenciesDto"];
 export type ReadinessResponseDto = components['schemas']["ReadinessResponseDto"];

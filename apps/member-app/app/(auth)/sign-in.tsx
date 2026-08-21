@@ -38,6 +38,7 @@ import {
   contactInvitationReviewRoute
 } from '@/navigation/contactInvitationFlow';
 import { useAuth, type AuthSignInResult } from '@/state/auth';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function SignInScreen() {
     signOutUser,
     user
   } = useAuth();
+  const { prepareCompetitionReminderSignOut } = useWorkoutProgress();
   const [email, setEmail] = useState('');
   const [errors, setErrors] = useState<AuthFormErrors>({});
   const [formError, setFormError] = useState<string>();
@@ -129,6 +131,10 @@ export default function SignInScreen() {
   async function clearSession() {
     setSubmitting(true);
     try {
+      if (!(await prepareCompetitionReminderSignOut())) {
+        setFormError('REMINDER CLEANUP NEEDS A CONNECTION. RETRY SIGN-OUT.');
+        return;
+      }
       await signOutUser();
     } finally {
       setSubmitting(false);

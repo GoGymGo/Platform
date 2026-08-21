@@ -851,8 +851,11 @@ export interface PushDevicesTable {
   user_id: string;
   provider: 'expo';
   platform: 'android' | 'ios';
-  push_token: string;
+  push_token: string | null;
+  installation_id: string;
   enabled: boolean;
+  disabled_at: NullableTimestamp;
+  last_registered_at: Timestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -864,11 +867,15 @@ export interface NotificationDeliveriesTable {
   payload: ColumnType<JsonValue, JsonValue, JsonValue>;
   status: NotificationDeliveryStatus;
   attempt_count: number;
+  completed_device_ids: string[];
+  dedupe_key: string;
+  delivered_count: number;
   last_error: string | null;
   lease_expires_at: NullableTimestamp;
   lease_token: string | null;
   scheduled_at: Timestamp;
   sent_at: NullableTimestamp;
+  target_device_ids: string[] | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

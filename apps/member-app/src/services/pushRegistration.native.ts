@@ -1,17 +1,21 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import * as Crypto from 'expo-crypto';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { competitionConfig } from '@/config/competition';
 import type { DevicePushRegistration } from '@/domain/accountSettings';
 
 export async function getDevicePushRegistration(): Promise<DevicePushRegistration | null> {
   if (Platform.OS !== 'android' && Platform.OS !== 'ios') return null;
 
-  const currentPermission = await Notifications.getPermissionsAsync();
-  const permission = currentPermission.granted
-    ? currentPermission
-    : await Notifications.requestPermissionsAsync();
-  if (!permission.granted) return null;
+  const permission = await Notifications.getPermissionsAsync();
+  if (
+    !permission.granted &&
+    permission.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL &&
+    permission.ios?.status !== Notifications.IosAuthorizationStatus.EPHEMERAL
+  ) return null;
 
   const easExtra = Constants.expoConfig?.extra?.eas as
     | { projectId?: string }
@@ -22,7 +26,18 @@ export async function getDevicePushRegistration(): Promise<DevicePushRegistratio
   }
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
+  let installationId = await AsyncStorage.getItem(
+    competitionConfig.pushInstallationIdStorageKey
+  );
+  if (!installationId) {
+    installationId = Crypto.randomUUID();
+    await AsyncStorage.setItem(
+      competitionConfig.pushInstallationIdStorageKey,
+      installationId
+    );
+  }
   return {
+    installationId,
     platform: Platform.OS,
     pushToken: token.data
   };

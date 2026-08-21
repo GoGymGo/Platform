@@ -9,6 +9,7 @@ import {
   type PropsWithChildren
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { AppState } from 'react-native';
 
 import { competitionConfig } from '@/config/competition';
 import { verifiedPartnerGymCatalogAvailable } from '@/config/partnerGyms';
@@ -23,7 +24,11 @@ import {
   type CompetitionPeriodIndex,
   type MonthlyCompetitionResult
 } from '@/domain/competition';
-import { buildCompetitionReminders } from '@/domain/competitionReminders';
+import {
+  buildCompetitionReminders,
+  createCompetitionReminderState,
+  type CompetitionReminderState
+} from '@/domain/competitionReminders';
 import {
   getCompetitionEntryStartDateKey,
 } from '@/domain/competitionEnrollment';
@@ -57,9 +62,11 @@ import {
   useCompetitionMatches
 } from '@/data/appDataHooks';
 import {
+  getCompetitionReminderPermission,
   requestCompetitionReminderPermission,
   syncCompetitionReminders
 } from '@/services/competitionReminders';
+import { reconcileCompetitionReminders } from '@/services/competitionReminderLifecycle';
 import { getDevicePushRegistration } from '@/services/pushRegistration';
 import {
   cancelMidSessionCheckReminder,
@@ -116,9 +123,11 @@ type WorkoutProgressContextValue = {
   prizeDrawEligible: boolean;
   projectedEntries: number;
   progressReady: boolean;
+  prepareCompetitionReminderSignOut: () => Promise<boolean>;
   recordHeartRateSample: (heartRateBpm: number, elapsedSeconds: number) => void;
   recordGymQrScan: (qrPayload: string) => Promise<boolean>;
   remindersEnabled: boolean;
+  reminderState: CompetitionReminderState;
   setCompetitionRemindersEnabled: (enabled: boolean) => Promise<boolean>;
   setWeeklyGoal: (goal: number, competitionMonthKey: string) => void;
   sessionActionError: string | null;
@@ -165,6 +174,10 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     appTourActive ? userId : null
   );
   const [remindersEnabled, setRemindersEnabled] = useState(false);
+  const [reminderState, setReminderState] = useState<CompetitionReminderState>(
+    () => createCompetitionReminderState(competitionRegion.timeZone)
+  );
+  const reminderRequestVersion = useRef(0);
   const [midSessionAlertsReady, setMidSessionAlertsReady] = useState(false);
   const [sessionActionError, setSessionActionError] = useState<string | null>(null);
   const [sessionActionPending, setSessionActionPending] = useState(false);
@@ -239,6 +252,15 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
         setRegistrationCompetitionMonthKey(storedMonthKey);
         setRegistrationDateKey(storedDateKey);
         setRemindersEnabled(storedReminderPreference === 'true');
+        setReminderState((current) => ({
+          ...current,
+          localSchedule: {
+            ...current.localSchedule,
+            timeZone: competitionRegion.timeZone
+          },
+          preference:
+            storedReminderPreference === 'true' ? 'enabled' : 'disabled'
+        }));
         setHydratedUserId(userId);
       })
       .catch(() => {
@@ -250,7 +272,14 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, [appTourActive, appTourScenario, authLoading, userId, userStorage]);
+  }, [
+    appTourActive,
+    appTourScenario,
+    authLoading,
+    competitionRegion.timeZone,
+    userId,
+    userStorage
+  ]);
 
   useEffect(() => {
     if (appTourActive || !userStorage || hydratedUserId !== userId) {
@@ -319,41 +348,77 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
     ? authoritativeProgress.goalDays
     : weeklyGoal;
 
-  useEffect(() => {
-    if (appTourActive) {
-      return;
-    }
-
-    if (!remindersEnabled) {
-      return;
-    }
-
+  const competitionReminders = useMemo(() => {
     const referenceDateKey = getCompetitionRegionDateKey(
       new Date(),
       competitionRegion.timeZone
     );
-    const verifiedDateKeys = effectiveLogs
-      .filter((log) => log.source === 'verified')
-      .map((log) => log.dateKey);
-    const reminders = buildCompetitionReminders({
+    return buildCompetitionReminders({
       competitionMonthKey:
         registrationCompetitionMonthKey ?? getCompetitionMonthKey(referenceDateKey),
       referenceDateKey,
-      userVerifiedDateKeys: verifiedDateKeys,
+      userVerifiedDateKeys: effectiveLogs
+        .filter((log) => log.source === 'verified')
+        .map((log) => log.dateKey),
       weeklyGoal: effectiveWeeklyGoal
     });
-
-    void syncCompetitionReminders(reminders).catch(() => {
-      // A backend push reminder can recover when local scheduling is unavailable.
-    });
   }, [
-    appTourActive,
     competitionRegion.timeZone,
     effectiveLogs,
     effectiveWeeklyGoal,
-    registrationCompetitionMonthKey,
-    remindersEnabled
+    registrationCompetitionMonthKey
   ]);
+
+  const reconcileReminders = useCallback(async (
+    enabled: boolean,
+    promptForPermission: boolean
+  ) => {
+    const requestVersion = reminderRequestVersion.current + 1;
+    reminderRequestVersion.current = requestVersion;
+    const state = await reconcileCompetitionReminders(
+      enabled,
+      promptForPermission,
+      {
+        accountSettings,
+        appTourActive,
+        getPermission: getCompetitionReminderPermission,
+        getPushRegistration: getDevicePushRegistration,
+        mode,
+        reminders: competitionReminders,
+        requestPermission: requestCompetitionReminderPermission,
+        storage: userStorage,
+        syncLocal: syncCompetitionReminders,
+        timeZone: competitionRegion.timeZone
+      }
+    );
+    if (requestVersion === reminderRequestVersion.current) {
+      setReminderState(state);
+      setRemindersEnabled(state.preference === 'enabled');
+    }
+    return state;
+  }, [
+    accountSettings,
+    appTourActive,
+    competitionRegion.timeZone,
+    competitionReminders,
+    mode,
+    userStorage
+  ]);
+
+  useEffect(() => {
+    if (hydratedUserId !== userId) return;
+    void reconcileReminders(remindersEnabled, false);
+  }, [hydratedUserId, reconcileReminders, remindersEnabled, userId]);
+
+  useEffect(() => {
+    if (!remindersEnabled || appTourActive) return;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void reconcileReminders(true, false);
+      }
+    });
+    return () => subscription.remove();
+  }, [appTourActive, reconcileReminders, remindersEnabled]);
 
   const reminderSessionId = activeSession?.id;
   const reminderCheckAtSeconds = activeSession?.midSessionCheckAtSeconds;
@@ -845,75 +910,24 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
   }, []);
 
   const setCompetitionRemindersEnabled = useCallback(async (enabled: boolean) => {
-    if (appTourActive) {
-      setRemindersEnabled(enabled);
-      return true;
-    }
-
+    const state = await reconcileReminders(enabled, enabled);
     if (!enabled) {
-      try {
-        const pushDeviceId = await userStorage?.getItem(
-          competitionConfig.pushDeviceIdStorageKey
-        );
-        if (mode === 'api' && pushDeviceId) {
-          await accountSettings.disablePushDevice(pushDeviceId);
-        }
-        await Promise.all([
-          userStorage?.setItem(
-            competitionConfig.reminderPreferenceStorageKey,
-            'false'
-          ) ?? Promise.resolve(),
-          userStorage?.removeItem(
-            competitionConfig.pushDeviceIdStorageKey
-          ) ?? Promise.resolve(),
-          syncCompetitionReminders([])
-        ]);
-        setRemindersEnabled(false);
-        return true;
-      } catch {
-        setRemindersEnabled(true);
-        return false;
-      }
-    }
-
-    try {
-      const granted = await requestCompetitionReminderPermission();
-
-      if (!granted) {
-        setRemindersEnabled(false);
-        await userStorage?.setItem(
-          competitionConfig.reminderPreferenceStorageKey,
-          'false'
-        );
-        return false;
-      }
-
-      if (mode === 'api') {
-        const registration = await getDevicePushRegistration();
-        if (!registration) {
-          throw new Error('Push notifications are unavailable on this device.');
-        }
-        const device = await accountSettings.registerPushDevice(
-          registration.platform,
-          registration.pushToken
-        );
-        await userStorage?.setItem(
-          competitionConfig.pushDeviceIdStorageKey,
-          device.id
-        );
-      }
-
-      setRemindersEnabled(true);
-      await userStorage?.setItem(
-        competitionConfig.reminderPreferenceStorageKey,
-        'true'
+      return (
+        state.preference === 'disabled' &&
+        state.localSchedule.status !== 'retry' &&
+        state.pushRegistration.status !== 'retry'
       );
-      return true;
-    } catch {
-      setRemindersEnabled(false);
-      return false;
     }
-  }, [accountSettings, appTourActive, mode, userStorage]);
+    return state.preference === 'enabled';
+  }, [reconcileReminders]);
+
+  const prepareCompetitionReminderSignOut = useCallback(async () => {
+    const state = await reconcileReminders(false, false);
+    return (
+      state.localSchedule.status !== 'retry' &&
+      state.pushRegistration.status !== 'retry'
+    );
+  }, [reconcileReminders]);
 
   const setWeeklyGoal = useCallback((goal: number, nextCompetitionMonthKey: string) => {
     const nextRegistrationDateKey = getCompetitionRegionDateKey(
@@ -944,8 +958,7 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       // The selected month remains active in memory if local persistence fails.
     });
 
-    void setCompetitionRemindersEnabled(true);
-  }, [competitionRegion.timeZone, setCompetitionRemindersEnabled, userStorage]);
+  }, [competitionRegion.timeZone, userStorage]);
 
   const dataReferenceDateKey =
     authoritativeProgress?.referenceDateKey ??
@@ -1080,10 +1093,12 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       midSessionAlertsReady,
       prizeDrawEligible: derived.prizeDrawEligible,
       projectedEntries: derived.projectedEntries,
+      prepareCompetitionReminderSignOut,
       progressReady,
       recordGymQrScan,
       recordHeartRateSample,
       remindersEnabled,
+      reminderState,
       setCompetitionRemindersEnabled,
       setWeeklyGoal,
       sessionActionError,
@@ -1108,10 +1123,12 @@ export function WorkoutProgressProvider({ children }: PropsWithChildren) {
       effectiveLogs,
       markMidSessionVerified,
       midSessionAlertsReady,
+      prepareCompetitionReminderSignOut,
       progressReady,
       recordHeartRateSample,
       recordGymQrScan,
       remindersEnabled,
+      reminderState,
       setCompetitionRemindersEnabled,
       setWeeklyGoal,
       sessionActionError,

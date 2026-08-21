@@ -161,6 +161,12 @@ export class OperatorService {
               sql<number>`count(*) filter (
                 where status = 'failed' and attempt_count >= 5
               )`.as('exhausted'),
+              sql<number>`count(*) filter (
+                where status in ('pending', 'failed')
+                  and attempt_count < 5
+                  and lease_expires_at is not null
+                  and lease_expires_at <= ${now}
+              )`.as('stale_leases'),
             ])
             .executeTakeFirstOrThrow(),
           transaction
@@ -330,6 +336,7 @@ export class OperatorService {
             notificationsLeased: Number(notifications.leased),
             notificationsPending: Number(notifications.pending),
             notificationsRetryScheduled: Number(notifications.retry_scheduled),
+            notificationsStaleLeases: Number(notifications.stale_leases),
             privacyOperationsLeased: Number(privacyOperations.leased),
             privacyOperationsPending: Number(privacyOperations.pending),
             privacyOperationsRetryScheduled: Number(

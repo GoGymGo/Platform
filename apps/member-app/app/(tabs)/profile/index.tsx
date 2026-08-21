@@ -21,6 +21,7 @@ import {
   useWithdrawFromCompetition
 } from '@/data/accountReadinessHooks'
 import { getPublicInitials } from '@/domain/profile'
+import type { CompetitionReminderState } from '@/domain/competitionReminders'
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification'
 import { useProfileImagePicker } from '@/hooks/useProfileImagePicker'
 import { useAuth } from '@/state/auth'
@@ -102,6 +103,8 @@ export default function ProfileScreen() {
   const { competitionRegion, regionVerification } = useCompetitionRegion()
   const publicInitials = getPublicInitials(publicName)
   const {
+    prepareCompetitionReminderSignOut,
+    reminderState,
     remindersEnabled,
     setCompetitionRemindersEnabled,
     totalEntries,
@@ -155,6 +158,9 @@ export default function ProfileScreen() {
     setSigningOut(true)
     setSignOutError(undefined)
     try {
+      if (!(await prepareCompetitionReminderSignOut())) {
+        throw new Error('Competition reminder cleanup is pending.')
+      }
       await signOutUser()
       router.replace('/')
     } catch {
@@ -185,6 +191,9 @@ export default function ProfileScreen() {
     setResettingApp(true)
     setAccountActionMessage(undefined)
     try {
+      if (!(await prepareCompetitionReminderSignOut())) {
+        throw new Error('Competition reminder cleanup is pending.')
+      }
       await signOutUser()
       await clearPendingGymScan()
       await clearLocalAppData()
@@ -207,8 +216,8 @@ export default function ProfileScreen() {
       if (!updated) {
         setNotificationMessage(
           enabled
-            ? 'NOTIFICATION PERMISSION IS OFF. ENABLE IT IN YOUR DEVICE SETTINGS, THEN TRY AGAIN.'
-            : 'REMINDERS COULD NOT BE UPDATED. TRY AGAIN.'
+            ? 'REMINDERS WERE NOT ENABLED. CHECK THE PERMISSION AND DELIVERY STATES BELOW, THEN TRY AGAIN.'
+            : 'LOCAL REMINDERS ARE OFF, BUT PUSH DISABLE IS PENDING. RETRY BEFORE SIGNING OUT.'
         )
       }
     } finally {
@@ -556,7 +565,16 @@ export default function ProfileScreen() {
                     tone={remindersEnabled ? 'green' : 'dim'}
                     variant="micro"
                   >
-                    {remindersEnabled ? 'ENABLED ON THIS DEVICE' : 'OFF'}
+                    {remindersEnabled ? 'OPTED IN' : 'OFF'}
+                  </TerminalText>
+                  <TerminalText tone="dim" uppercase={false} variant="micro">
+                    {formatReminderPermission(reminderState.permission)}
+                  </TerminalText>
+                  <TerminalText tone="dim" uppercase={false} variant="micro">
+                    {formatLocalReminderState(reminderState)}
+                  </TerminalText>
+                  <TerminalText tone="dim" uppercase={false} variant="micro">
+                    {formatPushReminderState(reminderState.pushRegistration.status)}
                   </TerminalText>
                 </View>
                 <Switch
@@ -726,6 +744,41 @@ export default function ProfileScreen() {
       </ScreenScrollView>
     </ScreenContainer>
   )
+}
+
+function formatReminderPermission(
+  permission: CompetitionReminderState['permission']
+) {
+  const label = {
+    checking: 'CHECKING',
+    denied: 'DENIED — ENABLE IN DEVICE SETTINGS, THEN RETRY',
+    granted: 'GRANTED',
+    provisional: 'PROVISIONAL — DELIVERED QUIETLY BY IOS',
+    undetermined: 'NOT REQUESTED',
+    unavailable: 'UNAVAILABLE ON THIS PLATFORM'
+  }[permission]
+  return `PERMISSION // ${label}`
+}
+
+function formatLocalReminderState(state: CompetitionReminderState) {
+  const { count, status, timeZone } = state.localSchedule
+  if (status === 'scheduled') {
+    return `LOCAL // SCHEDULED ${count} IN ${timeZone} // GOAL 18:00 // CHALLENGE 18:15 // BONUS 09:00`
+  }
+  return `LOCAL // ${status.toUpperCase()} // ${timeZone}`
+}
+
+function formatPushReminderState(
+  status: CompetitionReminderState['pushRegistration']['status']
+) {
+  const label = {
+    disabled: 'DISABLED BY PREFERENCE OR ENVIRONMENT',
+    error: 'ERROR — RETRY REGISTRATION',
+    registered: 'REGISTERED FOR REMOTE DELIVERY',
+    retry: 'RETRY REQUIRED',
+    unavailable: 'UNAVAILABLE ON THIS PLATFORM OR CONFIGURATION'
+  }[status]
+  return `PUSH // ${label}`
 }
 
 function formatProviderLabel(providerIds: readonly string[]) {

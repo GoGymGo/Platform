@@ -63,6 +63,24 @@ describe('account settings repository', () => {
           }
         } else if (path === '/v1/me/avatar' && options?.method === 'DELETE') {
           response = { status: 'removed' }
+        } else if (path === '/v1/me/push-devices/capabilities') {
+          response = {
+            deliveryStatus: 'available',
+            maximumDevices: 5,
+            registrationAvailable: true
+          }
+        } else if (path === '/v1/me/push-devices') {
+          response = {
+            enabled: true,
+            id: '30000000-0000-4000-8000-000000000003',
+            platform: 'ios',
+            provider: 'expo'
+          }
+        } else if (
+          path.startsWith('/v1/me/push-devices/') &&
+          options?.method === 'DELETE'
+        ) {
+          response = null
         } else if (path === '/v1/me/avatar') {
           response = { active: null, latest: null }
         } else if (path === '/v1/me') {
@@ -77,7 +95,12 @@ describe('account settings repository', () => {
     await settings.getPrivacyCapabilities()
     await settings.createPrivacyRequest('export', 'EXPORT_MY_DATA')
     await settings.getPrivacyDownload('privacy-one')
-    await settings.registerPushDevice('ios', 'ExponentPushToken[device-one]')
+    await settings.getPushCapabilities()
+    await settings.registerPushDevice({
+      installationId: '40000000-0000-4000-8000-000000000004',
+      platform: 'ios',
+      pushToken: 'ExponentPushToken[device-one]'
+    })
     await settings.disablePushDevice('device-one')
     await settings.getDevicePresenceConsent()
     await settings.setDevicePresenceConsent(false, '2026-07-05')
@@ -109,7 +132,16 @@ describe('account settings repository', () => {
         path: '/v1/me/privacy-requests/privacy-one/download-action'
       },
       {
-        body: { platform: 'ios', pushToken: 'ExponentPushToken[device-one]' },
+        body: undefined,
+        method: undefined,
+        path: '/v1/me/push-devices/capabilities'
+      },
+      {
+        body: {
+          installationId: '40000000-0000-4000-8000-000000000004',
+          platform: 'ios',
+          pushToken: 'ExponentPushToken[device-one]'
+        },
         method: 'POST',
         path: '/v1/me/push-devices'
       },
@@ -188,6 +220,46 @@ describe('account settings repository', () => {
 
     await assert.rejects(
       () => settings.getPrivacyDownload('privacy-one'),
+      /invalid response/i
+    )
+  })
+
+  it('rejects expanded push capability, registration, and disable responses', async () => {
+    const responseByPath: Record<string, unknown> = {
+      '/v1/me/push-devices/capabilities': {
+        deliveryStatus: 'available',
+        maximumDevices: 5,
+        providerTokenConfigured: true,
+        registrationAvailable: true
+      },
+      '/v1/me/push-devices': {
+        enabled: true,
+        id: '30000000-0000-4000-8000-000000000003',
+        platform: 'ios',
+        provider: 'expo',
+        pushToken: 'ExponentPushToken[must-not-escape]'
+      },
+      '/v1/me/push-devices/device-one': { disabled: true }
+    }
+    const settings = createAccountSettingsRepository('api', {
+      request: <TResponse>(path: string) =>
+        Promise.resolve(responseByPath[path]) as Promise<TResponse>
+    })
+
+    await assert.rejects(
+      () => settings.getPushCapabilities(),
+      /invalid response/i
+    )
+    await assert.rejects(
+      () => settings.registerPushDevice({
+        installationId: '40000000-0000-4000-8000-000000000004',
+        platform: 'ios',
+        pushToken: 'ExponentPushToken[device-one]'
+      }),
+      /invalid response/i
+    )
+    await assert.rejects(
+      () => settings.disablePushDevice('device-one'),
       /invalid response/i
     )
   })

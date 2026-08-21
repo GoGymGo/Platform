@@ -46,6 +46,7 @@ describe('local app reset', () => {
       storage: {
         getAllKeys: async () => [
           '@gogymgo/pending-gym-scan',
+          '@gogymgo/push-installation-id',
           'firebase:authUser:member',
           'other-app-key'
         ],
@@ -56,7 +57,7 @@ describe('local app reset', () => {
     });
 
     assert.deepEqual(events, [
-      'async-storage:@gogymgo/pending-gym-scan,firebase:authUser:member',
+      'async-storage:@gogymgo/pending-gym-scan,@gogymgo/push-installation-id,firebase:authUser:member',
       'local-storage:gogymgo:profile',
       'session-storage:firebase:authUser:member',
       'cookie:gogymgo-session=; Max-Age=0; path=/; SameSite=Lax',

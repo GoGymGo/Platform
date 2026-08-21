@@ -31,6 +31,7 @@ import {
 } from '@/navigation/contactInvitationFlow';
 import { useAppTour } from '@/state/appTour';
 import { useAuth } from '@/state/auth';
+import { useWorkoutProgress } from '@/state/workoutProgress';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
@@ -48,6 +49,7 @@ export default function VerifyEmailScreen() {
     signOutUser,
     user
   } = useAuth();
+  const { prepareCompetitionReminderSignOut } = useWorkoutProgress();
   const [busyAction, setBusyAction] = useState<'check' | 'resend' | 'signout' | null>(null);
   const initialVerificationDeliveryFailed = verificationEmailSent === 'false';
   const [message, setMessage] = useState<string | undefined>(
@@ -155,6 +157,11 @@ export default function VerifyEmailScreen() {
   async function exitAccount() {
     setBusyAction('signout');
     try {
+      if (!(await prepareCompetitionReminderSignOut())) {
+        setMessageTone('red');
+        setMessage('REMINDER CLEANUP NEEDS A CONNECTION. RETRY SIGN-OUT.');
+        return;
+      }
       await signOutUser();
       router.replace(
         challengeInvite

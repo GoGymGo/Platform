@@ -538,6 +538,7 @@ export function decodeSystemHealth(value: unknown): SystemHealth {
     "notificationsLeased",
     "notificationsPending",
     "notificationsRetryScheduled",
+    "notificationsStaleLeases",
     "privacyOperationsLeased",
     "privacyOperationsPending",
     "privacyOperationsRetryScheduled",

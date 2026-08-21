@@ -2,9 +2,11 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Headers,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
 import {
@@ -12,6 +14,7 @@ import {
   ApiCreatedResponse,
   ApiHeader,
   ApiNoContentResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -19,6 +22,7 @@ import { requireIdempotencyKey } from '../../common/idempotency/idempotency-key'
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { CurrentPrincipal } from '../auth/current-principal.decorator';
 import {
+  PushCapabilitiesResponseDto,
   PushDeviceResponseDto,
   RegisterPushDeviceDto,
 } from './dto/push-device.dto';
@@ -29,6 +33,13 @@ import { NotificationsService } from './notifications.service';
 @Controller('me/push-devices')
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
+
+  @Get('capabilities')
+  @ApiOperation({ summary: 'Read push registration availability' })
+  @ApiOkResponse({ type: PushCapabilitiesResponseDto })
+  capabilities(): PushCapabilitiesResponseDto {
+    return this.notifications.getCapabilities();
+  }
 
   @Post()
   @ApiHeader({ name: 'Idempotency-Key', required: true })
@@ -52,7 +63,7 @@ export class NotificationsController {
   @ApiNoContentResponse()
   disable(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
-    @Param('deviceId') deviceId: string,
+    @Param('deviceId', new ParseUUIDPipe({ version: '4' })) deviceId: string,
   ): Promise<void> {
     return this.notifications.disableDevice(principal, deviceId);
   }

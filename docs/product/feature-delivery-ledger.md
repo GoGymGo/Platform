@@ -18,10 +18,9 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `98bc63b04c40e92718af1f0772335150b4c078e6` after PR #118 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-018 — Competition reminders and push`
-  on `agent/ggg-018-competition-reminders-push`; creation follows this ledger
-  merge.
+  `6019ac5fddacec9ba4ee22f9a6bb037f9bf35d6d` after PR #120 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-025 — Public conversion journeys` on
+  `agent/ggg-025-public-conversion-journeys`; creation follows this ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -34,7 +33,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 46 forward migrations; generated OpenAPI/contracts; feature
+  worker behavior; 47 forward migrations; generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
 
@@ -653,17 +652,23 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   tokens are not public; worker leases retries durably.
 - External providers / feature flag: Expo Push; `PUSH_NOTIFICATIONS_ENABLED`
   defaults false and an access token may be required.
-- Current implementation / missing behavior: local/native services, server client,
-  templates, leases, and disable path exist. Missing release EAS project, physical
-  permission/token tests, provider credentials, delivery/retry staging evidence.
+- Current implementation / missing behavior: repository behavior is complete:
+  explicit permission/provider/local schedule states, Contest-timezone scheduling,
+  installation-scoped private registration/rotation/disable, replay authorization,
+  sign-out/reset cleanup, deduplicated fenced delivery, bounded retry/backoff,
+  partial-ticket handling, and operational stale-lease evidence. Provider delivery
+  remains deliberately disabled and unproven.
 - Required tests / operations / cloud dependency: permission states, register/
   disable coupling, token rotation, duplicate delivery, lease recovery, provider
   failure, background notifications; Expo/Firebase project and worker.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-018 — Competition reminders
-  and push`; branch `agent/ggg-018-competition-reminders-push`; PR/merge
-  `unassigned`; status `IN_PROGRESS`.
-- Residual risks / blocker: no UI may claim push delivery while the provider is
-  disabled or unavailable.
+  and push`; branch `agent/ggg-018-competition-reminders-push` (deleted after
+  merge); PR `#120`; merge `6019ac5fddacec9ba4ee22f9a6bb037f9bf35d6d`;
+  status `BLOCKED`.
+- Residual risks / blocker: `PUSH_NOTIFICATIONS_ENABLED=false`; EAS/Firebase/Expo
+  provider configuration and real-device permission, token, background delivery,
+  retry and rotation UAT require separate cloud/deployment authority. No UI claims
+  push delivery while the provider is disabled or unavailable.
 
 ### GGG-019 — Privacy export, deletion, and local-device reset
 
@@ -913,7 +918,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   no misleading registration/reward claims, SEO/robots/sitemap, responsive and
   keyboard behavior, production artifact audit; Sites/Firebase hosting domains.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-025 — Public conversion
-  journeys`; branch/PR/merge `unassigned`; status `AUDITED`.
+  journeys`; branch `agent/ggg-025-public-conversion-journeys`; PR/merge
+  `unassigned`; status `IN_PROGRESS`.
 - Residual risks / blocker: landing claims must track release capability and the
   approved pilot reward exactly.
 
@@ -1181,6 +1187,26 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed the repository delivery for `GGG-018` through PR #120.
+  Exact tested head `4b7af48c5db40723ac56ad7548f2b1ed71e7de35` was
+  squash-merged as `6019ac5fddacec9ba4ee22f9a6bb037f9bf35d6d`; all PR
+  checks and all six exact-main workflows passed and the feature branch was
+  deleted. Delivery added explicit permission/provider/local schedule states,
+  Contest-timezone/DST scheduling, installation-scoped owner-only registration,
+  rotation and disable with replay reauthorization, sign-out/reset cleanup,
+  private token handling, deduplicated fenced delivery, partial-ticket progress,
+  bounded backoff/exhaustion, stale-lease health, migration, contracts, member/
+  admin UI and runbooks. Serial proof included 398 API unit tests, 28 API E2E
+  tests, 76 PostGIS integration tests, 268 member tests, 43 admin tests, all-platform
+  Expo and production-image/runtime checks, plus governance/dependency/source/
+  build/artifact/secret gates. No provider, cloud, credential or deployment action
+  occurred. Status remains `BLOCKED` because push is disabled and real EAS/
+  Firebase/Expo configuration plus physical-device permission/token/background/
+  delivery/retry UAT are external. The exact local API image tag was retained after
+  three unrelated old stopped PostGIS containers made the conditional cleanup
+  authorization inapplicable; those containers were untouched. Dependency ordering
+  assigns `GGG-025` next because the public conversion duty can now consume the
+  completed landing, demo, legal, reward and member-application boundaries.
 - 2026-08-21 — Completed the repository delivery for `GGG-017` through PR #118.
   Exact tested head `3bd0cfb699ff8487473782246b5023ce6e682076` was
   squash-merged as `98bc63b04c40e92718af1f0772335150b4c078e6`; all PR

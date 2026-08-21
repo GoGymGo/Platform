@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `605c35274a377c54a6240a53f13cbe247501751c` after PR #124 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-027 — Landing data cutover` on
-  `agent/ggg-027-landing-data-cutover`; creation follows this ledger merge.
+  `5ab7216fe43d92db07b34d74f8d55dfb6341165a` after PR #126 on 2026-08-21.
+- Active feature task: `GoGymGo Feature GGG-028 — Member release and native
+  links` on `agent/ggg-028-member-release-native-links`; creation follows this
+  ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -33,7 +34,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   after staging-required product code is terminal.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 47 API forward migrations and 4 landing D1 migrations;
+  worker behavior; 48 API forward migrations and 4 landing D1 migrations;
   generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
@@ -975,16 +976,22 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   export disabled and owner-only; import is an operator procedure.
 - External providers / feature flag: Cloudflare D1 and PostgreSQL;
   `LANDING_D1_EXPORT_ENABLED=no` by default.
-- Current implementation / missing behavior: cutover code and runbook exist;
-  historical export/import/count verification and D1 removal are not evidenced.
+- Current implementation / missing behavior: fail-closed API-only forwarding,
+  frozen owner export, strict offline artifact validation, deterministic
+  transactional import/reconciliation, provenance, privacy, retention, admin
+  visibility, and the cutover runbook are repository-complete. Historical export,
+  production import/count/hash verification, deployment cutover, D1 removal, and
+  rollback rehearsal are not evidenced.
 - Required tests / operations / cloud dependency: read-only export, owner gate,
   idempotent import, duplicate mapping, count/hash verification, rollback, export
   disablement; Cloudflare and database access.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-027 — Landing data cutover`;
-  branch `agent/ggg-027-landing-data-cutover`; PR/merge `unassigned`; status
-  `IN_PROGRESS`.
-- Residual risks / blocker: requires unavailable/unauthorized cloud access and must
-  not be attempted from a normal feature task.
+  branch `agent/ggg-027-landing-data-cutover` (deleted after merge); PR `#126`;
+  merge `5ab7216fe43d92db07b34d74f8d55dfb6341165a`; status `BLOCKED`.
+- Residual risks / blocker: real exact-owner D1 export, production PostgreSQL
+  import count/hash/rerun verification, deployment cutover, binding removal, and
+  rollback rehearsal require separate cloud/data authority and must not be
+  attempted from a normal feature task.
 
 ### GGG-028 — Browser pilot release and native QR-link handoff
 
@@ -1006,7 +1013,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   export audit, demo exclusion, association generation, signed iOS/Android link
   test, rollback; Firebase/EAS/Apple/Google and domains.
 - Delivery: priority `P1`; task `GoGymGo Feature GGG-028 — Member release and
-  native links`; branch/PR/merge `unassigned`; status `READY`.
+  native links`; branch `agent/ggg-028-member-release-native-links`; PR/merge
+  `unassigned`; status `IN_PROGRESS`.
 - Residual risks / blocker: deployment is not authorized and placeholder native
   identifiers are forbidden.
 
@@ -1202,6 +1210,27 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-21 — Completed the repository delivery for `GGG-027` through PR #126.
+  Corrected exact head `2fc7610cc01e2543247d413ecf48f603ac7e15d9` was
+  squash-merged with an exact-head guard as
+  `5ab7216fe43d92db07b34d74f8d55dfb6341165a`; all seven PR checks and all six
+  exact-main workflows passed, the reviewed and merged trees matched exactly, and
+  the feature branch was deleted. Delivery replaced landing D1 writes with strict
+  fail-closed API-only forwarding, added authenticated idempotent PostgreSQL
+  intake with provenance and expiry, frozen exact-owner paginated D1 export,
+  strict offline page-chain/count/digest validation, deterministic serializable
+  import with duplicate mapping and rerun reconciliation, privacy deletion/export,
+  bounded retention, minimized admin evidence, and the cutover/rollback runbook.
+  Proof included 408 API unit tests, 29 E2E tests, 34 landing tests, 43 admin tests,
+  governance/contracts/source/artifact gates, and an authorized disposable
+  PostGIS suite passing 4/4; exact-head CI then passed all 12 integration suites.
+  The first CI head exposed only two stale privacy schema-version assertions,
+  which were corrected and fully reproved. No cloud/provider/credential/real-data/
+  deploy action occurred. Status remains `BLOCKED` pending separately authorized
+  real D1 export, production import count/hash/rerun verification, deployment
+  cutover, binding removal, and rollback rehearsal. Dependency ordering assigns
+  `GGG-028` next for repository release and native-link readiness only; no hosting,
+  store, signing, Firebase, EAS, domain, or provider action is authorized.
 - 2026-08-21 — Completed the repository delivery for `GGG-026` through PR #124.
   Exact tested head `51e3de9f00be5304ffcbc700544b9e41595f36b8` was
   squash-merged as `605c35274a377c54a6240a53f13cbe247501751c`; all PR

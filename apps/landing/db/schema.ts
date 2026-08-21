@@ -1,10 +1,12 @@
 import {
+  check,
   index,
   integer,
   sqliteTable,
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const interestSubmissions = sqliteTable(
   "interest_submissions",
@@ -59,10 +61,59 @@ export const publicSiteFeedback = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
+    index("idx_public_site_feedback_created").on(table.createdAt),
     index("idx_public_site_feedback_status_created").on(
       table.status,
       table.createdAt,
     ),
+  ],
+);
+
+export const publicSiteRateBuckets = sqliteTable(
+  "public_site_rate_buckets",
+  {
+    bucketKey: text("bucket_key").primaryKey(),
+    attemptCount: integer("attempt_count").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    check(
+      "public_site_rate_buckets_attempt_count_check",
+      sql`${table.attemptCount} >= 1 AND ${table.attemptCount} <= 10000`,
+    ),
+    index("idx_public_site_rate_buckets_expires").on(table.expiresAt),
+  ],
+);
+
+export const publicSiteOperationsAudit = sqliteTable(
+  "public_site_operations_audit",
+  {
+    id: text("id").primaryKey(),
+    operation: text("operation", {
+      enum: [
+        "export_feedback",
+        "export_events",
+        "retention_feedback",
+        "retention_events",
+        "retention_audit",
+      ],
+    }).notNull(),
+    affectedCount: integer("affected_count").notNull(),
+    pageSize: integer("page_size").notNull(),
+    cursorUsed: integer("cursor_used", { mode: "boolean" }).notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    check(
+      "public_site_operations_audit_affected_count_check",
+      sql`${table.affectedCount} >= 0 AND ${table.affectedCount} <= 1000`,
+    ),
+    check(
+      "public_site_operations_audit_page_size_check",
+      sql`${table.pageSize} >= 1 AND ${table.pageSize} <= 1000`,
+    ),
+    index("idx_public_site_operations_audit_created").on(table.createdAt),
   ],
 );
 
@@ -80,7 +131,6 @@ export const publicSiteEvents = sqliteTable(
         "gym_form_start",
         "brand_form_start",
         "feedback_form_start",
-        "eligibility_check_completed",
       ],
     }).notNull(),
     path: text("path").notNull(),

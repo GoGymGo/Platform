@@ -9,7 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "npm run build && node --import=tsx --test tests/rendered-html.test.mjs tests/public-boundaries.test.ts && npm run audit:production-artifact",
+    "test": "npm run build && node --import=tsx --test tests/rendered-html.test.mjs tests/public-boundaries.test.ts tests/public-site-data.test.ts && npm run audit:production-artifact",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "audit:production-artifact": "node scripts/audit-production-artifact.mjs dist",

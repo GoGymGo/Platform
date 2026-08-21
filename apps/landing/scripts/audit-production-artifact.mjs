@@ -87,8 +87,13 @@ if (fs.existsSync(serverEntry)) {
   const serverSource = fs.readFileSync(serverEntry, "utf8");
   for (const required of [
     "Content-Security-Policy",
+    "LANDING_D1_EXPORT_OWNER_USER_ID",
     "Permissions-Policy",
+    "PUBLIC_SITE_EVENT_RETENTION_DAYS",
+    "PUBLIC_SITE_FEEDBACK_RETENTION_DAYS",
     "camera=(), geolocation=(), microphone=()",
+    "public_site_operations_audit",
+    "public_site_rate_buckets",
     "Strict-Transport-Security",
     "X-Content-Type-Options",
   ]) {

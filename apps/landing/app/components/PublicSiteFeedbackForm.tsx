@@ -9,6 +9,7 @@ export function PublicSiteFeedbackForm() {
   const [error, setError] = useState("");
   const errorRef = useRef<HTMLParagraphElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
+  const submissionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (state === "error") {
@@ -22,8 +23,11 @@ export function PublicSiteFeedbackForm() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    submissionIdRef.current ??= crypto.randomUUID();
     setState("submitting");
     setError("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
 
     try {
       const response = await fetch("/api/public-site-feedback", {
@@ -34,30 +38,36 @@ export function PublicSiteFeedbackForm() {
           email: formData.get("email"),
           message: formData.get("message"),
           page: formData.get("page"),
+          submissionId: submissionIdRef.current,
         }),
+        credentials: "omit",
         headers: { "content-type": "application/json" },
         method: "POST",
+        referrerPolicy: "no-referrer",
+        signal: controller.signal,
       });
 
-      let body: { error?: string } = {};
-      try {
-        body = (await response.json()) as { error?: string };
-      } catch {
-        // Keep the fallback message when an upstream response has no JSON body.
-      }
-
       if (!response.ok) {
-        throw new Error(body.error ?? "We couldn't save your report. Please try again.");
+        throw new Error(
+          await readPublicError(
+            response,
+            "We couldn't save your report. Please try again.",
+          ),
+        );
       }
 
       setState("success");
     } catch (cause) {
       setError(
-        cause instanceof Error
+        cause instanceof DOMException && cause.name === "AbortError"
+          ? "The request took too long. Check your connection and try again."
+          : cause instanceof Error
           ? cause.message
           : "We couldn't save your report. Please try again.",
       );
       setState("error");
+    } finally {
+      window.clearTimeout(timeout);
     }
   }
 
@@ -74,8 +84,8 @@ export function PublicSiteFeedbackForm() {
         <div>
           <h3>Public-site report received.</h3>
           <p>
-            Thank you for the detail. We will use the email you provided if a
-            follow-up is needed.
+            Thank you for the detail. If you provided an email, we will use it
+            only if a follow-up about this report is needed.
           </p>
         </div>
       </div>
@@ -110,28 +120,40 @@ export function PublicSiteFeedbackForm() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="feedbackEmail">YOUR EMAIL *</label>
+          <label htmlFor="feedbackEmail">YOUR EMAIL (OPTIONAL)</label>
           <input
             autoComplete="email"
+            aria-describedby="public-site-feedback-contact-note"
             id="feedbackEmail"
             maxLength={320}
             name="email"
             placeholder="you@example.com"
-            required
             type="email"
           />
         </div>
       </div>
 
       <div className="field">
-        <label htmlFor="feedbackPage">PAGE OR LINK WITH THE PROBLEM *</label>
-        <input
+        <label htmlFor="feedbackPage">PUBLIC PAGE WITH THE PROBLEM *</label>
+        <select
+          defaultValue=""
           id="feedbackPage"
-          maxLength={300}
           name="page"
-          placeholder="e.g. FAQ, Regional updates, or a page URL"
           required
-        />
+        >
+          <option disabled value="">
+            Select one
+          </option>
+          <option value="home">Home</option>
+          <option value="gym_goers">Gym goers</option>
+          <option value="partners">Partners</option>
+          <option value="brands">Brands</option>
+          <option value="faq">FAQ</option>
+          <option value="contact">Contact</option>
+          <option value="accessibility">Accessibility</option>
+          <option value="account_deletion">Account deletion</option>
+          <option value="other">Another public page</option>
+        </select>
       </div>
 
       <div className="field">
@@ -141,7 +163,7 @@ export function PublicSiteFeedbackForm() {
           maxLength={2000}
           minLength={20}
           name="message"
-          placeholder="Describe what you expected, what happened, and any device or browser detail that may help."
+          placeholder="Describe what you expected and what happened."
           required
         />
       </div>
@@ -157,11 +179,16 @@ export function PublicSiteFeedbackForm() {
       </div>
 
       <div className="consent-group">
-        <input id="feedbackConsent" name="consent" required type="checkbox" />
+        <input id="feedbackConsent" name="consent" type="checkbox" />
         <label htmlFor="feedbackConsent">
-          I agree that GoGymGo may store this report and contact me about it. *
+          If I provide an email, I agree that GoGymGo may use it to contact me
+          about this report.
         </label>
       </div>
+      <p className="fine-print" id="public-site-feedback-contact-note">
+        You can report a problem without giving an email. Reports are deleted
+        after the approved retention period and never kept longer than 180 days.
+      </p>
 
       {state === "error" ? (
         <p className="form-status" ref={errorRef} role="alert" tabIndex={-1}>
@@ -174,7 +201,11 @@ export function PublicSiteFeedbackForm() {
         disabled={state === "submitting"}
         type="submit"
       >
-        {state === "submitting" ? "SENDING…" : "SEND PUBLIC-SITE REPORT →"}
+        {state === "submitting"
+          ? "SENDING…"
+          : state === "error"
+            ? "TRY AGAIN →"
+            : "SEND PUBLIC-SITE REPORT →"}
       </button>
       <p className="fine-print" id="public-site-feedback-note">
         Do not include passwords, authentication codes, health information, or
@@ -183,4 +214,28 @@ export function PublicSiteFeedbackForm() {
       </p>
     </form>
   );
+}
+
+async function readPublicError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const value: unknown = await response.json();
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 1 &&
+      "error" in value &&
+      typeof value.error === "string" &&
+      value.error.length > 0 &&
+      value.error.length <= 240
+    ) {
+      return value.error;
+    }
+  } catch {
+    // Keep the privacy-safe fallback when the response is not the exact schema.
+  }
+  return fallback;
 }

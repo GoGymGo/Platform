@@ -48,10 +48,12 @@ export default function AccessibilityPage() {
             <p>
               To find confusing public journeys, this site counts a fixed list
               of interactions such as app-link clicks, FAQ opens, and the first
-              use of a public form. These measurement events contain only the
-              event name, public page path, and time. They do not store cookies,
-              identifiers, eligibility-check answers, form values, precise
-              location, or member-app activity.
+              use of a public form. The browser sends only the allowlisted event
+              name; the server adds its fixed canonical action and time. Events
+              are deleted after the approved period and never kept longer than
+              90 days. They do not store cookies, identifiers, query strings,
+              referrers, network addresses, device details, eligibility-check
+              answers, form values, precise location, or member-app activity.
             </p>
           </section>
           <section>
@@ -69,7 +71,7 @@ export default function AccessibilityPage() {
               REPORT AN ACCESSIBILITY BARRIER →
             </Link>
           </section>
-          <p className="fine-print">Last updated August 3, 2026.</p>
+          <p className="fine-print">Last updated August 21, 2026.</p>
         </div>
       </div>
     </main>

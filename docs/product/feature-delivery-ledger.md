@@ -18,10 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `5728dc3a9c632e7d9b467fd4e6fa4fe5b589c39b` after PR #131 on 2026-08-22.
-- Active feature task: `GoGymGo Feature GGG-030 — AWS platform repository
-  readiness` on `agent/ggg-030-aws-foundation-readiness`; creation follows this
-  ledger merge.
+  `685de9f8d8b70988d5216f99ec1954162ca13336` after PR #133 on 2026-08-22.
+- Active feature task: none. Every non-deferred repository feature duty is
+  terminal (`COMPLETE` or externally `BLOCKED`); no cloud/read-only reconciliation,
+  deployment, provider, release or real-data task may start without new authority.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -1069,19 +1069,27 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   environments, least privilege, manual production approval.
 - External providers / feature flag: AWS, Firebase, GitHub; Terraform remote
   backend must be disabled for local validation.
-- Current implementation / missing behavior: infrastructure and runbooks exist and
-  prior PR #14 prepared the foundation. Deployed-resource truth, drift, costs,
-  backups, alarms, and staging UAT are intentionally uninspected here.
+- Current implementation / missing behavior: exact-source authorization, isolated
+  API/worker/migration execution roles and secrets, versioned private storage,
+  bounded Fargate/worker configuration, fail-closed runtime inputs, alarm/budget
+  destinations, serialized deployment with complete rollback baselines, backend-
+  disabled Terraform policies/tests, and release/restore/rotation/incident runbooks
+  are repository-complete. Deployed-resource truth, drift, costs, credentials,
+  backups, alarms and staging UAT remain intentionally uninspected.
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
   restore, health/alerts; AWS cloud dependency is total.
 - Delivery: priority `P0` after product code; repository task `GoGymGo Feature
   GGG-030 — AWS platform repository readiness`; branch
-  `agent/ggg-030-aws-foundation-readiness`; PR/merge `unassigned`; status
-  `IN_PROGRESS`. A later `GoGymGo — AWS Staging Read-Only Reconciliation` task may
-  be created only with separate cloud authority at the prescribed gate.
-- Residual risks / blocker: cloud deployment is not authorized. Read-only AWS
-  reconciliation also requires available credentials and its separate task.
+  `agent/ggg-030-aws-foundation-readiness` (deleted after merge); PR `#133`; merge
+  `685de9f8d8b70988d5216f99ec1954162ca13336`; status `BLOCKED`. A later
+  `GoGymGo — AWS Staging Read-Only Reconciliation` task may be created only with
+  separate cloud authority at the prescribed gate.
+- Residual risks / blocker: AWS account isolation, remote state/drift, costs,
+  current secret versions, alarms/subscription delivery, backups/PITR restore,
+  provider integrations, DNS/TLS, protected approvals, deployment and staging UAT
+  are not evidenced. Read-only reconciliation requires available credentials and
+  explicit separate authority; deployment requires further explicit authority.
 
 ### GGG-031 — Expo SDK patch compatibility and deterministic release checks
 
@@ -1225,6 +1233,30 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
+  Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was
+  guarded-squash merged as `685de9f8d8b70988d5216f99ec1954162ca13336`;
+  all required PR checks and all six exact-main workflows passed, the merged
+  release-authorization helper independently passed against PR #133 and exact
+  main, and the feature branches were deleted. Delivery hardened exact-source
+  authorization, split API/worker/migration execution roles and secret scopes,
+  made reward and landing secrets runtime-specific, enabled version-aware private
+  storage cleanup, bounded Fargate and singleton-worker configuration, required
+  production alarm/budget destinations, serialized releases, and restored complete
+  prior API/worker baselines for preparation, update, stabilization and readiness
+  failures. It also added backend-disabled Terraform policy tests and explicit AWS
+  release, restore, secret-rotation, capacity, incident and recovery evidence
+  runbooks. Proof included 420 API unit tests, 31 E2E tests, environment 23/23,
+  governance 35 passed with one Windows symlink-permission skip, architecture 8/8,
+  dependency/contract/source/artifact gates, and checksum-verified Terraform 1.15.8
+  formatting, validation and 4/4 mock tests with backend disabled, metadata access
+  disabled and provider 6.57.1 pinned. No local Docker, AWS account/provider/
+  credential/state/cost query, database, DNS, deployment or real-data action
+  occurred. Status remains `BLOCKED` pending separately authorized AWS read-only
+  reconciliation and all deployed backup/alarm/integration/release/UAT evidence.
+  This closes the implementation queue: every non-deferred repository feature is
+  now `COMPLETE` or externally `BLOCKED`; no new task is assigned without new
+  evidence or user authority.
 - 2026-08-22 — Completed the repository delivery for `GGG-014` through PR #131.
   Corrected exact head `1f4c7d1066f91dc91285518e02feac14a54c20c5`
   was guarded-squash merged as

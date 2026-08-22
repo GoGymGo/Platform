@@ -258,10 +258,14 @@ export const environmentSchema = z
           path: ['TRUST_PROXY'],
         });
       }
-      if (!environment.REWARD_CODE_ENCRYPTION_KEY) {
+      if (
+        environment.RUNTIME_ROLE === 'api' &&
+        !environment.REWARD_CODE_ENCRYPTION_KEY
+      ) {
         context.addIssue({
           code: 'custom',
-          message: 'REWARD_CODE_ENCRYPTION_KEY is required in production.',
+          message:
+            'REWARD_CODE_ENCRYPTION_KEY is required by the production API runtime.',
           path: ['REWARD_CODE_ENCRYPTION_KEY'],
         });
       }

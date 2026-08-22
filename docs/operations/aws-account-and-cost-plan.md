@@ -9,6 +9,11 @@ and the browser app is live through the private S3/CloudFront path at
 `app.gogymgo.com`. Public routes, API readiness, and browser CORS are verified;
 authenticated account UAT remains gated. Production is untouched.
 
+These deployed-state and cost observations are the historical operator record.
+Repository-only GGG-030 work does not re-attest the account, resources, credit,
+billing, alarms, backups, DNS, or runtime. Reconciliation requires a separate
+authorized AWS task and current evidence.
+
 ## Isolation gate
 
 Keep the existing AWS Organizations management account named `Souvenote` as the

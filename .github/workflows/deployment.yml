@@ -28,7 +28,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: gogymgo-deploy-${{ inputs.scope }}-${{ inputs.environment }}
+  group: gogymgo-deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -109,6 +109,7 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           ref: ${{ inputs.source_commit }}
 
       - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
@@ -138,17 +139,20 @@ jobs:
             echo "${ECS_API_TASK_DEFINITION} must map GOGYMGO_OWNER_EMAIL exactly once." >&2
             exit 1
           fi
-          for task_definition in \
-            "$ECS_API_TASK_DEFINITION" \
-            "$ECS_WORKER_TASK_DEFINITION"; do
-            secret_count="$(aws ecs describe-task-definition \
-              --task-definition "$task_definition" \
-              | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length')"
-            if [[ "$secret_count" != "1" ]]; then
-              echo "${task_definition} must map REWARD_CODE_ENCRYPTION_KEY exactly once." >&2
-              exit 1
-            fi
-          done
+          reward_secret_count="$(aws ecs describe-task-definition \
+            --task-definition "$ECS_API_TASK_DEFINITION" \
+            | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length')"
+          if [[ "$reward_secret_count" != "1" ]]; then
+            echo "${ECS_API_TASK_DEFINITION} must map REWARD_CODE_ENCRYPTION_KEY exactly once." >&2
+            exit 1
+          fi
+          worker_reward_secret_count="$(aws ecs describe-task-definition \
+            --task-definition "$ECS_WORKER_TASK_DEFINITION" \
+            | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length')"
+          if [[ "$worker_reward_secret_count" != "0" ]]; then
+            echo "${ECS_WORKER_TASK_DEFINITION} must not map the API-only reward encryption key." >&2
+            exit 1
+          fi
 
       - id: ecr
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
@@ -265,6 +269,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          worker_previous_state="$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_WORKER_SERVICE" \
+            --query 'services[0]' \
+            --output json)"
+          worker_previous_definition="$(jq -r '.taskDefinition' <<<"$worker_previous_state")"
+          worker_previous_desired_count="$(jq -r '.desiredCount' <<<"$worker_previous_state")"
+          if [[ ! "$worker_previous_definition" =~ ^arn:aws:ecs:ca-central-1:${AWS_ACCOUNT_ID}:task-definition/ ]] ||
+             [[ ! "$worker_previous_desired_count" =~ ^[0-1]$ ]]; then
+            echo "The worker service did not return a safe rollback baseline." >&2
+            exit 1
+          fi
+          echo "WORKER_PREVIOUS_TASK_DEFINITION=${worker_previous_definition}" >> "$GITHUB_ENV"
+          echo "WORKER_PREVIOUS_DESIRED_COUNT=${worker_previous_desired_count}" >> "$GITHUB_ENV"
+
+          rollback_worker() {
+            local recovery_status=0
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_WORKER_SERVICE" \
+              --task-definition "$worker_previous_definition" \
+              --desired-count "$worker_previous_desired_count" \
+              --force-new-deployment > /dev/null || recovery_status=1
+            aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE" || recovery_status=1
+            return "$recovery_status"
+          }
+
+          rollback_worker_on_error() {
+            local exit_code=$?
+            trap - ERR
+            rollback_worker || echo "Worker rollback also failed; operator intervention is required." >&2
+            exit "$exit_code"
+          }
+          trap rollback_worker_on_error ERR
+
           aws ecs describe-task-definition \
             --task-definition "$ECS_WORKER_TASK_DEFINITION" \
             --query taskDefinition > worker-current.json
@@ -293,11 +334,9 @@ jobs:
           if ! aws ecs wait services-stable \
               --cluster "$ECS_CLUSTER" \
               --services "$ECS_WORKER_SERVICE"; then
-            aws ecs update-service \
-              --cluster "$ECS_CLUSTER" \
-              --service "$ECS_WORKER_SERVICE" \
-              --desired-count 0 > /dev/null || true
-            echo "The worker failed to stabilize and was returned to zero tasks." >&2
+            trap - ERR
+            rollback_worker || echo "Worker rollback also failed; operator intervention is required." >&2
+            echo "The worker failed to stabilize and the prior service baseline was requested." >&2
             exit 1
           fi
           worker_rollout_complete=false
@@ -325,6 +364,7 @@ jobs:
             fi
           done
           if [[ "$worker_rollout_complete" != "true" ]]; then
+            trap - ERR
             jq '{
               requestedTaskDefinition: $requested,
               actualTaskDefinition: .taskDefinition,
@@ -333,14 +373,62 @@ jobs:
               primaryDeployment: ([.deployments[] | select(.status == "PRIMARY")][0]),
               recentEvents: [.events[0:10][]?.message]
             }' --arg requested "$worker_definition" <<<"$worker_state"
-            echo "The worker rolled back or did not reach the requested task definition." >&2
+            rollback_worker || echo "Worker rollback also failed; operator intervention is required." >&2
+            echo "The worker did not reach the requested task definition; the prior baseline was requested." >&2
             exit 1
           fi
+          trap - ERR
 
       - name: Deploy the API with circuit-breaker rollback
         shell: bash
         run: |
           set -euo pipefail
+          api_previous_state="$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_API_SERVICE" \
+            --query 'services[0]' \
+            --output json)"
+          api_previous_definition="$(jq -r '.taskDefinition' <<<"$api_previous_state")"
+          api_previous_desired_count="$(jq -r '.desiredCount' <<<"$api_previous_state")"
+          if [[ ! "$api_previous_definition" =~ ^arn:aws:ecs:ca-central-1:${AWS_ACCOUNT_ID}:task-definition/ ]] ||
+             [[ ! "$api_previous_desired_count" =~ ^[0-4]$ ]]; then
+            echo "The API service did not return a safe rollback baseline." >&2
+            exit 1
+          fi
+          echo "API_PREVIOUS_TASK_DEFINITION=${api_previous_definition}" >> "$GITHUB_ENV"
+          echo "API_PREVIOUS_DESIRED_COUNT=${api_previous_desired_count}" >> "$GITHUB_ENV"
+
+          rollback_release() {
+            local recovery_status=0
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_API_SERVICE" \
+              --task-definition "$api_previous_definition" \
+              --desired-count "$api_previous_desired_count" \
+              --force-new-deployment > /dev/null || recovery_status=1
+            aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_API_SERVICE" || recovery_status=1
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_WORKER_SERVICE" \
+              --task-definition "$WORKER_PREVIOUS_TASK_DEFINITION" \
+              --desired-count "$WORKER_PREVIOUS_DESIRED_COUNT" \
+              --force-new-deployment > /dev/null || recovery_status=1
+            aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE" || recovery_status=1
+            return "$recovery_status"
+          }
+
+          rollback_release_on_error() {
+            local exit_code=$?
+            trap - ERR
+            rollback_release || echo "Release rollback also failed; operator intervention is required." >&2
+            exit "$exit_code"
+          }
+          trap rollback_release_on_error ERR
+
           aws ecs describe-task-definition \
             --task-definition "$ECS_API_TASK_DEFINITION" \
             --query taskDefinition > api-current.json
@@ -367,9 +455,14 @@ jobs:
             --desired-count 1 \
             --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},minimumHealthyPercent=100,maximumPercent=200' \
             --force-new-deployment > /dev/null
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "$ECS_API_SERVICE"
+          if ! aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_API_SERVICE"; then
+            trap - ERR
+            rollback_release || echo "Release rollback also failed; operator intervention is required." >&2
+            echo "The API failed to stabilize; both prior service baselines were requested." >&2
+            exit 1
+          fi
           api_rollout_complete=false
           for attempt in {1..18}; do
             api_state="$(aws ecs describe-services \
@@ -395,6 +488,7 @@ jobs:
             fi
           done
           if [[ "$api_rollout_complete" != "true" ]]; then
+            trap - ERR
             jq '{
               requestedTaskDefinition: $requested,
               actualTaskDefinition: .taskDefinition,
@@ -403,19 +497,49 @@ jobs:
               primaryDeployment: ([.deployments[] | select(.status == "PRIMARY")][0]),
               recentEvents: [.events[0:10][]?.message]
             }' --arg requested "$api_definition" <<<"$api_state"
-            echo "The API rolled back or did not reach the requested task definition." >&2
+            rollback_release || echo "Release rollback also failed; operator intervention is required." >&2
+            echo "The API did not reach the requested task definition; both prior service baselines were requested." >&2
             exit 1
           fi
+          trap - ERR
 
       - name: Verify API and worker readiness
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent \
+          if curl --fail --show-error --silent \
             --retry 18 \
             --retry-all-errors \
             --retry-delay 10 \
-            "${API_URL}/v1/health/ready"
+            "${API_URL}/v1/health/ready"; then
+            exit 0
+          fi
+
+          recovery_status=0
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_API_SERVICE" \
+            --task-definition "$API_PREVIOUS_TASK_DEFINITION" \
+            --desired-count "$API_PREVIOUS_DESIRED_COUNT" \
+            --force-new-deployment > /dev/null || recovery_status=1
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_API_SERVICE" || recovery_status=1
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_WORKER_SERVICE" \
+            --task-definition "$WORKER_PREVIOUS_TASK_DEFINITION" \
+            --desired-count "$WORKER_PREVIOUS_DESIRED_COUNT" \
+            --force-new-deployment > /dev/null || recovery_status=1
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_WORKER_SERVICE" || recovery_status=1
+          if [[ "$recovery_status" != "0" ]]; then
+            echo "Readiness failed and automatic release rollback was incomplete." >&2
+          else
+            echo "Readiness failed; both prior service baselines were restored." >&2
+          fi
+          exit 1
 
   member-web:
     needs: authorize_source

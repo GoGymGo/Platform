@@ -86,7 +86,7 @@ resource "aws_ecs_task_definition" "api" {
     ]
   }])
   cpu                      = tostring(var.api_cpu)
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  execution_role_arn       = aws_iam_role.ecs_execution["api"].arn
   family                   = "${local.name}-api"
   memory                   = tostring(var.api_memory)
   network_mode             = "awsvpc"
@@ -101,7 +101,15 @@ resource "aws_ecs_task_definition" "api" {
   lifecycle {
     create_before_destroy = true
     ignore_changes        = [container_definitions]
-    replace_triggered_by  = [aws_iam_role_policy.ecs_execution]
+    replace_triggered_by  = [aws_iam_role_policy.ecs_execution["api"]]
+    precondition {
+      condition     = try(contains(local.fargate_memory_by_cpu[var.api_cpu], var.api_memory), false)
+      error_message = "api_cpu and api_memory must form a supported bounded Fargate size."
+    }
+    precondition {
+      condition     = !var.landing_intake_enabled || var.landing_intake_retention_days != null
+      error_message = "landing_intake_retention_days is required when landing_intake_enabled is true."
+    }
   }
 }
 
@@ -134,7 +142,7 @@ resource "aws_ecs_task_definition" "worker" {
     ]
   }])
   cpu                      = tostring(var.worker_cpu)
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  execution_role_arn       = aws_iam_role.ecs_execution["worker"].arn
   family                   = "${local.name}-worker"
   memory                   = tostring(var.worker_memory)
   network_mode             = "awsvpc"
@@ -146,7 +154,13 @@ resource "aws_ecs_task_definition" "worker" {
     operating_system_family = "LINUX"
   }
 
-  lifecycle { ignore_changes = [container_definitions] }
+  lifecycle {
+    ignore_changes = [container_definitions]
+    precondition {
+      condition     = try(contains(local.fargate_memory_by_cpu[var.worker_cpu], var.worker_memory), false)
+      error_message = "worker_cpu and worker_memory must form a supported bounded Fargate size."
+    }
+  }
 }
 
 resource "aws_ecs_task_definition" "migration" {
@@ -178,7 +192,7 @@ resource "aws_ecs_task_definition" "migration" {
     }]
   }])
   cpu                      = "512"
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  execution_role_arn       = aws_iam_role.ecs_execution["migration"].arn
   family                   = "${local.name}-migration"
   memory                   = "1024"
   network_mode             = "awsvpc"

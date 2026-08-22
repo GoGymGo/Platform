@@ -42,6 +42,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_s3_bucket_versioning.content.versioning_configuration[0].status == "Enabled" && aws_s3_bucket_versioning.privacy.versioning_configuration[0].status == "Enabled"
+    error_message = "Private content must preserve exact S3 versions for fenced cleanup and recovery."
+  }
+
+  assert {
     condition     = aws_s3_bucket_public_access_block.member_web.restrict_public_buckets && aws_s3_bucket_public_access_block.member_web.block_public_policy && aws_s3_bucket_ownership_controls.member_web.rule[0].object_ownership == "BucketOwnerEnforced"
     error_message = "The member-app origin must remain private and ACL-free."
   }
@@ -77,6 +82,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_ecs_task_definition.api.cpu == "512" && aws_ecs_task_definition.api.memory == "1024" && aws_ecs_task_definition.worker.cpu == "256" && aws_ecs_task_definition.worker.memory == "512"
+    error_message = "Pilot runtime sizes must remain explicit supported Fargate pairs."
+  }
+
+  assert {
     condition     = length(aws_ecs_service.api.load_balancer) == 0
     error_message = "The bootstrap API service must not attach an unassociated target group before an HTTPS certificate and listener exist."
   }
@@ -89,6 +99,11 @@ run "safe_isolated_foundation" {
   assert {
     condition     = contains(keys(local.api_secret_environment), "GOGYMGO_OWNER_EMAIL") && !contains(keys(local.worker_secret_environment), "GOGYMGO_OWNER_EMAIL")
     error_message = "Only the API task may receive the protected owner identity."
+  }
+
+  assert {
+    condition     = aws_iam_role.ecs_execution["api"].name == "gogymgo-staging-ecs-execution-api" && aws_iam_role.ecs_execution["worker"].name == "gogymgo-staging-ecs-execution-worker" && aws_iam_role.ecs_execution["migration"].name == "gogymgo-staging-ecs-execution-migration"
+    error_message = "API, worker, and migration tasks must use separate execution roles."
   }
 
   assert {
@@ -118,12 +133,48 @@ run "feature_secrets_remain_role_scoped" {
   }
 
   assert {
-    condition     = length(local.api_secret_environment) == 4 && length(local.worker_secret_environment) == 5
+    condition     = length(local.api_secret_environment) == 4 && length(local.worker_secret_environment) == 4
     error_message = "API-only and worker-only secret injection must remain isolated."
   }
 
   assert {
-    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
+    condition     = !contains(keys(local.api_secret_environment), "PRIVACY_PSEUDONYMIZATION_KEY") && !contains(keys(local.api_secret_environment), "EXPO_PUSH_ACCESS_TOKEN") && !contains(keys(local.worker_secret_environment), "REWARD_CODE_ENCRYPTION_KEY")
     error_message = "Runtime tasks must not receive secrets they do not consume."
   }
+
+  assert {
+    condition     = length(local.execution_secret_arns.api) == 4 && length(local.execution_secret_arns.worker) == 4 && length(local.execution_secret_arns.migration) == 1
+    error_message = "Execution-role secret reads must match the exact runtime mappings."
+  }
+}
+
+run "landing_cutover_configuration_is_api_scoped" {
+  command = plan
+
+  variables {
+    landing_intake_enabled        = true
+    landing_intake_retention_days = 90
+  }
+
+  assert {
+    condition     = local.api_environment.LANDING_INTAKE_ENABLED == "true" && local.api_environment.LANDING_INTAKE_RETENTION_DAYS == "90"
+    error_message = "Landing cutover must carry the reviewed API enablement and retention configuration."
+  }
+
+  assert {
+    condition     = contains(keys(local.api_secret_environment), "LANDING_INTAKE_FORWARDING_SECRET") && !contains(keys(local.worker_secret_environment), "LANDING_INTAKE_FORWARDING_SECRET")
+    error_message = "Only the API may receive the landing forwarding secret."
+  }
+}
+
+run "production_requires_alert_destinations" {
+  command = plan
+
+  variables {
+    budget_notification_email = null
+    deletion_protection       = true
+    environment               = "production"
+  }
+
+  expect_failures = [aws_budgets_budget.monthly]
 }

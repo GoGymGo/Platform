@@ -523,7 +523,7 @@ for (const marker of [
   'DATABASE_URL must not use a loopback host in production.',
   'FIREBASE_AUTH_EMULATOR_HOST must not be configured in production.',
   'OPENAPI_ENABLED must be false in production.',
-  'REWARD_CODE_ENCRYPTION_KEY is required in production.',
+  'REWARD_CODE_ENCRYPTION_KEY is required by the production API runtime.',
   'TRUST_PROXY must be true in production.',
 ]) {
   if (!environmentSource.includes(marker)) {

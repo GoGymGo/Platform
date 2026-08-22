@@ -8,6 +8,11 @@ The account boundary is enforced twice: the AWS provider permits only
 `account_id`, and the RDS resource refuses to plan when the signed-in account
 does not match it. Nothing here references or shares Souvenote resources.
 
+The checked-in source is not evidence that any resource exists or matches it.
+Account, state, drift, cost, backup, alarm, and deployment reconciliation is a
+separate credentialed operation. Offline validation must keep the backend
+disabled.
+
 ## What it creates
 
 - one VPC in Canada Central with two public runtime subnets and two private
@@ -18,12 +23,14 @@ does not match it. Nothing here references or shares Souvenote resources.
   same digest-pinned image;
 - an internet-facing TLS Application Load Balancer whose API target is reachable
   only from its security group;
-- private KMS-encrypted content and seven-day privacy-export S3 buckets;
+- versioned private KMS-encrypted content and seven-day privacy-export S3
+  buckets, with bounded noncurrent-version cleanup;
 - a private versioned member-app S3 origin, CloudFront HTTPS distribution, SPA
   route function, and browser security headers;
 - immutable ECR images, encrypted Secrets Manager containers, CloudWatch logs,
   alarms, and a per-account budget;
-- separate least-privilege API, worker, migration, and execution roles;
+- separate least-privilege API, worker, and migration task roles plus a distinct
+  secret-scoped execution role for each workload;
 - separate backend and member-web GitHub OIDC deployment roles restricted to
   the matching protected GitHub environment and the repository's immutable
   owner/repository IDs. No long-lived AWS deployment key is required.
@@ -75,6 +82,18 @@ terraform apply reviewed.tfplan
 
 Never use `-auto-approve` for production.
 
+Repository or CI validation uses the pinned provider and bounded Terraform CLI
+range with no remote state:
+
+```sh
+terraform init -backend=false -input=false
+terraform fmt -check -recursive
+terraform validate
+terraform test
+```
+
+Do not reuse that command as a cloud-readiness claim.
+
 ## Secrets and database bootstrap
 
 Terraform creates secret containers but no secret values. Payloads must never be
@@ -100,6 +119,13 @@ placed in Terraform variables or state. Before starting ECS tasks:
    service-account key remains a compatibility path only and requires an explicit
    exception approval and rotation plan.
 6. Populate optional worker secrets only when the related feature is approved.
+
+The API-only reward key is not mounted into the worker. Landing forwarding adds
+an API-only secret container only when its gate is enabled and requires a
+reviewed retention value. Creator, landing, partner-retention, profile-media,
+privacy, and push defaults remain fail closed. Production also requires a
+reviewed budget email and at least one same-account Canada Central alarm topic;
+Terraform cannot prove that a subscriber confirmed or received the alert.
 
 The application continues using environment-specific Firebase Authentication
 for the first AWS release. Migrating identities to Cognito is explicitly out of
@@ -133,6 +159,15 @@ Production must have required reviewers configured on the GitHub environment.
 
 Terraform ignores image-only task-definition and service drift so an
 infrastructure apply cannot silently move application code ahead of migrations.
+When changing reviewed task configuration, supply the current approved image
+digest and inspect the new Terraform task-definition revision. The protected
+release uses the newest reviewed family configuration and replaces only its
+image with the exact scanned digest.
+
+The operations worker is intentionally limited to one task. API autoscaling and
+RDS Proxy remain disabled until load tests approve scaling and database
+connection budgets. See
+[AWS runtime release and recovery evidence](../../../docs/operations/aws-runtime-recovery.md).
 
 The separate `Member Web Deployment` workflow builds the exact approved commit
 against its permanent API URL, rejects temporary or local endpoints, audits the

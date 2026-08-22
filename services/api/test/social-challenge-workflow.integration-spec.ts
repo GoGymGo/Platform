@@ -875,7 +875,7 @@ describeWithDatabase('social friend and challenge workflow', () => {
     );
     expect(privacyExport).toEqual(
       expect.objectContaining({
-        schemaVersion: 15,
+        schemaVersion: 16,
         socialData: expect.objectContaining({
           challengeCheckIns: [
             expect.objectContaining({

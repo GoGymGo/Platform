@@ -1100,7 +1100,8 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   closed narrow S3, SSM, ECR, SNS, and Access Analyzer metadata gaps. An approved
   protected Terraform-plan attempt initialized the exact staging backend from an
   isolated copy but stopped safely before producing a plan when refresh required
-  three unapproved tag/function metadata actions. Its role, lock, state, and
+  two unapproved tag metadata reads and one deployed CloudFront Function code
+  read. Its role, lock, state, and
   temporary-file rollback checks passed. Overall status remains BLOCKED because
   exact drift is still unknown, current main is not deployed, and material gaps
   remain.

@@ -31,7 +31,8 @@ an organization service-control policy rather than this role.
 The separately approved protected-plan procedure then initialized an isolated
 copy of repository commit 5bc18c8 against the exact staging backend and started
 one normal refresh-enabled plan. Refresh stopped safely before producing a plan
-because three additional tag/function metadata reads were not allowed. The
+because two tag metadata reads and one deployed CloudFront Function code read
+were not allowed. The
 temporary directory was deleted, no lock remains, the state object retains its
 pre-attempt modification time, and the Phase 1 role policy was restored.
 
@@ -69,7 +70,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Backend initialization succeeded and a normal plan began, but refresh stopped on three missing metadata actions before producing a plan | BLOCKED BY PERMISSIONS | High | Add the three exact read-only metadata actions below and repeat the protected no-apply procedure |
+| Exact Terraform drift | Backend initialization succeeded and a normal plan began, but refresh stopped on three missing read actions before producing a plan | BLOCKED BY PERMISSIONS | High | Temporarily add the three exact resource-scoped read actions below and repeat the protected no-apply procedure |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -114,10 +115,11 @@ safe default of false.
 
 Terraform 1.15.8 successfully initialized a fresh temporary copy of commit
 5bc18c8 against the verified backend. A normal refresh-enabled plan then exited
-1 before producing a plan because three metadata reads were denied:
+1 before producing a plan because three read operations were denied:
 
 - budgets:ListTagsForResource;
-- cloudfront:GetFunction;
+- cloudfront:GetFunction, which reads the deployed CloudFront Function code for
+  drift comparison;
 - ecr:ListTagsForResource.
 
 No raw state or plan was printed or committed. The temporary working directory
@@ -256,9 +258,10 @@ explicit denies unchanged. Every expanded check succeeded except AWS Backup.
 
 Remaining permission blockers:
 
-- The protected Terraform refresh needs three additional read-only metadata
-  actions: budgets:ListTagsForResource, cloudfront:GetFunction, and
-  ecr:ListTagsForResource. These were not added without a new exact approval.
+- The protected Terraform refresh needs two additional tag metadata actions,
+  budgets:ListTagsForResource and ecr:ListTagsForResource, plus
+  cloudfront:GetFunction to compare the deployed member-web function code. These
+  were not added without a new exact approval.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -332,7 +335,7 @@ succeeded except AWS Backup, which is explicitly denied by an organization SCP.
 
 The approved exact state-access and lock procedure was run from an isolated copy
 with live non-secret inputs held in process. Backend initialization succeeded,
-but refresh was denied three metadata reads before it could produce a plan. The
+but refresh was denied three read operations before it could produce a plan. The
 role, lock, state, and temporary-directory rollback checks all passed. Resume
 only after separately approving those exact actions; never apply in this phase.
 
@@ -370,8 +373,13 @@ for account **…9877** in ca-central-1.
 
 IAM Identity Center change:
 
-- add budgets:ListTagsForResource, cloudfront:GetFunction, and
-  ecr:ListTagsForResource to the reconciliation role's metadata-only allow list;
+- temporarily allow budgets:ListTagsForResource only for the exact staging
+  monthly budget;
+- temporarily allow ecr:ListTagsForResource only for the exact staging ECR
+  repository;
+- temporarily allow cloudfront:GetFunction only for the Terraform-managed
+  member-web CloudFront Function; this reads its deployed function code for
+  drift comparison;
 - allow s3:GetObject and s3:GetObjectVersion only for the exact
   gogymgo/staging/terraform.tfstate object;
 - allow s3:GetObject, s3:PutObject, and s3:DeleteObject only for the exact

@@ -1074,8 +1074,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   bounded Fargate/worker configuration, fail-closed runtime inputs, alarm/budget
   destinations, serialized deployment with complete rollback baselines, backend-
   disabled Terraform policies/tests, and release/restore/rotation/incident runbooks
-  are repository-complete. Deployed-resource truth, drift, costs, credentials,
-  backups, alarms and staging UAT remain intentionally uninspected.
+  are repository-complete. The authorized 2026-08-22 reconciliation verified
+  the dedicated staging account, healthy older runtime, active RDS backups/PITR,
+  and current credit application. It also found high-risk private-bucket
+  versioning, runtime secret-isolation, alarm-routing, and deployed-source-age
+  gaps. Exact Terraform drift, blocked metadata reads, deployment, recovery
+  rehearsal, and authenticated UAT remain open; see the
+  [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
   restore, health/alerts; AWS cloud dependency is total.
@@ -1085,11 +1090,17 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   `685de9f8d8b70988d5216f99ec1954162ca13336`; status `BLOCKED`. A later
   `GoGymGo — AWS Staging Read-Only Reconciliation` task may be created only with
   separate cloud authority at the prescribed gate.
-- Residual risks / blocker: AWS account isolation, remote state/drift, costs,
-  current secret versions, alarms/subscription delivery, backups/PITR restore,
-  provider integrations, DNS/TLS, protected approvals, deployment and staging UAT
-  are not evidenced. Read-only reconciliation requires available credentials and
-  explicit separate authority; deployment requires further explicit authority.
+- AWS reconciliation: completed under explicit read-only authority on
+  2026-08-22. Account isolation, live public health, current cost/credit
+  application, certificates, automated backups/PITR eligibility, and selected
+  security controls are now evidenced. Overall status remains BLOCKED because
+  current main is not deployed and material drift/gaps remain.
+- Residual risks / blocker: exact Terraform drift, state-bucket encryption,
+  private-bucket encryption/lifecycle and versioning, ECR scan evidence, runtime
+  secret scope, alarm/SNS delivery, Backup inventory/restore, current credit
+  balance, provider integrations, protected deployment approval, and
+  authenticated staging UAT remain unresolved. Deployment requires further
+  explicit authority.
 
 ### GGG-031 — Expo SDK patch compatibility and deterministic release checks
 
@@ -1232,6 +1243,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   approval; never infer eligibility from marketing location text.
 
 ## Change history
+
+- 2026-08-22 — Completed the explicitly authorized, non-root
+  [AWS staging read-only reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
+  Verified the dedicated staging account ending 9877 in Canada Central, a
+  healthy but 78-commit-old runtime, current AWS credit application, and active
+  RDS backup/PITR configuration. Recorded release-blocking versioning,
+  secret-scope, alarm-routing, source-age, permission, and recovery gaps. No
+  Terraform plan, application-resource mutation, deployment, secret/object/log
+  data read, database connection, or restore occurred.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

@@ -14,6 +14,11 @@ Repository-only GGG-030 work does not re-attest the account, resources, credit,
 billing, alarms, backups, DNS, or runtime. Reconciliation requires a separate
 authorized AWS task and current evidence.
 
+Current sanitized live evidence is recorded in the
+[2026-08-22 AWS staging reconciliation](aws-staging-reconciliation-2026-08-22.md).
+Where the two records differ, treat that reconciliation as the newer
+observation and require a reviewed Terraform plan before remediation.
+
 ## Isolation gate
 
 Keep the existing AWS Organizations management account named `Souvenote` as the

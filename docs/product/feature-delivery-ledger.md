@@ -1112,10 +1112,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   `s3:ListBucket` only on those buckets, proved all three `HeadBucket` checks
   succeed, and then stopped before producing a plan because Terraform also
   requires `s3:GetAccelerateConfiguration`. Exact provider-source review
-  identifies that action as the remaining uncovered bucket read. All attempts'
-  role, lock, state, and temporary-file rollback checks passed. Overall status
-  remains BLOCKED because a corrected exact plan, current deployment, and
-  material gaps remain.
+  identifies that action as the remaining uncovered bucket read. A fifth exactly
+  approved attempt proved that action on only those same buckets and advanced
+  Terraform past the S3 barrier, but the streaming sanitizer stopped on a
+  diagnostic event that omitted `detail`. Its seven early events were incomplete
+  and discarded. Null-diagnostic handling is locally corrected and validated.
+  All attempts' role, lock, state, and temporary-file rollback checks passed.
+  Overall status remains BLOCKED because a corrected exact plan, current
+  deployment, and material gaps remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1297,7 +1301,16 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   identifies that action as the remaining uncovered bucket read. A further
   no-apply plan therefore requires separate approval to repeat the exact
   three-bucket listing grant and temporarily add
-  `s3:GetAccelerateConfiguration`; object content reads remain denied.
+  `s3:GetAccelerateConfiguration`; object content reads remain denied. A fifth
+  exactly approved invocation proved both S3 grants and began streaming sanitized
+  planned changes, but the local parser stopped on a diagnostic without a
+  `detail` property. Its seven early planned-change events and four drift events
+  were incomplete and discarded from decision-making. The state remained
+  unchanged, no lock existed before or after, no manual cleanup was needed, the
+  isolated directory was removed, and the Phase 1 role returned to 111 allows,
+  26 denies, and zero Phase 2 markers. The null case is locally corrected and
+  validated; a further no-apply plan requires new exact approval but no new AWS
+  action.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

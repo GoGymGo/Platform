@@ -60,6 +60,17 @@ remained, the temporary directory was deleted, and the Phase 1 role was restored
 with 111 allowed actions, 26 explicit denies, and no temporary Phase 2 markers.
 No plan or action list was produced by this attempt.
 
+A fifth exactly approved attempt added that one remaining metadata read on only
+the same three buckets. Direct `HeadBucket` and acceleration-configuration checks
+all succeeded, and Terraform advanced past the prior S3 authorization barrier.
+The streaming sanitizer then encountered a diagnostic event with no `detail`
+field and stopped its pipe with exit code 1. Seven early address/action events
+were incomplete and discarded from decision-making; no exact plan summary was
+claimed. The null-diagnostic parser is now corrected and locally validated. The
+state was unchanged, no lock existed before or after, no manual lock cleanup was
+needed, both temporary state and application-bucket access were removed, the
+isolated directory was deleted, and the Phase 1 role was fully restored.
+
 No apply, deployment, secret value read, application-object read, database
 connection, log-content query, restore, rotation, scaling change, or
 application-resource mutation occurred. Terraform state access was limited to
@@ -95,7 +106,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Streaming JSON captured 48 events; 22 S3 actions are known permission artifacts; an approved ListBucket retry passed HeadBucket but stopped on one additional S3 metadata read | PARTIALLY VERIFIED | High | Approve exact-bucket GetAccelerateConfiguration temporarily and rerun before any remediation approval |
+| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; the exact S3 reads now pass, but the corrected run's sanitizer stopped on a null-detail diagnostic | PARTIALLY VERIFIED | High | Approve one null-safe streaming retry with the already-proven exact permissions before any remediation approval |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -243,6 +254,27 @@ remaining uncovered bucket-read action: the other calls are covered by
 `s3:GetLifecycleConfiguration`. This source review bounds the next retry to one
 additional action rather than another iterative permission-discovery run.
 
+The fifth exactly approved invocation temporarily added
+`s3:GetAccelerateConfiguration` only on the exact content, privacy, and
+member-web buckets while repeating the prior exact Phase 2 statements. All three
+`HeadBucket` and acceleration-configuration calls succeeded. Terraform 1.15.8
+initialized successfully and began emitting sanitized planned-change events,
+but its stream included a diagnostic event with no `detail` property. The local
+sanitizer attempted to search that null value, terminated the pipe, and produced
+exit code 1. Seven early address/action events and four drift events had already
+passed the sanitizer, but the stream was incomplete, so they are not retained as
+an exact plan or used to authorize remediation.
+
+The sanitizer now treats a missing diagnostic detail as an empty value while
+continuing to count the diagnostic. A synthetic local test passed both a
+detail-free warning and an authorization diagnostic through that code, retaining
+only the example action token. No further cloud run occurred. For the fifth
+invocation, the state ETag and last-modified value matched their pre-plan values,
+there were zero locks before and after, no manual cleanup was required, the
+temporary directory was deleted, and post-rollback checks confirmed application
+bucket `HeadBucket` and state `HeadObject` were denied again. The restored role
+has 111 allows, 26 denies, and zero Phase 2 markers.
+
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
 scoping, task inputs, alarm actions, retention controls, and release
@@ -376,15 +408,15 @@ ecr:ListTagsForResource can be scoped to the exact staging resources and that
 cloudfront:GetFunction can be scoped to the exact Terraform-managed member-web
 function. The plan completed with those temporary reads; they were then removed.
 
-Remaining permission blockers:
+Remaining access constraints:
 
 - The approved temporary `s3:ListBucket` grant on the exact content, privacy,
-  and member-web buckets made all three `HeadBucket` checks succeed. A corrected
-  S3 refresh now additionally requires temporary
-  `s3:GetAccelerateConfiguration` on those same three buckets. Exact provider
-  source review identifies this as the remaining uncovered S3 bucket-read
-  action. The repeated `s3:ListBucket` grant technically permits listing object
-  key names, but object content reads remain explicitly denied.
+  and member-web buckets made all three `HeadBucket` checks succeed. The fifth
+  attempt also proved temporary `s3:GetAccelerateConfiguration` works on only
+  those same three buckets and advanced Terraform past the prior S3 barrier. No
+  further provider-read denial was observed before the local sanitizer stopped.
+  A retry must repeat both grants; `s3:ListBucket` technically permits listing
+  object key names, but object content reads remain explicitly denied.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -454,7 +486,7 @@ metadata actions and removed the broad S3 bucket-listing actions. The policy
 was reprovisioned and all target-role safeguards were validated. All checks
 succeeded except AWS Backup, which is explicitly denied by an organization SCP.
 
-### Phase 2 — protected Terraform plan — sanitized, one S3 read remains
+### Phase 2 — protected Terraform plan — S3 reads proven, sanitizer retry remains
 
 The approved exact state-access and lock procedure was run from an isolated copy
 with live non-secret inputs held in process. The first attempt identified three
@@ -478,6 +510,12 @@ succeed, but Terraform stopped before producing a plan on
 `s3:GetAccelerateConfiguration`. Cleanup and full role restoration passed. The
 provider's exact-version bucket-reader source identifies that action as the
 remaining uncovered bucket metadata read.
+
+The fifth approved invocation added only that exact action and advanced past the
+S3 barrier. Its streaming sanitizer then stopped on a Terraform diagnostic event
+that omitted `detail`; seven early planned-change events were necessarily
+incomplete and discarded. The null case is locally corrected and validated, all
+rollback checks passed, and one further plan requires new exact approval.
 
 ### Phase 3 — infrastructure and least-privilege remediation
 
@@ -509,9 +547,9 @@ remains out of scope.
 ## Next approval boundary
 
 The next recommended step is one corrected protected, no-apply Terraform plan
-for account **…9877** in ca-central-1. It repeats the proven streaming sanitizer
-and adds only the final S3 bucket-metadata authorization identified by the exact
-provider source.
+for account **…9877** in ca-central-1. It repeats the now-proven exact permission
+set and uses the locally validated null-safe streaming sanitizer. No new AWS
+action is requested.
 
 IAM Identity Center change:
 
@@ -548,6 +586,7 @@ Terraform operation:
   Terraform's streaming JSON UI enabled;
 - never apply the plan;
 - retain only resource addresses and action types from `planned_change` events,
+  tolerate and count diagnostic events that omit `detail`,
   then remove the temporary plan and working directory without running
   `terraform show`.
 
@@ -567,10 +606,12 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-Four Phase 2 plan invocations have occurred. The first stopped on three read
+Five Phase 2 plan invocations have occurred. The first stopped on three read
 denials. The second completed but its local post-plan sanitizer failed. The third
 used the validated streaming sanitizer and exposed the S3 HeadBucket permission
 artifact. The fourth proved the exact-bucket `s3:ListBucket` fix and stopped on
 the one remaining uncovered provider bucket read,
-`s3:GetAccelerateConfiguration`. All attempts rolled back completely and no
-apply occurred.
+`s3:GetAccelerateConfiguration`. The fifth proved that final metadata permission
+but its streaming sanitizer stopped on a null-detail diagnostic, so its partial
+events were discarded. All attempts rolled back completely and no apply
+occurred.

@@ -71,6 +71,16 @@ state was unchanged, no lock existed before or after, no manual lock cleanup was
 needed, both temporary state and application-bucket access were removed, the
 isolated directory was deleted, and the Phase 1 role was fully restored.
 
+A sixth exactly approved attempt used the corrected null-safe sanitizer with the
+same nine temporary Phase 2 statements and no new AWS action. Terraform 1.15.8
+initialized and streamed seven early planned-change events before the plan itself
+exited 1 with four diagnostics. The sanitizer completed normally and found no
+IAM action token in the diagnostic details, but it intentionally retained no raw
+diagnostic text. The event stream is incomplete and was discarded again. State,
+lock, access-removal, role-restoration, and temporary-directory checks all
+passed. The next diagnostic sanitizer will retain only redacted diagnostic
+category/API-operation labels so a further failure can be classified safely.
+
 No apply, deployment, secret value read, application-object read, database
 connection, log-content query, restore, rotation, scaling change, or
 application-resource mutation occurred. Terraform state access was limited to
@@ -106,7 +116,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; the exact S3 reads now pass, but the corrected run's sanitizer stopped on a null-detail diagnostic | PARTIALLY VERIFIED | High | Approve one null-safe streaming retry with the already-proven exact permissions before any remediation approval |
+| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; exact S3 reads and the null-safe sanitizer now pass, but Terraform itself exited 1 with four unclassified diagnostics after seven incomplete events | PARTIALLY VERIFIED | High | Approve one diagnostic-label streaming retry with the already-proven exact permissions before any remediation approval |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -274,6 +284,25 @@ there were zero locks before and after, no manual cleanup was required, the
 temporary directory was deleted, and post-rollback checks confirmed application
 bucket `HeadBucket` and state `HeadObject` were denied again. The restored role
 has 111 allows, 26 denies, and zero Phase 2 markers.
+
+The sixth exactly approved invocation repeated the same exact permissions and
+used that corrected sanitizer. Terraform 1.15.8 initialized successfully. The
+sanitizer handled all diagnostic records without throwing, but Terraform itself
+exited 1 after emitting four diagnostics. Seven planned-change events and four
+drift events had appeared before the failure; because the stream did not
+complete, they were discarded from decision-making and are not an exact plan.
+No IAM action token was present in the retained diagnostic classification. Raw
+diagnostic summaries and details were neither printed nor retained, so the error
+category remains unknown.
+
+The next sanitizer revision is limited to retaining a redacted diagnostic
+summary category and AWS API-operation token, if present. It will remove account
+IDs, ARNs, request IDs, host IDs, email-shaped values, and other free-form detail;
+it will not retain raw diagnostic text or attribute values. For the sixth
+invocation, the state fingerprint was unchanged, there were zero locks before
+and after, no manual cleanup was needed, application-bucket and state access were
+denied again after rollback, the isolated directory was deleted, and the role
+returned to 111 allows, 26 denies, and zero temporary markers.
 
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
@@ -517,6 +546,12 @@ that omitted `detail`; seven early planned-change events were necessarily
 incomplete and discarded. The null case is locally corrected and validated, all
 rollback checks passed, and one further plan requires new exact approval.
 
+The sixth approved invocation proved the null-safe parser itself now completes,
+but Terraform emitted four unclassified diagnostics and exited 1 after seven
+incomplete planned-change events. Those events were discarded. A further run
+requires new approval and will retain only redacted diagnostic category and API
+operation labels if Terraform fails again.
+
 ### Phase 3 — infrastructure and least-privilege remediation
 
 Review the Phase 2 plan for:
@@ -548,8 +583,8 @@ remains out of scope.
 
 The next recommended step is one corrected protected, no-apply Terraform plan
 for account **…9877** in ca-central-1. It repeats the now-proven exact permission
-set and uses the locally validated null-safe streaming sanitizer. No new AWS
-action is requested.
+set and uses the null-safe streaming sanitizer with redacted diagnostic-category
+capture. No new AWS action is requested.
 
 IAM Identity Center change:
 
@@ -587,6 +622,8 @@ Terraform operation:
 - never apply the plan;
 - retain only resource addresses and action types from `planned_change` events,
   tolerate and count diagnostic events that omit `detail`,
+  retain only redacted diagnostic category and AWS API-operation labels if the
+  plan exits unsuccessfully,
   then remove the temporary plan and working directory without running
   `terraform show`.
 
@@ -606,12 +643,13 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-Five Phase 2 plan invocations have occurred. The first stopped on three read
+Six Phase 2 plan invocations have occurred. The first stopped on three read
 denials. The second completed but its local post-plan sanitizer failed. The third
 used the validated streaming sanitizer and exposed the S3 HeadBucket permission
 artifact. The fourth proved the exact-bucket `s3:ListBucket` fix and stopped on
 the one remaining uncovered provider bucket read,
 `s3:GetAccelerateConfiguration`. The fifth proved that final metadata permission
 but its streaming sanitizer stopped on a null-detail diagnostic, so its partial
-events were discarded. All attempts rolled back completely and no apply
-occurred.
+events were discarded. The sixth proved the null-safe sanitizer, but Terraform
+itself exited 1 with four unclassified diagnostics after seven incomplete
+events. All attempts rolled back completely and no apply occurred.

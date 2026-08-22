@@ -1117,9 +1117,12 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   Terraform past the S3 barrier, but the streaming sanitizer stopped on a
   diagnostic event that omitted `detail`. Its seven early events were incomplete
   and discarded. Null-diagnostic handling is locally corrected and validated.
-  All attempts' role, lock, state, and temporary-file rollback checks passed.
-  Overall status remains BLOCKED because a corrected exact plan, current
-  deployment, and material gaps remain.
+  A sixth exactly approved attempt proved the null-safe sanitizer completes, but
+  Terraform itself exited 1 with four unclassified diagnostics after seven
+  incomplete planned-change events. No IAM action token was retained; the
+  partial events were discarded. All attempts' role, lock, state, and
+  temporary-file rollback checks passed. Overall status remains BLOCKED because
+  a corrected exact plan, current deployment, and material gaps remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1309,8 +1312,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   unchanged, no lock existed before or after, no manual cleanup was needed, the
   isolated directory was removed, and the Phase 1 role returned to 111 allows,
   26 denies, and zero Phase 2 markers. The null case is locally corrected and
-  validated; a further no-apply plan requires new exact approval but no new AWS
-  action.
+  validated. A sixth exactly approved invocation repeated the same permissions;
+  its sanitizer completed, but Terraform exited 1 with four unclassified
+  diagnostics after seven incomplete planned-change and four drift events. No
+  IAM action token was captured, the partial stream was discarded, the state was
+  unchanged, zero locks remained, and all permission/temporary-file rollback
+  checks passed. A further no-apply plan requires new exact approval but no new
+  AWS action; its sanitizer will retain only redacted diagnostic category/API
+  operation labels if Terraform fails again.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

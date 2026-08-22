@@ -31,12 +31,14 @@ resource "aws_cloudwatch_log_metric_filter" "worker_failures" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "api_errors" {
+  alarm_actions       = var.alarm_notification_topic_arns
   alarm_description   = "GoGymGo API emitted at least one server error in five minutes."
   alarm_name          = "${local.name}-api-server-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "ApiServerErrors"
   namespace           = "GoGymGo/${var.environment}"
+  ok_actions          = var.alarm_notification_topic_arns
   period              = 300
   statistic           = "Sum"
   threshold           = 0
@@ -44,12 +46,14 @@ resource "aws_cloudwatch_metric_alarm" "api_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "worker_failures" {
+  alarm_actions       = var.alarm_notification_topic_arns
   alarm_description   = "GoGymGo worker emitted at least one batch failure in five minutes."
   alarm_name          = "${local.name}-worker-batch-failures"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "WorkerBatchFailures"
   namespace           = "GoGymGo/${var.environment}"
+  ok_actions          = var.alarm_notification_topic_arns
   period              = 300
   statistic           = "Sum"
   threshold           = 0
@@ -57,6 +61,7 @@ resource "aws_cloudwatch_metric_alarm" "worker_failures" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "database_cpu" {
+  alarm_actions       = var.alarm_notification_topic_arns
   alarm_description   = "GoGymGo RDS CPU remained above 80 percent."
   alarm_name          = "${local.name}-database-high-cpu"
   comparison_operator = "GreaterThanThreshold"
@@ -64,6 +69,7 @@ resource "aws_cloudwatch_metric_alarm" "database_cpu" {
   evaluation_periods  = 2
   metric_name         = "CPUUtilization"
   namespace           = "AWS/RDS"
+  ok_actions          = var.alarm_notification_topic_arns
   period              = 300
   statistic           = "Average"
   threshold           = 80
@@ -71,6 +77,7 @@ resource "aws_cloudwatch_metric_alarm" "database_cpu" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "database_storage" {
+  alarm_actions       = var.alarm_notification_topic_arns
   alarm_description   = "GoGymGo RDS free storage dropped below 5 GiB."
   alarm_name          = "${local.name}-database-low-storage"
   comparison_operator = "LessThanThreshold"
@@ -78,6 +85,7 @@ resource "aws_cloudwatch_metric_alarm" "database_storage" {
   evaluation_periods  = 1
   metric_name         = "FreeStorageSpace"
   namespace           = "AWS/RDS"
+  ok_actions          = var.alarm_notification_topic_arns
   period              = 300
   statistic           = "Average"
   threshold           = 5368709120
@@ -85,6 +93,7 @@ resource "aws_cloudwatch_metric_alarm" "database_storage" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "unhealthy_targets" {
+  alarm_actions       = var.alarm_notification_topic_arns
   alarm_description   = "The public API has an unhealthy target."
   alarm_name          = "${local.name}-unhealthy-api-targets"
   comparison_operator = "GreaterThanThreshold"
@@ -95,6 +104,7 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_targets" {
   evaluation_periods = 2
   metric_name        = "UnHealthyHostCount"
   namespace          = "AWS/ApplicationELB"
+  ok_actions         = var.alarm_notification_topic_arns
   period             = 60
   statistic          = "Maximum"
   threshold          = 0
@@ -130,6 +140,21 @@ resource "aws_budgets_budget" "monthly" {
       subscriber_email_addresses = [var.budget_notification_email]
       threshold                  = notification.value.threshold
       threshold_type             = "PERCENTAGE"
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.environment != "production" || var.budget_notification_email != null
+      error_message = "Production requires a reviewed budget notification email."
+    }
+    precondition {
+      condition = var.environment != "production" || (
+        length(var.alarm_notification_topic_arns) > 0 && alltrue([
+          for arn in var.alarm_notification_topic_arns : startswith(arn, "arn:aws:sns:${var.region}:${var.account_id}:")
+        ])
+      )
+      error_message = "Production requires at least one alarm topic in its own account and ca-central-1."
     }
   }
 }

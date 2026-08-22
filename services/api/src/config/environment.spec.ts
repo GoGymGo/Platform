@@ -120,14 +120,16 @@ describe('environment validation', () => {
     expect(environment.TRUST_PROXY).toBe(true);
   });
 
-  it('does not require the API-only owner identity for a production worker', () => {
+  it('does not require API-only secrets for a production worker', () => {
     const environment = validateEnvironment({
       ...productionEnvironment,
       GOGYMGO_OWNER_EMAIL: '',
+      REWARD_CODE_ENCRYPTION_KEY: '',
       RUNTIME_ROLE: 'worker',
     });
 
     expect(environment.GOGYMGO_OWNER_EMAIL).toBeUndefined();
+    expect(environment.REWARD_CODE_ENCRYPTION_KEY).toBeUndefined();
     expect(environment.RUNTIME_ROLE).toBe('worker');
   });
 

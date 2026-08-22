@@ -47,9 +47,11 @@ to Git, Expo variables, Terraform state, container images, or logs.
 4. Manually dispatch the protected deployment workflow from `main`. Before an
    AWS credential-bearing job can start, the workflow verifies that the exact
    commit is on `main`, is the merge commit of a merged pull request into `main`,
-   and passed every check currently required by branch protection. It then checks
-   out that commit, builds and scans the image, pushes it to the environment's
-   immutable ECR repository, and records its digest.
+   has every required check successful on the pull-request head, and has both
+   always-on main checks plus every emitted path-scoped required check successful
+   on that exact merged-main commit. It then checks out that commit without
+   persisted Git credentials, builds and scans the image, pushes it to the
+   environment's immutable ECR repository, and records its digest.
 5. Execute the migration task with the new digest and wait for success.
 6. Update the worker service with the same digest.
 7. Deploy the API with ECS circuit-breaker rollback and ALB health checks.
@@ -107,7 +109,7 @@ seven-day lifecycle, signed reads expire within five minutes, worker lease
 renewal/takeover alerts are visible, Firebase deletion and avatar/export object
 deletion return authoritative results, the pseudonymization key is present only
 in the worker, and backup/restore plus crashed-job reconciliation have been
-rehearsed. Run one staging v12 export minimization review and one deletion/FK/
+rehearsed. Run one staging schema-v16 export minimization review and one deletion/FK/
 retained-integrity review using disposable approved fixtures. Missing or
 ambiguous evidence is a release blocker; do not enable the flag or describe the
 path as live.
@@ -120,3 +122,11 @@ path as live.
 - Roll API/worker traffic back only when the schema remains compatible.
 - Otherwise fix forward while preserving append-only draw, reward, ledger,
   privacy, and operator-audit evidence.
+- The workflow captures the complete prior API and singleton-worker service
+  baselines. Worker, API, or readiness failure requests both prior task
+  definitions and desired counts, then fails. If automatic recovery is
+  incomplete, stop and escalate rather than editing a service by hand.
+
+The evidence checklist, new-target restore rehearsal, private-object recovery,
+secret rotation, and incident procedure are defined in
+[AWS runtime release and recovery evidence](./aws-runtime-recovery.md).

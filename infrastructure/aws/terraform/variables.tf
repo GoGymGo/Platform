@@ -227,13 +227,49 @@ variable "worker_memory" {
 }
 
 variable "worker_desired_count" {
-  description = "Bootstrap worker tasks. The protected deployment workflow scales an approved release to one."
+  description = "Bootstrap worker tasks. Operations heartbeat ownership requires a singleton worker."
   type        = number
   default     = 0
 
   validation {
-    condition     = floor(var.worker_desired_count) == var.worker_desired_count && var.worker_desired_count >= 0 && var.worker_desired_count <= 2
-    error_message = "worker_desired_count must be a whole number between 0 and 2."
+    condition     = floor(var.worker_desired_count) == var.worker_desired_count && var.worker_desired_count >= 0 && var.worker_desired_count <= 1
+    error_message = "worker_desired_count must be zero or one."
+  }
+}
+
+variable "creator_features_enabled" {
+  description = "Enable creator application/configuration routes only after the product and operations gates pass."
+  type        = bool
+  default     = false
+}
+
+variable "landing_intake_enabled" {
+  description = "Enable authenticated landing-intake forwarding only after the PostgreSQL cutover gate passes."
+  type        = bool
+  default     = false
+}
+
+variable "landing_intake_retention_days" {
+  description = "Approved landing-intake retention period; required by the API when landing intake is enabled."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.landing_intake_retention_days == null || (floor(var.landing_intake_retention_days) == var.landing_intake_retention_days && var.landing_intake_retention_days >= 30 && var.landing_intake_retention_days <= 730)
+    error_message = "landing_intake_retention_days must be null or a whole number between 30 and 730."
+  }
+}
+
+variable "partner_application_retention_days" {
+  description = "Approved public partner-application retention period; null keeps public intake unavailable."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.partner_application_retention_days == null || (floor(var.partner_application_retention_days) == var.partner_application_retention_days && var.partner_application_retention_days >= 30 && var.partner_application_retention_days <= 730)
+    error_message = "partner_application_retention_days must be null or a whole number between 30 and 730."
   }
 }
 
@@ -268,6 +304,19 @@ variable "budget_notification_email" {
   validation {
     condition     = var.budget_notification_email == null || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.budget_notification_email))
     error_message = "budget_notification_email must be a valid email address."
+  }
+}
+
+variable "alarm_notification_topic_arns" {
+  description = "Reviewed SNS topic ARNs that receive application and infrastructure alarm transitions."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for arn in var.alarm_notification_topic_arns : can(regex("^arn:aws:sns:ca-central-1:[0-9]{12}:[A-Za-z0-9_-]{1,256}$", arn))
+    ])
+    error_message = "Every alarm notification destination must be a ca-central-1 SNS topic ARN."
   }
 }
 

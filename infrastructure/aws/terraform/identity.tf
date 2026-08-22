@@ -9,11 +9,15 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 }
 
 resource "aws_iam_role" "ecs_execution" {
+  for_each = local.execution_secret_arns
+
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
-  name               = "${local.name}-ecs-execution"
+  name               = "${local.name}-ecs-execution-${each.key}"
 }
 
 data "aws_iam_policy_document" "ecs_execution" {
+  for_each = local.execution_secret_arns
+
   statement {
     actions = [
       "ecr:GetAuthorizationToken",
@@ -40,7 +44,7 @@ data "aws_iam_policy_document" "ecs_execution" {
 
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = values(aws_secretsmanager_secret.runtime)[*].arn
+    resources = each.value
   }
 
   statement {
@@ -50,9 +54,11 @@ data "aws_iam_policy_document" "ecs_execution" {
 }
 
 resource "aws_iam_role_policy" "ecs_execution" {
-  name   = "${local.name}-ecs-execution"
-  policy = data.aws_iam_policy_document.ecs_execution.json
-  role   = aws_iam_role.ecs_execution.id
+  for_each = local.execution_secret_arns
+
+  name   = "${local.name}-ecs-execution-${each.key}"
+  policy = data.aws_iam_policy_document.ecs_execution[each.key].json
+  role   = aws_iam_role.ecs_execution[each.key].id
 }
 
 resource "aws_iam_role" "api" {
@@ -72,11 +78,13 @@ resource "aws_iam_role" "migration" {
 
 data "aws_iam_policy_document" "api" {
   statement {
-    actions = ["s3:GetObject", "s3:PutObject"]
-    resources = [
-      "${aws_s3_bucket.user_content.arn}/avatars/*",
-      "${aws_s3_bucket.privacy_exports.arn}/privacy-exports/*",
-    ]
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.user_content.arn}/avatars/*"]
+  }
+
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.privacy_exports.arn}/privacy-exports/*"]
   }
 
   statement {
@@ -93,11 +101,18 @@ resource "aws_iam_role_policy" "api" {
 
 data "aws_iam_policy_document" "worker" {
   statement {
-    actions = ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
-    resources = [
-      "${aws_s3_bucket.user_content.arn}/*",
-      "${aws_s3_bucket.privacy_exports.arn}/*",
+    actions   = ["s3:DeleteObject", "s3:DeleteObjectVersion", "s3:GetObject"]
+    resources = ["${aws_s3_bucket.user_content.arn}/avatars/*"]
+  }
+
+  statement {
+    actions = [
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+      "s3:GetObject",
+      "s3:PutObject",
     ]
+    resources = ["${aws_s3_bucket.privacy_exports.arn}/privacy-exports/*"]
   }
 
   statement {
@@ -178,12 +193,14 @@ data "aws_iam_policy_document" "github_deploy" {
 
   statement {
     actions = ["iam:PassRole"]
-    resources = [
-      aws_iam_role.api.arn,
-      aws_iam_role.ecs_execution.arn,
-      aws_iam_role.migration.arn,
-      aws_iam_role.worker.arn,
-    ]
+    resources = concat(
+      [
+        aws_iam_role.api.arn,
+        aws_iam_role.migration.arn,
+        aws_iam_role.worker.arn,
+      ],
+      values(aws_iam_role.ecs_execution)[*].arn,
+    )
     condition {
       test     = "StringEquals"
       values   = ["ecs-tasks.amazonaws.com"]

@@ -13,67 +13,93 @@ locals {
 
   availability_zones = slice(data.aws_availability_zones.available.names, 0, 2)
 
-  secret_names = {
+  secret_names = merge({
     DATABASE_URL                  = "${local.name}/database-url"
     EXPO_PUSH_ACCESS_TOKEN        = "${local.name}/expo-push-access-token"
     FIREBASE_SERVICE_ACCOUNT_JSON = "${local.name}/firebase-service-account-json"
     GOGYMGO_OWNER_EMAIL           = "${local.name}/owner-email"
     PRIVACY_PSEUDONYMIZATION_KEY  = "${local.name}/privacy-pseudonymization-key"
     REWARD_CODE_ENCRYPTION_KEY    = "${local.name}/reward-code-encryption-key"
-  }
+    },
+    var.landing_intake_enabled ? {
+      LANDING_INTAKE_FORWARDING_SECRET = "${local.name}/landing-intake-forwarding-secret"
+    } : {},
+  )
 
   common_environment = {
-    AWS_REGION                       = var.region
-    CORS_ORIGINS                     = join(",", var.cors_origins)
-    DATABASE_POOL_MAX                = "10"
-    FIREBASE_PROJECT_ID              = var.firebase_project_id
-    LOG_LEVEL                        = "info"
-    NODE_ENV                         = "production"
-    OPENAPI_ENABLED                  = "false"
-    OTEL_ENABLED                     = "false"
-    PRETTY_LOGS_ENABLED              = "false"
-    PRIVATE_CONTENT_BUCKET           = aws_s3_bucket.user_content.bucket
-    PRIVATE_OBJECT_STORAGE_PROVIDER  = "aws-s3"
-    PRIVACY_DOWNLOAD_URL_TTL_SECONDS = "300"
-    PRIVACY_EXPORT_BUCKET            = aws_s3_bucket.privacy_exports.bucket
-    PRIVACY_EXPORT_RETENTION_DAYS    = "7"
-    PRIVACY_JOB_LEASE_SECONDS        = "600"
-    PRIVACY_OPERATIONS_ENABLED       = tostring(var.privacy_operations_enabled)
-    PROFILE_MEDIA_ENABLED            = tostring(var.profile_media_enabled)
-    PROFILE_MEDIA_MAX_BYTES          = "2097152"
-    PROFILE_MEDIA_READ_TTL_SECONDS   = "300"
-    PROFILE_MEDIA_UPLOAD_TTL_SECONDS = "300"
-    PUSH_NOTIFICATIONS_ENABLED       = tostring(var.push_notifications_enabled)
-    RATE_LIMIT_MAX                   = "120"
-    RATE_LIMIT_TTL_MS                = "60000"
-    TRUST_PROXY                      = "true"
-    WORKER_HEARTBEAT_INTERVAL_MS     = "30000"
-    WORKER_POLL_INTERVAL_MS          = "5000"
-    WORKER_STALE_AFTER_MS            = "120000"
+    AWS_REGION                          = var.region
+    CORS_ORIGINS                        = join(",", var.cors_origins)
+    DATABASE_POOL_MAX                   = "10"
+    FIREBASE_PROJECT_ID                 = var.firebase_project_id
+    LOG_LEVEL                           = "info"
+    NODE_ENV                            = "production"
+    OPENAPI_ENABLED                     = "false"
+    OTEL_ENABLED                        = "false"
+    PRETTY_LOGS_ENABLED                 = "false"
+    PRIVATE_CONTENT_BUCKET              = aws_s3_bucket.user_content.bucket
+    PRIVATE_OBJECT_STORAGE_PROVIDER     = "aws-s3"
+    PRIVACY_DOWNLOAD_URL_TTL_SECONDS    = "300"
+    PRIVACY_EXPORT_BUCKET               = aws_s3_bucket.privacy_exports.bucket
+    PRIVACY_EXPORT_RETENTION_DAYS       = "7"
+    PRIVACY_JOB_LEASE_SECONDS           = "600"
+    PRIVACY_OPERATIONS_ENABLED          = tostring(var.privacy_operations_enabled)
+    PROFILE_MEDIA_ENABLED               = tostring(var.profile_media_enabled)
+    PROFILE_MEDIA_CLEANUP_LEASE_SECONDS = "600"
+    PROFILE_MEDIA_MAX_BYTES             = "2097152"
+    PROFILE_MEDIA_READ_TTL_SECONDS      = "300"
+    PROFILE_MEDIA_UPLOAD_TTL_SECONDS    = "300"
+    PUSH_NOTIFICATIONS_ENABLED          = tostring(var.push_notifications_enabled)
+    RATE_LIMIT_MAX                      = "120"
+    RATE_LIMIT_TTL_MS                   = "60000"
+    TRUST_PROXY                         = "true"
+    WORKER_HEARTBEAT_INTERVAL_MS        = "30000"
+    WORKER_POLL_INTERVAL_MS             = "5000"
+    WORKER_STALE_AFTER_MS               = "120000"
   }
 
-  api_environment = merge(local.common_environment, {
-    OTEL_SERVICE_NAME = "${local.name}-api"
-    RUNTIME_ROLE      = "api"
-  })
+  api_environment = merge(
+    local.common_environment,
+    {
+      CREATOR_FEATURES_ENABLED = tostring(var.creator_features_enabled)
+      LANDING_INTAKE_ENABLED   = tostring(var.landing_intake_enabled)
+      OTEL_SERVICE_NAME        = "${local.name}-api"
+      RUNTIME_ROLE             = "api"
+    },
+    var.landing_intake_retention_days == null ? {} : {
+      LANDING_INTAKE_RETENTION_DAYS = tostring(var.landing_intake_retention_days)
+    },
+    var.partner_application_retention_days == null ? {} : {
+      PARTNER_APPLICATION_RETENTION_DAYS = tostring(var.partner_application_retention_days)
+    },
+  )
 
   worker_environment = merge(local.common_environment, {
     OTEL_SERVICE_NAME = "${local.name}-worker"
     RUNTIME_ROLE      = "worker"
   })
 
-  api_secret_environment = {
-    DATABASE_URL                  = aws_secretsmanager_secret.runtime["DATABASE_URL"].arn
-    FIREBASE_SERVICE_ACCOUNT_JSON = aws_secretsmanager_secret.runtime["FIREBASE_SERVICE_ACCOUNT_JSON"].arn
-    GOGYMGO_OWNER_EMAIL           = aws_secretsmanager_secret.runtime["GOGYMGO_OWNER_EMAIL"].arn
-    REWARD_CODE_ENCRYPTION_KEY    = aws_secretsmanager_secret.runtime["REWARD_CODE_ENCRYPTION_KEY"].arn
+  api_secret_environment = merge(
+    {
+      DATABASE_URL                  = aws_secretsmanager_secret.runtime["DATABASE_URL"].arn
+      FIREBASE_SERVICE_ACCOUNT_JSON = aws_secretsmanager_secret.runtime["FIREBASE_SERVICE_ACCOUNT_JSON"].arn
+      GOGYMGO_OWNER_EMAIL           = aws_secretsmanager_secret.runtime["GOGYMGO_OWNER_EMAIL"].arn
+      REWARD_CODE_ENCRYPTION_KEY    = aws_secretsmanager_secret.runtime["REWARD_CODE_ENCRYPTION_KEY"].arn
+    },
+    var.landing_intake_enabled ? {
+      LANDING_INTAKE_FORWARDING_SECRET = aws_secretsmanager_secret.runtime["LANDING_INTAKE_FORWARDING_SECRET"].arn
+    } : {},
+  )
+
+  fargate_memory_by_cpu = {
+    256  = [512, 1024, 2048]
+    512  = [1024, 2048, 3072, 4096]
+    1024 = [2048, 3072, 4096, 5120, 6144, 7168, 8192]
   }
 
   worker_secret_environment = merge(
     {
       DATABASE_URL                  = aws_secretsmanager_secret.runtime["DATABASE_URL"].arn
       FIREBASE_SERVICE_ACCOUNT_JSON = aws_secretsmanager_secret.runtime["FIREBASE_SERVICE_ACCOUNT_JSON"].arn
-      REWARD_CODE_ENCRYPTION_KEY    = aws_secretsmanager_secret.runtime["REWARD_CODE_ENCRYPTION_KEY"].arn
     },
     var.privacy_operations_enabled ? {
       PRIVACY_PSEUDONYMIZATION_KEY = aws_secretsmanager_secret.runtime["PRIVACY_PSEUDONYMIZATION_KEY"].arn
@@ -82,4 +108,10 @@ locals {
       EXPO_PUSH_ACCESS_TOKEN = aws_secretsmanager_secret.runtime["EXPO_PUSH_ACCESS_TOKEN"].arn
     } : {},
   )
+
+  execution_secret_arns = {
+    api       = values(local.api_secret_environment)
+    migration = [aws_secretsmanager_secret.runtime["DATABASE_URL"].arn]
+    worker    = values(local.worker_secret_environment)
+  }
 }

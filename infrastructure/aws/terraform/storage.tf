@@ -66,12 +66,12 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "privacy" {
 
 resource "aws_s3_bucket_versioning" "content" {
   bucket = aws_s3_bucket.user_content.id
-  versioning_configuration { status = "Suspended" }
+  versioning_configuration { status = "Enabled" }
 }
 
 resource "aws_s3_bucket_versioning" "privacy" {
   bucket = aws_s3_bucket.privacy_exports.id
-  versioning_configuration { status = "Suspended" }
+  versioning_configuration { status = "Enabled" }
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "content" {
@@ -82,7 +82,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "content" {
     status = "Enabled"
     filter {}
     abort_incomplete_multipart_upload { days_after_initiation = 1 }
+    noncurrent_version_expiration { noncurrent_days = 30 }
   }
+
+  depends_on = [aws_s3_bucket_versioning.content]
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "privacy" {
@@ -94,7 +97,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "privacy" {
     filter {}
     expiration { days = 7 }
     abort_incomplete_multipart_upload { days_after_initiation = 1 }
+    noncurrent_version_expiration { noncurrent_days = 7 }
   }
+
+  depends_on = [aws_s3_bucket_versioning.privacy]
 }
 
 resource "aws_s3_bucket_cors_configuration" "content" {

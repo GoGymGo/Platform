@@ -42,6 +42,16 @@ cleanup deleted the unsanitized plan and temporary directory. No action list was
 retained or inferred. The state ETag and modification time were unchanged, no
 lock remains, and the Phase 1 role policy was restored again.
 
+An exactly approved third attempt used the locally validated streaming JSON
+sanitizer and completed safely. It retained 48 address/action events: 9 creates,
+2 deletes, 22 replacements, 8 updates, and 7 data reads. Three reported bucket
+deletions were false refresh signals: all three buckets remain live, but
+`HeadBucket` is denied because the role lacks `s3:ListBucket` on application
+buckets. The corresponding 3 bucket creates and 19 dependent S3 replacements
+are therefore permission artifacts and must not be applied. The remaining 19
+non-S3 mutation events are useful but still speculative. State and lock checks,
+temporary cleanup, and Phase 1 policy restoration all passed.
+
 No apply, deployment, secret value read, application-object read, database
 connection, log-content query, restore, rotation, scaling change, or
 application-resource mutation occurred. Terraform state access was limited to
@@ -77,7 +87,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | A protected plan completed with exit code 2, confirming changes, but its local JSON sanitizer failed before a resource-action summary could be retained | GAP FOUND | High | Approve one streaming-JSON no-apply rerun to capture only resource addresses and action types |
+| Exact Terraform drift | Streaming JSON captured 48 events; 22 S3 actions are false/dependent artifacts because application-bucket HeadBucket is denied; 19 non-S3 mutations and 7 data reads remain | PARTIALLY VERIFIED | High | Approve exact-bucket ListBucket temporarily and rerun before any remediation approval |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -146,6 +156,66 @@ retaining unsanitized content. The state ETag and last-modified value matched
 their pre-plan values, no lock remained, the temporary directory was deleted,
 and the target role was restored to 111 allows and 26 denies. Exact resource
 actions therefore remain unknown.
+
+The exactly approved streaming-JSON retry initialized an isolated copy of
+commit 75dbfca and completed with detailed exit code 2. It retained only resource
+addresses and action types:
+
+- 9 creates;
+- 2 deletes;
+- 22 replacements;
+- 8 updates;
+- 7 data reads.
+
+The 22 S3 mutations are not trustworthy. Refresh reported the three live
+application buckets as deleted, which cascaded into 3 bucket creates and 19
+replacements of CORS, lifecycle, ownership, policy, public-access, encryption,
+and versioning resources. Direct checks confirmed that `HeadBucket` is denied on
+all three buckets because the role lacks `s3:ListBucket`; prior reconciliation
+already verified the buckets are live. These events are permission artifacts,
+not an apply candidate.
+
+Excluding those S3 artifacts, the sanitized plan contains 19 non-S3 mutation
+events:
+
+- create three role-scoped ECS execution roles and their three policies;
+- delete the old shared ECS execution role and policy;
+- replace the API, worker, and migration task definitions;
+- update the monthly budget, member-web CloudFront distribution and function,
+  worker service, and four IAM role policies.
+
+| Non-S3 resource address | Action |
+| --- | --- |
+| aws_budgets_budget.monthly | update |
+| aws_cloudfront_distribution.member_web | update |
+| aws_cloudfront_function.member_web_spa | update |
+| aws_ecs_service.worker | update |
+| aws_ecs_task_definition.api | replace |
+| aws_ecs_task_definition.migration | replace |
+| aws_ecs_task_definition.worker | replace |
+| aws_iam_role.ecs_execution | delete |
+| aws_iam_role.ecs_execution["api"] | create |
+| aws_iam_role.ecs_execution["migration"] | create |
+| aws_iam_role.ecs_execution["worker"] | create |
+| aws_iam_role_policy.api | update |
+| aws_iam_role_policy.ecs_execution | delete |
+| aws_iam_role_policy.ecs_execution["api"] | create |
+| aws_iam_role_policy.ecs_execution["migration"] | create |
+| aws_iam_role_policy.ecs_execution["worker"] | create |
+| aws_iam_role_policy.github_deploy | update |
+| aws_iam_role_policy.github_member_web_deploy | update |
+| aws_iam_role_policy.worker | update |
+
+Seven IAM policy-document data reads are non-mutating. Refresh also identified
+non-S3 drift addresses for the member-web distribution/function, database,
+API/worker services, API task definition, shared execution role, and owner-email
+secret metadata. Attribute values were intentionally not retained, so these
+addresses are evidence for a corrected plan, not an exact mutation approval.
+
+The state ETag and last-modified value again matched their pre-plan values,
+Terraform removed its lock without manual cleanup, the temporary plan and
+directory were deleted, and the target role was restored to 111 allows and 26
+denies. No apply occurred.
 
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
@@ -282,6 +352,11 @@ function. The plan completed with those temporary reads; they were then removed.
 
 Remaining permission blockers:
 
+- Correct S3 refresh requires temporary `s3:ListBucket` on the exact content,
+  privacy, and member-web buckets because AWS authorizes `HeadBucket` through
+  that action. This also technically permits listing object key names in those
+  three buckets; IAM cannot grant `HeadBucket` as a separate action. Object
+  content reads remain explicitly denied.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -351,7 +426,7 @@ metadata actions and removed the broad S3 bucket-listing actions. The policy
 was reprovisioned and all target-role safeguards were validated. All checks
 succeeded except AWS Backup, which is explicitly denied by an organization SCP.
 
-### Phase 2 — protected Terraform plan — drift confirmed, summary blocked locally
+### Phase 2 — protected Terraform plan — sanitized, S3 refresh incomplete
 
 The approved exact state-access and lock procedure was run from an isolated copy
 with live non-secret inputs held in process. The first attempt identified three
@@ -365,6 +440,12 @@ A backend-disabled local probe then verified that Terraform 1.15.8 emits
 `planned_change` events containing the resource address and action through
 `terraform plan -json`. The probe returned detailed exit code 2, the sanitizer
 retained only those two fields, and all local probe artifacts were removed.
+
+The approved streaming retry then retained the 48 resource address/action events
+described above. It exposed an S3 refresh-permission artifact: the three live
+buckets appeared deleted because `HeadBucket` was denied. The 22 resulting S3
+mutations are invalid. A corrected exact plan still requires a separately
+approved, temporary three-bucket `s3:ListBucket` grant.
 
 ### Phase 3 — infrastructure and least-privilege remediation
 
@@ -395,9 +476,9 @@ remains out of scope.
 
 ## Next approval boundary
 
-The next recommended step is one more protected, no-apply Terraform plan for
-account **…9877** in ca-central-1, changing the local sanitizer to parse
-Terraform's streaming JSON plan events instead of reopening the saved plan.
+The next recommended step is one corrected protected, no-apply Terraform plan
+for account **…9877** in ca-central-1. It repeats the proven streaming sanitizer
+and adds only the S3 authorization needed for accurate `HeadBucket` refresh.
 
 IAM Identity Center change:
 
@@ -408,6 +489,9 @@ IAM Identity Center change:
 - temporarily allow cloudfront:GetFunction only for the Terraform-managed
   member-web CloudFront Function; this reads its deployed function code for
   drift comparison;
+- temporarily allow s3:ListBucket on only the exact content, privacy, and
+  member-web buckets. This enables `HeadBucket` but also technically permits
+  listing object key names; no object content read is allowed or requested;
 - allow s3:GetObject and s3:GetObjectVersion only for the exact
   gogymgo/staging/terraform.tfstate object;
 - allow s3:GetObject, s3:PutObject, and s3:DeleteObject only for the exact
@@ -448,7 +532,7 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-Two Phase 2 plan invocations have occurred. The first stopped on the three read
-denials. The exactly approved second attempt completed with changes present but
-its local sanitizer failed; its unsanitized plan was deleted. Both attempts
-rolled back completely and no apply occurred.
+Three Phase 2 plan invocations have occurred. The first stopped on three read
+denials. The second completed but its local post-plan sanitizer failed. The third
+used the validated streaming sanitizer and exposed the S3 HeadBucket permission
+artifact. All attempts rolled back completely and no apply occurred.

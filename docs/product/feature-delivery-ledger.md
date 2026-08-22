@@ -1104,9 +1104,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   read. An exactly approved retry scoped those reads to the three staging
   resources and completed with exit code 2, confirming drift. Its post-plan JSON
   sanitizer failed, so the unsanitized plan was deleted and exact resource
-  actions remain unknown. Both attempts' role, lock, state, and temporary-file
-  rollback checks passed. Overall status remains BLOCKED because current main is
-  not deployed and material gaps remain.
+  actions were not inferred. An exactly approved streaming-JSON retry then
+  retained 48 resource address/action events. Twenty-two S3 mutations are
+  invalid artifacts because the restricted role cannot run `HeadBucket` on the
+  three live application buckets; 19 non-S3 mutation events and 7 data reads
+  remain. All attempts' role, lock, state, and temporary-file rollback checks
+  passed. Overall status remains BLOCKED because a corrected exact plan, current
+  deployment, and material gaps remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1275,7 +1279,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   was restored, no lock remained, state ETag and time were unchanged, and
   temporary files were deleted. No apply, application-resource mutation,
   deployment, secret or application-object/log data read, database connection,
-  or restore occurred.
+  or restore occurred. A third exactly approved streaming-JSON plan retained
+  only resource addresses and actions. It showed 9 creates, 2 deletes, 22
+  replacements, 8 updates and 7 reads, but direct authorization checks proved
+  the 3 bucket creates and 19 dependent S3 replacements are false artifacts of
+  denied `HeadBucket`. Correct S3 refresh now requires separate approval for
+  temporary `s3:ListBucket` on only those three application buckets; that action
+  can reveal object key names even though all object content reads remain
+  denied.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

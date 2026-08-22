@@ -52,6 +52,14 @@ are therefore permission artifacts and must not be applied. The remaining 19
 non-S3 mutation events are useful but still speculative. State and lock checks,
 temporary cleanup, and Phase 1 policy restoration all passed.
 
+After exact approval, a fourth attempt temporarily added `s3:ListBucket` only
+on those three application buckets. Direct `HeadBucket` checks then succeeded,
+but Terraform stopped before producing a plan because its S3 bucket refresh also
+requires `s3:GetAccelerateConfiguration`. The state was unchanged, no lock
+remained, the temporary directory was deleted, and the Phase 1 role was restored
+with 111 allowed actions, 26 explicit denies, and no temporary Phase 2 markers.
+No plan or action list was produced by this attempt.
+
 No apply, deployment, secret value read, application-object read, database
 connection, log-content query, restore, rotation, scaling change, or
 application-resource mutation occurred. Terraform state access was limited to
@@ -87,7 +95,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Streaming JSON captured 48 events; 22 S3 actions are false/dependent artifacts because application-bucket HeadBucket is denied; 19 non-S3 mutations and 7 data reads remain | PARTIALLY VERIFIED | High | Approve exact-bucket ListBucket temporarily and rerun before any remediation approval |
+| Exact Terraform drift | Streaming JSON captured 48 events; 22 S3 actions are known permission artifacts; an approved ListBucket retry passed HeadBucket but stopped on one additional S3 metadata read | PARTIALLY VERIFIED | High | Approve exact-bucket GetAccelerateConfiguration temporarily and rerun before any remediation approval |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -216,6 +224,24 @@ The state ETag and last-modified value again matched their pre-plan values,
 Terraform removed its lock without manual cleanup, the temporary plan and
 directory were deleted, and the target role was restored to 111 allows and 26
 denies. No apply occurred.
+
+The fourth exactly approved attempt initialized an isolated copy of commit
+f17b216 after temporarily adding `s3:ListBucket` only on the exact content,
+privacy, and member-web buckets. All three direct `HeadBucket` checks succeeded.
+Terraform initialization succeeded, but refresh stopped with exit code 1 before
+producing a plan because `s3:GetAccelerateConfiguration` was not allowed. The
+state ETag and last-modified value were unchanged, Terraform left no lock, the
+temporary directory was deleted, and the target role was restored to 111 allows,
+26 denies, and zero Phase 2 markers. No apply occurred.
+
+The exact-version [Terraform AWS Provider v6.57.1 bucket reader](https://github.com/hashicorp/terraform-provider-aws/blob/v6.57.1/internal/service/s3/bucket.go)
+shows that `aws_s3_bucket` refresh calls `GetBucketAccelerateConfiguration` after
+the bucket policy, ACL, CORS, website, and versioning reads. Comparing that
+sequence with the Phase 1 policy shows `s3:GetAccelerateConfiguration` is the
+remaining uncovered bucket-read action: the other calls are covered by
+`s3:GetBucket*`, `s3:GetEncryptionConfiguration`, or
+`s3:GetLifecycleConfiguration`. This source review bounds the next retry to one
+additional action rather than another iterative permission-discovery run.
 
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
@@ -352,11 +378,13 @@ function. The plan completed with those temporary reads; they were then removed.
 
 Remaining permission blockers:
 
-- Correct S3 refresh requires temporary `s3:ListBucket` on the exact content,
-  privacy, and member-web buckets because AWS authorizes `HeadBucket` through
-  that action. This also technically permits listing object key names in those
-  three buckets; IAM cannot grant `HeadBucket` as a separate action. Object
-  content reads remain explicitly denied.
+- The approved temporary `s3:ListBucket` grant on the exact content, privacy,
+  and member-web buckets made all three `HeadBucket` checks succeed. A corrected
+  S3 refresh now additionally requires temporary
+  `s3:GetAccelerateConfiguration` on those same three buckets. Exact provider
+  source review identifies this as the remaining uncovered S3 bucket-read
+  action. The repeated `s3:ListBucket` grant technically permits listing object
+  key names, but object content reads remain explicitly denied.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -426,7 +454,7 @@ metadata actions and removed the broad S3 bucket-listing actions. The policy
 was reprovisioned and all target-role safeguards were validated. All checks
 succeeded except AWS Backup, which is explicitly denied by an organization SCP.
 
-### Phase 2 — protected Terraform plan — sanitized, S3 refresh incomplete
+### Phase 2 — protected Terraform plan — sanitized, one S3 read remains
 
 The approved exact state-access and lock procedure was run from an isolated copy
 with live non-secret inputs held in process. The first attempt identified three
@@ -444,8 +472,12 @@ retained only those two fields, and all local probe artifacts were removed.
 The approved streaming retry then retained the 48 resource address/action events
 described above. It exposed an S3 refresh-permission artifact: the three live
 buckets appeared deleted because `HeadBucket` was denied. The 22 resulting S3
-mutations are invalid. A corrected exact plan still requires a separately
-approved, temporary three-bucket `s3:ListBucket` grant.
+mutations are invalid. A fourth approved attempt temporarily added the exact
+three-bucket `s3:ListBucket` grant and proved all three `HeadBucket` checks now
+succeed, but Terraform stopped before producing a plan on
+`s3:GetAccelerateConfiguration`. Cleanup and full role restoration passed. The
+provider's exact-version bucket-reader source identifies that action as the
+remaining uncovered bucket metadata read.
 
 ### Phase 3 — infrastructure and least-privilege remediation
 
@@ -478,7 +510,8 @@ remains out of scope.
 
 The next recommended step is one corrected protected, no-apply Terraform plan
 for account **…9877** in ca-central-1. It repeats the proven streaming sanitizer
-and adds only the S3 authorization needed for accurate `HeadBucket` refresh.
+and adds only the final S3 bucket-metadata authorization identified by the exact
+provider source.
 
 IAM Identity Center change:
 
@@ -492,6 +525,8 @@ IAM Identity Center change:
 - temporarily allow s3:ListBucket on only the exact content, privacy, and
   member-web buckets. This enables `HeadBucket` but also technically permits
   listing object key names; no object content read is allowed or requested;
+- temporarily allow s3:GetAccelerateConfiguration only on those same exact
+  content, privacy, and member-web buckets;
 - allow s3:GetObject and s3:GetObjectVersion only for the exact
   gogymgo/staging/terraform.tfstate object;
 - allow s3:GetObject, s3:PutObject, and s3:DeleteObject only for the exact
@@ -532,7 +567,10 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-Three Phase 2 plan invocations have occurred. The first stopped on three read
+Four Phase 2 plan invocations have occurred. The first stopped on three read
 denials. The second completed but its local post-plan sanitizer failed. The third
 used the validated streaming sanitizer and exposed the S3 HeadBucket permission
-artifact. All attempts rolled back completely and no apply occurred.
+artifact. The fourth proved the exact-bucket `s3:ListBucket` fix and stopped on
+the one remaining uncovered provider bucket read,
+`s3:GetAccelerateConfiguration`. All attempts rolled back completely and no
+apply occurred.

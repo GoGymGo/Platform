@@ -1108,9 +1108,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   retained 48 resource address/action events. Twenty-two S3 mutations are
   invalid artifacts because the restricted role cannot run `HeadBucket` on the
   three live application buckets; 19 non-S3 mutation events and 7 data reads
-  remain. All attempts' role, lock, state, and temporary-file rollback checks
-  passed. Overall status remains BLOCKED because a corrected exact plan, current
-  deployment, and material gaps remain.
+  remain. A fourth exactly approved attempt temporarily added
+  `s3:ListBucket` only on those buckets, proved all three `HeadBucket` checks
+  succeed, and then stopped before producing a plan because Terraform also
+  requires `s3:GetAccelerateConfiguration`. Exact provider-source review
+  identifies that action as the remaining uncovered bucket read. All attempts'
+  role, lock, state, and temporary-file rollback checks passed. Overall status
+  remains BLOCKED because a corrected exact plan, current deployment, and
+  material gaps remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1283,10 +1288,16 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   only resource addresses and actions. It showed 9 creates, 2 deletes, 22
   replacements, 8 updates and 7 reads, but direct authorization checks proved
   the 3 bucket creates and 19 dependent S3 replacements are false artifacts of
-  denied `HeadBucket`. Correct S3 refresh now requires separate approval for
-  temporary `s3:ListBucket` on only those three application buckets; that action
-  can reveal object key names even though all object content reads remain
-  denied.
+  denied `HeadBucket`. A fourth exactly approved attempt temporarily allowed
+  `s3:ListBucket` only on those three application buckets and proved all three
+  `HeadBucket` calls succeed. Terraform then stopped before producing a plan on
+  the additional metadata read `s3:GetAccelerateConfiguration`. The state was
+  unchanged, no lock remained, temporary files were removed, and the Phase 1
+  role was fully restored. Exact Terraform AWS Provider v6.57.1 source review
+  identifies that action as the remaining uncovered bucket read. A further
+  no-apply plan therefore requires separate approval to repeat the exact
+  three-bucket listing grant and temporarily add
+  `s3:GetAccelerateConfiguration`; object content reads remain denied.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

@@ -1078,7 +1078,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   the dedicated staging account, healthy older runtime, active RDS backups/PITR,
   and current credit application. It also found high-risk private-bucket
   versioning, runtime secret-isolation, alarm-routing, and deployed-source-age
-  gaps. Exact Terraform drift, blocked metadata reads, deployment, recovery
+  gaps. The approved Phase 1 follow-up verified bucket encryption/lifecycle,
+  the deployed image's historical push scan, empty Parameter Store/SNS
+  inventories, and the absence of an Access Analyzer. Exact Terraform drift,
+  AWS Backup metadata blocked by an organization SCP, deployment, recovery
   rehearsal, and authenticated UAT remain open; see the
   [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
@@ -1093,11 +1096,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - AWS reconciliation: completed under explicit read-only authority on
   2026-08-22. Account isolation, live public health, current cost/credit
   application, certificates, automated backups/PITR eligibility, and selected
-  security controls are now evidenced. Overall status remains BLOCKED because
-  current main is not deployed and material drift/gaps remain.
-- Residual risks / blocker: exact Terraform drift, state-bucket encryption,
-  private-bucket encryption/lifecycle and versioning, ECR scan evidence, runtime
-  secret scope, alarm/SNS delivery, Backup inventory/restore, current credit
+  security controls are now evidenced. The approved Phase 1 follow-up also
+  closed narrow S3, SSM, ECR, SNS, and Access Analyzer metadata gaps. Overall
+  status remains BLOCKED because current main is not deployed and material
+  drift/gaps remain.
+- Residual risks / blocker: exact Terraform drift, private-bucket versioning and
+  lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
+  inventory blocked by an organization SCP, restore readiness, current credit
   balance, provider integrations, protected deployment approval, and
   authenticated staging UAT remain unresolved. Deployment requires further
   explicit authority.
@@ -1249,7 +1254,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   Verified the dedicated staging account ending 9877 in Canada Central, a
   healthy but 78-commit-old runtime, current AWS credit application, and active
   RDS backup/PITR configuration. Recorded release-blocking versioning,
-  secret-scope, alarm-routing, source-age, permission, and recovery gaps. No
+  secret-scope, alarm-routing, source-age, permission, and recovery gaps. A
+  separately approved metadata-policy revision verified bucket encryption and
+  lifecycle, the deployed image's historical push scan, empty SSM/SNS
+  inventories, and an organization SCP blocking AWS Backup inspection. No
   Terraform plan, application-resource mutation, deployment, secret/object/log
   data read, database connection, or restore occurred.
 

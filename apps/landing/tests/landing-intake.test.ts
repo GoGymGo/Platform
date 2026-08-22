@@ -63,6 +63,25 @@ test("regional updates forward one normalized API-only submission", async () => 
   ]);
 });
 
+test("landing intake rejects a successful but malformed authority receipt", async () => {
+  const response = await handleRegionalUpdates(
+    publicRequest("/api/regional-updates", {
+      consent: true,
+      consentNoticeVersion: "regional-updates-2026-08-13-v1",
+      contactFax: "",
+      email: "player@example.com",
+      requestedRegion: "Victoria, BC",
+      submissionId,
+    }),
+    {
+      forward: async () => Response.json({ status: "maybe" }, { status: 201 }),
+    },
+  );
+
+  assert.equal(response.status, 503);
+  assert.match(await response.text(), /temporarily unavailable/);
+});
+
 test("landing intake rejects cross-origin, loose schema, oversized and silent failure paths", async () => {
   let forwarded = 0;
   const dependencies = {

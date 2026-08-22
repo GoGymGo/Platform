@@ -46,23 +46,33 @@ export class PartnersController {
   @Post('sponsors')
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Submit a public sponsor inquiry' })
   @ApiCreatedResponse({ type: PartnerApplicationResponseDto })
   submitSponsor(
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: SponsorApplicationDto,
   ): Promise<PartnerApplicationResponseDto> {
-    return this.partners.submitSponsor(input);
+    return this.partners.submitSponsor(
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
   }
 
   @Post('gyms')
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({ summary: 'Submit a public partner-gym inquiry' })
   @ApiCreatedResponse({ type: PartnerApplicationResponseDto })
   submitGym(
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: GymApplicationDto,
   ): Promise<PartnerApplicationResponseDto> {
-    return this.partners.submitGym(input);
+    return this.partners.submitGym(
+      requireIdempotencyKey(idempotencyKey),
+      input,
+    );
   }
 }
 

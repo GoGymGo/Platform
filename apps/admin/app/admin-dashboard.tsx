@@ -58,6 +58,7 @@ import {
   decodeDashboardProposalVisibility,
   decodeGymQrCredentialHistoryPage,
   decodeOperatorPortalAccess,
+  decodePartnerApplications,
   decodePartnerCompetitionPage,
   decodePartnerDashboardSnapshot,
   decodePartnerVisitPage,
@@ -586,7 +587,7 @@ export function AdminDashboard({
           sessions,
           waitlist,
           interestSubmissions,
-          partnerApplications,
+          partnerApplicationsResponse,
         ] = await Promise.all([
           adminRequest<unknown>(activeUser, "operator/configuration/dashboard"),
           adminRequest<PilotData["gyms"]>(activeUser, "operator/gym-locations"),
@@ -602,12 +603,15 @@ export function AdminDashboard({
             activeUser,
             "operator/interest-submissions",
           ),
-          adminRequest<PilotData["partnerApplications"]>(
+          adminRequest<unknown>(
             activeUser,
             "operator/partner-applications",
           ),
         ]);
         if (authEpoch.current !== refreshEpoch) return;
+        const partnerApplications = decodePartnerApplications(
+          partnerApplicationsResponse,
+        );
         setSnapshot(decodeDashboardProposalVisibility(dashboardResult));
         setPartnerSnapshot(null);
         const [healthResult, queueResult, auditResult] =

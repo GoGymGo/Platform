@@ -3,7 +3,7 @@ import { minimizePrivacySessionEventPayload } from './privacy-export.builder';
 
 describe('privacy export schema', () => {
   it('uses the portable v15 format', () => {
-    expect(privacyExportSchemaVersion).toBe(15);
+    expect(privacyExportSchemaVersion).toBe(16);
   });
 
   it('omits QR, device, attestation, trust, and hash evidence', () => {

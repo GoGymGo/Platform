@@ -14,6 +14,7 @@ const WORKER_RESULT_KEYS = [
   'landingInterestDeleted',
   'landingWaitlistDeleted',
   'notificationsSent',
+  'partnerApplicationsDeleted',
   'profileMediaCleanupFailed',
   'profileMediaDeleted',
   'privacyExportsDeleted',

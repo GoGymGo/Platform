@@ -291,7 +291,48 @@ async function forwardPublicIntake(
       ...(status === 429 ? { "Retry-After": "60" } : {}),
     });
   }
+  let receipt: unknown;
+  try {
+    receipt = await response.json();
+  } catch {
+    return publicJsonError(
+      `${label} are temporarily unavailable. Please try again shortly.`,
+      503,
+    );
+  }
+  if (!isAuthoritativeReceipt(path, receipt)) {
+    return publicJsonError(
+      `${label} are temporarily unavailable. Please try again shortly.`,
+      503,
+    );
+  }
   return Response.json({ saved: true }, { status: 201 });
+}
+
+function isAuthoritativeReceipt(
+  path: "/v1/interest-submissions" | "/v1/region-waitlist",
+  value: unknown,
+): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const receipt = value as Record<string, unknown>;
+  if (path === "/v1/region-waitlist") {
+    return (
+      hasExactKeys(receipt, ["status"], ["status"]) &&
+      receipt.status === "received"
+    );
+  }
+  return (
+    hasExactKeys(
+      receipt,
+      ["audience", "id", "submittedAt"],
+      ["audience", "id", "submittedAt"],
+    ) &&
+    receipt.audience === "brand" &&
+    readUuid(receipt.id) !== null &&
+    isIsoDateTime(receipt.submittedAt)
+  );
 }
 
 function upstreamError(label: string, status: number): string {
@@ -329,6 +370,14 @@ function readUuid(value: unknown): string | null {
     )
     ? value.toLowerCase()
     : null;
+}
+
+function isIsoDateTime(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
 }
 
 function isEmail(value: string): boolean {

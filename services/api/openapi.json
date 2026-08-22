@@ -4498,7 +4498,14 @@
     "/v1/partner-applications/sponsors": {
       "post": {
         "operationId": "submitSponsor",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4526,7 +4533,14 @@
     "/v1/partner-applications/gyms": {
       "post": {
         "operationId": "submitGym",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -9107,16 +9121,23 @@
             "format": "email",
             "nullable": true
           },
-          "payload": { "type": "object" },
-          "region": { "type": "string" }
+          "region": { "type": "string" },
+          "reviewVersion": { "type": "number", "minimum": 1 },
+          "retentionExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         },
         "required": [
           "id",
           "applicationType",
           "status",
           "submittedAt",
-          "payload",
-          "region"
+          "contactEmail",
+          "region",
+          "reviewVersion",
+          "retentionExpiresAt"
         ]
       },
       "CreatorApplicationDto": {
@@ -9149,9 +9170,25 @@
             "type": "string",
             "enum": ["approved", "in_review", "rejected", "submitted"]
           },
-          "submittedAt": { "type": "string", "format": "date-time" }
+          "outcome": {
+            "type": "string",
+            "enum": ["created", "duplicate", "screened"]
+          },
+          "submittedAt": { "type": "string", "format": "date-time" },
+          "retentionExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         },
-        "required": ["id", "applicationType", "status", "submittedAt"]
+        "required": [
+          "id",
+          "applicationType",
+          "status",
+          "outcome",
+          "submittedAt",
+          "retentionExpiresAt"
+        ]
       },
       "SponsorApplicationDto": {
         "type": "object",
@@ -9162,9 +9199,11 @@
             "format": "email",
             "maxLength": 320
           },
-          "targetRegion": { "type": "string", "maxLength": 120 }
+          "targetRegion": { "type": "string", "maxLength": 120 },
+          "consent": { "type": "boolean", "enum": [true] },
+          "contactFax": { "type": "string", "maxLength": 200 }
         },
-        "required": ["companyName", "contactEmail", "targetRegion"]
+        "required": ["companyName", "contactEmail", "targetRegion", "consent"]
       },
       "GymApplicationDto": {
         "type": "object",
@@ -9173,14 +9212,21 @@
           "gymAddress": { "type": "string", "maxLength": 500 },
           "gymName": { "type": "string", "maxLength": 160 },
           "managerName": { "type": "string", "maxLength": 160 },
-          "workEmail": { "type": "string", "format": "email", "maxLength": 320 }
+          "workEmail": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          },
+          "consent": { "type": "boolean", "enum": [true] },
+          "contactFax": { "type": "string", "maxLength": 200 }
         },
         "required": [
           "region",
           "gymAddress",
           "gymName",
           "managerName",
-          "workEmail"
+          "workEmail",
+          "consent"
         ]
       },
       "CurrentRegionVerificationResponseDto": {

@@ -15,6 +15,7 @@ function workerResult() {
     landingInterestDeleted: 0,
     landingWaitlistDeleted: 0,
     notificationsSent: 0,
+    partnerApplicationsDeleted: 0,
     privacyExportsDeleted: 0,
     privacyOperationsCompleted: 0,
     privacyOperationsFailed: 0,

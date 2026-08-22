@@ -22,6 +22,11 @@ const partnerOptions = [
     body: 'Request a Contest QR that lets players select and location-verify your gym.',
     route: '/gym/register' as Href,
     title: 'REGISTER A PARTNER GYM'
+  },
+  {
+    body: 'Share a creator profile and sample workout. The program remains unavailable unless explicitly enabled.',
+    route: '/creator/apply?source=profile' as Href,
+    title: 'APPLY AS A CREATOR'
   }
 ] as const;
 
@@ -41,8 +46,8 @@ export default function PartnerScreen() {
           step="APPLICATIONS"
         />
         <BrandScreenHeader
-          description="Apply to sponsor a regional campaign or register a verified Partner gym location."
-          eyebrow="SPONSORS + GYMS"
+          description="Submit sponsor, gym or creator interest. A receipt is not approval, activation or a contract."
+          eyebrow="SPONSORS + GYMS + CREATORS"
           title="PARTNER WITH GOGYMGO"
         />
 

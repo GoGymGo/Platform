@@ -304,6 +304,8 @@ test("brand inquiry remains detailed and isolated from the regional list", async
   assert.match(forms, /<span>02<\/span> CAMPAIGN FIT/);
   assert.match(forms, /<span>03<\/span> CONSENT &amp; NEXT STEP/);
   assert.match(forms, /written approval/);
+  assert.match(forms, /not approval, activation, a response-time promise, or a contract/i);
+  assert.doesNotMatch(forms, /five business days|review inquiries weekly|follow up at your work email/i);
   assert.match(forms, /aria-busy=\{state === "submitting"\}/);
   assert.match(forms, /successRef\.current\?\.focus\(\)/);
 });

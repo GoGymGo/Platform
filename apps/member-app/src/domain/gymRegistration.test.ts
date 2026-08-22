@@ -10,6 +10,7 @@ import {
 describe('gym registration', () => {
   it('normalizes and accepts one complete gym location', () => {
     const input = normalizeGymRegistration({
+      consent: true,
       gymAddress: ' 100 King Street West ',
       gymName: ' Harbour Strength ',
       managerName: ' Cameron Wilson ',
@@ -18,6 +19,7 @@ describe('gym registration', () => {
     });
 
     assert.deepEqual(input, {
+      consent: true,
       gymAddress: '100 King Street West',
       gymName: 'Harbour Strength',
       managerName: 'Cameron Wilson',
@@ -29,6 +31,7 @@ describe('gym registration', () => {
 
   it('requires the manager and exact gym location details', () => {
     const errors = validateGymRegistration({
+      consent: false,
       gymAddress: '',
       gymName: '',
       managerName: '',
@@ -41,5 +44,6 @@ describe('gym registration', () => {
     assert.equal(errors.workEmail, 'ENTER A VALID EMAIL ADDRESS.');
     assert.equal(errors.gymAddress, 'GYM ADDRESS IS REQUIRED.');
     assert.equal(errors.region, 'REGION IS REQUIRED.');
+    assert.equal(errors.consent, 'CONSENT IS REQUIRED TO SUBMIT.');
   });
 });

@@ -316,7 +316,15 @@ export class PrivacyOperationsRepository {
             updated_at: now,
             user_id: null,
           })
-          .where('user_id', '=', request.user_id)
+          .where((expression) =>
+            expression.or([
+              expression('user_id', '=', request.user_id),
+              expression.and([
+                expression('user_id', 'is', null),
+                expression('contact_email', '=', user.email),
+              ]),
+            ]),
+          )
           .execute();
         await transaction
           .updateTable('creator_workouts')

@@ -7,6 +7,7 @@ import { ProfilesModule } from '../profiles/profiles.module';
 import { SocialModule } from '../social/social.module';
 import { OperationsWorkerService } from './operations-worker.service';
 import { WorkerObservabilityService } from './worker-observability.service';
+import { PartnerApplicationRetentionService } from './partner-application-retention.service';
 
 @Module({
   exports: [OperationsWorkerService, WorkerObservabilityService],
@@ -18,6 +19,10 @@ import { WorkerObservabilityService } from './worker-observability.service';
     ProfilesModule,
     SocialModule,
   ],
-  providers: [OperationsWorkerService, WorkerObservabilityService],
+  providers: [
+    OperationsWorkerService,
+    PartnerApplicationRetentionService,
+    WorkerObservabilityService,
+  ],
 })
 export class OperationsModule {}

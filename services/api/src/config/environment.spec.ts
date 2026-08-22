@@ -28,6 +28,7 @@ describe('environment validation', () => {
     expect(environment.LANDING_INTAKE_ENABLED).toBe(false);
     expect(environment.PROFILE_MEDIA_ENABLED).toBe(false);
     expect(environment.CREATOR_FEATURES_ENABLED).toBe(false);
+    expect(environment.PARTNER_APPLICATION_RETENTION_DAYS).toBeUndefined();
     expect(environment.PRIVATE_OBJECT_STORAGE_PROVIDER).toBe('aws-s3');
     expect(environment.AWS_REGION).toBe('ca-central-1');
     expect(environment.PROFILE_MEDIA_MAX_BYTES).toBe(2 * 1_024 * 1_024);
@@ -38,6 +39,27 @@ describe('environment validation', () => {
     expect(
       validateEnvironment({ AWS_REGION: '', NODE_ENV: 'test' }).AWS_REGION,
     ).toBe('ca-central-1');
+  });
+
+  it('accepts only a bounded explicitly configured partner retention period', () => {
+    expect(
+      validateEnvironment({
+        NODE_ENV: 'test',
+        PARTNER_APPLICATION_RETENTION_DAYS: '365',
+      }).PARTNER_APPLICATION_RETENTION_DAYS,
+    ).toBe(365);
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'test',
+        PARTNER_APPLICATION_RETENTION_DAYS: '29',
+      }),
+    ).toThrow(/PARTNER_APPLICATION_RETENTION_DAYS/i);
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'test',
+        PARTNER_APPLICATION_RETENTION_DAYS: '731',
+      }),
+    ).toThrow(/PARTNER_APPLICATION_RETENTION_DAYS/i);
   });
 
   it('requires the forwarding secret and retention when landing intake is enabled', () => {

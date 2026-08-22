@@ -487,10 +487,20 @@ export class PrivacyExportBuilder {
             'region',
             'payload',
             'status',
+            'review_version',
+            'retention_expires_at',
             'created_at',
             'updated_at',
           ])
-          .where('user_id', '=', job.userId)
+          .where((expression) =>
+            expression.or([
+              expression('user_id', '=', job.userId),
+              expression.and([
+                expression('user_id', 'is', null),
+                expression('contact_email', '=', account.email),
+              ]),
+            ]),
+          )
           .orderBy('created_at')
           .execute();
 

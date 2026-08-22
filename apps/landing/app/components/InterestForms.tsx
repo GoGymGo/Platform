@@ -20,8 +20,25 @@ function readErrorMessage(error: unknown, fallbackError: string) {
       return message;
     }
   }
+  if (error && typeof error === "object" && "error" in error) {
+    const message = (error as { error?: unknown }).error;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
 
   return fallbackError;
+}
+
+function isSavedReceipt(value: unknown): value is { saved: true } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 1 &&
+    "saved" in value &&
+    value.saved === true
+  );
 }
 
 async function submitInterest(
@@ -45,15 +62,18 @@ async function submitInterest(
     }),
   });
 
-  let body: { error?: string } = {};
+  let body: unknown = {};
   try {
-    body = (await response.json()) as { error?: string };
+    body = await response.json();
   } catch {
     // Some upstream failures have no JSON body. Keep the message user-safe.
   }
 
   if (!response.ok) {
-    throw new Error(body.error ?? fallbackError);
+    throw new Error(readErrorMessage(body, fallbackError));
+  }
+  if (!isSavedReceipt(body)) {
+    throw new Error(fallbackError);
   }
 }
 
@@ -75,15 +95,18 @@ async function submitRegionalUpdates(
     }),
   });
 
-  let body: { error?: string } = {};
+  let body: unknown = {};
   try {
-    body = (await response.json()) as { error?: string };
+    body = await response.json();
   } catch {
     // Some upstream failures have no JSON body. Keep the message user-safe.
   }
 
   if (!response.ok) {
-    throw new Error(body.error ?? fallbackError);
+    throw new Error(readErrorMessage(body, fallbackError));
+  }
+  if (!isSavedReceipt(body)) {
+    throw new Error(fallbackError);
   }
 }
 
@@ -112,7 +135,7 @@ function Success({ brand = false }: { brand?: boolean }) {
       </h2>
       <p>
         {brand
-          ? "We review inquiries weekly and aim to follow up at your work email within five business days. Campaign timing still depends on fit and approval."
+          ? "Your request was received for possible review. This receipt is not approval, activation, a response-time promise, or a contract."
           : "This does not register you for the September beta. We’ll email as regional availability changes."}
       </p>
       {!brand ? (

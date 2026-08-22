@@ -1101,10 +1101,12 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   protected Terraform-plan attempt initialized the exact staging backend from an
   isolated copy but stopped safely before producing a plan when refresh required
   two unapproved tag metadata reads and one deployed CloudFront Function code
-  read. Its role, lock, state, and
-  temporary-file rollback checks passed. Overall status remains BLOCKED because
-  exact drift is still unknown, current main is not deployed, and material gaps
-  remain.
+  read. An exactly approved retry scoped those reads to the three staging
+  resources and completed with exit code 2, confirming drift. Its post-plan JSON
+  sanitizer failed, so the unsanitized plan was deleted and exact resource
+  actions remain unknown. Both attempts' role, lock, state, and temporary-file
+  rollback checks passed. Overall status remains BLOCKED because current main is
+  not deployed and material gaps remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1266,10 +1268,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   approved protected-plan attempt initialized the exact backend and invoked one
   no-apply plan, but refresh stopped before producing a plan because
   budgets:ListTagsForResource, cloudfront:GetFunction, and
-  ecr:ListTagsForResource were not allowed. The Phase 1 role was restored, no
-  lock remained, state metadata stayed pre-attempt, and temporary files were
-  deleted. No apply, application-resource mutation, deployment, secret or
-  application-object/log data read, database connection, or restore occurred.
+  ecr:ListTagsForResource were not allowed. An exactly approved retry scoped
+  those reads to the staging resources and completed with exit code 2, proving
+  changes are present. Its post-plan JSON sanitizer failed, so the unsanitized
+  plan was deleted and no resource-action list was retained. The Phase 1 role
+  was restored, no lock remained, state ETag and time were unchanged, and
+  temporary files were deleted. No apply, application-resource mutation,
+  deployment, secret or application-object/log data read, database connection,
+  or restore occurred.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

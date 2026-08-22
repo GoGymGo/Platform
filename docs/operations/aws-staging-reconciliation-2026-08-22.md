@@ -32,15 +32,22 @@ The separately approved protected-plan procedure then initialized an isolated
 copy of repository commit 5bc18c8 against the exact staging backend and started
 one normal refresh-enabled plan. Refresh stopped safely before producing a plan
 because two tag metadata reads and one deployed CloudFront Function code read
-were not allowed. The
-temporary directory was deleted, no lock remains, the state object retains its
-pre-attempt modification time, and the Phase 1 role policy was restored.
+were not allowed. The temporary directory was deleted and the role was restored.
 
-No successful Terraform plan or apply, deployment, secret value read,
-application-object read, database connection, log-content query, restore,
-rotation, scaling change, or application-resource mutation occurred. Terraform
-state access was limited to the exact staging state object and was never printed
-or retained outside the deleted temporary working directory.
+After exact approval, a second isolated attempt temporarily added only those
+three resource-scoped reads. Terraform completed the plan with detailed exit
+code 2, confirming changes are present, but the local post-plan
+`terraform show -json` sanitizer could not reopen the saved plan. The fail-closed
+cleanup deleted the unsanitized plan and temporary directory. No action list was
+retained or inferred. The state ETag and modification time were unchanged, no
+lock remains, and the Phase 1 role policy was restored again.
+
+No apply, deployment, secret value read, application-object read, database
+connection, log-content query, restore, rotation, scaling change, or
+application-resource mutation occurred. Terraform state access was limited to
+the exact staging state object and was never printed or retained outside the
+deleted temporary working directory. The explicitly approved CloudFront read
+was limited to the deployed member-web function code used for drift comparison.
 
 ## Verified target and method
 
@@ -70,7 +77,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Backend initialization succeeded and a normal plan began, but refresh stopped on three missing read actions before producing a plan | BLOCKED BY PERMISSIONS | High | Temporarily add the three exact resource-scoped read actions below and repeat the protected no-apply procedure |
+| Exact Terraform drift | A protected plan completed with exit code 2, confirming changes, but its local JSON sanitizer failed before a resource-action summary could be retained | GAP FOUND | High | Approve one streaming-JSON no-apply rerun to capture only resource addresses and action types |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -127,6 +134,18 @@ and any partial plan material were deleted. Terraform released its native lock;
 an exact post-run check found no .tflock object. The state object's modification
 time remained August 11, and the target role was restored to the Phase 1 policy
 with 111 metadata actions and all 26 explicit sensitive-data/execution denies.
+
+The separately approved retry scoped those three reads to the exact staging
+budget, ECR repository, and Terraform-managed member-web CloudFront Function.
+Terraform initialized an isolated copy of commit 36144c2 and completed a normal
+refresh-enabled plan with detailed exit code 2. This proves the committed
+configuration and refreshed staging state are not identical. The saved plan was
+not applied. Its local `terraform show -json` sanitization step failed, so the
+fail-closed helper deleted the plan rather than printing, committing, or
+retaining unsanitized content. The state ETag and last-modified value matched
+their pre-plan values, no lock remained, the temporary directory was deleted,
+and the target role was restored to 111 allows and 26 denies. Exact resource
+actions therefore remain unknown.
 
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
@@ -256,12 +275,13 @@ only the previously blocked configuration reads. The revised policy was
 reprovisioned to account 9877 and validated on the target role with all 26
 explicit denies unchanged. Every expanded check succeeded except AWS Backup.
 
+The approved retry proved that budgets:ListTagsForResource and
+ecr:ListTagsForResource can be scoped to the exact staging resources and that
+cloudfront:GetFunction can be scoped to the exact Terraform-managed member-web
+function. The plan completed with those temporary reads; they were then removed.
+
 Remaining permission blockers:
 
-- The protected Terraform refresh needs two additional tag metadata actions,
-  budgets:ListTagsForResource and ecr:ListTagsForResource, plus
-  cloudfront:GetFunction to compare the deployed member-web function code. These
-  were not added without a new exact approval.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -331,13 +351,20 @@ metadata actions and removed the broad S3 bucket-listing actions. The policy
 was reprovisioned and all target-role safeguards were validated. All checks
 succeeded except AWS Backup, which is explicitly denied by an organization SCP.
 
-### Phase 2 — protected Terraform plan — attempted, permission blocked
+### Phase 2 — protected Terraform plan — drift confirmed, summary blocked locally
 
 The approved exact state-access and lock procedure was run from an isolated copy
-with live non-secret inputs held in process. Backend initialization succeeded,
-but refresh was denied three read operations before it could produce a plan. The
-role, lock, state, and temporary-directory rollback checks all passed. Resume
-only after separately approving those exact actions; never apply in this phase.
+with live non-secret inputs held in process. The first attempt identified three
+missing reads. An exactly approved retry added them only for their staging
+resources and completed with exit code 2. The post-plan JSON sanitizer then
+failed, so no resource-action summary was retained. Both attempts passed role,
+lock, state, and temporary-directory rollback checks. A further run requires new
+approval; never apply in this phase.
+
+A backend-disabled local probe then verified that Terraform 1.15.8 emits
+`planned_change` events containing the resource address and action through
+`terraform plan -json`. The probe returned detailed exit code 2, the sanitizer
+retained only those two fields, and all local probe artifacts were removed.
 
 ### Phase 3 — infrastructure and least-privilege remediation
 
@@ -368,8 +395,9 @@ remains out of scope.
 
 ## Next approval boundary
 
-The next recommended step is to resume the protected, no-apply Terraform plan
-for account **…9877** in ca-central-1.
+The next recommended step is one more protected, no-apply Terraform plan for
+account **…9877** in ca-central-1, changing the local sanitizer to parse
+Terraform's streaming JSON plan events instead of reopening the saved plan.
 
 IAM Identity Center change:
 
@@ -397,10 +425,12 @@ Terraform operation:
   or replacing state;
 - derive required non-secret variables from already authorized live metadata,
   holding private values only in process memory;
-- run one normal, refresh-enabled Terraform plan with native S3 locking;
+- run one normal, refresh-enabled Terraform plan with native S3 locking and
+  Terraform's streaming JSON UI enabled;
 - never apply the plan;
-- produce only a sanitized resource-action summary, then remove the temporary
-  plan and working directory.
+- retain only resource addresses and action types from `planned_change` events,
+  then remove the temporary plan and working directory without running
+  `terraform show`.
 
 Expected AWS mutations are limited to updating/reprovisioning the reconciliation
 role and Terraform's transient creation/deletion of the exact .tflock object.
@@ -418,6 +448,7 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-The first Phase 2 attempt performed the approved temporary permission change,
-backend initialization, and one plan invocation, then rolled back completely
-after the metadata denial. No plan artifact was produced and no apply occurred.
+Two Phase 2 plan invocations have occurred. The first stopped on the three read
+denials. The exactly approved second attempt completed with changes present but
+its local sanitizer failed; its unsanitized plan was deleted. Both attempts
+rolled back completely and no apply occurred.

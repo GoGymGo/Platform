@@ -154,6 +154,7 @@ export const environmentSchema = z
     LANDING_INTAKE_ENABLED: booleanString.default(false),
     LANDING_INTAKE_FORWARDING_SECRET: optionalSecret,
     LANDING_INTAKE_RETENTION_DAYS: optionalIntakeRetentionDays,
+    PARTNER_APPLICATION_RETENTION_DAYS: optionalIntakeRetentionDays,
     PUSH_NOTIFICATIONS_ENABLED: booleanString.default(false),
     EXPO_PUSH_API_URL: z
       .string()

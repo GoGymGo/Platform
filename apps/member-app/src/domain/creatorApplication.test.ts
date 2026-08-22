@@ -38,4 +38,16 @@ describe('creator application', () => {
     assert.equal(errors.workoutStyle, 'WORKOUT STYLE IS REQUIRED.');
     assert.equal(errors.sampleWorkoutUrl, 'ENTER A VALID SAMPLE WORKOUT URL.');
   });
+
+  it('accepts only bounded HTTPS URLs', () => {
+    const errors = validateCreatorApplication({
+      channelUrl: 'http://example.com/channel',
+      region: 'BC',
+      sampleWorkoutUrl: 'javascript:alert(1)',
+      workoutStyle: 'HIIT'
+    });
+
+    assert.equal(errors.channelUrl, 'ENTER A VALID CREATOR CHANNEL URL.');
+    assert.equal(errors.sampleWorkoutUrl, 'ENTER A VALID SAMPLE WORKOUT URL.');
+  });
 });

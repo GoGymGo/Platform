@@ -114,6 +114,55 @@ test("accepts the exact bounded queue, health, and private-action contracts", ()
   );
 });
 
+test("decodes privacy-minimized partner application summaries", () => {
+  const application = {
+    applicationType: "sponsor",
+    contactEmail: "partner@example.com",
+    id: "10000000-0000-4000-8000-000000000010",
+    region: "Victoria, BC",
+    retentionExpiresAt: "2027-08-21T00:00:00.000Z",
+    reviewVersion: 2,
+    status: "submitted",
+    submittedAt: "2026-08-21T00:00:00.000Z",
+  };
+  assert.deepEqual(decoders.decodePartnerApplications([application]), [application]);
+  assert.throws(() =>
+    decoders.decodePartnerApplications([{ ...application, payload: { private: true } }]),
+  );
+  assert.throws(() =>
+    decoders.decodePartnerApplications([{ ...application, reviewVersion: 0 }]),
+  );
+});
+
+test("accepts declared partner facts and rejects undeclared partner detail", () => {
+  const applicationItem = {
+    ...queueItem,
+    kind: "partner_application",
+    status: "submitted",
+  };
+  assert.equal(
+    decoders.decodeWorkQueueDetail({
+      ...applicationItem,
+      allowedDecisions: ["in_review", "approved", "rejected"],
+      facts: [
+        { label: "Application type", value: "gym" },
+        { label: "Gym name", value: "Harbour Strength" },
+        { label: "Manager name", value: "Alex Manager" },
+        { label: "Gym address", value: "100 Harbour Road" },
+        { label: "Retention expiry", value: "2027-08-21T00:00:00.000Z" },
+      ],
+    }).kind,
+    "partner_application",
+  );
+  assert.throws(() =>
+    decoders.decodeWorkQueueDetail({
+      ...applicationItem,
+      allowedDecisions: ["approved"],
+      facts: [{ label: "Raw payload", value: "private" }],
+    }),
+  );
+});
+
 test("rejects undeclared actions, private facts, and malformed retry dates", () => {
   assert.throws(() =>
     decoders.decodeWorkQueueDetail({

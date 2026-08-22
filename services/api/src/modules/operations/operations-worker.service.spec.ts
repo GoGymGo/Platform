@@ -6,6 +6,7 @@ import { PrivacyOperationsService } from '../privacy/privacy-operations.service'
 import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
 import { SocialInvitationCleanupService } from '../social/social-invitation-cleanup.service';
 import { OperationsWorkerService } from './operations-worker.service';
+import { PartnerApplicationRetentionService } from './partner-application-retention.service';
 
 function createWorker(overrides?: {
   competitionLifecycle?: jest.Mock;
@@ -13,6 +14,7 @@ function createWorker(overrides?: {
   gyms?: jest.Mock;
   landingIntake?: jest.Mock;
   notifications?: jest.Mock;
+  partners?: jest.Mock;
   privacy?: jest.Mock;
   profileMedia?: jest.Mock;
   socialInvitations?: jest.Mock;
@@ -23,6 +25,7 @@ function createWorker(overrides?: {
     gyms: jest.Mock;
     landingIntake: jest.Mock;
     notifications: jest.Mock;
+    partners: jest.Mock;
     privacy: jest.Mock;
     profileMedia: jest.Mock;
     socialInvitations: jest.Mock;
@@ -40,6 +43,7 @@ function createWorker(overrides?: {
       overrides?.landingIntake ??
       jest.fn().mockResolvedValue({ interestDeleted: 13, waitlistDeleted: 14 }),
     notifications: overrides?.notifications ?? jest.fn().mockResolvedValue(4),
+    partners: overrides?.partners ?? jest.fn().mockResolvedValue(15),
     privacy:
       overrides?.privacy ??
       jest.fn().mockResolvedValue({
@@ -71,6 +75,9 @@ function createWorker(overrides?: {
       {
         processPending: calls.notifications,
       } as unknown as NotificationsService,
+      {
+        purgeExpired: calls.partners,
+      } as unknown as PartnerApplicationRetentionService,
       { process: calls.profileMedia } as unknown as ProfileMediaCleanupService,
       { processPending: calls.privacy } as unknown as PrivacyOperationsService,
       {
@@ -92,6 +99,7 @@ describe('OperationsWorkerService', () => {
       landingInterestDeleted: 13,
       landingWaitlistDeleted: 14,
       notificationsSent: 4,
+      partnerApplicationsDeleted: 15,
       privacyExportsDeleted: 6,
       privacyOperationsCompleted: 5,
       privacyOperationsFailed: 7,
@@ -115,6 +123,7 @@ describe('OperationsWorkerService', () => {
     expect(calls.landingIntake).toHaveBeenCalledTimes(1);
     expect(calls.privacy).toHaveBeenCalledTimes(1);
     expect(calls.notifications).toHaveBeenCalledTimes(1);
+    expect(calls.partners).toHaveBeenCalledTimes(1);
     expect(calls.socialInvitations).toHaveBeenCalledTimes(1);
   });
 });

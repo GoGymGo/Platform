@@ -95,7 +95,7 @@ export interface components {
     FriendRequestResponseDto: { createdAt: string; direction: "incoming" | "outgoing"; id: string; user: components['schemas']["SocialUserSummaryDto"] };
     FriendResponseDto: { friendsSince: string; screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
     GoalBracketDto: { goalDays: number; label: string };
-    GymApplicationDto: { gymAddress: string; gymName: string; managerName: string; region: string; workEmail: string };
+    GymApplicationDto: { consent: true; contactFax?: string; gymAddress: string; gymName: string; managerName: string; region: string; workEmail: string };
     GymLocationResponseDto: { active: boolean; activeCredentialVersion: number | null; activeQrCredentials: Array<components['schemas']["ActiveGymQrCredentialDto"]>; address: string; createdAt: string; id: string; latitude: number; longitude: number; name: string; radiusMeters: number; regionCode: string; regionPolicyId: string; updatedAt: string; version: number };
     GymQrCredentialHistoryDto: { competitionId: string; competitionName: string; credentialVersion: number; expiresAt: string; gymLocationId: string; id: string; issuedAt: string; revokedAt: string | null; status: "active" | "expired" | "revoked" };
     GymQrCredentialHistoryPageDto: { items: Array<components['schemas']["GymQrCredentialHistoryDto"]>; nextCursor?: string | null };
@@ -124,7 +124,7 @@ export interface components {
     OperatorAuditHistoryPageDto: { items: Array<components['schemas']["OperatorAuditHistoryDto"]>; nextCursor?: string | null };
     OperatorGymSessionDto: { completedAt: string | null; gymLocationId: string; gymName: string; id: string; incomplete: boolean; startedAt: string; status: string };
     OperatorInterestSubmissionDto: { audience: "gym_goer" | "brand"; companyName?: string | null; email: string; fullName: string; goalDays?: number | null; id: string; partnershipInterest?: string | null; region: string; retentionExpiresAt: string | null; source: string; submittedAt: string; workoutStyle?: string | null };
-    OperatorPartnerApplicationDto: { applicationType: "creator" | "gym" | "sponsor"; contactEmail?: string | null; id: string; payload: Record<string, unknown>; region: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
+    OperatorPartnerApplicationDto: { applicationType: "creator" | "gym" | "sponsor"; contactEmail: string | null; id: string; region: string; retentionExpiresAt: string | null; reviewVersion: number; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
     OperatorPortalAccessDto: { assignments: Array<components['schemas']["OperatorPortalAssignmentDto"]>; email: string; portal: "gogymgo" | "partner" };
     OperatorPortalAssignmentDto: { accessLevel: "admin" | "staff"; gymLocationId: string };
     OperatorProviderHealthDto: { evidence: string; status: "configured" | "disabled" | "unavailable" | "unconfigured" };
@@ -138,7 +138,7 @@ export interface components {
     OperatorWorkQueuePageDto: { items: Array<components['schemas']["OperatorWorkQueueItemDto"]>; nextCursor?: string | null };
     OperatorWorkerHealthDto: { heartbeatAgeSeconds: number | null; lastCompletedAt?: string | null; lastFailedAt?: string | null; lastFailureCode?: string | null; status: "degraded" | "healthy" | "stale" | "starting" };
     ParticipantCompetitionResultsResponseDto: { categoryLeaderboards: Array<components['schemas']["CategoryLeaderboardDto"]>; competitionId: string; competitionName: string; endedAt: string; monthKey: string; participantGoalDays: number; regionCode: string; regionName: string; resultsStatus: "pending" | "settled"; rewardCount: number; rewardWinners: Array<components['schemas']["RewardWinnerResponseDto"]>; settledAt: string | null };
-    PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
+    PartnerApplicationResponseDto: { applicationType: "creator" | "gym" | "sponsor"; id: string; outcome: "created" | "duplicate" | "screened"; retentionExpiresAt: string | null; status: "approved" | "in_review" | "rejected" | "submitted"; submittedAt: string };
     PartnerCompetitionDto: { competitionStatus: string; configurationVersion: number; endsAt: string; enrollmentCount: number; entrantCap: number | null; goalBrackets: Array<components['schemas']["AdminDashboardGoalBracketDto"]>; gymLocationId: string; gymName: string; id: string; monthKey: string; name: string; proposalStatus?: "archived" | "draft" | "published" | "submitted" | "withdrawn" | null; proposalVersion?: number | null; regionCode: string; regionName: string; regionPolicyId: string; registrationClosesAt: string; registrationOpensAt: string; startsAt: string };
     PartnerCompetitionPageDto: { items: Array<components['schemas']["PartnerCompetitionDto"]>; nextCursor?: string | null };
     PartnerDashboardOverviewDto: { activeVisitCount: number; assignedGymCount: number; draftProposalCount: number; submittedProposalCount: number };
@@ -197,7 +197,7 @@ export interface components {
     SocialChallengeResponseDto: { activity: "gym" | "running" | "walking" | "cycling" | "hiking" | "fitness_class" | "other"; activityLabel: string; canCancel: boolean; canCheckIn: boolean; canInvite: boolean; canJoin: boolean; canRespond: boolean; canWithdraw: boolean; challengeType: "friend" | "regional"; contactInvitations: Array<components['schemas']["ChallengeContactInvitationResponseDto"]>; createdAt: string; description: string | null; endDate: string; id: string; locationName: string | null; members: Array<components['schemas']["SocialChallengeMemberDto"]>; myProgress: components['schemas']["SocialChallengeProgressDto"]; myRole: "owner" | "member" | null; myStatus: "pending" | "accepted" | "not_joined"; name: string; ownerScreenName: string; ownerStreaks: components['schemas']["StreakCountsDto"]; participantCount: number; participantLimit: number | null; regionCode: string | null; regionName: string | null; scheduledDays: Array<number>; scheduledTime: string | null; serverTime: string; startDate: string; state: "upcoming" | "active" | "full" | "ended" | "cancelled"; targetCount: number; targetPeriod: "weekly" | "monthly"; timezone: string };
     SocialRelationshipActionResponseDto: { action: "blocked" | "cancelled" | "removed" | "unblocked"; requestId: string | null; userId: string };
     SocialUserSummaryDto: { screenName: string; streaks: components['schemas']["StreakCountsDto"]; userId: string };
-    SponsorApplicationDto: { companyName: string; contactEmail: string; targetRegion: string };
+    SponsorApplicationDto: { companyName: string; consent: true; contactEmail: string; contactFax?: string; targetRegion: string };
     StartedSessionResponseDto: { competitionId: string; completedAt: string | null; eligibleDate: string; id: string; policyVersion: string; requirements: components['schemas']["SessionRequirementsResponseDto"]; startedAt: string; status: "active" | "pending_review" | "verified" | "rejected" | "cancelled" };
     StreakCountsDto: { daily: number; monthly: number; projectionVersion: "streaks-v1"; weekly: number; yearly: number };
     StreakSummaryResponseDto: { asOfDate: string; streaks: components['schemas']["StreakCountsDto"]; timezone: string };
@@ -1278,7 +1278,7 @@ export interface operations {
   submitGym: {
     method: "POST";
     path: "/v1/partner-applications/gyms";
-    parameters: Record<string, never>;
+    parameters: { header: { "Idempotency-Key": string } };
     requestBody: components['schemas']["GymApplicationDto"];
     responses: {
       "201": components['schemas']["PartnerApplicationResponseDto"];
@@ -1296,7 +1296,7 @@ export interface operations {
   submitSponsor: {
     method: "POST";
     path: "/v1/partner-applications/sponsors";
-    parameters: Record<string, never>;
+    parameters: { header: { "Idempotency-Key": string } };
     requestBody: components['schemas']["SponsorApplicationDto"];
     responses: {
       "201": components['schemas']["PartnerApplicationResponseDto"];

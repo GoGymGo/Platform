@@ -15,13 +15,16 @@ This document describes the technical policy. Launch counsel must approve jurisd
    The deciding administrator is reauthorized from the database before an
    idempotent replay and cannot decide a request owned by the same account.
 3. The worker reads a repeatable PostgreSQL snapshot and builds deterministic
-   portable JSON schema version 14. The exhaustive table-disposition map covers
+   portable JSON schema version 16. The exhaustive table-disposition map covers
    every current authoritative table. It includes the member's account,
    consent/legal, region, Contest/workout/ledger/reward, social, Creator,
    Partner, notification/media, and privacy lifecycle data while excluding
    provider/bearer secrets, raw or hashed device/QR credentials, push tokens,
    coupon inventory, object keys, other-user identifiers, and internal case or
    operator material.
+   Partner applications include both account-linked Creator rows and anonymous
+   sponsor/gym rows whose canonical contact email matches the account. Their
+   review version and configured retention expiry are included in the export.
 4. The worker atomically creates one S3 object at `privacy-exports/{userId}/{requestId}.json` with `If-None-Match: *`, records its SHA-256 digest, and marks the request complete.
 5. The authenticated owner may call `POST /v1/me/privacy-requests/{id}/download-action`. The API returns a presigned S3 read URL lasting no longer than five minutes or the export's remaining lifetime.
 6. After seven days, the worker deletes the object and records the deletion time. The bucket lifecycle is a defense-in-depth cleanup if application processing is delayed. The export bucket is private, has public access prevention and uniform bucket-level access, and must not be reused for public media.
@@ -53,7 +56,9 @@ The worker:
 - removes idempotency records keyed by the former Firebase UID;
 - removes public profile identity and replaces Firebase UID and callsign with namespace-separated HMAC pseudonyms;
 - removes precise region evidence detail and free-text decision reasons while preserving the eligibility decision and policy version;
-- removes partner contact/payload data and unpublishes creator content metadata;
+- removes partner contact/payload data from account-linked rows and anonymous
+  sponsor/gym rows matching the canonical account email, and unpublishes
+  creator content metadata;
 - clears privacy-request reasons and marks the account `deleted`;
 - records an immutable completion event without personal information.
 
@@ -71,7 +76,7 @@ contains no bank, payee, card, wallet, tax, balance, provider or transfer data.
 Gym-owned Contest proposals remain attributable only to the retained
 pseudonymized account row: deletion does not erase, reassign or replace their
 immutable proposer, gym or creation provenance. The export omits proposer and
-reviewer identifiers, but schema version 14 includes status, lifecycle version,
+reviewer identifiers, but schema version 16 includes status, lifecycle version,
 submission, withdrawal, archival and publication timestamps for proposals made
 by the requesting account.
 The user's export describes the settled reward snapshot and fulfillment time

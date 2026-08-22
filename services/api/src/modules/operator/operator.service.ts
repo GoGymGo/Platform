@@ -10,7 +10,12 @@ import { sql, type RawBuilder, type Transaction } from 'kysely';
 import type { Environment } from '../../config/environment';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { DatabaseService } from '../../database/database.service';
-import type { Database, JsonObject } from '../../database/database.types';
+import type {
+  Database,
+  JsonObject,
+  JsonValue,
+  PartnerApplicationType,
+} from '../../database/database.types';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
 import { DrawsService } from '../draws/draws.service';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -696,7 +701,9 @@ export class OperatorService {
               'contact_email',
               'created_at',
               'id',
+              'payload',
               'region',
+              'retention_expires_at',
               'review_version',
               'status',
               'user_id',
@@ -720,6 +727,18 @@ export class OperatorService {
               { label: 'Region', value: item.region },
               ...(item.contact_email
                 ? [{ label: 'Contact email', value: item.contact_email }]
+                : []),
+              ...this.partnerApplicationFacts(
+                item.application_type,
+                item.payload,
+              ),
+              ...(item.retention_expires_at
+                ? [
+                    {
+                      label: 'Retention expiry',
+                      value: item.retention_expires_at.toISOString(),
+                    },
+                  ]
                 : []),
             ],
           };
@@ -1638,6 +1657,49 @@ export class OperatorService {
       waiting: ['contacted', 'closed'],
     };
     return transitions[status] ?? [];
+  }
+
+  private partnerApplicationFacts(
+    applicationType: PartnerApplicationType,
+    payload: JsonValue,
+  ): { label: string; value: string }[] {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw this.invalidPartnerApplicationDetail();
+    }
+    const read = (key: string, maximumLength: number): string => {
+      const value = payload[key];
+      if (
+        typeof value !== 'string' ||
+        value.length < 2 ||
+        value.length > maximumLength
+      ) {
+        throw this.invalidPartnerApplicationDetail();
+      }
+      return value;
+    };
+    if (applicationType === 'creator') {
+      return [
+        { label: 'Creator channel', value: read('channelUrl', 2_048) },
+        { label: 'Sample workout', value: read('sampleWorkoutUrl', 2_048) },
+        { label: 'Workout style', value: read('workoutStyle', 120) },
+      ];
+    }
+    if (applicationType === 'gym') {
+      return [
+        { label: 'Gym name', value: read('gymName', 160) },
+        { label: 'Manager name', value: read('managerName', 160) },
+        { label: 'Gym address', value: read('gymAddress', 500) },
+      ];
+    }
+    return [{ label: 'Company name', value: read('companyName', 160) }];
+  }
+
+  private invalidPartnerApplicationDetail(): ConflictException {
+    return new ConflictException({
+      code: 'PARTNER_APPLICATION_DETAIL_INVALID',
+      message:
+        'The partner application detail is incomplete. Do not decide it until the record is corrected.',
+    });
   }
 
   private assertReviewTransition(

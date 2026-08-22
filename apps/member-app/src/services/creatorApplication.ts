@@ -1,28 +1,21 @@
 import type { CreatorApplicationInput } from '@/domain/creatorApplication';
+import { decodePartnerApplicationReceipt } from '@/domain/partnerApplicationReceipt';
 import type { ApiClient } from '@/services/api/client';
-import { createUserStorage } from '@/services/storage/userStorage';
 
-const creatorApplicationKey = '@gogymgo/creator-application';
-
-export async function submitCreatorApplication(
+export function submitCreatorApplication(
   api: ApiClient | null,
-  userId: string,
-  input: CreatorApplicationInput
+  input: CreatorApplicationInput,
+  idempotencyKey: string
 ) {
-  if (api) {
-    await api.request('/v1/partner-applications/creators', {
-      body: input,
-      idempotencyKey: `creator-application:${userId}`,
-      method: 'POST'
-    });
-    return;
+  if (!api) {
+    throw new Error('The GoGymGo API is unavailable.');
   }
 
-  await createUserStorage(userId).setItem(
-    creatorApplicationKey,
-    JSON.stringify({
-      ...input,
-      submittedAt: new Date().toISOString()
+  return api
+    .request<unknown, CreatorApplicationInput>('/v1/partner-applications/creators', {
+      body: input,
+      idempotencyKey,
+      method: 'POST'
     })
-  );
+    .then((value) => decodePartnerApplicationReceipt(value, 'creator'));
 }

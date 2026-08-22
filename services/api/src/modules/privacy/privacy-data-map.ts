@@ -123,4 +123,4 @@ export const privacyTableDisposition = {
   workout_sessions: { deletion: 'retain_integrity', export: 'include' },
 } satisfies Record<keyof Database, PrivacyDisposition>;
 
-export const privacyExportSchemaVersion = 15;
+export const privacyExportSchemaVersion = 16;

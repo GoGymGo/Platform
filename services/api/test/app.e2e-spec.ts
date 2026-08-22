@@ -94,6 +94,53 @@ describe('platform foundation (e2e)', () => {
       });
   });
 
+  it('requires public partner consent and an idempotency key before persistence', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/partner-applications/sponsors')
+      .send({
+        companyName: 'Example Co',
+        consent: true,
+        contactEmail: 'partner@example.com',
+        targetRegion: 'BC',
+      })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'INVALID_IDEMPOTENCY_KEY' }),
+        });
+      });
+    await request(app.getHttpServer())
+      .post('/v1/partner-applications/gyms')
+      .set('Idempotency-Key', 'partner-gym-e2e')
+      .send({
+        consent: false,
+        gymAddress: '100 Harbour Road',
+        gymName: 'Harbour Strength',
+        managerName: 'Alex Manager',
+        region: 'BC',
+        workEmail: 'manager@example.com',
+      })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          error: expect.objectContaining({ code: 'VALIDATION_ERROR' }),
+        });
+      });
+  });
+
+  it('requires authentication before creator partner intake', () => {
+    return request(app.getHttpServer())
+      .post('/v1/partner-applications/creators')
+      .set('Idempotency-Key', 'partner-creator-e2e')
+      .send({
+        channelUrl: 'https://example.com/channel',
+        region: 'BC',
+        sampleWorkoutUrl: 'https://example.com/workout',
+        workoutStyle: 'HIIT',
+      })
+      .expect(401);
+  });
+
   it('requires authentication before cancelling a workout session', () => {
     return request(app.getHttpServer())
       .post('/v1/sessions/10000000-0000-4000-8000-000000000001/cancel')

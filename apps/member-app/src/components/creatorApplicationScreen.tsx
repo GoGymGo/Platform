@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { randomUUID } from 'expo-crypto';
+import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
@@ -26,6 +27,7 @@ import {
   validateCreatorApplication,
   type CreatorApplicationErrors
 } from '@/domain/creatorApplication';
+import { partnerApplicationReceiptMessage } from '@/domain/partnerApplicationReceipt';
 import { submitCreatorApplication } from '@/services/creatorApplication';
 import { useCompetitionRegion } from '@/state/competitionRegion';
 import { dismissCreatorInvite, recordCreatorApplication } from '@/state/onboardingPreferences';
@@ -52,10 +54,11 @@ export default function CreatorApplicationScreen() {
   const [region, setRegion] = useState(competitionRegion.label);
   const [sampleWorkoutUrl, setSampleWorkoutUrl] = useState('');
   const [showRequirements, setShowRequirements] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [receiptMessage, setReceiptMessage] = useState<string>();
   const [submissionError, setSubmissionError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const [workoutStyle, setWorkoutStyle] = useState('');
+  const retry = useRef<{ key: string; signature: string } | undefined>(undefined);
   const openedAfterFirstWorkout = source === 'first-workout';
 
   if (!creatorFeaturesEnabled) {
@@ -122,9 +125,13 @@ export default function CreatorApplicationScreen() {
         throw new Error('A signed-in account is required to submit a creator application.');
       }
 
-      await submitCreatorApplication(api, user.uid, input);
+      const signature = JSON.stringify(input);
+      if (retry.current?.signature !== signature) {
+        retry.current = { key: `partner-creator:${randomUUID()}`, signature };
+      }
+      const receipt = await submitCreatorApplication(api, input, retry.current.key);
       await recordCreatorApplication(user.uid);
-      setSubmitted(true);
+      setReceiptMessage(partnerApplicationReceiptMessage(receipt));
     } catch {
       setSubmissionError(
         'CREATOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
@@ -190,6 +197,7 @@ export default function CreatorApplicationScreen() {
           <AuthTextField
             error={errors.region}
             label="YOUR REGION"
+            maxLength={120}
             onChangeText={setRegion}
             placeholder="Nanaimo"
             value={region}
@@ -199,6 +207,7 @@ export default function CreatorApplicationScreen() {
             error={errors.channelUrl}
             keyboardType="url"
             label="CREATOR CHANNEL OR PROFILE URL"
+            maxLength={2048}
             onChangeText={setChannelUrl}
             placeholder="https://youtube.com/@yourchannel"
             value={channelUrl}
@@ -206,6 +215,7 @@ export default function CreatorApplicationScreen() {
           <AuthTextField
             error={errors.workoutStyle}
             label="WORKOUT STYLE"
+            maxLength={120}
             onChangeText={setWorkoutStyle}
             placeholder="Strength, HIIT, mobility..."
             value={workoutStyle}
@@ -215,23 +225,21 @@ export default function CreatorApplicationScreen() {
             error={errors.sampleWorkoutUrl}
             keyboardType="url"
             label="SAMPLE WORKOUT URL"
+            maxLength={2048}
             onChangeText={setSampleWorkoutUrl}
             placeholder="https://youtube.com/watch?v=..."
             value={sampleWorkoutUrl}
           />
           {submissionError ? (
             <AuthStatusNotice message={submissionError} tone="red" />
-          ) : submitted ? (
-            <AuthStatusNotice
-              message="APPLICATION SUBMITTED. GOGYMGO WILL REVIEW YOUR REGION, SAMPLE WORKOUT AND CONTENT RIGHTS BEFORE CONTACTING YOU."
-              tone="green"
-            />
+          ) : receiptMessage ? (
+            <AuthStatusNotice message={receiptMessage} tone="green" />
           ) : null}
           <DataCollectionNotice message="We use the region, profile and sample-workout links to review this creator request, prevent misuse and contact the signed-in applicant about the review. They are not used to award contest credit." />
           <CyberButtonPrimary
-            disabled={submitting || submitted}
+            disabled={submitting || Boolean(receiptMessage)}
             label={
-              submitted
+              receiptMessage
                 ? 'APPLICATION SUBMITTED'
                 : submitting
                   ? 'SUBMITTING...'
@@ -243,13 +251,13 @@ export default function CreatorApplicationScreen() {
         </HUDBorderBox>
 
         <View style={styles.actions}>
-          {submitted ? (
+          {receiptMessage ? (
             <CyberButtonOutline
               label="OPEN CREATOR CATALOG"
               onPress={() => router.replace('/workouts')}
             />
           ) : null}
-          {openedAfterFirstWorkout && !submitted ? (
+          {openedAfterFirstWorkout && !receiptMessage ? (
             <CyberButtonPrimary label="DON'T SHOW THIS AGAIN" onPress={dismissPrompt} />
           ) : null}
         </View>

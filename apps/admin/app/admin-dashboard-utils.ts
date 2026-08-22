@@ -10,6 +10,7 @@ import {
   type GymQrCredentialHistoryPage,
   type GymQrCredential,
   type OperatorPortalAccess,
+  type PartnerApplication,
   type PartnerCompetition,
   type PartnerCompetitionPage,
   type PartnerDashboardSnapshot,
@@ -98,6 +99,45 @@ export function decodeDashboardProposalVisibility(
     }
   }
   return snapshot as DashboardSnapshot;
+}
+
+export function decodePartnerApplications(value: unknown): PartnerApplication[] {
+  if (!Array.isArray(value)) {
+    throw invalidAdminResponse("partner applications");
+  }
+  return value.map((value) => {
+    const application = requireRecord(value, "partner application");
+    if (
+      !hasExactKeys(application, [
+        "applicationType",
+        "contactEmail",
+        "id",
+        "region",
+        "retentionExpiresAt",
+        "reviewVersion",
+        "status",
+        "submittedAt",
+      ]) ||
+      !isUuid(application.id) ||
+      !["creator", "gym", "sponsor"].includes(String(application.applicationType)) ||
+      !["approved", "in_review", "rejected", "submitted"].includes(
+        String(application.status),
+      ) ||
+      !isIsoDate(application.submittedAt) ||
+      !isPositiveInteger(application.reviewVersion) ||
+      !isNullableIsoDate(application.retentionExpiresAt) ||
+      !isString(application.region) ||
+      application.region.length < 2 ||
+      application.region.length > 120 ||
+      !isNullableString(application.contactEmail) ||
+      (application.contactEmail !== null &&
+        (application.contactEmail.length > 320 ||
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(application.contactEmail)))
+    ) {
+      throw invalidAdminResponse("partner application");
+    }
+    return application as PartnerApplication;
+  });
 }
 
 export function decodePartnerDashboardSnapshot(
@@ -688,7 +728,19 @@ const allowedReviewFactLabels: Record<WorkQueueItem["kind"], string[]> = {
     "Rights accepted",
     "Synthetic media disclosed",
   ],
-  partner_application: ["Application type", "Region", "Contact email"],
+  partner_application: [
+    "Application type",
+    "Region",
+    "Contact email",
+    "Creator channel",
+    "Sample workout",
+    "Workout style",
+    "Gym name",
+    "Manager name",
+    "Gym address",
+    "Company name",
+    "Retention expiry",
+  ],
   privacy_request: [
     "Request type",
     "Attempts",

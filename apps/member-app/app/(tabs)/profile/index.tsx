@@ -58,6 +58,12 @@ function getSettingsRows(): SettingsGroups {
         subtitle: 'GOALS, ENTRIES, RANKINGS AND REWARDS',
         tone: 'muted',
         route: '/how-it-works?from=profile' as Href
+      },
+      {
+        title: 'PARTNER APPLICATIONS',
+        subtitle: 'SPONSOR // GYM // CREATOR INTAKE',
+        tone: 'muted',
+        route: '/partner' as Href
       }
     ],
     legal: [

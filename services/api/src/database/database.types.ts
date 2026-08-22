@@ -792,6 +792,7 @@ export interface PartnerApplicationsTable {
   dedupe_hash: string;
   status: PartnerApplicationStatus;
   review_version: Generated<number>;
+  retention_expires_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

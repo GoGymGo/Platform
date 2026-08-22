@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
 import { ProfileMediaCleanupService } from '../profiles/profile-media-cleanup.service';
 import { SocialInvitationCleanupService } from '../social/social-invitation-cleanup.service';
+import { PartnerApplicationRetentionService } from './partner-application-retention.service';
 
 export interface WorkerRunResult {
   competitionsActivated: number;
@@ -14,6 +15,7 @@ export interface WorkerRunResult {
   incompleteGymSessionsExpired: number;
   landingInterestDeleted: number;
   landingWaitlistDeleted: number;
+  partnerApplicationsDeleted: number;
   notificationsSent: number;
   profileMediaCleanupFailed: number;
   profileMediaDeleted: number;
@@ -31,6 +33,7 @@ export class OperationsWorkerService {
     private readonly competitionScoring: CompetitionScoringService,
     private readonly gyms: GymsService,
     private readonly notifications: NotificationsService,
+    private readonly partnerApplications: PartnerApplicationRetentionService,
     private readonly profileMedia: ProfileMediaCleanupService,
     private readonly privacy: PrivacyOperationsService,
     private readonly socialInvitations: SocialInvitationCleanupService,
@@ -66,6 +69,10 @@ export class OperationsWorkerService {
       () => this.gyms.purgeExpiredLandingIntake(),
       { interestDeleted: 0, waitlistDeleted: 0 },
     );
+    const partnerApplicationsDeleted = await attempt(
+      () => this.partnerApplications.purgeExpired(),
+      0,
+    );
     const profileMedia = await attempt(() => this.profileMedia.process(), {
       deleted: 0,
       failed: 0,
@@ -99,6 +106,7 @@ export class OperationsWorkerService {
       landingInterestDeleted: landingIntake.interestDeleted,
       landingWaitlistDeleted: landingIntake.waitlistDeleted,
       notificationsSent,
+      partnerApplicationsDeleted,
       profileMediaCleanupFailed: profileMedia.failed,
       profileMediaDeleted: profileMedia.deleted,
       privacyExportsDeleted: privacy.expiredExportsDeleted,

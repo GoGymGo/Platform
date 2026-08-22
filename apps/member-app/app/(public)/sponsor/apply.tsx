@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { randomUUID } from 'expo-crypto';
+import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AuthStatusNotice, AuthTextField } from '@/components/auth';
@@ -11,7 +12,7 @@ import {
   TerminalText
 } from '@/components/cyber';
 import { OnboardingHeader } from '@/components/onboarding';
-import { DataCollectionNotice } from '@/components/legal';
+import { DataCollectionNotice, LegalConsentCheckbox } from '@/components/legal';
 import { BrandScreenHeader, brandScreenStyles } from '@/components/screenLayout';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { goBackOrReplace } from '@/navigation/goBack';
@@ -21,6 +22,7 @@ import {
   validateSponsorApplication,
   type SponsorApplicationErrors
 } from '@/domain/sponsorApplication';
+import { partnerApplicationReceiptMessage } from '@/domain/partnerApplicationReceipt';
 import { recordSponsorApplication } from '@/services/sponsorApplication';
 import { useApi } from '@/state/api';
 import { useCompetitionRegion } from '@/state/competitionRegion';
@@ -30,16 +32,19 @@ export default function SponsorApplicationScreen() {
   const { api } = useApi();
   const { competitionRegion } = useCompetitionRegion();
   const [companyName, setCompanyName] = useState('');
+  const [consent, setConsent] = useState(false);
   const [contactEmail, setContactEmail] = useState('');
   const [errors, setErrors] = useState<SponsorApplicationErrors>({});
   const [submissionError, setSubmissionError] = useState<string>();
-  const [submitted, setSubmitted] = useState(false);
+  const [receiptMessage, setReceiptMessage] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const [targetRegion, setTargetRegion] = useState(competitionRegion.label);
+  const retry = useRef<{ key: string; signature: string } | undefined>(undefined);
 
   async function submitApplication() {
     const input = normalizeSponsorApplication({
       companyName,
+      consent,
       contactEmail,
       targetRegion
     });
@@ -53,8 +58,12 @@ export default function SponsorApplicationScreen() {
     setSubmitting(true);
     setSubmissionError(undefined);
     try {
-      await recordSponsorApplication(api, input);
-      setSubmitted(true);
+      const signature = JSON.stringify(input);
+      if (retry.current?.signature !== signature) {
+        retry.current = { key: `partner-sponsor:${randomUUID()}`, signature };
+      }
+      const receipt = await recordSponsorApplication(api, input, retry.current.key);
+      setReceiptMessage(partnerApplicationReceiptMessage(receipt));
     } catch {
       setSubmissionError(
         'SPONSOR APPLICATION COULD NOT BE SENT. CHECK YOUR CONNECTION AND TRY AGAIN.'
@@ -99,6 +108,7 @@ export default function SponsorApplicationScreen() {
           <AuthTextField
             error={errors.companyName}
             label="COMPANY NAME"
+            maxLength={160}
             onChangeText={setCompanyName}
             placeholder="Your organization"
             value={companyName}
@@ -109,6 +119,7 @@ export default function SponsorApplicationScreen() {
             error={errors.contactEmail}
             keyboardType="email-address"
             label="WORK EMAIL"
+            maxLength={320}
             onChangeText={setContactEmail}
             placeholder="name@company.com"
             value={contactEmail}
@@ -116,23 +127,27 @@ export default function SponsorApplicationScreen() {
           <AuthTextField
             error={errors.targetRegion}
             label="TARGET REGION"
+            maxLength={120}
             onChangeText={setTargetRegion}
             placeholder="Nanaimo"
             value={targetRegion}
           />
           {submissionError ? (
             <AuthStatusNotice message={submissionError} tone="red" />
-          ) : submitted ? (
-            <AuthStatusNotice
-              message="APPLICATION SUBMITTED. THE GOGYMGO TEAM WILL REVIEW IT AND FOLLOW UP BY EMAIL."
-              tone="green"
-            />
+          ) : receiptMessage ? (
+            <AuthStatusNotice message={receiptMessage} tone="green" />
           ) : null}
           <DataCollectionNotice message="We use these business contact details to review this sponsor request, prevent misuse and contact you about the requested partnership. They are not added to a marketing list through this form." />
+          <LegalConsentCheckbox
+            checked={consent}
+            helper={errors.consent}
+            label="I consent to GoGymGo storing these details for the disclosed intake and retention period."
+            onToggle={() => setConsent((current) => !current)}
+          />
           <CyberButtonPrimary
-            disabled={submitting || submitted}
+            disabled={submitting || Boolean(receiptMessage)}
             label={
-              submitted
+              receiptMessage
                 ? 'INTEREST RECORDED'
                 : submitting
                   ? 'RECORDING...'

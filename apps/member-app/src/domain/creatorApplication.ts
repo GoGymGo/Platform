@@ -27,12 +27,16 @@ export function validateCreatorApplication(
 
   if (!input.region) {
     errors.region = 'REGION IS REQUIRED.';
+  } else if (input.region.length < 2 || input.region.length > 120) {
+    errors.region = 'REGION MUST BE 2 TO 120 CHARACTERS.';
   }
   if (!isWebUrl(input.channelUrl)) {
     errors.channelUrl = 'ENTER A VALID CREATOR CHANNEL URL.';
   }
   if (!input.workoutStyle) {
     errors.workoutStyle = 'WORKOUT STYLE IS REQUIRED.';
+  } else if (input.workoutStyle.length < 2 || input.workoutStyle.length > 120) {
+    errors.workoutStyle = 'WORKOUT STYLE MUST BE 2 TO 120 CHARACTERS.';
   }
   if (!isWebUrl(input.sampleWorkoutUrl)) {
     errors.sampleWorkoutUrl = 'ENTER A VALID SAMPLE WORKOUT URL.';
@@ -46,5 +50,10 @@ export function hasCreatorApplicationErrors(errors: CreatorApplicationErrors) {
 }
 
 function isWebUrl(value: string) {
-  return /^https?:\/\/[^\s]+\.[^\s]+$/i.test(value);
+  if (value.length > 2048) return false;
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
 }

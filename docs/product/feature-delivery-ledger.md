@@ -1074,8 +1074,16 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   bounded Fargate/worker configuration, fail-closed runtime inputs, alarm/budget
   destinations, serialized deployment with complete rollback baselines, backend-
   disabled Terraform policies/tests, and release/restore/rotation/incident runbooks
-  are repository-complete. Deployed-resource truth, drift, costs, credentials,
-  backups, alarms and staging UAT remain intentionally uninspected.
+  are repository-complete. The authorized 2026-08-22 reconciliation verified
+  the dedicated staging account, healthy older runtime, active RDS backups/PITR,
+  and current credit application. It also found high-risk private-bucket
+  versioning, runtime secret-isolation, alarm-routing, and deployed-source-age
+  gaps. The approved Phase 1 follow-up verified bucket encryption/lifecycle,
+  the deployed image's historical push scan, empty Parameter Store/SNS
+  inventories, and the absence of an Access Analyzer. Exact Terraform drift,
+  AWS Backup metadata blocked by an organization SCP, deployment, recovery
+  rehearsal, and authenticated UAT remain open; see the
+  [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
   restore, health/alerts; AWS cloud dependency is total.
@@ -1085,11 +1093,35 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   `685de9f8d8b70988d5216f99ec1954162ca13336`; status `BLOCKED`. A later
   `GoGymGo — AWS Staging Read-Only Reconciliation` task may be created only with
   separate cloud authority at the prescribed gate.
-- Residual risks / blocker: AWS account isolation, remote state/drift, costs,
-  current secret versions, alarms/subscription delivery, backups/PITR restore,
-  provider integrations, DNS/TLS, protected approvals, deployment and staging UAT
-  are not evidenced. Read-only reconciliation requires available credentials and
-  explicit separate authority; deployment requires further explicit authority.
+- AWS reconciliation: completed under explicit read-only authority on
+  2026-08-22. Account isolation, live public health, current cost/credit
+  application, certificates, automated backups/PITR eligibility, and selected
+  security controls are now evidenced. The approved Phase 1 follow-up also
+  closed narrow S3, SSM, ECR, SNS, and Access Analyzer metadata gaps. An approved
+  protected Terraform-plan attempt initialized the exact staging backend from an
+  isolated copy but stopped safely before producing a plan when refresh required
+  two unapproved tag metadata reads and one deployed CloudFront Function code
+  read. An exactly approved retry scoped those reads to the three staging
+  resources and completed with exit code 2, confirming drift. Its post-plan JSON
+  sanitizer failed, so the unsanitized plan was deleted and exact resource
+  actions were not inferred. An exactly approved streaming-JSON retry then
+  retained 48 resource address/action events. Twenty-two S3 mutations are
+  invalid artifacts because the restricted role cannot run `HeadBucket` on the
+  three live application buckets; 19 non-S3 mutation events and 7 data reads
+  remain. A fourth exactly approved attempt temporarily added
+  `s3:ListBucket` only on those buckets, proved all three `HeadBucket` checks
+  succeed, and then stopped before producing a plan because Terraform also
+  requires `s3:GetAccelerateConfiguration`. Exact provider-source review
+  identifies that action as the remaining uncovered bucket read. All attempts'
+  role, lock, state, and temporary-file rollback checks passed. Overall status
+  remains BLOCKED because a corrected exact plan, current deployment, and
+  material gaps remain.
+- Residual risks / blocker: exact Terraform drift, private-bucket versioning and
+  lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
+  inventory blocked by an organization SCP, restore readiness, current credit
+  balance, provider integrations, protected deployment approval, and
+  authenticated staging UAT remain unresolved. Deployment requires further
+  explicit authority.
 
 ### GGG-031 — Expo SDK patch compatibility and deterministic release checks
 
@@ -1232,6 +1264,40 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   approval; never infer eligibility from marketing location text.
 
 ## Change history
+
+- 2026-08-22 — Completed the explicitly authorized, non-root
+  [AWS staging read-only reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
+  Verified the dedicated staging account ending 9877 in Canada Central, a
+  healthy but 78-commit-old runtime, current AWS credit application, and active
+  RDS backup/PITR configuration. Recorded release-blocking versioning,
+  secret-scope, alarm-routing, source-age, permission, and recovery gaps. A
+  separately approved metadata-policy revision verified bucket encryption and
+  lifecycle, the deployed image's historical push scan, empty SSM/SNS
+  inventories, and an organization SCP blocking AWS Backup inspection. A later
+  approved protected-plan attempt initialized the exact backend and invoked one
+  no-apply plan, but refresh stopped before producing a plan because
+  budgets:ListTagsForResource, cloudfront:GetFunction, and
+  ecr:ListTagsForResource were not allowed. An exactly approved retry scoped
+  those reads to the staging resources and completed with exit code 2, proving
+  changes are present. Its post-plan JSON sanitizer failed, so the unsanitized
+  plan was deleted and no resource-action list was retained. The Phase 1 role
+  was restored, no lock remained, state ETag and time were unchanged, and
+  temporary files were deleted. No apply, application-resource mutation,
+  deployment, secret or application-object/log data read, database connection,
+  or restore occurred. A third exactly approved streaming-JSON plan retained
+  only resource addresses and actions. It showed 9 creates, 2 deletes, 22
+  replacements, 8 updates and 7 reads, but direct authorization checks proved
+  the 3 bucket creates and 19 dependent S3 replacements are false artifacts of
+  denied `HeadBucket`. A fourth exactly approved attempt temporarily allowed
+  `s3:ListBucket` only on those three application buckets and proved all three
+  `HeadBucket` calls succeed. Terraform then stopped before producing a plan on
+  the additional metadata read `s3:GetAccelerateConfiguration`. The state was
+  unchanged, no lock remained, temporary files were removed, and the Phase 1
+  role was fully restored. Exact Terraform AWS Provider v6.57.1 source review
+  identifies that action as the remaining uncovered bucket read. A further
+  no-apply plan therefore requires separate approval to repeat the exact
+  three-bucket listing grant and temporarily add
+  `s3:GetAccelerateConfiguration`; object content reads remain denied.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

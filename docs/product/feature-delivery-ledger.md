@@ -18,9 +18,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Coordinator task: permanent Goal-mode task in the local GoGymGo project.
 - Coordinator branch: `agent/feature-delivery-coordinator`.
 - Latest merged repository delivery: `origin/main` at
-  `6c7d7d63cc8c1689b2150edf0a54b2e67e82a4e8` after PR #129 on 2026-08-21.
-- Active feature task: `GoGymGo Feature GGG-014 — Partner intake and review` on
-  `agent/ggg-014-partner-intake-review`; creation follows this ledger merge.
+  `5728dc3a9c632e7d9b467fd4e6fa4fe5b589c39b` after PR #131 on 2026-08-22.
+- Active feature task: `GoGymGo Feature GGG-030 — AWS platform repository
+  readiness` on `agent/ggg-030-aws-foundation-readiness`; creation follows this
+  ledger merge.
 - Active feature limit: one implementation task at a time unless ownership and
   files are demonstrably disjoint.
 - Local resource limit: validation commands run serially with reduced worker
@@ -29,11 +30,12 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   task or stack may run at a time.
 - Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
   Cloudflare, staging, or production inspection, mutation, or deployment is
-  authorized here. The eventual AWS task is read-only and must be created only
-  after staging-required product code is terminal.
+  authorized here. Staging-required product code is now repository-terminal, so
+  GGG-030 may audit and improve offline infrastructure/release sources; any AWS
+  read-only reconciliation still requires separate user authority and credentials.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
-  worker behavior; 48 API forward migrations and 4 landing D1 migrations;
+  worker behavior; 49 API forward migrations and 4 landing D1 migrations;
   generated OpenAPI/contracts; feature
   capabilities; environment examples; source markers; tests; Git history; open
   GitHub issues and pull requests; and the existing worktree inventory.
@@ -522,17 +524,22 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   limited; decisions are admin-only and audited.
 - External providers / feature flag: no provider is required for persistence;
   creator intake follows creator release flag on creator-specific surfaces.
-- Current implementation / missing behavior: authoritative API forwarding and
-  explicit outcomes exist. Verify duplicate/rate-limit handling and that no
-  form claims activation or outbound follow-up.
+- Current implementation / missing behavior: authoritative public/authenticated
+  intake, explicit created/duplicate/screened receipts, idempotency, honeypot and
+  validation controls, creator fail-closed gating, bounded retention/purge,
+  versioned self-review-safe operator decisions and type-specific detail facts,
+  privacy email linkage, strict client decoders and honest no-follow-up outcomes
+  are repository-complete.
 - Required tests / operations / cloud dependency: validation, spam field, rate
   limits, deduplication/idempotency, role decision, privacy retention/export,
   landing-to-API failure; deployed API/database.
 - Delivery: priority `P2`; task `GoGymGo Feature GGG-014 — Partner intake and
-  review`; branch `agent/ggg-014-partner-intake-review`; PR/merge `unassigned`;
-  status `IN_PROGRESS`.
-- Residual risks / blocker: contractual onboarding remains a human process, not
-  an application success state.
+  review`; branch `agent/ggg-014-partner-intake-review` (deleted after merge); PR
+  `#131`; merge `5728dc3a9c632e7d9b467fd4e6fa4fe5b589c39b`; status
+  `BLOCKED`.
+- Residual risks / blocker: contractual/program approval remains a human process,
+  not an application success state. Approved retention configuration, deployment,
+  abuse monitoring and hosted end-to-end UAT require separate authority.
 
 ### GGG-015 — Brand Rewards catalog, inventory, awards, and claims
 
@@ -1068,9 +1075,11 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
   restore, health/alerts; AWS cloud dependency is total.
-- Delivery: priority `P0` after product code; task `GoGymGo — AWS Staging Read-Only
-  Reconciliation` must be created only at the prescribed gate; branch/PR/merge
-  `unassigned`; status `READY`.
+- Delivery: priority `P0` after product code; repository task `GoGymGo Feature
+  GGG-030 — AWS platform repository readiness`; branch
+  `agent/ggg-030-aws-foundation-readiness`; PR/merge `unassigned`; status
+  `IN_PROGRESS`. A later `GoGymGo — AWS Staging Read-Only Reconciliation` task may
+  be created only with separate cloud authority at the prescribed gate.
 - Residual risks / blocker: cloud deployment is not authorized. Read-only AWS
   reconciliation also requires available credentials and its separate task.
 
@@ -1216,6 +1225,30 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-22 — Completed the repository delivery for `GGG-014` through PR #131.
+  Corrected exact head `1f4c7d1066f91dc91285518e02feac14a54c20c5`
+  was guarded-squash merged as
+  `5728dc3a9c632e7d9b467fd4e6fa4fe5b589c39b`; all seven PR checks and all six
+  exact-main workflows passed and both feature branches were deleted. Delivery
+  removed fabricated offline member successes and landing follow-up promises,
+  added strict authoritative receipts, public idempotency and honeypot/consent
+  validation, direct API creator-flag enforcement, approved bounded retention and
+  purge, minimized summaries with type-specific review facts, versioned/self-review-
+  safe decisions, anonymous-email privacy linkage, runtime client decoders, Profile
+  reachability and honest fail-closed UI states. Proof included 416 API unit tests,
+  31 E2E tests, 273 member tests, 46 admin tests, 35 landing tests, contracts/
+  governance/dependency/source/artifact/browser gates, and an authorized disposable
+  PostGIS suite passing 4/4. The first CI head exposed only two stale privacy export
+  schema-version assertions; the corrected head passed the full CI integration
+  inventory. No cloud/provider/credential/deploy action occurred. Status remains
+  `BLOCKED` pending program/contract approval, production retention configuration,
+  deployment, abuse monitoring and hosted UAT. Windows path-length handling left
+  one unregistered partial worktree directory after branch/worktree cleanup; it has
+  no Git registration or branch and was intentionally left untouched rather than
+  risk broad deletion. With every staging-required product feature now repository-
+  terminal, dependency ordering assigns `GGG-030` for offline AWS foundation and
+  release-source readiness only; AWS inspection/reconciliation remains prohibited
+  without separate authorization.
 - 2026-08-21 — Completed the repository delivery for `GGG-028` through PRs #128
   and #129. Exact corrected feature head
   `7b16a9cdf4d9b208b82a02f5206c8a6789a1c5b5` was guarded-squash merged as

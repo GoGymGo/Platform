@@ -28,9 +28,18 @@ no reported findings; Parameter Store is empty; and no SNS topic, subscription,
 or regional IAM Access Analyzer exists. AWS Backup metadata remains blocked by
 an organization service-control policy rather than this role.
 
-No Terraform plan, deployment, secret value read, S3 object read, database
-connection, log-content query, restore, rotation, scaling change, or application
-resource mutation occurred.
+The separately approved protected-plan procedure then initialized an isolated
+copy of repository commit 5bc18c8 against the exact staging backend and started
+one normal refresh-enabled plan. Refresh stopped safely before producing a plan
+because three additional tag/function metadata reads were not allowed. The
+temporary directory was deleted, no lock remains, the state object retains its
+pre-attempt modification time, and the Phase 1 role policy was restored.
+
+No successful Terraform plan or apply, deployment, secret value read,
+application-object read, database connection, log-content query, restore,
+rotation, scaling change, or application-resource mutation occurred. Terraform
+state access was limited to the exact staging state object and was never printed
+or retained outside the deleted temporary working directory.
 
 ## Verified target and method
 
@@ -44,7 +53,7 @@ resource mutation occurred.
 | Authentication | IAM Identity Center / SSO, non-root |
 | Reconciliation permission set | GoGymGoStagingReconcile |
 | Session duration | Two hours |
-| Restrictions | No AWS mutations, secret values, object contents, log events, database log download, decryption, or interactive execution |
+| Restrictions | No application-resource mutation, secret values, application-object contents, log events, database log download, decryption, or interactive execution; the approved permission-set reprovision and transient lock procedure are the only control-plane mutations |
 
 The access portal now exposes the existing staging account to the existing
 workforce identity. After the approved Phase 1 revision, the permission set has
@@ -60,7 +69,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | State predates three material Terraform commits; exact plan unsafe now | NOT YET TESTED | High | Supply exact variables and separately approve state/lock procedure |
+| Exact Terraform drift | Backend initialization succeeded and a normal plan began, but refresh stopped on three missing metadata actions before producing a plan | BLOCKED BY PERMISSIONS | High | Add the three exact read-only metadata actions below and repeat the protected no-apply procedure |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -96,13 +105,26 @@ current .tflock object. The object layout supports the default workspace. Phase
 1 verified SSE-S3 encryption and no lifecycle configuration on the state
 bucket.
 
-An exact refresh-only plan was deliberately skipped:
+The approved Phase 2 procedure temporarily allowed read access to only the exact
+state object, read/write/delete access to only its exact .tflock object, and
+bucket listing only for those keys. Required non-secret inputs were derived in
+process from ECS, RDS, ALB/ACM, CloudFront, CloudWatch, and Budgets metadata.
+Feature flags absent from the 78-commit-old task definition used the committed
+safe default of false.
 
-- the approved role cannot read the state object;
-- a normal plan lock would create and remove an S3 .tflock object;
-- disabling locking would remove concurrency safety without solving state access;
-- exact staging image, Firebase, CORS, and optional values are unavailable;
-- raw Terraform state may contain sensitive configuration and was never fetched.
+Terraform 1.15.8 successfully initialized a fresh temporary copy of commit
+5bc18c8 against the verified backend. A normal refresh-enabled plan then exited
+1 before producing a plan because three metadata reads were denied:
+
+- budgets:ListTagsForResource;
+- cloudfront:GetFunction;
+- ecr:ListTagsForResource.
+
+No raw state or plan was printed or committed. The temporary working directory
+and any partial plan material were deleted. Terraform released its native lock;
+an exact post-run check found no .tflock object. The state object's modification
+time remained August 11, and the target role was restored to the Phase 1 policy
+with 111 metadata actions and all 26 explicit sensitive-data/execution denies.
 
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
@@ -234,6 +256,9 @@ explicit denies unchanged. Every expanded check succeeded except AWS Backup.
 
 Remaining permission blockers:
 
+- The protected Terraform refresh needs three additional read-only metadata
+  actions: budgets:ListTagsForResource, cloudfront:GetFunction, and
+  ecr:ListTagsForResource. These were not added without a new exact approval.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -303,12 +328,13 @@ metadata actions and removed the broad S3 bucket-listing actions. The policy
 was reprovisioned and all target-role safeguards were validated. All checks
 succeeded except AWS Backup, which is explicitly denied by an organization SCP.
 
-### Phase 2 — protected Terraform plan
+### Phase 2 — protected Terraform plan — attempted, permission blocked
 
-Supply authoritative staging variables. Separately review and approve a
-state-access and lock procedure that reads only the staging state key and
-creates/removes only its lock object. Run a saved exact-main plan; never apply
-it in this phase.
+The approved exact state-access and lock procedure was run from an isolated copy
+with live non-secret inputs held in process. Backend initialization succeeded,
+but refresh was denied three metadata reads before it could produce a plan. The
+role, lock, state, and temporary-directory rollback checks all passed. Resume
+only after separately approving those exact actions; never apply in this phase.
 
 ### Phase 3 — infrastructure and least-privilege remediation
 
@@ -339,11 +365,13 @@ remains out of scope.
 
 ## Next approval boundary
 
-The next recommended phase is a protected, no-apply Terraform plan for account
-**…9877** in ca-central-1.
+The next recommended step is to resume the protected, no-apply Terraform plan
+for account **…9877** in ca-central-1.
 
 IAM Identity Center change:
 
+- add budgets:ListTagsForResource, cloudfront:GetFunction, and
+  ecr:ListTagsForResource to the reconciliation role's metadata-only allow list;
 - allow s3:GetObject and s3:GetObjectVersion only for the exact
   gogymgo/staging/terraform.tfstate object;
 - allow s3:GetObject, s3:PutObject, and s3:DeleteObject only for the exact
@@ -382,5 +410,6 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-No Phase 2 permission change, backend initialization, lock operation, or
-Terraform plan has been performed.
+The first Phase 2 attempt performed the approved temporary permission change,
+backend initialization, and one plan invocation, then rolled back completely
+after the metadata denial. No plan artifact was produced and no apply occurred.

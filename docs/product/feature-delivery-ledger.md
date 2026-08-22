@@ -1097,9 +1097,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   2026-08-22. Account isolation, live public health, current cost/credit
   application, certificates, automated backups/PITR eligibility, and selected
   security controls are now evidenced. The approved Phase 1 follow-up also
-  closed narrow S3, SSM, ECR, SNS, and Access Analyzer metadata gaps. Overall
-  status remains BLOCKED because current main is not deployed and material
-  drift/gaps remain.
+  closed narrow S3, SSM, ECR, SNS, and Access Analyzer metadata gaps. An approved
+  protected Terraform-plan attempt initialized the exact staging backend from an
+  isolated copy but stopped safely before producing a plan when refresh required
+  three unapproved tag/function metadata actions. Its role, lock, state, and
+  temporary-file rollback checks passed. Overall status remains BLOCKED because
+  exact drift is still unknown, current main is not deployed, and material gaps
+  remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1257,9 +1261,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   secret-scope, alarm-routing, source-age, permission, and recovery gaps. A
   separately approved metadata-policy revision verified bucket encryption and
   lifecycle, the deployed image's historical push scan, empty SSM/SNS
-  inventories, and an organization SCP blocking AWS Backup inspection. No
-  Terraform plan, application-resource mutation, deployment, secret/object/log
-  data read, database connection, or restore occurred.
+  inventories, and an organization SCP blocking AWS Backup inspection. A later
+  approved protected-plan attempt initialized the exact backend and invoked one
+  no-apply plan, but refresh stopped before producing a plan because
+  budgets:ListTagsForResource, cloudfront:GetFunction, and
+  ecr:ListTagsForResource were not allowed. The Phase 1 role was restored, no
+  lock remained, state metadata stayed pre-attempt, and temporary files were
+  deleted. No apply, application-resource mutation, deployment, secret or
+  application-object/log data read, database connection, or restore occurred.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

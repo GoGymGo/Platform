@@ -1082,8 +1082,12 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   the deployed image's historical push scan, empty Parameter Store/SNS
   inventories, and the absence of an Access Analyzer. The exact Phase 3A saved
   plan has since restored versioning on both private buckets with a clean
-  targeted post-plan. Remaining Terraform drift, lifecycle retention, AWS
-  Backup metadata blocked by an organization SCP, deployment, recovery
+  targeted post-plan. The repository-only Phase 3C safety patch now configures
+  Terraform to retain the shared live execution role/policy under explicit moved
+  legacy addresses with `prevent_destroy`, while new task definitions use
+  runtime-scoped roles.
+  Remaining Terraform drift, lifecycle retention, AWS Backup metadata blocked
+  by an organization SCP, deployment, recovery
   rehearsal, and authenticated UAT remain open; see the
   [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
@@ -1147,7 +1151,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   zero changes, state advanced, no lock or rollback was needed, and the original
   111-allow/26-deny role was restored with zero temporary markers. Overall status
   remains BLOCKED pending the two-phase execution-role cutover, current
-  deployment, and remaining material gaps.
+  deployment, and remaining material gaps. The repository-only cutover-safety
+  patch is now implemented and passes Terraform 1.15.8 backend-disabled
+  validation and four mocked plans; a fresh protected live plan is still
+  required before mutation.
 - Residual risks / blocker: remaining Terraform and lifecycle drift, runtime
   secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1380,7 +1387,17 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   permissions and working files were removed; independent checks reconfirmed the
   111-allow/26-deny baseline with zero temporary markers and both live statuses
   enabled. No lifecycle, IAM, ECS, alarm, CloudFront, secret, or application-data
-  operation occurred.
+  operation occurred. The subsequently approved repository-only Phase 3C patch
+  renamed the planned runtime-specific execution-role resources, mapped the live
+  singleton role and policy to explicit legacy addresses, preserved their exact
+  names and existing all-runtime secret scope, and added `prevent_destroy` to
+  both. API, worker, and migration task definitions reference only the new
+  scoped roles, while the deployment role retains the legacy rollback path.
+  Terraform 1.15.8 formatting, backend-disabled initialization, validation, and
+  four mocked plans passed, as did the focused repository policy test. No AWS,
+  remote-state, credential, deployment, or application-data access occurred. A
+  fresh separately approved protected plan must prove the live move/no-delete
+  shape before any IAM or task-definition mutation.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

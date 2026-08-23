@@ -33,22 +33,76 @@ test("pins offline Terraform inputs and exact-version private storage", async ()
 });
 
 test("keeps runtime secrets role scoped and optional gates fail closed", async () => {
-  const [environment, identity, locals] = await Promise.all([
-    read("services/api/src/config/environment.ts"),
-    read("infrastructure/aws/terraform/identity.tf"),
-    read("infrastructure/aws/terraform/locals.tf"),
-  ]);
+  const [environment, identity, locals, stateMigrations, workloads] =
+    await Promise.all([
+      read("services/api/src/config/environment.ts"),
+      read("infrastructure/aws/terraform/identity.tf"),
+      read("infrastructure/aws/terraform/locals.tf"),
+      read("infrastructure/aws/terraform/state-migrations.tf"),
+      read("infrastructure/aws/terraform/workloads.tf"),
+    ]);
   const workerSecretStart = locals.indexOf(
     "worker_secret_environment = merge(",
   );
   const workerSecrets =
     workerSecretStart === -1 ? null : locals.slice(workerSecretStart);
+  const legacyRole = identity.slice(
+    identity.indexOf('resource "aws_iam_role" "ecs_execution_legacy"'),
+    identity.indexOf('data "aws_iam_policy_document" "ecs_execution_legacy"'),
+  );
+  const legacyPolicy = identity.slice(
+    identity.indexOf(
+      'resource "aws_iam_role_policy" "ecs_execution_legacy"',
+    ),
+    identity.indexOf('resource "aws_iam_role" "ecs_execution_scoped"'),
+  );
 
   assert.ok(workerSecrets, "worker secret map is missing");
   assert.doesNotMatch(workerSecrets, /REWARD_CODE_ENCRYPTION_KEY/);
   assert.match(locals, /LANDING_INTAKE_FORWARDING_SECRET/);
   assert.match(identity, /for_each = local\.execution_secret_arns/g);
   assert.match(identity, /resources = each\.value/);
+  assert.match(
+    legacyRole,
+    /name\s*=\s*"\$\{local\.name\}-ecs-execution"[\s\S]*?prevent_destroy\s*=\s*true/,
+  );
+  assert.match(
+    legacyPolicy,
+    /name\s*=\s*"\$\{local\.name\}-ecs-execution"[\s\S]*?prevent_destroy\s*=\s*true/,
+  );
+  assert.match(
+    identity,
+    /data "aws_iam_policy_document" "ecs_execution_legacy"[\s\S]*?secretsmanager:GetSecretValue[\s\S]*?resources\s*=\s*values\(aws_secretsmanager_secret\.runtime\)\[\*\]\.arn/,
+  );
+  assert.match(
+    identity,
+    /resource "aws_iam_role" "ecs_execution_scoped"\s*\{\s*for_each = local\.execution_secret_arns/,
+  );
+  assert.match(
+    identity,
+    /resource "aws_iam_role_policy" "ecs_execution_scoped"\s*\{\s*for_each = local\.execution_secret_arns/,
+  );
+  assert.match(
+    identity,
+    /aws_iam_role\.ecs_execution_legacy\.arn[\s\S]*?values\(aws_iam_role\.ecs_execution_scoped\)\[\*\]\.arn/,
+  );
+  assert.match(
+    stateMigrations,
+    /from\s*=\s*aws_iam_role\.ecs_execution\s+to\s*=\s*aws_iam_role\.ecs_execution_legacy/,
+  );
+  assert.match(
+    stateMigrations,
+    /from\s*=\s*aws_iam_role_policy\.ecs_execution\s+to\s*=\s*aws_iam_role_policy\.ecs_execution_legacy/,
+  );
+  for (const runtime of ["api", "worker", "migration"]) {
+    assert.match(
+      workloads,
+      new RegExp(
+        `execution_role_arn\\s*=\\s*aws_iam_role\\.ecs_execution_scoped\\["${runtime}"\\]\\.arn`,
+      ),
+    );
+  }
+  assert.doesNotMatch(workloads, /aws_iam_role\.ecs_execution\[/);
   assert.match(
     locals,
     /execution_secret_arns = \{[\s\S]*api\s*= values\(local\.api_secret_environment\)[\s\S]*migration = \[aws_secretsmanager_secret\.runtime\["DATABASE_URL"\]\.arn\][\s\S]*worker\s*= values\(local\.worker_secret_environment\)/,

@@ -86,7 +86,7 @@ resource "aws_ecs_task_definition" "api" {
     ]
   }])
   cpu                      = tostring(var.api_cpu)
-  execution_role_arn       = aws_iam_role.ecs_execution["api"].arn
+  execution_role_arn       = aws_iam_role.ecs_execution_scoped["api"].arn
   family                   = "${local.name}-api"
   memory                   = tostring(var.api_memory)
   network_mode             = "awsvpc"
@@ -101,7 +101,7 @@ resource "aws_ecs_task_definition" "api" {
   lifecycle {
     create_before_destroy = true
     ignore_changes        = [container_definitions]
-    replace_triggered_by  = [aws_iam_role_policy.ecs_execution["api"]]
+    replace_triggered_by  = [aws_iam_role_policy.ecs_execution_scoped["api"]]
     precondition {
       condition     = try(contains(local.fargate_memory_by_cpu[var.api_cpu], var.api_memory), false)
       error_message = "api_cpu and api_memory must form a supported bounded Fargate size."
@@ -142,7 +142,7 @@ resource "aws_ecs_task_definition" "worker" {
     ]
   }])
   cpu                      = tostring(var.worker_cpu)
-  execution_role_arn       = aws_iam_role.ecs_execution["worker"].arn
+  execution_role_arn       = aws_iam_role.ecs_execution_scoped["worker"].arn
   family                   = "${local.name}-worker"
   memory                   = tostring(var.worker_memory)
   network_mode             = "awsvpc"
@@ -192,7 +192,7 @@ resource "aws_ecs_task_definition" "migration" {
     }]
   }])
   cpu                      = "512"
-  execution_role_arn       = aws_iam_role.ecs_execution["migration"].arn
+  execution_role_arn       = aws_iam_role.ecs_execution_scoped["migration"].arn
   family                   = "${local.name}-migration"
   memory                   = "1024"
   network_mode             = "awsvpc"

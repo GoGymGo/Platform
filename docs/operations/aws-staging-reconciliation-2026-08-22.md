@@ -10,9 +10,10 @@ account ending **9877**, and is operating in ca-central-1.
 The existing staging release is publicly healthy: the API and worker are steady,
 the load-balancer target is healthy, health/readiness routes respond, browser
 routes load, and browser CORS is correct. It is not current-main ready. The live
-image is 78 commits behind the reconciled repository baseline, two private-data
-buckets have versioning suspended, runtime secret isolation is broader than the
-current Terraform, and all five runtime alarms have no notification actions.
+image is 78 commits behind the reconciled repository baseline, runtime secret
+isolation is broader than the current Terraform, and all five runtime alarms
+have no notification actions. Phase 3A has now restored versioning on both
+private-data buckets.
 
 August 1–22 gross staging usage was approximately **$63.55**. AWS applied
 approximately **$63.55** in credits, leaving approximately **$0** of eligible
@@ -109,12 +110,22 @@ creates, 2 deletes, 3 replacements, 10 updates, and 1 data read. There are no
 bucket creates or broad S3 replacements. State and lock checks, permission
 restoration, access removal, and temporary-directory cleanup all passed.
 
-No apply, deployment, secret value read, application-object read, database
-connection, log-content query, restore, rotation, scaling change, or
-application-resource mutation occurred. Terraform state access was limited to
-the exact staging state object and was never printed or retained outside the
-deleted temporary working directory. The explicitly approved CloudFront read
-was limited to the deployed member-web function code used for drift comparison.
+The separately approved Phase 3A run created a saved plan targeted only to the
+content and privacy bucket-versioning resources. Its fail-closed guard confirmed
+exactly two updates before applying that saved plan. Both buckets changed from
+`Suspended` to `Enabled`; the targeted post-apply plan returned zero changes,
+Terraform state advanced, and there were zero lock objects before and after.
+No rollback was required. The temporary permission set was removed, the role
+returned to 111 allowed actions and 26 explicit denies with zero temporary
+markers, and independent live checks reconfirmed both bucket statuses.
+
+No deployment, secret value read, application-object read/write/delete,
+database connection, log-content query, restore, rotation, scaling change,
+lifecycle mutation, IAM/runtime cutover, alarm change, or CloudFront mutation
+occurred. Terraform state access was limited to the exact staging state object
+and was never printed or retained outside the deleted temporary working
+directory. The explicitly approved CloudFront read was limited to the deployed
+member-web function code used for drift comparison.
 
 ## Verified target and method
 
@@ -144,7 +155,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Corrected Terraform 1.15.8 plan completed with 21 mutation events and 1 data read; zero diagnostics or permission artifacts | VERIFIED | High | Stage remediation; do not apply the full plan while services still reference the legacy execution role |
+| Exact Terraform drift | Corrected Terraform 1.15.8 plan completed with 21 mutation events and 1 data read; Phase 3A then applied only the 2 versioning updates | VERIFIED | High | Continue staged remediation; do not apply the remaining full plan while services still reference the legacy execution role |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -153,9 +164,9 @@ sensitive-data/execution denies.
 | Member web | Private-origin CloudFront; public routes HTTP 200; CORS correct | VERIFIED | Low | Authenticated UAT remains separate |
 | RDS protection | Private, encrypted, forced SSL, 14-day PITR, daily automated snapshots | VERIFIED | Medium | Rehearse restore under separate approval |
 | RDS deletion safety | Deletion protection disabled; no manual snapshot | GAP FOUND | Medium | Decide whether staging policy should change |
-| Private S3 versioning | User-content and privacy-export versioning suspended | GAP FOUND | High | Restore versioning through reviewed Terraform |
+| Private S3 versioning | User-content and privacy-export versioning enabled by the exact Phase 3A saved plan; zero-change targeted post-plan | VERIFIED | Low | Preserve; monitor retained-version storage cost |
 | S3 public access | All relevant buckets individually block public access | VERIFIED | Low | Consider account-level defense in depth |
-| S3 encryption/lifecycle | Private buckets use the GoGymGo KMS key; privacy current expiry is seven days, but both buckets lack current Terraform's noncurrent-version rules | GAP FOUND | High | Restore versioning and lifecycle rules through reviewed Terraform |
+| S3 encryption/lifecycle | Private buckets use the GoGymGo KMS key and now have versioning enabled; privacy current expiry is seven days, but both buckets lack current Terraform's noncurrent-version rules | GAP FOUND | High | Review existing version inventory and deletion implications before any lifecycle apply |
 | KMS | Customer key enabled with annual rotation | VERIFIED | Low | No immediate action |
 | Secret containers | Six app containers plus managed DB secret; no values read | VERIFIED | Low | Preserve out-of-band value handling |
 | Runtime secret isolation | One shared execution role; worker receives reward key | GAP FOUND | High | Apply current role/task-definition scoping |
@@ -167,7 +178,7 @@ sensitive-data/execution denies.
 | DNS/TLS | Cloudflare owns DNS; expected certificates issued/in use/renewable | VERIFIED | Low | Preserve ownership and recheck after ALB changes |
 | Current costs | Gross $63.55, credits -$63.55, net about $0 for August 1–22 | VERIFIED | Medium | Continue monitoring; investigate CloudWatch spend |
 | Credit balance/sharing | Payer Billing API denied because IAM billing access is inactive | BLOCKED BY PERMISSIONS | Medium | Do not promise future all-credit coverage |
-| Protected deployment | Current release is older; exact infrastructure plan is verified, but full apply has a legacy execution-role cutover hazard | REQUIRES MUTATION APPROVAL | High | Stage bucket versioning, implement two-phase role cutover, then approve exact deployment |
+| Protected deployment | Current release is older; Phase 3A is complete, but the remaining full apply has a legacy execution-role cutover hazard | REQUIRES MUTATION APPROVAL | High | Implement the two-phase role cutover before approving an exact deployment |
 | Authenticated UAT | Public routing only was tested | NOT YET TESTED | High | Run after approved current-main staging release |
 
 ## Terraform backend and drift
@@ -419,9 +430,9 @@ service `task_definition` changes. A full apply would register the new split-rol
 task definitions while deleting the shared execution role without moving the
 services. A later restart of an old revision could then fail to pull its image or
 mount secrets. Role cutover must be staged with deployment or implemented as a
-two-phase migration. The recommended first mutation is therefore limited to
-enabling versioning on the two private-data buckets; lifecycle changes and the
-runtime role cutover remain separate approvals.
+two-phase migration. The recommended first mutation was therefore limited to
+enabling versioning on the two private-data buckets; that Phase 3A step is now
+complete. Lifecycle changes and the runtime role cutover remain separate.
 
 For the ninth invocation, the state fingerprint was unchanged, there were zero
 locks before and after, no manual cleanup was needed, both temporary access paths
@@ -429,11 +440,26 @@ were denied again after rollback, the isolated directory was deleted, and the
 role returned to 111 allows, 26 denies, and zero temporary markers. No apply
 occurred.
 
-The state object was last updated August 11. Three later commits materially
-changed 11 AWS Terraform files (+339/-80), including execution-role and secret
-scoping, task inputs, alarm actions, retention controls, and release
-preconditions. This is strong evidence of likely unapplied configuration, not a
-substitute for a protected plan.
+The exactly approved Phase 3A helper repeated the proven metadata reads, added
+only exact state write/lock access and `s3:PutBucketVersioning` for the two
+private buckets, and created a saved targeted plan. The plan guard found exactly
+the two expected `update` events and no drift event. Applying that saved plan
+returned exit code 0. Direct checks changed both statuses from `Suspended` to
+`Enabled`, the targeted post-plan returned exit code 0 with zero changes, and
+the state object advanced. There were zero locks before and after, no manual
+cleanup or rollback was needed, and all temporary files and permissions were
+removed. The restored role and independent follow-up both confirmed 111 allows,
+26 denies, zero temporary markers, and both bucket statuses still `Enabled`.
+
+The two versioning rows in the ninth plan are therefore resolved. Every other
+row remains historical evidence until a fresh protected plan is approved; it
+must not be inferred that the remaining action set is unchanged.
+
+Before Phase 3A, the state object was last updated August 11. It advanced on
+August 22 only for the exact versioning apply. Three intervening repository
+commits materially changed 11 AWS Terraform files (+339/-80), including
+execution-role and secret scoping, task inputs, alarm actions, retention
+controls, and release preconditions.
 
 The selected AWS provider is correctly pinned at 6.57.1. The lockfile retains a
 broader historical constraint even though the selected version and hashes are
@@ -482,8 +508,8 @@ Gaps:
   application secrets;
 - the live worker receives REWARD_CODE_ENCRYPTION_KEY, while current Terraform
   reserves it for the API;
-- the content and privacy buckets lack current Terraform's noncurrent-version
-  expiry rules, while their versioning remains suspended;
+- the content and privacy buckets now have versioning enabled, but still lack
+  current Terraform's noncurrent-version expiry rules;
 - no regional IAM Access Analyzer exists;
 - the backend deployment role retains broad ECS actions, although iam:PassRole
   is limited to GoGymGo runtime roles.
@@ -545,6 +571,11 @@ eligible usage after rounding. This proves credits are currently applying. It
 does not prove the remaining balance or guarantee future, expired, exhausted,
 taxed, or ineligible charges.
 
+Phase 3A has no material direct API charge, but future overwrites and deletes can
+retain additional S3 object versions and therefore increase storage charges.
+No lifecycle rule was changed, and AWS credit eligibility for that incremental
+storage is not guaranteed.
+
 The budget reports $63.984 of a $100 gross monthly limit. The 25% and 50%
 thresholds are in ALARM; 80% and 100% remain OK. Simple calendar projection is
 approximately $90. CloudWatch alone is already $11.24, above the prior $3–$10
@@ -570,7 +601,8 @@ Remaining access constraints:
   those same three buckets and advanced Terraform past the prior S3 barrier. The
   classified eighth attempt found one further provider mapping:
   `GetBucketReplication` requires temporary `s3:GetReplicationConfiguration` on
-  those same exact buckets. A retry must repeat all three grants;
+  those same exact buckets. Phase 3A repeated all three exact grants and removed
+  them after the validated apply;
   `s3:ListBucket` technically permits listing object key names, but object
   content reads remain explicitly denied.
 - The approved ECR tag action was scoped to an incorrect repository ARN with an
@@ -700,15 +732,16 @@ approval for the additional S3 action and corrected ECR resource scope.
 
 The ninth approved invocation applied only those temporary read corrections and
 completed the exact sanitized plan with exit code 2 and zero diagnostics. Phase
-2 is complete. Never apply the full plan directly: stage private-bucket
-versioning first and coordinate the execution-role/task-definition cutover with
-the protected deployment.
+2 is complete. Never apply the remaining full plan directly: private-bucket
+versioning is now staged, while the execution-role/task-definition cutover still
+requires a protected two-phase deployment.
 
 ### Phase 3 — infrastructure and least-privilege remediation
 
 Stage the Phase 2 plan rather than applying it as one operation:
 
-- Phase 3A enables versioning only on both private-data buckets;
+- Phase 3A enabled versioning only on both private-data buckets and completed
+  with an exact two-update apply plus a zero-change targeted post-plan;
 - Phase 3B separately reviews lifecycle retention before enabling noncurrent
   deletion;
 - Phase 3C implements a two-phase API, worker, and migration execution-role
@@ -719,8 +752,8 @@ Stage the Phase 2 plan rather than applying it as one operation:
 - applying the member-web function and remaining exact-plan updates only in a
   reviewed order.
 
-Apply only after a separate exact-resource approval, with rollback and
-post-apply validation documented.
+Every remaining apply requires a separate exact-resource approval, with
+rollback and post-apply validation documented.
 
 ### Phase 4 — current-main staging release
 
@@ -736,82 +769,37 @@ remains out of scope.
 
 ## Next approval boundary
 
-The next recommended mutation is Phase 3A: enable versioning only on the content
-and privacy buckets in account **…9877**, ca-central-1. The completed full plan
-shows both as exact updates. Lifecycle rules, IAM roles/policies, task
-definitions, ECS services, alarms, and CloudFront remain out of scope for this
-phase.
+Phase 3A is complete. The next recommended step is a **repository-only Phase 3C
+cutover-safety patch**, before any further AWS apply. It will preserve the live
+shared ECS execution role and policy as explicitly managed legacy resources,
+use Terraform `moved` declarations to avoid destroying or duplicating the live
+role during state reconciliation, and create the new API, worker, and migration
+execution roles alongside it. The new task definitions continue to reference
+their runtime-specific roles; the legacy role remains until a later protected
+deployment proves all running services have cut over.
 
-IAM Identity Center change:
+Scope of the requested repository change:
 
-- repeat the exact resource-scoped metadata reads that produced the successful
-  corrected plan;
-- temporarily allow `s3:PutBucketVersioning` only on the content and privacy
-  bucket ARNs;
-- allow s3:GetObject, s3:GetObjectVersion, and s3:PutObject only for the exact
-  gogymgo/staging/terraform.tfstate object so Terraform can persist the approved
-  apply result;
-- allow s3:GetObject, s3:PutObject, and s3:DeleteObject only for the exact
-  gogymgo/staging/terraform.tfstate.tflock object;
-- allow s3:ListBucket only for that exact state/lock prefix;
-- restructure the existing S3 object-read deny so every other object in every
-  bucket remains explicitly denied;
-- preserve all secret, application-object, log-event, decryption, and execution
-  denies.
+- edit only committed Terraform and its offline policy tests/documentation;
+- retain the existing shared execution role and policy without broadening them;
+- add state-address migration declarations for the legacy role and policy;
+- keep the three new runtime-specific roles/policies and task-definition
+  references;
+- run formatting, backend-disabled validation/tests, governance checks, and
+  inspect the resulting repository diff;
+- do not connect Terraform to AWS, access remote state, alter IAM, register task
+  definitions, update ECS services, deploy an image, or change S3, lifecycle,
+  alarms, CloudFront, secrets, object data, or application data.
 
-Terraform operation:
+Expected effect in this phase is repository code only: no AWS charge,
+availability change, data change, or credit consumption. Rollback is a Git
+revert before merge. A later separately approved protected plan must prove that
+the legacy role/policy are retained and that no live execution role is deleted;
+only then can an exact staged IAM/task-definition apply and deployment be
+proposed.
 
-- copy the exact committed Terraform source to a fresh temporary directory;
-- initialize that copy against the verified staging backend without migrating
-  or replacing state;
-- derive required non-secret variables from already authorized live metadata,
-  holding private values only in process memory;
-- create one saved, refresh-enabled plan targeted only to
-  `aws_s3_bucket_versioning.content` and
-  `aws_s3_bucket_versioning.privacy`;
-- fail closed unless the saved plan contains exactly two updates and no other
-  create, replace, delete, update, or read action;
-- apply only that exact saved plan; never run a general apply or auto-approve;
-- remove the saved plan and isolated directory after validation.
-
-Expected AWS mutations are limited to updating/reprovisioning the reconciliation
-role, Terraform's transient creation/deletion of the exact .tflock object,
-updating the exact state object, and enabling versioning on the two named
-private-data buckets.
-
-- Direct AWS API cost: no material charge expected. Storage cost can rise as
-  future overwritten/deleted objects retain versions; credit eligibility is not
-  guaranteed.
-- Availability effect: none.
-- Data-loss effect: none expected; lifecycle rules are not changed and no object
-  read, write, or delete is authorized. Existing and future versions are not
-  deleted by this phase.
-- Security effect: stronger recovery for future object changes; temporary write
-  access to one versioned Terraform state object and versioning configuration on
-  only two buckets.
-- Rollback: if versioning validation fails, use the same exact
-  `s3:PutBucketVersioning` scope to return the affected bucket to `Suspended`,
-  then stop and record the resulting Terraform drift. Restore the Phase 1 role,
-  confirm no lock remains, and delete the temporary directory. Versions created
-  while enabled remain recoverable.
-- Validation: verify caller/account/region and target role policy, confirm the
-  backend and exact commit, verify the saved plan contains only the two approved
-  updates, require both live bucket statuses to be `Enabled`, run a targeted
-  post-apply plan expecting zero changes, confirm the state object gained only
-  the expected version and no lock remains, restore the role, and verify the
-  repository remains clean.
-
-Nine Phase 2 plan invocations occurred. The first stopped on three read
-denials. The second completed but its local post-plan sanitizer failed. The third
-used the validated streaming sanitizer and exposed the S3 HeadBucket permission
-artifact. The fourth proved the exact-bucket `s3:ListBucket` fix and stopped on
-the one remaining uncovered provider bucket read,
-`s3:GetAccelerateConfiguration`. The fifth proved that final metadata permission
-but its streaming sanitizer stopped on a null-detail diagnostic, so its partial
-events were discarded. The sixth proved the null-safe sanitizer, but Terraform
-itself exited 1 with four unclassified diagnostics after seven incomplete
-events. The seventh retained fixed labels, but all four were detail-free because
-only `detail` was classified; `summary` was not inspected. The eighth classified
-both fields and found three missing S3 replication reads plus the incorrect ECR
-resource ARN. The ninth corrected those scopes and completed the exact plan with
-zero diagnostics. All attempts rolled back completely and no apply occurred.
+Phase 3B lifecycle application is intentionally deferred. The desired rules
+would delete content noncurrent versions after 30 days and privacy noncurrent
+versions after 7 days. Because older historical versions may exist, lifecycle
+enablement needs a separate retention/data-loss decision and will not be bundled
+with the execution-role safety work.

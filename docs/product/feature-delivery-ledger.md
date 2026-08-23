@@ -1080,8 +1080,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   versioning, runtime secret-isolation, alarm-routing, and deployed-source-age
   gaps. The approved Phase 1 follow-up verified bucket encryption/lifecycle,
   the deployed image's historical push scan, empty Parameter Store/SNS
-  inventories, and the absence of an Access Analyzer. Exact Terraform drift,
-  AWS Backup metadata blocked by an organization SCP, deployment, recovery
+  inventories, and the absence of an Access Analyzer. The exact Phase 3A saved
+  plan has since restored versioning on both private buckets with a clean
+  targeted post-plan. Remaining Terraform drift, lifecycle retention, AWS
+  Backup metadata blocked by an organization SCP, deployment, recovery
   rehearsal, and authenticated UAT remain open; see the
   [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
@@ -1139,10 +1141,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   execution role, replaces three task definitions, and updates selected runtime,
   IAM, alarm, and member-web resources. The full plan must not be applied alone:
   services still reference legacy task definitions while Terraform would delete
-  their shared execution role. Overall status remains BLOCKED pending staged
-  remediation, current deployment, and remaining material gaps.
-- Residual risks / blocker: exact Terraform drift, private-bucket versioning and
-  lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
+  their shared execution role. A separately approved Phase 3A run then guarded,
+  saved, and applied exactly the two private-bucket versioning updates. Both
+  statuses changed from suspended to enabled, the targeted post-plan returned
+  zero changes, state advanced, no lock or rollback was needed, and the original
+  111-allow/26-deny role was restored with zero temporary markers. Overall status
+  remains BLOCKED pending the two-phase execution-role cutover, current
+  deployment, and remaining material gaps.
+- Residual risks / blocker: remaining Terraform and lifecycle drift, runtime
+  secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
   balance, provider integrations, protected deployment approval, and
   authenticated staging UAT remain unresolved. Deployment requires further
@@ -1365,7 +1372,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   delete the shared execution role needed by a restarting old task. The first
   recommended mutation is therefore a separately planned versioning-only apply.
   State remained unchanged, zero locks remained, and every temporary permission
-  and file was removed after the no-apply run.
+  and file was removed after the no-apply run. A separately approved Phase 3A
+  run then produced a saved targeted plan containing exactly the two expected
+  versioning updates and applied only that plan. Both private buckets changed
+  from suspended to enabled, the targeted post-plan had zero changes, state
+  advanced, zero locks remained, and no rollback was needed. The temporary
+  permissions and working files were removed; independent checks reconfirmed the
+  111-allow/26-deny baseline with zero temporary markers and both live statuses
+  enabled. No lifecycle, IAM, ECS, alarm, CloudFront, secret, or application-data
+  operation occurred.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

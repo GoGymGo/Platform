@@ -1085,7 +1085,10 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   targeted post-plan. The repository-only Phase 3C safety patch now configures
   Terraform to retain the shared live execution role/policy under explicit moved
   legacy addresses with `prevent_destroy`, while new task definitions use
-  runtime-scoped roles.
+  runtime-scoped roles. A fresh protected plan from exact commit `6f31b94`
+  recognized both moves and proved neither legacy resource has a create,
+  replacement, or deletion action. It returned 6 creates, 2 moves, 3
+  replacements, 8 updates, and 1 data read with no diagnostics; no apply occurred.
   Remaining Terraform drift, lifecycle retention, AWS Backup metadata blocked
   by an organization SCP, deployment, recovery
   rehearsal, and authenticated UAT remain open; see the
@@ -1152,9 +1155,17 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   111-allow/26-deny role was restored with zero temporary markers. Overall status
   remains BLOCKED pending the two-phase execution-role cutover, current
   deployment, and remaining material gaps. The repository-only cutover-safety
-  patch is now implemented and passes Terraform 1.15.8 backend-disabled
-  validation and four mocked plans; a fresh protected live plan is still
-  required before mutation.
+  patch passes Terraform 1.15.8 backend-disabled validation and four mocked
+  plans. Its separately approved protected live plan then completed with exact
+  commit guard, Terraform exit code 2, and zero diagnostics: 6 creates, 2 exact
+  legacy-address moves, 3 task-definition replacements, 8 updates, and 1 data
+  read. Neither legacy role/policy has a create, replacement, or deletion action.
+  State remained unchanged, locks were zero, all temporary access/files were
+  removed, the 111-allow/26-deny baseline was independently reconfirmed, and both
+  private buckets remain versioned. No apply occurred. The next recommended
+  mutation is a separately approved saved targeted plan/apply containing only the
+  two state moves and creation of the six unused scoped role/policy resources;
+  task-definition registration and workload cutover remain later approvals.
 - Residual risks / blocker: remaining Terraform and lifecycle drift, runtime
   secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit

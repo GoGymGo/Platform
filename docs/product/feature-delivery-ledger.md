@@ -1126,7 +1126,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   planned-change events and four errors; all four labels were
   `detail-free-diagnostic`, with no operation, status, or IAM action token. The
   sanitizer had not classified `summary`, so the cause remains unknown and the
-  partial events were discarded. All attempts' role, lock, state, and
+  partial events were discarded. An eighth exactly approved attempt classified
+  both raw fields transiently and retained only fixed labels. It identified
+  three denied `s3:GetReplicationConfiguration` reads on the application buckets
+  and one `ecr:ListTagsForResource` denial caused by an incorrect `/api` suffix
+  on the temporary repository ARN. Live metadata confirms the exact repository
+  is `gogymgo-staging-backend`. Its partial events were discarded. All attempts'
+  role, lock, state, and
   temporary-file rollback checks passed. Overall status remains BLOCKED because
   a corrected exact plan, current deployment, and material gaps remain.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
@@ -1332,7 +1338,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   role, and temporary-file rollback checks all passed. A further plan requires
   new exact approval but no new AWS action. Its classifier will derive the same
   fixed labels from both `summary` and `detail` transiently while retaining
-  neither raw field.
+  neither raw field. An eighth exactly approved attempt did so and identified
+  three `S3.GetBucketReplication` HTTP 403 errors requiring
+  `s3:GetReplicationConfiguration` on the exact application buckets, plus one
+  ECR tag-read HTTP 400 caused by the temporary permission's erroneous `/api`
+  repository suffix. Live metadata confirms the correct exact repository is
+  `gogymgo-staging-backend`. The seven planned-change and four drift events were
+  incomplete and discarded; state, lock, role, access, and temporary-file
+  rollback checks all passed. A further plan requires exact approval for that
+  added S3 action and corrected ECR resource ARN.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

@@ -91,6 +91,16 @@ All state, lock, access-removal, role-restoration, and cleanup checks passed. Th
 next classifier will derive the same fixed labels from both `summary` and
 `detail` in memory while retaining neither raw field.
 
+An eighth exactly approved attempt used that classifier. Terraform again exited
+1 after seven incomplete planned-change events, but the four fixed labels now
+identified the exact causes: three S3 `GetBucketReplication` reads returned 403
+because IAM action `s3:GetReplicationConfiguration` was absent, and one ECR
+`ListTagsForResource` read returned 400 because the temporary statement targeted
+a nonexistent `/api` repository suffix. Live ECR metadata confirms the exact
+Terraform repository is `gogymgo-staging-backend`. The partial events were
+discarded. State, lock, access-removal, role-restoration, and cleanup checks all
+passed.
+
 No apply, deployment, secret value read, application-object read, database
 connection, log-content query, restore, rotation, scaling change, or
 application-resource mutation occurred. Terraform state access was limited to
@@ -126,7 +136,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; exact S3 reads pass, but Terraform exited 1 with four detail-free diagnostics after seven incomplete events | PARTIALLY VERIFIED | High | Approve one summary-and-detail classification retry with the already-proven exact permissions before any remediation approval |
+| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; the classified retry found three missing exact-bucket replication reads and one incorrectly scoped ECR tag read | PARTIALLY VERIFIED | High | Approve exact-bucket GetReplicationConfiguration and the corrected exact ECR ARN for one no-apply retry |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -330,6 +340,27 @@ before and after, no manual cleanup was needed, application-bucket and state
 access were denied after rollback, the isolated directory was deleted, and the
 role returned to 111 allows, 26 denies, and zero temporary markers.
 
+The eighth exactly approved invocation used the combined classifier and produced
+four useful fixed labels without retaining raw diagnostic text:
+
+- three `provider-read-error` labels for `S3.GetBucketReplication`, HTTP 403,
+  IAM action `s3:GetReplicationConfiguration`;
+- one `provider-read-error` label for `ECR.ListTagsForResource`, HTTP 400, IAM
+  action `ecr:ListTagsForResource`.
+
+The three S3 failures correspond to the exact content, privacy, and member-web
+buckets. The provider source calls `GetBucketReplication`, whose IAM action name
+is not matched by the Phase 1 `s3:GetBucket*` pattern. The ECR permission action
+was already approved, but its temporary resource ARN incorrectly appended
+`/api`. Direct live metadata and current Terraform both identify the repository
+as `gogymgo-staging-backend`; no repository named with that suffix exists.
+
+The seven planned-change and four drift events preceding the failure remain
+incomplete and were discarded. The state fingerprint was unchanged, zero locks
+existed before and after, no manual cleanup was required, both temporary access
+paths were denied again after rollback, the isolated directory was deleted, and
+the role returned to 111 allows, 26 denies, and zero temporary markers.
+
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
 scoping, task inputs, alarm actions, retention controls, and release
@@ -468,10 +499,15 @@ Remaining access constraints:
 - The approved temporary `s3:ListBucket` grant on the exact content, privacy,
   and member-web buckets made all three `HeadBucket` checks succeed. The fifth
   attempt also proved temporary `s3:GetAccelerateConfiguration` works on only
-  those same three buckets and advanced Terraform past the prior S3 barrier. No
-  further provider-read denial was observed before the local sanitizer stopped.
-  A retry must repeat both grants; `s3:ListBucket` technically permits listing
-  object key names, but object content reads remain explicitly denied.
+  those same three buckets and advanced Terraform past the prior S3 barrier. The
+  classified eighth attempt found one further provider mapping:
+  `GetBucketReplication` requires temporary `s3:GetReplicationConfiguration` on
+  those same exact buckets. A retry must repeat all three grants;
+  `s3:ListBucket` technically permits listing object key names, but object
+  content reads remain explicitly denied.
+- The approved ECR tag action was scoped to an incorrect repository ARN with an
+  `/api` suffix. Live metadata confirms the corrected exact repository is
+  `gogymgo-staging-backend`; the retry must change only that resource ARN.
 - AWS Backup plan/vault/recovery-point listing is explicitly denied by an
   organization service-control policy. IAM Identity Center cannot override it.
 - Payer billing:GetCredits remains unavailable because IAM billing access is not
@@ -584,6 +620,12 @@ classified only as `detail-free-diagnostic` because Terraform populated no
 events were discarded. A further run requires new approval to derive the same
 fixed labels from both raw fields transiently without retaining either one.
 
+The eighth approved invocation used both fields transiently and identified three
+missing exact-bucket `s3:GetReplicationConfiguration` reads plus one ECR tag read
+whose approved action was attached to the wrong repository ARN. The partial
+events were discarded and all rollback checks passed. A further run requires new
+approval for the additional S3 action and corrected ECR resource scope.
+
 ### Phase 3 — infrastructure and least-privilege remediation
 
 Review the Phase 2 plan for:
@@ -614,17 +656,17 @@ remains out of scope.
 ## Next approval boundary
 
 The next recommended step is one corrected protected, no-apply Terraform plan
-for account **…9877** in ca-central-1. It repeats the now-proven exact permission
-set and uses the null-safe streaming sanitizer with redacted diagnostic-category
-capture derived from both `summary` and `detail` in memory. Neither raw field is
-retained. No new AWS action is requested.
+for account **…9877** in ca-central-1. It repeats the proven exact permission set,
+adds one S3 metadata action on only the three application buckets, corrects the
+already-approved ECR tag-read resource ARN, and keeps the fixed-label sanitizer.
+Neither raw diagnostic field is retained.
 
 IAM Identity Center change:
 
 - temporarily allow budgets:ListTagsForResource only for the exact staging
   monthly budget;
-- temporarily allow ecr:ListTagsForResource only for the exact staging ECR
-  repository;
+- temporarily allow ecr:ListTagsForResource only for the corrected exact staging
+  ECR repository `gogymgo-staging-backend` (without the erroneous `/api` suffix);
 - temporarily allow cloudfront:GetFunction only for the Terraform-managed
   member-web CloudFront Function; this reads its deployed function code for
   drift comparison;
@@ -632,6 +674,8 @@ IAM Identity Center change:
   member-web buckets. This enables `HeadBucket` but also technically permits
   listing object key names; no object content read is allowed or requested;
 - temporarily allow s3:GetAccelerateConfiguration only on those same exact
+  content, privacy, and member-web buckets;
+- temporarily allow s3:GetReplicationConfiguration only on those same exact
   content, privacy, and member-web buckets;
 - allow s3:GetObject and s3:GetObjectVersion only for the exact
   gogymgo/staging/terraform.tfstate object;
@@ -677,7 +721,7 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-Seven Phase 2 plan invocations have occurred. The first stopped on three read
+Eight Phase 2 plan invocations have occurred. The first stopped on three read
 denials. The second completed but its local post-plan sanitizer failed. The third
 used the validated streaming sanitizer and exposed the S3 HeadBucket permission
 artifact. The fourth proved the exact-bucket `s3:ListBucket` fix and stopped on
@@ -687,5 +731,6 @@ but its streaming sanitizer stopped on a null-detail diagnostic, so its partial
 events were discarded. The sixth proved the null-safe sanitizer, but Terraform
 itself exited 1 with four unclassified diagnostics after seven incomplete
 events. The seventh retained fixed labels, but all four were detail-free because
-only `detail` was classified; `summary` was not inspected. All attempts rolled
-back completely and no apply occurred.
+only `detail` was classified; `summary` was not inspected. The eighth classified
+both fields and found three missing S3 replication reads plus the incorrect ECR
+resource ARN. All attempts rolled back completely and no apply occurred.

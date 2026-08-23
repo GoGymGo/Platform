@@ -1120,6 +1120,12 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   A sixth exactly approved attempt proved the null-safe sanitizer completes, but
   Terraform itself exited 1 with four unclassified diagnostics after seven
   incomplete planned-change events. No IAM action token was retained; the
+  partial events were discarded.
+  A seventh exactly approved attempt repeated the same permissions and retained
+  only fixed diagnostic labels. Terraform again exited 1 after seven incomplete
+  planned-change events and four errors; all four labels were
+  `detail-free-diagnostic`, with no operation, status, or IAM action token. The
+  sanitizer had not classified `summary`, so the cause remains unknown and the
   partial events were discarded. All attempts' role, lock, state, and
   temporary-file rollback checks passed. Overall status remains BLOCKED because
   a corrected exact plan, current deployment, and material gaps remain.
@@ -1319,7 +1325,14 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   unchanged, zero locks remained, and all permission/temporary-file rollback
   checks passed. A further no-apply plan requires new exact approval but no new
   AWS action; its sanitizer will retain only redacted diagnostic category/API
-  operation labels if Terraform fails again.
+  operation labels if Terraform fails again. A seventh exactly approved attempt
+  did so, but all four errors lacked `detail`, producing only
+  `detail-free-diagnostic` labels after the same seven incomplete planned-change
+  and four drift events. The partial stream was discarded; state, lock, access,
+  role, and temporary-file rollback checks all passed. A further plan requires
+  new exact approval but no new AWS action. Its classifier will derive the same
+  fixed labels from both `summary` and `detail` transiently while retaining
+  neither raw field.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

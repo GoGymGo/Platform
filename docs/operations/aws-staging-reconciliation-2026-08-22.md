@@ -81,6 +81,16 @@ lock, access-removal, role-restoration, and temporary-directory checks all
 passed. The next diagnostic sanitizer will retain only redacted diagnostic
 category/API-operation labels so a further failure can be classified safely.
 
+A seventh exactly approved attempt repeated those same permissions and added the
+approved fixed diagnostic labels. Terraform again exited 1 after the same seven
+early planned-change events and four error diagnostics. All four labels were
+`detail-free-diagnostic`: Terraform supplied no `detail`, API operation, HTTP
+status, or IAM action token. The classifier did not inspect `summary` for a
+category, so the cause remains unknown and the incomplete events were discarded.
+All state, lock, access-removal, role-restoration, and cleanup checks passed. The
+next classifier will derive the same fixed labels from both `summary` and
+`detail` in memory while retaining neither raw field.
+
 No apply, deployment, secret value read, application-object read, database
 connection, log-content query, restore, rotation, scaling change, or
 application-resource mutation occurred. Terraform state access was limited to
@@ -116,7 +126,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; exact S3 reads and the null-safe sanitizer now pass, but Terraform itself exited 1 with four unclassified diagnostics after seven incomplete events | PARTIALLY VERIFIED | High | Approve one diagnostic-label streaming retry with the already-proven exact permissions before any remediation approval |
+| Exact Terraform drift | Earlier streaming JSON captured 48 events with 22 known S3 permission artifacts; exact S3 reads pass, but Terraform exited 1 with four detail-free diagnostics after seven incomplete events | PARTIALLY VERIFIED | High | Approve one summary-and-detail classification retry with the already-proven exact permissions before any remediation approval |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -303,6 +313,22 @@ invocation, the state fingerprint was unchanged, there were zero locks before
 and after, no manual cleanup was needed, application-bucket and state access were
 denied again after rollback, the isolated directory was deleted, and the role
 returned to 111 allows, 26 denies, and zero temporary markers.
+
+The seventh exactly approved invocation repeated the same permissions and added
+only the fixed diagnostic label fields. Terraform again emitted seven
+planned-change and four drift events before exiting 1 with four error
+diagnostics. Each label reported `detail-free-diagnostic`; no API operation,
+HTTP status, or IAM action token was present. The sanitizer intentionally did
+not use or retain the diagnostic `summary`, so the underlying cause remains
+unclassified. The partial change stream was discarded.
+
+The next classifier will combine `summary` and `detail` only transiently in
+memory, map them to the same fixed category/API-operation/status/action fields,
+and discard both raw strings. This does not expand retained data. For the seventh
+invocation, the state fingerprint remained unchanged, there were zero locks
+before and after, no manual cleanup was needed, application-bucket and state
+access were denied after rollback, the isolated directory was deleted, and the
+role returned to 111 allows, 26 denies, and zero temporary markers.
 
 The state object was last updated August 11. Three later commits materially
 changed 11 AWS Terraform files (+339/-80), including execution-role and secret
@@ -552,6 +578,12 @@ incomplete planned-change events. Those events were discarded. A further run
 requires new approval and will retain only redacted diagnostic category and API
 operation labels if Terraform fails again.
 
+The seventh approved invocation retained those labels, but all four errors were
+classified only as `detail-free-diagnostic` because Terraform populated no
+`detail` field and the sanitizer did not inspect `summary`. The seven partial
+events were discarded. A further run requires new approval to derive the same
+fixed labels from both raw fields transiently without retaining either one.
+
 ### Phase 3 — infrastructure and least-privilege remediation
 
 Review the Phase 2 plan for:
@@ -584,7 +616,8 @@ remains out of scope.
 The next recommended step is one corrected protected, no-apply Terraform plan
 for account **…9877** in ca-central-1. It repeats the now-proven exact permission
 set and uses the null-safe streaming sanitizer with redacted diagnostic-category
-capture. No new AWS action is requested.
+capture derived from both `summary` and `detail` in memory. Neither raw field is
+retained. No new AWS action is requested.
 
 IAM Identity Center change:
 
@@ -623,7 +656,8 @@ Terraform operation:
 - retain only resource addresses and action types from `planned_change` events,
   tolerate and count diagnostic events that omit `detail`,
   retain only redacted diagnostic category and AWS API-operation labels if the
-  plan exits unsuccessfully,
+  plan exits unsuccessfully, deriving them from both `summary` and `detail` while
+  retaining neither raw field,
   then remove the temporary plan and working directory without running
   `terraform show`.
 
@@ -643,7 +677,7 @@ The state object is read-only.
   “changes present,” redact the plan summary, and verify the repository remains
   clean.
 
-Six Phase 2 plan invocations have occurred. The first stopped on three read
+Seven Phase 2 plan invocations have occurred. The first stopped on three read
 denials. The second completed but its local post-plan sanitizer failed. The third
 used the validated streaming sanitizer and exposed the S3 HeadBucket permission
 artifact. The fourth proved the exact-bucket `s3:ListBucket` fix and stopped on
@@ -652,4 +686,6 @@ the one remaining uncovered provider bucket read,
 but its streaming sanitizer stopped on a null-detail diagnostic, so its partial
 events were discarded. The sixth proved the null-safe sanitizer, but Terraform
 itself exited 1 with four unclassified diagnostics after seven incomplete
-events. All attempts rolled back completely and no apply occurred.
+events. The seventh retained fixed labels, but all four were detail-free because
+only `detail` was classified; `summary` was not inspected. All attempts rolled
+back completely and no apply occurred.

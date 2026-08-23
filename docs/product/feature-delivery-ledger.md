@@ -1132,9 +1132,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   and one `ecr:ListTagsForResource` denial caused by an incorrect `/api` suffix
   on the temporary repository ARN. Live metadata confirms the exact repository
   is `gogymgo-staging-backend`. Its partial events were discarded. All attempts'
-  role, lock, state, and
-  temporary-file rollback checks passed. Overall status remains BLOCKED because
-  a corrected exact plan, current deployment, and material gaps remain.
+  role, lock, state, and temporary-file rollback checks passed. A ninth exactly
+  approved attempt added only those corrected temporary reads and completed with
+  Terraform exit code 2, zero diagnostics, 21 mutation events, and 1 data read.
+  The exact plan restores private-bucket versioning/lifecycle, splits the ECS
+  execution role, replaces three task definitions, and updates selected runtime,
+  IAM, alarm, and member-web resources. The full plan must not be applied alone:
+  services still reference legacy task definitions while Terraform would delete
+  their shared execution role. Overall status remains BLOCKED pending staged
+  remediation, current deployment, and remaining material gaps.
 - Residual risks / blocker: exact Terraform drift, private-bucket versioning and
   lifecycle drift, runtime secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
@@ -1347,6 +1353,19 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   incomplete and discarded; state, lock, role, access, and temporary-file
   rollback checks all passed. A further plan requires exact approval for that
   added S3 action and corrected ECR resource ARN.
+  A ninth exactly approved attempt made only those temporary read corrections.
+  Terraform completed with exit code 2 and zero diagnostics, returning 6
+  creates, 2 deletes, 3 replacements, 10 updates, and 1 data read. No S3 bucket
+  create or broad replacement artifact remains. The plan includes two private
+  bucket versioning updates, two lifecycle updates, the three-way ECS execution
+  role/policy split, three task-definition replacements, and selected service,
+  IAM, alarm, and CloudFront Function updates. Because the live services still
+  reference the legacy task definitions and Terraform ignores service task-
+  definition drift, applying the full plan before coordinated deployment could
+  delete the shared execution role needed by a restarting old task. The first
+  recommended mutation is therefore a separately planned versioning-only apply.
+  State remained unchanged, zero locks remained, and every temporary permission
+  and file was removed after the no-apply run.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

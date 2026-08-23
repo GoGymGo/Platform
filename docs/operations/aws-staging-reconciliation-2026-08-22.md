@@ -144,6 +144,19 @@ was unchanged, locks were zero before and after, the permission set returned to
 111 allowed actions and 26 explicit denies with zero temporary markers, both
 temporary access paths were denied, and both private buckets remain versioned.
 
+The first separately approved Phase 3C1 saved-plan/apply attempt then stopped
+before producing a plan. Terraform initialization succeeded, but targeted
+planning returned exit code 1 because the target set named the two moved
+resources only at their destination addresses. Terraform Core requires targeted
+plans to include both the source and destination of every state move. The helper
+therefore emitted no mutation list and never called apply. State was untouched,
+locks were zero, all three scoped roles remained absent, both services remained
+healthy on their original task definitions and legacy execution role, the exact
+111-allow/26-deny permission baseline was restored with zero temporary markers,
+and temporary state access/files were removed. A retry requires separate approval
+to add the two former singleton addresses as target selectors; the allowed
+mutation set remains exactly two moves and six creates.
+
 ## Verified target and method
 
 | Item | Verified value |
@@ -521,6 +534,14 @@ temporary markers, and both private bucket versioning statuses still `Enabled`.
 No apply or staging workload/infrastructure mutation occurred; the only AWS-side
 changes were the approved temporary permission-set reprovisioning and lock flow.
 
+The first approved Phase 3C1 targeted invocation did not reach its saved-plan
+guard. Terraform Core rejected the target set because it contained the move
+destinations but not both former singleton source addresses. This is a local
+target-selection failure, not an AWS authorization or drift finding. Plan exit
+code was 1, no planned mutation was retained, apply was never attempted, state
+remained at the pre-run version, locks remained zero, all new roles remained
+absent, and every access/policy/runtime cleanup check passed.
+
 The selected AWS provider is correctly pinned at 6.57.1. The lockfile retains a
 broader historical constraint even though the selected version and hashes are
 correct; this is repository hygiene rather than live drift.
@@ -831,10 +852,13 @@ remains out of scope.
 ## Next approval boundary
 
 Phase 3A, the Phase 3C repository safety patch, and its protected live no-delete
-plan are complete. The next recommended step is a **guarded saved plan and apply
-of only the unused scoped IAM foundation** from exact commit `6f31b94` against
-staging account **…9877** in ca-central-1. The allowed Terraform action set is
-exactly two state-address moves plus six creates:
+plan are complete. The first Phase 3C1 attempt stopped before plan/apply because
+Terraform targeting omitted the two former singleton source addresses. The next
+recommended step is a **corrected guarded saved plan and apply of only the unused
+scoped IAM foundation** from exact commit `6f31b94` against staging account
+**…9877** in ca-central-1. The target selector will contain both sides of each
+move plus the two scoped resource blocks. The allowed Terraform mutation set is
+unchanged at exactly two state-address moves plus six creates:
 
 - move the existing shared execution role and inline policy to their protected
   legacy Terraform addresses without changing or replacing either AWS resource;

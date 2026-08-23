@@ -1164,8 +1164,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   removed, the 111-allow/26-deny baseline was independently reconfirmed, and both
   private buckets remain versioned. No apply occurred. The next recommended
   mutation is a separately approved saved targeted plan/apply containing only the
-  two state moves and creation of the six unused scoped role/policy resources;
-  task-definition registration and workload cutover remain later approvals.
+  two state moves and creation of the six unused scoped role/policy resources.
+  Its first approved invocation initialized successfully but stopped before a
+  plan because Terraform targeting included the move destinations without both
+  former singleton source addresses. It emitted no mutation list and never
+  called apply. State/locks were untouched, all scoped roles remained absent,
+  services remained healthy on the legacy execution role, and the exact baseline
+  policy/access/file cleanup passed. A corrected retry adds only those two source
+  selectors; the guarded eight-mutation boundary is unchanged. Task-definition
+  registration and workload cutover remain later approvals.
 - Residual risks / blocker: remaining Terraform and lifecycle drift, runtime
   secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit

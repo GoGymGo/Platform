@@ -21,7 +21,7 @@
   "dependencies": {
     "@gogymgo/brand": "*",
     "@gogymgo/contracts": "*",
-    "firebase": "^12.17.0",
+    "firebase": "^12.18.0",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"

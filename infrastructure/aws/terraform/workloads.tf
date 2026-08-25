@@ -91,6 +91,7 @@ resource "aws_ecs_task_definition" "api" {
   memory                   = tostring(var.api_memory)
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
+  skip_destroy             = true
   task_role_arn            = aws_iam_role.api.arn
 
   runtime_platform {
@@ -147,6 +148,7 @@ resource "aws_ecs_task_definition" "worker" {
   memory                   = tostring(var.worker_memory)
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
+  skip_destroy             = true
   task_role_arn            = aws_iam_role.worker.arn
 
   runtime_platform {
@@ -155,7 +157,8 @@ resource "aws_ecs_task_definition" "worker" {
   }
 
   lifecycle {
-    ignore_changes = [container_definitions]
+    create_before_destroy = true
+    ignore_changes        = [container_definitions]
     precondition {
       condition     = try(contains(local.fargate_memory_by_cpu[var.worker_cpu], var.worker_memory), false)
       error_message = "worker_cpu and worker_memory must form a supported bounded Fargate size."
@@ -197,6 +200,7 @@ resource "aws_ecs_task_definition" "migration" {
   memory                   = "1024"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
+  skip_destroy             = true
   task_role_arn            = aws_iam_role.migration.arn
 
   runtime_platform {
@@ -204,7 +208,10 @@ resource "aws_ecs_task_definition" "migration" {
     operating_system_family = "LINUX"
   }
 
-  lifecycle { ignore_changes = [container_definitions] }
+  lifecycle {
+    create_before_destroy = true
+    ignore_changes        = [container_definitions]
+  }
 }
 
 resource "aws_ecs_service" "api" {

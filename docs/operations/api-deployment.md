@@ -44,23 +44,33 @@ to Git, Expo variables, Terraform state, container images, or logs.
 2. Run Backend CI, Terraform validation, and the PostGIS integration suite.
 3. Confirm a fresh backup and validate that the target migration ledger matches
    the clean release baseline.
-4. Manually dispatch the protected deployment workflow from `main`. Before an
+4. From the exact reviewed Terraform source, create and apply a saved preparation
+   plan limited to the API/worker task-role policies, deployment-role policy, and
+   API/worker/migration base task definitions. Every task definition must use its
+   scoped execution role, exclude secrets not consumed by that runtime, set
+   `skip_destroy`, and retain the service-referenced API and worker revisions as
+   `ACTIVE`. Do not update either ECS service in this preparation apply.
+5. Confirm the protected environment defines `ECS_MIGRATION_TASK_DEFINITION`,
+   `ECS_WORKER_SERVICE`, and `ECS_WORKER_TASK_DEFINITION` from the reviewed
+   Terraform outputs.
+6. Manually dispatch the protected deployment workflow from `main`. Before an
    AWS credential-bearing job can start, the workflow verifies that the exact
    commit is on `main`, is the merge commit of a merged pull request into `main`,
    has every required check successful on the pull-request head, and has both
    always-on main checks plus every emitted path-scoped required check successful
    on that exact merged-main commit. It then checks out that commit without
    persisted Git credentials, builds and scans the image, pushes it to the
-   environment's immutable ECR repository, and records its digest.
-5. Execute the migration task with the new digest and wait for success.
-6. Update the worker service with the same digest.
-7. Deploy the API with ECS circuit-breaker rollback and ALB health checks.
-8. Verify `/v1/health`, `/v1/health/ready`, one authenticated
+   environment's immutable ECR repository, waits for its repository scan to
+   complete with zero high or critical findings, and records its digest.
+7. Execute the migration task with the new digest and wait for success.
+8. Update the worker service with the same digest.
+9. Deploy the API with ECS circuit-breaker rollback and ALB health checks.
+10. Verify `/v1/health`, `/v1/health/ready`, one authenticated
    `/v1/streaks/me` read, one permitted and one `showStats = false` shared Alias
    projection, reward catalog reads, coupon secrecy, operator authorization, and
    a staging claim. Confirm the streak response is `streaks-v1`, uses the expected
    region timezone, and exposes no workout/contact/location fields.
-9. Complete the rolling replacement while monitoring API failures, streak/list
+11. Complete the rolling replacement while monitoring API failures, streak/list
    request latency, worker heartbeat, database saturation, reward-claim failures,
    notifications, and privacy work. A shared Alias list must remain bounded to
    100 streak subjects per database aggregation; investigate slow-query evidence
@@ -123,7 +133,8 @@ path as live.
 - Otherwise fix forward while preserving append-only draw, reward, ledger,
   privacy, and operator-audit evidence.
 - The workflow captures the complete prior API and singleton-worker service
-  baselines. Worker, API, or readiness failure requests both prior task
+  baselines and rejects either baseline unless its exact task-definition revision
+  is still `ACTIVE`. Worker, API, or readiness failure requests both prior task
   definitions and desired counts, then fails. If automatic recovery is
   incomplete, stop and escalate rather than editing a service by hand.
 

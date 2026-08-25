@@ -128,29 +128,57 @@ jobs:
             exit 1
           fi
 
-      - name: Verify runtime secret mappings
+      - name: Verify staged task-definition safety
         shell: bash
         run: |
           set -euo pipefail
-          owner_secret_count="$(aws ecs describe-task-definition \
-            --task-definition "$ECS_API_TASK_DEFINITION" \
-            | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "GOGYMGO_OWNER_EMAIL")] | length')"
+          api_definition="$(aws ecs describe-task-definition \
+            --task-definition "$ECS_API_TASK_DEFINITION")"
+          worker_definition="$(aws ecs describe-task-definition \
+            --task-definition "$ECS_WORKER_TASK_DEFINITION")"
+          migration_definition="$(aws ecs describe-task-definition \
+            --task-definition "$ECS_MIGRATION_TASK_DEFINITION")"
+
+          expected_api_execution_role="arn:aws:iam::${AWS_ACCOUNT_ID}:role/gogymgo-${{ inputs.environment }}-ecs-execution-api"
+          expected_worker_execution_role="arn:aws:iam::${AWS_ACCOUNT_ID}:role/gogymgo-${{ inputs.environment }}-ecs-execution-worker"
+          expected_migration_execution_role="arn:aws:iam::${AWS_ACCOUNT_ID}:role/gogymgo-${{ inputs.environment }}-ecs-execution-migration"
+          for definition in api worker migration; do
+            definition_json="${definition}_definition"
+            expected_role="expected_${definition}_execution_role"
+            status="$(jq -r '.taskDefinition.status' <<<"${!definition_json}")"
+            execution_role="$(jq -r '.taskDefinition.executionRoleArn' <<<"${!definition_json}")"
+            if [[ "$status" != "ACTIVE" || "$execution_role" != "${!expected_role}" ]]; then
+              echo "${definition} base task definition must be ACTIVE and use its scoped execution role." >&2
+              exit 1
+            fi
+          done
+
+          owner_secret_count="$(jq \
+            '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "GOGYMGO_OWNER_EMAIL")] | length' \
+            <<<"$api_definition")"
           if [[ "$owner_secret_count" != "1" ]]; then
             echo "${ECS_API_TASK_DEFINITION} must map GOGYMGO_OWNER_EMAIL exactly once." >&2
             exit 1
           fi
-          reward_secret_count="$(aws ecs describe-task-definition \
-            --task-definition "$ECS_API_TASK_DEFINITION" \
-            | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length')"
+          reward_secret_count="$(jq \
+            '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length' \
+            <<<"$api_definition")"
           if [[ "$reward_secret_count" != "1" ]]; then
             echo "${ECS_API_TASK_DEFINITION} must map REWARD_CODE_ENCRYPTION_KEY exactly once." >&2
             exit 1
           fi
-          worker_reward_secret_count="$(aws ecs describe-task-definition \
-            --task-definition "$ECS_WORKER_TASK_DEFINITION" \
-            | jq '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length')"
+          worker_reward_secret_count="$(jq \
+            '[.taskDefinition.containerDefinitions[0].secrets[]? | select(.name == "REWARD_CODE_ENCRYPTION_KEY")] | length' \
+            <<<"$worker_definition")"
           if [[ "$worker_reward_secret_count" != "0" ]]; then
             echo "${ECS_WORKER_TASK_DEFINITION} must not map the API-only reward encryption key." >&2
+            exit 1
+          fi
+          migration_secret_names="$(jq -c \
+            '[.taskDefinition.containerDefinitions[0].secrets[]?.name] | sort' \
+            <<<"$migration_definition")"
+          if [[ "$migration_secret_names" != '["DATABASE_URL"]' ]]; then
+            echo "${ECS_MIGRATION_TASK_DEFINITION} must map only DATABASE_URL." >&2
             exit 1
           fi
 
@@ -197,7 +225,7 @@ jobs:
           scan-type: image
           severity: HIGH,CRITICAL
 
-      - name: Push and pin the scanned image
+      - name: Push, pin, and verify the scanned image
         env:
           IMAGE_TAG: ${{ steps.image.outputs.tag }}
         shell: bash
@@ -212,6 +240,19 @@ jobs:
             --output text)"
           if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
             echo "ECR did not return a valid immutable digest." >&2
+            exit 1
+          fi
+          aws ecr wait image-scan-complete \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id "imageDigest=${digest}"
+          scan_findings="$(aws ecr describe-image-scan-findings \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id "imageDigest=${digest}")"
+          scan_status="$(jq -r '.imageScanStatus.status' <<<"$scan_findings")"
+          critical_findings="$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' <<<"$scan_findings")"
+          high_findings="$(jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0' <<<"$scan_findings")"
+          if [[ "$scan_status" != "COMPLETE" || "$critical_findings" != "0" || "$high_findings" != "0" ]]; then
+            echo "ECR scan must complete with zero HIGH or CRITICAL findings." >&2
             exit 1
           fi
           image="${IMAGE_TAG%:*}@${digest}"
@@ -276,8 +317,13 @@ jobs:
             --output json)"
           worker_previous_definition="$(jq -r '.taskDefinition' <<<"$worker_previous_state")"
           worker_previous_desired_count="$(jq -r '.desiredCount' <<<"$worker_previous_state")"
+          worker_previous_status="$(aws ecs describe-task-definition \
+            --task-definition "$worker_previous_definition" \
+            --query 'taskDefinition.status' \
+            --output text)"
           if [[ ! "$worker_previous_definition" =~ ^arn:aws:ecs:ca-central-1:${AWS_ACCOUNT_ID}:task-definition/ ]] ||
-             [[ ! "$worker_previous_desired_count" =~ ^[0-1]$ ]]; then
+             [[ ! "$worker_previous_desired_count" =~ ^[0-1]$ ]] ||
+             [[ "$worker_previous_status" != "ACTIVE" ]]; then
             echo "The worker service did not return a safe rollback baseline." >&2
             exit 1
           fi
@@ -390,8 +436,13 @@ jobs:
             --output json)"
           api_previous_definition="$(jq -r '.taskDefinition' <<<"$api_previous_state")"
           api_previous_desired_count="$(jq -r '.desiredCount' <<<"$api_previous_state")"
+          api_previous_status="$(aws ecs describe-task-definition \
+            --task-definition "$api_previous_definition" \
+            --query 'taskDefinition.status' \
+            --output text)"
           if [[ ! "$api_previous_definition" =~ ^arn:aws:ecs:ca-central-1:${AWS_ACCOUNT_ID}:task-definition/ ]] ||
-             [[ ! "$api_previous_desired_count" =~ ^[0-4]$ ]]; then
+             [[ ! "$api_previous_desired_count" =~ ^[0-4]$ ]] ||
+             [[ "$api_previous_status" != "ACTIVE" ]]; then
             echo "The API service did not return a safe rollback baseline." >&2
             exit 1
           fi

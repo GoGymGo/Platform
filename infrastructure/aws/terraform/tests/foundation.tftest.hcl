@@ -87,6 +87,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_ecs_task_definition.api.skip_destroy && aws_ecs_task_definition.worker.skip_destroy && aws_ecs_task_definition.migration.skip_destroy
+    error_message = "API, worker, and migration rollback revisions must remain active after task-definition replacement."
+  }
+
+  assert {
     condition     = length(aws_ecs_service.api.load_balancer) == 0
     error_message = "The bootstrap API service must not attach an unassociated target group before an HTTPS certificate and listener exist."
   }

@@ -87,6 +87,11 @@ test("keeps runtime secrets role scoped and optional gates fail closed", async (
     /aws_iam_role\.ecs_execution_legacy\.arn[\s\S]*?values\(aws_iam_role\.ecs_execution_scoped\)\[\*\]\.arn/,
   );
   assert.match(
+    identity,
+    /ecr:DescribeImageScanFindings/,
+    "The deployment role must be able to enforce the repository scan gate",
+  );
+  assert.match(
     stateMigrations,
     /from\s*=\s*aws_iam_role\.ecs_execution\s+to\s*=\s*aws_iam_role\.ecs_execution_legacy/,
   );
@@ -102,6 +107,16 @@ test("keeps runtime secrets role scoped and optional gates fail closed", async (
       ),
     );
   }
+  assert.equal(
+    workloads.match(/skip_destroy\s*=\s*true/g)?.length,
+    3,
+    "Every ECS task definition must retain prior rollback revisions",
+  );
+  assert.equal(
+    workloads.match(/create_before_destroy\s*=\s*true/g)?.length,
+    3,
+    "Every ECS task definition must register its replacement before state advances",
+  );
   assert.doesNotMatch(workloads, /aws_iam_role\.ecs_execution\[/);
   assert.match(
     locals,
@@ -141,6 +156,17 @@ test("serializes releases and preserves complete rollback baselines", async () =
   assert.match(workflow, /rollback_worker_on_error\(\)/);
   assert.match(workflow, /rollback_release\(\)/);
   assert.match(workflow, /rollback_release_on_error\(\)/);
+  for (const runtime of ["api", "worker", "migration"]) {
+    assert.match(
+      workflow,
+      new RegExp(`expected_${runtime}_execution_role`),
+    );
+  }
+  assert.match(workflow, /worker_previous_status[\s\S]*?"ACTIVE"/);
+  assert.match(workflow, /api_previous_status[\s\S]*?"ACTIVE"/);
+  assert.match(workflow, /aws ecr wait image-scan-complete/);
+  assert.match(workflow, /aws ecr describe-image-scan-findings/);
+  assert.match(workflow, /zero HIGH or CRITICAL findings/);
   assert.doesNotMatch(
     workflow,
     /failed to stabilize and was returned to zero tasks/i,

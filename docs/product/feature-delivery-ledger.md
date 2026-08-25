@@ -1171,8 +1171,13 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   called apply. State/locks were untouched, all scoped roles remained absent,
   services remained healthy on the legacy execution role, and the exact baseline
   policy/access/file cleanup passed. A corrected retry adds only those two source
-  selectors; the guarded eight-mutation boundary is unchanged. Task-definition
-  registration and workload cutover remain later approvals.
+  selectors. That approved retry resolved targeting but stopped before apply on
+  the missing, previously proven `ecr:ListTagsForResource` dependency read for
+  the exact staging backend repository; its partial one-move/three-create stream
+  was discarded. State/locks/IAM/runtime were untouched and all cleanup checks
+  passed again. A further retry adds only that exact metadata read; the guarded
+  eight-mutation boundary is unchanged. Task-definition registration and workload
+  cutover remain later approvals.
 - Residual risks / blocker: remaining Terraform and lifecycle drift, runtime
   secret scope, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit

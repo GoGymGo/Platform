@@ -157,6 +157,18 @@ and temporary state access/files were removed. A retry requires separate approva
 to add the two former singleton addresses as target selectors; the allowed
 mutation set remains exactly two moves and six creates.
 
+The approved corrected-selector retry proved that targeting issue resolved, then
+also stopped before apply. Terraform emitted only a partial one-move/three-create
+stream before the ECR repository dependency refresh was denied
+`ecr:ListTagsForResource`. The incomplete events were discarded and the exact
+eight-mutation guard never passed. Apply was never called, state was untouched,
+locks remained zero, and all three scoped roles remained absent. Independent
+checks again confirmed both services healthy on the legacy execution role, the
+111-allow/26-deny/zero-marker baseline, and removal of temporary state access.
+A further retry requires separate approval to restore the already proven ECR tag
+metadata read on only the exact staging backend repository; no mutation boundary
+changes.
+
 ## Verified target and method
 
 | Item | Verified value |
@@ -542,6 +554,14 @@ code was 1, no planned mutation was retained, apply was never attempted, state
 remained at the pre-run version, locks remained zero, all new roles remained
 absent, and every access/policy/runtime cleanup check passed.
 
+The corrected-selector invocation included both source and destination addresses
+and advanced into dependency refresh. It then stopped on the previously proven
+`ecr:ListTagsForResource` metadata read because the Phase 3C1 temporary policy had
+not repeated that exact repository-scoped grant. Its partial one-move/three-create
+stream is not a valid plan and was discarded. Apply was never called; state,
+locks, IAM inventory, service health/references, baseline policy, access removal,
+and temporary-file cleanup all passed again.
+
 The selected AWS provider is correctly pinned at 6.57.1. The lockfile retains a
 broader historical constraint even though the selected version and hashes are
 correct; this is repository hygiene rather than live drift.
@@ -854,10 +874,13 @@ remains out of scope.
 Phase 3A, the Phase 3C repository safety patch, and its protected live no-delete
 plan are complete. The first Phase 3C1 attempt stopped before plan/apply because
 Terraform targeting omitted the two former singleton source addresses. The next
-recommended step is a **corrected guarded saved plan and apply of only the unused
-scoped IAM foundation** from exact commit `6f31b94` against staging account
-**…9877** in ca-central-1. The target selector will contain both sides of each
-move plus the two scoped resource blocks. The allowed Terraform mutation set is
+attempt corrected those selectors but stopped before apply on the missing exact
+ECR repository tag read. The next recommended step is a **corrected guarded saved
+plan and apply of only the unused scoped IAM foundation** from exact commit
+`6f31b94` against staging account **…9877** in ca-central-1. The target selector
+will contain both sides of each move plus the two scoped resource blocks, and the
+temporary policy will add `ecr:ListTagsForResource` only on the exact
+`gogymgo-staging-backend` repository. The allowed Terraform mutation set is
 unchanged at exactly two state-address moves plus six creates:
 
 - move the existing shared execution role and inline policy to their protected
@@ -868,7 +891,8 @@ unchanged at exactly two state-address moves plus six creates:
 Temporary IAM Identity Center scope:
 
 - repeat only the resource-scoped metadata reads required to initialize and plan
-  those exact targets;
+  those exact targets, including `ecr:ListTagsForResource` only on the exact
+  staging backend repository;
 - allow `s3:GetObject` and `s3:GetObjectVersion` only for the exact staging state
   object;
 - allow Terraform state and exact `.tflock` writes only for the saved-plan apply

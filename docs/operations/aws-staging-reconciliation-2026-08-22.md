@@ -13,7 +13,9 @@ routes load, and browser CORS is correct. It is not current-main ready. The live
 image is 78 commits behind the reconciled repository baseline, runtime secret
 isolation is broader than the current Terraform, and all five runtime alarms
 have no notification actions. Phase 3A has now restored versioning on both
-private-data buckets.
+private-data buckets. Phase 3C1 has also staged the three unused, runtime-scoped
+ECS execution roles and their three inline policies without changing either live
+service or task definition.
 
 August 1–22 gross staging usage was approximately **$63.55**. AWS applied
 approximately **$63.55** in credits, leaving approximately **$0** of eligible
@@ -121,11 +123,13 @@ markers, and independent live checks reconfirmed both bucket statuses.
 
 No deployment, secret value read, application-object read/write/delete,
 database connection, log-content query, restore, rotation, scaling change,
-lifecycle mutation, IAM/runtime cutover, alarm change, or CloudFront mutation
-occurred. Terraform state access was limited to the exact staging state object
-and was never printed or retained outside the deleted temporary working
-directory. The explicitly approved CloudFront read was limited to the deployed
-member-web function code used for drift comparison.
+lifecycle mutation, runtime cutover, alarm change, or CloudFront mutation
+occurred. The only durable IAM mutation was the approved creation of three
+unused scoped execution roles and one scoped inline policy per role. Terraform
+state access was limited to the exact staging state object and was never printed
+or retained outside deleted temporary working directories. The explicitly
+approved CloudFront read was limited to the deployed member-web function code
+used for drift comparison.
 
 The approved repository-only Phase 3C safety patch configures Terraform to
 re-address the live shared execution role and policy as protected legacy
@@ -169,6 +173,32 @@ A further retry requires separate approval to restore the already proven ECR tag
 metadata read on only the exact staging backend repository; no mutation boundary
 changes.
 
+That approved retry produced the exact saved plan—two state-address moves and
+six creates—and applied it successfully. The targeted post-plan returned zero
+changes and state advanced cleanly. A post-validation bug then interpreted an
+empty IAM `RoleLastUsed` object as evidence that the new roles had been used and
+incorrectly entered rollback. The three new role/policy pairs were removed; the
+state-rollback result was inconclusive. The baseline permission set was restored
+and independent checks confirmed healthy unchanged services.
+
+An approved read-only state audit then established the exact recovery shape:
+zero former singleton addresses, two protected legacy addresses, and all six
+scoped addresses remained in state, with no lock. Temporary audit access was
+removed and the 111-allow/26-deny/zero-marker baseline was restored. The narrow
+recovery therefore targeted only the scoped role and policy resources. Its saved
+plan contained exactly six creates and no move, update, replacement, or delete;
+apply exited 0; the targeted post-plan exited 0 with zero changes; state advanced
+and then remained stable; and no rollback was attempted. The corrected unused
+check now requires a real nonempty `LastUsedDate` rather than the presence of an
+empty `RoleLastUsed` object.
+
+Independent final checks found all three scoped roles, exactly one inline policy
+on each, no recorded use date, both services at 1/1 on their unchanged task
+definitions and legacy execution role, state-bucket versioning enabled, no
+Terraform lock, zero temporary policy markers, and baseline state-object reads
+denied again. Task-definition registration and live workload cutover remain out
+of scope and unapplied.
+
 ## Verified target and method
 
 | Item | Verified value |
@@ -181,7 +211,7 @@ changes.
 | Authentication | IAM Identity Center / SSO, non-root |
 | Reconciliation permission set | GoGymGoStagingReconcile |
 | Session duration | Two hours |
-| Restrictions | No secret values, application-object contents, log events, database log download, decryption, or interactive execution; approved mutations were limited to permission-set reprovisioning, transient lock/state handling, and the exact Phase 3A bucket-versioning updates |
+| Restrictions | No secret values, application-object contents, log events, database log download, decryption, or interactive execution; approved mutations were limited to permission-set reprovisioning, transient lock/state handling, the exact Phase 3A bucket-versioning updates, and the exact Phase 3C1 unused scoped IAM foundation |
 
 The access portal now exposes the existing staging account to the existing
 workforce identity. After the approved Phase 1 revision, the permission set has
@@ -197,7 +227,7 @@ sensitive-data/execution denies.
 | Root protection | No IAM users or account keys, but root MFA is disabled | GAP FOUND | High | Account owner enables root MFA outside this non-root workflow |
 | Remote backend | Expected state key and versions exist; public access blocked; no current lock | VERIFIED | Low | Preserve backend and default workspace |
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
-| Exact Terraform drift | Fresh protected Phase 3C plan has 19 mutation events and 1 data read; both legacy state moves are exact and have no create/replace/delete action | EXACT PLAN VERIFIED | High | Stage only the unused scoped IAM foundation under a separate exact apply approval; do not apply the full mixed plan |
+| Exact Terraform drift | Fresh protected Phase 3C plan had 19 mutation events and 1 data read; Phase 3C1 has applied only the two protected state moves and six scoped IAM creates, with a zero-change targeted post-plan | VERIFIED | High | Do not apply the remaining mixed plan; prepare a separately guarded deployment plan |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
 | ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
 | Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
@@ -211,7 +241,7 @@ sensitive-data/execution denies.
 | S3 encryption/lifecycle | Private buckets use the GoGymGo KMS key and now have versioning enabled; privacy current expiry is seven days, but both buckets lack current Terraform's noncurrent-version rules | GAP FOUND | High | Review existing version inventory and deletion implications before any lifecycle apply |
 | KMS | Customer key enabled with annual rotation | VERIFIED | Low | No immediate action |
 | Secret containers | Six app containers plus managed DB secret; no values read | VERIFIED | Low | Preserve out-of-band value handling |
-| Runtime secret isolation | Live tasks still use one shared execution role and the worker receives the reward key; the protected plan proves Terraform retains the legacy role/policy while adding scoped roles | GAP FOUND | High | Create the unused scoped IAM foundation first, then use a separately approved protected deployment |
+| Runtime secret isolation | The three unused scoped execution roles/policies now exist, but live tasks still use the shared legacy execution role and the worker still receives the reward key | GAP FOUND | High | Use the staged roles only through a separately approved protected deployment |
 | Optional features | Privacy/push secrets empty and matching flags disabled | VERIFIED | Low | Populate only with separate approval |
 | Runtime alarms | Five alarms are OK but all alarm/OK actions are empty | GAP FOUND | High | Add and validate an incident destination |
 | Budget notifications | $100 budget; thresholds have redacted email subscribers | VERIFIED | Medium | Confirm delivery with an authorized test |
@@ -220,7 +250,7 @@ sensitive-data/execution denies.
 | DNS/TLS | Cloudflare owns DNS; expected certificates issued/in use/renewable | VERIFIED | Low | Preserve ownership and recheck after ALB changes |
 | Current costs | Gross $63.55, credits -$63.55, net about $0 for August 1–22 | VERIFIED | Medium | Continue monitoring; investigate CloudWatch spend |
 | Credit balance/sharing | Payer Billing API denied because IAM billing access is inactive | BLOCKED BY PERMISSIONS | Medium | Do not promise future all-credit coverage |
-| Protected deployment | Current release is older; the Phase 3C plan proves the legacy IAM resources are retained, but no IAM foundation or task-definition cutover has been applied | REQUIRES APPLY APPROVAL | High | Stage the unused scoped roles/policies separately; build, scan, migrate, and cut over only under later deployment approval |
+| Protected deployment | Current release is older; the scoped IAM foundation is staged and unused, while task-definition registration and workload cutover remain unapplied | REQUIRES APPLY APPROVAL | High | Build, scan, migrate, and cut over only under a later exact deployment approval |
 | Authenticated UAT | Public routing only was tested | NOT YET TESTED | High | Run after approved current-main staging release |
 
 ## Terraform backend and drift
@@ -562,6 +592,24 @@ stream is not a valid plan and was discarded. Apply was never called; state,
 locks, IAM inventory, service health/references, baseline policy, access removal,
 and temporary-file cleanup all passed again.
 
+The next approved retry repeated only the exact ECR tag metadata read. Its saved
+plan contained exactly the two protected state moves and six scoped IAM creates,
+and both apply and the zero-change targeted post-plan succeeded. A local
+post-validation defect then treated an empty `RoleLastUsed` object as a real use
+date and incorrectly ran rollback. The role/policy deletes completed, while the
+state-rollback check did not establish success. A subsequent approved read-only
+audit found the state moves and six scoped addresses intact and no old singleton
+addresses or lock.
+
+Recovery consequently used only the two scoped resource targets and failed
+closed unless the saved plan contained exactly the six missing creates. That
+guard passed; saved-plan apply exited 0; the targeted post-plan exited 0 with no
+mutation; the state-address, state-stability, lock, policy, protected-role, and
+runtime-reference guards all passed; and no rollback was attempted. Independent
+validation confirmed three unused roles, three inline policies, healthy unchanged
+services, enabled state-bucket versioning, the restored 111/26/zero-marker policy,
+and denied state access under the baseline role.
+
 The selected AWS provider is correctly pinned at 6.57.1. The lockfile retains a
 broader historical constraint even though the selected version and hashes are
 correct; this is repository hygiene rather than live drift.
@@ -676,6 +724,11 @@ Phase 3A has no material direct API charge, but future overwrites and deletes ca
 retain additional S3 object versions and therefore increase storage charges.
 No lifecycle rule was changed, and AWS credit eligibility for that incremental
 storage is not guaranteed.
+
+Phase 3C1 created only IAM roles and inline policies, which have no direct IAM
+charge. Its small versioned Terraform-state writes have no material expected
+cost. This does not change the earlier warning that future AWS credit coverage
+cannot be guaranteed.
 
 The budget reports $63.984 of a $100 gross monthly limit. The 25% and 50%
 thresholds are in ALARM; 80% and 100% remain OK. Simple calendar projection is
@@ -845,9 +898,9 @@ Stage the Phase 2 plan rather than applying it as one operation:
   with an exact two-update apply plus a zero-change targeted post-plan;
 - Phase 3B separately reviews lifecycle retention before enabling noncurrent
   deletion;
-- Phase 3C repository safety and live no-delete proof are complete: both explicit
-  state moves are recognized, the protected legacy resources have no destructive
-  action, and the scoped IAM foundation/cutover remain unapplied;
+- Phase 3C repository safety and live no-delete proof are complete; Phase 3C1
+  applied both protected state moves and created the three unused scoped roles
+  and policies, while task-definition/workload cutover remains unapplied;
 - removing the reward encryption key from the worker;
 - attaching and validating runtime alarm actions;
 - considering account-level S3 public-access blocking;
@@ -871,63 +924,28 @@ remains out of scope.
 
 ## Next approval boundary
 
-Phase 3A, the Phase 3C repository safety patch, and its protected live no-delete
-plan are complete. The first Phase 3C1 attempt stopped before plan/apply because
-Terraform targeting omitted the two former singleton source addresses. The next
-attempt corrected those selectors but stopped before apply on the missing exact
-ECR repository tag read. The next recommended step is a **corrected guarded saved
-plan and apply of only the unused scoped IAM foundation** from exact commit
-`6f31b94` against staging account **…9877** in ca-central-1. The target selector
-will contain both sides of each move plus the two scoped resource blocks, and the
-temporary policy will add `ecr:ListTagsForResource` only on the exact
-`gogymgo-staging-backend` repository. The allowed Terraform mutation set is
-unchanged at exactly two state-address moves plus six creates:
+Phase 3A, the Phase 3C repository safety patch, its protected live no-delete
+plan, and the Phase 3C1 unused scoped IAM foundation are complete. The live API
+and worker remain deliberately unchanged on their legacy execution role. The
+next recommended work is an **offline/read-only preparation of the exact Phase 4
+current-main staging release proposal**, followed by a new explicit mutation
+approval before any image push, migration run, task-definition registration, or
+service update.
 
-- move the existing shared execution role and inline policy to their protected
-  legacy Terraform addresses without changing or replacing either AWS resource;
-- create the API, migration, and worker scoped execution roles;
-- create one scoped inline policy on each new role.
+That proposal must identify the exact source commit and image digest, enumerate
+every ECR/IAM/ECS/database operation, preserve the current API and worker task
+definitions as rollback baselines, serialize migration then worker then API,
+and include image-scan, health/readiness, service-stability, CORS, alarm, cost,
+and state/lock validation. It must also keep lifecycle deletion, alarm/SNS
+creation, CloudFront mutation, secret rotation/value access, restore rehearsal,
+and production entirely outside the deployment boundary unless separately
+approved.
 
-Temporary IAM Identity Center scope:
-
-- repeat only the resource-scoped metadata reads required to initialize and plan
-  those exact targets, including `ecr:ListTagsForResource` only on the exact
-  staging backend repository;
-- allow `s3:GetObject` and `s3:GetObjectVersion` only for the exact staging state
-  object;
-- allow Terraform state and exact `.tflock` writes only for the saved-plan apply
-  and post-apply verification;
-- allow IAM creation/tagging and inline-policy writes only for the three exact
-  new scoped role names; allow exact-resource deletion only for fail-closed
-  rollback of a partially created new role/policy;
-- keep every other S3 object read and all secret, decryption, execution,
-  application-data, and log-content action explicitly denied;
-- do not allow task-definition registration, ECS service, active API/worker task
-  role-policy, lifecycle, versioning, alarm, CloudFront, secret, application-data,
-  or deployment-role-policy writes.
-
-Terraform operation:
-
-- archive exact commit `6f31b94` into a fresh isolated directory;
-- initialize with Terraform 1.15.8 against the verified backend without state
-  migration/replacement and without printing or persisting a local state copy;
-- create a saved targeted plan and fail closed unless it contains exactly the two
-  recognized moves and six scoped IAM creates, with no other mutation;
-- apply only that saved plan, confirm all three new roles/policies exist but are
-  unused, and run a zero-change targeted post-plan;
-- preserve the existing legacy AWS role/policy and current service/task-definition
-  references throughout;
-- delete the isolated directory and all saved-plan material after reporting.
-
-Expected AWS mutations are the temporary permission-set reprovisioning, exact
-Terraform state/lock updates, and creation of three unused IAM roles with three
-inline policies. [AWS documents IAM as available at no additional
-charge](https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html), so no
-material credit draw is expected. Rollback removes only partially created new
-scoped resources, preserves the legacy role/policy, restores the exact
-111-allow/26-deny permission set, confirms zero temporary markers and no lock,
-removes all temporary files, and stops. Task-definition registration and live
-cutover remain a later separate approval.
+Expected material cost remains the existing staging run rate plus temporary
+build/image storage and any normal deployment overlap; credits are currently
+applying but are not guaranteed. The exact cost and mutation list must be
+recomputed from the chosen source/digest before requesting approval. No Phase 4
+mutation is authorized by the completed Phase 3C1 approval.
 
 Phase 3B lifecycle application remains deferred. The desired rules would delete
 content noncurrent versions after 30 days and privacy noncurrent versions after

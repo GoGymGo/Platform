@@ -28,11 +28,11 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   concurrency where supported. The coordinator must pause for user direction
   before any future Docker command; if resumed, no more than one Docker-backed
   task or stack may run at a time.
-- Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
-  Cloudflare, staging, or production inspection, mutation, or deployment is
-  authorized here. Staging-required product code is now repository-terminal, so
-  GGG-030 may audit and improve offline infrastructure/release sources; any AWS
-  read-only reconciliation still requires separate user authority and credentials.
+- Cloud boundary: repository and GitHub work are authorized. The separately
+  approved AWS reconciliation, private-bucket versioning, and unused scoped IAM
+  foundation are complete. No further AWS, Firebase, Cloudflare, staging, or
+  production mutation or deployment is authorized here; each remaining cloud
+  phase requires a new exact approval.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
   worker behavior; 49 API forward migrations and 4 landing D1 migrations;
@@ -1082,16 +1082,22 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   the deployed image's historical push scan, empty Parameter Store/SNS
   inventories, and the absence of an Access Analyzer. The exact Phase 3A saved
   plan has since restored versioning on both private buckets with a clean
-  targeted post-plan. The repository-only Phase 3C safety patch now configures
+  targeted post-plan. The repository-only Phase 3C safety patch configures
   Terraform to retain the shared live execution role/policy under explicit moved
   legacy addresses with `prevent_destroy`, while new task definitions use
   runtime-scoped roles. A fresh protected plan from exact commit `6f31b94`
   recognized both moves and proved neither legacy resource has a create,
   replacement, or deletion action. It returned 6 creates, 2 moves, 3
-  replacements, 8 updates, and 1 data read with no diagnostics; no apply occurred.
-  Remaining Terraform drift, lifecycle retention, AWS Backup metadata blocked
-  by an organization SCP, deployment, recovery
-  rehearsal, and authenticated UAT remain open; see the
+  replacements, 8 updates, and 1 data read with no diagnostics. Phase 3C1 then
+  applied only the two state moves and six unused scoped IAM resources. A false
+  local use-date validation triggered rollback after the first successful apply;
+  an approved read-only audit established that the moved/scoped state addresses
+  remained, and an exact six-create recovery completed with a zero-change
+  post-plan. Three unused roles and three inline policies now exist, while both
+  live services remain healthy on unchanged task definitions and the legacy role.
+  Remaining Terraform drift, lifecycle retention, AWS Backup metadata blocked by
+  an organization SCP, deployment, recovery rehearsal, and authenticated UAT
+  remain open; see the
   [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
@@ -1153,7 +1159,7 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   statuses changed from suspended to enabled, the targeted post-plan returned
   zero changes, state advanced, no lock or rollback was needed, and the original
   111-allow/26-deny role was restored with zero temporary markers. Overall status
-  remains BLOCKED pending the two-phase execution-role cutover, current
+  remains BLOCKED pending the execution-role/task-definition cutover, current
   deployment, and remaining material gaps. The repository-only cutover-safety
   patch passes Terraform 1.15.8 backend-disabled validation and four mocked
   plans. Its separately approved protected live plan then completed with exact
@@ -1176,10 +1182,21 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   the exact staging backend repository; its partial one-move/three-create stream
   was discarded. State/locks/IAM/runtime were untouched and all cleanup checks
   passed again. A further retry adds only that exact metadata read; the guarded
-  eight-mutation boundary is unchanged. Task-definition registration and workload
-  cutover remain later approvals.
-- Residual risks / blocker: remaining Terraform and lifecycle drift, runtime
-  secret scope, absent alarm/SNS delivery, Backup
+  eight-mutation boundary was unchanged. That retry produced and applied exactly
+  the two moves and six creates, followed by a zero-change targeted post-plan. A
+  local validation bug treated an empty IAM `RoleLastUsed` object as actual use
+  and incorrectly removed the new roles; the state-rollback result was
+  inconclusive. An approved read-only audit then proved state contained zero old
+  singleton, two legacy, and six scoped addresses with no lock. The recovery
+  saved plan consequently contained exactly six creates and no other mutation;
+  apply and the zero-change post-plan both succeeded. Independent checks confirmed
+  three unused roles, three inline policies, healthy 1/1 services on unchanged
+  legacy execution-role references, enabled state versioning, no lock, restored
+  111-allow/26-deny permissions with zero temporary markers, and denied baseline
+  state access. Task-definition registration and workload cutover remain later
+  approvals.
+- Residual risks / blocker: remaining Terraform and lifecycle drift, live runtime
+  cutover to the staged secret-scoped roles, absent alarm/SNS delivery, Backup
   inventory blocked by an organization SCP, restore readiness, current credit
   balance, provider integrations, protected deployment approval, and
   authenticated staging UAT remain unresolved. Deployment requires further
@@ -1327,6 +1344,22 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 
 ## Change history
 
+- 2026-08-25 — Completed the separately approved Phase 3C1 unused IAM foundation
+  in staging account ending 9877. The first exact two-move/six-create saved-plan
+  apply and zero-change post-plan succeeded, but a local validator mistook an
+  empty `RoleLastUsed` object for a real use date and initiated rollback. The new
+  roles were removed while state rollback was inconclusive. A read-only audit
+  proved state retained exactly two legacy and six scoped addresses, no former
+  singleton addresses, and no lock. The guarded recovery then planned and applied
+  exactly six creates with no move/update/replace/delete, followed by a zero-change
+  targeted post-plan. Independent validation confirmed all three roles and their
+  three inline policies exist and are unused; legacy/GitHub IAM fingerprints and
+  API/worker task-definition references remain unchanged; both services are 1/1;
+  state-bucket versioning remains enabled; the permission set is restored to
+  111 allows, 26 denies, and zero temporary markers; and baseline state reads are
+  denied. No task definition, service, lifecycle, alarm, CloudFront, secret,
+  application-data, or production mutation occurred. A protected current-main
+  staging release requires a new exact approval.
 - 2026-08-22 — Completed the explicitly authorized, non-root
   [AWS staging read-only reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
   Verified the dedicated staging account ending 9877 in Canada Central, a

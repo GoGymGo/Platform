@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import {
   assertExactCommitChecks,
@@ -8,6 +9,8 @@ import {
 } from "./deployment-source-policy.mjs";
 
 const sourceCommit = "a".repeat(40);
+const platformWorkflow = read(".github/workflows/deployment.yml");
+const memberWorkflow = read(".github/workflows/member-web-deployment.yml");
 
 test("accepts a full commit when the workflow itself runs from main", () => {
   assert.doesNotThrow(() =>
@@ -84,17 +87,81 @@ test("rejects commits without a merged pull request into main", () => {
   assert.equal(selectMergedMainPullRequest([], sourceCommit), null);
 });
 
-test("normalizes app-bound and legacy required check contexts", () => {
+test("binds passing required PR checks to their GitHub App or legacy status", () => {
   assert.deepEqual(
-    selectRequiredChecks({
-      checks: [{ app_id: 15368, context: "API CI" }],
-      contexts: ["API CI", "Platform Integration"],
-    }),
+    selectRequiredChecks(
+      [
+        { bucket: "pass", name: "API CI", state: "SUCCESS" },
+        {
+          bucket: "pass",
+          name: "Platform Integration",
+          state: "SUCCESS",
+        },
+      ],
+      [
+        {
+          app: { id: 15368 },
+          conclusion: "success",
+          name: "API CI",
+        },
+      ],
+      [{ context: "Platform Integration", state: "success" }],
+    ),
     [
       { appId: 15368, context: "API CI" },
       { appId: null, context: "Platform Integration" },
     ],
   );
+});
+
+test("rejects required PR checks that are not passing", () => {
+  assert.throws(
+    () =>
+      selectRequiredChecks(
+        [{ bucket: "fail", name: "API CI", state: "FAILURE" }],
+        [],
+        [],
+      ),
+    /API CI is not passing/i,
+  );
+});
+
+test("rejects required PR checks without an authoritative head result", () => {
+  assert.throws(
+    () =>
+      selectRequiredChecks(
+        [{ bucket: "pass", name: "API CI", state: "SUCCESS" }],
+        [],
+        [],
+      ),
+    /no authoritative passing result/i,
+  );
+});
+
+test("rejects required PR checks produced by multiple GitHub Apps", () => {
+  assert.throws(
+    () =>
+      selectRequiredChecks(
+        [{ bucket: "pass", name: "API CI", state: "SUCCESS" }],
+        [
+          { app: { id: 15368 }, conclusion: "success", name: "API CI" },
+          { app: { id: 99999 }, conclusion: "success", name: "API CI" },
+        ],
+        [],
+      ),
+    /multiple GitHub Apps/i,
+  );
+});
+
+test("grants legacy status reads to every source-authorization boundary", () => {
+  for (const [workflow, jobName] of [
+    [platformWorkflow, "authorize_source"],
+    [platformWorkflow, "member-web"],
+    [platformWorkflow, "member-native-links"],
+    [memberWorkflow, "authorize_source"],
+  ]) {
+    assert.match(workflowJob(workflow, jobName), /\n      statuses: read\n/);
+  }
 });
 
 test("requires success on the exact commit and the configured check app", () => {
@@ -196,3 +263,16 @@ test("fails closed when an always-on exact-main check leaves protection", () => 
     /baseline checks are not required on main/i,
   );
 });
+
+function read(relativePath) {
+  return fs.readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
+}
+
+function workflowJob(workflow, jobName) {
+  const marker = `  ${jobName}:\n`;
+  const start = workflow.indexOf(marker);
+  assert.ok(start >= 0, `Missing workflow job ${jobName}.`);
+  const remainder = workflow.slice(start + marker.length);
+  const nextJob = remainder.search(/\n  [a-z0-9_-]+:\n/);
+  return remainder.slice(0, nextJob >= 0 ? nextJob : undefined);
+}

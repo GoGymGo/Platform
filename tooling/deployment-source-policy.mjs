@@ -39,19 +39,53 @@ export function selectMergedMainPullRequest(pullRequests, sourceCommit) {
   return candidates.at(-1) ?? null;
 }
 
-export function selectRequiredChecks(requiredStatusChecks) {
+export function selectRequiredChecks(
+  requiredPullRequestChecks,
+  pullRequestHeadCheckRuns,
+  pullRequestHeadStatuses,
+) {
   const selected = new Map();
-  for (const check of requiredStatusChecks?.checks ?? []) {
-    if (typeof check?.context !== "string" || check.context.length === 0)
+  for (const check of requiredPullRequestChecks ?? []) {
+    const context = check?.name;
+    if (typeof context !== "string" || context.length === 0) {
+      throw new Error("A required pull request check has no context name.");
+    }
+    if (check.bucket !== "pass") {
+      throw new Error(
+        `Required pull request check ${context} is not passing (state: ${check.state ?? "unknown"}).`,
+      );
+    }
+    if (selected.has(context)) continue;
+
+    const appIds = new Set(
+      pullRequestHeadCheckRuns
+        .filter(
+          (checkRun) =>
+            checkRun?.name === context &&
+            ["neutral", "skipped", "success"].includes(checkRun.conclusion) &&
+            Number.isSafeInteger(checkRun?.app?.id),
+        )
+        .map((checkRun) => checkRun.app.id),
+    );
+    if (appIds.size > 1) {
+      throw new Error(
+        `Required pull request check ${context} has passing results from multiple GitHub Apps; refusing an ambiguous authorization policy.`,
+      );
+    }
+    if (appIds.size === 1) {
+      selected.set(context, { appId: [...appIds][0], context });
       continue;
-    selected.set(check.context, {
-      appId: Number.isSafeInteger(check.app_id) ? check.app_id : null,
-      context: check.context,
-    });
-  }
-  for (const context of requiredStatusChecks?.contexts ?? []) {
-    if (typeof context !== "string" || context.length === 0) continue;
-    if (!selected.has(context)) selected.set(context, { appId: null, context });
+    }
+
+    const successfulLegacyStatus = pullRequestHeadStatuses.some(
+      (status) => status?.context === context && status.state === "success",
+    );
+    if (!successfulLegacyStatus) {
+      throw new Error(
+        `Required pull request check ${context} has no authoritative passing result on the pull request head commit.`,
+      );
+    }
+    selected.set(context, { appId: null, context });
   }
   return [...selected.values()].sort((left, right) =>
     left.context.localeCompare(right.context),
@@ -158,23 +192,53 @@ export function authorizeDeploymentSource({
     );
   }
 
-  run("gh", [
-    "pr",
-    "checks",
-    String(pullRequest.number),
-    "--repo",
-    repository,
-    "--required",
-  ]);
-
-  const requiredStatusChecks = JSON.parse(
+  const requiredPullRequestChecks = JSON.parse(
+    run(
+      "gh",
+      [
+        "pr",
+        "checks",
+        String(pullRequest.number),
+        "--repo",
+        repository,
+        "--required",
+        "--json",
+        "bucket,name,state",
+      ],
+      { capture: true },
+    ),
+  );
+  const pullRequestHeadCommit = pullRequest?.head?.sha ?? "";
+  if (!FULL_COMMIT_PATTERN.test(pullRequestHeadCommit)) {
+    throw new Error(
+      `Merged PR #${pullRequest.number} does not expose a full lowercase head commit SHA.`,
+    );
+  }
+  const pullRequestHeadCheckRunsResponse = JSON.parse(
     run(
       "gh",
       [
         "api",
         "-H",
         "Accept: application/vnd.github+json",
-        `repos/${repository}/branches/main/protection/required_status_checks`,
+        `repos/${repository}/commits/${pullRequestHeadCommit}/check-runs?filter=latest&per_page=100`,
+      ],
+      { capture: true },
+    ),
+  );
+  if (pullRequestHeadCheckRunsResponse.total_count > 100) {
+    throw new Error(
+      "Pull request head commit has more than 100 check runs; refusing an incomplete authorization query.",
+    );
+  }
+  const pullRequestHeadCombinedStatus = JSON.parse(
+    run(
+      "gh",
+      [
+        "api",
+        "-H",
+        "Accept: application/vnd.github+json",
+        `repos/${repository}/commits/${pullRequestHeadCommit}/status?per_page=100`,
       ],
       { capture: true },
     ),
@@ -211,7 +275,11 @@ export function authorizeDeploymentSource({
   assertExactCommitChecks({
     checkRuns: checkRunsResponse.check_runs ?? [],
     minimumContexts: EXACT_COMMIT_BASELINE_CONTEXTS,
-    requiredChecks: selectRequiredChecks(requiredStatusChecks),
+    requiredChecks: selectRequiredChecks(
+      requiredPullRequestChecks,
+      pullRequestHeadCheckRunsResponse.check_runs ?? [],
+      pullRequestHeadCombinedStatus.statuses ?? [],
+    ),
     statuses: combinedStatus.statuses ?? [],
   });
   console.log(

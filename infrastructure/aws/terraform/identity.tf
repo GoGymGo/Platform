@@ -8,14 +8,69 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
   }
 }
 
-resource "aws_iam_role" "ecs_execution" {
+resource "aws_iam_role" "ecs_execution_legacy" {
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name               = "${local.name}-ecs-execution"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+data "aws_iam_policy_document" "ecs_execution_legacy" {
+  statement {
+    actions = [
+      "ecr:GetAuthorizationToken",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = [aws_ecr_repository.backend.arn]
+  }
+
+  statement {
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["${aws_cloudwatch_log_group.application.arn}:*"]
+  }
+
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = values(aws_secretsmanager_secret.runtime)[*].arn
+  }
+
+  statement {
+    actions   = ["kms:Decrypt"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_execution_legacy" {
+  name   = "${local.name}-ecs-execution"
+  policy = data.aws_iam_policy_document.ecs_execution_legacy.json
+  role   = aws_iam_role.ecs_execution_legacy.id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_iam_role" "ecs_execution_scoped" {
   for_each = local.execution_secret_arns
 
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
   name               = "${local.name}-ecs-execution-${each.key}"
 }
 
-data "aws_iam_policy_document" "ecs_execution" {
+data "aws_iam_policy_document" "ecs_execution_scoped" {
   for_each = local.execution_secret_arns
 
   statement {
@@ -53,12 +108,12 @@ data "aws_iam_policy_document" "ecs_execution" {
   }
 }
 
-resource "aws_iam_role_policy" "ecs_execution" {
+resource "aws_iam_role_policy" "ecs_execution_scoped" {
   for_each = local.execution_secret_arns
 
   name   = "${local.name}-ecs-execution-${each.key}"
-  policy = data.aws_iam_policy_document.ecs_execution[each.key].json
-  role   = aws_iam_role.ecs_execution[each.key].id
+  policy = data.aws_iam_policy_document.ecs_execution_scoped[each.key].json
+  role   = aws_iam_role.ecs_execution_scoped[each.key].id
 }
 
 resource "aws_iam_role" "api" {
@@ -170,6 +225,7 @@ data "aws_iam_policy_document" "github_deploy" {
       "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
       "ecr:CompleteLayerUpload",
+      "ecr:DescribeImageScanFindings",
       "ecr:DescribeImages",
       "ecr:DescribeRepositories",
       "ecr:InitiateLayerUpload",
@@ -196,10 +252,11 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = concat(
       [
         aws_iam_role.api.arn,
+        aws_iam_role.ecs_execution_legacy.arn,
         aws_iam_role.migration.arn,
         aws_iam_role.worker.arn,
       ],
-      values(aws_iam_role.ecs_execution)[*].arn,
+      values(aws_iam_role.ecs_execution_scoped)[*].arn,
     )
     condition {
       test     = "StringEquals"

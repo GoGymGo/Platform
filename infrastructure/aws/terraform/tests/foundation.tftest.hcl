@@ -87,6 +87,11 @@ run "safe_isolated_foundation" {
   }
 
   assert {
+    condition     = aws_ecs_task_definition.api.skip_destroy && aws_ecs_task_definition.worker.skip_destroy && aws_ecs_task_definition.migration.skip_destroy
+    error_message = "API, worker, and migration rollback revisions must remain active after task-definition replacement."
+  }
+
+  assert {
     condition     = length(aws_ecs_service.api.load_balancer) == 0
     error_message = "The bootstrap API service must not attach an unassociated target group before an HTTPS certificate and listener exist."
   }
@@ -102,8 +107,13 @@ run "safe_isolated_foundation" {
   }
 
   assert {
-    condition     = aws_iam_role.ecs_execution["api"].name == "gogymgo-staging-ecs-execution-api" && aws_iam_role.ecs_execution["worker"].name == "gogymgo-staging-ecs-execution-worker" && aws_iam_role.ecs_execution["migration"].name == "gogymgo-staging-ecs-execution-migration"
+    condition     = aws_iam_role.ecs_execution_scoped["api"].name == "gogymgo-staging-ecs-execution-api" && aws_iam_role.ecs_execution_scoped["worker"].name == "gogymgo-staging-ecs-execution-worker" && aws_iam_role.ecs_execution_scoped["migration"].name == "gogymgo-staging-ecs-execution-migration"
     error_message = "API, worker, and migration tasks must use separate execution roles."
+  }
+
+  assert {
+    condition     = aws_iam_role.ecs_execution_legacy.name == "gogymgo-staging-ecs-execution" && aws_iam_role_policy.ecs_execution_legacy.name == "gogymgo-staging-ecs-execution"
+    error_message = "The shared execution role must remain managed until the protected workload cutover is complete."
   }
 
   assert {

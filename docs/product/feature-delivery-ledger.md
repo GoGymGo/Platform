@@ -28,11 +28,11 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   concurrency where supported. The coordinator must pause for user direction
   before any future Docker command; if resumed, no more than one Docker-backed
   task or stack may run at a time.
-- Cloud boundary: repository and GitHub work are authorized. No AWS, Firebase,
-  Cloudflare, staging, or production inspection, mutation, or deployment is
-  authorized here. Staging-required product code is now repository-terminal, so
-  GGG-030 may audit and improve offline infrastructure/release sources; any AWS
-  read-only reconciliation still requires separate user authority and credentials.
+- Cloud boundary: repository and GitHub work are authorized. The separately
+  approved AWS reconciliation, private-bucket versioning, and unused scoped IAM
+  foundation are complete. No further AWS, Firebase, Cloudflare, staging, or
+  production mutation or deployment is authorized here; each remaining cloud
+  phase requires a new exact approval.
 - Discovery inputs: product, architecture, compliance, and operations documents;
   49 member routes; admin and landing surfaces; API controllers and services;
   worker behavior; 49 API forward migrations and 4 landing D1 migrations;
@@ -1074,8 +1074,31 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   bounded Fargate/worker configuration, fail-closed runtime inputs, alarm/budget
   destinations, serialized deployment with complete rollback baselines, backend-
   disabled Terraform policies/tests, and release/restore/rotation/incident runbooks
-  are repository-complete. Deployed-resource truth, drift, costs, credentials,
-  backups, alarms and staging UAT remain intentionally uninspected.
+  are repository-complete. The authorized 2026-08-22 reconciliation verified
+  the dedicated staging account, healthy older runtime, active RDS backups/PITR,
+  and current credit application. It also found high-risk private-bucket
+  versioning, runtime secret-isolation, alarm-routing, and deployed-source-age
+  gaps. The approved Phase 1 follow-up verified bucket encryption/lifecycle,
+  the deployed image's historical push scan, empty Parameter Store/SNS
+  inventories, and the absence of an Access Analyzer. The exact Phase 3A saved
+  plan has since restored versioning on both private buckets with a clean
+  targeted post-plan. The repository-only Phase 3C safety patch configures
+  Terraform to retain the shared live execution role/policy under explicit moved
+  legacy addresses with `prevent_destroy`, while new task definitions use
+  runtime-scoped roles. A fresh protected plan from exact commit `6f31b94`
+  recognized both moves and proved neither legacy resource has a create,
+  replacement, or deletion action. It returned 6 creates, 2 moves, 3
+  replacements, 8 updates, and 1 data read with no diagnostics. Phase 3C1 then
+  applied only the two state moves and six unused scoped IAM resources. A false
+  local use-date validation triggered rollback after the first successful apply;
+  an approved read-only audit established that the moved/scoped state addresses
+  remained, and an exact six-create recovery completed with a zero-change
+  post-plan. Three unused roles and three inline policies now exist, while both
+  live services remain healthy on unchanged task definitions and the legacy role.
+  Remaining Terraform drift, lifecycle retention, AWS Backup metadata blocked by
+  an organization SCP, deployment, recovery rehearsal, and authenticated UAT
+  remain open; see the
+  [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
   restore, health/alerts; AWS cloud dependency is total.
@@ -1085,11 +1108,99 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   `685de9f8d8b70988d5216f99ec1954162ca13336`; status `BLOCKED`. A later
   `GoGymGo — AWS Staging Read-Only Reconciliation` task may be created only with
   separate cloud authority at the prescribed gate.
-- Residual risks / blocker: AWS account isolation, remote state/drift, costs,
-  current secret versions, alarms/subscription delivery, backups/PITR restore,
-  provider integrations, DNS/TLS, protected approvals, deployment and staging UAT
-  are not evidenced. Read-only reconciliation requires available credentials and
-  explicit separate authority; deployment requires further explicit authority.
+- AWS reconciliation: completed under explicit read-only authority on
+  2026-08-22. Account isolation, live public health, current cost/credit
+  application, certificates, automated backups/PITR eligibility, and selected
+  security controls are now evidenced. The approved Phase 1 follow-up also
+  closed narrow S3, SSM, ECR, SNS, and Access Analyzer metadata gaps. An approved
+  protected Terraform-plan attempt initialized the exact staging backend from an
+  isolated copy but stopped safely before producing a plan when refresh required
+  two unapproved tag metadata reads and one deployed CloudFront Function code
+  read. An exactly approved retry scoped those reads to the three staging
+  resources and completed with exit code 2, confirming drift. Its post-plan JSON
+  sanitizer failed, so the unsanitized plan was deleted and exact resource
+  actions were not inferred. An exactly approved streaming-JSON retry then
+  retained 48 resource address/action events. Twenty-two S3 mutations are
+  invalid artifacts because the restricted role cannot run `HeadBucket` on the
+  three live application buckets; 19 non-S3 mutation events and 7 data reads
+  remain. A fourth exactly approved attempt temporarily added
+  `s3:ListBucket` only on those buckets, proved all three `HeadBucket` checks
+  succeed, and then stopped before producing a plan because Terraform also
+  requires `s3:GetAccelerateConfiguration`. Exact provider-source review
+  identifies that action as the remaining uncovered bucket read. A fifth exactly
+  approved attempt proved that action on only those same buckets and advanced
+  Terraform past the S3 barrier, but the streaming sanitizer stopped on a
+  diagnostic event that omitted `detail`. Its seven early events were incomplete
+  and discarded. Null-diagnostic handling is locally corrected and validated.
+  A sixth exactly approved attempt proved the null-safe sanitizer completes, but
+  Terraform itself exited 1 with four unclassified diagnostics after seven
+  incomplete planned-change events. No IAM action token was retained; the
+  partial events were discarded.
+  A seventh exactly approved attempt repeated the same permissions and retained
+  only fixed diagnostic labels. Terraform again exited 1 after seven incomplete
+  planned-change events and four errors; all four labels were
+  `detail-free-diagnostic`, with no operation, status, or IAM action token. The
+  sanitizer had not classified `summary`, so the cause remains unknown and the
+  partial events were discarded. An eighth exactly approved attempt classified
+  both raw fields transiently and retained only fixed labels. It identified
+  three denied `s3:GetReplicationConfiguration` reads on the application buckets
+  and one `ecr:ListTagsForResource` denial caused by an incorrect `/api` suffix
+  on the temporary repository ARN. Live metadata confirms the exact repository
+  is `gogymgo-staging-backend`. Its partial events were discarded. All attempts'
+  role, lock, state, and temporary-file rollback checks passed. A ninth exactly
+  approved attempt added only those corrected temporary reads and completed with
+  Terraform exit code 2, zero diagnostics, 21 mutation events, and 1 data read.
+  The exact plan restores private-bucket versioning/lifecycle, splits the ECS
+  execution role, replaces three task definitions, and updates selected runtime,
+  IAM, alarm, and member-web resources. The full plan must not be applied alone:
+  services still reference legacy task definitions while Terraform would delete
+  their shared execution role. A separately approved Phase 3A run then guarded,
+  saved, and applied exactly the two private-bucket versioning updates. Both
+  statuses changed from suspended to enabled, the targeted post-plan returned
+  zero changes, state advanced, no lock or rollback was needed, and the original
+  111-allow/26-deny role was restored with zero temporary markers. Overall status
+  remains BLOCKED pending the execution-role/task-definition cutover, current
+  deployment, and remaining material gaps. The repository-only cutover-safety
+  patch passes Terraform 1.15.8 backend-disabled validation and four mocked
+  plans. Its separately approved protected live plan then completed with exact
+  commit guard, Terraform exit code 2, and zero diagnostics: 6 creates, 2 exact
+  legacy-address moves, 3 task-definition replacements, 8 updates, and 1 data
+  read. Neither legacy role/policy has a create, replacement, or deletion action.
+  State remained unchanged, locks were zero, all temporary access/files were
+  removed, the 111-allow/26-deny baseline was independently reconfirmed, and both
+  private buckets remain versioned. No apply occurred. The next recommended
+  mutation is a separately approved saved targeted plan/apply containing only the
+  two state moves and creation of the six unused scoped role/policy resources.
+  Its first approved invocation initialized successfully but stopped before a
+  plan because Terraform targeting included the move destinations without both
+  former singleton source addresses. It emitted no mutation list and never
+  called apply. State/locks were untouched, all scoped roles remained absent,
+  services remained healthy on the legacy execution role, and the exact baseline
+  policy/access/file cleanup passed. A corrected retry adds only those two source
+  selectors. That approved retry resolved targeting but stopped before apply on
+  the missing, previously proven `ecr:ListTagsForResource` dependency read for
+  the exact staging backend repository; its partial one-move/three-create stream
+  was discarded. State/locks/IAM/runtime were untouched and all cleanup checks
+  passed again. A further retry adds only that exact metadata read; the guarded
+  eight-mutation boundary was unchanged. That retry produced and applied exactly
+  the two moves and six creates, followed by a zero-change targeted post-plan. A
+  local validation bug treated an empty IAM `RoleLastUsed` object as actual use
+  and incorrectly removed the new roles; the state-rollback result was
+  inconclusive. An approved read-only audit then proved state contained zero old
+  singleton, two legacy, and six scoped addresses with no lock. The recovery
+  saved plan consequently contained exactly six creates and no other mutation;
+  apply and the zero-change post-plan both succeeded. Independent checks confirmed
+  three unused roles, three inline policies, healthy 1/1 services on unchanged
+  legacy execution-role references, enabled state versioning, no lock, restored
+  111-allow/26-deny permissions with zero temporary markers, and denied baseline
+  state access. Task-definition registration and workload cutover remain later
+  approvals.
+- Residual risks / blocker: remaining Terraform and lifecycle drift, live runtime
+  cutover to the staged secret-scoped roles, absent alarm/SNS delivery, Backup
+  inventory blocked by an organization SCP, restore readiness, current credit
+  balance, provider integrations, protected deployment approval, and
+  authenticated staging UAT remain unresolved. Deployment requires further
+  explicit authority.
 
 ### GGG-031 — Expo SDK patch compatibility and deterministic release checks
 
@@ -1232,6 +1343,117 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   approval; never infer eligibility from marketing location text.
 
 ## Change history
+
+- 2026-08-25 — Completed the separately approved Phase 3C1 unused IAM foundation
+  in staging account ending 9877. The first exact two-move/six-create saved-plan
+  apply and zero-change post-plan succeeded, but a local validator mistook an
+  empty `RoleLastUsed` object for a real use date and initiated rollback. The new
+  roles were removed while state rollback was inconclusive. A read-only audit
+  proved state retained exactly two legacy and six scoped addresses, no former
+  singleton addresses, and no lock. The guarded recovery then planned and applied
+  exactly six creates with no move/update/replace/delete, followed by a zero-change
+  targeted post-plan. Independent validation confirmed all three roles and their
+  three inline policies exist and are unused; legacy/GitHub IAM fingerprints and
+  API/worker task-definition references remain unchanged; both services are 1/1;
+  state-bucket versioning remains enabled; the permission set is restored to
+  111 allows, 26 denies, and zero temporary markers; and baseline state reads are
+  denied. No task definition, service, lifecycle, alarm, CloudFront, secret,
+  application-data, or production mutation occurred. A protected current-main
+  staging release requires a new exact approval.
+- 2026-08-22 — Completed the explicitly authorized, non-root
+  [AWS staging read-only reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
+  Verified the dedicated staging account ending 9877 in Canada Central, a
+  healthy but 78-commit-old runtime, current AWS credit application, and active
+  RDS backup/PITR configuration. Recorded release-blocking versioning,
+  secret-scope, alarm-routing, source-age, permission, and recovery gaps. A
+  separately approved metadata-policy revision verified bucket encryption and
+  lifecycle, the deployed image's historical push scan, empty SSM/SNS
+  inventories, and an organization SCP blocking AWS Backup inspection. A later
+  approved protected-plan attempt initialized the exact backend and invoked one
+  no-apply plan, but refresh stopped before producing a plan because
+  budgets:ListTagsForResource, cloudfront:GetFunction, and
+  ecr:ListTagsForResource were not allowed. An exactly approved retry scoped
+  those reads to the staging resources and completed with exit code 2, proving
+  changes are present. Its post-plan JSON sanitizer failed, so the unsanitized
+  plan was deleted and no resource-action list was retained. The Phase 1 role
+  was restored, no lock remained, state ETag and time were unchanged, and
+  temporary files were deleted. No apply, application-resource mutation,
+  deployment, secret or application-object/log data read, database connection,
+  or restore occurred. A third exactly approved streaming-JSON plan retained
+  only resource addresses and actions. It showed 9 creates, 2 deletes, 22
+  replacements, 8 updates and 7 reads, but direct authorization checks proved
+  the 3 bucket creates and 19 dependent S3 replacements are false artifacts of
+  denied `HeadBucket`. A fourth exactly approved attempt temporarily allowed
+  `s3:ListBucket` only on those three application buckets and proved all three
+  `HeadBucket` calls succeed. Terraform then stopped before producing a plan on
+  the additional metadata read `s3:GetAccelerateConfiguration`. The state was
+  unchanged, no lock remained, temporary files were removed, and the Phase 1
+  role was fully restored. Exact Terraform AWS Provider v6.57.1 source review
+  identifies that action as the remaining uncovered bucket read. A further
+  no-apply plan therefore requires separate approval to repeat the exact
+  three-bucket listing grant and temporarily add
+  `s3:GetAccelerateConfiguration`; object content reads remain denied. A fifth
+  exactly approved invocation proved both S3 grants and began streaming sanitized
+  planned changes, but the local parser stopped on a diagnostic without a
+  `detail` property. Its seven early planned-change events and four drift events
+  were incomplete and discarded from decision-making. The state remained
+  unchanged, no lock existed before or after, no manual cleanup was needed, the
+  isolated directory was removed, and the Phase 1 role returned to 111 allows,
+  26 denies, and zero Phase 2 markers. The null case is locally corrected and
+  validated. A sixth exactly approved invocation repeated the same permissions;
+  its sanitizer completed, but Terraform exited 1 with four unclassified
+  diagnostics after seven incomplete planned-change and four drift events. No
+  IAM action token was captured, the partial stream was discarded, the state was
+  unchanged, zero locks remained, and all permission/temporary-file rollback
+  checks passed. A further no-apply plan requires new exact approval but no new
+  AWS action; its sanitizer will retain only redacted diagnostic category/API
+  operation labels if Terraform fails again. A seventh exactly approved attempt
+  did so, but all four errors lacked `detail`, producing only
+  `detail-free-diagnostic` labels after the same seven incomplete planned-change
+  and four drift events. The partial stream was discarded; state, lock, access,
+  role, and temporary-file rollback checks all passed. A further plan requires
+  new exact approval but no new AWS action. Its classifier will derive the same
+  fixed labels from both `summary` and `detail` transiently while retaining
+  neither raw field. An eighth exactly approved attempt did so and identified
+  three `S3.GetBucketReplication` HTTP 403 errors requiring
+  `s3:GetReplicationConfiguration` on the exact application buckets, plus one
+  ECR tag-read HTTP 400 caused by the temporary permission's erroneous `/api`
+  repository suffix. Live metadata confirms the correct exact repository is
+  `gogymgo-staging-backend`. The seven planned-change and four drift events were
+  incomplete and discarded; state, lock, role, access, and temporary-file
+  rollback checks all passed. A further plan requires exact approval for that
+  added S3 action and corrected ECR resource ARN.
+  A ninth exactly approved attempt made only those temporary read corrections.
+  Terraform completed with exit code 2 and zero diagnostics, returning 6
+  creates, 2 deletes, 3 replacements, 10 updates, and 1 data read. No S3 bucket
+  create or broad replacement artifact remains. The plan includes two private
+  bucket versioning updates, two lifecycle updates, the three-way ECS execution
+  role/policy split, three task-definition replacements, and selected service,
+  IAM, alarm, and CloudFront Function updates. Because the live services still
+  reference the legacy task definitions and Terraform ignores service task-
+  definition drift, applying the full plan before coordinated deployment could
+  delete the shared execution role needed by a restarting old task. The first
+  recommended mutation is therefore a separately planned versioning-only apply.
+  State remained unchanged, zero locks remained, and every temporary permission
+  and file was removed after the no-apply run. A separately approved Phase 3A
+  run then produced a saved targeted plan containing exactly the two expected
+  versioning updates and applied only that plan. Both private buckets changed
+  from suspended to enabled, the targeted post-plan had zero changes, state
+  advanced, zero locks remained, and no rollback was needed. The temporary
+  permissions and working files were removed; independent checks reconfirmed the
+  111-allow/26-deny baseline with zero temporary markers and both live statuses
+  enabled. No lifecycle, IAM, ECS, alarm, CloudFront, secret, or application-data
+  operation occurred. The subsequently approved repository-only Phase 3C patch
+  renamed the planned runtime-specific execution-role resources, mapped the live
+  singleton role and policy to explicit legacy addresses, preserved their exact
+  names and existing all-runtime secret scope, and added `prevent_destroy` to
+  both. API, worker, and migration task definitions reference only the new
+  scoped roles, while the deployment role retains the legacy rollback path.
+  Terraform 1.15.8 formatting, backend-disabled initialization, validation, and
+  four mocked plans passed, as did the focused repository policy test. No AWS,
+  remote-state, credential, deployment, or application-data access occurred. A
+  fresh separately approved protected plan must prove the live move/no-delete
+  shape before any IAM or task-definition mutation.
 
 - 2026-08-22 — Completed the repository delivery for `GGG-030` through PR #133.
   Exact head `c3574e59b7a6147b8771524860351062dccdfa7f` was

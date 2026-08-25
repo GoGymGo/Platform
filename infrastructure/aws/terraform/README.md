@@ -31,6 +31,8 @@ disabled.
   alarms, and a per-account budget;
 - separate least-privilege API, worker, and migration task roles plus a distinct
   secret-scoped execution role for each workload;
+- for an existing shared-role environment, a protected legacy execution role
+  and policy retained only through the two-phase workload cutover;
 - separate backend and member-web GitHub OIDC deployment roles restricted to
   the matching protected GitHub environment and the repository's immutable
   owner/repository IDs. No long-lived AWS deployment key is required.
@@ -163,6 +165,16 @@ When changing reviewed task configuration, supply the current approved image
 digest and inspect the new Terraform task-definition revision. The protected
 release uses the newest reviewed family configuration and replaces only its
 image with the exact scanned digest.
+
+Existing environments migrate the original shared ECS execution role and policy
+to explicit `ecs_execution_legacy` state addresses. `prevent_destroy` remains on
+both legacy resources while any deployed task definition can reference them.
+New API, worker, and migration task definitions use only the runtime-scoped
+execution roles. Do not remove the legacy resources or historical state moves
+in this phase. A future decommission needs its own reviewed state migration only
+after every environment using this root has applied the move and live inspection
+proves every active and rollback task-definition revision has cut over; removing
+a `moved` declaration is a breaking compatibility change.
 
 The operations worker is intentionally limited to one task. API autoscaling and
 RDS Proxy remain disabled until load tests approve scaling and database

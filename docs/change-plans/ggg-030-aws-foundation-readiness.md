@@ -20,6 +20,9 @@ cost state exists or is healthy.
 - Terraform creates secret containers, never secret values. Runtime roles
   and distinct execution roles receive only the mappings they consume; the
   reward encryption key is API-only.
+- Existing shared-role environments retain that role and policy behind
+  `prevent_destroy` and explicit state moves until a protected deployment proves
+  both active and rollback task-definition revisions use the new scoped roles.
 - The operations worker remains a singleton. API autoscaling, RDS Proxy,
   Multi-AZ production capacity, and alert thresholds beyond the existing source
   are separate load, availability, and cost decisions.

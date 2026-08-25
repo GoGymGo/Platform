@@ -39,6 +39,7 @@ jobs:
       checks: read
       contents: read
       pull-requests: read
+      statuses: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -600,6 +601,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: read
+      statuses: read
     uses: ./.github/workflows/member-web-deployment.yml
     with:
       environment: ${{ inputs.environment }}
@@ -614,6 +616,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: read
+      statuses: read
     uses: ./.github/workflows/member-web-deployment.yml
     with:
       environment: ${{ inputs.environment }}

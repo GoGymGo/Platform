@@ -56,7 +56,13 @@ test("publishes assets before the entrypoint and preserves automatic rollback", 
   assert.doesNotMatch(memberWorkflow, /aws s3 sync[^\n]*--delete/);
   assert.match(memberWorkflow, /--exclude index\.html/);
   assert.match(memberWorkflow, /--exclude '\.well-known\/\*'/);
-  assert.match(memberWorkflow, /trap rollback ERR/);
+  assert.match(memberWorkflow, /trap rollback EXIT/);
+  assert.match(memberWorkflow, /trap - EXIT/);
+  assert.match(
+    memberWorkflow,
+    /if \[\[ "\$status" != "0" && "\$remote_mutated" == "true" \]\]/,
+  );
+  assert.doesNotMatch(memberWorkflow, /trap rollback ERR/);
   assert.match(memberWorkflow, /restore_object index\.html/);
   assert.match(memberWorkflow, /Could not capture s3:\/\//);
   assert.match(memberWorkflow, /Automatic recovery was incomplete/);

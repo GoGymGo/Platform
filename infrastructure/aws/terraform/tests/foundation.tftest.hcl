@@ -19,7 +19,7 @@ variables {
   environment         = "staging"
   container_image     = "111122223333.dkr.ecr.ca-central-1.amazonaws.com/gogymgo-staging-backend/api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
   firebase_project_id = "gogymgo-staging"
-  cors_origins        = ["https://staging.gogymgo.com"]
+  cors_origins        = ["https://app.gogymgo.com"]
   deletion_protection = false
 }
 
@@ -77,8 +77,8 @@ run "safe_isolated_foundation" {
   }
 
   assert {
-    condition     = aws_ecs_service.api.deployment_minimum_healthy_percent == 100 && aws_ecs_service.worker.deployment_minimum_healthy_percent == 100
-    error_message = "API and worker rollouts must preserve their healthy task while a replacement starts."
+    condition     = aws_ecs_service.api.deployment_minimum_healthy_percent == 100 && aws_ecs_service.api.deployment_maximum_percent == 200 && aws_ecs_service.worker.deployment_minimum_healthy_percent == 0 && aws_ecs_service.worker.deployment_maximum_percent == 101
+    error_message = "API rollouts must preserve capacity while singleton-worker rollouts remain stop-first and AZ-rebalancing compatible."
   }
 
   assert {
@@ -99,6 +99,11 @@ run "safe_isolated_foundation" {
   assert {
     condition     = local.api_environment.PRIVATE_OBJECT_STORAGE_PROVIDER == "aws-s3" && local.api_environment.AWS_REGION == "ca-central-1"
     error_message = "AWS tasks must select the S3 adapter explicitly."
+  }
+
+  assert {
+    condition     = contains(split(",", local.api_environment.CORS_ORIGINS), "https://${var.member_web_domain}")
+    error_message = "The API CORS allowlist must include the configured member-web origin."
   }
 
   assert {
@@ -156,6 +161,16 @@ run "feature_secrets_remain_role_scoped" {
     condition     = length(local.execution_secret_arns.api) == 4 && length(local.execution_secret_arns.worker) == 4 && length(local.execution_secret_arns.migration) == 1
     error_message = "Execution-role secret reads must match the exact runtime mappings."
   }
+}
+
+run "member_web_origin_is_required_in_api_cors" {
+  command = plan
+
+  variables {
+    cors_origins = ["https://wrong.example.com"]
+  }
+
+  expect_failures = [var.cors_origins]
 }
 
 run "landing_cutover_configuration_is_api_scoped" {

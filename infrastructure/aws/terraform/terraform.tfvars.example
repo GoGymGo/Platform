@@ -9,7 +9,7 @@ container_image    = "111122223333.dkr.ecr.ca-central-1.amazonaws.com/gogymgo-st
 firebase_project_id = "replace-with-isolated-firebase-project-id"
 
 cors_origins = [
-  "https://staging.gogymgo.com",
+  "https://app.gogymgo.com",
 ]
 
 # Leave null until the ACM validation record has been approved in Cloudflare

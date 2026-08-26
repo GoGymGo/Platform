@@ -23,6 +23,9 @@ export function up(pgm: MigrationBuilder): void {
     lifecycle_version: { type: 'integer', notNull: true, default: 1 },
   });
   pgm.sql(`
+    DROP TRIGGER IF EXISTS legal_document_events_append_only
+      ON legal_document_events;
+
     WITH ranked_events AS (
       SELECT
         id,
@@ -36,6 +39,10 @@ export function up(pgm: MigrationBuilder): void {
     SET lifecycle_version = ranked.lifecycle_version
     FROM ranked_events AS ranked
     WHERE ranked.id = event.id;
+
+    CREATE TRIGGER legal_document_events_append_only
+    BEFORE UPDATE OR DELETE ON legal_document_events
+    FOR EACH ROW EXECUTE FUNCTION gogymgo_reject_append_only_mutation();
   `);
   pgm.addConstraint(
     'legal_document_events',

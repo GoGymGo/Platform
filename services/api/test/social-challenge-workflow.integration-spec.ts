@@ -187,7 +187,11 @@ describeWithDatabase('social friend and challenge workflow', () => {
       }),
     ]);
 
-    const challengeDate = dateKeyInTimezone(new Date(), 'America/Toronto');
+    const workoutStartedAt = new Date();
+    const challengeDate = dateKeyInTimezone(
+      workoutStartedAt,
+      'America/Toronto',
+    );
     const challengeEndDate = addDateKeyDays(challengeDate, 6);
     const challenge = await social.createChallenge(
       alice,
@@ -290,13 +294,14 @@ describeWithDatabase('social friend and challenge workflow', () => {
         competition_id, enrollment_id, user_id, eligible_date, status,
         policy_version, started_at, completed_at, verification_summary
       ) VALUES ($1, $2, $3, $4, 'verified', 'social-challenge-rules-v1',
-                now() - interval '30 minutes', now(), '{"fixture":true}'::jsonb)
+                $5, now(), '{"fixture":true}'::jsonb)
       RETURNING id`,
       [
         competition.rows[0].id,
         enrollment.rows[0].id,
         aliceProfile.id,
         challengeDate,
+        workoutStartedAt,
       ],
     );
     await expect(

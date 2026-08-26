@@ -424,7 +424,7 @@ describeWithDatabase('connected static QR pilot', () => {
     });
   });
 
-  it('uses server time to verify after 30 minutes and deduplicates the day', async () => {
+  it('uses server time to verify and applies the limit by local day', async () => {
     const started = await gyms.scan(
       principal,
       'verify-start',
@@ -435,12 +435,24 @@ describeWithDatabase('connected static QR pilot', () => {
     await expect(
       gyms.scan(principal, 'verify-exit', scanRequest('verify-exit-event')),
     ).resolves.toMatchObject({ outcome: 'verified', remainingSeconds: 0 });
+    const verifiedSession = await database.connection
+      .selectFrom('workout_sessions')
+      .select('eligible_date')
+      .where('id', '=', started.sessionId!)
+      .executeTakeFirstOrThrow();
+    const sameLocalDay =
+      verifiedSession.eligible_date ===
+      dateKeyInTimezone(new Date(), 'America/Vancouver');
     await expect(
       gyms.scan(principal, 'verify-again', scanRequest('verify-again-event')),
-    ).resolves.toMatchObject({
-      outcome: 'rejected',
-      rejectionReason: 'daily_limit_reached',
-    });
+    ).resolves.toMatchObject(
+      sameLocalDay
+        ? {
+            outcome: 'rejected',
+            rejectionReason: 'daily_limit_reached',
+          }
+        : { outcome: 'started', rejectionReason: null },
+    );
     const ledger = await database.connection
       .selectFrom('entry_ledger')
       .select('id')
@@ -821,7 +833,10 @@ describeWithDatabase('connected static QR pilot', () => {
     const startedAt = new Date(referenceTime - 31 * 60_000);
     await database.connection
       .updateTable('workout_sessions')
-      .set({ started_at: startedAt })
+      .set({
+        eligible_date: dateKeyInTimezone(startedAt, 'America/Vancouver'),
+        started_at: startedAt,
+      })
       .where('id', '=', sessionId)
       .execute();
   }

@@ -4,6 +4,19 @@ import { describe, it } from 'node:test';
 import { getVisibleStreakUnits } from '@/domain/streakBadges';
 
 describe('visible streak badges', () => {
+  it('shows one day for one verified consecutive workout day', () => {
+    assert.deepEqual(
+      getVisibleStreakUnits({
+        daily: 1,
+        monthly: 1,
+        projectionVersion: 'streaks-v1',
+        weekly: 1,
+        yearly: 1
+      }),
+      [{ count: 1, key: 'daily' }]
+    );
+  });
+
   it('shows only a day badge for a streak shorter than one week', () => {
     assert.deepEqual(
       getVisibleStreakUnits({
@@ -59,6 +72,19 @@ describe('visible streak badges', () => {
         projectionVersion: 'streaks-v1',
         weekly: 0,
         yearly: 0
+      }),
+      []
+    );
+  });
+
+  it('does not turn calendar-period activity into a duration badge when the daily streak is inactive', () => {
+    assert.deepEqual(
+      getVisibleStreakUnits({
+        daily: 0,
+        monthly: 1,
+        projectionVersion: 'streaks-v1',
+        weekly: 0,
+        yearly: 1
       }),
       []
     );

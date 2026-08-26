@@ -11,6 +11,10 @@ const durationUnits: readonly { days: number; key: StreakBadgeKey }[] = [
 
 export function getVisibleStreakUnits(streaks: StreakCounts, maximum = 2) {
   const limit = Math.max(1, Math.min(2, maximum));
+  // Duration badges are a compact rendering of the consecutive-day streak.
+  // The other API counts are independent calendar-period streaks, so one
+  // workout can legitimately make each of them 1 without representing a week,
+  // month, or year of consecutive workouts.
   let remainingDays = Math.max(0, Math.floor(streaks.daily));
   const visible: { count: number; key: StreakBadgeKey }[] = [];
 
@@ -22,15 +26,6 @@ export function getVisibleStreakUnits(streaks: StreakCounts, maximum = 2) {
     }
     if (visible.length === limit) {
       break;
-    }
-  }
-
-  if (visible.length === 0) {
-    const fallback = (['yearly', 'monthly', 'weekly'] as const).find(
-      (key) => streaks[key] > 0
-    );
-    if (fallback) {
-      visible.push({ count: streaks[fallback], key: fallback });
     }
   }
 

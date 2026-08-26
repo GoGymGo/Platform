@@ -7,15 +7,15 @@ for metadata-only reconciliation of the existing GoGymGo-Staging member account.
 The account is active, belongs to the Souvenote organization, uses the expected
 account ending **9877**, and is operating in ca-central-1.
 
-The existing staging release is publicly healthy: the API and worker are steady,
-the load-balancer target is healthy, health/readiness routes respond, browser
-routes load, and browser CORS is correct. It is not current-main ready. The live
-image is 78 commits behind the reconciled repository baseline, runtime secret
-isolation is broader than the current Terraform, and all five runtime alarms
-have no notification actions. Phase 3A has now restored versioning on both
-private-data buckets. Phase 3C1 has also staged the three unused, runtime-scoped
-ECS execution roles and their three inline policies without changing either live
-service or task definition.
+The staging backend is now current-main ready. On August 26, protected Platform
+Deployment run `32942580862` released exact main commit
+`ae3760c3b15aada171d130e930dd6f77ebd2babc` as one immutable, digest-pinned
+image. Migration revision `:43` exited zero, singleton worker revision `:39`
+reached steady state, and circuit-breaker-protected API revision `:36` reached
+steady state. Both services are at desired/running count one, the load-balancer
+target is healthy, and health/readiness return HTTP 200. API `:33` and worker
+`:34` remain ACTIVE rollback definitions. All five runtime alarms still have no
+notification actions, so incident delivery remains a material gap.
 
 August 1–22 gross staging usage was approximately **$63.55**. AWS applied
 approximately **$63.55** in credits, leaving approximately **$0** of eligible
@@ -121,15 +121,15 @@ No rollback was required. The temporary permission set was removed, the role
 returned to 111 allowed actions and 26 explicit denies with zero temporary
 markers, and independent live checks reconfirmed both bucket statuses.
 
-No deployment, secret value read, application-object read/write/delete,
-database connection, log-content query, restore, rotation, scaling change,
-lifecycle mutation, runtime cutover, alarm change, or CloudFront mutation
-occurred. The only durable IAM mutation was the approved creation of three
-unused scoped execution roles and one scoped inline policy per role. Terraform
-state access was limited to the exact staging state object and was never printed
-or retained outside deleted temporary working directories. The explicitly
-approved CloudFront read was limited to the deployed member-web function code
-used for drift comparison.
+Through Phase 3C1, no deployment, secret value read, application-object
+read/write/delete, database connection, restore, rotation, lifecycle mutation,
+alarm change, or CloudFront mutation occurred. Phase 4C later performed only the
+documented staging backend release: one image push, one forward-only migration,
+and one worker/API cutover. It did not perform Terraform, IAM, secret-value,
+manual database, RDS, DNS/TLS, alarm/SNS, member-web, authenticated-UAT, or
+production operations. Terraform state access remained limited to the exact
+staging state object and was never printed or retained outside deleted temporary
+working directories.
 
 The approved repository-only Phase 3C safety patch configures Terraform to
 re-address the live shared execution role and policy as protected legacy
@@ -192,12 +192,60 @@ and then remained stable; and no rollback was attempted. The corrected unused
 check now requires a real nonempty `LastUsedDate` rather than the presence of an
 empty `RoleLastUsed` object.
 
-Independent final checks found all three scoped roles, exactly one inline policy
-on each, no recorded use date, both services at 1/1 on their unchanged task
-definitions and legacy execution role, state-bucket versioning enabled, no
+Independent Phase 3C1 checks found all three scoped roles, exactly one inline
+policy on each, no recorded use date, both services at 1/1 on their unchanged
+task definitions and legacy execution role, state-bucket versioning enabled, no
 Terraform lock, zero temporary policy markers, and baseline state-object reads
-denied again. Task-definition registration and live workload cutover remain out
-of scope and unapplied.
+denied again. Phase 4C has since completed the task-definition registration and
+live backend workload cutover described below.
+
+## Phase 4C current-main staging backend release — 2026-08-26
+
+The first current-main attempt exposed a migration constraint ordering defect.
+A narrow forward-only migration repair archived invalid legacy published reward
+rows before adding the existing asset constraint. The next attempt exposed a
+production-image Sharp dependency omission; the image build and CI audit were
+corrected. The following attempt proved that overlapping singleton workers lose
+the worker heartbeat lease; worker deployment was changed to stop-first. ECS
+Availability Zone rebalancing then rejected `maximumPercent=100`; the final
+reviewed setting uses `minimumHealthyPercent=0` and `maximumPercent=101`. At a
+desired count of one, ECS rounded this to one runnable task and events proved the
+old worker stopped before the new worker started. Each failed attempt preserved
+or restored API `:33` and worker `:34` at 1/1 before the next source change.
+
+PRs `#147` through `#150` contain the migration, production-image, singleton
+worker, Availability Zone rebalancing, and midnight integration-test fixes. All
+required PR and exact-main checks passed before the final dispatch. Protected
+run [32942580862](https://github.com/GoGymGo/Platform/actions/runs/32942580862)
+then completed every gate from exact commit
+`ae3760c3b15aada171d130e930dd6f77ebd2babc`:
+
+- Trivy passed and ECR reported scan status `COMPLETE` with zero HIGH or CRITICAL
+  findings for immutable digest
+  `sha256:eadb652f7f929fff2b843b39efcc1ef5105a0584a7181493109de40fa98505e8`;
+- migration `:43` used that digest and its ECS task exited zero;
+- worker `:39` used that digest, deployed without singleton overlap, and reached
+  1/1 with rollout `COMPLETED` and zero failed tasks;
+- API `:36` used that digest, reached 1/1 with rollout `COMPLETED` and zero failed
+  tasks, and retained deployment-circuit-breaker rollback;
+- rollback task definitions API `:33` and worker `:34` remain ACTIVE;
+- the only load-balancer target is healthy and both `/v1/health` and
+  `/v1/health/ready` return HTTP 200;
+- new API, worker, and migration log streams exist and are fresh; the post-release
+  window contains no `ApiServerErrors` or `WorkerBatchFailures` datapoints; and
+- all five staging alarms are `OK`. Their action lists remain empty.
+
+The database remained available, encrypted, private, and without pending
+configuration changes. Backup retention remains 14 days with a current PITR
+restore point. A future, unforced operating-system update is still available for
+a maintenance window. No restore or direct database access was performed.
+
+The new 362,934,861-byte image adds approximately `$0.036/month` at the published
+`$0.10/GB-month` private ECR storage rate. The short migration and deployment
+overlap keep the attempt within the prior `<$0.10` incremental estimate. August
+1–26 Cost Explorer records approximately `$75.31` in applied credits and net AWS
+usage remains approximately zero; the remaining balance and expiration are still
+not visible. GitHub Actions cost, if any, is separate from AWS credits.
 
 ## Verified target and method
 
@@ -207,11 +255,14 @@ of scope and unapplied.
 | AWS account | GoGymGo-Staging ending **9877** |
 | Organization management account | Souvenote ending **6665** |
 | Region | ca-central-1 |
-| Repository baseline | e7faf79b7d9e669bcd34ed9b9ef84845b37d5814 |
+| Original reconciliation baseline | e7faf79b7d9e669bcd34ed9b9ef84845b37d5814 |
+| Current deployed main | ae3760c3b15aada171d130e930dd6f77ebd2babc |
+| Active backend definitions | migration `:43`; worker `:39`; API `:36` |
+| Preserved rollback definitions | worker `:34`; API `:33` (both ACTIVE) |
 | Authentication | IAM Identity Center / SSO, non-root |
 | Reconciliation permission set | GoGymGoStagingReconcile |
 | Session duration | Two hours |
-| Restrictions | No secret values, application-object contents, log events, database log download, decryption, or interactive execution; approved mutations were limited to permission-set reprovisioning, transient lock/state handling, the exact Phase 3A bucket-versioning updates, and the exact Phase 3C1 unused scoped IAM foundation |
+| Restrictions | No secret values, application-object contents, broad log queries, database access, decryption, or interactive execution; durable mutations were limited to the documented Phase 3 infrastructure work and the exact Phase 4C staging backend release |
 
 The access portal now exposes the existing staging account to the existing
 workforce identity. After the approved Phase 1 revision, the permission set has
@@ -229,10 +280,10 @@ sensitive-data/execution denies.
 | Backend encryption | State bucket uses SSE-S3; versioning remains enabled | VERIFIED | Low | Preserve |
 | Exact Terraform drift | Fresh protected Phase 3C plan had 19 mutation events and 1 data read; Phase 3C1 has applied only the two protected state moves and six scoped IAM creates, with a zero-change targeted post-plan | VERIFIED | High | Do not apply the remaining mixed plan; prepare a separately guarded deployment plan |
 | Network | Expected VPC, subnet, IGW, no-NAT, and security-group shape | VERIFIED | Low | No immediate action |
-| ECS runtime | API 1/1 and worker 1/1, steady, no pending tasks | VERIFIED | Medium | Confirm active-cost window is intentional |
-| Deployed source | Running commit is 78 commits behind current main | GAP FOUND | High | Build, scan, plan, and deploy an approved current-main digest later |
-| ECR assurance | Immutable and scan-on-push; deployed image push scan completed with no reported findings | VERIFIED | Medium | Require a fresh scan for a current-main digest |
-| Load balancer/readiness | Active TLS listener, healthy target, health/readiness HTTP 200 | VERIFIED | Low | Re-run after deployment |
+| ECS runtime | API `:36` and worker `:39`, each 1/1, steady, zero failed tasks; API circuit breaker enabled | VERIFIED | Low | Continue routine monitoring |
+| Deployed source | Exact current main `ae3760c3b15aada171d130e930dd6f77ebd2babc` deployed by protected run `32942580862` | VERIFIED | Low | Preserve exact-source gate |
+| ECR assurance | Immutable and scan-on-push; deployed digest passed Trivy and ECR with zero HIGH/CRITICAL findings | VERIFIED | Low | Preserve digest-only deployment |
+| Load balancer/readiness | Active TLS listener, one healthy target, health/readiness HTTP 200 after release | VERIFIED | Low | Continue routine monitoring |
 | Member web | Private-origin CloudFront; public routes HTTP 200; CORS correct | VERIFIED | Low | Authenticated UAT remains separate |
 | RDS protection | Private, encrypted, forced SSL, 14-day PITR, daily automated snapshots | VERIFIED | Medium | Rehearse restore under separate approval |
 | RDS deletion safety | Deletion protection disabled; no manual snapshot | GAP FOUND | Medium | Decide whether staging policy should change |
@@ -241,17 +292,17 @@ sensitive-data/execution denies.
 | S3 encryption/lifecycle | Private buckets use the GoGymGo KMS key and now have versioning enabled; privacy current expiry is seven days, but both buckets lack current Terraform's noncurrent-version rules | GAP FOUND | High | Review existing version inventory and deletion implications before any lifecycle apply |
 | KMS | Customer key enabled with annual rotation | VERIFIED | Low | No immediate action |
 | Secret containers | Six app containers plus managed DB secret; no values read | VERIFIED | Low | Preserve out-of-band value handling |
-| Runtime secret isolation | The three unused scoped execution roles/policies now exist, but live tasks still use the shared legacy execution role and the worker still receives the reward key | GAP FOUND | High | Use the staged roles only through a separately approved protected deployment |
+| Runtime secret isolation | Current API, worker, and migration definitions use the reviewed scoped-role task-definition bases; worker definition excludes the API-only reward key | VERIFIED | Low | Preserve workflow safety checks and rollback definitions |
 | Optional features | Privacy/push secrets empty and matching flags disabled | VERIFIED | Low | Populate only with separate approval |
 | Runtime alarms | Five alarms are OK but all alarm/OK actions are empty | GAP FOUND | High | Add and validate an incident destination |
 | Budget notifications | $100 budget; thresholds have redacted email subscribers | VERIFIED | Medium | Confirm delivery with an authorized test |
 | SNS routing | No topics or subscriptions exist | GAP FOUND | High | Create, confirm, attach, and test an approved incident destination |
 | Backup inventory | RDS backups verified; organization SCP explicitly denies AWS Backup inventory; restore untested | BLOCKED BY PERMISSIONS | High | Review the SCP before any Backup inspection; separately approve restore rehearsal |
 | DNS/TLS | Cloudflare owns DNS; expected certificates issued/in use/renewable | VERIFIED | Low | Preserve ownership and recheck after ALB changes |
-| Current costs | Gross $63.55, credits -$63.55, net about $0 for August 1–22 | VERIFIED | Medium | Continue monitoring; investigate CloudWatch spend |
+| Current costs | About $75.31 of August credit records; net AWS usage remains approximately $0; new image adds about $0.036/month | VERIFIED | Medium | Continue monitoring; investigate CloudWatch spend |
 | Credit balance/sharing | Payer Billing API denied because IAM billing access is inactive | BLOCKED BY PERMISSIONS | Medium | Do not promise future all-credit coverage |
-| Protected deployment | Current release is older; the scoped IAM foundation is staged and unused, while task-definition registration and workload cutover remain unapplied | REQUIRES APPLY APPROVAL | High | Build, scan, migrate, and cut over only under a later exact deployment approval |
-| Authenticated UAT | Public routing only was tested | NOT YET TESTED | High | Run after approved current-main staging release |
+| Protected deployment | Exact current-main staging backend release succeeded; migration `:43`, worker `:39`, and API `:36` share one scanned immutable digest | VERIFIED | Low | Preserve run evidence and rollback baselines |
+| Authenticated UAT | Public health/readiness only were tested after release | NOT YET TESTED | High | Run a separately controlled staging UAT window without production access |
 
 ## Terraform backend and drift
 
@@ -910,11 +961,13 @@ Stage the Phase 2 plan rather than applying it as one operation:
 Every remaining apply requires a separate exact-resource approval, with
 rollback and post-apply validation documented.
 
-### Phase 4 — current-main staging release
+### Phase 4 — current-main staging release — completed
 
-Build and scan the exact approved digest, run the protected migration, deploy
-worker and API, verify rollback baselines, and repeat health/readiness, TLS,
-CORS, alarm, and cost checks. This is a separate deployment approval.
+Protected run `32942580862` built and scanned exact commit `ae3760c3`, ran
+migration `:43`, and deployed worker `:39` then API `:36`. Rollback baselines,
+health/readiness, target health, logs/metrics, alarms, database metadata, and
+incremental cost were independently reconfirmed. No production or member-web
+deployment occurred.
 
 ### Phase 5 — UAT and recovery proof
 
@@ -922,30 +975,25 @@ Run authenticated member/operator journeys, provider checks, notification
 delivery, migration idempotency, and an approved restore rehearsal. Production
 remains out of scope.
 
-## Next approval boundary
+## Next operating boundary
 
-Phase 3A, the Phase 3C repository safety patch, its protected live no-delete
-plan, and the Phase 3C1 unused scoped IAM foundation are complete. The live API
-and worker remain deliberately unchanged on their legacy execution role. The
-next recommended work is an **offline/read-only preparation of the exact Phase 4
-current-main staging release proposal**, followed by a new explicit mutation
-approval before any image push, migration run, task-definition registration, or
-service update.
+Phase 3A, the Phase 3C repository safety patch and no-delete proof, Phase 3C1,
+and the Phase 4 current-main staging backend release are complete. The next
+program work is controlled Phase 5 staging UAT and recovery proof. It includes
+authenticated member/operator journeys, provider checks, notification delivery,
+migration idempotency evidence, and a restore rehearsal. Those activities can
+change staging data or external systems and remain outside this release record.
 
-That proposal must identify the exact source commit and image digest, enumerate
-every ECR/IAM/ECS/database operation, preserve the current API and worker task
-definitions as rollback baselines, serialize migration then worker then API,
-and include image-scan, health/readiness, service-stability, CORS, alarm, cost,
-and state/lock validation. It must also keep lifecycle deletion, alarm/SNS
-creation, CloudFront mutation, secret rotation/value access, restore rehearsal,
-and production entirely outside the deployment boundary unless separately
-approved.
+Lifecycle deletion, alarm/SNS creation, member-web or CloudFront mutation,
+secret rotation/value access, restore execution, and production remain separate
+boundaries. The current backend should stay on API `:36` and worker `:39` while
+those decisions are prepared; API `:33` and worker `:34` remain the documented
+release rollback definitions.
 
-Expected material cost remains the existing staging run rate plus temporary
-build/image storage and any normal deployment overlap; credits are currently
-applying but are not guaranteed. The exact cost and mutation list must be
-recomputed from the chosen source/digest before requesting approval. No Phase 4
-mutation is authorized by the completed Phase 3C1 approval.
+Expected material cost remains the existing staging run rate plus approximately
+`$0.036/month` for the retained Phase 4 image. Credits are currently applying but
+future coverage is not guaranteed. GitHub Actions charges, if any, remain
+separate from AWS credits.
 
 Phase 3B lifecycle application remains deferred. The desired rules would delete
 content noncurrent versions after 30 days and privacy noncurrent versions after

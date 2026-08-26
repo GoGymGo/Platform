@@ -2,7 +2,6 @@ import { IdempotencyService } from '../src/common/idempotency/idempotency.servic
 import { sql } from 'kysely';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
-import { dateKeyInTimezone } from '../src/modules/competitions/competition-calendar';
 import { GymsService } from '../src/modules/gyms/gyms.service';
 import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';
@@ -821,10 +820,7 @@ describeWithDatabase('connected static QR pilot', () => {
     const startedAt = new Date(referenceTime - 31 * 60_000);
     await database.connection
       .updateTable('workout_sessions')
-      .set({
-        eligible_date: dateKeyInTimezone(startedAt, 'America/Vancouver'),
-        started_at: startedAt,
-      })
+      .set({ started_at: startedAt })
       .where('id', '=', sessionId)
       .execute();
   }

@@ -243,6 +243,27 @@ jobs:
             echo "ECR did not return a valid immutable digest." >&2
             exit 1
           fi
+          scan_record_visible=false
+          for attempt in {1..12}; do
+            if scan_probe="$(aws ecr describe-image-scan-findings \
+                --repository-name "$ECR_REPOSITORY" \
+                --image-id "imageDigest=${digest}" 2>&1)"; then
+              scan_record_visible=true
+              break
+            fi
+            if [[ "$scan_probe" != *"ScanNotFoundException"* ]]; then
+              printf '%s\n' "$scan_probe" >&2
+              exit 1
+            fi
+            if [[ "$attempt" -lt 12 ]]; then
+              echo "ECR scan record is not visible yet; retrying (${attempt}/12)."
+              sleep 5
+            fi
+          done
+          if [[ "$scan_record_visible" != "true" ]]; then
+            echo "ECR scan record did not become visible after 12 attempts." >&2
+            exit 1
+          fi
           aws ecr wait image-scan-complete \
             --repository-name "$ECR_REPOSITORY" \
             --image-id "imageDigest=${digest}"

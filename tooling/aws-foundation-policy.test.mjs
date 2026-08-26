@@ -134,6 +134,10 @@ test("keeps runtime secrets role scoped and optional gates fail closed", async (
 
 test("serializes releases and preserves complete rollback baselines", async () => {
   const workflow = await read(".github/workflows/deployment.yml");
+  const scanGate = workflow.slice(
+    workflow.indexOf("- name: Push, pin, and verify the scanned image"),
+    workflow.indexOf("- name: Register and run the forward-only migration task"),
+  );
 
   assert.match(
     workflow,
@@ -164,9 +168,30 @@ test("serializes releases and preserves complete rollback baselines", async () =
   }
   assert.match(workflow, /worker_previous_status[\s\S]*?"ACTIVE"/);
   assert.match(workflow, /api_previous_status[\s\S]*?"ACTIVE"/);
-  assert.match(workflow, /aws ecr wait image-scan-complete/);
-  assert.match(workflow, /aws ecr describe-image-scan-findings/);
-  assert.match(workflow, /zero HIGH or CRITICAL findings/);
+  assert.match(scanGate, /scan_record_visible=false/);
+  assert.match(scanGate, /for attempt in \{1\.\.12\}/);
+  assert.match(
+    scanGate,
+    /scan_probe="\$\(aws ecr describe-image-scan-findings[\s\S]*?2>&1\)"/,
+  );
+  assert.match(
+    scanGate,
+    /if \[\[ "\$scan_probe" != \*"ScanNotFoundException"\* \]\]; then[\s\S]*?exit 1/,
+    "Only the eventual-consistency ScanNotFoundException may be retried",
+  );
+  assert.match(
+    scanGate,
+    /if \[\[ "\$attempt" -lt 12 \]\]; then[\s\S]*?sleep 5/,
+    "Scan-record discovery retries must remain bounded",
+  );
+  assert.match(scanGate, /aws ecr wait image-scan-complete/);
+  assert.match(scanGate, /scan_findings="\$\(aws ecr describe-image-scan-findings/);
+  assert.match(scanGate, /zero HIGH or CRITICAL findings/);
+  assert.doesNotMatch(
+    scanGate,
+    /aws ecr start-image-scan/,
+    "The workflow must rely on repository scan-on-push rather than mutating scan state",
+  );
   assert.doesNotMatch(
     workflow,
     /failed to stabilize and was returned to zero tasks/i,

@@ -196,6 +196,14 @@ test("serializes releases and preserves complete rollback baselines", async () =
     workflow,
     /failed to stabilize and was returned to zero tasks/i,
   );
+
+  const singletonWorkerDeployment =
+    /--service "\$ECS_WORKER_SERVICE" \\\s+--task-definition "\$(?:worker_definition|worker_previous_definition|WORKER_PREVIOUS_TASK_DEFINITION)" \\\s+--desired-count (?:1|"\$(?:worker_previous_desired_count|WORKER_PREVIOUS_DESIRED_COUNT)") \\\s+--deployment-configuration 'deploymentCircuitBreaker=\{enable=true,rollback=true\},minimumHealthyPercent=0,maximumPercent=100'/g;
+  assert.equal(
+    workflow.match(singletonWorkerDeployment)?.length,
+    4,
+    "Every forward and rollback worker deployment must stop the singleton before starting its replacement",
+  );
 });
 
 test("labels repository readiness and external recovery gates honestly", async () => {

@@ -2,6 +2,7 @@ import { IdempotencyService } from '../src/common/idempotency/idempotency.servic
 import { sql } from 'kysely';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
+import { dateKeyInTimezone } from '../src/modules/competitions/competition-calendar';
 import { GymsService } from '../src/modules/gyms/gyms.service';
 import { hashOpaqueValue } from '../src/modules/gyms/gym-scan-policy';
 import { LedgerService } from '../src/modules/ledger/ledger.service';

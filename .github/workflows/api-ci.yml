@@ -88,3 +88,9 @@ jobs:
           '
           docker run --rm --entrypoint node gogymgo-api:ci \
             node_modules/node-pg-migrate/bin/node-pg-migrate.js --help
+          docker run --rm --entrypoint node gogymgo-api:ci -e '
+            const sharp = require("sharp");
+            if (!sharp.versions.vips) {
+              throw new Error("Sharp did not load its native image runtime.");
+            }
+          '

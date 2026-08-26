@@ -265,9 +265,9 @@ jobs:
           rollback() {
             local status="$?"
             local recovery_status=0
-            trap - ERR
+            trap - EXIT
             set +e
-            if [[ "$remote_mutated" == "true" ]]; then
+            if [[ "$status" != "0" && "$remote_mutated" == "true" ]]; then
               echo "Release verification failed; restoring the previous entrypoint and association state." >&2
               restore_object index.html "$previous_root/index.html" 'text/html; charset=utf-8' 'no-store,max-age=0' || recovery_status=1
               restore_object \
@@ -287,7 +287,7 @@ jobs:
             fi
             exit "$status"
           }
-          trap rollback ERR
+          trap rollback EXIT
 
           capture_object index.html "$previous_root/index.html"
           capture_object \
@@ -374,4 +374,4 @@ jobs:
               fi
             fi
           done
-          trap - ERR
+          trap - EXIT

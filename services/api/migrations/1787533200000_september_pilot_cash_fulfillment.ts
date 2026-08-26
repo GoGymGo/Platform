@@ -28,11 +28,18 @@ export function up(pgm: MigrationBuilder): void {
     ) AS value
     WHERE reward.id = value.reward_catalog_item_id;
 
+    DROP TRIGGER IF EXISTS draw_reward_catalog_snapshots_append_only
+      ON draw_reward_catalog_snapshots;
+
     UPDATE draw_reward_catalog_snapshots AS snapshot
     SET cash_amount_cents = reward.cash_amount_cents,
         cash_currency = reward.cash_currency
     FROM reward_catalog_items AS reward
     WHERE reward.id = snapshot.reward_catalog_item_id;
+
+    CREATE TRIGGER draw_reward_catalog_snapshots_append_only
+    BEFORE UPDATE OR DELETE ON draw_reward_catalog_snapshots
+    FOR EACH ROW EXECUTE FUNCTION gogymgo_reject_append_only_mutation();
 
     UPDATE cash_fulfillments AS cash
     SET reward_award_version = greatest(award.version - 1, 1)

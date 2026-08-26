@@ -1,5 +1,6 @@
 import { IdempotencyService } from '../src/common/idempotency/idempotency.service';
 import { sql } from 'kysely';
+import { normalizeDateKey } from '../src/database/date-key';
 import { DatabaseService } from '../src/database/database.service';
 import type { AuthenticatedPrincipal } from '../src/modules/auth/auth.types';
 import { dateKeyInTimezone } from '../src/modules/competitions/competition-calendar';
@@ -441,7 +442,7 @@ describeWithDatabase('connected static QR pilot', () => {
       .where('id', '=', started.sessionId!)
       .executeTakeFirstOrThrow();
     const sameLocalDay =
-      verifiedSession.eligible_date ===
+      normalizeDateKey(verifiedSession.eligible_date) ===
       dateKeyInTimezone(new Date(), 'America/Vancouver');
     await expect(
       gyms.scan(principal, 'verify-again', scanRequest('verify-again-event')),

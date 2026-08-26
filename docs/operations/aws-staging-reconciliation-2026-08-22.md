@@ -247,6 +247,54 @@ overlap keep the attempt within the prior `<$0.10` incremental estimate. August
 usage remains approximately zero; the remaining balance and expiration are still
 not visible. GitHub Actions cost, if any, is separate from AWS credits.
 
+## Phase 5 read-only UAT preflight — August 26
+
+The restricted staging role still resolved to account ending **9877** in
+ca-central-1. API `:36` and worker `:39` remained 1/1 with completed rollouts,
+the load-balancer target was healthy, and public health and readiness returned
+HTTP 200. The region endpoint returned the active Vancouver Island + Gulf
+Islands policy with `America/Vancouver`; the September public reward catalog was
+empty. Unauthenticated streak, award, push-capability, and operator-health reads
+all failed closed with HTTP 401.
+
+An existing staging Firebase test session loaded the member-app shell, but two
+read-only resume attempts both rendered `COULD NOT RESUME`. No account was
+created, no credential was entered, and no profile, legal, enrollment, claim,
+operator, or other data mutation was attempted. The failure has two independently
+observed configuration causes:
+
+- the protected environment names `https://app.gogymgo.com` as `MEMBER_WEB_URL`,
+  while API `:36` has `CORS_ORIGINS=https://staging.gogymgo.com`; a browser
+  preflight from the member origin returned HTTP 204 without
+  `Access-Control-Allow-Origin`, while the configured staging origin received
+  the allow header; and
+- Firebase's public project metadata did not include `app.gogymgo.com` in its
+  seven authorized domains.
+
+The latest protected member-web release remains workflow run `31666457668` from
+August 13 at source `0286b5137fa92d46d4c4fee1de7acfbb6d92a38f`; substantial
+member-app changes have merged since that artifact. A new member-web release is
+therefore required after both origin configurations are corrected.
+
+Push delivery cannot be tested because `PUSH_NOTIFICATIONS_ENABLED=false`; the
+Expo token secret container exists but is not injected into either active
+runtime. Runtime alarm delivery also remains untestable because there are still
+zero SNS topics/subscriptions and every alarm action list is empty. These are
+intentional fail-closed states, not successful provider evidence.
+
+Migration idempotency has bounded live evidence without another database task:
+deployment runs `32940019811` and `32942580862` both completed their forward-only
+migration step using revisions `:42` and `:43`. The commits differ only in the
+deployment workflow, its focused policy test, and a midnight integration-test
+fixture; no migration file changed. The second run therefore safely encountered
+an already-current ledger and still exited zero. This does not replace a future
+isolated restore rehearsal.
+
+Recovery metadata remains healthy: the database is available, private,
+encrypted, has 14-day retention, a current PITR point, and daily automated
+snapshots through August 26. No restore was performed. AWS Backup inventory
+remains permission-blocked, so recoverability is still not proven end to end.
+
 ## Verified target and method
 
 | Item | Verified value |
@@ -284,7 +332,7 @@ sensitive-data/execution denies.
 | Deployed source | Exact current main `ae3760c3b15aada171d130e930dd6f77ebd2babc` deployed by protected run `32942580862` | VERIFIED | Low | Preserve exact-source gate |
 | ECR assurance | Immutable and scan-on-push; deployed digest passed Trivy and ECR with zero HIGH/CRITICAL findings | VERIFIED | Low | Preserve digest-only deployment |
 | Load balancer/readiness | Active TLS listener, one healthy target, health/readiness HTTP 200 after release | VERIFIED | Low | Continue routine monitoring |
-| Member web | Private-origin CloudFront; public routes HTTP 200; CORS correct | VERIFIED | Low | Authenticated UAT remains separate |
+| Member web | Private-origin CloudFront and public routes HTTP 200, but live API CORS excludes the canonical member origin, Firebase does not authorize it, and the artifact is stale | GAP FOUND | High | Correct both origin controls, publish current main, then rerun authenticated UAT |
 | RDS protection | Private, encrypted, forced SSL, 14-day PITR, daily automated snapshots | VERIFIED | Medium | Rehearse restore under separate approval |
 | RDS deletion safety | Deletion protection disabled; no manual snapshot | GAP FOUND | Medium | Decide whether staging policy should change |
 | Private S3 versioning | User-content and privacy-export versioning enabled by the exact Phase 3A saved plan; zero-change targeted post-plan | VERIFIED | Low | Preserve; monitor retained-version storage cost |
@@ -302,7 +350,7 @@ sensitive-data/execution denies.
 | Current costs | About $75.31 of August credit records; net AWS usage remains approximately $0; new image adds about $0.036/month | VERIFIED | Medium | Continue monitoring; investigate CloudWatch spend |
 | Credit balance/sharing | Payer Billing API denied because IAM billing access is inactive | BLOCKED BY PERMISSIONS | Medium | Do not promise future all-credit coverage |
 | Protected deployment | Exact current-main staging backend release succeeded; migration `:43`, worker `:39`, and API `:36` share one scanned immutable digest | VERIFIED | Low | Preserve run evidence and rollback baselines |
-| Authenticated UAT | Public health/readiness only were tested after release | NOT YET TESTED | High | Run a separately controlled staging UAT window without production access |
+| Authenticated UAT | Existing staging test session reached the shell, but read-only resume failed twice before authenticated API assertions could run | BLOCKED BY CONFIGURATION | High | Correct CORS and Firebase domains, redeploy the current member artifact, then resume the same non-destructive UAT |
 
 ## Terraform backend and drift
 

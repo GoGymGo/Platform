@@ -108,6 +108,11 @@ variable "cors_origins" {
     ])
     error_message = "Every CORS origin must be an exact HTTPS origin."
   }
+
+  validation {
+    condition     = contains(var.cors_origins, "https://${var.member_web_domain}")
+    error_message = "cors_origins must include the configured member-web origin."
+  }
 }
 
 variable "api_certificate_arn" {

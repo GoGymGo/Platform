@@ -1095,9 +1095,16 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   remained, and an exact six-create recovery completed with a zero-change
   post-plan. Three unused roles and three inline policies now exist, while both
   live services remain healthy on unchanged task definitions and the legacy role.
-  Remaining Terraform drift, lifecycle retention, AWS Backup metadata blocked by
-  an organization SCP, deployment, recovery rehearsal, and authenticated UAT
-  remain open; see the
+  Phase 4C has since completed the protected current-main backend release from
+  exact commit `ae3760c3b15aada171d130e930dd6f77ebd2babc`. Protected run
+  `32942580862` passed source authorization, image/runtime checks, Trivy, and the
+  immutable ECR scan; migration `:43` exited zero; worker `:39` and API `:36`
+  reached steady 1/1 state with zero failed tasks; and API `:33` plus worker `:34`
+  remain ACTIVE rollback definitions. Post-release health/readiness returned 200,
+  the target was healthy, all alarms were OK, and no new API/worker failure
+  metrics appeared. Remaining Terraform drift, lifecycle retention, AWS Backup
+  metadata blocked by an organization SCP, recovery rehearsal, alert delivery,
+  and authenticated UAT remain open; see the
   [AWS staging reconciliation](../operations/aws-staging-reconciliation-2026-08-22.md).
 - Required tests / operations / cloud dependency: offline Terraform validation/
   tests, image/security audit, migration idempotency, rollout/rollback, backup/
@@ -1193,14 +1200,15 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
   three unused roles, three inline policies, healthy 1/1 services on unchanged
   legacy execution-role references, enabled state versioning, no lock, restored
   111-allow/26-deny permissions with zero temporary markers, and denied baseline
-  state access. Task-definition registration and workload cutover remain later
-  approvals.
-- Residual risks / blocker: remaining Terraform and lifecycle drift, live runtime
-  cutover to the staged secret-scoped roles, absent alarm/SNS delivery, Backup
-  inventory blocked by an organization SCP, restore readiness, current credit
-  balance, provider integrations, protected deployment approval, and
-  authenticated staging UAT remain unresolved. Deployment requires further
-  explicit authority.
+  state access. The later Phase 4C deployment registered digest-pinned migration
+  `:43`, worker `:39`, and API `:36`, completed the workload cutover, and retained
+  the former API `:33` and worker `:34` as ACTIVE rollback definitions.
+- Residual risks / blocker: remaining Terraform and lifecycle drift, absent
+  alarm/SNS delivery, Backup inventory blocked by an organization SCP, restore
+  readiness, the undisclosed remaining credit balance/expiration, provider
+  integrations, and authenticated staging UAT remain unresolved. The current-main
+  staging backend deployment is complete; production and the remaining external
+  operations are not.
 
 ### GGG-031 — Expo SDK patch compatibility and deterministic release checks
 

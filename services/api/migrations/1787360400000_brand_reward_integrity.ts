@@ -43,6 +43,14 @@ export function up(pgm: MigrationBuilder): void {
       AND (claim_url IS NULL OR claim_url ~ '^https://[^[:space:]]+$')
     `,
   });
+  pgm.sql(`
+    UPDATE reward_catalog_items
+    SET status = 'archived',
+        updated_at = current_timestamp,
+        version = version + 1
+    WHERE status = 'published'
+      AND (image_url IS NULL OR terms_url IS NULL)
+  `);
   pgm.addConstraint('reward_catalog_items', 'reward_catalog_published_assets', {
     check: `
         status <> 'published'

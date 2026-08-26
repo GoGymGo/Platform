@@ -18,11 +18,14 @@ export interface MigratedPostgisTestDatabase {
   stop(): Promise<void>;
 }
 
-export async function startMigratedPostgisTestDatabase(): Promise<MigratedPostgisTestDatabase> {
-  const container = await new PostgreSqlContainer(
-    'postgis/postgis:17-3.5',
-  ).start();
-  const databaseUrl = container.getConnectionUri();
+export async function migrateTestDatabase(
+  databaseUrl: string,
+  targetTimestamp?: string,
+): Promise<void> {
+  const targetArguments = targetTimestamp
+    ? [targetTimestamp, '--timestamp']
+    : [];
+
   await execFileAsync(
     process.execPath,
     [
@@ -31,6 +34,7 @@ export async function startMigratedPostgisTestDatabase(): Promise<MigratedPostgi
         'node_modules/node-pg-migrate/bin/node-pg-migrate.js',
       ),
       'up',
+      ...targetArguments,
       '--tsx',
       '--migrations-dir',
       resolve(process.cwd(), 'migrations'),
@@ -39,6 +43,16 @@ export async function startMigratedPostgisTestDatabase(): Promise<MigratedPostgi
     ],
     { env: { ...process.env, DATABASE_URL: databaseUrl } },
   );
+}
+
+export async function startMigratedPostgisTestDatabase(
+  targetTimestamp?: string,
+): Promise<MigratedPostgisTestDatabase> {
+  const container = await new PostgreSqlContainer(
+    'postgis/postgis:17-3.5',
+  ).start();
+  const databaseUrl = container.getConnectionUri();
+  await migrateTestDatabase(databaseUrl, targetTimestamp);
   const pool = new Pool({ connectionString: databaseUrl });
 
   return {

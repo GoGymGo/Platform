@@ -359,6 +359,7 @@ jobs:
               --service "$ECS_WORKER_SERVICE" \
               --task-definition "$worker_previous_definition" \
               --desired-count "$worker_previous_desired_count" \
+              --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},minimumHealthyPercent=0,maximumPercent=100' \
               --force-new-deployment > /dev/null || recovery_status=1
             aws ecs wait services-stable \
               --cluster "$ECS_CLUSTER" \
@@ -398,6 +399,7 @@ jobs:
             --service "$ECS_WORKER_SERVICE" \
             --task-definition "$worker_definition" \
             --desired-count 1 \
+            --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},minimumHealthyPercent=0,maximumPercent=100' \
             --force-new-deployment > /dev/null
           if ! aws ecs wait services-stable \
               --cluster "$ECS_CLUSTER" \
@@ -487,6 +489,7 @@ jobs:
               --service "$ECS_WORKER_SERVICE" \
               --task-definition "$WORKER_PREVIOUS_TASK_DEFINITION" \
               --desired-count "$WORKER_PREVIOUS_DESIRED_COUNT" \
+              --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},minimumHealthyPercent=0,maximumPercent=100' \
               --force-new-deployment > /dev/null || recovery_status=1
             aws ecs wait services-stable \
               --cluster "$ECS_CLUSTER" \
@@ -603,6 +606,7 @@ jobs:
             --service "$ECS_WORKER_SERVICE" \
             --task-definition "$WORKER_PREVIOUS_TASK_DEFINITION" \
             --desired-count "$WORKER_PREVIOUS_DESIRED_COUNT" \
+            --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true},minimumHealthyPercent=0,maximumPercent=100' \
             --force-new-deployment > /dev/null || recovery_status=1
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \

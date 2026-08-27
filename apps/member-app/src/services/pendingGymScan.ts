@@ -5,6 +5,11 @@ import { isGymScanCredential } from '@/domain/gymScan';
 
 const pendingGymScanStorageKey = '@gogymgo/pending-gym-scan';
 export const pendingGymScanMaxAgeMs = 4 * 60 * 60 * 1000;
+const recoverableGymScanRejectionReasons = new Set([
+  'inaccurate_location',
+  'outside_geofence',
+  'replayed_event'
+]);
 
 export type PendingGymScanSession = {
   expiresAt: string;
@@ -171,10 +176,10 @@ export async function rememberCompetitionGymScanResult(
   const now = dependencies.now?.() ?? Date.now();
   const activeSession = parseActiveSession(result);
   const nextPending: PendingGymScan = {
-    activeSession:
-      result.outcome === 'started' || result.outcome === 'too_early'
-        ? activeSession ?? existing?.activeSession ?? null
-        : null,
+    activeSession: resolveActiveSessionAfterScan(
+      result,
+      activeSession ?? existing?.activeSession ?? null
+    ),
     competitionId,
     credential: null,
     credentialValidUntil,
@@ -203,10 +208,10 @@ export async function rememberGymScanResult(
   const activeSession = parseActiveSession(result);
   const nextPending: PendingGymScan = {
     ...pending,
-    activeSession:
-      result.outcome === 'started' || result.outcome === 'too_early'
-        ? activeSession ?? pending.activeSession
-        : null
+    activeSession: resolveActiveSessionAfterScan(
+      result,
+      activeSession ?? pending.activeSession
+    )
   };
   await storage.setItem(pendingGymScanStorageKey, JSON.stringify(nextPending));
   notifyPendingGymScan(nextPending);
@@ -294,6 +299,23 @@ function parseActiveSession(result: GymScanResultDto) {
     sessionId: result.sessionId,
     startedAt: result.startedAt
   });
+}
+
+function resolveActiveSessionAfterScan(
+  result: GymScanResultDto,
+  activeSession: PendingGymScanSession | null
+) {
+  if (result.outcome === 'started' || result.outcome === 'too_early') {
+    return activeSession;
+  }
+  if (
+    result.outcome === 'rejected' &&
+    result.rejectionReason &&
+    recoverableGymScanRejectionReasons.has(result.rejectionReason)
+  ) {
+    return activeSession;
+  }
+  return null;
 }
 
 function parseStoredActiveSession(value: unknown): PendingGymScanSession | null {

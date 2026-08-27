@@ -39,6 +39,7 @@ import {
   getCompetitionRegionDateKey
 } from '@/domain/competition';
 import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
+import { readEnrollmentGymPresence } from '@/domain/enrollmentGymPresence';
 import { isGymLocationAccuracyValidationMessage } from '@/domain/gymScan';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import type { RewardCatalogItem } from '@/domain/rewards';
@@ -312,7 +313,10 @@ function MobileCommitmentScreen() {
       let gymPresence: CreateCompetitionEnrollmentInput['gymPresence'] | undefined;
       let confirmedGymScan: PendingGymScan | null = null;
       if (!appTourActive && !registration.alreadyEnrolled) {
-        const pendingScan = await readPendingGymScan();
+        const { location, pendingScan } = await readEnrollmentGymPresence({
+          readLocation: readGymScanLocation,
+          readPendingScan: readPendingGymScan
+        });
         if (!pendingScan?.credential) {
           setGymPresenceStatus('missing');
           setConfirmationError(
@@ -321,7 +325,6 @@ function MobileCommitmentScreen() {
           return;
         }
         confirmedGymScan = pendingScan;
-        const location = await readGymScanLocation();
         if (location.status !== 'location-read') {
           setConfirmationError(
             location.status === 'permission-denied'

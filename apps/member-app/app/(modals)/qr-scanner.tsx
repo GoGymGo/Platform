@@ -154,6 +154,11 @@ function MobileQrScannerModal() {
     Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
   const workoutVerified = !enrollmentPresenceMode && result?.outcome === 'verified';
   const workoutGymName = result?.gymName ?? activeSession?.gymName ?? null;
+  const activeWorkoutError =
+    error ??
+    (result?.outcome === 'rejected'
+      ? rejectionMessage(result.rejectionReason ?? null)
+      : null);
   const scannedContestAcceptsWorkouts = scannedCompetition?.status === 'active';
 
   useEffect(() => {
@@ -491,11 +496,11 @@ function MobileQrScannerModal() {
           <HUDBorderBox
             glow
             style={styles.timerCard}
-            tone={error ? 'red' : completionReady ? 'green' : 'cyan'}
+            tone={activeWorkoutError ? 'red' : completionReady ? 'green' : 'cyan'}
           >
             <TerminalText
               glow
-              tone={error ? 'red' : completionReady ? 'green' : 'cyan'}
+              tone={activeWorkoutError ? 'red' : completionReady ? 'green' : 'cyan'}
               variant="label"
             >
               {completionReady ? '30 MINUTES COMPLETE' : 'WORKOUT TIMER'}
@@ -508,8 +513,8 @@ function MobileQrScannerModal() {
                 {workoutGymName}
               </TerminalText>
             ) : null}
-            <TerminalText tone={error ? 'red' : 'muted'} uppercase={false} variant="body">
-              {error ??
+            <TerminalText tone={activeWorkoutError ? 'red' : 'muted'} uppercase={false} variant="body">
+              {activeWorkoutError ??
                 (completionReady
                   ? 'Tap Finish Workout to check your gym location.'
                   : 'Finish unlocks at 00:00.')}
@@ -520,7 +525,7 @@ function MobileQrScannerModal() {
               </TerminalText>
             ) : (
               <>
-                {error?.startsWith('Location access') && Platform.OS !== 'web' ? (
+                {activeWorkoutError?.startsWith('Location access') && Platform.OS !== 'web' ? (
                   <CyberButtonOutline
                     label="OPEN DEVICE SETTINGS"
                     onPress={() => void Linking.openSettings()}
@@ -531,7 +536,7 @@ function MobileQrScannerModal() {
                   disabled={!completionReady || cancelling}
                   label={
                     completionReady
-                      ? error
+                      ? activeWorkoutError
                         ? 'TRY LOCATION CHECK AGAIN'
                         : 'CHECK LOCATION + FINISH'
                       : 'FINISH WORKOUT AT 00:00'

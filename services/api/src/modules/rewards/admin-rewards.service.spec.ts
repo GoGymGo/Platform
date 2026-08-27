@@ -10,6 +10,10 @@ import {
 import { AdminRewardAwardsService } from './admin-reward-awards.service';
 import { AdminRewardsService } from './admin-rewards.service';
 import type { RewardCodeCipherService } from './reward-code-cipher.service';
+import {
+  defaultRewardTermsUrl,
+  resolveRewardTermsUrl,
+} from './reward-defaults';
 
 const principal: AuthenticatedPrincipal = {
   email: 'admin@example.test',
@@ -40,6 +44,14 @@ describe('AdminRewardsService validation', () => {
     {} as RewardCodeCipherService,
     idempotency,
   );
+
+  it('uses generic reward terms unless an admin provides an override', () => {
+    expect(resolveRewardTermsUrl(undefined)).toBe(defaultRewardTermsUrl);
+    expect(resolveRewardTermsUrl('   ')).toBe(defaultRewardTermsUrl);
+    expect(
+      resolveRewardTermsUrl(' https://sponsor.example.test/specific-terms '),
+    ).toBe('https://sponsor.example.test/specific-terms');
+  });
 
   it('requires exactly one physical fulfillment path', () => {
     expectBadRequest(

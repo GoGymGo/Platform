@@ -78,8 +78,8 @@ export class RewardCatalogItemResponseDto {
   @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
   cashCurrency!: string | null;
 
-  @ApiProperty({ format: 'uri', type: String })
-  imageUrl!: string;
+  @ApiProperty({ format: 'uri', nullable: true, type: String })
+  imageUrl!: string | null;
 
   @ApiProperty({ format: 'uri', type: String })
   termsUrl!: string;

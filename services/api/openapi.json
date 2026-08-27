@@ -7603,7 +7603,7 @@
             "minLength": 3,
             "nullable": true
           },
-          "imageUrl": { "type": "string", "format": "uri" },
+          "imageUrl": { "type": "string", "format": "uri", "nullable": true },
           "termsUrl": { "type": "string", "format": "uri" },
           "inventoryRemaining": { "type": "number", "minimum": 0 },
           "inventoryTotal": { "type": "number", "minimum": 1 },

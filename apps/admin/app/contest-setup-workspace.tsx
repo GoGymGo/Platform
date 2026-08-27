@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveRewardTermsUrl } from "@gogymgo/contracts";
 import { FormEvent, useRef, useState } from "react";
 import type {
   Competition,
@@ -150,14 +151,20 @@ function distanceKilometres(
   return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
-function locationError(error: GeolocationPositionError) {
+function locationFallbackMessage(
+  error: GeolocationPositionError,
+  selectedRegionName?: string,
+) {
+  const selection = selectedRegionName
+    ? `${selectedRegionName} remains selected; confirm it below.`
+    : "Choose the contest region below.";
   if (error.code === error.PERMISSION_DENIED) {
-    return "Location access was not allowed. Choose the contest region below instead.";
+    return `Location access was not allowed. ${selection}`;
   }
   if (error.code === error.TIMEOUT) {
-    return "Your location took too long to detect. Try again or choose the region below.";
+    return `Location detection timed out. ${selection}`;
   }
-  return "Your location could not be detected. Choose the contest region below.";
+  return `Location could not be detected. ${selection}`;
 }
 
 function nativeSectionErrors(form: HTMLFormElement) {
@@ -312,7 +319,6 @@ export function ContestSetupWorkspace({
   const [flowError, setFlowError] = useState("");
   const [progress, setProgress] = useState("");
   const [locationMessage, setLocationMessage] = useState("");
-  const [locationIssue, setLocationIssue] = useState("");
   const [locating, setLocating] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const selectedRegion = enabledRegions.find(
@@ -333,11 +339,12 @@ export function ContestSetupWorkspace({
   }
 
   function useMyLocation() {
-    setLocationIssue("");
     setLocationMessage("");
     if (!navigator.geolocation) {
-      setLocationIssue(
-        "This browser cannot provide your location. Choose the contest region below.",
+      setLocationMessage(
+        selectedRegion
+          ? `This browser cannot provide your location. ${selectedRegion.metroName} remains selected; confirm it below.`
+          : "This browser cannot provide your location. Choose the contest region below.",
       );
       return;
     }
@@ -375,7 +382,9 @@ export function ContestSetupWorkspace({
         setLocating(false);
       },
       (error) => {
-        setLocationIssue(locationError(error));
+        setLocationMessage(
+          locationFallbackMessage(error, selectedRegion?.metroName),
+        );
         setLocating(false);
       },
       { enableHighAccuracy: true, maximumAge: 60_000, timeout: 20_000 },
@@ -461,12 +470,7 @@ export function ContestSetupWorkspace({
       const fulfillment = optionalString(
         formData.get("fulfillmentInstructions"),
       );
-      const imageUrl = optionalString(formData.get("imageUrl"));
-      const termsUrl = optionalString(formData.get("termsUrl"));
-      if (!imageUrl || !termsUrl) {
-        errors.reward =
-          "Add an approved HTTPS image and terms link before publishing.";
-      } else if (
+      if (
         selectedRewardType !== "coupon" &&
         Boolean(claimUrl) === Boolean(fulfillment)
       ) {
@@ -556,7 +560,9 @@ export function ContestSetupWorkspace({
               : "Create and publish the verified reward during contest launch.",
             rewardType: String(form.get("rewardType")),
             sponsorName: String(form.get("sponsorName")).trim(),
-            termsUrl: optionalString(form.get("termsUrl")),
+            termsUrl: resolveRewardTermsUrl(
+              optionalString(form.get("termsUrl")),
+            ),
             title: String(form.get("title")).trim(),
           });
       await onPublish(
@@ -933,10 +939,13 @@ export function ContestSetupWorkspace({
                 <details className="reward-advanced setup-advanced">
                   <summary>
                     <span>ADVANCED REWARD OPTIONS</span>
-                    <small>Image, terms, availability and display order</small>
+                    <small>
+                      Optional image, terms override, availability and display
+                      order
+                    </small>
                   </summary>
                   <div className="reward-advanced-grid">
-                    <SetupField label="IMAGE URL">
+                    <SetupField label="IMAGE URL (OPTIONAL)">
                       <input
                         defaultValue={editableReward?.imageUrl ?? ""}
                         name="imageUrl"
@@ -944,9 +953,11 @@ export function ContestSetupWorkspace({
                         type="url"
                       />
                     </SetupField>
-                    <SetupField label="TERMS URL">
+                    <SetupField label="TERMS URL (OPTIONAL OVERRIDE)">
                       <input
-                        defaultValue={editableReward?.termsUrl ?? ""}
+                        defaultValue={resolveRewardTermsUrl(
+                          editableReward?.termsUrl,
+                        )}
                         name="termsUrl"
                         placeholder="https://"
                         type="url"
@@ -1030,13 +1041,8 @@ export function ContestSetupWorkspace({
               </div>
             </div>
             {locationMessage ? (
-              <p className="setup-location-message success" role="status">
+              <p className="setup-location-message" role="status">
                 {locationMessage}
-              </p>
-            ) : null}
-            {locationIssue ? (
-              <p className="setup-location-message error" role="status">
-                {locationIssue}
               </p>
             ) : null}
             <div className="setup-region-choice">

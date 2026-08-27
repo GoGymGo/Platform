@@ -222,7 +222,15 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(contestSetupWorkspace, /CREATE A DIFFERENT REGION/);
   assert.match(contestSetupWorkspace, /ADD AN APPROVED PARTNER GYM/);
   assert.match(contestSetupWorkspace, /PUBLISH CONTEST/);
-  assert.match(contestSetupWorkspace, /if \(!imageUrl \|\| !termsUrl\)/);
+  assert.doesNotMatch(
+    contestSetupWorkspace,
+    /Add an approved HTTPS image and terms link before publishing/,
+  );
+  assert.match(contestSetupWorkspace, /resolveRewardTermsUrl/);
+  assert.match(contestSetupWorkspace, /IMAGE URL \(OPTIONAL\)/);
+  assert.match(contestSetupWorkspace, /TERMS URL \(OPTIONAL OVERRIDE\)/);
+  assert.match(contestSetupWorkspace, /Location detection timed out/);
+  assert.doesNotMatch(contestSetupWorkspace, /location-message error/);
   assert.match(
     contestSetupWorkspace,
     /Boolean\(claimUrl\) === Boolean\(fulfillment\)/,

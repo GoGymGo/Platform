@@ -200,7 +200,7 @@ export class RewardsService {
       competitionName: item.competition_name,
       description: item.description,
       id: item.id,
-      imageUrl: item.image_url!,
+      imageUrl: item.image_url,
       inventoryRemaining: Number(item.inventory_remaining),
       inventoryTotal: item.inventory_total,
       monthKey: item.month_key,

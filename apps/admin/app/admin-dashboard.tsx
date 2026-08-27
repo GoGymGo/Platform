@@ -1,7 +1,10 @@
 "use client";
 
 import { resolveFeatureCapabilities } from "@gogymgo/contracts/feature-capabilities";
-import type { UpdateRegionWaitlistStatusDto } from "@gogymgo/contracts";
+import {
+  resolveRewardTermsUrl,
+  type UpdateRegionWaitlistStatusDto,
+} from "@gogymgo/contracts";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
   browserLocalPersistence,
@@ -4172,10 +4175,7 @@ function RewardsPanel({
                   const couponReady =
                     reward.rewardType !== "coupon" ||
                     reward.couponCodeCount >= reward.inventoryTotal;
-                  const assetsReady = Boolean(
-                    reward.imageUrl && reward.termsUrl,
-                  );
-                  const publishReady = couponReady && assetsReady;
+                  const publishReady = couponReady;
                   const publishGateId = `reward-${reward.id}-publish-gate`;
                   return (
                     <tr key={reward.id}>
@@ -4229,9 +4229,8 @@ function RewardsPanel({
                                   className="action-guidance compact"
                                   id={publishGateId}
                                 >
-                                  {!assetsReady
-                                    ? "Add an approved image and terms link before publishing."
-                                    : "Add enough coupon codes for every inventory unit before publishing."}
+                                  Add enough coupon codes for every inventory
+                                  unit before publishing.
                                 </span>
                               ) : null}
                               <button
@@ -6056,7 +6055,7 @@ function RewardForm({
         reason: String(form.get("reason")),
         rewardType: selectedRewardType,
         sponsorName: String(form.get("sponsorName")),
-        termsUrl: optionalString(form.get("termsUrl")),
+        termsUrl: resolveRewardTermsUrl(optionalString(form.get("termsUrl"))),
         title: String(form.get("title")),
       });
       await onSubmit(body, reward);
@@ -6202,10 +6201,12 @@ function RewardForm({
           <details className="reward-advanced">
             <summary>
               <span>ADVANCED OPTIONS</span>
-              <small>Images, terms, timing and display order</small>
+              <small>
+                Optional image, terms override, timing and display order
+              </small>
             </summary>
             <div className="reward-advanced-grid">
-              <Field label="IMAGE URL">
+              <Field label="IMAGE URL (OPTIONAL)">
                 <input
                   defaultValue={reward?.imageUrl ?? ""}
                   name="imageUrl"
@@ -6213,9 +6214,9 @@ function RewardForm({
                   type="url"
                 />
               </Field>
-              <Field label="TERMS URL">
+              <Field label="TERMS URL (OPTIONAL OVERRIDE)">
                 <input
-                  defaultValue={reward?.termsUrl ?? ""}
+                  defaultValue={resolveRewardTermsUrl(reward?.termsUrl)}
                   name="termsUrl"
                   placeholder="https://"
                   type="url"

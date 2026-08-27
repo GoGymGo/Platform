@@ -192,7 +192,7 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
         </TerminalText>
         {reward.termsUrl ? (
           <CyberButtonOutline
-            label="VIEW BRAND TERMS"
+            label="VIEW TERMS"
             onPress={() => void Linking.openURL(reward.termsUrl!)}
             style={styles.termsButton}
             tone={tone}

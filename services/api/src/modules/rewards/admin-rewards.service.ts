@@ -33,6 +33,7 @@ import {
   isSeptemberPilotCompetition,
   septemberPilotRewardConfigurationErrors,
 } from './september-pilot-cash-policy';
+import { resolveRewardTermsUrl } from './reward-defaults';
 
 interface AdminRewardJson extends JsonObject {
   id: string;
@@ -106,7 +107,7 @@ export class AdminRewardsService {
             reward_type: input.rewardType,
             sponsor_name: input.sponsorName.trim(),
             status: 'draft',
-            terms_url: input.termsUrl ?? null,
+            terms_url: resolveRewardTermsUrl(input.termsUrl),
             title: input.title.trim(),
             updated_at: now,
             version: 1,
@@ -207,7 +208,7 @@ export class AdminRewardsService {
             inventory_total: input.inventoryTotal,
             reward_type: input.rewardType,
             sponsor_name: input.sponsorName.trim(),
-            terms_url: input.termsUrl ?? null,
+            terms_url: resolveRewardTermsUrl(input.termsUrl),
             title: input.title.trim(),
             updated_at: new Date(),
             version: sql<number>`version + 1`,
@@ -276,8 +277,15 @@ export class AdminRewardsService {
             transaction,
             current.competition_id,
           );
-          this.assertPublicationAssets(current);
-          await this.assertSeptemberPilotPublication(transaction, current);
+          const publicationReward = {
+            ...current,
+            terms_url: resolveRewardTermsUrl(current.terms_url),
+          };
+          this.assertPublicationTerms(publicationReward);
+          await this.assertSeptemberPilotPublication(
+            transaction,
+            publicationReward,
+          );
           if (current.reward_type === 'coupon') {
             const codeInventory = await transaction
               .selectFrom('reward_coupon_codes')
@@ -305,6 +313,10 @@ export class AdminRewardsService {
           .updateTable('reward_catalog_items')
           .set({
             status: nextStatus,
+            terms_url:
+              nextStatus === 'published'
+                ? resolveRewardTermsUrl(current.terms_url)
+                : current.terms_url,
             updated_at: new Date(),
             version: sql<number>`version + 1`,
           })
@@ -712,15 +724,11 @@ export class AdminRewardsService {
     }
   }
 
-  private assertPublicationAssets(input: {
-    image_url: string | null;
-    terms_url: string | null;
-  }): void {
-    if (!input.image_url || !input.terms_url) {
+  private assertPublicationTerms(input: { terms_url: string | null }): void {
+    if (!input.terms_url) {
       throw new ConflictException({
-        code: 'REWARD_PUBLICATION_ASSETS_REQUIRED',
-        message:
-          'Add an approved HTTPS image and terms link before publishing the reward.',
+        code: 'REWARD_PUBLICATION_TERMS_REQUIRED',
+        message: 'A valid HTTPS terms link is required to publish the reward.',
       });
     }
   }

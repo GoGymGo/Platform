@@ -26,6 +26,7 @@ import {
   RewardTypeDto,
 } from '../src/modules/rewards/dto/reward.dto';
 import { RewardCodeCipherService } from '../src/modules/rewards/reward-code-cipher.service';
+import { defaultRewardTermsUrl } from '../src/modules/rewards/reward-defaults';
 import { RewardsService } from '../src/modules/rewards/rewards.service';
 import { SessionsService } from '../src/modules/sessions/sessions.service';
 import { SocialService } from '../src/modules/social/social.service';
@@ -1510,12 +1511,10 @@ describeWithDatabase('critical session and ledger workflow', () => {
       {
         competitionId: fixture.competitionId,
         description: 'Single-use recovery sponsor coupon.',
-        imageUrl: 'https://cdn.example.com/recovery-coupon.jpg',
         inventoryTotal: 1,
         reason: 'Configure the tested sponsor coupon inventory.',
         rewardType: RewardTypeDto.COUPON,
         sponsorName: 'Recovery Sponsor',
-        termsUrl: 'https://example.com/recovery-coupon-terms',
         title: 'Recovery coupon',
       },
     );
@@ -1572,10 +1571,12 @@ describeWithDatabase('critical session and ledger workflow', () => {
     ).resolves.toEqual([
       expect.objectContaining({
         id: created.id,
+        imageUrl: null,
         inventoryRemaining: 1,
         inventoryTotal: 1,
         regionTimezone: 'America/Vancouver',
         rewardType: 'coupon',
+        termsUrl: defaultRewardTermsUrl,
       }),
     ]);
 

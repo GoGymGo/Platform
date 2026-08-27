@@ -507,6 +507,17 @@ if (
   );
 }
 for (const marker of [
+  'FROM node:24-alpine3.23 AS build',
+  'FROM node:24-alpine3.23 AS runtime',
+  'apk upgrade --no-cache libcrypto3 libssl3',
+]) {
+  if (!dockerfile.includes(marker)) {
+    violations.push(
+      `the production image is missing the reviewed OpenSSL baseline marker ${marker}`,
+    );
+  }
+}
+for (const marker of [
   'command = [',
   '"node"',
   '"node_modules/node-pg-migrate/bin/node-pg-migrate.js"',

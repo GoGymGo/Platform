@@ -1,4 +1,4 @@
-FROM node:24-alpine AS build
+FROM node:24-alpine3.23 AS build
 
 WORKDIR /workspace
 COPY package.json package-lock.json ./
@@ -14,7 +14,7 @@ COPY services/api services/api
 RUN npm run build --workspace @gogymgo/api \
   && npm prune --omit=dev --ignore-scripts
 
-FROM node:24-alpine AS runtime
+FROM node:24-alpine3.23 AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -29,7 +29,8 @@ COPY --from=build --chown=node:node /workspace/services/api/node_modules ./servi
 COPY --from=build --chown=node:node /workspace/services/api/config ./services/api/config
 COPY --from=build --chown=node:node /workspace/services/api/dist ./services/api/dist
 
-RUN chmod 0444 /etc/ssl/certs/aws-rds-ca-central-1-bundle.pem \
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+  && chmod 0444 /etc/ssl/certs/aws-rds-ca-central-1-bundle.pem \
   && rm -rf /usr/local/lib/node_modules/npm \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx
 

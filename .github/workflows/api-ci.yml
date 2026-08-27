@@ -72,6 +72,16 @@ jobs:
         env:
           REWARD_CODE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       - run: docker build --file services/api/Dockerfile --tag gogymgo-api:ci .
+      - name: Scan the production API image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          exit-code: "1"
+          format: table
+          hide-progress: true
+          image-ref: gogymgo-api:ci
+          ignore-unfixed: true
+          scan-type: image
+          severity: HIGH,CRITICAL
       - name: Verify production image runtime dependencies
         run: |
           docker run --rm --entrypoint node gogymgo-api:ci -e '

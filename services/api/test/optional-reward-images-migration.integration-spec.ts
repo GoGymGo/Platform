@@ -67,7 +67,7 @@ describeWithDatabase('optional reward images migration', () => {
     await expect(
       migrated.pool.query(
         `UPDATE reward_catalog_items
-         SET status = 'published'
+         SET status = 'published', version = version + 1
          WHERE title = 'No custom image'`,
       ),
     ).resolves.toMatchObject({ rowCount: 1 });
@@ -77,7 +77,7 @@ describeWithDatabase('optional reward images migration', () => {
     await expect(
       migrated.pool.query(
         `UPDATE reward_catalog_items
-         SET status = 'published'
+         SET status = 'published', version = version + 1
          WHERE title = 'Missing terms'`,
       ),
     ).rejects.toMatchObject<Partial<DatabaseError>>({

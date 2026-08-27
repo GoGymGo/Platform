@@ -229,6 +229,121 @@ describe('pending gym scan storage', () => {
     assert.equal(stored?.credential, null);
   });
 
+  it('keeps an active workout after a recoverable finish-location rejection', async () => {
+    const storage = createMemoryStorage();
+    const dependencies = { now: () => startedAt, storage };
+    await rememberGymScanCredential(credential, dependencies);
+    await rememberCompetitionGymAccess(
+      {
+        competitionId: 'competition-1',
+        credentialValidUntil: '2026-10-01T07:00:00.000Z'
+      },
+      dependencies
+    );
+    await rememberCompetitionGymScanResult(
+      {
+        competitionId: 'competition-1',
+        credentialValidUntil: '2026-10-01T07:00:00.000Z',
+        result: {
+          credentialVersion: 1,
+          expiresAt: '2026-09-01T21:00:00.000Z',
+          gymLocationId: 'gym-1',
+          gymName: 'SkyGate',
+          minimumCompleteAt: '2026-09-01T17:30:00.000Z',
+          outcome: 'started',
+          rejectionReason: null,
+          remainingSeconds: 1800,
+          serverTimestamp: '2026-09-01T17:00:00.000Z',
+          sessionId: 'session-1',
+          startedAt: '2026-09-01T17:00:00.000Z'
+        }
+      },
+      dependencies
+    );
+
+    await rememberCompetitionGymScanResult(
+      {
+        competitionId: 'competition-1',
+        credentialValidUntil: '2026-10-01T07:00:00.000Z',
+        result: {
+          credentialVersion: 1,
+          expiresAt: null,
+          gymLocationId: 'gym-1',
+          gymName: 'SkyGate',
+          minimumCompleteAt: null,
+          outcome: 'rejected',
+          rejectionReason: 'inaccurate_location',
+          remainingSeconds: 0,
+          serverTimestamp: '2026-09-01T17:31:00.000Z',
+          sessionId: null,
+          startedAt: null
+        }
+      },
+      dependencies
+    );
+
+    assert.equal(
+      (await readPendingGymScan(dependencies))?.activeSession?.sessionId,
+      'session-1'
+    );
+  });
+
+  it('clears an active workout after a terminal session expiry', async () => {
+    const storage = createMemoryStorage();
+    const dependencies = { now: () => startedAt, storage };
+    await rememberGymScanCredential(credential, dependencies);
+    await rememberCompetitionGymAccess(
+      {
+        competitionId: 'competition-1',
+        credentialValidUntil: '2026-10-01T07:00:00.000Z'
+      },
+      dependencies
+    );
+    await rememberCompetitionGymScanResult(
+      {
+        competitionId: 'competition-1',
+        credentialValidUntil: '2026-10-01T07:00:00.000Z',
+        result: {
+          credentialVersion: 1,
+          expiresAt: '2026-09-01T21:00:00.000Z',
+          gymLocationId: 'gym-1',
+          gymName: 'SkyGate',
+          minimumCompleteAt: '2026-09-01T17:30:00.000Z',
+          outcome: 'started',
+          rejectionReason: null,
+          remainingSeconds: 1800,
+          serverTimestamp: '2026-09-01T17:00:00.000Z',
+          sessionId: 'session-1',
+          startedAt: '2026-09-01T17:00:00.000Z'
+        }
+      },
+      dependencies
+    );
+
+    await rememberCompetitionGymScanResult(
+      {
+        competitionId: 'competition-1',
+        credentialValidUntil: '2026-10-01T07:00:00.000Z',
+        result: {
+          credentialVersion: 1,
+          expiresAt: '2026-09-01T21:00:00.000Z',
+          gymLocationId: 'gym-1',
+          gymName: 'SkyGate',
+          minimumCompleteAt: '2026-09-01T17:30:00.000Z',
+          outcome: 'rejected',
+          rejectionReason: 'session_expired',
+          remainingSeconds: 0,
+          serverTimestamp: '2026-09-01T21:00:01.000Z',
+          sessionId: 'session-1',
+          startedAt: '2026-09-01T17:00:00.000Z'
+        }
+      },
+      dependencies
+    );
+
+    assert.equal((await readPendingGymScan(dependencies))?.activeSession, null);
+  });
+
   it('clears a cancelled workout while preserving enrolled gym access', async () => {
     const storage = createMemoryStorage();
     const dependencies = { now: () => startedAt, storage };

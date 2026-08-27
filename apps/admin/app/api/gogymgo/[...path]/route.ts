@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   buildUpstreamUrl,
+  isEmptySuccessfulAdminResponse,
   isAllowedAdminProxyPath,
   validatedAdminProxySearch,
 } from "./upstream-url.mjs";
@@ -99,11 +100,24 @@ async function proxy(request: NextRequest, context: RouteContext) {
   if (response.status >= 300 && response.status < 400) {
     return proxyError("The GoGymGo API returned an invalid redirect.", 502);
   }
+  const responseBody = await response.text();
+  if (isEmptySuccessfulAdminResponse(response.status, responseBody)) {
+    if (response.status === 204 || response.status === 205) {
+      return new NextResponse(null, {
+        headers: { "cache-control": "no-store" },
+        status: response.status,
+      });
+    }
+    return NextResponse.json(null, {
+      headers: { "cache-control": "no-store" },
+      status: response.status,
+    });
+  }
   const responseType = response.headers.get("content-type") ?? "";
   if (!/^application\/json\b/i.test(responseType)) {
     return proxyError("The GoGymGo API returned an invalid response.", 502);
   }
-  return new NextResponse(await response.text(), {
+  return new NextResponse(responseBody, {
     headers: {
       "cache-control": "no-store",
       "content-type": responseType,

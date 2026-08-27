@@ -497,6 +497,8 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(proxy, /redirect: "manual"/);
   assert.match(proxy, /invalid redirect/);
   assert.match(proxy, /could not be reached/);
+  assert.match(proxy, /isEmptySuccessfulAdminResponse/);
+  assert.match(proxy, /NextResponse\.json\(null/);
   assert.doesNotMatch(proxy, /firebase.*private|serviceAccount/i);
   assert.match(upstreamUrl, /path\[0\] === "operator"/);
   assert.match(upstreamUrl, /parsed\.username \|\| parsed\.password/);

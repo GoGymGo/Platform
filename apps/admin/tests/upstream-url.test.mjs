@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   buildUpstreamUrl,
+  isEmptySuccessfulAdminResponse,
   isAllowedAdminProxyPath,
   parseAdminApiBaseUrl,
   validatedAdminProxySearch,
@@ -83,4 +84,12 @@ test("admin proxy preserves safe queries without forwarding authentication mater
   ]) {
     assert.throws(() => validatedAdminProxySearch(search));
   }
+});
+
+test("admin proxy recognizes an empty successful API response", () => {
+  assert.equal(isEmptySuccessfulAdminResponse(200, ""), true);
+  assert.equal(isEmptySuccessfulAdminResponse(201, " \n"), true);
+  assert.equal(isEmptySuccessfulAdminResponse(204, ""), true);
+  assert.equal(isEmptySuccessfulAdminResponse(200, "null"), false);
+  assert.equal(isEmptySuccessfulAdminResponse(404, ""), false);
 });

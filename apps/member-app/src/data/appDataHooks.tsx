@@ -33,6 +33,7 @@ import {
   createSocialRepository,
   type SocialRepository
 } from '@/data/socialRepository';
+import { getCompetitionMatchRefetchInterval } from '@/data/competitionMatchSync';
 import {
   createWorkoutSessionRepository,
   type WorkoutSessionRepository
@@ -215,6 +216,8 @@ export function useCompetitionMatches(
       regionCode,
       competitionId!
     ),
+    refetchInterval: (query) =>
+      getCompetitionMatchRefetchInterval(query.state.data),
     queryKey: [
       'competition-matches',
       competitionMonthKey,

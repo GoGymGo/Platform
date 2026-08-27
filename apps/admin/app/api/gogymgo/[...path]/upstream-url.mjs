@@ -61,6 +61,11 @@ export function validatedAdminProxySearch(search = "") {
   return encoded ? `?${encoded}` : "";
 }
 
+/** @param {number} status @param {string} body */
+export function isEmptySuccessfulAdminResponse(status, body) {
+  return status >= 200 && status < 300 && body.trim().length === 0;
+}
+
 /**
  * Build the only upstream URL shape accepted by the admin proxy.
  *

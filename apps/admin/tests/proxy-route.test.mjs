@@ -30,6 +30,11 @@ before(async () => {
       response.end("<p>upstream detail</p>");
       return;
     }
+    if (responseMode === "empty-success") {
+      response.writeHead(200);
+      response.end();
+      return;
+    }
     const status = responseMode === "unauthorized" ? 401 : 200;
     response.writeHead(status, { "content-type": "application/json" });
     response.end(
@@ -196,6 +201,18 @@ test("passes JSON auth failures but sanitizes invalid upstream responses", async
   });
   assert.equal(html.status, 502);
   assert.doesNotMatch(await html.text(), /upstream detail/);
+});
+
+test("normalizes an empty successful upstream response as JSON null", async () => {
+  responseMode = "empty-success";
+  const response = await dispatch(
+    "/api/gogymgo/operator/competitions/competition-1/gym-locations/gym-1/qr-credentials/active",
+    { headers: { authorization: validAuthorization } },
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json/);
+  assert.equal(await response.json(), null);
 });
 
 test("sanitizes upstream network failures", async () => {

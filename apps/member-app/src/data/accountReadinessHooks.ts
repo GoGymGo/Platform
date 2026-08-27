@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAppData } from '@/data/appDataHooks';
+import { competitionEnrollmentRefreshQueryKeys } from '@/data/competitionMatchSync';
 import type {
   CreateCompetitionEnrollmentInput,
   CreateRegionVerificationInput,
@@ -128,6 +129,9 @@ export function useEnrollInCompetition() {
       void queryClient.invalidateQueries({
         queryKey: ['competition-enrollment-count']
       });
+      for (const queryKey of competitionEnrollmentRefreshQueryKeys) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
     }
   });
 }

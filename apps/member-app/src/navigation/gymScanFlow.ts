@@ -1,10 +1,12 @@
 import type { AccountSetupStep } from '@/domain/accountSetup';
 import type { PendingGymScan } from '@/services/pendingGymScan';
+import type { GymScanResultDto } from '@gogymgo/contracts';
 
 export const gymScanAuthNext = 'gym-scan';
 export const gymScanSetupNext = 'gym-scan-setup';
 export const gymScanSource = 'gym-scan';
 export const gymScanWorkoutRoute = '/qr-scanner';
+export const gymScanVerifiedWorkoutRoute = '/home';
 
 export function isGymScanContinuation(next: string | undefined) {
   return next === gymScanAuthNext || next === gymScanSetupNext;
@@ -32,4 +34,10 @@ export function getRecoverableWorkoutCompetitionId(
   return pending?.activeSession && pending.competitionId
     ? pending.competitionId
     : null;
+}
+
+export function getGymScanPostVerificationRoute(
+  outcome: GymScanResultDto['outcome']
+) {
+  return outcome === 'verified' ? gymScanVerifiedWorkoutRoute : null;
 }

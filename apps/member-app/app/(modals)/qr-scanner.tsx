@@ -36,6 +36,7 @@ import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
 import {
+  getGymScanPostVerificationRoute,
   getGymScanSetupRoute,
   getRecoverableWorkoutCompetitionId
 } from '@/navigation/gymScanFlow';
@@ -362,6 +363,14 @@ function MobileQrScannerModal() {
         } catch {
           // The server response remains authoritative if local continuity storage fails.
         }
+        const postVerificationRoute = getGymScanPostVerificationRoute(scanResult.outcome);
+        if (postVerificationRoute) {
+          void queryClient.invalidateQueries({ queryKey: ['competition-progress'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-latest-competition-results'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-reward-awards'] });
+          router.replace(postVerificationRoute);
+          return;
+        }
       } catch (scanError) {
         setError(getScanErrorMessage(scanError));
       } finally {
@@ -376,6 +385,7 @@ function MobileQrScannerModal() {
       enrolledCompetitionId,
       pendingIntent,
       next,
+      queryClient,
       repository,
       router,
       scanLocked,

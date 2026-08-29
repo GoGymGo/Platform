@@ -3,8 +3,10 @@ import { describe, it } from 'node:test';
 
 import {
   getGymScanPostAuthRoute,
+  getGymScanPostVerificationRoute,
   getRecoverableWorkoutCompetitionId,
   getGymScanSetupRoute,
+  gymScanVerifiedWorkoutRoute,
   gymScanWorkoutRoute,
   isGymScanContinuation
 } from './gymScanFlow';
@@ -49,5 +51,15 @@ describe('gym scan navigation', () => {
       }),
       null
     );
+  });
+
+  it('returns a verified workout directly home without re-entering weekly-goal setup', () => {
+    assert.equal(
+      getGymScanPostVerificationRoute('verified'),
+      gymScanVerifiedWorkoutRoute
+    );
+    assert.equal(getGymScanPostVerificationRoute('started'), null);
+    assert.equal(getGymScanPostVerificationRoute('too_early'), null);
+    assert.equal(getGymScanPostVerificationRoute('rejected'), null);
   });
 });

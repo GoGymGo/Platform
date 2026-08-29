@@ -36,6 +36,11 @@ export class RewardCatalogQueryDto {
   @IsOptional()
   @Matches(/^[0-9]{4}-(0[1-9]|1[0-2])$/)
   monthKey?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  competitionId?: string;
 }
 
 export class RewardCatalogItemResponseDto {

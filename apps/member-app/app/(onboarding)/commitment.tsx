@@ -142,7 +142,8 @@ function MobileCommitmentScreen() {
   const upcomingCompetitionMonthKey = registration.competitionMonthKey;
   const rewardsQuery = useRewardCatalog(
     registration.competition?.regionCode ?? '',
-    registration.competition?.monthKey
+    registration.competition?.monthKey,
+    registration.competition?.id
   );
   const contestRewards = (rewardsQuery.data ?? []).filter(
     (reward) => reward.competitionId === registration.competition?.id

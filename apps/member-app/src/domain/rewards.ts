@@ -79,6 +79,12 @@ export function rewardAvailabilityLabel(reward: RewardCatalogItem): string {
   return `${reward.inventoryRemaining.toLocaleString()} AVAILABLE`;
 }
 
+export function rewardTypeLabel(rewardType: RewardType): string {
+  if (rewardType === 'cash') return 'CASH PRIZE';
+  if (rewardType === 'coupon') return 'COUPON CODE';
+  return 'PHYSICAL PRIZE';
+}
+
 export function rewardAvailabilityWindowLabel(
   reward: RewardCatalogItem
 ): string {

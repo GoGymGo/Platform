@@ -67,7 +67,8 @@ export type AppDataSource = {
   getMyStreaks: () => Promise<StreakSummary | null>;
   getRewardCatalog: (
     regionCode: string,
-    monthKey?: string
+    monthKey?: string,
+    competitionId?: string
   ) => Promise<readonly RewardCatalogItem[]>;
   planCreatorWorkout: (
     workoutId: string,
@@ -191,9 +192,10 @@ function createApiDataSource(api: ApiClient): AppDataSource {
       ).then(normalizeParticipantCompetitionResults),
     getMyStreaks: () =>
       api.request<unknown>('/v1/streaks/me').then(parseStreakSummary),
-    getRewardCatalog: (regionCode, monthKey) => {
+    getRewardCatalog: (regionCode, monthKey, competitionId) => {
       const query = new URLSearchParams({ region: regionCode });
       if (monthKey) query.set('monthKey', monthKey);
+      if (competitionId) query.set('competitionId', competitionId);
       return api.request<unknown>(
         `/v1/rewards/catalog?${query.toString()}`,
         { authenticated: false }

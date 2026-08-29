@@ -18,6 +18,7 @@ import { useRewardCatalog } from '@/data/appDataHooks';
 import {
   rewardAvailabilityLabel,
   rewardAvailabilityWindowLabel,
+  rewardTypeLabel,
   type RewardCatalogItem
 } from '@/domain/rewards';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
@@ -34,11 +35,12 @@ export default function RewardMarketplaceScreen() {
     false
   );
   const { competitionRegion, regionVerification } = useCompetitionRegion();
-  const { competition } = useWorkoutProgress();
+  const { competition, competitionId } = useWorkoutProgress();
   const hasVerifiedRegion = Boolean(regionVerification?.regionCode);
   const rewardsQuery = useRewardCatalog(
     regionVerification?.regionCode ?? '',
-    competition.competitionMonthKey
+    competition.competitionMonthKey,
+    competitionId ?? undefined
   );
   const { data: rewards = [], isPending } = rewardsQuery;
 
@@ -109,13 +111,20 @@ export default function RewardMarketplaceScreen() {
           <TerminalText live="polite" style={styles.empty} tone="muted" variant="label">
             LOADING REGIONAL REWARDS...
           </TerminalText>
+        ) : rewards.length === 0 && competitionId ? (
+          <RecoverableError
+            body="The published reward for this Contest was not returned. Refresh to load it without leaving the Rewards screen."
+            onRetry={() => void rewardsQuery.refetch()}
+            retrying={rewardsQuery.isFetching}
+            title="REWARD COULD NOT BE LOADED"
+          />
         ) : rewards.length === 0 ? (
           <HUDBorderBox style={styles.emptyCard} tone="muted">
             <TerminalText tone="muted" variant="label">
-              REWARDS PUBLISHING SOON
+              NO CURRENT CONTEST REWARDS
             </TerminalText>
             <TerminalText tone="muted" uppercase={false} variant="body">
-              Brand Rewards for this regional Contest have not been published yet.
+              Join a published Contest to view its reward here.
             </TerminalText>
           </HUDBorderBox>
         ) : (
@@ -151,6 +160,8 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
               color={reward.rewardType === 'coupon' ? colors.cyan : colors.pink}
               name={reward.rewardType === 'coupon'
                 ? 'pricetag-outline'
+                : reward.rewardType === 'cash'
+                  ? 'cash-outline'
                 : reward.title.toLowerCase().includes('hoodie')
                   ? 'shirt-outline'
                   : 'barbell-outline'}
@@ -170,7 +181,7 @@ function RewardCard({ reward }: { reward: RewardCatalogItem }) {
       <View style={styles.rewardCopy}>
         <View style={styles.rewardMeta}>
           <TerminalText tone={tone} variant="micro">
-            {reward.rewardType === 'coupon' ? 'COUPON CODE' : 'PHYSICAL PRIZE'}
+            {rewardTypeLabel(reward.rewardType)}
           </TerminalText>
           <TerminalText tone={inStock ? 'green' : 'muted'} variant="micro">
             {rewardAvailabilityLabel(reward)}

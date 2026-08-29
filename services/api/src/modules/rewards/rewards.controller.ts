@@ -38,7 +38,11 @@ export class RewardsController {
   getCatalog(
     @Query() query: RewardCatalogQueryDto,
   ): Promise<RewardCatalogItemResponseDto[]> {
-    return this.rewards.getCatalog(query.region, query.monthKey);
+    return this.rewards.getCatalog(
+      query.region,
+      query.monthKey,
+      query.competitionId,
+    );
   }
 
   @Get('awards/me')

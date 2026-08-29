@@ -2551,6 +2551,12 @@
             "required": false,
             "in": "query",
             "schema": { "example": "2026-08", "type": "string" }
+          },
+          {
+            "name": "competitionId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
           }
         ],
         "responses": {

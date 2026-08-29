@@ -441,12 +441,21 @@ export function useMyStreaks() {
   });
 }
 
-export function useRewardCatalog(regionCode: string, monthKey?: string) {
+export function useRewardCatalog(
+  regionCode: string,
+  monthKey?: string,
+  competitionId?: string
+) {
   const { apiQueriesEnabled, source } = useAppData();
   return useQuery({
     enabled: apiQueriesEnabled && regionCode.length > 0,
-    queryFn: () => source.getRewardCatalog(regionCode, monthKey),
-    queryKey: ['reward-catalog', regionCode, monthKey ?? 'current']
+    queryFn: () => source.getRewardCatalog(regionCode, monthKey, competitionId),
+    queryKey: [
+      'reward-catalog',
+      regionCode,
+      monthKey ?? 'current',
+      competitionId ?? 'all-contests'
+    ]
   });
 }
 

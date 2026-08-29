@@ -134,7 +134,11 @@ describeWithDatabase('automatic Weekly Challenge matching', () => {
         INSERT INTO friendships (user_a_id, user_b_id, created_at)
         VALUES (LEAST($1::uuid, $2::uuid), GREATEST($1::uuid, $2::uuid),
                 '2026-07-26T00:00:00.000Z');
-
+        `,
+        [userIds[0], userIds[1]],
+      );
+      await client.query(
+        `
         INSERT INTO weekly_challenge_requests (
           competition_id, period_index, requester_user_id, recipient_user_id,
           goal_days, status, created_at

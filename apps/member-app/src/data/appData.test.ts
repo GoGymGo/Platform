@@ -59,10 +59,14 @@ describe('app data boundary', () => {
     };
     const production = createAppDataSource('api', api);
 
-    await production.getRewardCatalog('toronto', '2026-08');
+    await production.getRewardCatalog(
+      'toronto',
+      '2026-08',
+      '40000000-0000-4000-8000-000000000001'
+    );
     assert.equal(
       requestPath,
-      '/v1/rewards/catalog?region=toronto&monthKey=2026-08'
+      '/v1/rewards/catalog?region=toronto&monthKey=2026-08&competitionId=40000000-0000-4000-8000-000000000001'
     );
     assert.equal(authenticated, false);
   });

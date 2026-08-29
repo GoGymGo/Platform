@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   rewardAvailabilityLabel,
   rewardAvailabilityWindowLabel,
+  rewardTypeLabel,
   type RewardCatalogItem
 } from '@/domain/rewards';
 
@@ -33,6 +34,12 @@ describe('reward marketplace labels', () => {
   it('shows truthful bounded inventory', () => {
     assert.equal(rewardAvailabilityLabel(reward), '2 AVAILABLE');
     assert.equal(rewardAvailabilityLabel({ ...reward, inventoryRemaining: 0 }), 'FULLY AWARDED');
+  });
+
+  it('labels every published reward type accurately', () => {
+    assert.equal(rewardTypeLabel('cash'), 'CASH PRIZE');
+    assert.equal(rewardTypeLabel('coupon'), 'COUPON CODE');
+    assert.equal(rewardTypeLabel('physical'), 'PHYSICAL PRIZE');
   });
 
   it('formats availability in the owning region timezone', () => {

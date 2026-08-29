@@ -102,8 +102,10 @@ export class RewardsService {
   async getCatalog(
     regionCode: string,
     monthKey?: string,
+    competitionId?: string,
   ): Promise<RewardCatalogItemResponseDto[]> {
     const now = new Date();
+    const includesSettledContest = Boolean(monthKey || competitionId);
     let query = this.database.connection
       .selectFrom('reward_catalog_items as item')
       .innerJoin(
@@ -157,7 +159,6 @@ export class RewardsService {
           expression('region.valid_to', '>', now),
         ]),
       )
-      .where('competition.status', 'in', ['registration', 'active'])
       .where('item.status', '=', 'published')
       .where((expression) =>
         expression.or([
@@ -167,23 +168,57 @@ export class RewardsService {
             expression('item.cash_currency', 'is not', null),
           ]),
         ]),
-      )
-      .where((expression) =>
-        expression.or([
-          expression('item.available_from', 'is', null),
-          expression('item.available_from', '<=', now),
-        ]),
-      )
-      .where((expression) =>
-        expression.or([
-          expression('item.available_until', 'is', null),
-          expression('item.available_until', '>', now),
-        ]),
       );
 
-    query = monthKey
-      ? query.where('competition.month_key', '=', monthKey)
-      : query.where('competition.ends_at', '>', now);
+    query = query.where(
+      'competition.status',
+      'in',
+      includesSettledContest
+        ? ['registration', 'active', 'settled']
+        : ['registration', 'active'],
+    );
+
+    if (includesSettledContest) {
+      query = query.where((expression) =>
+        expression.or([
+          expression('competition.status', '=', 'settled'),
+          expression.and([
+            expression.or([
+              expression('item.available_from', 'is', null),
+              expression('item.available_from', '<=', now),
+            ]),
+            expression.or([
+              expression('item.available_until', 'is', null),
+              expression('item.available_until', '>', now),
+            ]),
+          ]),
+        ]),
+      );
+    } else {
+      query = query
+        .where((expression) =>
+          expression.or([
+            expression('item.available_from', 'is', null),
+            expression('item.available_from', '<=', now),
+          ]),
+        )
+        .where((expression) =>
+          expression.or([
+            expression('item.available_until', 'is', null),
+            expression('item.available_until', '>', now),
+          ]),
+        );
+    }
+
+    if (monthKey) {
+      query = query.where('competition.month_key', '=', monthKey);
+    }
+    if (competitionId) {
+      query = query.where('competition.id', '=', competitionId);
+    }
+    if (!monthKey && !competitionId) {
+      query = query.where('competition.ends_at', '>', now);
+    }
 
     const items = await query
       .orderBy('competition.starts_at')

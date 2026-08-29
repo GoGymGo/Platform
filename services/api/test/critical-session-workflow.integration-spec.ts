@@ -1744,6 +1744,29 @@ describeWithDatabase('critical session and ledger workflow', () => {
     );
     await expect(
       rewards.getCatalog(catalogRegion.rows[0].code, fixture.monthKey),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: created.id,
+        inventoryRemaining: 0,
+        inventoryTotal: 1,
+        title: 'Recovery coupon',
+      }),
+    ]);
+    await expect(
+      rewards.getCatalog(
+        catalogRegion.rows[0].code,
+        fixture.monthKey,
+        fixture.competitionId,
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        competitionId: fixture.competitionId,
+        id: created.id,
+        inventoryRemaining: 0,
+      }),
+    ]);
+    await expect(
+      rewards.getCatalog(catalogRegion.rows[0].code),
     ).resolves.toEqual([]);
     const allocatedInventory = await migrated.pool.query<{
       awarded_count: number;

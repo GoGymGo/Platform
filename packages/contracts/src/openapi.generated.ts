@@ -672,7 +672,7 @@ export interface operations {
   getCatalog: {
     method: "GET";
     path: "/v1/rewards/catalog";
-    parameters: { query: { monthKey?: string; region: string } };
+    parameters: { query: { competitionId?: string; monthKey?: string; region: string } };
     responses: {
       "200": Array<components['schemas']["RewardCatalogItemResponseDto"]>;
     };

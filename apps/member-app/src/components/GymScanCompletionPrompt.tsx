@@ -10,11 +10,7 @@ import {
   cancelGymScanCompletionReminder,
   scheduleGymScanCompletionReminder
 } from '@/services/gymScanCompletionReminder';
-import {
-  readPendingGymScan,
-  subscribePendingGymScan,
-  type PendingGymScanSession
-} from '@/services/pendingGymScan';
+import { usePendingGymScanSession } from '@/hooks/usePendingGymScanSession';
 import { useAuth } from '@/state/auth';
 
 export function GymScanCompletionPrompt() {
@@ -32,27 +28,15 @@ function MobileGymScanCompletionPrompt() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const [activeSession, setActiveSession] = useState<PendingGymScanSession | null>(null);
+  const { activeSession } = usePendingGymScanSession();
   const [dismissedSessionId, setDismissedSessionId] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    void readPendingGymScan().then((pending) => {
-      if (mounted) setActiveSession(pending?.activeSession ?? null);
-    });
-    const unsubscribe = subscribePendingGymScan((pending) => {
-      if (mounted) setActiveSession(pending?.activeSession ?? null);
-    });
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') setNow(Date.now());
     });
-
-    return () => {
-      mounted = false;
-      unsubscribe();
-      appStateSubscription.remove();
-    };
+    return () => appStateSubscription.remove();
   }, []);
 
   useEffect(() => {

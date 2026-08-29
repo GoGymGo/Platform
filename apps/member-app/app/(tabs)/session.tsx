@@ -11,9 +11,14 @@ import {
 import { RecoverableScreenError } from '@/components/reliability';
 import { BrandScreenHeader } from '@/components/screenLayout';
 import { colors, spacing } from '@/constants/theme';
+import { heartRateTelemetryAvailable } from '@/config/workoutVerification';
 import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
-import { getWorkoutAccessMode } from '@/domain/workoutAccess';
+import {
+  getWorkoutAccessMode,
+  getWorkoutSessionContinuity
+} from '@/domain/workoutAccess';
+import { usePendingGymScanSession } from '@/hooks/usePendingGymScanSession';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { useWorkoutProgress } from '@/state/workoutProgress';
 
@@ -30,7 +35,11 @@ export default function SessionTabRoute() {
 
 function MobileSessionTabRoute() {
   const router = useRouter();
-  const { competition, competitionTimeZone } = useWorkoutProgress();
+  const { activeSession, competition, competitionTimeZone } = useWorkoutProgress();
+  const {
+    activeSession: pendingGymScanSession,
+    ready: pendingGymScanSessionReady
+  } = usePendingGymScanSession();
   const {
     checking: setupChecking,
     currentCompetition,
@@ -53,11 +62,23 @@ function MobileSessionTabRoute() {
         competitionTimeZone
       )
     : null;
+  const workoutSessionContinuity = getWorkoutSessionContinuity({
+    gymScanSessionActive: pendingGymScanSession !== null,
+    gymScanSessionReady: pendingGymScanSessionReady,
+    workoutProgressSessionActive: activeSession !== null
+  });
+  const activeWorkoutRoute =
+    activeSession?.verificationMethod === 'heartRate' && heartRateTelemetryAvailable
+      ? '/workout/active'
+      : '/qr-scanner';
 
-  if (setupChecking) {
+  if (
+    workoutSessionContinuity === 'checking' ||
+    (setupChecking && workoutSessionContinuity !== 'active-session')
+  ) {
     return <ScreenLoadingState body="Checking your Contest." />;
   }
-  if (setupError) {
+  if (setupError && workoutSessionContinuity !== 'active-session') {
     return (
       <RecoverableScreenError
         body="We couldn&apos;t check your Contest. Try again."
@@ -77,7 +98,20 @@ function MobileSessionTabRoute() {
         title="VERIFY A GYM VISIT"
       />
 
-      {!setupReady ? (
+      {workoutSessionContinuity === 'active-session' ? (
+        <HUDBorderBox style={styles.notice} tone="cyan">
+          <TerminalText tone="cyan" variant="label">
+            WORKOUT IN PROGRESS
+          </TerminalText>
+          <TerminalText tone="muted" uppercase={false} variant="body">
+            Your original workout timer is still running. Return to it instead of starting again.
+          </TerminalText>
+          <CyberButtonPrimary
+            label="RETURN TO WORKOUT ->"
+            onPress={() => router.push(activeWorkoutRoute)}
+          />
+        </HUDBorderBox>
+      ) : !setupReady ? (
         <HUDBorderBox style={styles.notice} tone="amber">
           <TerminalText tone="amber" variant="label">
             FINISH SETUP

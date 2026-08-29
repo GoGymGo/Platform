@@ -64,21 +64,28 @@ export function rankCategoryStandings(
   rulesVersion: string,
   standings: readonly CategoryStandingInput[],
 ): CategoryStanding[] {
-  return [...standings]
-    .sort(
-      (left, right) =>
-        right.categoryScore - left.categoryScore ||
-        right.longestStreak - left.longestStreak ||
-        right.verifiedDays - left.verifiedDays ||
-        competitionTieBreakDigest(
-          competitionId,
-          rulesVersion,
-          left.userId,
-        ).localeCompare(
-          competitionTieBreakDigest(competitionId, rulesVersion, right.userId),
-        ),
-    )
-    .map((standing, index) => ({ ...standing, rank: index + 1 }));
+  const ordered = [...standings].sort(
+    (left, right) =>
+      right.categoryScore - left.categoryScore ||
+      competitionTieBreakDigest(
+        competitionId,
+        rulesVersion,
+        left.userId,
+      ).localeCompare(
+        competitionTieBreakDigest(competitionId, rulesVersion, right.userId),
+      ),
+  );
+
+  let previousScore: number | null = null;
+  let previousRank = 0;
+
+  return ordered.map((standing, index) => {
+    const rank =
+      previousScore === standing.categoryScore ? previousRank : index + 1;
+    previousScore = standing.categoryScore;
+    previousRank = rank;
+    return { ...standing, rank };
+  });
 }
 
 export function applyCategoryMultiplier(

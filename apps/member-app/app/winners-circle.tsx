@@ -19,6 +19,7 @@ import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useMyLatestCompetitionResults } from '@/data/appDataHooks';
 import {
   formatCompetitionMonth,
+  getGoalChampions,
   getWinnersCirclePresentationKey,
 } from "@/domain/winnersCircle";
 import { markWinnersCircleSeen } from "@/services/winnersCircle";
@@ -41,20 +42,17 @@ export default function WinnersCircleScreen() {
   } = useMyLatestCompetitionResults();
   const categoryLeaderboards = participantResults?.categoryLeaderboards ?? [];
   const rewardWinners = participantResults?.rewardWinners ?? [];
-  const categoryChampions = [...categoryLeaderboards]
-    .reverse()
-    .flatMap((leaderboard) => {
-      const winner = leaderboard?.rows[0];
-      return winner ? [{ goal: leaderboard.goal, winner }] : [];
-    });
-  const currentCategoryChampion = categoryChampions.find(
+  const categoryChampions = getGoalChampions(categoryLeaderboards);
+  const currentCategoryChampions = categoryChampions.filter(
     ({ goal }) => goal === participantResults?.participantGoalDays
   );
+  const firstChampionGoal = categoryChampions[0]?.goal;
   const visibleCategoryChampions = showAllCategories
     ? categoryChampions
-    : currentCategoryChampion
-      ? [currentCategoryChampion]
-      : categoryChampions.slice(0, 1);
+    : currentCategoryChampions.length > 0
+      ? currentCategoryChampions
+      : categoryChampions.filter(({ goal }) => goal === firstChampionGoal);
+  const championGoalCount = new Set(categoryChampions.map(({ goal }) => goal)).size;
 
   async function closeWinnersCircle() {
     setClosing(true);
@@ -230,7 +228,7 @@ export default function WinnersCircleScreen() {
                 ) : null}
                 {visibleCategoryChampions.map(({ goal, winner }, index) => (
                   <View
-                    key={goal}
+                    key={`${goal}:${winner.alias}:${index}`}
                     style={[
                       styles.winnerRow,
                       index === visibleCategoryChampions.length - 1 ? styles.lastRow : null
@@ -264,7 +262,7 @@ export default function WinnersCircleScreen() {
                     </View>
                   </View>
                 ))}
-                {categoryChampions.length > 1 ? (
+                {championGoalCount > 1 ? (
                   <CompactTextButton
                     label={showAllCategories ? 'SHOW MY GOAL GROUP' : 'VIEW ALL GOAL GROUPS'}
                     onPress={() => setShowAllCategories((current) => !current)}

@@ -463,6 +463,24 @@ describe('app data boundary', () => {
     );
   });
 
+  it('accepts shared first-place ranks for equal Goal Scores', async () => {
+    const response = settledWinnersCircleResponse();
+    const first = response.categoryLeaderboards[0]!.rows[0]!;
+    response.categoryLeaderboards[0]!.rows.push({
+      ...first,
+      alias: 'TIED_CHAMPION',
+      isCurrentUser: false,
+      rank: 1
+    });
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve(response) as Promise<TResponse>
+    };
+
+    await assert.doesNotReject(() =>
+      createAppDataSource('api', api).getMyLatestCompetitionResults()
+    );
+  });
+
   it("accepts only the exact September pilot cash snapshot", async () => {
     const base = settledWinnersCircleResponse();
     const pilot = {

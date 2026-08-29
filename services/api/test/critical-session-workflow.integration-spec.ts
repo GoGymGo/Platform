@@ -2861,7 +2861,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   }
 
   async function seedAccountLegalDocuments(): Promise<void> {
-    const effectiveAt = new Date(Date.now() - 60_000);
+    const effectiveAt = new Date(Date.now() - 7 * 24 * 60 * 60_000);
     for (const document of [
       {
         documentKey: 'privacy_policy',

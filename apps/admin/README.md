@@ -19,7 +19,10 @@ sign-in, the app waits for `GET /v1/operator/access`; only that response selects
 the platform or partner surface. A missing, unavailable, or denied access
 response cannot fall back to a dashboard. The app exposes retry, expired-session,
 denied-access, and complete sign-out states without retaining pending mutation
-keys or draw-reveal material for the next account.
+keys. Winner publication is server-owned: after the Contest and workout
+completion window close, the worker atomically audits the immutable scoring,
+entrant, identity, and reward snapshots, settles the draw, and publishes the
+Winners Circle without an operator-held seed or a manual dashboard action.
 
 Authentication alone does not grant access: every request is authorized again
 by the GoGymGo API, which requires an active, email-verified database user and a

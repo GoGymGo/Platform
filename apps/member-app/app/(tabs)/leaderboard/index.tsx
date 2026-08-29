@@ -154,9 +154,9 @@ export default function ContestOverviewScreen() {
             <View style={styles.rankingRules}>
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Goal Score includes each settled week&apos;s 1x, 2x or 3x Weekly
-                Challenge result. Equal scores are resolved by longest verified
-                Contest streak, verified Contest days, then the versioned
-                audited tie-break. Unsettled values remain projections.
+                Challenge result. Equal Goal Scores share the same rank, and
+                every player tied for first is a Goal Champion. Unsettled values
+                remain projections.
               </TerminalText>
               <TerminalText tone="muted" uppercase={false} variant="caption">
                 Entries set your Prize Draw odds. Banked entries are final;

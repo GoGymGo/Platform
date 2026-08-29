@@ -3,6 +3,7 @@ import { sql, type Transaction } from 'kysely';
 import type { Database } from '../../database/database.types';
 import { DatabaseService } from '../../database/database.service';
 import type { AuthenticatedPrincipal } from '../auth/auth.types';
+import { rankCategoryStandings } from '../competitions/competition-scoring';
 import type { CategoryLeaderboardDto } from '../leaderboards/dto/leaderboard.dto';
 import { ProfilesService } from '../profiles/profiles.service';
 import type {
@@ -153,6 +154,7 @@ export class ResultsService {
         'input.category_rank',
         'input.category_score',
         'input.goal_days',
+        'input.longest_streak',
         'input.user_id',
         'input.verified_days',
       ])
@@ -166,16 +168,30 @@ export class ResultsService {
       ...new Set(settlementInputs.map(({ goal_days: goalDays }) => goalDays)),
     ].sort((left, right) => left - right);
 
-    return goals.map((goal) => ({
-      competitionId,
-      goal,
-      rows: settlementInputs
-        .filter((row) => row.goal_days === goal)
-        .map((row) => ({
+    return goals.map((goal) => {
+      const goalRows = settlementInputs.filter((row) => row.goal_days === goal);
+      const rankByUser = new Map(
+        rankCategoryStandings(
+          competitionId,
+          rulesVersion,
+          goalRows.map((row) => ({
+            categoryScore: row.category_score,
+            goalDays: row.goal_days,
+            longestStreak: row.longest_streak,
+            userId: row.user_id,
+            verifiedDays: row.verified_days,
+          })),
+        ).map(({ rank, userId }) => [userId, rank]),
+      );
+
+      return {
+        competitionId,
+        goal,
+        rows: goalRows.map((row) => ({
           alias: row.alias,
           categoryEntries: row.category_score,
           isCurrentUser: row.user_id === currentUserId,
-          rank: row.category_rank,
+          rank: rankByUser.get(row.user_id)!,
           streaks: {
             daily: row.streak_daily,
             monthly: row.streak_monthly,
@@ -185,11 +201,12 @@ export class ResultsService {
           },
           verifiedDays: row.verified_days,
         })),
-      rulesVersion,
-      scoringStatus: 'final' as const,
-      serverTime: now.toISOString(),
-      settledPeriodCount: 4,
-    }));
+        rulesVersion,
+        scoringStatus: 'final' as const,
+        serverTime: now.toISOString(),
+        settledPeriodCount: 4,
+      };
+    });
   }
 
   private async loadRewardWinners(

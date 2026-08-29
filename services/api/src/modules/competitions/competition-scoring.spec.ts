@@ -75,7 +75,7 @@ describe('authoritative competition scoring', () => {
     ).toMatchObject({ entries: 4, multiplier: 1, recovered: false });
   });
 
-  it('uses deterministic category tie-breaks and integer draw weights', () => {
+  it('gives equal Goal Scores the same competition rank', () => {
     const first = rankCategoryStandings('competition-1', 'rules-v1', [
       {
         categoryScore: 10,
@@ -91,6 +91,13 @@ describe('authoritative competition scoring', () => {
         userId: 'user-a',
         verifiedDays: 11,
       },
+      {
+        categoryScore: 9,
+        goalDays: 3,
+        longestStreak: 12,
+        userId: 'user-c',
+        verifiedDays: 20,
+      },
     ]);
     const second = rankCategoryStandings(
       'competition-1',
@@ -98,8 +105,17 @@ describe('authoritative competition scoring', () => {
       [...first].reverse(),
     );
 
-    expect(first.map(({ userId }) => userId)).toEqual(['user-a', 'user-b']);
-    expect(second.map(({ userId }) => userId)).toEqual(['user-a', 'user-b']);
+    expect(
+      first.map(({ categoryScore, rank }) => ({ categoryScore, rank })),
+    ).toEqual([
+      { categoryScore: 10, rank: 1 },
+      { categoryScore: 10, rank: 1 },
+      { categoryScore: 9, rank: 3 },
+    ]);
+    expect(second).toEqual(first);
+  });
+
+  it('keeps immutable snapshot ordering deterministic and draw weights integral', () => {
     expect(
       competitionTieBreakDigest('competition-1', 'rules-v1', 'user-a'),
     ).not.toBe(

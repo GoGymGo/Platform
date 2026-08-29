@@ -467,7 +467,7 @@ describeWithDatabase('authoritative competition scoring settlement', () => {
         [
           userBId,
           {
-            categoryRank: 2,
+            categoryRank: 1,
             goalDays: 3,
             rulesVersion: 'rules-v1',
             verifiedDays: 12,

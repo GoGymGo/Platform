@@ -287,8 +287,8 @@ Weekly scoring:
   multiplier after all weeks settle.
 - Goal categories are 1-7 days. Category ranking separates verified days,
   category score, and Prize Draw Entry weight.
-- Category tie-break order is category score, longest verified workout streak,
-  most verified competition days, then an audited equal-chance tie-break.
+- Category rank is determined by Goal Score. Players with equal Goal Scores share
+  the same competition rank, and every player tied for first is a Goal Champion.
 - Category placement can change draw weight but never guarantees a reward.
 - Winners Circle separates category champions from Brand Reward winners.
 - Category champions and all other displayed players show Alias badges when

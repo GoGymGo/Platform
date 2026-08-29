@@ -1,3 +1,15 @@
+import type { CategoryLeaderboard } from '@/domain/leaderboard';
+
+export function getGoalChampions(
+  categoryLeaderboards: readonly CategoryLeaderboard[]
+) {
+  return [...categoryLeaderboards].reverse().flatMap((leaderboard) =>
+    leaderboard.rows
+      .filter(({ rank }) => rank === 1)
+      .map((winner) => ({ goal: leaderboard.goal, winner }))
+  );
+}
+
 export function shouldAutoPresentWinnersCircle(
   presentationKey: string | null,
   lastSeenPresentationKey: string | null

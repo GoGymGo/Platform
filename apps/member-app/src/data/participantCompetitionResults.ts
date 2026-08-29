@@ -161,8 +161,22 @@ function isSettledCategoryLeaderboard(
     Array.isArray(value.rows) &&
     value.rows.length > 0 &&
     value.rows.every(isExactCategoryLeaderboardRow) &&
-    value.rows.every((row, index) => row.rank === index + 1)
+    hasCompetitionRanks(value.rows)
   );
+}
+
+function hasCompetitionRanks(rows: CategoryLeaderboard['rows']): boolean {
+  let previousScore: number | null = null;
+  let previousRank = 0;
+
+  return rows.every((row, index) => {
+    const expectedRank =
+      previousScore === row.categoryEntries ? previousRank : index + 1;
+    const valid = row.rank === expectedRank;
+    previousScore = row.categoryEntries;
+    previousRank = row.rank;
+    return valid;
+  });
 }
 
 function isExactCategoryLeaderboardRow(

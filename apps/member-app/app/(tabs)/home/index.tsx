@@ -133,6 +133,7 @@ export default function HomeScreen() {
     workoutStartRoute
   } = useWorkoutVerificationPreference();
   const currentPeriod = competition.currentPeriod;
+  const weeklyMatchAssigned = currentPeriod?.availability === 'matched';
   const completedSessions = Math.min(currentWeekVerified, weeklyGoal);
   const remainingSessions = Math.max(weeklyGoal - completedSessions, 0);
   const weeklyGoalUnit = weeklyGoal === 1 ? 'DAY' : 'DAYS';
@@ -217,10 +218,12 @@ export default function HomeScreen() {
       tone: 'cyan'
     },
     {
-      value: currentPeriod
+      value: weeklyMatchAssigned && currentPeriod
         ? `${Math.min(currentPeriod.opponentVerifiedCount, weeklyGoal)}/${weeklyGoal}`
-        : 'NOT STARTED',
-      label: currentPeriod ? 'PARTNER DAYS' : 'WEEKLY CHALLENGE',
+        : currentPeriod
+          ? 'MATCHING'
+          : 'NOT STARTED',
+      label: weeklyMatchAssigned ? 'MATCH DAYS' : 'WEEKLY MATCH',
       tone: 'cyan'
     }
   ];
@@ -850,17 +853,17 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.pactCopy}>
                   <TerminalText glow tone="cyan" variant="micro">
-                    WEEKLY CHALLENGE
+                    WEEKLY MATCH
                   </TerminalText>
                   {isBonusDayPhase || competitionNotStarted || !currentPeriod ? (
                     <TerminalText style={styles.pactTitle} tone="text" uppercase={false} variant="body">
                       {isBonusDayPhase
                         ? `Bonus Days: +${weeklyGoal} ${weeklyGoal === 1 ? 'entry' : 'entries'} each`
                         : competitionNotStarted
-                          ? `Challenges open ${competitionStartLabel}`
+                          ? `Matching opens ${competitionStartLabel}`
                           : 'Pairing in progress'}
                     </TerminalText>
-                  ) : (
+                  ) : weeklyMatchAssigned ? (
                     <View style={styles.pactOpponent}>
                       <UserAlias
                         alias={currentPeriod.opponentAlias}
@@ -870,6 +873,15 @@ export default function HomeScreen() {
                       />
                       <TerminalText tone="cyan" variant="micro">
                         {currentPeriod.opponentVerifiedCount}/{weeklyGoal} THIS WEEK
+                      </TerminalText>
+                    </View>
+                  ) : (
+                    <View style={styles.pactOpponent}>
+                      <TerminalText style={styles.pactTitle} tone="text" variant="body">
+                        PAIRING IN PROGRESS
+                      </TerminalText>
+                      <TerminalText tone="cyan" uppercase={false} variant="micro">
+                        Finding another active {weeklyGoal}-day goal player
                       </TerminalText>
                     </View>
                   )}

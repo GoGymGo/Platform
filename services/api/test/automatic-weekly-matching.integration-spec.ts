@@ -129,6 +129,26 @@ describeWithDatabase('automatic Weekly Challenge matching', () => {
         `,
         [userIds[2], userIds[3]],
       );
+      await client.query(
+        `
+        INSERT INTO friendships (user_a_id, user_b_id, created_at)
+        VALUES (LEAST($1::uuid, $2::uuid), GREATEST($1::uuid, $2::uuid),
+                '2026-07-26T00:00:00.000Z');
+        `,
+        [userIds[0], userIds[1]],
+      );
+      await client.query(
+        `
+        INSERT INTO weekly_challenge_requests (
+          competition_id, period_index, requester_user_id, recipient_user_id,
+          goal_days, status, created_at
+        ) VALUES (
+          $3::uuid, 4, $1::uuid, $2::uuid, 1, 'pending',
+          '2026-08-27T18:00:00.000Z'
+        );
+        `,
+        [userIds[0], userIds[1], competitionId],
+      );
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -143,7 +163,7 @@ describeWithDatabase('automatic Weekly Challenge matching', () => {
     await migrated?.stop();
   });
 
-  it('pairs same-goal strangers immediately and never pairs blocked players', async () => {
+  it('pairs same-goal players immediately despite a pending invite and never pairs blocked players', async () => {
     const now = new Date('2026-08-27T19:00:00.000Z');
     for (const [index, userId] of userIds.entries()) {
       await database.connection.transaction().execute((transaction) =>
@@ -193,5 +213,20 @@ describeWithDatabase('automatic Weekly Challenge matching', () => {
       [competitionId],
     );
     expect(activeParticipants.rows[0]?.count).toBe(2);
+    const pendingRequest = await migrated.pool.query<{
+      cancellation_reason: string | null;
+      status: string;
+    }>(
+      `SELECT cancellation_reason, status::text
+       FROM weekly_challenge_requests
+       WHERE competition_id = $1 AND period_index = 4`,
+      [competitionId],
+    );
+    expect(pendingRequest.rows).toEqual([
+      {
+        cancellation_reason: 'automatic_match_created',
+        status: 'cancelled',
+      },
+    ]);
   });
 });

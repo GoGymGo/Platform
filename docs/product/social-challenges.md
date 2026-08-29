@@ -71,12 +71,14 @@ settlement.
 
 ## Direct Weekly Challenges
 
-Direct Weekly Challenges are a separate Contest feature from the general
-friend/regional Challenges above. During the current seven-day scoring week,
-an enrolled member may request an accepted, unblocked friend who has the same
-active Contest, region, and immutable Weekly Goal. The recipient explicitly
-accepts or declines; an outgoing pending request can be cancelled. Enrollment,
-activation, reads, and settlement never assign a stranger or infer consent.
+Weekly Matches are a separate Contest feature from the general friend/regional
+Challenges above. During the current seven-day scoring week, GoGymGo
+automatically pairs the first available active, unblocked members in the same
+Contest and immutable Weekly Goal. While pairing is still in progress, an
+enrolled member may optionally request an accepted, unblocked friend with the
+same active Contest, region, and goal. The recipient explicitly accepts or
+declines; an outgoing pending request can be cancelled. A pending friend request
+does not block an otherwise eligible automatic match.
 
 The API returns eligible command handles only on the eligible-partner list.
 Request and match detail omit internal user IDs and private workout dates. A

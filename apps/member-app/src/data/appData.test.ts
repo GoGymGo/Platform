@@ -82,6 +82,21 @@ describe('app data boundary', () => {
     assert.equal(rewards[0].availableFrom, '2026-08-01T07:00:00.000Z');
   });
 
+  it('loads published rewards that use the optional image field', async () => {
+    const api: ApiClient = {
+      request: <TResponse>() => Promise.resolve([{
+        ...validRewardCatalogItem(),
+        imageUrl: null
+      }]) as Promise<TResponse>
+    };
+
+    const rewards = await createAppDataSource('api', api)
+      .getRewardCatalog('toronto', '2026-08');
+
+    assert.equal(rewards[0].title, 'Recovery coupon');
+    assert.equal(rewards[0].imageUrl, null);
+  });
+
   it('rejects malformed or over-counted reward catalog responses', async () => {
     let response: unknown = [{
       ...validRewardCatalogItem(),

@@ -225,6 +225,34 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await seedAccountLegalDocuments();
   });
 
+  beforeEach(() => {
+    const realNow = new Date();
+    const regionalDay = Number(
+      dateKeyInTimezone(realNow, 'America/Vancouver').slice(-2),
+    );
+    if (regionalDay <= 28) return;
+
+    jest.useFakeTimers({
+      doNotFake: [
+        'clearImmediate',
+        'clearInterval',
+        'clearTimeout',
+        'hrtime',
+        'nextTick',
+        'performance',
+        'queueMicrotask',
+        'setImmediate',
+        'setInterval',
+        'setTimeout',
+      ],
+      now: new Date(realNow.getTime() - (regionalDay - 28) * 24 * 60 * 60_000),
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   afterAll(async () => {
     await database?.onApplicationShutdown();
     await migrated?.stop();
@@ -2833,7 +2861,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
   }
 
   async function seedAccountLegalDocuments(): Promise<void> {
-    const effectiveAt = new Date(Date.now() - 60_000);
+    const effectiveAt = new Date(Date.now() - 7 * 24 * 60 * 60_000);
     for (const document of [
       {
         documentKey: 'privacy_policy',

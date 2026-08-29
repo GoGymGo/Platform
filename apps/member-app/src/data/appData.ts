@@ -330,7 +330,7 @@ function isRewardCatalogItem(value: unknown): value is RewardCatalogItem {
     typeof value.description === 'string' &&
     typeof value.id === 'string' &&
     isUuid(value.id) &&
-    isHttpsUrl(value.imageUrl) &&
+    isNullableHttpsUrl(value.imageUrl) &&
     isFiniteNonnegativeInteger(value.inventoryRemaining) &&
     isIntegerInRange(value.inventoryTotal, 1, 100_000) &&
     value.inventoryRemaining <= value.inventoryTotal &&

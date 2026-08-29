@@ -890,7 +890,9 @@ function locationStatusMessage(
   status: 'location-unavailable' | 'mobile-required' | 'permission-denied'
 ) {
   if (status === 'permission-denied') {
-    return 'Location access was not allowed. Enable location in device settings, then try again.';
+    return Platform.OS === 'web'
+      ? "Location access was blocked. Allow Location for app.gogymgo.com in your browser's site settings, then try again."
+      : 'Location access was not allowed. Enable location in device settings, then try again.';
   }
   if (status === 'mobile-required') {
     return 'Open GoGymGo on a phone or tablet to complete the live location check.';

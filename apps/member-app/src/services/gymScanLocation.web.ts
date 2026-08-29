@@ -19,6 +19,17 @@ export async function readGymScanLocation(): Promise<GymScanLocationResult> {
   try {
     return await readFreshGymScanWebLocation({
       clearWatch: (watchId) => navigator.geolocation.clearWatch(watchId),
+      getCurrentPosition: (onReading, onError, options) =>
+        navigator.geolocation.getCurrentPosition(
+          (position) =>
+            onReading({
+              accuracyMeters: position.coords.accuracy,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            }),
+          (error) => onError(error.code),
+          options
+        ),
       watchPosition: (onReading, onError, options) =>
         navigator.geolocation.watchPosition(
           (position) =>

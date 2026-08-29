@@ -38,31 +38,48 @@ type ScheduledEvent =
 
 function fakeGeolocation(events: readonly ScheduledEvent[]) {
   let clearedWatchId: number | null = null;
-  let observedOptions: GymScanWebPositionOptions | null = null;
+  let observedCurrentOptions: GymScanWebPositionOptions | null = null;
+  let observedWatchOptions: GymScanWebPositionOptions | null = null;
+  const calls: string[] = [];
   const timers: ReturnType<typeof setTimeout>[] = [];
+  const schedule = (
+    scheduledEvents: readonly ScheduledEvent[],
+    onReading: (reading: GymScanWebReading) => void,
+    onError: (errorCode: number) => void
+  ) => {
+    for (const event of scheduledEvents) {
+      timers.push(
+        setTimeout(() => {
+          if ('reading' in event) onReading(event.reading);
+          else onError(event.errorCode);
+        }, event.afterMs)
+      );
+    }
+  };
   const geolocation: GymScanWebGeolocation = {
     clearWatch: (watchId) => {
       clearedWatchId = watchId;
       timers.forEach(clearTimeout);
     },
+    getCurrentPosition: (onReading, onError, options) => {
+      calls.push('getCurrentPosition');
+      observedCurrentOptions = options;
+      schedule(events.slice(0, 1), onReading, onError);
+    },
     watchPosition: (onReading, onError, options) => {
-      observedOptions = options;
-      for (const event of events) {
-        timers.push(
-          setTimeout(() => {
-            if ('reading' in event) onReading(event.reading);
-            else onError(event.errorCode);
-          }, event.afterMs)
-        );
-      }
+      calls.push('watchPosition');
+      observedWatchOptions = options;
+      schedule(events, onReading, onError);
       return 42;
     }
   };
 
   return {
     geolocation,
+    getCalls: () => calls,
     getClearedWatchId: () => clearedWatchId,
-    getObservedOptions: () => observedOptions
+    getObservedCurrentOptions: () => observedCurrentOptions,
+    getObservedWatchOptions: () => observedWatchOptions
   };
 }
 
@@ -73,7 +90,7 @@ const fastPolicy = {
 };
 
 describe('fresh browser gym location sampling', () => {
-  it('forces uncached high-accuracy readings and keeps the best sample', async () => {
+  it('requests one current position before watching for the best high-accuracy sample', async () => {
     const fake = fakeGeolocation([
       {
         afterMs: 1,
@@ -93,7 +110,13 @@ describe('fresh browser gym location sampling', () => {
       longitude: -123.6,
       status: 'location-read'
     });
-    assert.deepEqual(fake.getObservedOptions(), {
+    assert.deepEqual(fake.getCalls(), ['getCurrentPosition', 'watchPosition']);
+    assert.deepEqual(fake.getObservedCurrentOptions(), {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 40
+    });
+    assert.deepEqual(fake.getObservedWatchOptions(), {
       enableHighAccuracy: true,
       maximumAge: 0,
       timeout: 40

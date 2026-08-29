@@ -21,7 +21,6 @@ import {
   formatCompetitionMonth,
   getWinnersCirclePresentationKey,
 } from "@/domain/winnersCircle";
-import type { RewardWinner } from "@/domain/rewards";
 import { markWinnersCircleSeen } from "@/services/winnersCircle";
 import { useAuth } from "@/state/auth";
 
@@ -325,11 +324,12 @@ export default function WinnersCircleScreen() {
                     </View>
                     <View style={styles.rewardName}>
                       <TerminalText tone="pink" variant="body">
-                        {winner.rewardType === "cash"
-                          ? `${formatCashWinnerValue(winner)} // ${winner.rewardTitle}`
-                          : winner.rewardTitle}
+                        {winner.rewardTitle}
                       </TerminalText>
                       <TerminalText tone="dim" variant="micro">
+                        {winner.prizeDrawEntries.toLocaleString()} DRAW{' '}
+                        {winner.prizeDrawEntries === 1 ? 'ENTRY' : 'ENTRIES'}
+                        {' // '}
                         {winner.sponsorName}
                       </TerminalText>
                     </View>
@@ -363,18 +363,6 @@ export default function WinnersCircleScreen() {
       </ScreenContainer>
     </AuthGate>
   );
-}
-
-function formatCashWinnerValue(winner: RewardWinner) {
-  if (winner.cashAmountCents === null || !winner.cashCurrency) {
-    return "CASH VALUE UNAVAILABLE";
-  }
-  return `${new Intl.NumberFormat("en-CA", {
-    currency: winner.cashCurrency,
-    currencyDisplay: "narrowSymbol",
-    maximumFractionDigits: 0,
-    style: "currency",
-  }).format(winner.cashAmountCents / 100)} ${winner.cashCurrency}`;
 }
 
 function ResultTab({

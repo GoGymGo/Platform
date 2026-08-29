@@ -222,20 +222,24 @@ export class CompetitionScoringService {
       }
       const [userAId, userBId] = [match.user_a_id, match.user_b_id].sort();
       const [request, friendship, block] = await Promise.all([
-        transaction
-          .selectFrom('weekly_challenge_requests')
-          .select(['goal_days', 'id'])
-          .where('id', '=', match.weekly_challenge_request_id ?? '')
-          .where('competition_id', '=', competitionId)
-          .where('period_index', '=', period.index)
-          .where('status', '=', 'accepted')
-          .executeTakeFirst(),
-        transaction
-          .selectFrom('friendships')
-          .select('created_at')
-          .where('user_a_id', '=', userAId)
-          .where('user_b_id', '=', userBId)
-          .executeTakeFirst(),
+        match.weekly_challenge_request_id
+          ? transaction
+              .selectFrom('weekly_challenge_requests')
+              .select(['goal_days', 'id'])
+              .where('id', '=', match.weekly_challenge_request_id)
+              .where('competition_id', '=', competitionId)
+              .where('period_index', '=', period.index)
+              .where('status', '=', 'accepted')
+              .executeTakeFirst()
+          : Promise.resolve(undefined),
+        match.weekly_challenge_request_id
+          ? transaction
+              .selectFrom('friendships')
+              .select('created_at')
+              .where('user_a_id', '=', userAId)
+              .where('user_b_id', '=', userBId)
+              .executeTakeFirst()
+          : Promise.resolve(undefined),
         transaction
           .selectFrom('user_blocks')
           .select('id')
@@ -255,16 +259,19 @@ export class CompetitionScoringService {
       ]);
       const userA = enrollmentByUserId.get(match.user_a_id);
       const userB = enrollmentByUserId.get(match.user_b_id);
-      const directMatchIsEligible =
-        request &&
-        friendship &&
-        !block &&
-        userA &&
-        userB &&
-        userA.goalDays === request.goal_days &&
-        userB.goalDays === request.goal_days;
+      const sharedEligibility = Boolean(
+        !block && userA && userB && userA.goalDays === userB.goalDays,
+      );
+      const matchIsEligible = match.weekly_challenge_request_id
+        ? Boolean(
+            sharedEligibility &&
+            request &&
+            friendship &&
+            userA?.goalDays === request.goal_days,
+          )
+        : sharedEligibility;
 
-      if (directMatchIsEligible) {
+      if (matchIsEligible) {
         validMatches.push(match);
         continue;
       }

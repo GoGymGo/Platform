@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CompetitionLifecycleService } from '../competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../competitions/competition-scoring.service';
+import { AutomaticDrawSettlementService } from '../draws/automatic-draw-settlement.service';
 import { GymsService } from '../gyms/gyms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
@@ -11,6 +12,7 @@ import { PartnerApplicationRetentionService } from './partner-application-retent
 export interface WorkerRunResult {
   competitionsActivated: number;
   competitionsCancelled: number;
+  competitionsSettled: number;
   competitionPeriodsSettled: number;
   incompleteGymSessionsExpired: number;
   landingInterestDeleted: number;
@@ -31,6 +33,7 @@ export class OperationsWorkerService {
   constructor(
     private readonly competitions: CompetitionLifecycleService,
     private readonly competitionScoring: CompetitionScoringService,
+    private readonly automaticDrawSettlement: AutomaticDrawSettlementService,
     private readonly gyms: GymsService,
     private readonly notifications: NotificationsService,
     private readonly partnerApplications: PartnerApplicationRetentionService,
@@ -57,12 +60,16 @@ export class OperationsWorkerService {
       () => this.competitions.processDueStarts(),
       { activated: 0, cancelled: 0 },
     );
+    const incompleteGymSessionsExpired = await attempt(
+      () => this.gyms.expireIncompleteSessions(),
+      0,
+    );
     const competitionPeriodsSettled = await attempt(
       () => this.competitionScoring.processDuePeriods(),
       0,
     );
-    const incompleteGymSessionsExpired = await attempt(
-      () => this.gyms.expireIncompleteSessions(),
+    const competitionsSettled = await attempt(
+      () => this.automaticDrawSettlement.processDueCompetitions(),
       0,
     );
     const landingIntake = await attempt(
@@ -101,6 +108,7 @@ export class OperationsWorkerService {
     return {
       competitionsActivated: competitions.activated,
       competitionsCancelled: competitions.cancelled,
+      competitionsSettled,
       competitionPeriodsSettled,
       incompleteGymSessionsExpired,
       landingInterestDeleted: landingIntake.interestDeleted,

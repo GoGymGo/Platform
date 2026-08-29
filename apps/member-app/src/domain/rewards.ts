@@ -51,6 +51,7 @@ export type RewardWinner = {
   awardRank: number;
   cashAmountCents: number | null;
   cashCurrency: string | null;
+  prizeDrawEntries: number;
   rewardTitle: string;
   rewardType: RewardType;
   sponsorName: string;

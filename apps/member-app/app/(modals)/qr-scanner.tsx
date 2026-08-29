@@ -35,7 +35,10 @@ import { getWorkoutCompletionDeadline } from '@/domain/competitionTiming';
 import { isMobileWebGymVerificationDevice } from '@/domain/mobileGymVerification';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
 import { goBackOrReplace } from '@/navigation/goBack';
-import { getGymScanSetupRoute } from '@/navigation/gymScanFlow';
+import {
+  getGymScanSetupRoute,
+  getRecoverableWorkoutCompetitionId
+} from '@/navigation/gymScanFlow';
 import { ApiError } from '@/services/api/client';
 import { readGymScanLocation } from '@/services/gymScanLocation';
 import {
@@ -154,6 +157,10 @@ function MobileQrScannerModal() {
     Boolean(activeSession || result?.outcome === 'started' || result?.outcome === 'too_early');
   const workoutVerified = !enrollmentPresenceMode && result?.outcome === 'verified';
   const workoutGymName = result?.gymName ?? activeSession?.gymName ?? null;
+  const recoverableWorkoutCompetitionId =
+    getRecoverableWorkoutCompetitionId(pendingIntent);
+  const enrolledCompetitionId =
+    pendingIntent?.competitionId ?? scannedCompetition?.id ?? null;
   const activeWorkoutError =
     error ??
     (result?.outcome === 'rejected'
@@ -286,8 +293,8 @@ function MobileQrScannerModal() {
             : createAppTourStartedGymLocationResult()
           : await repository!.scan({
               accuracyMeters: location.accuracyMeters,
-              ...(allowEnrolledGym && scannedCompetition
-                ? { competitionId: scannedCompetition.id }
+              ...(allowEnrolledGym && enrolledCompetitionId
+                ? { competitionId: enrolledCompetitionId }
                 : { credential: credential! }),
               eventId: randomUUID(),
               latitude: location.latitude,
@@ -318,13 +325,18 @@ function MobileQrScannerModal() {
           const recoveryCredential = credential ?? effectiveCredential;
           if (recoveryCredential) {
             setPendingIntent(await rememberGymScanResult(recoveryCredential, scanResult));
-          } else if (scannedCompetition) {
+          } else if (
+            enrolledCompetitionId &&
+            (scannedCompetition || pendingIntent?.credentialValidUntil)
+          ) {
             setPendingIntent(
               await rememberCompetitionGymScanResult({
-                competitionId: scannedCompetition.id,
-                credentialValidUntil: getWorkoutCompletionDeadline(
-                  scannedCompetition.endsAt
-                ).toISOString(),
+                competitionId: enrolledCompetitionId,
+                credentialValidUntil:
+                  pendingIntent?.credentialValidUntil ??
+                  getWorkoutCompletionDeadline(
+                    scannedCompetition!.endsAt
+                  ).toISOString(),
                 result: scanResult
               })
             );
@@ -361,7 +373,8 @@ function MobileQrScannerModal() {
       appTourActive,
       effectiveCredential,
       enrollmentPresenceMode,
-      pendingIntent?.credential,
+      enrolledCompetitionId,
+      pendingIntent,
       next,
       repository,
       router,
@@ -426,10 +439,18 @@ function MobileQrScannerModal() {
       />
     );
   }
-  if (!enrollmentPresenceMode && registrationChecking) {
+  if (
+    !enrollmentPresenceMode &&
+    !recoverableWorkoutCompetitionId &&
+    registrationChecking
+  ) {
     return <ScreenLoadingState body="Checking your Contest." />;
   }
-  if (!enrollmentPresenceMode && registrationError) {
+  if (
+    !enrollmentPresenceMode &&
+    !recoverableWorkoutCompetitionId &&
+    registrationError
+  ) {
     return (
       <RecoverableScreenError
         body="We couldn&apos;t check your Contest. Try again."
@@ -439,11 +460,20 @@ function MobileQrScannerModal() {
       />
     );
   }
-  if (!enrollmentPresenceMode && !registrationReady) {
+  if (
+    !enrollmentPresenceMode &&
+    !recoverableWorkoutCompetitionId &&
+    !registrationReady
+  ) {
     const setupRoute = getGymScanSetupRoute(setupStep);
     return <Redirect href={setupRoute ?? '/home'} />;
   }
-  if (!enrollmentPresenceMode && scannedCompetition && !scannedContestAcceptsWorkouts) {
+  if (
+    !enrollmentPresenceMode &&
+    !recoverableWorkoutCompetitionId &&
+    scannedCompetition &&
+    !scannedContestAcceptsWorkouts
+  ) {
     return (
       <SessionUnavailable
         actionLabel="BACK TO HOME"

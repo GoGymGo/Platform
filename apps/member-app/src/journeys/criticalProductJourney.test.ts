@@ -492,6 +492,7 @@ function journeyResponse(path: string, method: string): unknown {
           awardRank: 1,
           cashAmountCents: null,
           cashCurrency: null,
+          prizeDrawEntries: 42,
           rewardTitle: "Recovery Kit",
           rewardType: "physical",
           sponsorName: "GoGymGo",

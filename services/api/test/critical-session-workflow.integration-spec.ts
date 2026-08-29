@@ -6,6 +6,7 @@ import {
   dateKeyInTimezone,
 } from '../src/modules/competitions/competition-calendar';
 import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
+import { AutomaticWeeklyMatchingService } from '../src/modules/competitions/automatic-weekly-matching.service';
 import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
 import { buildSeedCommitment } from '../src/modules/draws/draw-algorithm';
@@ -206,6 +207,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       legalDocuments,
       profiles,
       lifecycle,
+      new AutomaticWeeklyMatchingService(),
     );
     social = new SocialService(database, idempotency, profiles);
     sessions = new SessionsService(database, idempotency, ledger, profiles);
@@ -1461,6 +1463,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         {
           alias: originalAlias,
           awardRank: 1,
+          prizeDrawEntries: 1,
           rewardTitle: 'Recovery Kit',
           rewardType: 'physical',
           sponsorName: 'GoGymGo',

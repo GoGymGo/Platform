@@ -22,7 +22,7 @@ const canonicalDigestPattern = /^[0-9a-f]{64}$/;
 
 export interface LockDrawInput {
   competitionId: string;
-  operatorUserId: string;
+  operatorUserId: string | null;
   reason: string;
   requestId: string;
   seedCommitment: string;
@@ -43,7 +43,7 @@ export interface LockedDrawResult {
 
 export interface SettleDrawInput {
   drawId: string;
-  operatorUserId: string;
+  operatorUserId: string | null;
   reason: string;
   requestId: string;
   seedReveal: string;
@@ -786,7 +786,7 @@ export class DrawsService {
     transaction: Transaction<Database>,
     event: {
       action: string;
-      actorUserId: string;
+      actorUserId: string | null;
       entityId: string;
       nextState: Record<string, boolean | number | string>;
       previousState: Record<string, boolean | number | string> | null;

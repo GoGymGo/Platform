@@ -404,18 +404,20 @@ Allowed statuses: `DISCOVERED`, `AUDITED`, `READY`, `IN_PROGRESS`, `CI_PENDING`,
 - Authentication and authorization: same competition, region, week, Weekly Goal,
   accepted friendship, ownership, and conflicting-request rules are server-side.
 - External providers / feature flag: database/worker; no flag.
-- Current implementation / missing behavior: automatic stranger pairing and
-  synthetic searching assignments are removed. Exact accepted/unblocked friend,
-  active enrollment/Contest/region/week/server-time/Weekly Goal eligibility,
-  explicit accept/decline/cancel, stable idempotency, accepted-request
-  provenance, cross-role and permanent one-assignment constraints, privacy-safe
-  partner aggregates, lifecycle closure, and authoritative 0x/1x/2x/3x settled
-  scoring are connected. Projected values remain explicitly provisional; only
-  settled ledger entries are banked. No repository duty remains missing.
+- Current implementation / missing behavior: active entrants are placed into the
+  current scoring week's server-owned queue at enrollment and paired immediately
+  with the earliest eligible unblocked entrant who has the same Weekly Goal.
+  Accepted direct friend challenges remain available and retain request
+  provenance. Exact active enrollment/Contest/region/week/server-time/Weekly Goal
+  eligibility, permanent one-assignment constraints, privacy-safe partner
+  aggregates, lifecycle closure, and authoritative 0x/1x/2x/3x settled scoring
+  are connected. Projected values remain explicitly provisional; only settled
+  ledger entries are banked.
 - Required tests / operations / cloud dependency: exact eligibility, explicit
-  response/cancel/retry, conflicting/concurrent acceptance, solo/searching/
-  matched/settled states, privacy-safe partner detail, lifecycle closure,
-  provenance/assignment database constraints, 0x/1x/2x/3x settlement,
+  response/cancel/retry, deterministic same-goal automatic matching,
+  conflicting/concurrent acceptance, solo/searching/matched/settled states,
+  privacy-safe partner detail, lifecycle closure, provenance/assignment database
+  constraints, 0x/1x/2x/3x settlement,
   reconciliation, contracts, journeys, and artifacts passed locally and in CI.
   Migration rollout and the four-week/two-account staging rehearsal require
   separate deployment authority.

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CompetitionsModule } from '../competitions/competitions.module';
+import { DrawsModule } from '../draws/draws.module';
 import { GymsModule } from '../gyms/gyms.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PrivacyModule } from '../privacy/privacy.module';
@@ -13,6 +14,7 @@ import { PartnerApplicationRetentionService } from './partner-application-retent
   exports: [OperationsWorkerService, WorkerObservabilityService],
   imports: [
     CompetitionsModule,
+    DrawsModule,
     GymsModule,
     NotificationsModule,
     PrivacyModule,

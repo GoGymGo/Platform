@@ -10,6 +10,7 @@ const WORKER_NAME = 'operations';
 const WORKER_RESULT_KEYS = [
   'competitionsActivated',
   'competitionsCancelled',
+  'competitionsSettled',
   'competitionPeriodsSettled',
   'landingInterestDeleted',
   'landingWaitlistDeleted',

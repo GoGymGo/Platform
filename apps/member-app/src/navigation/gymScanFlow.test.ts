@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   getGymScanPostAuthRoute,
+  getRecoverableWorkoutCompetitionId,
   getGymScanSetupRoute,
   gymScanWorkoutRoute,
   isGymScanContinuation
@@ -25,5 +26,28 @@ describe('gym scan navigation', () => {
     assert.equal(isGymScanContinuation('gym-scan'), true);
     assert.equal(isGymScanContinuation('gym-scan-setup'), true);
     assert.equal(isGymScanContinuation('home'), false);
+  });
+
+  it('keeps an active workout attached to its enrolled contest after the contest closes', () => {
+    assert.equal(
+      getRecoverableWorkoutCompetitionId({
+        activeSession: {
+          expiresAt: '2026-08-28T00:15:00.000Z',
+          gymName: 'SkyGate',
+          minimumCompleteAt: '2026-08-28T00:00:00.000Z',
+          sessionId: 'session-1',
+          startedAt: '2026-08-27T23:30:00.000Z'
+        },
+        competitionId: 'competition-1'
+      }),
+      'competition-1'
+    );
+    assert.equal(
+      getRecoverableWorkoutCompetitionId({
+        activeSession: null,
+        competitionId: 'competition-1'
+      }),
+      null
+    );
   });
 });

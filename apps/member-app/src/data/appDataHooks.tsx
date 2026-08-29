@@ -35,6 +35,10 @@ import {
 } from '@/data/socialRepository';
 import { getCompetitionMatchRefetchInterval } from '@/data/competitionMatchSync';
 import {
+  getCompetitionResultsRefetchInterval,
+  getRewardAwardsRefetchInterval
+} from '@/data/competitionResultsSync';
+import {
   createWorkoutSessionRepository,
   type WorkoutSessionRepository
 } from '@/data/sessionRepository';
@@ -409,7 +413,9 @@ export function useMyRewardAwards() {
   return useQuery({
     enabled: authenticatedQueriesEnabled,
     queryFn: () => source.getMyRewardAwards(),
-    queryKey: ['my-reward-awards', user?.uid ?? 'anonymous']
+    queryKey: ['my-reward-awards', user?.uid ?? 'anonymous'],
+    refetchInterval: (query) =>
+      getRewardAwardsRefetchInterval(query.state.data)
   });
 }
 
@@ -419,7 +425,9 @@ export function useMyLatestCompetitionResults() {
   return useQuery({
     enabled: authenticatedQueriesEnabled,
     queryFn: () => source.getMyLatestCompetitionResults(),
-    queryKey: ['my-latest-competition-results', user?.uid ?? 'anonymous']
+    queryKey: ['my-latest-competition-results', user?.uid ?? 'anonymous'],
+    refetchInterval: (query) =>
+      getCompetitionResultsRefetchInterval(query.state.data)
   });
 }
 

@@ -1,5 +1,6 @@
 import { CompetitionLifecycleService } from '../competitions/competition-lifecycle.service';
 import { CompetitionScoringService } from '../competitions/competition-scoring.service';
+import { AutomaticDrawSettlementService } from '../draws/automatic-draw-settlement.service';
 import { GymsService } from '../gyms/gyms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrivacyOperationsService } from '../privacy/privacy-operations.service';
@@ -11,6 +12,7 @@ import { PartnerApplicationRetentionService } from './partner-application-retent
 function createWorker(overrides?: {
   competitionLifecycle?: jest.Mock;
   competitionScoring?: jest.Mock;
+  automaticDrawSettlement?: jest.Mock;
   gyms?: jest.Mock;
   landingIntake?: jest.Mock;
   notifications?: jest.Mock;
@@ -22,6 +24,7 @@ function createWorker(overrides?: {
   calls: {
     competitionLifecycle: jest.Mock;
     competitionScoring: jest.Mock;
+    automaticDrawSettlement: jest.Mock;
     gyms: jest.Mock;
     landingIntake: jest.Mock;
     notifications: jest.Mock;
@@ -38,6 +41,8 @@ function createWorker(overrides?: {
       jest.fn().mockResolvedValue({ activated: 2, cancelled: 1 }),
     competitionScoring:
       overrides?.competitionScoring ?? jest.fn().mockResolvedValue(3),
+    automaticDrawSettlement:
+      overrides?.automaticDrawSettlement ?? jest.fn().mockResolvedValue(16),
     gyms: overrides?.gyms ?? jest.fn().mockResolvedValue(10),
     landingIntake:
       overrides?.landingIntake ??
@@ -69,6 +74,9 @@ function createWorker(overrides?: {
         processDuePeriods: calls.competitionScoring,
       } as unknown as CompetitionScoringService,
       {
+        processDueCompetitions: calls.automaticDrawSettlement,
+      } as unknown as AutomaticDrawSettlementService,
+      {
         expireIncompleteSessions: calls.gyms,
         purgeExpiredLandingIntake: calls.landingIntake,
       } as unknown as GymsService,
@@ -94,6 +102,7 @@ describe('OperationsWorkerService', () => {
     await expect(worker.runOnce()).resolves.toEqual({
       competitionsActivated: 2,
       competitionsCancelled: 1,
+      competitionsSettled: 16,
       competitionPeriodsSettled: 3,
       incompleteGymSessionsExpired: 10,
       landingInterestDeleted: 13,
@@ -118,6 +127,7 @@ describe('OperationsWorkerService', () => {
 
     await expect(worker.runOnce()).rejects.toBeInstanceOf(AggregateError);
     expect(calls.competitionScoring).toHaveBeenCalledTimes(1);
+    expect(calls.automaticDrawSettlement).toHaveBeenCalledTimes(1);
     expect(calls.profileMedia).toHaveBeenCalledTimes(1);
     expect(calls.gyms).toHaveBeenCalledTimes(1);
     expect(calls.landingIntake).toHaveBeenCalledTimes(1);

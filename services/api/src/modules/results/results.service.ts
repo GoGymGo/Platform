@@ -217,6 +217,11 @@ export class ResultsService {
           .onRef('identity.draw_id', '=', 'award.draw_id')
           .onRef('identity.user_id', '=', 'award.user_id'),
       )
+      .innerJoin('draw_entries as entry', (join) =>
+        join
+          .onRef('entry.draw_id', '=', 'award.draw_id')
+          .onRef('entry.user_id', '=', 'award.user_id'),
+      )
       .select([
         'identity.alias',
         'identity.streak_daily',
@@ -225,6 +230,7 @@ export class ResultsService {
         'identity.streak_weekly',
         'identity.streak_yearly',
         'award.award_rank',
+        'entry.entry_count',
         'reward.cash_amount_cents',
         'reward.cash_currency',
         'reward.reward_type',
@@ -240,6 +246,7 @@ export class ResultsService {
       awardRank: winner.award_rank,
       cashAmountCents: winner.cash_amount_cents,
       cashCurrency: winner.cash_currency,
+      prizeDrawEntries: winner.entry_count,
       rewardTitle: winner.title,
       rewardType: winner.reward_type,
       sponsorName: winner.sponsor_name,

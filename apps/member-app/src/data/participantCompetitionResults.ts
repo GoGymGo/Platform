@@ -110,6 +110,7 @@ function isRewardWinner(
       "awardRank",
       "cashAmountCents",
       "cashCurrency",
+      "prizeDrawEntries",
       "rewardTitle",
       "rewardType",
       "sponsorName",
@@ -118,6 +119,7 @@ function isRewardWinner(
     typeof value.alias === 'string' &&
     value.alias.trim().length > 0 &&
     isIntegerInRange(value.awardRank, 1, 100_000) &&
+    isIntegerInRange(value.prizeDrawEntries, 1, Number.MAX_SAFE_INTEGER) &&
     (value.rewardType === "cash"
       ? isIntegerInRange(value.cashAmountCents, 1, 10_000_000) &&
         typeof value.cashCurrency === "string" &&

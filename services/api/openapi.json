@@ -9415,6 +9415,7 @@
             "minLength": 3,
             "nullable": true
           },
+          "prizeDrawEntries": { "type": "number", "minimum": 1 },
           "sponsorName": { "type": "string" },
           "rewardTitle": { "type": "string" },
           "rewardType": {
@@ -9428,6 +9429,7 @@
           "awardRank",
           "cashAmountCents",
           "cashCurrency",
+          "prizeDrawEntries",
           "sponsorName",
           "rewardTitle",
           "rewardType",

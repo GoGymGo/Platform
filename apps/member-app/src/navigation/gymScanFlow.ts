@@ -1,4 +1,5 @@
 import type { AccountSetupStep } from '@/domain/accountSetup';
+import type { PendingGymScan } from '@/services/pendingGymScan';
 
 export const gymScanAuthNext = 'gym-scan';
 export const gymScanSetupNext = 'gym-scan-setup';
@@ -23,4 +24,12 @@ export function getGymScanSetupRoute(step: AccountSetupStep) {
     return `/commitment?source=${gymScanSource}`;
   }
   return null;
+}
+
+export function getRecoverableWorkoutCompetitionId(
+  pending: Pick<PendingGymScan, 'activeSession' | 'competitionId'> | null
+) {
+  return pending?.activeSession && pending.competitionId
+    ? pending.competitionId
+    : null;
 }

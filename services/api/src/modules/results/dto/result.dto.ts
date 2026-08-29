@@ -15,6 +15,9 @@ export class RewardWinnerResponseDto {
   @ApiProperty({ maxLength: 3, minLength: 3, nullable: true, type: String })
   cashCurrency!: string | null;
 
+  @ApiProperty({ minimum: 1, type: Number })
+  prizeDrawEntries!: number;
+
   @ApiProperty({ type: String })
   sponsorName!: string;
 

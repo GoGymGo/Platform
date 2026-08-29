@@ -6,6 +6,7 @@ import {
   dateKeyInTimezone,
 } from '../src/modules/competitions/competition-calendar';
 import { CompetitionLifecycleService } from '../src/modules/competitions/competition-lifecycle.service';
+import { AutomaticWeeklyMatchingService } from '../src/modules/competitions/automatic-weekly-matching.service';
 import { CompetitionScoringService } from '../src/modules/competitions/competition-scoring.service';
 import { CompetitionsService } from '../src/modules/competitions/competitions.service';
 import { buildSeedCommitment } from '../src/modules/draws/draw-algorithm';
@@ -206,6 +207,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       legalDocuments,
       profiles,
       lifecycle,
+      new AutomaticWeeklyMatchingService(),
     );
     social = new SocialService(database, idempotency, profiles);
     sessions = new SessionsService(database, idempotency, ledger, profiles);
@@ -228,7 +230,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await migrated?.stop();
   });
 
-  it('activates a due contest during the member read without inventing Weekly Challenge partners', async () => {
+  it('activates a due contest during the member read and queues the entrant without inventing a partner', async () => {
     const fixture = await seedRegistrationCompetition();
     await competitions.enroll(
       userPrincipal,
@@ -267,13 +269,16 @@ describeWithDatabase('critical session and ledger workflow', () => {
       status: 'active',
     });
 
-    const matches = await migrated.pool.query<{ count: string }>(
-      `SELECT count(*)::text AS count
+    const matches = await migrated.pool.query<{
+      status: string;
+      user_b_id: string | null;
+    }>(
+      `SELECT status::text, user_b_id
        FROM competition_matches
        WHERE competition_id = $1`,
       [fixture.competitionId],
     );
-    expect(Number(matches.rows[0].count)).toBe(0);
+    expect(matches.rows).toEqual([{ status: 'searching', user_b_id: null }]);
   });
 
   it('requires an accepted friend request and explicit Weekly Challenge acceptance', async () => {
@@ -330,13 +335,24 @@ describeWithDatabase('critical session and ledger workflow', () => {
         regionVerificationId: fixture.regionVerificationId,
       },
     );
-    const inventedMatches = await database.connection
+    const queuedMatches = await database.connection
       .selectFrom('competition_matches')
       .select(['period_index', 'status', 'user_a_id', 'user_b_id'])
       .where('competition_id', '=', fixture.competitionId)
       .orderBy('period_index')
       .execute();
-    expect(inventedMatches).toEqual([]);
+    expect(queuedMatches).toEqual([
+      expect.objectContaining({
+        status: 'searching',
+        user_a_id: firstUser.id,
+        user_b_id: null,
+      }),
+    ]);
+
+    await database.connection
+      .insertInto('user_blocks')
+      .values({ blocker_user_id: firstUser.id, blocked_user_id: secondUser.id })
+      .executeTakeFirstOrThrow();
 
     await competitions.enroll(
       pairingPrincipal,
@@ -348,6 +364,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
         regionVerificationId: secondVerification.id,
       },
     );
+    await database.connection
+      .deleteFrom('user_blocks')
+      .where('blocker_user_id', '=', firstUser.id)
+      .where('blocked_user_id', '=', secondUser.id)
+      .executeTakeFirstOrThrow();
     const region = await database.connection
       .selectFrom('competitions as competition')
       .innerJoin(
@@ -417,7 +438,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
           weekly_challenge_request_id: null,
         })
         .execute(),
-    ).rejects.toThrow(/accepted request evidence/i);
+    ).rejects.toThrow(/competition_match_participants_one_active_period/i);
 
     const [userAId, userBId] = [firstUser.id, secondUser.id].sort();
     await database.connection
@@ -520,6 +541,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         'weekly_challenge_request_id',
       ])
       .where('competition_id', '=', fixture.competitionId)
+      .where('status', '!=', 'cancelled')
       .execute();
     expect(pairedMatches).toEqual([
       {
@@ -1044,7 +1066,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       audit_count: 1,
       cancellation_reason: 'enrollment_withdrawn',
       challenge_status: 'cancelled',
-      match_count: 1,
+      match_count: 2,
     });
     await expect(
       competitions.withdrawEnrollment(
@@ -1224,7 +1246,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
       audit_count: 1,
       competition_status: 'cancelled',
       enrollment_status: 'withdrawn',
-      match_count: 0,
+      match_count: 1,
       request_reason: 'competition_cancelled',
       request_status: 'cancelled',
       session_status: 'cancelled',
@@ -1461,6 +1483,7 @@ describeWithDatabase('critical session and ledger workflow', () => {
         {
           alias: originalAlias,
           awardRank: 1,
+          prizeDrawEntries: 1,
           rewardTitle: 'Recovery Kit',
           rewardType: 'physical',
           sponsorName: 'GoGymGo',

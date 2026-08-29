@@ -35,6 +35,7 @@ import {
   availableRegistrationGoalDays,
   competitionRegistrationAvailability,
 } from './competition-registration';
+import { AutomaticWeeklyMatchingService } from './automatic-weekly-matching.service';
 import { CompetitionLifecycleService } from './competition-lifecycle.service';
 import { parseCompetitionRules } from './competition-rules';
 import { calculateWeeklyScore } from './competition-scoring';
@@ -100,6 +101,7 @@ export class CompetitionsService {
     private readonly legalDocuments: LegalDocumentsService,
     private readonly profiles: ProfilesService,
     private readonly lifecycle: CompetitionLifecycleService,
+    private readonly automaticMatching: AutomaticWeeklyMatchingService,
   ) {}
 
   getCurrent(
@@ -384,7 +386,13 @@ export class CompetitionsService {
         const now = new Date();
         const competition = await transaction
           .selectFrom('competitions as competition')
+          .innerJoin(
+            'region_policies as policy',
+            'policy.id',
+            'competition.region_policy_id',
+          )
           .selectAll('competition')
+          .select('policy.timezone')
           .where('competition.id', '=', competitionId)
           .forUpdate()
           .executeTakeFirst();
@@ -508,6 +516,14 @@ export class CompetitionsService {
                 'This account is already enrolled with different enrollment details.',
             });
           }
+          await this.automaticMatching.synchronize(transaction, {
+            competitionId: competition.id,
+            goalDays: existingEnrollment.goal_days,
+            monthKey: competition.month_key,
+            now,
+            timezone: competition.timezone,
+            userId: user.id,
+          });
           return {
             competitionId: competition.id,
             enrolledAt: existingEnrollment.enrolled_at.toISOString(),
@@ -753,6 +769,14 @@ export class CompetitionsService {
           userId: user.id,
           verifiedDaysDelta: 0,
         });
+        await this.automaticMatching.synchronize(transaction, {
+          competitionId: competition.id,
+          goalDays: enrollment.goal_days,
+          monthKey: competition.month_key,
+          now,
+          timezone: competition.timezone,
+          userId: user.id,
+        });
         return {
           competitionId: competition.id,
           enrolledAt: enrollment.enrolled_at.toISOString(),
@@ -968,6 +992,7 @@ export class CompetitionsService {
             'competition.rules',
             'competition.rules_version',
             'competition.starts_at',
+            'competition.status',
             'enrollment.enrolled_at',
             'enrollment.goal_days',
             'policy.metro_name',
@@ -982,6 +1007,19 @@ export class CompetitionsService {
           .executeTakeFirst();
         if (!competition) {
           return [];
+        }
+        if (
+          ['registration', 'active'].includes(competition.status) &&
+          competition.ends_at > now
+        ) {
+          await this.automaticMatching.synchronize(transaction, {
+            competitionId: competition.id,
+            goalDays: competition.goal_days,
+            monthKey: competition.month_key,
+            now,
+            timezone: competition.timezone,
+            userId: user.id,
+          });
         }
         const matches = await transaction
           .selectFrom('competition_matches')
@@ -1058,10 +1096,21 @@ export class CompetitionsService {
         const assignedPeriodIndexes = new Set(
           assignmentRows.map((assignment) => assignment.period_index),
         );
-        const visibleOpponentIds = opponentIds.filter(
-          (opponentId) =>
-            friendIds.has(opponentId) && !blockedUserIds.has(opponentId),
-        );
+        const visibleOpponentIds = opponentIds.filter((opponentId) => {
+          const match = matches.find(
+            (candidate) =>
+              (candidate.user_a_id === user.id &&
+                candidate.user_b_id === opponentId) ||
+              (candidate.user_b_id === user.id &&
+                candidate.user_a_id === opponentId),
+          );
+          return Boolean(
+            match &&
+            !blockedUserIds.has(opponentId) &&
+            (match.weekly_challenge_request_id === null ||
+              friendIds.has(opponentId)),
+          );
+        });
         const [profiles, streaksByUser, userSessions, opponentSessions] =
           await Promise.all([
             visibleOpponentIds.length === 0
@@ -1110,14 +1159,15 @@ export class CompetitionsService {
               ? match.user_b_id
               : match.user_a_id
             : null;
-          const directPartnerIsVisible = Boolean(
+          const partnerIsVisible = Boolean(
             opponentId &&
-            match?.weekly_challenge_request_id &&
-            acceptedRequestIds.has(match.weekly_challenge_request_id) &&
+            match &&
+            (match.weekly_challenge_request_id === null ||
+              acceptedRequestIds.has(match.weekly_challenge_request_id)) &&
             visibleOpponentIds.includes(opponentId),
           );
           const partnerDateKeys =
-            directPartnerIsVisible && opponentId
+            partnerIsVisible && opponentId
               ? (opponentDateKeysByUserId.get(opponentId) ?? [])
               : [];
           const userVerifiedCount = uniqueDateCountInsidePeriod(
@@ -1125,7 +1175,7 @@ export class CompetitionsService {
             period.startDateKey,
             period.endDateKey,
           );
-          const opponentVerifiedCount = directPartnerIsVisible
+          const opponentVerifiedCount = partnerIsVisible
             ? uniqueDateCountInsidePeriod(
                 partnerDateKeys,
                 period.startDateKey,
@@ -1140,7 +1190,7 @@ export class CompetitionsService {
             bothHitMultiplier: rules.weeklyChallengeBothHitMultiplier,
             entriesPerVerifiedDay: rules.verifiedSessionPrizeDrawEntries,
             goalDays: competition.goal_days,
-            opponentVerifiedDays: directPartnerIsVisible
+            opponentVerifiedDays: partnerIsVisible
               ? opponentVerifiedCount
               : null,
             recoveryMultiplier: rules.weeklyChallengeRecoveryMultiplier,
@@ -1148,7 +1198,7 @@ export class CompetitionsService {
           });
           const outcome = settledOutcome ?? projectedOutcome;
           const streaks =
-            directPartnerIsVisible && opponentId
+            partnerIsVisible && opponentId
               ? (streaksByUser.get(opponentId) ?? emptyStreaks())
               : emptyStreaks();
           const statisticsAreVisible = Boolean(
@@ -1158,10 +1208,10 @@ export class CompetitionsService {
           return {
             availability:
               match?.status === 'settled'
-                ? directPartnerIsVisible && match.user_b_id
+                ? partnerIsVisible && match.user_b_id
                   ? ('matched' as const)
                   : ('solo' as const)
-                : directPartnerIsVisible && match?.status === 'matched'
+                : partnerIsVisible && match?.status === 'matched'
                   ? ('matched' as const)
                   : assignedPeriodIndexes.has(period.index)
                     ? ('solo' as const)
@@ -1169,7 +1219,7 @@ export class CompetitionsService {
             entries: outcome.entries,
             multiplier: normalizeWeeklyMultiplier(outcome.multiplier),
             opponentAlias:
-              directPartnerIsVisible && opponentId
+              partnerIsVisible && opponentId
                 ? (profileByUserId.get(opponentId)?.screen_name ?? null)
                 : null,
             opponentBestStreak: statisticsAreVisible
@@ -1680,6 +1730,25 @@ export class CompetitionsService {
           .returningAll()
           .executeTakeFirstOrThrow();
         await transaction
+          .updateTable('competition_matches')
+          .set({ settled_at: now, status: 'cancelled' })
+          .where('competition_id', '=', request.competition_id)
+          .where('period_index', '=', request.period_index)
+          .where('status', '=', 'searching')
+          .where((expression) =>
+            expression.or([
+              expression('user_a_id', 'in', [
+                request.requester_user_id,
+                request.recipient_user_id,
+              ]),
+              expression('user_b_id', 'in', [
+                request.requester_user_id,
+                request.recipient_user_id,
+              ]),
+            ]),
+          )
+          .execute();
+        await transaction
           .insertInto('competition_matches')
           .values({
             competition_id: request.competition_id,
@@ -1908,7 +1977,7 @@ export class CompetitionsService {
         .select('id')
         .where('competition_id', '=', competitionId)
         .where('period_index', '=', periodIndex)
-        .where('status', '!=', 'cancelled')
+        .where('status', 'in', ['matched', 'settled'])
         .where((expression) =>
           expression.or([
             expression('user_a_id', 'in', [...userIds]),

@@ -605,6 +605,7 @@ function settledWinnersCircleResponse() {
         awardRank: 1,
         cashAmountCents: null,
         cashCurrency: null,
+        prizeDrawEntries: 42,
         rewardTitle: "Recovery Kit",
         rewardType: "physical",
         sponsorName: "GoGymGo",

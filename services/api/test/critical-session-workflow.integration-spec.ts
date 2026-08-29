@@ -225,6 +225,34 @@ describeWithDatabase('critical session and ledger workflow', () => {
     await seedAccountLegalDocuments();
   });
 
+  beforeEach(() => {
+    const realNow = new Date();
+    const regionalDay = Number(
+      dateKeyInTimezone(realNow, 'America/Vancouver').slice(-2),
+    );
+    if (regionalDay <= 28) return;
+
+    jest.useFakeTimers({
+      doNotFake: [
+        'clearImmediate',
+        'clearInterval',
+        'clearTimeout',
+        'hrtime',
+        'nextTick',
+        'performance',
+        'queueMicrotask',
+        'setImmediate',
+        'setInterval',
+        'setTimeout',
+      ],
+      now: new Date(realNow.getTime() - (regionalDay - 28) * 24 * 60 * 60_000),
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   afterAll(async () => {
     await database?.onApplicationShutdown();
     await migrated?.stop();
@@ -2545,26 +2573,11 @@ describeWithDatabase('critical session and ledger workflow', () => {
     principal: AuthenticatedPrincipal = userPrincipal,
   ): Promise<CompetitionFixture> {
     const now = Date.now();
-    const monthKeyFormatter = new Intl.DateTimeFormat('en-CA', {
+    const monthKey = new Intl.DateTimeFormat('en-CA', {
       month: '2-digit',
       timeZone: 'America/Vancouver',
       year: 'numeric',
-    });
-    const currentMonthKey = monthKeyFormatter.format(new Date(now));
-    const regionalDateKey = dateKeyInTimezone(
-      new Date(now),
-      'America/Vancouver',
-    );
-    const currentMonthHasWeeklyPeriod = buildCompetitionPeriods(
-      currentMonthKey,
-    ).some(
-      (period) =>
-        regionalDateKey >= period.startDateKey &&
-        regionalDateKey <= period.endDateKey,
-    );
-    const monthKey = currentMonthHasWeeklyPeriod
-      ? currentMonthKey
-      : monthKeyFormatter.format(new Date(now + 7 * 24 * 60 * 60_000));
+    }).format(new Date(now));
     const fixtureSequence = ++registrationFixtureSequence;
     const user = await profiles.ensureUser(principal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(

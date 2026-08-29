@@ -236,14 +236,17 @@ score, and Prize Draw Entry totals reconcile from server progress in API mode.
 ### 3.6 Weekly Challenges
 
 - A Weekly Challenge is created for one of the four seven-day scoring weeks.
-- The system does not silently assign a random stranger.
-- A player can request an accepted friend who is actively enrolled in the same
-  competition, region, scoring week, and Weekly Goal.
+- The system automatically assigns the first available active, unblocked player
+  in the same competition, scoring week, and Weekly Goal. The assigned Alias and
+  live weekly progress must remain plainly visible from Home and Compete.
+- While automatic pairing is still in progress, a player can request an accepted
+  friend who is actively enrolled in the same competition, region, scoring week,
+  and Weekly Goal. A pending request never prevents an eligible automatic match.
 - The invited player must explicitly accept or decline.
 - Each player can have only one Weekly Challenge partner for a scoring week;
   accepting one request cancels conflicting pending requests.
-- If no request is accepted, the week remains searching or settles in solo mode
-  according to competition rules.
+- If no eligible player is available, the week remains visibly in pairing state
+  and may settle in solo mode according to competition rules.
 - Tapping the Weekly Challenge shows the partner's permitted Alias, visible
   streak badges, current and best streaks, monthly verified-day total, and that
   week's verified count without exposing private workout details.

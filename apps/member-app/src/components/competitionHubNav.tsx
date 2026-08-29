@@ -24,7 +24,12 @@ const sections: readonly {
   route: Href;
 }[] = [
   { key: 'rankings', label: 'OVERVIEW', route: '/leaderboard' },
-  { key: 'challenge', label: 'CHALLENGE', route: '/squad' },
+  {
+    accessibilityLabel: 'Weekly Match',
+    key: 'challenge',
+    label: 'WEEKLY\nMATCH',
+    route: '/squad'
+  },
   {
     accessibilityLabel: 'Leaderboard / Winners',
     key: 'winners',

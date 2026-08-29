@@ -44,21 +44,6 @@ export class AutomaticWeeklyMatchingService {
       .executeTakeFirst();
     if (existing) return;
 
-    const pendingDirectRequest = await transaction
-      .selectFrom('weekly_challenge_requests')
-      .select('id')
-      .where('competition_id', '=', input.competitionId)
-      .where('period_index', '=', period.index)
-      .where('status', '=', 'pending')
-      .where((expression) =>
-        expression.or([
-          expression('requester_user_id', '=', input.userId),
-          expression('recipient_user_id', '=', input.userId),
-        ]),
-      )
-      .executeTakeFirst();
-    if (pendingDirectRequest) return;
-
     const candidate = await transaction
       .selectFrom('competition_matches as match')
       .innerJoin('competition_enrollments as enrollment', (join) =>
@@ -83,19 +68,6 @@ export class AutomaticWeeklyMatchingService {
                  AND block.blocked_user_id = match.user_a_id)
              OR (block.blocker_user_id = match.user_a_id
                  AND block.blocked_user_id = ${input.userId})
-        )`,
-      )
-      .where(
-        sql<boolean>`NOT EXISTS (
-          SELECT 1
-          FROM weekly_challenge_requests AS request
-          WHERE request.competition_id = ${input.competitionId}
-            AND request.period_index = ${period.index}
-            AND request.status = 'pending'
-            AND (
-              request.requester_user_id = match.user_a_id
-              OR request.recipient_user_id = match.user_a_id
-            )
         )`,
       )
       .orderBy('match.created_at')

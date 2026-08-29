@@ -17,7 +17,10 @@ import { UserAlias } from '@/components/streakRewards';
 import { colors, fontFamilies, spacing } from '@/constants/theme';
 import { useCategoryLeaderboard, useMyStreaks } from '@/data/appDataHooks';
 import { type GoalCategory } from '@/domain/campaignEconomics';
-import { getCompetitionRankLabel } from '@/domain/competition';
+import {
+  getCompetitionRankLabel,
+  getWeeklyChallengeDisplayStatus
+} from '@/domain/competition';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { recordFlowMetric } from '@/services/flowMetrics';
 import { useAuth } from '@/state/auth';
@@ -61,13 +64,14 @@ export default function ContestOverviewScreen() {
     hasSettledWeek,
     rank: myStanding?.rank
   });
-  const challengeStatus = competitionNotStarted
+  const weeklyMatchStatus = competitionNotStarted
     ? 'NOT STARTED'
-    : competition.phase === 'bonus-days'
-      ? 'COMPLETE'
-      : competition.currentPeriod?.availability === 'matched'
-        ? 'IN PROGRESS'
-        : 'PAIRING NEEDED';
+    : getWeeklyChallengeDisplayStatus({
+        activeAvailability: competition.currentPeriod?.availability,
+        hasIncomingRequest: false,
+        isRemainderDayPhase:
+          competition.phase === 'bonus-days' || competition.phase === 'complete'
+      });
 
   return (
     <ScreenContainer>
@@ -85,7 +89,7 @@ export default function ContestOverviewScreen() {
               onPress={() => router.push('/how-it-works?from=leaderboard')}
             />
           }
-          description="Track your rank, entries and Weekly Challenge."
+          description="Track your rank, entries and assigned Weekly Match."
           eyebrow={`${competitionRegion.label} // MONTHLY CONTEST`}
           title="REGIONAL CONTEST"
         />
@@ -126,11 +130,20 @@ export default function ContestOverviewScreen() {
               value={String(totalEntries)}
             />
             <OverviewMetric
-              label="WEEKLY CHALLENGE"
-              tone={challengeStatus === 'PAIRING NEEDED' ? 'amber' : 'cyan'}
-              value={challengeStatus}
+              label="WEEKLY MATCH"
+              tone={weeklyMatchStatus === 'PAIRING IN PROGRESS' ? 'amber' : 'cyan'}
+              value={weeklyMatchStatus}
             />
           </View>
+          <CompactTextButton
+            label={
+              competition.currentPeriod?.availability === 'matched'
+                ? `OPEN MATCH WITH @${competition.currentPeriod.opponentAlias}`
+                : 'OPEN WEEKLY MATCH'
+            }
+            onPress={() => router.push('/squad')}
+            tone="cyan"
+          />
           <TerminalText
             live="polite"
             tone="dim"

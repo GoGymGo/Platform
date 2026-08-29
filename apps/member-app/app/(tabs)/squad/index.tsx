@@ -147,21 +147,21 @@ export default function SquadScreen() {
             />
           )}
           eyebrow={challengeState}
-          title={activePeriod ? `WEEK ${activePeriod.index} CHALLENGE` : 'WEEKLY CHALLENGE'}
+          title={activePeriod ? `WEEK ${activePeriod.index} MATCH` : 'WEEKLY MATCH'}
         />
         <CompetitionHubNav active="challenge" style={styles.hubNav} />
 
         {pairingDataError ? (
           <RecoverableError
-            body="Weekly Challenge status could not be loaded. No partner action was assumed."
+            body="Weekly Match status could not be loaded. No partner assignment was assumed."
             onRetry={retryPairingData}
             retrying={eligiblePartnersQuery.isFetching || requestsQuery.isFetching}
             style={styles.queryState}
-            title="COULD NOT LOAD CHALLENGE"
+            title="COULD NOT LOAD WEEKLY MATCH"
           />
         ) : pairingDataLoading ? (
           <TerminalText live="polite" style={styles.queryState} tone="muted" variant="label">
-            LOADING WEEKLY CHALLENGE...
+            LOADING WEEKLY MATCH...
           </TerminalText>
         ) : null}
 
@@ -174,7 +174,7 @@ export default function SquadScreen() {
         ) : null}
 
         <FirstVisitTip
-          body="Choose an accepted friend with the same Weekly Goal. A challenge starts only after they accept."
+          body="GoGymGo automatically assigns another active player with the same Weekly Goal. Your assigned Alias and live progress appear here."
           onOpenGuide={() => router.push('/how-it-works?from=challenge')}
           style={styles.firstVisitTip}
           tip="weekly-challenge"
@@ -189,7 +189,7 @@ export default function SquadScreen() {
           />
         ) : isBonusDayPhase ? (
           <HUDBorderBox style={styles.pactCard} tone="cyan">
-            <TerminalText tone="cyan" variant="label">WEEKLY CHALLENGES COMPLETE</TerminalText>
+            <TerminalText tone="cyan" variant="label">WEEKLY MATCHES COMPLETE</TerminalText>
             <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
               Only settled weekly entries are banked. Bonus Days are scored separately.
             </TerminalText>
@@ -201,7 +201,7 @@ export default function SquadScreen() {
               {formatDateKey(competitionEntryStartDateKey)}
             </TerminalText>
             <TerminalText style={styles.matchNoteText} tone="muted" uppercase={false} variant="body">
-              Partner requests open during each active seven-day scoring week.
+              Automatic matching begins during each active seven-day scoring week.
             </TerminalText>
           </HUDBorderBox>
         )}
@@ -225,7 +225,7 @@ export default function SquadScreen() {
             </View>
             {showBonusDetails ? (
               <TerminalText style={styles.bonusCopy} tone="muted" uppercase={false} variant="body">
-                Missing your goal settles at 0x. Solo completion settles at 1x. Both partners
+                Missing your goal settles at 0x. Solo completion settles at 1x. Both matched players
                 meeting the goal settles at 2x. If your partner misses, you need an eligible
                 extra Verified workout to settle at 3x. Projections are never banked entries.
               </TerminalText>
@@ -299,11 +299,11 @@ export default function SquadScreen() {
 
             {incomingRequests.length === 0 && outgoingRequests.length === 0 ? (
               <HUDBorderBox style={styles.requestCard} tone="cyan">
-                <TerminalText glow tone="cyan" variant="label">CHOOSE AN ACCEPTED FRIEND</TerminalText>
+                <TerminalText glow tone="cyan" variant="label">OPTIONAL: CHOOSE A FRIEND</TerminalText>
                 {(eligiblePartnersQuery.data ?? []).length === 0 ? (
                   <TerminalText tone="muted" uppercase={false} variant="body">
-                    No accepted, unblocked friend is currently eligible for this Contest, week,
-                    region and Weekly Goal. You can continue in searching mode and settle solo.
+                    Automatic matching is still active. No accepted, unblocked friend is currently
+                    eligible for this Contest, week, region and Weekly Goal.
                   </TerminalText>
                 ) : (
                   (eligiblePartnersQuery.data ?? []).map((partner) => (
@@ -395,12 +395,12 @@ function ChallengeProgressCard({
       ) : (
         <>
           <TerminalText tone="cyan" variant="label">
-            {period.availability === 'solo' ? 'SOLO RESULT' : 'SEARCHING FOR YOUR CHOICE'}
+            {period.availability === 'solo' ? 'SOLO RESULT' : 'PAIRING IN PROGRESS'}
           </TerminalText>
           <TerminalText tone="muted" uppercase={false} variant="body">
             {period.availability === 'solo'
-              ? 'No accepted direct partner remained eligible. This week uses the solo scoring rule.'
-              : 'No friend has been explicitly accepted as your partner. The system will not assign a stranger.'}
+              ? 'No eligible player remained available. This week uses the solo scoring rule.'
+              : `GoGymGo is finding another active player with the same ${weeklyGoal}-day Weekly Goal. This screen refreshes automatically.`}
           </TerminalText>
         </>
       )}
@@ -455,8 +455,9 @@ function PairingMoreOptions({
           />
           {showRules ? (
             <TerminalText tone="muted" uppercase={false} variant="caption">
-              Partners must be accepted, unblocked friends in the exact active Contest,
-              region, week and Weekly Goal. An invite has no effect until explicitly accepted.
+              Automatic matches use another active, unblocked player in the exact Contest,
+              scoring week and Weekly Goal. While pairing is in progress, you can instead invite
+              an accepted friend; an invite has no effect until explicitly accepted.
             </TerminalText>
           ) : null}
           <CompactTextButton label="Manage friends" onPress={onManageFriends} tone="muted" />
@@ -481,11 +482,11 @@ function getChallengeState({
 }) {
   if (isBonusDayPhase) return 'WEEKS SETTLED';
   if (scoringStatus === 'settled') return availability === 'matched' ? 'SETTLED' : 'SOLO SETTLED';
-  if (availability === 'matched') return 'PARTNER ACCEPTED';
+  if (availability === 'matched') return 'WEEKLY MATCH ASSIGNED';
   if (hasIncoming) return 'INCOMING INVITE';
   if (hasOutgoing) return 'AWAITING ACCEPTANCE';
   if (availability === 'solo') return 'SOLO';
-  return availability === 'searching' ? 'SEARCHING' : 'NOT ACTIVE';
+  return availability === 'searching' ? 'PAIRING IN PROGRESS' : 'NOT ACTIVE';
 }
 
 function getMatchNote(
@@ -496,7 +497,7 @@ function getMatchNote(
     return `${period.finalMultiplier}x is settled. ${period.entries} entries are banked for this week.`;
   }
   if (period.availability !== 'matched') {
-    return `Meet ${weeklyGoal} Verified workout days for the projected solo 1x result. No partner has been assigned.`;
+    return `Meet ${weeklyGoal} Verified workout days while automatic matching continues. Your assigned player will appear here as soon as the server confirms the match.`;
   }
   if (period.userGoalMet && period.opponentGoalMet) {
     return 'Both goals are currently met. The projected result is 2x until settlement.';

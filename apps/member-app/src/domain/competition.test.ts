@@ -350,10 +350,9 @@ describe('competition clarity labels', () => {
     );
   });
 
-  it('prioritizes the next Weekly Challenge action', () => {
+  it('makes automatic Weekly Match assignment and pairing states explicit', () => {
     assert.equal(
       getWeeklyChallengeDisplayStatus({
-        hasFeaturedPartner: true,
         hasIncomingRequest: true,
         isRemainderDayPhase: false
       }),
@@ -362,23 +361,29 @@ describe('competition clarity labels', () => {
     assert.equal(
       getWeeklyChallengeDisplayStatus({
         activeAvailability: 'matched',
-        hasFeaturedPartner: true,
         hasIncomingRequest: true,
         isRemainderDayPhase: false
       }),
-      'IN PROGRESS'
+      'MATCH ASSIGNED'
     );
     assert.equal(
       getWeeklyChallengeDisplayStatus({
-        hasFeaturedPartner: true,
+        activeAvailability: 'searching',
         hasIncomingRequest: false,
         isRemainderDayPhase: false
       }),
-      'CHOOSE PARTNER'
+      'PAIRING IN PROGRESS'
     );
     assert.equal(
       getWeeklyChallengeDisplayStatus({
-        hasFeaturedPartner: true,
+        activeAvailability: 'solo',
+        hasIncomingRequest: false,
+        isRemainderDayPhase: false
+      }),
+      'SOLO'
+    );
+    assert.equal(
+      getWeeklyChallengeDisplayStatus({
         hasIncomingRequest: true,
         isRemainderDayPhase: true
       }),

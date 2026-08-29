@@ -8,11 +8,11 @@ export type CurrentWeekProgress = {
 
 export type MatchAvailability = 'matched' | 'searching' | 'solo';
 export type WeeklyChallengeDisplayStatus =
-  | 'CHOOSE PARTNER'
+  | 'MATCH ASSIGNED'
   | 'COMPLETE'
-  | 'IN PROGRESS'
   | 'INVITE WAITING'
-  | 'PAIRING PENDING';
+  | 'PAIRING IN PROGRESS'
+  | 'SOLO';
 
 export type CompetitionPhase =
   | 'before-month'
@@ -38,12 +38,10 @@ export function getCompetitionRankLabel({
 
 export function getWeeklyChallengeDisplayStatus({
   activeAvailability,
-  hasFeaturedPartner,
   hasIncomingRequest,
   isRemainderDayPhase
 }: {
   activeAvailability?: MatchAvailability;
-  hasFeaturedPartner: boolean;
   hasIncomingRequest: boolean;
   isRemainderDayPhase: boolean;
 }): WeeklyChallengeDisplayStatus {
@@ -52,18 +50,18 @@ export function getWeeklyChallengeDisplayStatus({
   }
 
   if (activeAvailability === 'matched') {
-    return 'IN PROGRESS';
+    return 'MATCH ASSIGNED';
   }
 
   if (hasIncomingRequest) {
     return 'INVITE WAITING';
   }
 
-  if (activeAvailability || hasFeaturedPartner) {
-    return 'CHOOSE PARTNER';
+  if (activeAvailability === 'solo') {
+    return 'SOLO';
   }
 
-  return 'PAIRING PENDING';
+  return 'PAIRING IN PROGRESS';
 }
 
 export type CompetitionPeriod = {

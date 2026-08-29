@@ -113,10 +113,14 @@ test("keeps authorization and mutation safeguards in the implementation", async 
   assert.match(dashboard, /Your session expired/);
   assert.match(dashboard, /authEpoch\.current/);
   assert.match(dashboard, /clearAdminRequestSession\(\)/);
-  assert.match(dashboard, /loadPendingDrawFinalization\(/);
+  assert.match(dashboard, /clearLegacyDrawRecovery\(/);
   assert.match(dashboard, /nextUser\.uid/);
   assert.match(dashboard, /window\.location\.origin/);
-  assert.match(dashboard, /canRevealPendingDraw\(/);
+  assert.match(dashboard, /AUTOMATIC PUBLICATION PENDING/);
+  assert.match(dashboard, /No admin action is required/);
+  assert.doesNotMatch(dashboard, /operator\/draws\/lock/);
+  assert.doesNotMatch(dashboard, /REVEAL \+ PUBLISH RESULTS/);
+  assert.doesNotMatch(dashboard, /LOCK AUDITED DRAW SNAPSHOT/);
   const signOutImplementation = dashboard.match(
     /async function handleSignOut\(\) \{[\s\S]*?\n  \}/,
   )?.[0];

@@ -100,14 +100,9 @@ import {
   zonedDateTimeToIso,
 } from "./contest-schedule.js";
 import {
-  buildDrawSeedCommitment,
-  canRevealPendingDraw,
-  canFinalizeCompetitionResults,
-  createPendingDrawFinalization,
-  createDrawSeed,
-  loadPendingDrawFinalization,
-  savePendingDrawFinalization,
-} from "./draw-finalization.js";
+  clearLegacyDrawRecovery,
+  isAutomaticResultsPublicationDue,
+} from "./automatic-results-publication.js";
 import {
   assertGymQrCredentialScope,
   PilotOperationsPanel,
@@ -163,21 +158,6 @@ type CompetitionPublicationPreflight = {
   evidence: Record<string, unknown>;
   ready: boolean;
   version: number;
-};
-
-type PendingDrawFinalization = ReturnType<typeof createPendingDrawFinalization>;
-
-type DrawLockResult = {
-  entrantCount: number;
-  entrantSnapshotHash: string;
-  id: string;
-  lockedAt: string;
-  publicResultSnapshotHash: string;
-  rewardSlotCount: number;
-  rewardSnapshotHash: string;
-  scoringSnapshotHash: string;
-  status: "locked" | "settled";
-  totalEntries: string;
 };
 
 type NavigationCounts = Partial<Record<AdminSection, number>>;
@@ -525,9 +505,6 @@ export function AdminDashboard({
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
     null,
   );
-  const [pendingDrawFinalization, setPendingDrawFinalization] =
-    useState<PendingDrawFinalization | null>(null);
-
   const request = useCallback(
     <T,>(
       path: string,
@@ -718,17 +695,18 @@ export function AdminDashboard({
         setSnapshot(null);
         setPartnerSnapshot(null);
         if (nextUser) {
-          setPendingDrawFinalization(
-            loadPendingDrawFinalization(
+          try {
+            clearLegacyDrawRecovery(
               window.localStorage,
               nextUser.uid,
               window.location.origin,
-            ),
-          );
+            );
+          } catch {
+            // Publication is server-owned; unavailable browser storage is safe.
+          }
           setAuthStage("checking");
           void refresh(nextUser, nextEpoch);
         } else {
-          setPendingDrawFinalization(null);
           setLoadError("");
           setAuthStage("signed-out");
         }
@@ -916,7 +894,6 @@ export function AdminDashboard({
       await signOut(getAuth());
       authEpoch.current += 1;
       clearAdminRequestSession();
-      setPendingDrawFinalization(null);
       setUser(null);
       setPortalAccess(null);
       setSnapshot(null);
@@ -1149,161 +1126,6 @@ export function AdminDashboard({
       throw error;
     }
     return preflight;
-  }
-
-  async function finalizeContestResults(
-    competition: Competition,
-    reason: string,
-  ) {
-    setSubmitting(true);
-    setLoadError("");
-    try {
-      if (!user) {
-        throw new AdminUserFacingError(
-          "Sign in before finalizing contest results.",
-        );
-      }
-      const environmentOrigin = window.location.origin;
-      if (
-        pendingDrawFinalization &&
-        pendingDrawFinalization.competitionId !== competition.id
-      ) {
-        throw new AdminUserFacingError(
-          "Finish the saved draw publication before finalizing another contest.",
-        );
-      }
-      let recovery =
-        pendingDrawFinalization?.competitionId === competition.id
-          ? pendingDrawFinalization
-          : null;
-      if (!recovery && competition.status === "active") {
-        const seedReveal = createDrawSeed();
-        const seedCommitment = await buildDrawSeedCommitment(seedReveal);
-        recovery = createPendingDrawFinalization({
-          competitionId: competition.id,
-          environmentOrigin,
-          operatorUserId: user.uid,
-          seedCommitment,
-          seedReveal,
-        });
-        setPendingDrawFinalization(recovery);
-        try {
-          savePendingDrawFinalization(
-            window.localStorage,
-            user.uid,
-            environmentOrigin,
-            recovery,
-          );
-        } catch {
-          // The in-memory record remains usable for this signed-in session.
-        }
-      }
-      if (competition.status === "active" && recovery) {
-        const locked = await request<DrawLockResult>("operator/draws/lock", {
-          body: {
-            competitionId: competition.id,
-            reason,
-            seedCommitment: recovery.seedCommitment,
-          },
-          method: "POST",
-        });
-        if (
-          locked.status !== "locked" ||
-          !locked.id ||
-          locked.entrantCount < 1 ||
-          locked.rewardSlotCount < 1 ||
-          !/^[1-9][0-9]*$/.test(locked.totalEntries) ||
-          ![
-            locked.entrantSnapshotHash,
-            locked.scoringSnapshotHash,
-            locked.rewardSnapshotHash,
-            locked.publicResultSnapshotHash,
-          ].every((value) => /^[a-f0-9]{64}$/.test(value))
-        ) {
-          throw new AdminUserFacingError(
-            "The server returned incomplete draw-lock evidence. The saved seed was retained; refresh before retrying.",
-          );
-        }
-        recovery = {
-          ...recovery,
-          drawId: locked.id,
-        };
-        setPendingDrawFinalization(recovery);
-        try {
-          savePendingDrawFinalization(
-            window.localStorage,
-            user.uid,
-            environmentOrigin,
-            recovery,
-          );
-        } catch {
-          // The in-memory record remains usable for this signed-in session.
-        }
-        await refresh(user);
-        setToast(
-          "Draw snapshot locked. Review the evidence, then reveal and publish.",
-        );
-        return;
-      }
-      if (
-        competition.status !== "settling" ||
-        !recovery ||
-        !competition.draw ||
-        !canRevealPendingDraw(
-          recovery,
-          competition.draw,
-          user.uid,
-          environmentOrigin,
-        )
-      ) {
-        throw new AdminUserFacingError(
-          "This draw's exact saved seed is unavailable or does not match the locked commitment. Recover it in the original operator account and environment before publishing.",
-        );
-      }
-      await request<AdminEntityResult>(
-        `operator/draws/${competition.draw.id}/settle`,
-        {
-          body: { reason, seedReveal: recovery.seedReveal },
-          method: "POST",
-        },
-      );
-      setPendingDrawFinalization(null);
-      try {
-        savePendingDrawFinalization(
-          window.localStorage,
-          user.uid,
-          environmentOrigin,
-          null,
-        );
-      } catch {
-        // The completed server state remains authoritative.
-      }
-      if (user) await refresh(user);
-      setToast("Audited results published to the Winners Circle.");
-    } catch (error) {
-      setLoadError(errorMessage(error));
-      if (user) await refresh(user);
-      throw error;
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function requestContestFinalization(competition: Competition) {
-    setConfirmAction({
-      actionLabel:
-        competition.status === "settling"
-          ? "Reveal + publish"
-          : "Lock audited draw snapshot",
-      auditReason:
-        "Finalize the ended contest and publish its audited Winners Circle results.",
-      description:
-        competition.status === "settling"
-          ? `${competition.name}'s entrant and reward snapshots are locked. Verify the evidence, then reveal the matching saved seed and publish the deterministic result.`
-          : `${competition.name}'s completion period is over. This locks one immutable entrant, scoring, identity, and reward snapshot for review; it does not publish winners yet.`,
-      execute: (reason) => finalizeContestResults(competition, reason),
-      tone: "primary",
-    });
   }
 
   async function publishCompleteContestSetup(
@@ -1577,7 +1399,6 @@ export function AdminDashboard({
                 setSection("competitions");
               }}
               onDelete={requestContestDeletion}
-              onFinalize={requestContestFinalization}
               onIssueQr={(competitionId, gymId, body) =>
                 mutate(
                   "Printable QR poster issued.",
@@ -1593,20 +1414,6 @@ export function AdminDashboard({
               snapshot={snapshot}
               onNavigate={navigateToSection}
               onStatus={requestContestStatus}
-              pendingDrawCompetitionId={
-                user &&
-                pendingDrawFinalization &&
-                canRevealPendingDraw(
-                  pendingDrawFinalization,
-                  snapshot.competitions.find(
-                    ({ id }) => id === pendingDrawFinalization.competitionId,
-                  )?.draw ?? null,
-                  user.uid,
-                  typeof window === "undefined" ? "" : window.location.origin,
-                )
-                  ? pendingDrawFinalization.competitionId
-                  : null
-              }
               submitting={submitting}
             />
           ) : null}
@@ -3177,7 +2984,6 @@ function Overview({
   health,
   onCreate,
   onDelete,
-  onFinalize,
   onIssueQr,
   onLoadActiveQr,
   publishReady,
@@ -3186,7 +2992,6 @@ function Overview({
   snapshot,
   onNavigate,
   onStatus,
-  pendingDrawCompetitionId,
   submitting,
 }: {
   activeCompetitions: Competition[];
@@ -3196,7 +3001,6 @@ function Overview({
   health: SystemHealth | null;
   onCreate: () => void;
   onDelete: (competition: Competition) => void;
-  onFinalize: (competition: Competition) => void;
   onIssueQr: (
     competitionId: string,
     gymId: string,
@@ -3212,7 +3016,6 @@ function Overview({
   snapshot: DashboardSnapshot;
   onNavigate: (section: AdminSection) => void;
   onStatus: (competition: Competition, action: "cancel") => void;
-  pendingDrawCompetitionId: string | null;
   submitting: boolean;
 }) {
   const [contestHomePoster, setContestHomePoster] =
@@ -3701,26 +3504,24 @@ function Overview({
                             {competition.status === "settled"
                               ? "RESULTS PUBLISHED"
                               : competition.status === "settling"
-                                ? "DRAW LOCKED"
-                                : canFinalizeCompetitionResults(competition)
-                                  ? "READY TO FINALIZE"
+                                ? "AUTOMATIC PUBLICATION IN PROGRESS"
+                                : isAutomaticResultsPublicationDue(competition)
+                                  ? "AUTOMATIC PUBLICATION PENDING"
                                   : "WAITING FOR CONTEST COMPLETION"}
                           </strong>
                           <p>
                             {competition.status === "settled"
                               ? "Players can now see the audited results when they return to the app."
                               : competition.status === "settling"
-                                ? pendingDrawCompetitionId === competition.id
-                                  ? "The immutable draw evidence matches this operator's saved seed. Review it, then reveal once to publish results."
-                                  : "The draw is locked, but its exact saved seed is unavailable in this operator account and environment. Publishing remains disabled until it is recovered."
-                                : canFinalizeCompetitionResults(competition)
-                                  ? "The 15-minute workout completion period has ended. Lock an immutable audited snapshot, then review it before a separate reveal."
+                                ? "The server is validating the immutable audited snapshot and publishing the deterministic winners. No admin action is required."
+                                : isAutomaticResultsPublicationDue(competition)
+                                  ? "The completion period has ended. The worker will audit the scoring and reward snapshots, determine the winners, and publish the Winners Circle automatically."
                                   : workoutCutoffs
-                                    ? `Finalization opens after ${formatContestDateTime(
+                                    ? `Automatic publication starts after ${formatContestDateTime(
                                         workoutCutoffs.completionDeadline,
                                         contestTimeZone,
                                       )}.`
-                                    : "Finalization opens after the completion period ends."}
+                                    : "Automatic publication starts after the completion period ends."}
                           </p>
                           {competition.draw ? (
                             <dl className="metrics-grid">
@@ -3760,24 +3561,6 @@ function Overview({
                             </dl>
                           ) : null}
                         </div>
-                        {canFinalizeCompetitionResults(competition) ||
-                        (competition.status === "settling" &&
-                          pendingDrawCompetitionId === competition.id) ? (
-                          <button
-                            className="primary-button"
-                            disabled={
-                              submitting ||
-                              (pendingDrawCompetitionId !== null &&
-                                pendingDrawCompetitionId !== competition.id)
-                            }
-                            onClick={() => onFinalize(competition)}
-                            type="button"
-                          >
-                            {competition.status === "settling"
-                              ? "REVEAL + PUBLISH RESULTS"
-                              : "LOCK AUDITED DRAW SNAPSHOT"}
-                          </button>
-                        ) : null}
                       </div>
                     ) : null}
                     <div className="card-actions">

@@ -88,25 +88,17 @@ Competition publication requires registration to be open already, with its close
 
 The worker changes a published competition from `registration` to `active` at its start time. If the competition is below `minimumEntrants`, one locked transaction instead cancels the competition, withdraws active enrollments, cancels active workouts and open Weekly Challenge participation, queues neutral cancellation notifications, and records one append-only audit event. A notification enqueue or audit failure rolls back the whole transition so a worker retry can safely complete it without duplicate effects. Manual cancellation uses the same participation cleanup.
 
-After the contest end and its 15-minute workout completion period, the contest
-home exposes **Lock audited draw snapshot**. The dashboard generates a
-cryptographically random draw seed and commits the entrant, scoring, public
-identity, and exact eligible reward-slot snapshots through
-`POST /v1/operator/draws/lock`. Locking does not publish winners. The operator
-must review the returned counts and hashes before using the separate
-**Reveal + publish** action, which sends the same seed to
-`POST /v1/operator/draws/:drawId/settle`.
-
-An interrupted lock or reveal keeps a bounded 30-day recovery record in browser
-storage. That record is scoped to the exact Firebase operator and admin origin,
-and settlement remains disabled if its draw ID or commitment differs from the
-server's locked evidence. Signing out does not destroy recoverable material,
-but another operator or environment cannot load it. Do not clear browser
-storage while a contest says **Draw locked**. If the seed is lost, stop: do not
-create another draw or fabricate a reveal. Follow an independently approved
-forward-recovery procedure.
-Successful settlement changes the contest to `settled` and makes its exact
-participant results available in the member Winners Circle.
+After the Contest end and its 15-minute workout completion period, the worker
+automatically generates a cryptographically secure draw seed and, in one
+transaction, locks the entrant, scoring, public-identity, and exact eligible
+reward-slot snapshots, validates their hashes and counts, deterministically
+settles the draw, creates bounded awards, changes the Contest to `settled`, and
+publishes the exact participant results to the member Winners Circle. The admin
+Contest home is read-only for this lifecycle: it reports waiting, automatic
+publication, or published state and retains the immutable audit evidence, but
+it exposes no lock, seed-reveal, or publish action. A failed transaction leaves
+no partial draw or winners and is retried by the worker after the blocking
+condition is corrected.
 
 Locking the draw is also the scoring reconciliation boundary. In the same
 transaction, the API settles every remaining scoring period, reconstructs each

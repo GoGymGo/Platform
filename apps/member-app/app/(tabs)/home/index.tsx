@@ -41,13 +41,15 @@ import { formatCompetitionOpeningDateTime } from '@/domain/competition';
 import {
   getWorkoutAccessMode,
   getWorkoutEntryLabel,
-  getWorkoutEntryTarget
+  getWorkoutEntryTarget,
+  getWorkoutSessionContinuity
 } from '@/domain/workoutAccess';
 import {
   getWinnersCirclePresentationKey,
   shouldAutoPresentWinnersCircle
 } from '@/domain/winnersCircle';
 import { useSessionRegistrationAccess } from '@/hooks/useSessionRegistrationAccess';
+import { usePendingGymScanSession } from '@/hooks/usePendingGymScanSession';
 import { useScreenMemory } from '@/hooks/useScreenMemory';
 import { useWorkoutVerificationPreference } from '@/hooks/useWorkoutVerificationPreference';
 import { recordFlowMetric } from '@/services/flowMetrics';
@@ -108,6 +110,10 @@ export default function HomeScreen() {
     verifiedSessionCount,
     weeklyGoal
   } = useWorkoutProgress();
+  const {
+    activeSession: pendingGymScanSession,
+    ready: pendingGymScanSessionReady
+  } = usePendingGymScanSession();
   const {
     checking: registrationChecking,
     currentCompetition,
@@ -223,8 +229,14 @@ export default function HomeScreen() {
     currentCompetition ? currentCompetition.status !== 'active' : competitionNotStarted
   );
   const workoutUnavailable = workoutAccessMode === 'upcoming';
+  const workoutSessionContinuity = getWorkoutSessionContinuity({
+    gymScanSessionActive: pendingGymScanSession !== null,
+    gymScanSessionReady: pendingGymScanSessionReady,
+    workoutProgressSessionActive: activeSession !== null
+  });
+  const activeWorkoutInProgress = workoutSessionContinuity === 'active-session';
   const workoutEntryTarget = getWorkoutEntryTarget({
-    activeSession: activeSession !== null,
+    activeSession: activeWorkoutInProgress,
     registrationReady
   });
   const activeWorkoutRoute =
@@ -234,7 +246,7 @@ export default function HomeScreen() {
   const setupRequired =
     workoutEntryTarget === 'setup' && !completedContestWithoutReplacement;
   const workoutEntryLabel = getWorkoutEntryLabel({
-    activeSession: activeSession !== null,
+    activeSession: activeWorkoutInProgress,
     setupActionLabel,
     setupRequired,
     workoutUnavailable
@@ -276,7 +288,7 @@ export default function HomeScreen() {
   const pendingChallengeInvite = (weeklyChallengeRequestsQuery.data ?? [])
     .some(({ direction }) => direction === 'incoming');
   const immediateResumeTarget = getAppResumeTarget({
-    activeWorkout: mobileGymVerificationAvailable && activeSession !== null,
+    activeWorkout: mobileGymVerificationAvailable && activeWorkoutInProgress,
     activeWorkoutRoute,
     pendingChallengeInvite: false,
     setupRoute: mobileGymVerificationAvailable ? setupRoute ?? null : null,
@@ -284,7 +296,7 @@ export default function HomeScreen() {
     unclaimedReward: false
   });
   const urgentResumeTarget =
-    mobileGymVerificationAvailable && activeSession !== null
+    mobileGymVerificationAvailable && activeWorkoutInProgress
       ? immediateResumeTarget
       : null;
   const resultsDecisionLoading =
@@ -359,7 +371,7 @@ export default function HomeScreen() {
     }
 
     const target = getAppResumeTarget({
-      activeWorkout: mobileGymVerificationAvailable && activeSession !== null,
+      activeWorkout: mobileGymVerificationAvailable && activeWorkoutInProgress,
       activeWorkoutRoute,
       pendingChallengeInvite,
       setupRoute:
@@ -377,6 +389,7 @@ export default function HomeScreen() {
     router.replace((target?.route ?? '/home') as Href);
   }, [
     activeSession,
+    activeWorkoutInProgress,
     activeWorkoutRoute,
     completedContestWithoutReplacement,
     mobileGymVerificationAvailable,
@@ -409,6 +422,7 @@ export default function HomeScreen() {
   if (
     !profileReady ||
     !progressReady ||
+    workoutSessionContinuity === 'checking' ||
     latestResultsQuery.isLoading ||
     (mobileGymVerificationAvailable && registrationChecking) ||
     (mobileGymVerificationAvailable && !verificationPreferenceReady)
@@ -535,6 +549,8 @@ export default function HomeScreen() {
                     ? 'YOUR ACCOUNT IS STILL AVAILABLE'
                   : desktopSetupPending
                     ? 'FINISH CONTEST SETUP ON A PHONE OR TABLET'
+                  : activeWorkoutInProgress
+                    ? 'WORKOUT IN PROGRESS'
                   : isBonusDayPhase
                   ? `ADD ${weeklyGoal} ${weeklyGoal === 1 ? 'ENTRY' : 'ENTRIES'} PER DAY`
                   : competitionNotStarted
@@ -556,6 +572,8 @@ export default function HomeScreen() {
                     ? 'Contest status could not refresh. Other screens are still available.'
                   : desktopSetupPending
                     ? 'Finish Contest setup on your phone or tablet.'
+                  : activeWorkoutInProgress
+                    ? 'Your original workout timer is still running. Return to it below.'
                   : !mobileGymVerificationAvailable
                     ? 'Track your Weekly Goal and entries here. Verify workouts on your phone.'
                   : isBonusDayPhase
@@ -662,7 +680,7 @@ export default function HomeScreen() {
           ) : gymVerificationHome.showWorkoutActions ? (
           <>
           <CyberButtonPrimary
-            disabled={!setupRequired && workoutUnavailable && !activeSession}
+            disabled={!setupRequired && workoutUnavailable && !activeWorkoutInProgress}
             label={workoutEntryLabel}
             onPress={() => {
               if (workoutEntryTarget === 'setup' && setupRoute) {
@@ -680,12 +698,12 @@ export default function HomeScreen() {
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
               Complete this step before starting a Verified workout.
             </TerminalText>
-          ) : !activeSession && competitionOpeningDateTime ? (
+          ) : !activeWorkoutInProgress && competitionOpeningDateTime ? (
             <TerminalText style={styles.previewWorkoutNote} tone="amber" uppercase={false} variant="caption">
               {`Start your workout at ${competitionOpeningDateTime}.`}
             </TerminalText>
           ) : null}
-          {!activeSession && !setupRequired ? (
+          {!activeWorkoutInProgress && !setupRequired ? (
             <TerminalText style={styles.defaultMethod} tone="muted" uppercase={false} variant="caption">
               {verificationPreferenceSaved
                 ? `Pilot verification: ${verificationPreference.sourceLabel}.`

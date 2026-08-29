@@ -5,11 +5,30 @@ import {
   getWorkoutAccessMode,
   getWorkoutEntryLabel,
   getWorkoutEntryTarget,
+  getWorkoutSessionContinuity,
   hasSessionCompetitionAccess,
   resolveSessionCompetitionMonthKey
 } from './workoutAccess';
 
 describe('workout access policy', () => {
+  it('does not offer a new workout while browser session continuity is loading or active', () => {
+    assert.equal(getWorkoutSessionContinuity({
+      gymScanSessionActive: false,
+      gymScanSessionReady: false,
+      workoutProgressSessionActive: false
+    }), 'checking');
+    assert.equal(getWorkoutSessionContinuity({
+      gymScanSessionActive: true,
+      gymScanSessionReady: true,
+      workoutProgressSessionActive: false
+    }), 'active-session');
+    assert.equal(getWorkoutSessionContinuity({
+      gymScanSessionActive: false,
+      gymScanSessionReady: true,
+      workoutProgressSessionActive: false
+    }), 'inactive');
+  });
+
   it('routes incomplete players to setup before workout verification', () => {
     assert.equal(getWorkoutEntryTarget({
       activeSession: false,

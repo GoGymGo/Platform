@@ -1,5 +1,21 @@
 export type WorkoutAccessMode = 'active' | 'upcoming';
 export type WorkoutEntryTarget = 'active-session' | 'setup' | 'workout';
+export type WorkoutSessionContinuity = 'active-session' | 'checking' | 'inactive';
+
+export function getWorkoutSessionContinuity({
+  gymScanSessionActive,
+  gymScanSessionReady,
+  workoutProgressSessionActive
+}: {
+  gymScanSessionActive: boolean;
+  gymScanSessionReady: boolean;
+  workoutProgressSessionActive: boolean;
+}): WorkoutSessionContinuity {
+  if (workoutProgressSessionActive || gymScanSessionActive) {
+    return 'active-session';
+  }
+  return gymScanSessionReady ? 'inactive' : 'checking';
+}
 
 export function getWorkoutEntryTarget({
   activeSession,

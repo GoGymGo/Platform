@@ -25,6 +25,11 @@ export type GymScanWebPositionOptions = {
 
 export type GymScanWebGeolocation = {
   clearWatch: (watchId: number) => void;
+  getCurrentPosition: (
+    onReading: (reading: GymScanWebReading) => void,
+    onError: (errorCode: number) => void,
+    options: GymScanWebPositionOptions
+  ) => void;
   watchPosition: (
     onReading: (reading: GymScanWebReading) => void,
     onError: (errorCode: number) => void,
@@ -80,6 +85,22 @@ export function readFreshGymScanWebLocation(
         settle(bestReading);
       }
     };
+    const observeReading = (reading: GymScanWebReading) => {
+      const candidate = normalizeGymScanWebReading(reading);
+      if (candidate && (!bestReading || candidate.accuracyMeters < bestReading.accuracyMeters)) {
+        bestReading = candidate;
+      }
+      maybeSettleAccurateReading();
+    };
+    const observeError = (errorCode: number) => {
+      if (errorCode === 1) {
+        settle({ status: 'permission-denied' });
+        return;
+      }
+      if (bestReading) {
+        settle(bestReading);
+      }
+    };
 
     const minimumWaitTimer = setTimeout(
       () => {
@@ -93,29 +114,20 @@ export function readFreshGymScanWebLocation(
       Math.max(policy.minimumWaitMs, policy.maximumWaitMs)
     );
 
-    watchId = geolocation.watchPosition(
-      (reading) => {
-        const candidate = normalizeGymScanWebReading(reading);
-        if (candidate && (!bestReading || candidate.accuracyMeters < bestReading.accuracyMeters)) {
-          bestReading = candidate;
-        }
-        maybeSettleAccurateReading();
-      },
-      (errorCode) => {
-        if (errorCode === 1) {
-          settle({ status: 'permission-denied' });
-          return;
-        }
-        if (bestReading) {
-          settle(bestReading);
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: policy.maximumWaitMs
-      }
-    );
+    const positionOptions = {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: policy.maximumWaitMs
+    };
+
+    // Android Chrome does not consistently surface its permission prompt when a
+    // location flow begins with watchPosition. An explicit one-time read made
+    // from the verification tap reliably triggers the browser permission request;
+    // the watch still gathers a better reading when the first fix is coarse.
+    geolocation.getCurrentPosition(observeReading, observeError, positionOptions);
+    if (!settled) {
+      watchId = geolocation.watchPosition(observeReading, observeError, positionOptions);
+    }
 
     if (settled) {
       clearWatch();

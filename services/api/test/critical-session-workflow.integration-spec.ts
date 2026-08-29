@@ -2545,11 +2545,26 @@ describeWithDatabase('critical session and ledger workflow', () => {
     principal: AuthenticatedPrincipal = userPrincipal,
   ): Promise<CompetitionFixture> {
     const now = Date.now();
-    const monthKey = new Intl.DateTimeFormat('en-CA', {
+    const monthKeyFormatter = new Intl.DateTimeFormat('en-CA', {
       month: '2-digit',
       timeZone: 'America/Vancouver',
       year: 'numeric',
-    }).format(new Date(now));
+    });
+    const currentMonthKey = monthKeyFormatter.format(new Date(now));
+    const regionalDateKey = dateKeyInTimezone(
+      new Date(now),
+      'America/Vancouver',
+    );
+    const currentMonthHasWeeklyPeriod = buildCompetitionPeriods(
+      currentMonthKey,
+    ).some(
+      (period) =>
+        regionalDateKey >= period.startDateKey &&
+        regionalDateKey <= period.endDateKey,
+    );
+    const monthKey = currentMonthHasWeeklyPeriod
+      ? currentMonthKey
+      : monthKeyFormatter.format(new Date(now + 7 * 24 * 60 * 60_000));
     const fixtureSequence = ++registrationFixtureSequence;
     const user = await profiles.ensureUser(principal, database.connection);
     const legalReceiptBundleId = await acceptCurrentLegalBundle(
